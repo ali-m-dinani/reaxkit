@@ -1,0 +1,91 @@
+# ------------------------------
+# PYTHON BASICS
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# --------------------------------
+# BUILD / PACKAGING
+# --------------------------------
+build/
+dist/
+*.egg-info/
+
+# Coverage / testing
+htmlcov/
+.coverage
+*.cover
+.cache/
+
+# --------------------------------
+# EDITOR / IDE
+# --------------------------------
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# --------------------------------
+# LOGS & TEMP FILES
+# --------------------------------
+*.log
+*.tmp
+*.bak
+
+# --------------------------------
+# REAXKIT PROJECT-SPECIFIC
+# --------------------------------
+# Temporary outputs
+results/
+output/
+plots/
+figures/
+exports/
+
+# Simulation run directories or files
+full_sim_examples/
+src/reaxkit/trash/
+examples/control
+examples/coordinations.csv
+examples/coordination/xmolout_relabeled
+examples/eregime.in
+examples/fort.7
+examples/fort.13
+examples/fort.78
+examples/fort.79
+examples/molfra.out
+examples/summary.txt
+examples/xmolout
+README.txt
+README_full_version.md
+convert_readme.py
+folder_structure.py
+folder_structure.txt
+requirements.txt
+requirements_to_add_to_pyproject_toml.txt
+gen_requirements.py
+
+# Large intermediate analysis outputs
+cache/
+*.h5
+*.hdf5
+*.csv   # If you really want to keep processed CSV out of repo
+
+# --------------------------------
+# OS-SPECIFIC
+# --------------------------------
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
