@@ -6,14 +6,12 @@ body:
   - type: dropdown
     id: module
     attributes:
-      label: Which part of reaxkit?
+      label: Related to which ReaxFF file(s)?
       options:
-        - fort7 handler
-        - xmolout handler
-        - summary handler
-        - workflows
-        - plotting
-        - documentation
+        - fort7
+        - xmolout
+        - summary
+        - else
     validations:
       required: true
 
