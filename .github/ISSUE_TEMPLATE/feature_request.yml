@@ -1,0 +1,32 @@
+name: "Feature request"
+description: "Suggest a new feature for reaxkit"
+labels: ["enhancement"]
+
+body:
+  - type: dropdown
+    id: module
+    attributes:
+      label: Which part of reaxkit?
+      options:
+        - fort7 handler
+        - xmolout handler
+        - summary handler
+        - workflows
+        - plotting
+        - documentation
+    validations:
+      required: true
+
+  - type: input
+    id: file
+    attributes:
+      label: Main file affected
+      placeholder: src/reaxkit/...
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature description
+      placeholder: Explain the feature...
+    validations:
+      required: true
