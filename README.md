@@ -1,11 +1,7 @@
 #  ReaxKit
 
----
-
 **ReaxKit** is a modular Python toolkit for **pre- and post-processing ReaxFF molecular dynamics simulation files**.  
 It provides clean, extensible interfaces for reading and generating AMS/ReaxFF input and output files (e.g., `xmolout`, `control`), processing simulation data, and producing quantitative analyses and graphical visualizations.
-
----
 
 ##  Features
 

@@ -3,7 +3,7 @@ import argparse, sys
 from reaxkit.workflows import (
     eregime_workflow, fort13_workflow, fort78_workflow, fort79_workflow,
     molfra_workflow, summary_workflow, xmolout_workflow, fort7_workflow,
-    coordination_workflow, xmolout_fort7_workflow
+    coordination_workflow, xmolout_fort7_workflow, geo_workflow
 )
 from reaxkit import introspection
 
@@ -11,7 +11,7 @@ WORKFLOW_MODULES = {
     "fort78": fort78_workflow, "xmolout": xmolout_workflow, "summary": summary_workflow,
     "eregime": eregime_workflow, "molfra": molfra_workflow, "fort13": fort13_workflow,
     "fort79": fort79_workflow, "fort7": fort7_workflow, "xmolfort7": xmolout_fort7_workflow,
-    "coord": coordination_workflow, "intspec": introspection,
+    "coord": coordination_workflow, "intspec": introspection, "geo": geo_workflow
 }
 DEFAULTABLE = {"gplot"}
 DEFAULT_TASKS = {"plot", "extreme", "_default"}
