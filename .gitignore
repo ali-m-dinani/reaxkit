@@ -55,6 +55,7 @@ exports/
 # Simulation run directories or files
 full_sim_examples/
 src/reaxkit/trash/
+src/reaxkit/under_development/
 examples/control
 examples/coordinations.csv
 examples/coordination/xmolout_relabeled

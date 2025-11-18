@@ -62,6 +62,14 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
 
     #fort.99 alias
     "error": ["Err", "Error"],
+
+    #electrostatics
+    "mu_x (debye)": ["mu_x", "dipole_x", "dipole_moment_x"],
+    "mu_y (debye)": ["mu_y", "dipole_y", "dipole_moment_y"],
+    "mu_z (debye)": ["mu_z", "dipole_z", "dipole_moment_z"],
+    "P_x (uC/cm^2)": ["pol_x", "polarization_x"],
+    "P_y (uC/cm^2)": ["pol_y", "polarization_y"],
+    "P_z (uC/cm^2)": ["pol_z", "polarization_z"],
 }
 
 def resolve_alias_from_columns(

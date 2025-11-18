@@ -118,3 +118,30 @@ class Fort7Handler(FileHandler):
         }
 
         return sim_df, meta
+
+    # -------------------------------------------------------
+    # Frame utilities (match XmoloutHandler API)
+    # -------------------------------------------------------
+
+    def n_frames(self) -> int:
+        """Return number of frames parsed from fort.7."""
+        return len(self._frames) if hasattr(self, "_frames") else 0
+
+    def n_atoms(self, frame: int = 0) -> int:
+        """Return number of atoms in a specific frame."""
+        if not hasattr(self, "_frames") or self.n_frames() == 0:
+            return 0
+        return len(self._frames[int(frame)])
+
+    def frame(self, i: int):
+        """Return the i-th frame as a DataFrame (atom table)."""
+        if not hasattr(self, "_frames"):
+            raise RuntimeError("fort.7 has not been parsed yet.")
+        return self._frames[int(i)]
+
+    def iter_frames(self, step: int = 1):
+        """Yield frames one by one (optionally subsampling)."""
+        if not hasattr(self, "_frames"):
+            return
+        for i in range(0, self.n_frames(), max(1, int(step))):
+            yield self._frames[i]

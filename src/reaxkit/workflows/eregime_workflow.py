@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from typing import Callable, Dict, Any
-from reaxkit.utils.constants import UNITS
+from reaxkit.utils.units import UNITS
 
 from reaxkit.io.eregime_handler import EregimeHandler
 from reaxkit.analysis.eregime_analyzer import get_series

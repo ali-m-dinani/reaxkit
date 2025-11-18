@@ -445,7 +445,7 @@ def scatter3d_points(
     vmin: Optional[float] = None,
     vmax: Optional[float] = None,
     cmap: str = "coolwarm",
-    figsize: Tuple[float, float] = (6.5, 6.0),
+    figsize: Tuple[float, float] = (7.5, 6.0),
     elev: float = 22.0,
     azim: float = 38.0,
     save: Optional[Union[str, Path]] = None,   # dir or full path w/ extension

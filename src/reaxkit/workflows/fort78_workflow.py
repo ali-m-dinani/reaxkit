@@ -1,7 +1,7 @@
 """used to get the data in fort.78 file"""
 import argparse
 from pathlib import Path
-from reaxkit.utils.constants import UNITS
+from reaxkit.utils.units import UNITS
 from reaxkit.io.fort78_handler import Fort78Handler
 from reaxkit.analysis.fort78_analyzer import get_iter_vs
 from reaxkit.analysis.plotter import single_plot

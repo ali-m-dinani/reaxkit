@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.io.xmolout_handler import XmoloutHandler
+from reaxkit.io.xmolout_generator import write_xmolout_from_handler
 from reaxkit.analysis.plotter import single_plot
 from reaxkit.utils.frame_utils import (
     _select_frames,
@@ -364,6 +365,18 @@ def extras_task(args: argparse.Namespace) -> int:
         print(df.head(10).to_string(index=False))
     return 0
 
+def trim_task(args: argparse.Namespace) -> int:
+    """
+    Write a trimmed copy of an xmolout file that keeps only atom_type and x,y,z
+    columns for each atom line (drops any extra per-atom columns).
+    """
+    xh = XmoloutHandler(args.file)
+    out_path = args.output or "xmolout_trimmed"
+    # include_extras=False ⇒ only atom_type + x y z
+    write_xmolout_from_handler(xh, out_path, include_extras=False)
+    print(f"[Done] Wrote trimmed xmolout (type + x,y,z only) to {out_path}")
+    return 0
+
 # --------------------------
 # CLI REGISTRATION
 # --------------------------
@@ -499,6 +512,21 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     pz.add_argument("--export", default=None, help="CSV output path for z-span table")
     pz.add_argument("--save", default=None, help="Save a plot of z-span vs frame to this path")
     pz.set_defaults(_run=zspan_task)
+
+    # TRIM
+    ptr = subparsers.add_parser(
+        "trim",
+        help=(
+            "Write a trimmed copy of xmolout with only atom_type and x,y,z per atom line.\n"
+            "Example:\n"
+            "  reaxkit xmolout trim --file xmolout --output xmolout_trimmed"
+        )
+    )
+    ptr.add_argument("--file", default="xmolout", help="Input xmolout file")
+    ptr.add_argument("--output", default="xmolout_trimmed", help="Output trimmed xmolout file")
+    ptr.set_defaults(_run=trim_task)
+
+
 
     # NEW: extras
     pe = subparsers.add_parser(

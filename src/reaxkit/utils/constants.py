@@ -1,35 +1,21 @@
-"""constants for different quantities such as energies, density, etc. across ReaxFF files."""
+"""constants for different quantities such as electron charge, etc. across ReaxFF files."""
 
-UNITS = {
-    # Common units
+CONSTANTS = {
+    # Electric field
+    "electric_field_VA_to_MVcm": 100.0,  # V/Å → MV/cm
 
-    # molfra.out units
-    "molecular_mass": "a.u.",
-    "total_molecular_mass": "a.u.",
+    # Energies
+    "energy_kcalmol_to_eV": 0.0433634,
 
-    # fort.78 alias
-    "field_x": "V/Å",
-    "field_y": "V/Å",
-    "field_z": "V/Å",
+    # Fundamental constants
+    "electron_charge_C": 1.602176634e-19,   # Coulomb
+    "electron_charge_e": 1.0,               # dimensionless charge
 
-    "E_field_x": "kcal/mol",
-    "E_field_y": "kcal/mol",
-    "E_field_z": "kcal/mol",
-    "E_field": "kcal/mol",
+    # Dipole moment
+    "ea_to_debye": 4.80320427,              # e·Å → Debye
+    "debye_to_ea": 0.20819434,              # Debye → e·Å
 
-    # summary.txt units
-    "time": "fs",
-    "E_pot": "kcal/mol",
-    "V": "Å³",
-    "T": "K",
-    "P": "MPa",
-    "D": "kg/dm³",
-    "elap_time": "s",
-
-    # eregime.in
-    "field": "V/Å",
-    "field1": "V/Å",
-    "field2": "V/Å",
-    "field3": "V/Å",
-
+    # Polarization (dipole/volume)
+    "ea3_to_uC_cm2": 1.602176634e+3,        # (e·Å)/Å³ → μC/cm²
 }
+

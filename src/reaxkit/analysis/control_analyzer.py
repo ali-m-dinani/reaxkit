@@ -44,7 +44,7 @@ def available_keys(handler: ControlHandler, section: Optional[str] = None) -> li
     return sorted(all_keys)
 
 
-def get(
+def control_get(
     handler: ControlHandler,
     key: str,
     section: Optional[str] = None,
@@ -82,7 +82,10 @@ def get(
         section = section.lower()
         if section not in section_map:
             raise ValueError(f"❌ Unknown section: {section}")
-        return section_map[section].get_sections_data(key, default)
+        try:
+            return section_map[section][key]
+        except:
+            return default
 
     for d in section_map.values():
         if key in d:

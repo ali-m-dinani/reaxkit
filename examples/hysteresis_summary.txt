@@ -1,0 +1,10 @@
+Hysteresis Analysis Summary
+===========================
+
+Coercive fields (where polarization crosses zero vs field_z)
+Units: MV/cm
+Values: 0.0701107, -0.0713173, 0.0701107
+
+Remnant polarizations (where field_z crosses zero vs P_z)
+Units: µC/cm^2
+Values: 5.76572, -5.83109, 5.82773
