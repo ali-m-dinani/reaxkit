@@ -49,7 +49,7 @@ def _summary_get_task(args: argparse.Namespace) -> int:
         single_plot(
             work["x"], work["y"],
             title=f"{ycol} vs {xlabel}",
-            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get(ycol, '') or ''})",
+            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get_sections_data(ycol, '') or ''})",
             save=args.save,
         )
 
@@ -58,7 +58,7 @@ def _summary_get_task(args: argparse.Namespace) -> int:
         single_plot(
             work["x"], work["y"],
             title=f"{ycol} vs {xlabel}",
-            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get(ycol, '') or ''})",
+            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get_sections_data(ycol, '') or ''})",
             save=None,
         )
 

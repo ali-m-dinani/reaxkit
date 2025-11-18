@@ -60,8 +60,8 @@ class TemplateHandler(FileHandler):
         row = df.iloc[i]
         return {
             "index": i,
-            "iteration": row.get("iteration"),
-            "energy": row.get("energy"),
+            "iteration": row.get_sections_data("iteration"),
+            "energy": row.get_sections_data("energy"),
             # Add other fields as needed
         }
 

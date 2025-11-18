@@ -43,7 +43,7 @@ def _eregime_get_task(args: argparse.Namespace) -> int:
     x_label = df.columns[0]
     y_label = df.columns[1]
     canonical_label = normalize_choice(args.column)  # resolve like E1 → field1
-    unit = UNITS.get(canonical_label, UNITS.get(y_label, ""))  # fallback if alias missing
+    unit = UNITS.get_sections_data(canonical_label, UNITS.get_sections_data(y_label, ""))  # fallback if alias missing
     title = f"{canonical_label} vs {x_label}"
 
     # Export CSV

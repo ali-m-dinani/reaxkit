@@ -64,7 +64,7 @@ def get_task(args: argparse.Namespace) -> int:
             y=y_plot,
             title=f"{ykey} vs {xlabel} (fort.78)",
             xlabel=xlabel,
-            ylabel=f"{ykey} ({UNITS.get(ykey, '') or ''})",
+            ylabel=f"{ykey} ({UNITS.get_sections_data(ykey, '') or ''})",
             save=args.save,       # file path OR directory; handled by plotter._save_or_show
             legend=False,
         )

@@ -82,7 +82,7 @@ def get(
         section = section.lower()
         if section not in section_map:
             raise ValueError(f"❌ Unknown section: {section}")
-        return section_map[section].get(key, default)
+        return section_map[section].get_sections_data(key, default)
 
     for d in section_map.values():
         if key in d:
