@@ -10,6 +10,8 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
     "frame": ['frm'],
     "time": ["Time(fs)", "Time"], #also in summary.txt
     "num_of_atoms": ['num_atoms','number_of_atoms','count_of_atoms'], #used in xmolout and fort.7
+    "V": ["Vol(A^3)", "Volume", "volume"], #summary.txt and fort.74
+    "D": ["Dens(kg/dm3)", "Density", "density"], #summary.txt and fort.74
 
     # molfra.out alias
     "freq": ["frequency", "count"],
@@ -32,12 +34,10 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
     "nmol": ["Nmol"],
     "T": ["T(K)", "Temp", "temp"],
     "P": ["Pres(MPa)", "Pressure", "pressure"],
-    "V": ["Vol(A^3)", "Volume", "volume"],
-    "D": ["Dens(kg/dm3)", "Density", "density"],
     "elap_time": ["Elap", "time_elapsed", "elapsed_time"],
 
     # fort.13 alias
-    "total_ff_error": ["Err", "error", "tot_err", "err_tot"],
+    "total_ff_error": ["tot_err", "err_tot"],
 
     # eregime.in (generic + enumerated)
     "field_zones": ["#V", "V"],
@@ -58,7 +58,10 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
 
     # fort.7 alias
     "molecule_num": ['molecular_number', 'molecular_num'],
-    "partial_charge": ['charge', 'q']
+    "partial_charge": ['charge', 'q'],
+
+    #fort.99 alias
+    "error": ["Err", "Error"],
 }
 
 def resolve_alias_from_columns(
