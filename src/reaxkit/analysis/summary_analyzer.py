@@ -4,7 +4,7 @@ from typing import Optional, Sequence, Union
 import pandas as pd
 
 from reaxkit.io.summary_handler import SummaryHandler
-from reaxkit.utils.alias_utils import _resolve_alias, available_keys, normalize_choice
+from reaxkit.utils.alias import _resolve_alias, available_keys, normalize_choice
 
 __all__ = ["get"]
 

@@ -6,7 +6,7 @@ from reaxkit.workflows import (
     coordination_workflow, xmolout_fort7_workflow, geo_workflow,
     fort99_workflow, trainset_workflow, fort83_workflow,
     fort73_workflow, electrostatics_workflow, make_video_workflow,
-
+    plotter_workflow,
 )
 from reaxkit import introspection
 
@@ -17,7 +17,7 @@ WORKFLOW_MODULES = {
     "coord": coordination_workflow, "intspec": introspection, "geo": geo_workflow,
     "fort99": fort99_workflow, "trainset": trainset_workflow, "fort83": fort83_workflow,
     "fort73": fort73_workflow, "elect": electrostatics_workflow, 'video': make_video_workflow,
-
+    "plotter": plotter_workflow,
 }
 DEFAULTABLE = {"gplot"}
 DEFAULT_TASKS = {"plot", "extreme", "_default"}

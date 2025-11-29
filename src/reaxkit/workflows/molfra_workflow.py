@@ -15,7 +15,7 @@ from reaxkit.analysis.molfra_analyzer import (
 from reaxkit.utils.frame_utils import parse_frames, select_frames
 from reaxkit.utils.convert import convert_xaxis
 from reaxkit.analysis.plotter import single_plot
-from reaxkit.utils.alias_utils import normalize_choice
+from reaxkit.utils.alias import normalize_choice
 
 FramesT = Optional[Union[slice, Sequence[int]]]
 

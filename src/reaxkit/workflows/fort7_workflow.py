@@ -16,7 +16,7 @@ from reaxkit.analysis.connectivity_analyzer import (
 )
 from reaxkit.analysis.plotter import single_plot
 from reaxkit.utils.frame_utils import parse_frames
-from reaxkit.utils.alias_utils import normalize_choice
+from reaxkit.utils.alias import normalize_choice
 from reaxkit.utils.convert import convert_xaxis
 
 FramesT = Optional[Union[slice, Sequence[int]]]

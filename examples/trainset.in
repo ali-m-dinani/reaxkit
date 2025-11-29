@@ -1,148 +1,836 @@
-ENERGY
+ENERGY  
+#Weigh op1 Key1  n1  op2 Key2  n2  op3 Key3  n3  op4 Key4  n4  op5 Key5  n5  #Lit (f6.2,5(1x,a1,3x,a5,1x,i3),f10.4)  
+# Restraint ZnH_bond in HZnSH
+ 1.0   +  HZnSH_ZnHbond_253 /1 -    HZnSH_std /1                                          47.9159
+ 5.0   +  HZnSH_ZnHbond_243 /1 -    HZnSH_std /1                                          44.8035
+ 5.0   +  HZnSH_ZnHbond_233 /1 -    HZnSH_std /1                                          37.4555
+ 5.0   +  HZnSH_ZnHbond_223 /1 -    HZnSH_std /1                                          31.8582
+ 2.0   +  HZnSH_ZnHbond_213 /1 -    HZnSH_std /1                                          26.1040
+ 2.0   +  HZnSH_ZnHbond_203 /1 -    HZnSH_std /1                                          20.2996
+ 2.0   +  HZnSH_ZnHbond_193 /1 -    HZnSH_std /1                                          14.6145
+ 1.0   +  HZnSH_ZnHbond_183 /1 -    HZnSH_std /1                                           9.2995
+ 0.5   +  HZnSH_ZnHbond_173 /1 -    HZnSH_std /1                                           4.7000
+ 0.5   +  HZnSH_ZnHbond_163 /1 -    HZnSH_std /1                                           1.3680
+ 0.5   +  HZnSH_ZnHbond_143 /1 -    HZnSH_std /1                                           1.8260
+ 1.0   +  HZnSH_ZnHbond_133 /1 -    HZnSH_std /1                                           8.5277
+ 2.0   +  HZnSH_ZnHbond_123 /1 -    HZnSH_std /1                                          22.6779
+ 5.0   +  HZnSH_ZnHbond_113 /1 -    HZnSH_std /1                                          48.1795
+10.0   +  HZnSH_ZnHbond_103 /1 -    HZnSH_std /1                                          91.0252
+25.0   +  HZnSH_ZnHbond_093 /1 -    HZnSH_std /1                                         160.6149
+50.0   +  HZnSH_ZnHbond_083 /1 -    HZnSH_std /1                                         272.0213
+250.0  +  HZnSH_ZnHbond_073 /1 -    HZnSH_std /1                                         750.6092
+# Restraint ZnS_bond in HZnSH
+ 5.0   +  HZnSH_ZnSbond_318 /1 -    HZnSH_std /1                                    44.14463
+ 5.0   +  HZnSH_ZnSbond_308 /1 -    HZnSH_std /1                                    39.4635
+ 5.0   +  HZnSH_ZnSbond_298 /1 -    HZnSH_std /1                                    34.5251
+ 2.0   +  HZnSH_ZnSbond_288 /1 -    HZnSH_std /1                                    29.3670
+ 2.0   +  HZnSH_ZnSbond_278 /1 -    HZnSH_std /1                                    24.0521
+ 2.0   +  HZnSH_ZnSbond_268 /1 -    HZnSH_std /1                                    18.6995
+ 1.0   +  HZnSH_ZnSbond_258 /1 -    HZnSH_std /1                                    13.4536
+ 1.0   +  HZnSH_ZnSbond_248 /1 -    HZnSH_std /1                                     8.5528
+ 0.5   +  HZnSH_ZnSbond_238 /1 -    HZnSH_std /1                                     4.3298
+ 0.5   +  HZnSH_ZnSbond_228 /1 -    HZnSH_std /1                                     1.2550
+ 0.5   +  HZnSH_ZnSbond_208 /1 -    HZnSH_std /1                                     1.5499
+ 1.0   +  HZnSH_ZnSbond_198 /1 -    HZnSH_std /1                                     7.3167
+ 2.0   +  HZnSH_ZnSbond_188 /1 -    HZnSH_std /1                                    19.3521
+ 2.0   +  HZnSH_ZnSbond_178 /1 -    HZnSH_std /1                                    40.6495  
+ 5.0   +  HZnSH_ZnSbond_168 /1 -    HZnSH_std /1                                    76.7426
+10.0   +  HZnSH_ZnSbond_158 /1 -    HZnSH_std /1                                   129.6352
+25.0   +  HZnSH_ZnSbond_148 /1 -    HZnSH_std /1                                   209.7544
+50.0   +  HZnSH_ZnSbond_138 /1 -    HZnSH_std /1                                   327.4232
+100.0   +  HZnSH_ZnSbond_128 /1 -    HZnSH_std /1                                   504.1210
+250.0   +  HZnSH_ZnSbond_118 /1 -    HZnSH_std /1                                   773.6008
+# Restraint HZnS_angle in HZnSH
+ 0.5   +  HZnSH_HZnSangle_173 /1 -    HZnSH_std /1                                          0.1318
+ 0.5   +  HZnSH_HZnSangle_168 /1 -    HZnSH_std /1                                          0.5146
+ 0.5   +  HZnSH_HZnSangle_163 /1 -    HZnSH_std /1                                          1.1546
+ 0.5   +  HZnSH_HZnSangle_158 /1 -    HZnSH_std /1                                          2.0457
+ 0.5   +  HZnSH_HZnSangle_153 /1 -    HZnSH_std /1                                          3.1752
+ 1.0   +  HZnSH_HZnSangle_148 /1 -    HZnSH_std /1                                          4.5431
+ 1.0   +  HZnSH_HZnSangle_143 /1 -    HZnSH_std /1                                          6.1370
+ 1.0   +  HZnSH_HZnSangle_138 /1 -    HZnSH_std /1                                          7.9504
+ 2.0   +  HZnSH_HZnSangle_133 /1 -    HZnSH_std /1                                          9.9710
+ 2.0   +  HZnSH_HZnSangle_128 /1 -    HZnSH_std /1                                         12.1923
+# Restraint ZnC_bond in  ZnCH3SH
+ 5.0   +  CH3ZnSH_ZnCb_2948 /1 -    CH3ZnSH_std /1                               44.3454
+ 5.0   +  CH3ZnSH_ZnCb_2848 /1 -    CH3ZnSH_std /1                               39.8588
+ 5.0   +  CH3ZnSH_ZnCb_2748 /1 -    CH3ZnSH_std /1                               35.0835
+ 5.0   +  CH3ZnSH_ZnCb_2648 /1 -    CH3ZnSH_std /1                               30.0447
+ 2.0   +  CH3ZnSH_ZnCb_2548 /1 -    CH3ZnSH_std /1                               24.7800
+ 2.0   +  CH3ZnSH_ZnCb_2448 /1 -    CH3ZnSH_std /1                               19.4149
+ 1.0   +  CH3ZnSH_ZnCb_2348 /1 -    CH3ZnSH_std /1                               14.0874
+ 1.0   +  CH3ZnSH_ZnCb_2248 /1 -    CH3ZnSH_std /1                                9.0423
+ 0.5   +  CH3ZnSH_ZnCb_2148 /1 -    CH3ZnSH_std /1                                4.6309
+ 0.5   +  CH3ZnSH_ZnCb_2048 /1 -    CH3ZnSH_std /1                                1.3679
+ 0.5   +  CH3ZnSH_ZnCb_1848 /1 -    CH3ZnSH_std /1                                1.6629
+ 1.0   +  CH3ZnSH_ZnCb_1748 /1 -    CH3ZnSH_std /1                                8.0320
+ 2.0   +  CH3ZnSH_ZnCb_1648 /1 -    CH3ZnSH_std /1                               21.6111
+ 5.0   +  CH3ZnSH_ZnCb_1548 /1 -    CH3ZnSH_std /1                               46.1589
+ 5.0   +  CH3ZnSH_ZnCb_1448 /1 -    CH3ZnSH_std /1                               87.3250
+15.0   +  CH3ZnSH_ZnCb_1348 /1 -    CH3ZnSH_std /1                              153.0159
+30.0   +  CH3ZnSH_ZnCb_1248 /1 -    CH3ZnSH_std /1                              255.3988
+50.0   +  CH3ZnSH_ZnCb_1148 /1 -    CH3ZnSH_std /1                              411.3388
+# Restraint ZnS_bond_ZnCH3SH in ZnCH3SH
+ 5.0   +  CH3ZnSH_ZnSb_3186 /1 -    CH3ZnSH_std /1                               42.5006
+ 5.0   +  CH3ZnSH_ZnSb_3086 /1 -    CH3ZnSH_std /1                               38.0140
+ 5.0   +  CH3ZnSH_ZnSb_2986 /1 -    CH3ZnSH_std /1                               33.2700
+ 2.0   +  CH3ZnSH_ZnSb_2886 /1 -    CH3ZnSH_std /1                               28.3191
+ 2.0   +  CH3ZnSH_ZnSb_2786 /1 -    CH3ZnSH_std /1                               23.2112
+ 2.0   +  CH3ZnSH_ZnSb_2686 /1 -    CH3ZnSH_std /1                               18.0657
+ 1.0   +  CH3ZnSH_ZnSb_2586 /1 -    CH3ZnSH_std /1                               13.0144
+ 1.0   +  CH3ZnSH_ZnSb_2486 /1 -    CH3ZnSH_std /1                                8.2830
+ 1.0   +  CH3ZnSH_ZnSb_2386 /1 -    CH3ZnSH_std /1                                4.2042
+ 0.5   +  CH3ZnSH_ZnSb_2286 /1 -    CH3ZnSH_std /1                                1.2236
+ 0.5   +  CH3ZnSH_ZnSb_2086 /1 -    CH3ZnSH_std /1                                1.4872
+ 1.0   +  CH3ZnSH_ZnSb_1986 /1 -    CH3ZnSH_std /1                                7.0656
+ 2.0   +  CH3ZnSH_ZnSb_1886 /1 -    CH3ZnSH_std /1                               18.7246
+ 2.0   +  CH3ZnSH_ZnSb_1786 /1 -    CH3ZnSH_std /1                               39.4007
+ 5.0   +  CH3ZnSH_ZnSb_1686 /1 -    CH3ZnSH_std /1                               73.3045
+10.0   +  CH3ZnSH_ZnSb_1586 /1 -    CH3ZnSH_std /1                              126.1652
+25.0   +  CH3ZnSH_ZnSb_1486 /1 -    CH3ZnSH_std /1                              204.8788
+50.0   +  CH3ZnSH_ZnSb_1386 /1 -    CH3ZnSH_std /1                              320.4580
+100.0   +  CH3ZnSH_ZnSb_1286 /1 -    CH3ZnSH_std /1                              493.2589
+250.0   +  CH3ZnSH_ZnSb_1186 /1 -    CH3ZnSH_std /1                              571.2760
+# Restraint CZnS_angle in  ZnCH3SH
+ 0.5   +  CH3ZnSH_CZnSang_173 /1 -    CH3ZnSH_std /1                                       0.1192
+ 0.5   +  CH3ZnSH_CZnSang_168 /1 -    CH3ZnSH_std /1                                       0.4769
+ 0.5   +  CH3ZnSH_CZnSang_163 /1 -    CH3ZnSH_std /1                                       1.0730
+ 0.5   +  CH3ZnSH_CZnSang_158 /1 -    CH3ZnSH_std /1                                       1.9201
+ 0.5   +  CH3ZnSH_CZnSang_153 /1 -    CH3ZnSH_std /1                                       2.9806
+ 1.0   +  CH3ZnSH_CZnSang_148 /1 -    CH3ZnSH_std /1                                       4.2858
+ 1.0   +  CH3ZnSH_CZnSang_143 /1 -    CH3ZnSH_std /1                                       5.7918
+ 1.0   +  CH3ZnSH_CZnSang_138 /1 -    CH3ZnSH_std /1                                       7.5112
+ 2.0   +  CH3ZnSH_CZnSang_133 /1 -    CH3ZnSH_std /1                                       9.4251
+ 2.0   +  CH3ZnSH_CZnSang_128 /1 -    CH3ZnSH_std /1                                      11.5648
+#Scan ZnO bond in ZnSHOH
+ 5.0   +  OHZnSH_ZnObond_2797 /1 -    OHZnSH_std /1                               59.5121
+ 5.0   +  OHZnSH_ZnObond_2697 /1 -    OHZnSH_std /1                               53.9399
+ 5.0   +  OHZnSH_ZnObond_2597 /1 -    OHZnSH_std /1                               47.9347
+ 5.0   +  OHZnSH_ZnObond_2497 /1 -    OHZnSH_std /1                               41.5091
+ 2.0   +  OHZnSH_ZnObond_2397 /1 -    OHZnSH_std /1                               34.7008
+ 2.0   +  OHZnSH_ZnObond_2297 /1 -    OHZnSH_std /1                               27.6288
+ 2.0   +  OHZnSH_ZnObond_2197 /1 -    OHZnSH_std /1                               20.4691
+ 2.0   +  OHZnSH_ZnObond_2097 /1 -    OHZnSH_std /1                               13.4975
+ 1.0   +  OHZnSH_ZnObond_1997 /1 -    OHZnSH_std /1                                7.1849
+ 0.5   +  OHZnSH_ZnObond_1897 /1 -    OHZnSH_std /1                                2.2904
+ 0.5   +  OHZnSH_ZnObond_1697 /1 -    OHZnSH_std /1                                2.2967
+ 1.0   +  OHZnSH_ZnObond_1597 /1 -    OHZnSH_std /1                               12.1610
+ 2.0   +  OHZnSH_ZnObond_1497 /1 -    OHZnSH_std /1                               34.3494
+10.0   +  OHZnSH_ZnObond_1397 /1 -    OHZnSH_std /1                               76.1471
+25.0   +  OHZnSH_ZnObond_1297 /1 -    OHZnSH_std /1                              151.2212
+50.0   +  OHZnSH_ZnObond_1197 /1 -    OHZnSH_std /1                              281.2769
+100.0   +  OHZnSH_ZnObond_1097 /1 -    OHZnSH_std /1                              498.6994
+250.0   +  OHZnSH_ZnObond_0997 /1 -    OHZnSH_std /1                              852.6658
+#Scan ZnS bond in ZnSHOH
+ 5.0   +  OHZnSH_ZnSbond_317 /1 -    OHZnSH_std /1                               46.1777
+ 5.0   +  OHZnSH_ZnSbond_307 /1 -    OHZnSH_std /1                               41.4087
+ 5.0   +  OHZnSH_ZnSbond_297 /1 -    OHZnSH_std /1                               36.3574
+ 5.0   +  OHZnSH_ZnSbond_287 /1 -    OHZnSH_std /1                               31.0613
+ 2.0   +  OHZnSH_ZnSbond_277 /1 -    OHZnSH_std /1                               25.5832
+ 2.0   +  OHZnSH_ZnSbond_267 /1 -    OHZnSH_std /1                               20.0298
+ 2.0   +  OHZnSH_ZnSbond_257 /1 -    OHZnSH_std /1                               14.5580
+ 2.0   +  OHZnSH_ZnSbond_247 /1 -    OHZnSH_std /1                                9.4062
+ 1.0   +  OHZnSH_ZnSbond_237 /1 -    OHZnSH_std /1                                4.9071
+ 0.5   +  OHZnSH_ZnSbond_227 /1 -    OHZnSH_std /1                                1.5499
+ 0.5   +  OHZnSH_ZnSbond_207 /1 -    OHZnSH_std /1                                1.3303
+ 1.0   +  OHZnSH_ZnSbond_197 /1 -    OHZnSH_std /1                                6.9527
+ 2.0   +  OHZnSH_ZnSbond_187 /1 -    OHZnSH_std /1                               19.0070
+ 2.0   +  OHZnSH_ZnSbond_177 /1 -    OHZnSH_std /1                               40.6118
+ 5.0   +  OHZnSH_ZnSbond_167 /1 -    OHZnSH_std /1                               76.2664
+10.0   +  OHZnSH_ZnSbond_157 /1 -    OHZnSH_std /1                              132.3586
+25.0   +  OHZnSH_ZnSbond_147 /1 -    OHZnSH_std /1                              217.2907
+50.0   +  OHZnSH_ZnSbond_137 /1 -    OHZnSH_std /1                              342.2699
+100.0   +  OHZnSH_ZnSbond_127 /1 -    OHZnSH_std /1                              524.1131
+250.0   +  OHZnSH_ZnSbond_117 /1 -    OHZnSH_std /1                              802.4847
+#Scan OZnS angle in ZnSHOH
+ 0.5   +  OHZnSH_OZnSang_171 /1 -    OHZnSH_std /1                              0.1318
+ 0.5   +  OHZnSH_OZnSang_166 /1 -    OHZnSH_std /1                              0.5208
+ 0.5   +  OHZnSH_OZnSang_161 /1 -    OHZnSH_std /1                              1.1671
+ 0.5   +  OHZnSH_OZnSang_156 /1 -    OHZnSH_std /1                              2.0645
+ 1.0   +  OHZnSH_OZnSang_151 /1 -    OHZnSH_std /1                              3.1940
+ 2.0   +  OHZnSH_OZnSang_146 /1 -    OHZnSH_std /1                              4.5557
+ 2.0   +  OHZnSH_OZnSang_141 /1 -    OHZnSH_std /1                              6.1244
+ 2.0   +  OHZnSH_OZnSang_136 /1 -    OHZnSH_std /1                              7.9065
+ 5.0   +  OHZnSH_OZnSang_131 /1 -    OHZnSH_std /1                              9.8706
+ 5.0   +  OHZnSH_OZnSang_126 /1 -    OHZnSH_std /1                             12.0229
+#Scan ZnS bond in ZnSH2
+ 5.0   +  ZnSH2_ZnSbond_317 /1 -    ZnSH2_st /1                               44.6027
+ 5.0   +  ZnSH2_ZnSbond_307 /1 -    ZnSH2_st /1                               39.9341
+ 5.0   +  ZnSH2_ZnSbond_297 /1 -    ZnSH2_st /1                               34.8941
+ 5.0   +  ZnSH2_ZnSbond_287 /1 -    ZnSH2_st /1                               29.8063
+ 2.0   +  ZnSH2_ZnSbond_277 /1 -    ZnSH2_st /1                               24.4537
+ 2.0   +  ZnSH2_ZnSbond_267 /1 -    ZnSH2_st /1                               19.0384
+ 2.0   +  ZnSH2_ZnSbond_257 /1 -    ZnSH2_st /1                               13.7234
+ 1.0   +  ZnSH2_ZnSbond_247 /1 -    ZnSH2_st /1                               10.4353
+ 1.0   +  ZnSH2_ZnSbond_237 /1 -    ZnSH2_st /1                                8.7411
+ 0.5   +  ZnSH2_ZnSbond_227 /1 -    ZnSH2_st /1                                1.2926
+ 0.5   +  ZnSH2_ZnSbond_207 /1 -    ZnSH2_st /1                                1.5813
+ 1.0   +  ZnSH2_ZnSbond_197 /1 -    ZnSH2_st /1                                7.4986
+ 1.0   +  ZnSH2_ZnSbond_187 /1 -    ZnSH2_st /1                               19.8855
+ 2.0   +  ZnSH2_ZnSbond_177 /1 -    ZnSH2_st /1                               41.8166
+10.0   +  ZnSH2_ZnSbond_167 /1 -    ZnSH2_st /1                               77.7912
+15.0   +  ZnSH2_ZnSbond_157 /1 -    ZnSH2_st /1                              134.1281
+25.0   +  ZnSH2_ZnSbond_147 /1 -    ZnSH2_st /1                              219.0665
+50.0   +  ZnSH2_ZnSbond_137 /1 -    ZnSH2_st /1                              343.6629
+#Scan SZnS angle in ZnSH2
+ 0.5   +  ZnSH2_SZnSangle_173 /1 -   ZnSH2_st /1                                0.1129
+ 0.5   +  ZnSH2_SZnSangle_168 /1 -   ZnSH2_st /1                                0.4518
+ 0.5   +  ZnSH2_SZnSangle_163 /1 -   ZnSH2_st /1                                1.0228
+ 0.5   +  ZnSH2_SZnSangle_158 /1 -   ZnSH2_st /1                                1.8315
+ 0.5   +  ZnSH2_SZnSangle_153 /1 -   ZnSH2_st /1                                2.8237
+ 1.0   +  ZnSH2_SZnSangle_148 /1 -   ZnSH2_st /1                                4.0411
+ 1.0   +  ZnSH2_SZnSangle_143 /1 -   ZnSH2_st /1                                5.4655
+ 1.0   +  ZnSH2_SZnSangle_138 /1 -   ZnSH2_st /1                                7.0782
+ 2.0   +  ZnSH2_SZnSangle_133 /1 -   ZnSH2_st /1                                8.8854
+ 2.0   +  ZnSH2_SZnSangle_128 /1 -   ZnSH2_st /1                               10.8683
+#Scan ZnO bond in  ZnCH3OH
+10.0   +  CH3ZnOH_OZnbond_283 /1 -    CH3ZnOH_std /1                      59.7882
+10.0   +  CH3ZnOH_OZnbond_273 /1 -    CH3ZnOH_std /1                      54.4607
+ 5.0   +  CH3ZnOH_OZnbond_263 /1 -    CH3ZnOH_std /1                      48.7128
+ 5.0   +  CH3ZnOH_OZnbond_253 /1 -    CH3ZnOH_std /1                      42.5445
+ 5.0   +  CH3ZnOH_OZnbond_243 /1 -    CH3ZnOH_std /1                      35.9871
+ 2.0   +  CH3ZnOH_OZnbond_233 /1 -    CH3ZnOH_std /1                      29.1474
+ 2.0   +  CH3ZnOH_OZnbond_223 /1 -    CH3ZnOH_std /1                      22.1570
+ 2.0   +  CH3ZnOH_OZnbond_213 /1 -    CH3ZnOH_std /1                      15.2608
+ 1.0   +  CH3ZnOH_OZnbond_203 /1 -    CH3ZnOH_std /1                       8.8352
+ 0.5   +  CH3ZnOH_OZnbond_193 /1 -    CH3ZnOH_std /1                       3.5265
+ 0.5   +  CH3ZnOH_OZnbond_173 /1 -    CH3ZnOH_std /1                       0.9099
+ 1.0   +  CH3ZnOH_OZnbond_163 /1 -    CH3ZnOH_std /1                       7.8061
+ 2.0   +  CH3ZnOH_OZnbond_153 /1 -    CH3ZnOH_std /1                      25.0686
+ 5.0   +  CH3ZnOH_OZnbond_143 /1 -    CH3ZnOH_std /1                      58.9473
+10.0   +  CH3ZnOH_OZnbond_133 /1 -    CH3ZnOH_std /1                     120.2667
+10.0   +  CH3ZnOH_OZnbond_123 /1 -    CH3ZnOH_std /1                     227.9143
+#Scan ZnC bond in  ZnCH3OH
+ 5.0   +  CH3ZnOH_CZnb_2936 /1 -    CH3ZnOH_std /1                      46.1024
+ 5.0   +  CH3ZnOH_CZnb_2836 /1 -    CH3ZnOH_std /1                      41.4589
+ 5.0   +  CH3ZnOH_CZnb_2736 /1 -    CH3ZnOH_std /1                      36.5079
+ 5.0   +  CH3ZnOH_CZnb_2636 /1 -    CH3ZnOH_std /1                      31.2872
+ 2.0   +  CH3ZnOH_CZnb_2536 /1 -    CH3ZnOH_std /1                      25.8405
+ 2.0   +  CH3ZnOH_CZnb_2436 /1 -    CH3ZnOH_std /1                      20.2745
+ 1.0   +  CH3ZnOH_CZnb_2336 /1 -    CH3ZnOH_std /1                      14.7525
+ 1.0   +  CH3ZnOH_CZnb_2236 /1 -    CH3ZnOH_std /1                       9.5129
+ 0.5   +  CH3ZnOH_CZnb_2136 /1 -    CH3ZnOH_std /1                       4.9070
+ 0.5   +  CH3ZnOH_CZnb_2036 /1 -    CH3ZnOH_std /1                       1.4809
+ 0.5   +  CH3ZnOH_CZnb_1836 /1 -    CH3ZnOH_std /1                       1.6440
+ 1.0   +  CH3ZnOH_CZnb_1736 /1 -    CH3ZnOH_std /1                       8.1512
+ 2.0   +  CH3ZnOH_CZnb_1636 /1 -    CH3ZnOH_std /1                      22.1507
+ 5.0   +  CH3ZnOH_CZnb_1536 /1 -    CH3ZnOH_std /1                      47.5457
+10.0   +  CH3ZnOH_CZnb_1436 /1 -    CH3ZnOH_std /1                      90.1718
+30.0   +  CH3ZnOH_CZnb_1336 /1 -    CH3ZnOH_std /1                     158.5881
+40.0   +  CH3ZnOH_CZnb_1236 /1 -    CH3ZnOH_std /1                     265.2694
+50.0   +  CH3ZnOH_CZnb_1136 /1 -    CH3ZnOH_std /1                     428.0805
+#Scan CZnO angle in  ZnCH3OH
+ 0.5   +  CH3ZnOH_CZnOang_170 /1 -   CH3ZnOH_std /1                               0.1506
+ 0.5   +  CH3ZnOH_CZnOang_165 /1 -   CH3ZnOH_std /1                               0.3646
+ 0.5   +  CH3ZnOH_CZnOang_160 /1 -   CH3ZnOH_std /1                               1.3366
+ 0.5   +  CH3ZnOH_CZnOang_155 /1 -   CH3ZnOH_std /1                               2.3406
+ 1.0   +  CH3ZnOH_CZnOang_150 /1 -   CH3ZnOH_std /1                               3.6144
+ 1.0   +  CH3ZnOH_CZnOang_145 /1 -   CH3ZnOH_std /1                               5.1329
+ 2.0   +  CH3ZnOH_CZnOang_140 /1 -   CH3ZnOH_std /1                               6.8774
+ 2.0   +  CH3ZnOH_CZnOang_135 /1 -   CH3ZnOH_std /1                               8.8352
+ 5.0   +  CH3ZnOH_CZnOang_130 /1 -   CH3ZnOH_std /1                              10.9875
+ 5.0   +  CH3ZnOH_CZnOang_125 /1 -   CH3ZnOH_std /1                              13.3281
+# Volume ZnS_wurtzite_I
+ 1.0   +  ZnS_ap20 /1 - ZnS_ap05 /1                                  9.3309
+ 1.0   +  ZnS_ap15 /1 - ZnS_ap05 /1                                  4.0725
+ 0.5   +  ZnS_ap10 /1 - ZnS_ap05 /1                                  1.3052
+ 0.5   +  ZnS_w_st /1 - ZnS_ap05 /1                                  1.9829
+ 0.5   +  ZnS_am05 /1 - ZnS_ap05 /1                                  3.0183
+ 1.0   +  ZnS_am10 /1 - ZnS_ap05 /1                                 11.2197
+ 2.0   +  ZnS_am15 /1 - ZnS_ap05 /1                                 24.0333
+ 2.0   +  ZnS_am20 /1 - ZnS_ap05 /1                                 37.9387
+10.0   +  ZnS_am25 /1 - ZnS_ap05 /1                                 64.5076
+25.0   +  ZnS_am30 /1 - ZnS_ap05 /1                                 96.5076
+40.0   +  ZnS_am35 /1 - ZnS_ap05 /1                                139.7819
+50.0   +  ZnS_am40 /1 - ZnS_ap05 /1                                195.8239
+# Volume ZnS_wurtzite_II
+ 1.0   +  ZnS_cp20 /1 - ZnS_cp05 /1                                 17.0680
+ 1.0   +  ZnS_cp15 /1 - ZnS_cp05 /1                                  9.3623
+ 0.5   +  ZnS_cp10 /1 - ZnS_cp05 /1                                  3.3571
+ 2.0   +  ZnS_w_st /1 - ZnS_cp05 /1                                  4.0160
+ 2.0   +  ZnS_cm05 /1 - ZnS_cp05 /1                                  4.1540
+ 5.0   +  ZnS_cm10 /1 - ZnS_cp05 /1                                 13.3469
+ 5.0   +  ZnS_cm15 /1 - ZnS_cp05 /1                                 28.8148
+ 5.0   +  ZnS_cm20 /1 - ZnS_cp05 /1                                 43.6050
+10.0   +  ZnS_cm25 /1 - ZnS_cp05 /1                                 68.0273
+20.0   +  ZnS_cm30 /1 - ZnS_cp05 /1                                112.5170
+30.0   +  ZnS_cm35 /1 - ZnS_cp05 /1                                188.7332
+40.0   +  ZnS_cm40 /1 - ZnS_cp05 /1                                324.9007
+# Volume ZnOS_mixed oxide_w_I
+ 2.0   +  ZnOS_ap20 /1 - ZnOS_ap05 /1                               12.7257
+ 2.0   +  ZnOS_ap15 /1 - ZnOS_ap05 /1                                7.3229
+ 1.0   +  ZnOS_ap10 /1 - ZnOS_ap05 /1                                4.2231
+ 0.5   +  ZnOS_ap05 /1 - ZnOS_ap05 /1                                0.0188
+ 0.5   +  ZnOS_w_st /1 - ZnOS_ap05 /1                                1.7821
+ 1.0   +  ZnOS_am10 /1 - ZnOS_ap05 /1                                5.1957
+ 2.0   +  ZnOS_am15 /1 - ZnOS_ap05 /1                               16.3589
+ 2.0   +  ZnOS_am20 /1 - ZnOS_ap05 /1                               30.5153
+ 2.0   +  ZnOS_am25 /1 - ZnOS_ap05 /1                               46.1338
+ 5.0   +  ZnOS_am30 /1 - ZnOS_ap05 /1                               70.4369
+20.0   +  ZnOS_am35 /1 - ZnOS_ap05 /1                              109.9882
+30.0   +  ZnOS_am40 /1 - ZnOS_ap05 /1                              161.6252
+# Volume ZnOS_mixed_oxide_w_II
+ 2.0   +  ZnOS_cp20 /1 - ZnOS_w_st /1                               26.8570
+ 2.0   +  ZnOS_cp15 /1 - ZnOS_w_st /1                               19.2141
+ 1.0   +  ZnOS_cp10 /1 - ZnOS_w_st /1                               13.4160
+ 1.0   +  ZnOS_cp05 /1 - ZnOS_w_st /1                                3.0421
+ 0.5   +  ZnOS_cm05 /1 - ZnOS_w_st /1                                0.4706
+ 1.0   +  ZnOS_cm10 /1 - ZnOS_w_st /1                                5.7542
+ 2.0   +  ZnOS_cm15 /1 - ZnOS_w_st /1                               14.7400
+ 2.0   +  ZnOS_cm20 /1 - ZnOS_w_st /1                               29.3858
+ 5.0   +  ZnOS_cm25 /1 - ZnOS_w_st /1                               49.7043
+10.0   +  ZnOS_cm30 /1 - ZnOS_w_st /1                               77.9104
+15.0   +  ZnOS_cm35 /1 - ZnOS_w_st /1                              113.4081
+25.0   +  ZnOS_cm40 /1 - ZnOS_w_st /1                              131.4675
+#General Binding_energies
+ 2.0   +  ZnSH2_st /1  - ZnSH /1  -  SH /1                          -85.6098
+ 2.0   + HZnSH_std /1  -ZnH /1 - SH /1                                -89.4815
+ 2.0   + CH3ZnSH_std /1 - ZnSH /1 - CH3 /1                            -74.1104
+ 2.0   + CH3ZnSH_std /1 - ZnCH3 /1 - SH /1                            -90.0525
+ 2.0  + OHZnSH_std /1 - ZnOH /1  - SH /1                                -86.8084
+20.0  + OHZnSH_std /1 - ZnSH /1  -OH /1                                -105.903
+#Heats of formation
+ 1.0   +  ZnS_w_st /2 - Zn_fcc_opt /4 - S_a16_opt/128                   -48.90
+# General Surfaces_BE
+10.0   + ZnO_surf_C /4 - ZnO_surf /4 -C_atom_BAND /1                     -60.5524
+ 2.0   + ZnO_surf_CH /4 - ZnO_surf /4 -CH_BAND /1                        -93.4103
+ 2.0   + ZnO_surf_CH2 /4 - ZnO_surf /4 -CH2_BAND /1                      -69.8219
+ 2.0   + ZnO_surf_CH3 /4 - ZnO_surf /4 -CH3_BAND /1                      -10.7993
+ 2.0   + ZnO_surf_S /4 - ZnO_surf /4 -S_atom_BAND /1                     -41.9107
+ 2.0   + ZnO_surf_SH /4 - ZnO_surf /4 -SH_BAND /1                        -38.7607
+ 2.0   + ZnO_surf_SH2 /4 - ZnO_surf /4 -SH2_BAND /1                      -12.6127
+#
+ 2.5   + ZnO_surf_C /4 - ZnO_surf_C_qm /4                                        -0.01
+ 2.5   + ZnO_surf_CH /4 - ZnO_surf_CH_qm /4                                        -0.01
+ 2.5   + ZnO_surf_CH2 /4 - ZnO_surf_CH2_qm /4                                        -0.01
+ 2.5   + ZnO_surf_CH3 /4 - ZnO_surf_CH3_qm /4                                        -0.01
+ 2.5   + ZnO_surf_S /4 - ZnO_surf_S_qm /4                                        -0.01
+ 2.5   + ZnO_surf_SH /4 - ZnO_surf_SH_qm /4                                        -0.01
+ 2.5   + ZnO_surf_SH2 /4 - ZnO_surf_SH2_qm /4                                        -0.01
+# General Qiang_Cui_data
+ 2.5   + zn_sch3ch3_3 /1 - zn_sch3ch3_2/1 - sch3ch3/1        -46.0
+ 2.5   + zn_sch3ch3_2 /1 - zn_sch3ch3_1/1 - sch3ch3/1        -96.1
+ 2.5   + Zn_sch3_2 /1 - Zn_sch3_1_c/1 - sch3_anion/1        -207.4
+ 2.5   + Zn_sh2_4 /1 - Zn_sh2_3/1 - SH2/1                    -29.1
+ 2.5   + Zn_sh2_3 /1 - Zn_sh2_2/1 - SH2/1                    -42.9
+ 2.5   + Zn_sh2_2 /1 - Zn_sh2_1/1 - SH2/1                    -84.4
+ 2.5   + Zn_shch3_4 /1 - Zn_shch3_3/1 - SHCH3/1                    -31.1
+ 2.5   + Zn_shch3_3 /1 - Zn_shch3_2/1 - SHCH3/1                    -46.0
+ 2.5   + Zn_shch3_2 /1 - Zn_shch3_1/1 - SHCH3/1                    -92.2
+ 2.5   + Zn_sh2_2 /1 - zn_sh2_2_dep/1 - Proton/1                    -93.2
+ 2.5   + Zn_sh2_3 /1 - zn_sh2_3_dep/1 - Proton/1                    -115.0
+ 2.5   + Zn_sh2_4 /1 - zn_sh2_4_dep/1 - Proton/1                    -131.1
+ 2.5   + Zn_shch3_2 /1 - zn_shch3_2_dep/1 - Proton/1                -114.9
+ 2.5   + Zn_shch3_3 /1 - zn_shch3_3_dep/1 - Proton/1                -136.7
+ 2.5   + Zn_shch3_4 /1 - zn_shch3_4_dep/1 - Proton/1                -152.6
+# General Qiang_Cui_data(Proton_affinity_Table11_DFTB3)
+1.0   + Zn_h2o-1_P2 /1 - Zn_oh-1_P1/1 - Proton/1                      -54.0
+1.0   + Zn_h2o-2_P2 /1 - zn_h2o-2-dep_P1/1 - Proton/1                 -91.4
+1.0   + Zn_h2o-3_P2 /1 - zn_h2o-3-dep_P1/1 - Proton/1                -120.1
+1.0   + Zn_h2o-4_P2 /1 - zn_h2o-4-dep_P1/1 - Proton/1                -140.2 
+ 1.0    + Zn_nh3-1_P2 /1 - Zn_nh2-1_P1/1 - Proton/1                     -76.1
+ 1.0   + Zn_nh3-2_P2 /1 - zn_nh3-2-dep_P1/1 - Proton/1                -116.6 
+ 1.0   + Zn_nh3-3_P2 /1 - zn_nh3-3-dep_P1/1 - Proton/1                -144.4 
+ 1.0   + Zn_nh3-4_P2 /1 - zn_nh3-4-dep_P1/1 - Proton/1                -169.7 
+ 1.0   + Zn_nhch2-1_P2 /1 - Zn_nch2-1_P1/1 - Proton/1                  -86.3
+ 1.0   + Zn_nhch2-2_P2 /1 - zn_nhch2-2-dep_P1/1 - Proton/1            -138.8    
+ 1.0   + Zn_nhch2-3_P2 /1 - zn_nhch2-3-dep_P1/1 - Proton/1            -166.4     
+ 1.0   + Zn_nhch2-4_P2 /1 - zn_nhch2-4-dep_P1/1 - Proton/1            -186.5     
+# General Qiang_Cui_data(Proton_affinity_Table14_DFTB3)
+ 1.0   + zn_nh3-2_h2o-2_P2 /1 - zn_nh3-2_h2o-2_P1/1 - Proton/1        -145.7         
+ 1.0   + zn_nh3-3_h2o-1_P2 /1 - zn_nh3-3_oh-1_P1/1 - Proton/1         -149.7        
+ 1.0   + zn_nh3-1_h2o-3_P2 /1 - zn_nh3-1_h2o-3_P1/1 - Proton/1        -142.7         
+# General Qiang_Cui_data(Proton_affinity_Table17_DFTB3)
+ 1.0   + zn_im-2_h2o-2_P2 /1 - zn_im-2_h2o-2_P1/1 - Proton/1          -173.7       
+ 2.0   + zn_im-3_h2o-1_P2 /1 - zn_im-3_oh-1_P1/1 - Proton/1           -189.0      
+ 1.0   + zn_2im_h2o_ac_P1 /1 - zn_2im_h2o_ac/1 - Proton/1             -269.6    
+# General Qiang_Cui_data(Proton_affinity_Table17_Depronated_imidazole_DFTB3)
+ 1.0   + zn_im-2_P2 /1 - zn_im-2-dep_P1/1 - Proton/1                  -185.8
+ 1.0   + zn_im-3_P2 /1 - zn_im-3-dep_P1/1 - Proton/1                  -205.8
+ 0.8   + zn_im-1_h2o-3_P2 /1 - zn_im-1-dep_3h2o_P1/1 - Proton/1      -193.6           
+ 1.0   + zn_im-2_h2o-2_P2 /1 - zn_im-2-dep_2h2o_P1/1 - Proton/1      -203.2           
+ 1.0   + zn_im-2_ac_ach_P1 /1 - zn_im-2_ac_ach/1 - Proton/1           -255.7      
+ 1.0   + zn_im-3_ach-1_P2 /1 - zn_im-3_ach-1_P1/1 - Proton/1          -181.5       
+# General Qiang_Cui_data(Sequential_Bond_Diss_Table10_DFTB3)
+1.0   + Zn_h2o-2_P2 /1 - Zn_h2o-1_P2/1 - h2o/1                 -94.0
+1.0   + Zn_h2o-3_P2 /1 - Zn_h2o-2_P2/1 - h2o/1                 -54.2
+1.0   + Zn_h2o-4_P2 /1 - Zn_h2o-3_P2/1 - h2o/1                 -42.1
+1.0   + Zn_h2o-5_P2 /1 - Zn_h2o-4_P2/1 - h2o/1                 -23.6
+1.0   + Zn_h2o-6_P2 /1 - Zn_h2o-5_P2/1 - h2o/1                 -21.9
+ 0.7   + Zn_nh3-2_P2 /1 - Zn_nh3-1_P2/1 - NH3/1                -104.0
+ 1.0   + Zn_nh3-3_P2 /1 - Zn_nh3-2_P2/1 - NH3/1                 -57.1
+ 1.0   + Zn_nh3-4_P2 /1 - Zn_nh3-3_P2/1 - NH3/1                 -46.6
+ 0.6   + Zn_nh3-5_P2 /1 - Zn_nh3-4_P2/1 - NH3/1                 -18.5
+ 1.0   + Zn_nh3-6_P2 /1 - Zn_nh3-5_P2/1 - NH3/1                 -17.2
+ 1.0   + Zn_nhch2-2_P2 /1 - Zn_nhch2-1_P2/1 - NHCH2/1          -112.0
+ 0.5   + Zn_nhch2-3_P2 /1 - Zn_nhch2-2_P2/1 - NHCH2/1           -58.6 
+ 1.0   + Zn_nhch2-4_P2 /1 - Zn_nhch2-3_P2/1 - NHCH2/1           -46.3
+1.0   + Zn_oh-2 /1 - Zn_oh-1_P1/1 - OH/1                      -250.4
+ 1.0   + Zn_nh2-2 /1 - Zn_nh2-1_P1/1 - NH2/1                   -244.1
+ 1.0   + Zn_nch2-2 /1 - Zn_nch2-1_P1/1 - NCH2/1                -228.6
+# General Qiang_Cui_data(Bond_Diss_Table13_DFTB3)
+ 0.4   + zn_nh3-4_h2o-1_P2 /1 - zn_nh3-3_h2o-1_P2/1 - NH3/1         -26.6 
+ 1.0   + zn_nh3-4_h2o-1_P2 /1 - Zn_nh3-4_P2/1 - h2o/1               -19.0
+ 0.6   + zn_nh3-2_h2o-4_P2 /1 - zn_nh3-1_h2o-4_P2/1 - NH3/1         -25.7 
+ 1.0   + zn_nh3-2_h2o-4_P2 /1 - zn_2nh3_3h2o_P2a/1 - h2o/1          -16.1  !different configuration
+ 1.0   + zn_nh3-2_h2o-4_P2 /1 - zn_2nh3_3h2o_P2b/1 - h2o/1          -16.1  !different configuration
+ 0.4   + zn_nh3_2h2o_sh_P1 /1 - zn_h2o-2_sh-1_P1/1 - NH3/1          -28.1
+ 1.0   + zn_nh3_2h2o_sh_P1 /1 - zn_nh3_h2o_sh_P1/1 - h2o/1          -21.2
+# General Qiang_Cui_data(Bond_Diss_Table16_DFTB3)
+ 1.0   + zn_nch2ch3-2_P2 /1 - zn_nch2ch3-1_P2/1 - nch2ch3/1         -113.4
+ 1.0   + zn_nch2ch3-3_P2 /1 - zn_nch2ch3-2_P2/1 - nch2ch3/1          -58.0
+ 0.7   + zn_nch2ch3-4_P2 /1 - zn_nch2ch3-3_P2/1 - nch2ch3/1          -44.8
+ 0.35   + zn_im-2_P2 /1 - zn_im-1_P2/1 - im/1                        -134.1
+ 1.0   + zn_im-3_P2 /1 - zn_im-2_P2/1 - im/1                         -65.8
+ 1.0   + zn_im-1_shch3-3_P2 /1 - Zn_shch3-3_P2/1 - im/1              -72.0
+ 0.3   + zn_im-1_h2o-3_P2 /1 - Zn_h2o-3_P2/1 - im/1                  -88.3
+ 1.0   + zn_im-3_h2o-1_P2 /1 - zn_im-3_P2/1 - h2o/1                  -22.5
+ 1.0   + zn_im-1_h2o-3_P2 /1 - zn_im_h2o-2_P2a/1 - h2o/1             -33.6  !
+ 1.0   + zn_im-1_h2o-3_P2 /1 - zn_im_h2o-2_P2b/1 - h2o/1             -33.6  !
+ 1.0   + zn_im-2_h2o-2_P2 /1 - zn_im-2_h2o-1_P2/1 - h2o/1            -26.6
+ 0.8   + zn_im_h2o_2shch3_P2 /1 - zn_h2o_shch3-2_P2/1 - im/1         -76.2
+ 1.0   + zn_im_h2o_2shch3_P2 /1 - zn_im_shch3-2_P2/1 - h2o/1         -29.4
+# General ligand_exchange_Zn(H2O)3_Im_(LACV3P+**)
+ 0.8   + Zn_2H2OIm_H2O_sep /1 - Zn_3H2O_Im_sep /1      -42.6
+ 0.9   + Zn_3H2O_Im_sep /1 - Zn_3H2O_Im /1              47.3
+ 0.08   + Zn_3H2O_ImII /1 - Zn_3H2O_Im /1              -9.8
+ 0.15   + Zn_2H2OIm_H2O /1 - Zn_3H2O_Im /1              -17.8
+ 0.8   + Zn_2H2OIm_H2O_sep /1 - Zn_3H2O_Im /1            4.7
+# General ligand_exchange_Zn(H2O)3_Im_aqueous
+ 0.9   + Zn_2H2OIm_H2O_aq /1 - Zn_3H2O_Im_aq_sep /1      -42.6
+ 0.9   + Zn_3H2O_Im_aq_sep /1 - Zn_3H2O_Im_aq /1              47.3
+ 0.2   + Zn_3H2O_Im_aqII /1 - Zn_3H2O_Im_aq /1              -12.8
+ 0.6   + Zn_2H2OIm_H2O_aq /1 - Zn_3H2O_Im_aq /1              -17.8
+# ZnN_condensed_phase
+ 0.25  + Zn3N2_cubic /16 - N2 /1  - Zn_metal/0.666              -4.95
+ 0.25  + Zn3N2_ortho /4 - N2 /1  - Zn_metal/0.666              -3.80
+ 0.25  + Zn3N2_hexa /4 - N2 /1  - Zn_metal/0.666              -3.34
+ 0.25  + Zn3N2_cubic_c1 /16 - Zn3N2_cubic_e1/16                 -0.01
+ 0.50  + Zn3N2_cubic /16 - Zn3N2_cubic_DFT/16                 -0.01
+ 0.50  + Zn3N2_ortho /4 - Zn3N2_ortho_DFT/4                 -0.01
+ 0.50  + Zn3N2_hexa /4 - Zn3N2_hexa_DFT/4                 -0.01
+ 1.00  + Zn3N2_cubic /16 - Zn3N2_cubic_lowd/16         -100.00
+ 0.05  + Zn3N2_cubic /16 - Zn3N2_ortho/4              -1.05
+ 0.05  + Zn3N2_cubic /16 - Zn3N2_hexa/4              -1.61
 # Volume Bulk_EOS
- 1.0   +   bulk_0 /1  -  bulk_c5 /1           -1.2904
- 1.0   +   bulk_0 /1  -  bulk_c4 /1           -0.8249
- 1.0   +   bulk_0 /1  -  bulk_c3 /1           -0.4633
- 1.0   +   bulk_0 /1  -  bulk_c2 /1           -0.2056
- 1.0   +   bulk_0 /1  -  bulk_c1 /1           -0.0513
- 1.0   +   bulk_0 /1  -  bulk_0  /1           -0.0001
- 1.0   +   bulk_0 /1  -  bulk_e1 /1           -0.0511
- 1.0   +   bulk_0 /1  -  bulk_e2 /1           -0.2040
- 1.0   +   bulk_0 /1  -  bulk_e3 /1           -0.4578
- 1.0   +   bulk_0 /1  -  bulk_e4 /1           -0.8119
- 1.0   +   bulk_0 /1  -  bulk_e5 /1           -1.2652
+ 1.0   -   bulk_0 /1  +  bulk_c5 /1          +31.5221
+ 1.0   -   bulk_0 /1  +  bulk_c4 /1          +20.1503
+ 1.0   -   bulk_0 /1  +  bulk_c3 /1          +11.3189
+ 1.0   -   bulk_0 /1  +  bulk_c2 /1           +5.0227
+ 1.0   -   bulk_0 /1  +  bulk_c1 /1           +1.2535
+ 1.0   -   bulk_0 /1  +  bulk_0  /1           +0.0001
+ 1.0   -   bulk_0 /1  +  bulk_e1 /1           +1.2485
+ 1.0   -   bulk_0 /1  +  bulk_e2 /1           +4.9828
+ 1.0   -   bulk_0 /1  +  bulk_e3 /1          +11.1846
+ 1.0   -   bulk_0 /1  +  bulk_e4 /1          +19.8334
+ 1.0   -   bulk_0 /1  +  bulk_e5 /1          +30.9070
 # Volume C11_EOS
- 1.0   +   c11_0 /1  -  c11_c6  /1           -0.5280
- 1.0   +   c11_0 /1  -  c11_c5  /1           -0.3666
- 1.0   +   c11_0 /1  -  c11_c4  /1           -0.2346
- 1.0   +   c11_0 /1  -  c11_c3  /1           -0.1320
- 1.0   +   c11_0 /1  -  c11_c2  /1           -0.0587
- 1.0   +   c11_0 /1  -  c11_c1  /1           -0.0147
- 1.0   +   c11_0 /1  -  c11_0   /1           -0.0001
- 1.0   +   c11_0 /1  -  c11_e1  /1           -0.0147
- 1.0   +   c11_0 /1  -  c11_e2  /1           -0.0587
- 1.0   +   c11_0 /1  -  c11_e3  /1           -0.1320
- 1.0   +   c11_0 /1  -  c11_e4  /1           -0.2346
- 1.0   +   c11_0 /1  -  c11_e5  /1           -0.3666
- 1.0   +   c11_0 /1  -  c11_e6  /1           -0.5280
+ 1.0   -   c11_0 /1  +  c11_c6  /1          +11.5201
+ 1.0   -   c11_0 /1  +  c11_c5  /1           +8.0001
+ 1.0   -   c11_0 /1  +  c11_c4  /1           +5.1200
+ 1.0   -   c11_0 /1  +  c11_c3  /1           +2.8800
+ 1.0   -   c11_0 /1  +  c11_c2  /1           +1.2800
+ 1.0   -   c11_0 /1  +  c11_c1  /1           +0.3200
+ 1.0   -   c11_0 /1  +  c11_0   /1           +0.0001
+ 1.0   -   c11_0 /1  +  c11_e1  /1           +0.3200
+ 1.0   -   c11_0 /1  +  c11_e2  /1           +1.2800
+ 1.0   -   c11_0 /1  +  c11_e3  /1           +2.8800
+ 1.0   -   c11_0 /1  +  c11_e4  /1           +5.1200
+ 1.0   -   c11_0 /1  +  c11_e5  /1           +8.0001
+ 1.0   -   c11_0 /1  +  c11_e6  /1          +11.5201
 # Volume C22_EOS
- 1.0   +   c22_0 /1  -  c22_c6  /1           -0.5280
- 1.0   +   c22_0 /1  -  c22_c5  /1           -0.3666
- 1.0   +   c22_0 /1  -  c22_c4  /1           -0.2346
- 1.0   +   c22_0 /1  -  c22_c3  /1           -0.1320
- 1.0   +   c22_0 /1  -  c22_c2  /1           -0.0587
- 1.0   +   c22_0 /1  -  c22_c1  /1           -0.0147
- 1.0   +   c22_0 /1  -  c22_0   /1           -0.0001
- 1.0   +   c22_0 /1  -  c22_e1  /1           -0.0147
- 1.0   +   c22_0 /1  -  c22_e2  /1           -0.0587
- 1.0   +   c22_0 /1  -  c22_e3  /1           -0.1320
- 1.0   +   c22_0 /1  -  c22_e4  /1           -0.2346
- 1.0   +   c22_0 /1  -  c22_e5  /1           -0.3666
- 1.0   +   c22_0 /1  -  c22_e6  /1           -0.5280
+ 1.0   -   c22_0 /1  +  c22_c6  /1          +11.5201
+ 1.0   -   c22_0 /1  +  c22_c5  /1           +8.0001
+ 1.0   -   c22_0 /1  +  c22_c4  /1           +5.1200
+ 1.0   -   c22_0 /1  +  c22_c3  /1           +2.8800
+ 1.0   -   c22_0 /1  +  c22_c2  /1           +1.2800
+ 1.0   -   c22_0 /1  +  c22_c1  /1           +0.3200
+ 1.0   -   c22_0 /1  +  c22_0   /1           +0.0001
+ 1.0   -   c22_0 /1  +  c22_e1  /1           +0.3200
+ 1.0   -   c22_0 /1  +  c22_e2  /1           +1.2800
+ 1.0   -   c22_0 /1  +  c22_e3  /1           +2.8800
+ 1.0   -   c22_0 /1  +  c22_e4  /1           +5.1200
+ 1.0   -   c22_0 /1  +  c22_e5  /1           +8.0001
+ 1.0   -   c22_0 /1  +  c22_e6  /1          +11.5201
 # Volume C33_EOS
- 1.0   +   c33_0 /1  -  c33_c6  /1           -0.4029
- 1.0   +   c33_0 /1  -  c33_c5  /1           -0.2798
- 1.0   +   c33_0 /1  -  c33_c4  /1           -0.1791
- 1.0   +   c33_0 /1  -  c33_c3  /1           -0.1007
- 1.0   +   c33_0 /1  -  c33_c2  /1           -0.0448
- 1.0   +   c33_0 /1  -  c33_c1  /1           -0.0112
- 1.0   +   c33_0 /1  -  c33_0   /1           -0.0001
- 1.0   +   c33_0 /1  -  c33_e1  /1           -0.0112
- 1.0   +   c33_0 /1  -  c33_e2  /1           -0.0448
- 1.0   +   c33_0 /1  -  c33_e3  /1           -0.1007
- 1.0   +   c33_0 /1  -  c33_e4  /1           -0.1791
- 1.0   +   c33_0 /1  -  c33_e5  /1           -0.2798
- 1.0   +   c33_0 /1  -  c33_e6  /1           -0.4029
+ 1.0   -   c33_0 /1  +  c33_c6  /1          +11.5201
+ 1.0   -   c33_0 /1  +  c33_c5  /1           +8.0001
+ 1.0   -   c33_0 /1  +  c33_c4  /1           +5.1200
+ 1.0   -   c33_0 /1  +  c33_c3  /1           +2.8800
+ 1.0   -   c33_0 /1  +  c33_c2  /1           +1.2800
+ 1.0   -   c33_0 /1  +  c33_c1  /1           +0.3200
+ 1.0   -   c33_0 /1  +  c33_0   /1           +0.0001
+ 1.0   -   c33_0 /1  +  c33_e1  /1           +0.3200
+ 1.0   -   c33_0 /1  +  c33_e2  /1           +1.2800
+ 1.0   -   c33_0 /1  +  c33_e3  /1           +2.8800
+ 1.0   -   c33_0 /1  +  c33_e4  /1           +5.1200
+ 1.0   -   c33_0 /1  +  c33_e5  /1           +8.0001
+ 1.0   -   c33_0 /1  +  c33_e6  /1          +11.5201
 # Volume C12_EOS
- 1.0   +   c12_0 /1  -  c12_c6  /1           -0.6880
- 1.0   +   c12_0 /1  -  c12_c5  /1           -0.4778
- 1.0   +   c12_0 /1  -  c12_c4  /1           -0.3058
- 1.0   +   c12_0 /1  -  c12_c3  /1           -0.1720
- 1.0   +   c12_0 /1  -  c12_c2  /1           -0.0764
- 1.0   +   c12_0 /1  -  c12_c1  /1           -0.0191
- 1.0   +   c12_0 /1  -  c12_0   /1           -0.0001
- 1.0   +   c12_0 /1  -  c12_e1  /1           -0.0191
- 1.0   +   c12_0 /1  -  c12_e2  /1           -0.0764
- 1.0   +   c12_0 /1  -  c12_e3  /1           -0.1720
- 1.0   +   c12_0 /1  -  c12_e4  /1           -0.3058
- 1.0   +   c12_0 /1  -  c12_e5  /1           -0.4778
- 1.0   +   c12_0 /1  -  c12_e6  /1           -0.6880
+ 1.0   -   c12_0 /1  +  c12_c6  /1          +11.1023
+ 1.0   -   c12_0 /1  +  c12_c5  /1           +7.7099
+ 1.0   -   c12_0 /1  +  c12_c4  /1           +4.9343
+ 1.0   -   c12_0 /1  +  c12_c3  /1           +2.7756
+ 1.0   -   c12_0 /1  +  c12_c2  /1           +1.2336
+ 1.0   -   c12_0 /1  +  c12_c1  /1           +0.3084
+ 1.0   -   c12_0 /1  +  c12_0   /1           +0.0001
+ 1.0   -   c12_0 /1  +  c12_e1  /1           +0.3084
+ 1.0   -   c12_0 /1  +  c12_e2  /1           +1.2336
+ 1.0   -   c12_0 /1  +  c12_e3  /1           +2.7756
+ 1.0   -   c12_0 /1  +  c12_e4  /1           +4.9343
+ 1.0   -   c12_0 /1  +  c12_e5  /1           +7.7099
+ 1.0   -   c12_0 /1  +  c12_e6  /1          +11.1023
 # Volume C13_EOS
- 1.0   +   c13_0 /1  -  c13_c6  /1           -0.4010
- 1.0   +   c13_0 /1  -  c13_c5  /1           -0.2785
- 1.0   +   c13_0 /1  -  c13_c4  /1           -0.1782
- 1.0   +   c13_0 /1  -  c13_c3  /1           -0.1003
- 1.0   +   c13_0 /1  -  c13_c2  /1           -0.0446
- 1.0   +   c13_0 /1  -  c13_c1  /1           -0.0111
- 1.0   +   c13_0 /1  -  c13_0   /1           -0.0001
- 1.0   +   c13_0 /1  -  c13_e1  /1           -0.0111
- 1.0   +   c13_0 /1  -  c13_e2  /1           -0.0446
- 1.0   +   c13_0 /1  -  c13_e3  /1           -0.1003
- 1.0   +   c13_0 /1  -  c13_e4  /1           -0.1782
- 1.0   +   c13_0 /1  -  c13_e5  /1           -0.2785
- 1.0   +   c13_0 /1  -  c13_e6  /1           -0.4010
+ 1.0   -   c13_0 /1  +  c13_c6  /1          +11.1023
+ 1.0   -   c13_0 /1  +  c13_c5  /1           +7.7099
+ 1.0   -   c13_0 /1  +  c13_c4  /1           +4.9343
+ 1.0   -   c13_0 /1  +  c13_c3  /1           +2.7756
+ 1.0   -   c13_0 /1  +  c13_c2  /1           +1.2336
+ 1.0   -   c13_0 /1  +  c13_c1  /1           +0.3084
+ 1.0   -   c13_0 /1  +  c13_0   /1           +0.0001
+ 1.0   -   c13_0 /1  +  c13_e1  /1           +0.3084
+ 1.0   -   c13_0 /1  +  c13_e2  /1           +1.2336
+ 1.0   -   c13_0 /1  +  c13_e3  /1           +2.7756
+ 1.0   -   c13_0 /1  +  c13_e4  /1           +4.9343
+ 1.0   -   c13_0 /1  +  c13_e5  /1           +7.7099
+ 1.0   -   c13_0 /1  +  c13_e6  /1          +11.1023
 # Volume C23_EOS
- 1.0   +   c23_0 /1  -  c23_c6  /1           -0.4010
- 1.0   +   c23_0 /1  -  c23_c5  /1           -0.2785
- 1.0   +   c23_0 /1  -  c23_c4  /1           -0.1782
- 1.0   +   c23_0 /1  -  c23_c3  /1           -0.1003
- 1.0   +   c23_0 /1  -  c23_c2  /1           -0.0446
- 1.0   +   c23_0 /1  -  c23_c1  /1           -0.0111
- 1.0   +   c23_0 /1  -  c23_0   /1           -0.0001
- 1.0   +   c23_0 /1  -  c23_e1  /1           -0.0111
- 1.0   +   c23_0 /1  -  c23_e2  /1           -0.0446
- 1.0   +   c23_0 /1  -  c23_e3  /1           -0.1003
- 1.0   +   c23_0 /1  -  c23_e4  /1           -0.1782
- 1.0   +   c23_0 /1  -  c23_e5  /1           -0.2785
- 1.0   +   c23_0 /1  -  c23_e6  /1           -0.4010
+ 1.0   -   c23_0 /1  +  c23_c6  /1          +11.1023
+ 1.0   -   c23_0 /1  +  c23_c5  /1           +7.7099
+ 1.0   -   c23_0 /1  +  c23_c4  /1           +4.9343
+ 1.0   -   c23_0 /1  +  c23_c3  /1           +2.7756
+ 1.0   -   c23_0 /1  +  c23_c2  /1           +1.2336
+ 1.0   -   c23_0 /1  +  c23_c1  /1           +0.3084
+ 1.0   -   c23_0 /1  +  c23_0   /1           +0.0001
+ 1.0   -   c23_0 /1  +  c23_e1  /1           +0.3084
+ 1.0   -   c23_0 /1  +  c23_e2  /1           +1.2336
+ 1.0   -   c23_0 /1  +  c23_e3  /1           +2.7756
+ 1.0   -   c23_0 /1  +  c23_e4  /1           +4.9343
+ 1.0   -   c23_0 /1  +  c23_e5  /1           +7.7099
+ 1.0   -   c23_0 /1  +  c23_e6  /1          +11.1023
 # Volume C44_EOS
- 1.0   +   c44_0 /1  -  c44_c6  /1           -0.5592
- 1.0   +   c44_0 /1  -  c44_c5  /1           -0.3884
- 1.0   +   c44_0 /1  -  c44_c4  /1           -0.2485
- 1.0   +   c44_0 /1  -  c44_c3  /1           -0.1398
- 1.0   +   c44_0 /1  -  c44_c2  /1           -0.0621
- 1.0   +   c44_0 /1  -  c44_c1  /1           -0.0155
- 1.0   +   c44_0 /1  -  c44_0   /1           -0.0001
- 1.0   +   c44_0 /1  -  c44_e1  /1           -0.0155
- 1.0   +   c44_0 /1  -  c44_e2  /1           -0.0621
- 1.0   +   c44_0 /1  -  c44_e3  /1           -0.1398
- 1.0   +   c44_0 /1  -  c44_e4  /1           -0.2485
- 1.0   +   c44_0 /1  -  c44_e5  /1           -0.3884
- 1.0   +   c44_0 /1  -  c44_e6  /1           -0.5592
+ 1.0   -   c44_0 /1  +  c44_c6  /1          +15.0418
+ 1.0   -   c44_0 /1  +  c44_c5  /1          +10.4457
+ 1.0   -   c44_0 /1  +  c44_c4  /1           +6.6852
+ 1.0   -   c44_0 /1  +  c44_c3  /1           +3.7604
+ 1.0   -   c44_0 /1  +  c44_c2  /1           +1.6713
+ 1.0   -   c44_0 /1  +  c44_c1  /1           +0.4178
+ 1.0   -   c44_0 /1  +  c44_0   /1           +0.0001
+ 1.0   -   c44_0 /1  +  c44_e1  /1           +0.4178
+ 1.0   -   c44_0 /1  +  c44_e2  /1           +1.6713
+ 1.0   -   c44_0 /1  +  c44_e3  /1           +3.7604
+ 1.0   -   c44_0 /1  +  c44_e4  /1           +6.6852
+ 1.0   -   c44_0 /1  +  c44_e5  /1          +10.4457
+ 1.0   -   c44_0 /1  +  c44_e6  /1          +15.0418
 # Volume C55_EOS
- 1.0   +   c55_0 /1  -  c55_c6  /1           -0.5592
- 1.0   +   c55_0 /1  -  c55_c5  /1           -0.3884
- 1.0   +   c55_0 /1  -  c55_c4  /1           -0.2485
- 1.0   +   c55_0 /1  -  c55_c3  /1           -0.1398
- 1.0   +   c55_0 /1  -  c55_c2  /1           -0.0621
- 1.0   +   c55_0 /1  -  c55_c1  /1           -0.0155
- 1.0   +   c55_0 /1  -  c55_0   /1           -0.0001
- 1.0   +   c55_0 /1  -  c55_e1  /1           -0.0155
- 1.0   +   c55_0 /1  -  c55_e2  /1           -0.0621
- 1.0   +   c55_0 /1  -  c55_e3  /1           -0.1398
- 1.0   +   c55_0 /1  -  c55_e4  /1           -0.2485
- 1.0   +   c55_0 /1  -  c55_e5  /1           -0.3884
- 1.0   +   c55_0 /1  -  c55_e6  /1           -0.5592
+ 1.0   -   c55_0 /1  +  c55_c6  /1          +15.0418
+ 1.0   -   c55_0 /1  +  c55_c5  /1          +10.4457
+ 1.0   -   c55_0 /1  +  c55_c4  /1           +6.6852
+ 1.0   -   c55_0 /1  +  c55_c3  /1           +3.7604
+ 1.0   -   c55_0 /1  +  c55_c2  /1           +1.6713
+ 1.0   -   c55_0 /1  +  c55_c1  /1           +0.4178
+ 1.0   -   c55_0 /1  +  c55_0   /1           +0.0001
+ 1.0   -   c55_0 /1  +  c55_e1  /1           +0.4178
+ 1.0   -   c55_0 /1  +  c55_e2  /1           +1.6713
+ 1.0   -   c55_0 /1  +  c55_e3  /1           +3.7604
+ 1.0   -   c55_0 /1  +  c55_e4  /1           +6.6852
+ 1.0   -   c55_0 /1  +  c55_e5  /1          +10.4457
+ 1.0   -   c55_0 /1  +  c55_e6  /1          +15.0418
 # Volume C66_EOS
- 1.0   +   c66_0 /1  -  c66_c6  /1           -0.3679
- 1.0   +   c66_0 /1  -  c66_c5  /1           -0.2555
- 1.0   +   c66_0 /1  -  c66_c4  /1           -0.1635
- 1.0   +   c66_0 /1  -  c66_c3  /1           -0.0920
- 1.0   +   c66_0 /1  -  c66_c2  /1           -0.0409
- 1.0   +   c66_0 /1  -  c66_c1  /1           -0.0102
- 1.0   +   c66_0 /1  -  c66_0   /1           -0.0001
- 1.0   +   c66_0 /1  -  c66_e1  /1           -0.0102
- 1.0   +   c66_0 /1  -  c66_e2  /1           -0.0409
- 1.0   +   c66_0 /1  -  c66_e3  /1           -0.0920
- 1.0   +   c66_0 /1  -  c66_e4  /1           -0.1635
- 1.0   +   c66_0 /1  -  c66_e5  /1           -0.2555
- 1.0   +   c66_0 /1  -  c66_e6  /1           -0.3679
-# heat of formation for ZnPt
- 1.0   +   bulk_0 /1 - Zn_metal/2 - Pt_metal/4           -26.058
-#Mengyi's ZnPt trainings on Jan 26 2025
-1   +   Zn_Pt111_top /1 - Pt111_slab /1 - Zn_atom/1       -40.11
-0.5      +   Zn_Pt111_bridge /1 - Pt111_slab /1 - Zn_atom/1    -51.34
-0.5      +   Zn_Pt111_hcp1 /1 - Pt111_slab /1 - Zn_atom/1      -54.89
-0.5      +   Zn_Pt111_hcp2 /1 - Pt111_slab /1 - Zn_atom/1      -54.69
-0.25   +   Zn_Pt111_hcp1 /1 - Zn_Pt111_bridge/1              -3.590
+ 1.0   -   c66_0 /1  +  c66_c6  /1          +15.0418
+ 1.0   -   c66_0 /1  +  c66_c5  /1          +10.4457
+ 1.0   -   c66_0 /1  +  c66_c4  /1           +6.6852
+ 1.0   -   c66_0 /1  +  c66_c3  /1           +3.7604
+ 1.0   -   c66_0 /1  +  c66_c2  /1           +1.6713
+ 1.0   -   c66_0 /1  +  c66_c1  /1           +0.4178
+ 1.0   -   c66_0 /1  +  c66_0   /1           +0.0001
+ 1.0   -   c66_0 /1  +  c66_e1  /1           +0.4178
+ 1.0   -   c66_0 /1  +  c66_e2  /1           +1.6713
+ 1.0   -   c66_0 /1  +  c66_e3  /1           +3.7604
+ 1.0   -   c66_0 /1  +  c66_e4  /1           +6.6852
+ 1.0   -   c66_0 /1  +  c66_e5  /1          +10.4457
+ 1.0   -   c66_0 /1  +  c66_e6  /1          +15.0418
+ENDENERGY
+CHARGE
+#Keyw Weight Atom (a5,1x,f6.2,1x,i4)
+#NH3
+NH3      0.01  1   -0.71734
+NH3      0.01  2    0.23912
+#Imidazole_epsilon
+Imid_e   0.05  1   -0.36684
+Imid_e   0.05  2    0.12365
+Imid_e   0.05  3    0.12386
+Imid_e   0.05  4    0.10001
+Imid_e   0.05  5    0.20632
+Imid_e   0.05  6   -0.47163
+Imid_e   0.05  7    0.03773
+Imid_e   0.05  8    0.10185
+Imid_e   0.05  9    0.26262
+Imid_e   0.05 10    0.10831
+Imid_e   0.05 11   -0.48984
+Imid_e   0.05 12    0.26397
+#Imidazole proton
+Im_p     0.05  1   -0.38583
+Im_p     0.05  2    0.17528
+Im_p     0.05  3    0.17581
+Im_p     0.05  4    0.17560
+Im_p     0.05  5    0.29028
+Im_p     0.05  6   -0.50629
+Im_p     0.05  7    0.33359
+Im_p     0.05  8    0.07161
+Im_p     0.05  9    0.19971
+Im_p     0.05 10    0.37386
+Im_p     0.05 11    0.22961
+Im_p     0.05 12   -0.47411
+Im_p     0.05 13    0.34088
+#Methanol
+Methanol 0.01  1   -0.07385
+Methanol 0.01  2    0.08962
+Methanol 0.01  3    0.12088
+Methanol 0.01  4    0.08963
+Methanol 0.01  5   -0.53225
+Methanol 0.01  6    0.30597
+#Methanol anion
+Methanol_m 0.05  1    0.13586
+Methanol_m 0.05  2   -0.12815
+Methanol_m 0.05  3   -0.12846
+Methanol_m 0.05  4   -0.12818
+Methanol_m 0.05  5   -0.75108
+#Formamide
+Formamide 0.01  1   -0.57004
+Formamide 0.01  2    0.28009
+Formamide 0.01  3    0.27147
+Formamide 0.01  4    0.40857
+Formamide 0.01  5    0.06512
+Formamide 0.01  6   -0.45522
+#Formic acid
+Formic_acid 0.01  1    0.42851
+Formic_acid 0.01  2    0.07199
+Formic_acid 0.01  3   -0.38747
+Formic_acid 0.01  4   -0.43577
+Formic_acid 0.01  5    0.32275
+#Water
+H2O      0.05  1   -0.60970
+H2O      0.05  2    0.30485
+H2O      0.05  3    0.30485
+#Hydroxyl anion
+OH_m     0.05  1   -1.06871
+OH_m     0.05  2    0.06871
+#Hydronium cation
+H3O_p     0.05  1   -0.38150 
+H3O_p     0.05  2    0.46050 
+H3O_p     0.05  3    0.46050 
+H3O_p     0.05  4    0.46050 
+#NH2 anion
+NH2_m     0.05  1   -1.00739
+NH2_m     0.05  2    0.00370
+NH2_m     0.05  3    0.00370
+#NH4 cation
+NH4_p     0.02  1   -0.59735 
+NH4_p     0.02  2    0.39331 
+NH4_p     0.02  3    0.39331 
+NH4_p     0.02  4    0.39331 
+NH4_p     0.02  5    0.39331 
+#Tetrahedral anion intermediate 1
+Tet_int1     0.05  1   -0.62265
+Tet_int1     0.05  2    0.18683
+Tet_int1     0.05  3    0.18016
+Tet_int1     0.05  4    0.51023
+Tet_int1     0.05  5   -0.05042
+Tet_int1     0.05  6   -0.64978
+Tet_int1     0.05  7   -0.60994
+Tet_int1     0.05  8    0.00060
+Tet_int1     0.05  9    0.07687
+Tet_int1     0.05 10   -0.00359
+Tet_int1     0.05 11   -0.01831
+#Tetrahedral anion intermediate 2
+Tet_int2     0.05  1    0.57152
+Tet_int2     0.05  2   -0.06129
+Tet_int2     0.05  3   -0.61992
+Tet_int2     0.05  4   -0.61365
+Tet_int2     0.05  5   -0.01069
+Tet_int2     0.05  6    0.00062
+Tet_int2     0.05  7   -0.00198
+Tet_int2     0.05  8    0.08524
+Tet_int2     0.05  9   -0.60747
+Tet_int2     0.05 10    0.25762
+#Im-OH complex
+zwitter1  0.05 1  -0.49400
+zwitter1  0.05 2   0.28339
+zwitter1  0.05 3  -0.52137
+zwitter1  0.05 4   0.25188
+zwitter1  0.05 5   0.03283
+zwitter1  0.05 6   0.27222
+zwitter1  0.05 7   0.12461
+zwitter1  0.05 8  -0.24363
+zwitter1  0.05 9   0.11209
+zwitter1  0.05 10 -0.19177
+zwitter1  0.05 11  0.07779
+zwitter1  0.05 12  0.09216
+zwitter1  0.05 13  0.11226
+zwitter1  0.05 14  0.10120
+zwitter1  0.05 15  0.08263
+zwitter1  0.05 16  0.08653
+zwitter1  0.05 17 -0.56580
+zwitter1  0.05 18  0.32779
+zwitter1  0.05 19  0.05918
+#H-Im-O complex
+zwitter6  0.05 1  -0.49092
+zwitter6  0.05 2   0.33567
+zwitter6  0.05 3  -0.47492
+zwitter6  0.05 4   0.29723
+zwitter6  0.05 5   0.03025
+zwitter6  0.05 6   0.29496
+zwitter6  0.05 7   0.17560
+zwitter6  0.05 8  -0.24209
+zwitter6  0.05 9   0.14157
+zwitter6  0.05 10 -0.18752
+zwitter6  0.05 11  0.16175
+zwitter6  0.05 12  0.09480
+zwitter6  0.05 13  0.12680
+zwitter6  0.05 14  0.08007
+zwitter6  0.05 15  0.06510
+zwitter6  0.05 16  0.01616
+zwitter6  0.05 17 -0.70186
+zwitter6  0.05 18  0.30029
+zwitter6  0.05 19 -0.02294
+#HONO
+hono  0.05 1  -0.35
+hono  0.05 2   0.30
+hono  0.05 3   0.31
+hono  0.05 4  -0.26
+#Ureum
+Ureum    0.01 1  -0.62
+Ureum    0.01 2   0.65
+Ureum    0.01 4   0.27
+Ureum    0.01 6  -0.50
+#Alanine
+Alanine    0.01 1  -0.64
+Alanine    0.01 2  -0.05
+Alanine    0.01 3   0.61
+Alanine    0.01 4  -0.49
+Alanine    0.01 5   0.26
+Alanine    0.01 7  -0.31
+Alanine    0.01 8   0.14
+Alanine    0.01 9  -0.47
+Alanine    0.01 10  0.34
+Alanine    0.01 11  0.12
+#RDX
+rdx  0.05  1  0.05
+rdx  0.05  2 -0.32
+rdx  0.05  7  0.66
+rdx  0.05 10 -0.39
+rdx  0.05 16  0.19
+#H2S
+H2S  0.05  1  -0.16
+H2S  0.05  2   0.08
+#H3C-SH
+H3CSH  0.05  1  -0.46
+H3CSH  0.05  2  -0.05
+H3CSH  0.05  3   0.15
+H3CSH  0.05  4   0.06
+#H3C-S-CH3
+H3CSCH3  0.05  1   0.14
+H3CSCH3  0.05  2  -0.46
+H3CSCH3  0.05  3   0.08
+ENDCHARGE
+GEOMETRY
+nh3_min         0.05  1   2   1.040
+H2O_H2O         0.05  3   4   1.953
+SER_H2O         0.05  6   8   1.972
+H2O_SER         0.05  3   5   1.921
+SER_SER         0.05  6   8   1.934
+H2O_Amide_C=O   0.05  3   6   1.847
+Amide_H2O       0.05  2   9   2.060
+Amide_Amide     0.05  9  11   2.016
+Amide_Amide_double  0.05  5  11   1.846
+Amide_Amide_double  0.05  3  17   1.839
+Methyl_Amide    0.05  9  11   2.017
+Amide_SER       0.05  2  11   1.946
+Amide_SER_2     0.05  2  12   2.067
+SER_Amide       0.05  6   9   1.872
+SER_Amide_II    0.05  7  15   1.875
+SER_Amide_II    0.05  2  13   2.047
+MeNH2           5.00  1   5   1.4500
+MeNH3           0.05  1   7   1.5200
+h3coh_min       0.05  1   2   1.4100
+ENDGEOMETRY
+ENERGY
+# Restraint NH3_dimer
+0.50  + NH3_NH3_1_4/1 - NH3_NH3_diss/1     6.90
+0.10  + NH3_NH3_1_6/1 - NH3_NH3_diss/1     0.90
+0.10  + NH3_NH3_1_8/1 - NH3_NH3_diss/1    -1.60
+0.10  + NH3_NH3_2_0/1 - NH3_NH3_diss/1    -3.40
+0.10  + NH3_NH3_2_2/1 - NH3_NH3_diss/1    -4.10
+0.10  + NH3_NH3_2_4/1 - NH3_NH3_diss/1    -3.90
+0.10  + NH3_NH3_2_6/1 - NH3_NH3_diss/1    -3.30
+0.10  + NH3_NH3_3_0/1 - NH3_NH3_diss/1    -2.20
+# Restraint NH3_OH2_dimer
+1.00  + NH3_H2O_1_2/1 - NH3_H2O_diss/1     3.90
+1.20  + NH3_H2O_1_4/1 - NH3_H2O_diss/1    -2.00
+1.20  + NH3_H2O_1_6/1 - NH3_H2O_diss/1    -4.60
+1.20  + NH3_H2O_1_8/1 - NH3_H2O_diss/1    -6.40
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_diss/1    -7.10
+0.10  + NH3_H2O_2_2/1 - NH3_H2O_diss/1    -6.90
+1.20  + NH3_H2O_2_4/1 - NH3_H2O_diss/1    -6.30
+1.20  + NH3_H2O_2_5/1 - NH3_H2O_diss/1    -5.20
+# Restraint NH3_OH2_dimer2
+2.50  + NH3_H2O_2_0/1 - NH3_H2O_1_2/1    -10.0
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_1_4/1    -5.10
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_1_6/1    -2.50
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_1_8/1    -0.70
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_2_2/1    -0.20
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_2_4/1    -0.80
+0.10  + NH3_H2O_2_0/1 - NH3_H2O_2_5/1    -1.50
+# Restraint H2O_NH3_dimer
+2.50  + H2O_NH3_1_3/1 - H2O_NH3_diss/1    12.00
+1.50  + H2O_NH3_1_5/1 - H2O_NH3_diss/1     1.00
+0.50  + H2O_NH3_1_7/1 - H2O_NH3_diss/1    -4.30
+0.50  + H2O_NH3_1_9/1 - H2O_NH3_diss/1    -5.50
+0.50  + H2O_NH3_2_1/1 - H2O_NH3_diss/1    -4.80
+0.50  + H2O_NH3_2_3/1 - H2O_NH3_diss/1    -3.30
+0.50  + H2O_NH3_2_5/1 - H2O_NH3_diss/1    -2.50
+0.50  + H2O_NH3_2_7/1 - H2O_NH3_diss/1    -2.10
+0.50  + H2O_NH3_3_0/1 - H2O_NH3_diss/1    -1.90
+#HN bond dissociation
+50.0   +   nh3_min/1   -   nh1  /1                                             -257.80
+20.0   +   nh3_min/1   -   nh2  /1                                             -111.30
+2.0    +   nh3_min/1   -   nh3  /1                                              -40.00
+0.1    +   nh3_min/1   -   nh4  /1                                               -9.10
+0.1    +   nh3_min/1   -   nh5  /1                                               -0.20
+0.025  +   nh3_min/1   -   nh3_1_04  /1                                               -0.01
+0.1    +   nh3_min/1   -   nh6  /1                                               -2.80
+1.0    +   nh3_min/1   -   nh7  /1                                              -11.50
+2.0    +   nh3_min/1   -   nh8  /1                                              -23.10
+5.0    +   nh3_min/1   -   nh9  /1                                              -35.80
+7.5    +   nh3_min/1   -   nh10 /1                                              -48.50
+10.0   +   nh3_min/1   -   nh11 /1                                              -60.80
+10.0   +   nh3_min/1   -   nh12 /1                                              -83.00
+25.0   +   nh3_min/1   -   nh13 /1                                             -101.50
+25.0   +   nh3_min/1   -   nh14 /1                                             -115.80
+25.0   +   nh3_min/1   -   nh15 /1                                             -113.00
+# Restraint H-NH-H angle
+ 2.0   +   a1206/1   -   a1201/1                                              -15.20
+ 0.25  +   a1206/1   -   a1202/1                                               -3.30
+ 0.1   +   a1206/1   -   a1203/1                                               -0.70
+ 0.1   +   a1206/1   -   a1204/1                                               -0.10
+ 0.1   +   a1206/1   -   a1205/1                                               -0.01
+ 0.1   +   a1206/1   -   a1207/1                                               -0.01
+ 0.1   +   a1206/1   -   a1208/1                                               -0.10
+ 0.1   +   a1206/1   -   a1209/1                                               -0.60
+ 0.25  +   a1206/1   -   a1210/1                                               -2.70
+ 2.0   +   a1206/1   -   a1211/1                                               -9.80
+# Restraint H-NH-OH angle
+ 2.0   +   a1306/1   -   a1301/1                                              -18.20
+ 1.0   +   a1306/1   -   a1302/1                                               -4.30
+ 1.0   +   a1306/1   -   a1303/1                                               -0.90
+ 0.5   +   a1306/1   -   a1304/1                                               -0.20
+ 0.2   +   a1306/1   -   a1305/1                                               -0.01
+ 0.2   +   a1306/1   -   a1307/1                                               -0.01
+ 0.5   +   a1306/1   -   a1308/1                                               -0.20
+ 1.0   +   a1306/1   -   a1309/1                                               -0.90
+ 1.0   +   a1306/1   -   a1310/1                                               -4.10
+ 2.0   +   a1306/1   -   a1311/1                                              -16.10
+#
+ 0.50  +   nh3_min/1   -   h2n_frag/1  - H1/1                                  -113.0
 ENDENERGY

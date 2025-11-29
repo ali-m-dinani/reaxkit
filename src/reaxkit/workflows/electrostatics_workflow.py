@@ -19,7 +19,7 @@ from reaxkit.analysis.electrostatics_analyzer import (
 )
 from reaxkit.analysis.plotter import single_plot
 
-from reaxkit.utils.alias_utils import (
+from reaxkit.utils.alias import (
     normalize_choice,
     _resolve_alias,
 )
@@ -30,7 +30,7 @@ from reaxkit.analysis.xmolout_analyzer import get_atom_trajectories
 from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
 
 from reaxkit.utils.frame_utils import parse_frames, resolve_indices
-from reaxkit.utils.alias_utils import resolve_alias_from_columns
+from reaxkit.utils.alias import resolve_alias_from_columns
 
 
 # -------------------------------------------------------------------------

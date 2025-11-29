@@ -79,7 +79,7 @@ def category_task(args: argparse.Namespace) -> int:
     Print or export unique group comments (categories) for trainset sections.
     """
     handler = TrainsetHandler(args.file)
-    df = trainset_group_comments(handler)   # columns: section, group_comment
+    df = trainset_group_comments(handler, sort=args.sort)   # columns: section, group_comment
 
     if df.empty:
         print("[Info] No categories found in trainset.")
@@ -131,7 +131,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_cat = subparsers.add_parser("category",
                                   help="List or export unique trainset categories (group comments) || "
                                        "reaxkit trainset category --section all --export trainset_categories.csv"
-                                       "reaxkit trainset category --section all"
+                                       "reaxkit trainset category --section all --sort"
                                        "reaxkit trainset category --section energy --export energy_categories.csv",
     )
     p_cat.add_argument("--file", default="trainset.in", help="Path to trainset/fort.99 file")
@@ -139,4 +139,5 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
                        help="Section to analyze: all, charge, heatfo, geometry, cell_parameters, energy",
     )
     p_cat.add_argument("--export", help="Optional CSV file to write categories into (e.g. trainset_categories.csv)")
+    p_cat.add_argument("--sort", action="store_true", help="Sort labels alphabetically (default: off)")
     p_cat.set_defaults(_run=category_task)

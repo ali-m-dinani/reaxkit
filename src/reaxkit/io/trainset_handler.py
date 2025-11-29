@@ -238,7 +238,7 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
         #Weigh op1 Ide1  n1 op2 Ide2    n2    Lit
         #group comment...
          1.5   +  butbenz/1 -  butbenz_a/1   -90.00 !inline
-         1   +   Zn_Pt111_top /1 - Pt111_slab /1 - Zn_atom/1   -40.11
+         1.0   + Zn_h2o-1_P2 /1 - Zn_oh-1_P1/1 - Proton/1   -54.0
          ...
         ENDENERGY
 
@@ -247,7 +247,6 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
     - First token  -> weight
     - Last token   -> lit
     - Middle part  -> repeated groups of (op, iden, /n)
-      We normalize tokens so that 'Zn_atom/1' becomes ['Zn_atom', '/1'].
 
     Columns: section, weight, lit,
              op1, id1, n1, op2, id2, n2, op3, id3, n3, ...
@@ -289,9 +288,12 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
         except ValueError:
             continue
 
-        middle_tokens = tokens[1:-1]
-        if not middle_tokens:
+        # middle_part: everything between weight and lit
+        middle_part = " ".join(tokens[1:-1]).strip()
+        if not middle_part:
             continue
+
+        middle_tokens = middle_part.split()
 
         # --- normalize middle tokens ---
         # Ensure that each "iden/n" becomes two tokens: "iden", "/n"
@@ -302,7 +304,7 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
                     # already just "/n"
                     norm.append(tok)
                 else:
-                    # split "Zn_atom/1" -> "Zn_atom", "/1"
+                    # split "Zn_atom/1" or "Zn_atom/1.00" -> "Zn_atom", "/1" or "/1.00"
                     base, rest = tok.split("/", 1)
                     norm.append(base)
                     norm.append("/" + rest)
@@ -328,18 +330,14 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
             iden = norm[i + 1]
             n_tok = norm[i + 2]
 
-            # parse n from "/n"
-            n = 1
+            # parse n from "/n" (supports ints and floats: /1, /1.00, etc.)
+            n = 1.0
             if "/" in n_tok:
-                # "/1" or possibly "iden/1" if something odd slipped through
-                if n_tok.startswith("/"):
-                    _, n_str = n_tok.split("/", 1)
-                else:
-                    _, n_str = n_tok.split("/", 1)
+                _, n_str = n_tok.split("/", 1)
                 try:
-                    n = int(n_str.strip())
+                    n = float(n_str.strip())
                 except ValueError:
-                    n = 1
+                    n = 1.0
 
             row[f"op{group_idx}"] = op
             row[f"id{group_idx}"] = iden
@@ -408,7 +406,12 @@ class TrainsetHandler(TemplateHandler):
             else:
                 df = pd.DataFrame()
 
-            tables[name] = df
+            # 🔧 KEY CHANGE: append rather than overwrite
+            if name in tables and not tables[name].empty:
+                tables[name] = pd.concat([tables[name], df], ignore_index=True)
+            else:
+                tables[name] = df
+
             buffer = []
 
         for raw in lines:

@@ -7,7 +7,7 @@ import pandas as pd
 from reaxkit.io.fort99_handler import Fort99Handler
 from reaxkit.analysis import fort99_analyzer
 from reaxkit.analysis.plotter import single_plot
-from reaxkit.utils.alias_utils import normalize_choice
+from reaxkit.utils.alias import normalize_choice
 from reaxkit.io.fort74_handler import Fort74Handler
 
 
@@ -49,10 +49,10 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
       4) For each iden1 group, plot single_plot (both lines on same axes)
       5) Optionally export table
     """
-    fort99_handler = Fort99Handler(args.file)
+    fort99_handler = Fort99Handler(args.fort99)
 
     # Guess fort.74 path if not provided
-    fort74_path = (Path(args.file).with_name("fort.74")
+    fort74_path = (Path(args.fort99).with_name("fort.74")
                     if args.fort74 is None else Path(args.fort74))
     fort74_handler = Fort74Handler(str(fort74_path))
 
@@ -141,7 +141,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
                                               "reaxkit fort99 eos --iden all --save eos_plots --flip || "
                                               "reaxkit fort99 eos --iden bulk_0 --save eos_plots --export eos_bulk0.csv"
                                   )
-    p_eos.add_argument("--file", default="fort.99", help="Path to fort.99 file")
+    p_eos.add_argument("--fort99", default="fort.99", help="Path to fort.99 file")
     p_eos.add_argument("--fort74", default=None, help="Path to fort.74 (default: same directory as fort.99)")
     p_eos.add_argument("--iden", default="all", help="iden1 to include ('all' or specific e.g. bulk_0)")
     p_eos.add_argument("--plot", action="store_true", help="Show plots interactively")

@@ -3,15 +3,26 @@ from __future__ import annotations
 from typing import Any
 import pandas as pd
 
-from reaxkit.io.template_handler import TemplateHandler
+from reaxkit.io.trainset_handler import TrainsetHandler
 
 
-def trainset_group_comments(handler: TemplateHandler) -> pd.DataFrame:
+def trainset_group_comments(handler: TrainsetHandler, *, sort: bool = False) -> pd.DataFrame:
     """
     Collect all UNIQUE group comments from a trainset file,
     along with the section they belong to.
 
-    Returns a DataFrame with columns:
+    Parameters
+    ----------
+    handler : TrainsetHandler
+        Parsed trainset handler with metadata and tables.
+
+    sort : bool, default=True
+        If True, sort the result by 'section' and 'group_comment'.
+        If False, preserve original appearance order.
+
+    Returns
+    -------
+    DataFrame with columns:
         - section
         - group_comment
     """
@@ -38,8 +49,8 @@ def trainset_group_comments(handler: TemplateHandler) -> pd.DataFrame:
 
     result = pd.DataFrame(rows).drop_duplicates()
 
-    # optional: sort by section then group_comment
-    if not result.empty:
+    # Apply sort only if requested
+    if sort and not result.empty:
         result = result.sort_values(["section", "group_comment"], ignore_index=True)
 
     return result

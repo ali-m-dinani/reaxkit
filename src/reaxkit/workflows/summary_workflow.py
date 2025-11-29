@@ -6,7 +6,7 @@ from typing import Optional, Sequence, Union
 import pandas as pd
 from reaxkit.utils.units import UNITS
 from reaxkit.io.summary_handler import SummaryHandler
-from reaxkit.utils.alias_utils import _resolve_alias, available_keys, normalize_choice
+from reaxkit.utils.alias import _resolve_alias, available_keys, normalize_choice
 from reaxkit.analysis.plotter import single_plot
 from reaxkit.utils.convert import convert_xaxis
 from reaxkit.utils.frame_utils import parse_frames, select_frames

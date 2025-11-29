@@ -14,7 +14,7 @@ from reaxkit.io.eregime_generator import (
     make_eregime_smooth_pulse,
     make_eregime_from_function,
 )
-from reaxkit.utils.alias_utils import normalize_choice
+from reaxkit.utils.alias import normalize_choice
 from reaxkit.utils.frame_utils import parse_frames, select_frames
 
 

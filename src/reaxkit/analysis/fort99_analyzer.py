@@ -51,85 +51,83 @@ def get(
 def parse_fort99_two_body_energy_terms(handler: TemplateHandler) -> pd.DataFrame:
     """
     Parse ENERGY section titles of fort.99 into structured columns, but only
-    for titles that contain two "/" symbols (i.e. pairwise terms).
-
-    Filtering rules:
-      1. Keep rows where section == "ENERGY" (case-insensitive).
-      2. From those, keep only titles that contain exactly two "/" characters.
-
-    Example title:
-        "Energy +bulk_0/  1 -bulk_c5/  1"
+    for titles that contain (at least) two "/" symbols (i.e. pairwise terms).
 
     Output columns:
-        opt1  = +1
-        iden1 = bulk_0
-        n1    = 1
-        opt2  = -1
-        iden2 = bulk_c5
-        n2    = 1
-
-    Returns
-    -------
-    energy_section_df : pd.DataFrame
-        ENERGY rows (with two "/") with parsed columns added and 'title' removed.
+        opt1  = +1 / -1
+        iden1 = first identifier
+        n1    = float stoichiometry
+        opt2  = +1 / -1
+        iden2 = second identifier
+        n2    = float stoichiometry
     """
     import re
+    import numpy as np
+    import pandas as pd
 
     df = handler.dataframe().copy()
 
-    # 1) Restrict to ENERGY section (case-insensitive)
+    # 1) Basic sanity check
     if "section" not in df.columns or "title" not in df.columns:
         raise KeyError("Expected 'section' and 'title' columns in fort.99 DataFrame.")
 
+    # 2) Restrict to ENERGY section (case-insensitive)
     energy_df = df[df["section"].astype(str).str.upper() == "ENERGY"].copy()
 
-    # 2) Keep only titles that contain exactly two "/" symbols
-    energy_df = energy_df[
-        energy_df["title"].astype(str).str.count("/") == 2
-    ].copy()
+    # 3) Keep rows with *at least* 2 "/" (some triple-body lines may be truncated)
+    energy_df = energy_df[energy_df["title"].astype(str).str.count("/") == 2].copy()
 
-    # Regex for entries like:
-    #   Energy +bulk_0/  1 -bulk_c5/  1
+    # Regex:
+    #   Energy +Zn_h2o-1_P2/1.00 -Zn_oh-1_P1/1.00 ...
+    #
+    #  - allow any non-"/" chars in identifiers: [^/]+?
+    #  - allow ints or floats for n1, n2: \d+(?:\.\d+)?
+    #  - ignore case on "Energy"
     pattern = re.compile(
         r"^Energy\s+"
-        r"(?P<sign1>[+-])(?P<iden1>[A-Za-z0-9_]+)\s*/\s*(?P<n1>\d+)\s+"
-        r"(?P<sign2>[+-])(?P<iden2>[A-Za-z0-9_]+)\s*/\s*(?P<n2>\d+)"
+        r"(?P<sign1>[+-])(?P<iden1>[^/]+?)\s*/\s*(?P<n1>\d+(?:\.\d+)?)\s+"
+        r"(?P<sign2>[+-])(?P<iden2>[^/]+?)\s*/\s*(?P<n2>\d+(?:\.\d+)?)",
+        flags=re.IGNORECASE,
     )
 
-    def _parse_title(title: str) -> pd.Series:
-        m = pattern.match(title.strip())
+    def _parse_title(title: str) -> dict:
+        """Return parsed components or NaNs if it doesn't match."""
+        m = pattern.search(title)
         if not m:
-            raise ValueError(f"Could not parse ENERGY title: {title!r}")
-
-        sign1 = m.group("sign1")
-        iden1 = m.group("iden1")
-        n1 = int(m.group("n1"))
-
-        sign2 = m.group("sign2")
-        iden2 = m.group("iden2")
-        n2 = int(m.group("n2"))
-
-        return pd.Series(
-            {
-                "opt1": 1 if sign1 == "+" else -1,
-                "iden1": iden1,
-                "n1": n1,
-                "opt2": 1 if sign2 == "+" else -1,
-                "iden2": iden2,
-                "n2": n2,
+            # Return NaNs so we can drop these rows later instead of raising
+            return {
+                "opt1": np.nan,
+                "iden1": np.nan,
+                "n1": np.nan,
+                "opt2": np.nan,
+                "iden2": np.nan,
+                "n2": np.nan,
             }
-        )
 
+        g = m.groupdict()
+        return {
+            "opt1": 1 if g["sign1"] == "+" else -1,
+            "iden1": g["iden1"].strip(),
+            "n1": float(g["n1"]),
+            "opt2": 1 if g["sign2"] == "+" else -1,
+            "iden2": g["iden2"].strip(),
+            "n2": float(g["n2"]),
+        }
+
+    # Apply parser row-wise
     parsed = energy_df["title"].astype(str).apply(_parse_title)
+    parsed_df = pd.DataFrame(list(parsed))  # list-of-dicts -> DataFrame
 
-    # Replace title column with parsed columns
-    energy_section_df = (
-        energy_df
-        .drop(columns=["title"])
-        .join(parsed)
-    )
+    # Merge parsed columns into energy_df
+    energy_df = pd.concat([energy_df.reset_index(drop=True), parsed_df], axis=1)
 
-    return energy_section_df
+    # Drop rows where parsing failed (NaNs in iden1/iden2)
+    energy_df = energy_df.dropna(subset=["iden1", "iden2"])
+
+    # (Optional) if you no longer need the raw 'title' column, remove it:
+    # energy_df = energy_df.drop(columns=["title"])
+
+    return energy_df
 
 
 def fort99_energy_vs_volume(

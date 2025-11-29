@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from reaxkit.io.eregime_handler import EregimeHandler
-from reaxkit.utils.alias_utils import resolve_alias_from_columns, normalize_choice  # uses shared alias map
+from reaxkit.utils.alias import resolve_alias_from_columns, normalize_choice  # uses shared alias map
 from reaxkit.utils.convert import convert_xaxis  # converts iter → time or frame
 
 

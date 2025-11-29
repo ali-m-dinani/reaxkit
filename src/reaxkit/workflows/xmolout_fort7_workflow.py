@@ -15,7 +15,7 @@ from reaxkit.analysis import fort7_analyzer as f7
 from reaxkit.utils.frame_utils import parse_frames, parse_atoms, resolve_indices
 
 # Aliases (NEW: accept canonical or alias names like 'charge', 'q', etc.)
-from reaxkit.utils.alias_utils import resolve_alias_from_columns
+from reaxkit.utils.alias import resolve_alias_from_columns
 
 # Plotting
 from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
