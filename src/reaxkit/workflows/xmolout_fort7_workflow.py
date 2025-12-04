@@ -232,54 +232,86 @@ def heatmap2d_task(args: argparse.Namespace) -> int:
 
 
 # ==================== CLI registration ====================
+def _add_common_xmolout_io_args(
+    p: argparse.ArgumentParser,
+    *,
+    include_plot: bool = False,
+) -> None:
+    p.add_argument("--xmolout", default="xmolout", help="Path to xmolout file.")
+    p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file.")
+    if include_plot:
+        p.add_argument("--plot", action="store_true", help="Show plot interactively.")
+
+    p.add_argument("--export", default=None, help="Path to export CSV data.")
+
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # 3D scatter
     p = subparsers.add_parser(
         "plot3d",
-        help=(
-            "3D scatter plot of any fort7 property (aliases allowed: charge/q → partial_charge) ||"
-            "  reaxkit xmolfort7 plot3d --property charge --frames 0:20:10 --save figs/charges3d"
+        help="3D scatter plot of any fort7 property (aliases allowed: charge/q → partial_charge).",
+        description=(
+            "Examples:\n"
+            "  reaxkit xmolfort7 plot3d --property charge --frames 0:20:10 \n"
         ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
-    p.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
-    p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
-    p.add_argument("--property", required=True, help="Column name or alias (e.g., partial_charge, charge, q)")
-    p.add_argument("--frames", default=None, help='Frames: "0,10,20" or "0:100:5"')
-    p.add_argument("--atoms", default=None, help='Atom indices: "0,1,2" (0-based)')
-    p.add_argument("--save", default=None, help="Directory to save PNGs (one per frame)")
-    p.add_argument("--vmin", type=float, default=None, help="Color scale min (auto if not set)")
-    p.add_argument("--vmax", type=float, default=None, help="Color scale max (auto if not set)")
-    p.add_argument("--size", type=float, default=8.0, help="Marker size")
-    p.add_argument("--alpha", type=float, default=0.9, help="Marker transparency")
-    p.add_argument("--cmap", default="coolwarm", help="Matplotlib colormap")
-    p.add_argument("--elev", type=float, default=22.0, help="3D view elevation")
-    p.add_argument("--azim", type=float, default=38.0, help="3D view azimuth")
+    _add_common_xmolout_io_args(p, include_plot=True)
+    p.add_argument("--property", required=True,
+                  help="Column name or alias (e.g., partial_charge, charge, q).")
+    p.add_argument("--frames", default=None,
+                  help='Frames: "0,10,20" or "0:100:5".')
+    p.add_argument("--atoms", default=None,
+                  help='Atom indices: "0,1,2" (0-based).')
+    p.add_argument("--vmin", type=float, default=None,
+                  help="Color scale min (auto if not set).")
+    p.add_argument("--vmax", type=float, default=None,
+                  help="Color scale max (auto if not set).")
+    p.add_argument("--size", type=float, default=8.0, help="Marker size.")
+    p.add_argument("--alpha", type=float, default=0.9, help="Marker transparency.")
+    p.add_argument("--cmap", default="coolwarm", help="Matplotlib colormap.")
+    p.add_argument("--elev", type=float, default=22.0, help="3D view elevation.")
+    p.add_argument("--azim", type=float, default=38.0, help="3D view azimuth.")
+    p.add_argument("--save", default="reaxkit_outputs/xmol_fort7/3D_scatter/", help="Path to save plot image.")
     p.set_defaults(_run=plot_property_task)
+
+
+
+
 
     # 2D heatmap
     q = subparsers.add_parser(
         "heatmap2d",
-        help=(
-            "Project 3D atoms to 2D grid (xy/xz/yz) and aggregate values per cell. ||"
-            "  reaxkit xmolfort7 heatmap2d --property partial_charge --plane xz --bins 10 --agg mean --frames 0:300:100 --save figs/heat_xy_charge"
+        help="Project 3D atoms to 2D grid (xy/xz/yz) and aggregate values per cell.",
+        description=(
+            "Examples:\n"
+            "  reaxkit xmolfort7 heatmap2d --property partial_charge --plane xz "
+            "--bins 10 --agg mean --frames 0:300:100\n"
         ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
-    q.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
-    q.add_argument("--frames", default=None, help='Frames: "0,10,20" or "0:100:5"')
+    _add_common_xmolout_io_args(q, include_plot=True)
+    q.add_argument("--frames", default=None,
+                  help='Frames: "0,10,20" or "0:100:5".')
 
     # Projection/grid
-    q.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane")
-    q.add_argument("--bins", default="40", help='Grid bins: "N" or "Nx,Ny" (e.g., "10,25")')
-    q.add_argument("--agg", default="mean", help="Aggregation: mean|max|min|sum|count")
+    q.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"],
+                  help="Projection plane.")
+    q.add_argument("--bins", default="40",
+                  help='Grid bins: "N" or "Nx,Ny" (e.g., "10,25").')
+    q.add_argument("--agg", default="mean",
+                  help="Aggregation: mean|max|min|sum|count.")
 
     # Optional scalar from fort7
-    q.add_argument("--fort7", default='fort.7', help="Path to fort.7 file (required if --property is set)")
-    q.add_argument("--property", default=None, help="fort7 column or alias to aggregate (e.g., partial_charge|charge|q)")
+    q.add_argument("--property", default=None,
+                  help="fort7 column or alias to aggregate (e.g., partial_charge|charge|q).")
 
     # Viz
-    q.add_argument("--vmin", type=float, default=None, help="Color scale min (auto if not set)")
-    q.add_argument("--vmax", type=float, default=None, help="Color scale max (auto if not set)")
-    q.add_argument("--cmap", default="viridis", help="Matplotlib colormap")
-    q.add_argument("--save", default=None, help="Directory to save PNGs (one per frame)")
+    q.add_argument("--vmin", type=float, default=None,
+                  help="Color scale min (auto if not set).")
+    q.add_argument("--vmax", type=float, default=None,
+                  help="Color scale max (auto if not set).")
+    q.add_argument("--cmap", default="viridis", help="Matplotlib colormap.")
+    q.add_argument("--save", default="reaxkit_outputs/xmol_fort7/2D_heatmap/", help="Path to save plot image.")
     q.set_defaults(_run=heatmap2d_task)
+

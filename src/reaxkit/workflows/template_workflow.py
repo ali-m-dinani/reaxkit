@@ -34,6 +34,13 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
             p.add_argument("--save", default=None, help="Path to save plot image.")
             p.add_argument("--export", default=None, help="Path to export CSV data.")
 
+    furthermore, examples of each task are added in a format as follows:
+        description=(
+            "Examples:\n"
+            "  reaxkit workflow task --flags\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+
     finally, for the sake of readability, add_arguments as written as compact as possible. so, instead of:
         pt.add_argument(
         "--atoms",

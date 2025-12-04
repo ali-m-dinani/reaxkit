@@ -8,25 +8,54 @@ import pandas as pd
 from reaxkit.io.xmolout_handler import XmoloutHandler
 from reaxkit.io.xmolout_generator import write_xmolout_from_frames
 from reaxkit.analysis.fort7_analyzer import coordination_status_over_frames
-
-FrameSel = Optional[Union[Sequence[int], range, slice]]
+from reaxkit.utils.path import resolve_output_path
 
 # -----------------------------
 # Helpers
 # -----------------------------
-def _normalize_frames(xh: XmoloutHandler, frames: FrameSel, start: Optional[int], end: Optional[int], every: int) -> list[int]:
+def _normalize_frames(xh: XmoloutHandler, frames: Optional[str]) -> list[int]:
+    """
+    Normalize a frame-selection string into a sorted list of frame indices.
+
+    Supported formats:
+      - 'start:end:step'  (any of the 3 can be omitted, e.g. '::5', '10:', ':100')
+      - 'i,j,k' or 'i j k' (explicit indices)
+    If frames is None, all frames [0, n_frames) are used.
+    """
     n = xh.n_frames()
-    if frames is not None:
-        if isinstance(frames, slice):
-            idx = list(range(*frames.indices(n)))
-        else:
-            idx = [int(i) for i in frames if 0 <= int(i) < n]
-    else:
-        lo = 0 if start is None else max(0, int(start))
-        hi = n if end   is None else min(n, int(end))
-        idx = list(range(lo, hi))
-    every = max(1, int(every))
-    return idx[::every]
+
+    if not frames:
+        return list(range(n))
+
+    s = frames.strip()
+
+    # Slice-like 'start:end:step'
+    if ":" in s:
+        parts = s.split(":")
+        if len(parts) > 3:
+            raise ValueError(f"Invalid --frames slice specification: {frames!r}")
+        start_s = parts[0].strip() if len(parts) >= 1 else ""
+        end_s   = parts[1].strip() if len(parts) >= 2 else ""
+        step_s  = parts[2].strip() if len(parts) == 3 else ""
+
+        start = int(start_s) if start_s else 0
+        end   = int(end_s)   if end_s   else n
+        step  = int(step_s)  if step_s  else 1
+        if step == 0:
+            raise ValueError("Step in --frames slice cannot be 0.")
+
+        start = max(0, start)
+        end   = min(n, end)
+        return list(range(start, end, step))
+
+    # Comma/space-separated explicit indices
+    idx: List[int] = []
+    for tok in s.replace(",", " ").split():
+        i = int(tok)
+        if 0 <= i < n:
+            idx.append(i)
+    return sorted(set(idx))
+
 
 def _parse_kv_map(s: Optional[str], value_cast=float) -> Dict[str, float]:
     if not s:
@@ -40,6 +69,7 @@ def _parse_kv_map(s: Optional[str], value_cast=float) -> Dict[str, float]:
         k, v = item.split("=", 1)
         out[k.strip()] = value_cast(v.strip())
     return out
+
 
 def _parse_status_labels(s: Optional[str]) -> Dict[int, str]:
     if not s:
@@ -56,8 +86,9 @@ def _parse_status_labels(s: Optional[str]) -> Dict[int, str]:
             raise ValueError("Status keys must be -1, 0, or 1")
         out[ki] = v.strip()
     for k in (-1, 0, 1):
-        out.setdefault(k, { -1:"U", 0:"C", 1:"O" }[k])
+        out.setdefault(k, {-1: "U", 0: "C", 1: "O"}[k])
     return out
+
 
 def _frame_record_from_handler(xh: XmoloutHandler, i: int) -> Dict[str, Any]:
     fr = xh.frame(i)
@@ -76,10 +107,11 @@ def _frame_record_from_handler(xh: XmoloutHandler, i: int) -> Dict[str, Any]:
         "gamma": float(row["gamma"]) if "gamma" in row else 90.0,
     }
 
+
 # -----------------------------
 # Action implementations
 # -----------------------------
-def _run_analyze(args: argparse.Namespace) -> int:
+def _task_analyze(args: argparse.Namespace) -> int:
     xh = XmoloutHandler(args.xmolout)
     from reaxkit.io.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
@@ -88,7 +120,7 @@ def _run_analyze(args: argparse.Namespace) -> int:
     if not valences:
         raise SystemExit("❌ Provide --valences like 'Mg=2,O=2'.")
 
-    frames = _normalize_frames(xh, None, args.start, args.end, args.every)
+    frames = _normalize_frames(xh, args.frames)
 
     df = coordination_status_over_frames(
         f7, xh,
@@ -99,16 +131,21 @@ def _run_analyze(args: argparse.Namespace) -> int:
         require_all_valences=not args.allow_missing_valences,
     )
 
-    if args.save:
-        Path(args.save).parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(args.save, index=False)
-        print(f"[Done] Saved coordination table to {args.save}")
+    workflow_name = args.kind
+    if args.export:
+        export_path = resolve_output_path(args.export, workflow_name)
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(export_path, index=False)
+        print(f"[Done] Exported coordination table to {export_path}")
     else:
-        summary = df.groupby(["frame_index", "status"], dropna=False).size().unstack(fill_value=0)
+        summary = df.groupby(["frame_index", "status"], dropna=False) \
+            .size().unstack(fill_value=0)
         print(summary)
+
     return 0
 
-def _run_relabel(args: argparse.Namespace) -> int:
+
+def _task_relabel(args: argparse.Namespace) -> int:
     xh = XmoloutHandler(args.xmolout)
     from reaxkit.io.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
@@ -119,7 +156,7 @@ def _run_relabel(args: argparse.Namespace) -> int:
 
     labels = _parse_status_labels(args.labels)
     mode: Literal["global", "by_type"] = args.mode
-    frames = _normalize_frames(xh, None, args.start, args.end, args.every)
+    frames = _normalize_frames(xh, args.frames)
 
     status_df = coordination_status_over_frames(
         f7, xh,
@@ -133,11 +170,11 @@ def _run_relabel(args: argparse.Namespace) -> int:
     if status_df.empty:
         blocks = (_frame_record_from_handler(xh, i) for i in frames)
         write_xmolout_from_frames(
-            blocks, args.out,
+            blocks, args.output,
             simulation_name=args.simulation or getattr(xh, "simulation_name", None) or "MD",
             precision=args.precision,
         )
-        print(f"⚠️ No frames selected or empty status; wrote pass-through xmolout to {args.out}")
+        print(f"⚠️ No frames selected or empty status; wrote pass-through xmolout to {args.output}")
         return 0
 
     sim_df = xh.dataframe()
@@ -161,7 +198,7 @@ def _run_relabel(args: argparse.Namespace) -> int:
                 new_types.append(t0)
                 continue
             st = int(st_val)
-            tag = labels.get(st, { -1:"U", 0:"C", 1:"O" }[st])
+            tag = labels.get(st, {-1: "U", 0: "C", 1: "O"}[st])
             if mode == "global":
                 new_types.append(str(tag))
             else:
@@ -184,59 +221,84 @@ def _run_relabel(args: argparse.Namespace) -> int:
             "gamma": float(row["gamma"]) if "gamma" in row else 90.0,
         })
 
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+    workflow_name = args.kind
+    output_path = resolve_output_path(args.output, workflow_name)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     write_xmolout_from_frames(
-        frame_blocks, args.out,
+        frame_blocks,
+        output_path,
         simulation_name=args.simulation or getattr(xh, "simulation_name", None) or "MD",
         precision=args.precision,
     )
-    print(f"[Done] Wrote relabeled xmolout to {args.out}")
+
+    print(f"[Done] Wrote relabeled xmolout to {output_path}")
     return 0
+
 
 # -----------------------------
 # Template-style registration
 # -----------------------------
+def _add_common_coord_args(p: argparse.ArgumentParser) -> None:
+    """Common args shared by coord analyze / relabel."""
+    p.add_argument("--xmolout", default="xmolout", help="Path to xmolout.")
+    p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file.")
+    p.add_argument("--valences", required=True, help="Type valences, e.g. 'Mg=2,O=2,H=1'.")
+    p.add_argument("--threshold", type=float, default=0.3, help="Tolerance around valence.")
+    p.add_argument("--frames", default=None,
+                   help="Frame selection, e.g. '0:100:5' or '0,5,10'.")
+    p.add_argument("--allow-missing-valences", action="store_true",
+                   help="Keep atoms with unknown valence (status=NaN).")
+
+
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Your CLI already adds a top-level 'coord' group.
-    Here we register two child subcommands under that group:
-      - analyze
-      - relabel
-    So you will run:
-      reaxkit coord analyze ...
-      reaxkit coord relabel ...
+    Register subcommands under:
+        reaxkit coord analyze
+        reaxkit coord relabel
     """
-    # coord analyze
-    p1 = subparsers.add_parser("analyze", help="Analyze coordination per atom per frame"
-                                               "reaxkit coord analyze --valences 'Mg=2,O=2,Zn=2' --save coord.csv")
-    p1.add_argument("--xmolout", default='xmolout', help="Path to xmolout")
-    p1.add_argument("--fort7", default='fort.7', help="Path to fort.7 (or Fort7-compatible) file")
-    p1.add_argument("--valences", required=True, help="Type valences, e.g. 'Mg=2,O=2,H=1'")
-    p1.add_argument("--threshold", type=float, default=0.3, help="Tolerance around valence")
-    p1.add_argument("--allow-missing-valences", action="store_true", help="Keep atoms with unknown valence (status=NaN)")
-    p1.add_argument("--start", type=int, default=None, help="Start frame (0-based)")
-    p1.add_argument("--end", type=int, default=None, help="End frame (exclusive)")
-    p1.add_argument("--every", type=int, default=1, help="Stride over frames")
-    p1.add_argument("--save", default=None, help="CSV path to save full coordination table")
-    p1.set_defaults(_run=_run_analyze)
 
-    # coord relabel
-    p2 = subparsers.add_parser("relabel", help="Relabel atom types by coordination and write a new xmolout"
-                                               "reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --out xmolout_relabeled --mode global --labels=-1=U,0=C,1=O"
-                                               "reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --out xmolout_type --mode by_type --keep-coord-original"
-                                               "reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --out xmolout_relabeled --mode global")
-    p2.add_argument("--xmolout", default='xmolout', help="Path to xmolout")
-    p2.add_argument("--fort7", default='fort.7', help="Path to fort.7 (or Fort7-compatible) file")
-    p2.add_argument("--out", required=True, help="Output xmolout path")
-    p2.add_argument("--valences", required=True, help="Type valences, e.g. 'Mg=2,O=2,H=1'")
-    p2.add_argument("--threshold", type=float, default=0.3, help="Tolerance around valence")
-    p2.add_argument("--mode", choices=["global", "by_type"], default="global", help="Relabeling mode")
-    p2.add_argument("--labels", default=None, help="Status→tag map, e.g. '-1=U,0=C,1=O'")
-    p2.add_argument("--keep-coord-original", action="store_true", help="In by_type mode, keep original label when status==0")
-    p2.add_argument("--simulation", default=None, help="Override header simulation name")
-    p2.add_argument("--precision", type=int, default=6, help="Float precision")
-    p2.add_argument("--start", type=int, default=None, help="Start frame (0-based)")
-    p2.add_argument("--end", type=int, default=None, help="End frame (exclusive)")
-    p2.add_argument("--every", type=int, default=1, help="Stride over frames")
-    p2.add_argument("--allow-missing-valences", action="store_true", help="Keep atoms with unknown valence (status=NaN)")
-    p2.set_defaults(_run=_run_relabel)
+    # -------------------- analyze --------------------
+    p1 = subparsers.add_parser(
+        "analyze",
+        help="Analyze coordination per atom per frame.",
+        description=(
+            "Examples:\n"
+            "  reaxkit coord analyze --valences 'Mg=2,O=2,Zn=2' --export coord_analysis.csv\n"
+            "  reaxkit coord analyze --valences 'Mg=2,O=2' --frames 0:200:2 --export coord_0_200_2.csv\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+
+    _add_common_coord_args(p1)
+    p1.add_argument("--export", default=None, help="Path to export coordination CSV.")
+    p1.set_defaults(_run=_task_analyze)
+
+
+    # -------------------- relabel --------------------
+    p2 = subparsers.add_parser(
+        "relabel",
+        help="Relabel atom types by coordination and write a new xmolout.",
+        description=(
+            "Examples:\n"
+            "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --output xmolout_relabeled "
+            "--mode global --labels=-1=U,0=C,1=O\n"
+            "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --output xmolout_type "
+            "--mode by_type --keep-coord-original\n"
+            "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --frames 0:400:5 "
+            "--output xmolout_relabeled --mode global\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+
+    _add_common_coord_args(p2)
+    p2.add_argument("--output", required=True, help="Output xmolout path.")
+    p2.add_argument("--mode", choices=["global", "by_type"], default="global",
+                    help="Relabeling mode.")
+    p2.add_argument("--labels", default=None,
+                    help="Status→tag map, e.g. '-1=U,0=C,1=O'.")
+    p2.add_argument("--keep-coord-original", action="store_true",
+                    help="In by_type mode, keep original label when status==0.")
+    p2.add_argument("--simulation", default=None, help="Override header simulation name.")
+    p2.add_argument("--precision", type=int, default=6, help="Float precision.")
+    p2.set_defaults(_run=_task_relabel)
