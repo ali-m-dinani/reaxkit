@@ -6,10 +6,10 @@ import pandas as pd
 from reaxkit.io.summary_handler import SummaryHandler
 from reaxkit.utils.alias import _resolve_alias, available_keys, normalize_choice
 
-__all__ = ["get"]
+__all__ = ["get_summary"]
 
 
-def get(
+def get_summary(
     handler: SummaryHandler,
     feature: str,
     frames: Optional[Union[slice, Sequence[int]]] = None,

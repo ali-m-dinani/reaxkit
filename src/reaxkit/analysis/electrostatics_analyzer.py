@@ -15,8 +15,8 @@ from reaxkit.analysis.xmolout_analyzer import (
     get_atom_type_mapping,
 )
 from reaxkit.analysis.fort7_analyzer import (
-    partial_charges,
-    all_atom_cnn,
+    get_partial_charges,
+    get_all_atom_cnn,
 )
 from reaxkit.analysis.fort78_analyzer import match_electric_field_to_iout2
 
@@ -155,7 +155,7 @@ def single_frame_dipoles_polarizations(
     atom_types = traj["atom_type"].astype(str).tolist()
 
     # --- 3) charges from fort7_analyzer.partial_charges (matched by iteration) ---
-    q_df = partial_charges(f7, iterations=[iter_val])
+    q_df = get_partial_charges(f7, iterations=[iter_val])
     if q_df.empty:
         raise ValueError(f"No partial charges found in fort.7 for iter={iter_val}.")
 
@@ -202,7 +202,7 @@ def single_frame_dipoles_polarizations(
         return pd.DataFrame(columns=cols)
 
     # connectivity from fort7_analyzer.all_atom_cnn (also matched by iteration)
-    cnn_df = all_atom_cnn(f7, iterations=[iter_val])
+    cnn_df = get_all_atom_cnn(f7, iterations=[iter_val])
     if cnn_df.empty:
         raise ValueError(f"No connectivity (atom_cnn*) data found in fort.7 for iter={iter_val}.")
 

@@ -61,7 +61,7 @@ def _plot_fort7_property_3d(
     Plot any scalar property (e.g., partial_charge/charge/q) from fort.7 in 3D across frames.
     """
     # Pull all per-atom data we need from fort7 (tidy: frame_idx, iter, atom_idx, <props...>)
-    df_all = f7.features_atom(fort7_handler, columns=".*", frames=frames_spec, regex=True)
+    df_all = f7.get_features_atom(fort7_handler, columns=".*", frames=frames_spec, regex=True)
 
     # Resolve the requested property via alias map against the columns we actually have
     col = resolve_alias_from_columns(df_all.columns, property_name)
@@ -173,7 +173,7 @@ def heatmap2d_task(args: argparse.Namespace) -> int:
     use_scalar = args.property is not None
     if use_scalar:
         fh = Fort7Handler(args.fort7)
-        df = f7.features_atom(fh, columns=".*", frames=frames_spec, regex=True)
+        df = f7.get_features_atom(fh, columns=".*", frames=frames_spec, regex=True)
         col = resolve_alias_from_columns(df.columns, args.property)
         if col is None:
             raise ValueError(

@@ -8,7 +8,7 @@ from reaxkit.utils.alias import resolve_alias_from_columns, _DEFAULT_ALIAS_MAP
 from reaxkit.io.control_handler import ControlHandler
 from reaxkit.analysis.control_analyzer import control_get
 
-def get_iter_vs(handler: Fort78Handler, variables: str | Sequence[str]) -> pd.DataFrame:
+def get_iter_vs_fort78_data(handler: Fort78Handler, variables: str | Sequence[str]) -> pd.DataFrame:
     """Return iter vs one or more user-specified variables to get fort.78 data.
     The output will rename columns to the *requested alias(es)* so downstream
     code can safely look them up by what the user typed.
@@ -49,10 +49,10 @@ def get_iter_vs(handler: Fort78Handler, variables: str | Sequence[str]) -> pd.Da
 
     return out
 
-#-------------------------------------------------------------------------------------
-#matching electric fields data to iout2, which is used to get plots of summary,
-#xmolout, polarization, or etc. along with electric field profile
-#-------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------
+# matching electric fields data to iout2, which is used to get plots of summary,
+# xmolout, polarization, or etc. along with electric field profile
+# ----------------------------------------------------------------------------------------
 
 def match_electric_field_to_iout2(
     f78: Fort78Handler,
@@ -92,7 +92,7 @@ def match_electric_field_to_iout2(
     iout2 = control_get(ctrl, "iout2", section="md", default=1)
     _ = iout2  # currently not used explicitly, but kept for future use/logging
 
-    df_E = get_iter_vs(f78, variables=field_var)  # columns: ['iter', field_var]
+    df_E = get_iter_vs_fort78_data(f78, variables=field_var)  # columns: ['iter', field_var]
     if df_E.empty:
         raise ValueError("fort.78 has no usable data.")
 

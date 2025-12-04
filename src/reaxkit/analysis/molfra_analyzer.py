@@ -10,7 +10,7 @@ from reaxkit.utils.convert import convert_xaxis
 # =======================
 # Molecule-level analysis
 # =======================
-def occurrences_wide(
+def get_occurrences_wide(
     handler: MolFraHandler,
     *,
     molecules: Optional[Iterable[str]] = None,
@@ -67,7 +67,7 @@ def occurrences_wide(
     return pivot
 
 
-def occurrences_long(
+def get_occurrences_long(
     handler: MolFraHandler,
     *,
     molecules: Optional[Iterable[str]] = None,
@@ -77,7 +77,7 @@ def occurrences_long(
 ) -> pd.DataFrame:
     """Return freqs (counts) for specific molecules across frames (long format).
     """
-    wide = occurrences_wide(
+    wide = get_occurrences_wide(
         handler,
         molecules=molecules,
         iters=iters,
@@ -95,7 +95,7 @@ def occurrences_long(
     return long_df
 
 
-def qualifying_types(
+def _qualifying_types(
     handler: MolFraHandler,
     *,
     threshold: int = 3,
@@ -115,7 +115,7 @@ def qualifying_types(
 # ====================
 # Totals-level analysis
 # ====================
-def totals_vs_axis(
+def get_molfra_totals_vs_axis(
     handler: MolFraHandler,
     *,
     xaxis: str = "iter",
@@ -169,6 +169,14 @@ def largest_molecule_by_individual_mass(
           - iter : int
           - molecule_type : str
           - mass : float
+
+    Examples:
+    --------
+       iter molecular_formula  molecular_mass
+    0     0          Al48N48          3425.6
+    1     1          Al48N48          3425.6
+    2     2          Al48N48          3425.6
+
     """
     df = handler.dataframe().copy()
     if df.empty:
@@ -181,12 +189,19 @@ def largest_molecule_by_individual_mass(
     return df_max.sort_values("iter").reset_index(drop=True)
 
 
-def largest_molecule_atoms_wide(handler: MolFraHandler) -> pd.DataFrame:
+def atoms_in_the_largest_molecule_wide_format(handler: MolFraHandler) -> pd.DataFrame:
     """Return a stable, element-keyed wide table of atom counts for the largest (by individual mass) molecule at each iter.
 
     Columns:
       - iter
       - one column per element symbol (e.g., N, Al, O, H), values = counts (int)
+
+    Examples
+    --------
+       iter  Al   N  O  H
+    0     0  48  48  0  0
+    1     1  48  48  0  0
+    2     2  48  48  0  0
     """
     # Get largest molecule per iter
     df_largest = largest_molecule_by_individual_mass(handler)
@@ -221,10 +236,10 @@ def largest_molecule_atoms_wide(handler: MolFraHandler) -> pd.DataFrame:
     return wide[cols]
 
 
-def largest_molecule_atoms_long(handler: MolFraHandler) -> pd.DataFrame:
+def atoms_in_the_largest_molecule_long_format(handler: MolFraHandler) -> pd.DataFrame:
     """Long-form (iter, element, count) from the stable wide table.
     """
-    wide = largest_molecule_atoms_wide(handler)
+    wide = atoms_in_the_largest_molecule_wide_format(handler)
     if wide.empty:
         return pd.DataFrame(columns=["iter", "element", "freq"])
     return wide.melt(id_vars="iter", var_name="element", value_name="freq") \

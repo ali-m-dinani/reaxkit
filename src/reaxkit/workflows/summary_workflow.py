@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Optional, Sequence, Union
 import pandas as pd
 from reaxkit.utils.units import UNITS
-from reaxkit.io.summary_handler import SummaryHandler
-from reaxkit.utils.alias import _resolve_alias, available_keys, normalize_choice
 from reaxkit.analysis.plotter import single_plot
 from reaxkit.utils.convert import convert_xaxis
 from reaxkit.utils.frame_utils import parse_frames, select_frames
+from reaxkit.utils.path import resolve_output_path
+from reaxkit.io.summary_handler import SummaryHandler
+from reaxkit.utils.alias import available_keys
+from reaxkit.analysis.summary_analyzer import get_summary
 
 FramesT = Optional[Union[slice, Sequence[int]]]
 
@@ -23,42 +25,57 @@ def _summary_get_task(args: argparse.Namespace) -> int:
         raise KeyError("Expected 'iter' column in parsed summary data.")
     xvals, xlabel = convert_xaxis(df["iter"].to_numpy(), args.xaxis)
 
-    # --- Y axis: normalize alias -> canonical, then resolve ---
-    y_canonical = normalize_choice(args.yaxis)          # e.g., "E_potential" -> "E_pot"
+    # --- Y axis: use analyzer-level helper for alias resolution ---
     try:
-        ycol = _resolve_alias(handler, y_canonical)     # resolves to actual df column
+        y_series = get_summary(handler, args.yaxis)  # handles aliases + fallbacks
     except KeyError as e:
-        # helpful hint listing available keys
-        raise KeyError(
-            f"{e}\nTry one of: {available_keys(df.columns)}"
-        )
+        # (optional) just re-raise, message already includes available keys
+        # from summary_analyzer.get_summary
+        raise e
 
-    work = pd.DataFrame({"x": pd.Series(xvals, index=df.index), "y": df[ycol]})
+    # Name of the resolved column (canonical or actual df column)
+    ycol = y_series.name or args.yaxis
+
+    # Build working DataFrame with aligned index
+    work = pd.DataFrame(
+        {
+            "x": pd.Series(xvals, index=df.index),
+            "y": y_series,
+        }
+    )
 
     # --- Frame selection ---
     frames = parse_frames(args.frames)
     work = select_frames(work, frames)
 
+    workflow_name = args.kind
+
     # --- Export CSV ---
     if args.export:
-        out = Path(args.export)
+        out = resolve_output_path(args.export, workflow_name)
         work.rename(columns={"x": xlabel, "y": ycol}).to_csv(out, index=False)
+        print(f'[Done] successfully saved the data in {out}')
 
     # --- Save figure (no show) ---
     if args.save:
+        out = resolve_output_path(args.save, workflow_name)
         single_plot(
-            work["x"], work["y"],
+            work["x"],
+            work["y"],
             title=f"{ycol} vs {xlabel}",
-            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get_sections_data(ycol, '') or ''})",
-            save=args.save,
+            xlabel=xlabel,
+            ylabel=f"{ycol} ({UNITS.get(ycol, '') or ''})",
+            save=out,
         )
 
     # --- Plot interactively ---
     if args.plot:
         single_plot(
-            work["x"], work["y"],
+            work["x"],
+            work["y"],
             title=f"{ycol} vs {xlabel}",
-            xlabel=xlabel, ylabel=f"{ycol} ({UNITS.get_sections_data(ycol, '') or ''})",
+            xlabel=xlabel,
+            ylabel=f"{ycol} ({UNITS.get(ycol, '') or ''})",
             save=None,
         )
 
@@ -108,8 +125,13 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
     p = subparsers.add_parser(
         "get",
-        help="Extract a column and optionally plot/save/export it.\n"
-             "reaxkit summary get --yaxis E_pot --xaxis time --plot"
-             "reaxkit summary get --file summary.txt --yaxis T --xaxis iter --frames 0:400:5 --save summary_T_vs_iter.png --export summary_T_vs_iter.csv"
+        help="Extract a column and optionally plot/save/export it.",
+        description=(
+            "Examples:\n"
+            "  reaxkit summary get --yaxis E_pot --xaxis time --plot\n"
+            "  reaxkit summary get --file summary.txt --yaxis T --xaxis iter "
+            "--frames 0:400:5 --save summary_T_vs_iter.png --export summary_T_vs_iter.csv"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _wire_get_flags(p)

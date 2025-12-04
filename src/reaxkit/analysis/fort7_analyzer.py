@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 import pandas as pd
+from collections.abc import Mapping
 
 from reaxkit.utils.frame_utils import resolve_indices
 from typing import Iterable, List, Optional, Sequence, Union, Literal, Tuple
@@ -57,7 +58,7 @@ def _resolve_columns(
 
 # --------------------------- atom-level features ---------------------------
 
-def features_atom(
+def get_features_atom(
     handler,
     columns: Union[str, Sequence[str]],
     frames: Indexish = None,
@@ -97,7 +98,7 @@ def features_atom(
 
 # ------------------------- iter-level features -------------------------
 
-def features_summary(
+def get_features_summary(
     handler,
     columns: Union[str, Sequence[str]],
     frames: Indexish = None,
@@ -134,24 +135,24 @@ def features_summary(
 
 # ---------------------------- convenience slices ----------------------------
 
-def partial_charges(
+def get_partial_charges(
     handler,
     frames: Indexish = None,
     iterations: Indexish = None,
 ) -> pd.DataFrame:
     """convenience function for getting all partial charges across selected frames."""
-    return features_atom(handler, "partial_charge", frames=frames, iterations=iterations)
+    return get_features_atom(handler, "partial_charge", frames=frames, iterations=iterations)
 
 
-def all_atom_cnn(
+def get_all_atom_cnn(
     handler,
     frames: Indexish = None,
     iterations: Indexish = None,
 ) -> pd.DataFrame:
     """convenience function for getting all atom_cnn* columns (connectivity to other atoms) across selected frames."""
-    return features_atom(handler, r"^atom_cnn\d+$", frames=frames, iterations=iterations, regex=True)
+    return get_features_atom(handler, r"^atom_cnn\d+$", frames=frames, iterations=iterations, regex=True)
 
-def sum_bos(
+def get_sum_bos(
     handler,
     frames: Indexish = None,
     iterations: Indexish = None,
@@ -164,7 +165,7 @@ def sum_bos(
       - atom_idx (0-based)
       - sum_BOs
     """
-    return features_atom(
+    return get_features_atom(
         handler,
         columns="sum_BOs",
         frames=frames,
@@ -197,7 +198,7 @@ def coordination_status_over_frames(
       valence, delta, status (-1/0/+1 or NaN), status_label
     """
     # Pull sum_BOs in tidy form (frame_idx, iter, atom_idx, sum_BOs)
-    df_sum = sum_bos(f7_handler, frames=frames, iterations=iterations)
+    df_sum = get_sum_bos(f7_handler, frames=frames, iterations=iterations)
     if df_sum.empty:
         return pd.DataFrame(columns=[
             "frame_index","iter","atom_id","atom_type","sum_BOs",
@@ -239,18 +240,6 @@ def coordination_status_over_frames(
     out = pd.concat(rows, ignore_index=True)
     out = out.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
     return out
-
-
-def summary_metric_vs_iter(
-    handler,
-    field: str = "total_charge",
-    frames: Indexish = None,
-    iterations: Indexish = None,
-) -> pd.DataFrame:
-    """extracts a single summary field (e.g., total_charge) vs iter.
-    """
-    df = features_summary(handler, ["iter", field], frames=frames, iterations=iterations, regex=False, add_index_cols=False)
-    return df.sort_values("iter").reset_index(drop=True)
 
 
 

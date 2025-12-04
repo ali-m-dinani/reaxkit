@@ -312,6 +312,146 @@ def dual_yaxis_plot(
     _save_or_show(fig, save, title or 'dual_yaxis_plot')
 
 
+def multi_subplots(
+    subplots: Sequence[Sequence[Mapping[str, Any]]],
+    *,
+    title: Optional[Union[str, Sequence[Optional[str]]]] = None,
+    xlabel: Optional[Union[str, Sequence[Optional[str]]]] = None,
+    ylabel: Optional[Union[str, Sequence[Optional[str]]]] = None,
+    sharex: bool = False,
+    sharey: bool = False,
+    legend: bool = True,
+    grid: bool = False,
+    figsize: tuple[float, float] = (8.0, 6.0),
+    save: Optional[Union[str, Path]] = None,
+) -> plt.Figure:
+    """
+    Create multiple stacked subplots, using the same {x, y, label} series format
+    as `single_plot`.
+
+    Parameters
+    ----------
+    subplots : list of list of dict
+        Each element is a list of series dictionaries for one subplot:
+            {"x": [...], "y": [...], "label": "..."}
+
+    title : str or sequence of str, optional
+        - If a single string → used as a global suptitle for the figure.
+        - If a sequence with length == n_subplots → per-subplot titles.
+
+    xlabel, ylabel : str or sequence of str, optional
+        - If a single string → used for all subplots.
+        - If a sequence with length == n_subplots → per-subplot labels.
+
+    sharex, sharey : bool
+        Whether to share X / Y axes between subplots.
+
+    legend : bool
+        Show legend in each subplot.
+
+    grid : bool
+        If True, show grid on each subplot.
+
+    figsize : (float, float)
+        Figure size.
+
+    save : str or Path or None
+        Passed to `_save_or_show`:
+          - None → show interactively
+          - directory → save `<dir>/<title>.png`
+          - full filename → save exactly there
+    """
+    import matplotlib.pyplot as plt
+
+    nplots = len(subplots)
+    if nplots == 0:
+        print("multi_subplots: no subplot data provided.")
+        return None  # type: ignore[return-value]
+
+    def _normalize_seq(
+        val: Optional[Union[str, Sequence[Optional[str]]]],
+        n: int,
+    ) -> list[Optional[str]]:
+        """Turn val into a list of length n.
+
+        - None → [None] * n
+        - str → [str] * n
+        - sequence:
+            * len == 1 → repeat for all
+            * len == n → use as-is
+            * otherwise → error
+        """
+        if val is None:
+            return [None] * n
+        if isinstance(val, (list, tuple)):
+            if len(val) == 1:
+                return [val[0]] * n
+            if len(val) != n:
+                raise ValueError(
+                    f"Expected sequence of length 1 or {n}, got length {len(val)}"
+                )
+            return list(val)
+        # single string
+        return [val] * n
+
+    # Handle global vs per-subplot title
+    if isinstance(title, (list, tuple)):
+        per_titles = _normalize_seq(title, nplots)
+        global_title = None
+    else:
+        per_titles = [None] * nplots
+        global_title = title
+
+    xlabels = _normalize_seq(xlabel, nplots)
+    ylabels = _normalize_seq(ylabel, nplots)
+
+    fig, axes = plt.subplots(
+        nplots,
+        1,
+        figsize=figsize,
+        sharex=sharex,
+        sharey=sharey,
+        squeeze=False,
+    )
+    axes = axes.flatten()
+
+    for idx, ax in enumerate(axes):
+        if idx >= nplots:
+            break
+
+        # Plot series for this subplot
+        for series in subplots[idx]:
+            x = series.get("x")
+            y = series.get("y")
+            if x is None or y is None:
+                continue
+            label = series.get("label")
+            ax.plot(x, y, label=label)
+
+        # Per-subplot labels/titles
+        if ylabels[idx]:
+            ax.set_ylabel(ylabels[idx])
+        if xlabels[idx]:
+            ax.set_xlabel(xlabels[idx])
+        if per_titles[idx]:
+            ax.set_title(per_titles[idx])
+
+        if grid:
+            ax.grid(True, alpha=0.3)
+        if legend:
+            ax.legend(fontsize=9)
+
+    # Global suptitle if provided as a single string
+    if global_title:
+        fig.suptitle(global_title, fontsize=14, y=0.98)
+
+    fig.tight_layout()
+    _save_or_show(fig, save, global_title or "multi_subplots")
+    return fig
+
+
+
+
 def tornado_plot(
     labels: Sequence[str],
     min_vals: Sequence[float],

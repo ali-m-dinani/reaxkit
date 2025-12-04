@@ -32,4 +32,8 @@ UNITS = {
     "field2": "V/Å",
     "field3": "V/Å",
 
+    # xmolout
+    'x': 'Å',
+    'y': 'Å',
+    'z': 'Å'
 }

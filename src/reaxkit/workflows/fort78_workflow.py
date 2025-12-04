@@ -3,18 +3,10 @@ import argparse
 from pathlib import Path
 from reaxkit.utils.units import UNITS
 from reaxkit.io.fort78_handler import Fort78Handler
-from reaxkit.analysis.fort78_analyzer import get_iter_vs
+from reaxkit.analysis.fort78_analyzer import get_iter_vs_fort78_data
 from reaxkit.analysis.plotter import single_plot
-
-# x-axis conversion (iter → frame/time); optional dependency
-try:
-    from reaxkit.analysis.convert import convert_xaxis  # expects ControlHandler under reaxkit.io
-except Exception:  # graceful fallback if module not available
-    def convert_xaxis(iters, xaxis: str, control_file: str = "control"):
-        if xaxis != "iter":
-            print("⚠️ convert_xaxis not available; using 'iter' for x-axis.")
-        return iters, "iter"
-
+from reaxkit.utils.convert import convert_xaxis
+from reaxkit.utils.path import resolve_output_path
 
 def _export_csv(x, x_label: str, y, y_label: str, path: str) -> None:
     import pandas as pd
@@ -22,22 +14,22 @@ def _export_csv(x, x_label: str, y, y_label: str, path: str) -> None:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
-    print(f"[Done] exported data → {out}")
+    print(f"[Done] exported data to {out}")
 
 
 def get_task(args: argparse.Namespace) -> int:
     """
-    Get/plot/export a single column from fort.78 vs iter/frame/time.
+    Get/plot/export a single yaxis from fort.78 vs iter/frame/time.
     """
     handler = Fort78Handler(args.file)
 
-    # Pull requested column from fort.78 summary.
-    # Analyzer will *rename* the output column to the *requested alias*.
-    ykey: str = args.column.strip()
-    df = get_iter_vs(handler, [ykey])  # DataFrame: columns ['iter', ykey]
+    # Pull requested yaxis from fort.78 summary.
+    # Analyzer will *rename* the output yaxis to the *requested alias*.
+    ykey: str = args.yaxis.strip()
+    df = get_iter_vs_fort78_data(handler, [ykey])  # DataFrame: columns ['iter', ykey]
 
     if ykey not in df.columns:
-        raise KeyError(f"❌ Column '{ykey}' not found in fort.78 data.")
+        raise KeyError(f"❌ yaxis '{ykey}' not found in fort.78 data.")
 
     # Select and sanitize x/y
     import pandas as pd
@@ -48,9 +40,11 @@ def get_task(args: argparse.Namespace) -> int:
 
     yvals = pd.to_numeric(df[ykey], errors="coerce").to_numpy()
 
+    workflow_name = args.kind
     # Export CSV if requested
     if args.export:
-        _export_csv(xvals, xlabel, yvals, ykey, args.export)
+        out = resolve_output_path(args.export, workflow_name)
+        _export_csv(xvals, xlabel, yvals, ykey, out)
 
     # Plot and/or save plot
     if args.plot or args.save:
@@ -59,15 +53,26 @@ def get_task(args: argparse.Namespace) -> int:
         x_plot = np.asarray(xvals, dtype=float)
         y_plot = np.asarray(yvals, dtype=float)
 
-        single_plot(
-            x=x_plot,
-            y=y_plot,
-            title=f"{ykey} vs {xlabel} (fort.78)",
-            xlabel=xlabel,
-            ylabel=f"{ykey} ({UNITS.get_sections_data(ykey, '') or ''})",
-            save=args.save,       # file path OR directory; handled by plotter._save_or_show
-            legend=False,
-        )
+        if args.save:
+            out = resolve_output_path(args.save, workflow_name)
+            single_plot(
+                x=x_plot,
+                y=y_plot,
+                title=f"{ykey} vs {xlabel}",
+                xlabel=xlabel,
+                ylabel=f"{ykey} ({UNITS.get(ykey, '') or ''})",
+                save=out,
+                legend=False,
+            )
+        elif args.plot:
+            single_plot(
+                x=x_plot,
+                y=y_plot,
+                title=f"{ykey} vs {xlabel}",
+                xlabel=xlabel,
+                ylabel=f"{ykey} ({UNITS.get_sections_data(ykey, '') or ''})",
+                legend=False,
+            )
 
     # If neither plot nor export was requested, print a short tip
     if not (args.plot or args.save or args.export or args.head):
@@ -83,25 +88,23 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
     g = subparsers.add_parser(
         "get",
-        help="Get/plot/export a single column from fort.78 vs iter/frame/time.\n"
-             "reaxkit fort78 get --column E_field_x --save E_field_x.png\n"
-             "reaxkit fort78 get --column E_field --save molfa_E_field.png",
+        help="Get/plot/export a single yaxis from fort.78 vs iter/frame/time.\n",
+        description=(
+            "Examples:\n"
+            "  reaxkit fort78 get --xaxis time --yaxis E_field_x --save E_field_x.png --export E_field_x.csv\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     g.add_argument("--file", default="fort.78", help="Path to fort.78 file")
-    g.add_argument(
-        "--column",
+    g.add_argument("--yaxis",
         required=True,
-        help="Name of the fort.78 column to extract (e.g., 'E_field_x')",
+        help="Name of the fort.78 yaxis to extract (e.g., 'E_field_x')",
     )
-    g.add_argument(
-        "--xaxis",
-        choices=("iter", "frame", "time"),
-        default="iter",
+    g.add_argument("--xaxis",
+        choices=("iter", "frame", "time"), default="iter",
         help="X-axis for plotting/export (default: iter). 'time' may require a control file.",
     )
-    g.add_argument(
-        "--control",
-        default="control",
+    g.add_argument("--control", default="control",
         help="Path to control file (only used when --xaxis time).",
     )
     # Output options
