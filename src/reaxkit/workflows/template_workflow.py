@@ -18,6 +18,33 @@ def metric_task(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    in the CLI structure of:
+        reaxkit kind task --flags
+    task should be placed here as a parser not the kind (workflow).
+    moreover, if multiple tasks have common flags like plot, etc., they should be grouped in a format like:
+        def _add_common_xmolout_io_args(
+            p: argparse.ArgumentParser,
+            *,
+            include_plot: bool = False,
+        ) -> None:
+            p.add_argument("--file", default="xmolout", help="Path to xmolout file.")
+            if include_plot:
+                p.add_argument("--plot", action="store_true", help="Show plot interactively.")
+            p.add_argument("--save", default=None, help="Path to save plot image.")
+            p.add_argument("--export", default=None, help="Path to export CSV data.")
+
+    finally, for the sake of readability, add_arguments as written as compact as possible. so, instead of:
+        pt.add_argument(
+        "--atoms",
+        default=None,
+        help="Comma/space separated 1-based atom indices, e.g. '1,5,12'."
+        )
+    it's better to write it as:
+        pt.add_argument("--atoms", default=None,
+        help="Comma/space separated 1-based atom indices, e.g. '1,5,12'.")
+
+    """
     p = subparsers.add_parser("metric", help="Plot example metric")
     p.add_argument("--file", required=True, help="Path to <filetype> file")
     p.add_argument("--save", default=None, help="Path to save plot (optional)")

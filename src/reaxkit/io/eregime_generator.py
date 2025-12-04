@@ -115,7 +115,7 @@ def make_eregime_sinusoidal(
         rows.append((it, voltage_idx, direction, float(mag)))
 
     out = write_eregime(file_path, rows)
-    print(f"[Done] Sinusoidal eregime saved to {out} ({npts} points)")
+    print(f"[Done] Sinusoidal eregime saved to {out} ({npts} entry rows).")
     return out
 
 
@@ -199,7 +199,7 @@ def make_eregime_smooth_pulse(
         rows.append((it, voltage_idx, direction, float(mag)))
 
     out = write_eregime(file_path, rows)
-    print(f"[Done] Smooth pulse eregime saved to {out} with {len(rows)} points.")
+    print(f"[Done] Smooth pulse eregime saved to {out} ({len(rows)} entry rows).")
     return out
 
 
@@ -248,6 +248,6 @@ def make_eregime_from_function(
         rows.append((it, voltage_idx, direction, mag))
 
     out = write_eregime(file_path, rows)
-    print(f"[Done] Functional eregime saved to {out} with {len(rows)} points.")
+    print(f"[Done] Functional eregime saved to {out} ({len(rows)} entry rows).")
     return out
 

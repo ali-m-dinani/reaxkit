@@ -38,7 +38,7 @@ def _resolve_with_fallback(df: pd.DataFrame, name: str) -> str:
     )
 
 
-def get_series(
+def get_eregime_data(
     handler: EregimeHandler,
     y: str,
     xaxis: str = "iter",

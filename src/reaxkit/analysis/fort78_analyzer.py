@@ -6,7 +6,7 @@ import pandas as pd
 from reaxkit.io.fort78_handler import Fort78Handler
 from reaxkit.utils.alias import resolve_alias_from_columns, _DEFAULT_ALIAS_MAP
 from reaxkit.io.control_handler import ControlHandler
-from reaxkit.analysis.control_analyzer import control_get
+from reaxkit.analysis.control_analyzer import get_control
 
 def get_iter_vs_fort78_data(handler: Fort78Handler, variables: str | Sequence[str]) -> pd.DataFrame:
     """Return iter vs one or more user-specified variables to get fort.78 data.

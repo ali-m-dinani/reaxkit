@@ -30,7 +30,7 @@ def _task_get(args: argparse.Namespace) -> int:
     h = Fort7Handler(args.file)
 
     frames_sel = parse_frames(args.frames)
-    feat = (args.feature or "").strip()
+    feat = (args.yaxis or "").strip()
     feat = normalize_choice(feat, domain="feature")
     use_regex = bool(args.regex)
     is_atom_scope = args.atom is not None
@@ -364,7 +364,7 @@ def _add_common_io_args(
 
 def _wire_get(p: argparse.ArgumentParser) -> None:
     _add_common_fort7_file_arg(p)
-    p.add_argument("--feature", required=True, help="Feature name or regex (with --regex).")
+    p.add_argument("--yaxis", required=True, help="Feature name or regex (with --regex).")
     p.add_argument("--atom", type=int, default=None, help="1-based atom index for atom-level features.")
     p.add_argument("--frames", default=None, help="Frame selection: 'a:b[:c]' or 'i,j,k'.")
     p.add_argument("--xaxis", default="iter", choices=["iter","frame","time"], help="X-axis mode.")
@@ -453,8 +453,8 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Extract a feature and optionally plot/save/export.",
         description=(
             "Examples:\n"
-            "  reaxkit fort7 get --feature charge --atom 1 --plot\n"
-            "  reaxkit fort7 get --feature q_.* --regex --export charges.csv\n"
+            "  reaxkit fort7 get --yaxis charge --atom 1 --plot\n"
+            "  reaxkit fort7 get --yaxis q_.* --regex --export charges.csv\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )

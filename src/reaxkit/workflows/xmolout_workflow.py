@@ -234,7 +234,7 @@ def msd_task(args: argparse.Namespace) -> int:
                     subplots=subplots_data,
                     title=title,
                     xlabel=xlabel,
-                    ylabel="MSD",
+                    ylabel="Å²",
                     legend=True,
                     save=out,
                 )
@@ -243,7 +243,7 @@ def msd_task(args: argparse.Namespace) -> int:
                     subplots=subplots_data,
                     title=title,
                     xlabel=xlabel,
-                    ylabel="MSD",
+                    ylabel="Å²",
                     legend=True,
                     save=None,
                 )
@@ -255,7 +255,7 @@ def msd_task(args: argparse.Namespace) -> int:
                     series=series_combined,
                     title=title,
                     xlabel=xlabel,
-                    ylabel="MSD",
+                    ylabel="Å²",
                     legend=True,
                     save=out,
                 )
@@ -264,7 +264,7 @@ def msd_task(args: argparse.Namespace) -> int:
                     series=series_combined,
                     title=title,
                     xlabel=xlabel,
-                    ylabel="MSD",
+                    ylabel="Å²",
                     legend=True,
                     save=None,
                 )

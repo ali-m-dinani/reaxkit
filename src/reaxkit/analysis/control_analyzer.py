@@ -5,7 +5,7 @@ from typing import Optional
 from reaxkit.io.control_handler import ControlHandler
 
 
-def available_sections(handler: ControlHandler) -> list[str]:
+def get_available_sections(handler: ControlHandler) -> list[str]:
     """Return all sections that contain parameters."""
     sections = []
     if handler.general_parameters:
@@ -21,7 +21,7 @@ def available_sections(handler: ControlHandler) -> list[str]:
     return sections
 
 
-def available_keys(handler: ControlHandler, section: Optional[str] = None) -> list[str]:
+def get_available_keys(handler: ControlHandler, section: Optional[str] = None) -> list[str]:
     """Return list of all keys either for a section or all combined."""
     section_map = {
         "general": handler.general_parameters,
@@ -44,7 +44,7 @@ def available_keys(handler: ControlHandler, section: Optional[str] = None) -> li
     return sorted(all_keys)
 
 
-def control_get(
+def get_control(
     handler: ControlHandler,
     key: str,
     section: Optional[str] = None,

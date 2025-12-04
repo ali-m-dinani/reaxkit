@@ -9,7 +9,7 @@
 
 Parts of this codebase were inspired by or adapted from work contributed by:
 
-- **[Alireza Sepehrinezhad]** – CLI development
+- **[Alireza Sepehrinezhad]** – developed the initial version of `make_eregime_sinusoidal` used in `eregime_generator.py`, plus the `electrostatics_analyzers.py`
 - **[??]** – developing the xtob.f fortran code, which was used in `geo_generator.py`
 - **[??]** – developing the place2.f fortran code, which was used in `geo_generator.py`
 
