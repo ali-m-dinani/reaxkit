@@ -51,7 +51,7 @@ output/
 plots/
 figures/
 exports/
-examples/
+examples_to_test/
 
 # Simulation run directories or files
 full_sim_examples/
