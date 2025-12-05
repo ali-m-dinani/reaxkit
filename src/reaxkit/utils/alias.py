@@ -1,4 +1,21 @@
-"""Alias resolution utilities for tolerant column/key matching across ReaxKit files."""
+"""Alias resolution utilities for tolerant column/key matching across ReaxKit files.
+
+ReaxFF output formats (summary.txt, xmolout, fort.7, fort.78, fort.99, molfra,
+eregime.in, etc.) frequently use inconsistent naming conventions for the same
+quantities. This module provides a centralized alias-mapping and resolution
+system that:
+
+  • normalizes heterogeneous column names to canonical keys,
+  • detects the correct column even if formats vary in case, spacing,
+    prefixes/suffixes, or ReaxFF zone numbering,
+  • supports backwards-compatible resolution for DataFrames and handlers,
+  • exposes utilities for discovering available canonical keys.
+
+These tools enable analysis modules and CLI commands to access data fields
+consistently without requiring users to remember file-specific naming quirks.
+
+"""
+
 from __future__ import annotations
 from typing import Dict, List, Iterable, Optional
 

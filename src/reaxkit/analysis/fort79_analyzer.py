@@ -1,10 +1,12 @@
 """analyzer for fort.79 file"""
+
 import pandas as pd
 from reaxkit.io.fort79_handler import Fort79Handler
 
 
 def diff_sensitivities(handler: Fort79Handler) -> pd.DataFrame:
-    """Compute the sensitivitys of diff1, diff2, and diff4 relative to diff3 from a fort.79 file, which is used to find the most effective parameter for a reduction in total force field error.
+    """Compute the sensitivitys of diff1, diff2, and diff4 relative to diff3 from a fort.79 file,
+    which is used to find the most effective parameter for a reduction in total force field error.
     diff3 is the error value obtained by the current value of this parameter while other
     diffs are related to the error values obtained by changing this parameter. hence, 
     their diff sensitivity shows the sensitivity of force field error to a change in that parameter.

@@ -1,4 +1,15 @@
-"""coordination analyzer based on fort.7 data"""
+"""coordination analyzer based on fort.7 data
+
+Coordination analysis evaluates how well each atom in a frame satisfies its
+expected valence by comparing its total bond order (from fort.7 data) to its
+nominal valence. This module computes per-atom coordination states—under-,
+well-, or over-coordinated—based on the difference between summed bond orders
+and ideal valence values. The resulting labels help identify defects,
+dangling bonds, over-saturated sites, and other chemically relevant
+coordination anomalies in ReaxFF simulations.
+
+"""
+
 from __future__ import annotations
 from typing import Mapping, Sequence, Optional, Literal
 import numpy as np

@@ -1,4 +1,5 @@
-"""used to read a fort.7 file, getting its data, or calculating bond events and bond connectivities across selected frames."""
+"""workflow for working with the data in fort.7 such as bond orders"""
+
 from __future__ import annotations
 import argparse
 import pandas as pd
@@ -15,7 +16,7 @@ from reaxkit.analysis.connectivity_analyzer import (
     bond_events,
     debug_bond_trace_overlay,
 )
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.frame_utils import parse_frames
 from reaxkit.utils.alias import normalize_choice
 from reaxkit.utils.convert import convert_xaxis

@@ -1,4 +1,4 @@
-# reaxkit/utils/numerical_analysis_utils.py
+"""this is a general utility module used for numerical analysis such as finding the y = 0 (i.e., x-axes crossing)."""
 
 from __future__ import annotations
 from typing import Sequence, List

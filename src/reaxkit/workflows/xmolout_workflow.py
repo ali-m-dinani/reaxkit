@@ -1,4 +1,5 @@
-"""Extract data from xmolout file to get trajectories, MSD, RDF, etc."""
+"""workflow for extracting data from xmolout file to get trajectories, MSD, RDF, etc."""
+
 import argparse
 from typing import Optional, Iterable
 import numpy as np
@@ -7,7 +8,7 @@ import pandas as pd
 from reaxkit.io.xmolout_handler import XmoloutHandler
 from reaxkit.utils.path import resolve_output_path
 from reaxkit.io.xmolout_generator import write_xmolout_from_handler
-from reaxkit.analysis.plotter import single_plot, multi_subplots
+from reaxkit.utils.plotter import single_plot, multi_subplots
 from reaxkit.utils.frame_utils import (
     _select_frames,
     parse_frames as _parse_frames,

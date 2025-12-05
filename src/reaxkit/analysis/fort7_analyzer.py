@@ -1,4 +1,5 @@
 """analyzer for fort.7 file"""
+
 from __future__ import annotations
 import re
 import pandas as pd

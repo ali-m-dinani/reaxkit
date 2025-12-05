@@ -1,4 +1,5 @@
-"""all types of plots used in reaxkit"""
+"""utility module for all types of plots used in ReaxKit"""
+
 from __future__ import annotations
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (needed for 3D)

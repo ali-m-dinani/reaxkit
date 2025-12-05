@@ -1,4 +1,23 @@
-"""template handler for parsing and cleaning data in any ReaxFF file"""
+"""Template for building new ReaxFF file handlers.
+
+This module provides a minimal, extensible base for implementing parsers for
+different ReaxFF output files. A TemplateHandler defines the standard workflow
+used by all handlers in reaxkit:
+
+  • reading the raw file through FileHandler,
+  • parsing it into a summary DataFrame (simulation-level data),
+  • extracting per-frame records when applicable,
+  • performing lightweight cleaning steps such as duplicate filtering,
+  • exposing a consistent API for frame access and iteration.
+
+Developers should replace the placeholder parsing logic inside `_parse()` with
+file-specific rules for extracting metadata, iterations, energies, positions, or
+any other quantities contained in the target file format. This template ensures
+that all custom handlers integrate seamlessly with analysis modules and the
+CLI/UI layers of reaxkit.
+
+"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Iterator

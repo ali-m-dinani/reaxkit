@@ -1,12 +1,11 @@
-"""a workflow for getting summary.txt data"""
+"""a workflow for processing summary.txt data"""
 
 from __future__ import annotations
 import argparse
-from pathlib import Path
 from typing import Optional, Sequence, Union
 import pandas as pd
 from reaxkit.utils.units import UNITS
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.convert import convert_xaxis
 from reaxkit.utils.frame_utils import parse_frames, select_frames
 from reaxkit.utils.path import resolve_output_path

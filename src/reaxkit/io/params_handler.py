@@ -1,4 +1,5 @@
-# reaxkit/io/params_handler.py
+"""handler for parsing and cleaning data in params file"""
+
 from __future__ import annotations
 
 from pathlib import Path

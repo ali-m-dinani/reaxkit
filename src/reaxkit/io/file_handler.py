@@ -1,4 +1,22 @@
-"""the main abstract handler for parsing and cleaning data"""
+"""the main abstract handler for parsing and cleaning data
+
+The FileHandler provides the common interface used by all specialized handlers
+(e.g., XmoloutHandler, Fort7Handler, SummaryHandler, ParamsHandler). It defines
+the shared mechanisms for:
+
+  • loading raw file contents,
+  • parsing them into structured pandas DataFrames,
+  • exposing metadata and per-frame access,
+  • performing lazy or on-demand parsing,
+  • normalizing file-specific quirks into a unified API.
+
+All higher-level analysis modules rely on FileHandler subclasses to provide a
+consistent, uniform view of ReaxFF output files. This module serves as the
+foundation for building new handlers and ensures interoperability across the
+entire reaxkit analysis pipeline.
+
+"""
+
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from pathlib import Path

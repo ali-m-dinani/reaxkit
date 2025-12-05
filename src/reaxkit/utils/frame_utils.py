@@ -1,4 +1,22 @@
-"""Utilities to parse and resolve frame/atom selections into concrete DataFrame/handler indices."""
+"""Utilities to parse and resolve frame/atom selections into concrete DataFrame/handler indices.
+
+ReaxFF analyses frequently require flexible user input for selecting frames
+(e.g., "0:100:5", "10,20,30") and atom indices. This module provides the common
+parsing and resolution logic used across handlers and analyzers:
+
+  • parse_frames(): interprets slice-like or comma-separated frame strings,
+  • select_frames(): applies frame selections to DataFrames,
+  • resolve_indices(): converts user-specified frames or iteration numbers into
+    concrete frame indices using handler metadata,
+  • parse_atoms(): parses atom-index lists,
+  • helper utilities for range construction and backwards compatibility.
+
+These functions ensure that all modules can accept flexible frame/atom notation
+(including CLI inputs) and resolve them into consistent, ordered Python
+indices before analysis.
+
+"""
+
 from __future__ import annotations
 from typing import Optional, Sequence, Union, Iterable, List
 import pandas as pd

@@ -13,11 +13,11 @@ from reaxkit.io.fort7_handler import Fort7Handler
 from reaxkit.io.fort78_handler import Fort78Handler
 from reaxkit.io.control_handler import ControlHandler
 from reaxkit.analysis.xmolout_analyzer import get_atom_trajectories
-from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
+from reaxkit.utils.plotter import scatter3d_points, heatmap2d_from_3d
 from reaxkit.utils.frame_utils import parse_frames, resolve_indices
 from reaxkit.utils.alias import resolve_alias_from_columns
 from reaxkit.utils.path import resolve_output_path
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 
 from reaxkit.analysis.electrostatics_analyzer import (
     single_frame_dipoles_polarizations,

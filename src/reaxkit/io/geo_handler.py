@@ -1,4 +1,4 @@
-"""Handler for .geo structure files (XTLGRF format)."""
+"""Handler for geo structure files (XTLGRF format)."""
 
 from __future__ import annotations
 from pathlib import Path

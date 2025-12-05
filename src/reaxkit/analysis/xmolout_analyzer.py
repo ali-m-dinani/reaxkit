@@ -1,4 +1,5 @@
 """analyzer for xmolout file"""
+
 from __future__ import annotations
 from typing import Iterable, Optional, Sequence, Union, Dict, Any, List, Tuple
 import numpy as np

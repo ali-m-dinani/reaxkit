@@ -1,4 +1,5 @@
-"""reads an available eregime.in file and gives its data using 'get' command or generates new eregime.in files using 'gen' command."""
+"""reads an eregime.in file and gives its data using 'get' command or generates new eregime.in using 'gen' command."""
+
 from __future__ import annotations
 import argparse
 from pathlib import Path
@@ -7,9 +8,8 @@ from reaxkit.utils.units import UNITS
 
 from reaxkit.io.eregime_handler import EregimeHandler
 from reaxkit.analysis.eregime_analyzer import get_eregime_data
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 from reaxkit.io.eregime_generator import (
-    write_eregime,
     make_eregime_sinusoidal,
     make_eregime_smooth_pulse,
     make_eregime_from_function,

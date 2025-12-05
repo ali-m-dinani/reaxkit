@@ -2,7 +2,7 @@
 import argparse
 from reaxkit.io.template_handler import TemplateHandler
 from reaxkit.analysis.template_analyzer import example_metric
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 
 
 def metric_task(args: argparse.Namespace) -> int:

@@ -1,4 +1,5 @@
 """handler for parsing and cleaning data in fort.7 file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Dict, Any, Optional

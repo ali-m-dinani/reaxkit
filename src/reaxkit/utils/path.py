@@ -1,3 +1,17 @@
+"""utility module helping the ReaxKit output organization
+
+This module centralizes the logic that determines where analysis results,
+exports, and generated files should be stored. It enforces a consistent
+directory layout such as:
+
+    reaxkit_outputs/<workflow>/<filename>
+
+unless the user provides an explicit absolute or directory-containing path.
+This ensures that all ReaxKit workflows create their outputs in a predictable,
+well-structured location while still allowing users full control when desired.
+
+"""
+
 from pathlib import Path
 
 DEFAULT_OUTROOT = Path("reaxkit_outputs")

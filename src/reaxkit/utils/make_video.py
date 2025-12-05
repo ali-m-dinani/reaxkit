@@ -1,4 +1,4 @@
-
+"""utility used to make videos out of images"""
 
 import os
 import re

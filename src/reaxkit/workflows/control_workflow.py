@@ -1,4 +1,4 @@
-"""workflow for control file: query control keys like 'nmdit' """
+"""workflow for control file"""
 
 from __future__ import annotations
 import argparse

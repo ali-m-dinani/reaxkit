@@ -1,4 +1,20 @@
-"""analyzer for electrostatics calculations such as dipole moment calculation for a molecule, slab, etc."""
+"""analyzer for electrostatics calculations such as dipole moment calculation for a molecule, slab, etc.
+
+This module processes per-atom electrostatic quantities—such as partial charges,
+induced dipoles, and electric-field–dependent properties—and provides utilities
+for computing frame-resolved electrostatic metrics. Typical tasks include
+matching electric field schedules to simulation iterations, assembling charge
+and dipole time series, evaluating field-driven responses, and generating
+derived observables useful for polarization, dielectric, or charge-transfer
+analysis.
+
+The goal is to offer a consistent and high-level interface for all
+electrostatics-related data extracted from ReaxFF output files (e.g.,
+control settings, summary data, or per-frame charge tables), enabling
+quantitative interpretation of field effects, charge redistribution, and
+electrostatic contributions to chemical processes.
+
+"""
 
 from typing import Literal, Sequence, Optional, Tuple
 

@@ -1,4 +1,5 @@
 """analyzer to get Radial Distribution Function (RDF) across different frames"""
+
 from __future__ import annotations
 from typing import Iterable, Optional, Sequence, Tuple, List, Dict, Union
 import numpy as np

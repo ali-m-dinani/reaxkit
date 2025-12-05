@@ -1,4 +1,5 @@
 """analyzer for molfra.out or molfra_ig.out file"""
+
 from __future__ import annotations
 import re
 import pandas as pd

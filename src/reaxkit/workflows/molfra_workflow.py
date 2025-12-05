@@ -1,9 +1,9 @@
 """Workflow for analyzing molfra.out / molfra_ig.out."""
+
 from __future__ import annotations
 
 import argparse
 from typing import Optional, Sequence, Union, List
-import pandas as pd
 
 from reaxkit.io.molfra_handler import MolFraHandler
 from reaxkit.analysis.molfra_analyzer import (
@@ -15,7 +15,7 @@ from reaxkit.analysis.molfra_analyzer import (
 )
 from reaxkit.utils.frame_utils import parse_frames, select_frames
 from reaxkit.utils.convert import convert_xaxis
-from reaxkit.analysis.plotter import single_plot, multi_subplots
+from reaxkit.utils.plotter import single_plot, multi_subplots
 from reaxkit.utils.alias import normalize_choice
 from reaxkit.utils.path import resolve_output_path
 

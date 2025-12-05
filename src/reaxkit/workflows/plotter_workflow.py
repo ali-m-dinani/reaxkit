@@ -1,3 +1,5 @@
+"""Workflow for general purpose plotting working on any tabular data"""
+
 from __future__ import annotations
 
 import argparse
@@ -7,7 +9,7 @@ from typing import List, Dict, Any, Sequence
 import numpy as np
 import pandas as pd
 
-from reaxkit.analysis.plotter import (
+from reaxkit.utils.plotter import (
     single_plot,
     directed_plot,
     dual_yaxis_plot,

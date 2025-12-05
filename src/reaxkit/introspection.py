@@ -8,6 +8,7 @@ Examples:
   # One-line summaries for every module in a folder
   reaxkit intspec run --folder workflow
   reaxkit intspec --folder reaxkit/workflows
+
 """
 from __future__ import annotations
 

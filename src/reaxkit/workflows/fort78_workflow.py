@@ -1,10 +1,11 @@
-"""used to get the data in fort.78 file"""
+"""workflow used to get the data in fort.78 file"""
+
 import argparse
 from pathlib import Path
 from reaxkit.utils.units import UNITS
 from reaxkit.io.fort78_handler import Fort78Handler
 from reaxkit.analysis.fort78_analyzer import get_iter_vs_fort78_data
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.convert import convert_xaxis
 from reaxkit.utils.path import resolve_output_path
 

@@ -1,4 +1,17 @@
-"""analyzer to extract the minimum or maximum of a series of data"""
+"""utility to extract the minimum or maximum of a series of data.
+
+This module provides high-level functions for identifying local minima,
+local maxima, inflection points, and other critical features in 1D data
+streams commonly produced by ReaxFF simulations (e.g., energy curves,
+bond-order traces, dipole trajectories, polarization loops, or field-response
+signals).
+
+These tools help locate reaction barriers, switching points, peak responses,
+and transient intermediates, offering a consistent interface for extrema
+analysis across different ReaxFF observables.
+
+"""
+
 import numpy as np
 import pandas as pd
 

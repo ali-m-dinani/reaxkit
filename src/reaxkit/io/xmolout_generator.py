@@ -1,4 +1,5 @@
 """handler for generating a new xmolout file which may be used for coordination analysis"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Iterable, Optional, Sequence, Union, Dict, Any, Tuple, List

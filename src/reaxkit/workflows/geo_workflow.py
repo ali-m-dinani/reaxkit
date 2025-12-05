@@ -355,7 +355,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Convert an XYZ file to GEO (XTLGRF) format \n",
         description=(
             "Examples:\n"
-            "  reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output geo\n"
+            "  reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output slab_geo_from_xyz\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -373,7 +373,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Build a surface slab from bulk and write XYZ/CIF || ",
         description=(
             "Examples:\n"
-            "  reaxkit geo make --file bulk.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
+            "  reaxkit geo make --file AlN.cif --output slab_from_AlN_cif.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -407,7 +407,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Convert hexagonal (90,90,120) cell to orthorhombic (90,90,90) \n",
         description=(
             "Examples:\n"
-            "  reaxkit geo ortho --file AlN_hex.cif --output AlN_ortho.cif\n"
+            "  reaxkit geo ortho --file AlN.cif --output AlN_ortho_from_hex.cif\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
@@ -422,11 +422,11 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         description=(
             "Examples:\n"
             "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
-            "--angles 90,90,90 --output place2_no_base.xyz\n"
+            "--angles 90,90,90 --output place2_on_template_xyz_with_no_base.xyz\n"
             "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
-            "--angles 90,90,90 --output place2_with_base.xyz --base base.xyz\n"
+            "--angles 90,90,90 --output place2__on_template_xyz_with_base.xyz --base base.xyz\n"
             "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
-            "--angles 90,90,90 --output place2_geo --base base.xyz"
+            "--angles 90,90,90 --output place2_geo_from_template_xyz --base base.xyz"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )

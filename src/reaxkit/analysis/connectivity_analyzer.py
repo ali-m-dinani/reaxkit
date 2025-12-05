@@ -1,13 +1,22 @@
-"""fort.7 based file for analyzing atomic connectivities."""
+"""fort.7 based file for analyzing atomic connectivities.
+
+Connectivities refer to the atomic bonding network derived from fort.7 data —
+i.e., which atoms are connected to which neighbors in each frame, and with what
+bond order. This module extracts these neighbor lists, cleans them, and converts
+them into tidy edge lists or adjacency tables suitable for chemical analysis,
+statistics, and time-series bond-event detection.
+
+"""
+
 from __future__ import annotations
-from typing import Iterable, List, Optional, Sequence, Union, Literal, Tuple
+from typing import Iterable, List, Optional, Union, Literal, Tuple
 import pandas as pd
 import numpy as np
 
 from reaxkit.utils.frame_utils import resolve_indices
 from reaxkit.utils.moving_average import moving_average, exponential_moving_average
 from reaxkit.utils.signal_ops import schmitt_hysteresis, clean_flicker
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 
 Indexish = Union[int, Iterable[int], None]
 

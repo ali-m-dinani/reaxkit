@@ -1,4 +1,5 @@
 """handler for parsing and cleaning data in eregime.in file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple

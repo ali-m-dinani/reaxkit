@@ -1,8 +1,9 @@
 """used to get the data in fort.13 file"""
+
 import argparse
 from reaxkit.io.fort13_handler import Fort13Handler
 from reaxkit.analysis.fort13_analyzer import get_errors
-from reaxkit.analysis.plotter import single_plot
+from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.path import resolve_output_path
 
 def fort13_get_task(args: argparse.Namespace) -> int:

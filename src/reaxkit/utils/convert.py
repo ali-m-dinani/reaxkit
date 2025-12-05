@@ -1,4 +1,5 @@
 """used to convert x-axis from iteration to time or frame, based on user's selection"""
+
 import numpy as np
 
 from reaxkit.io.control_handler import ControlHandler

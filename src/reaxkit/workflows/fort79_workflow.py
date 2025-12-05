@@ -1,10 +1,10 @@
-"""used to read fort.79 data, find the most sensitive parameter in the ffield and plot tornado plots of sensitivities"""
+"""workflow for hanalding and analyzing fort.79 data"""
+
 import argparse
 from pathlib import Path
-import pandas as pd
 from reaxkit.io.fort79_handler import Fort79Handler
 from reaxkit.analysis.fort79_analyzer import diff_sensitivities
-from reaxkit.analysis.plotter import single_plot, tornado_plot
+from reaxkit.utils.plotter import single_plot, tornado_plot
 from reaxkit.utils.path import resolve_output_path
 
 

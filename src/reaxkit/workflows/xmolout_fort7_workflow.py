@@ -1,8 +1,9 @@
-"""spatial resolution of data in fort.7 to plot a fort.7 feature (i.e., atomic charges) according to the atomic location."""
+"""workflow for tasks that need both xmoloout and fort7, such as spatial resolution of charges."""
+
 from __future__ import annotations
 import argparse
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -18,7 +19,7 @@ from reaxkit.utils.frame_utils import parse_frames, parse_atoms, resolve_indices
 from reaxkit.utils.alias import resolve_alias_from_columns
 
 # Plotting
-from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
+from reaxkit.utils.plotter import scatter3d_points, heatmap2d_from_3d
 
 
 # ------------------------- internals -------------------------

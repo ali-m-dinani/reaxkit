@@ -1,4 +1,5 @@
 """handler for generating an eregime.in file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Callable, Iterable, Tuple, Union, Sequence

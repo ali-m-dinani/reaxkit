@@ -1,4 +1,4 @@
-"""Signal-processing helpers for applying Schmitt-trigger hysteresis and removing short flicker segments in boolean time-series."""
+"""Signal-processing helpers (i.e., applying Schmitt-trigger hysteresis) in time-series data."""
 
 from __future__ import annotations
 import numpy as np

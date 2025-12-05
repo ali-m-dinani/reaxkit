@@ -1,4 +1,5 @@
 """handler for parsing and cleaning data in xmolout file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Iterator, Dict, Any
