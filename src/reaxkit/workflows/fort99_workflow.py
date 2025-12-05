@@ -1,4 +1,5 @@
-# reaxkit/workflows/fort99_workflow.py
+"""workflow for fort.99 file to """
+
 from __future__ import annotations
 import argparse
 from pathlib import Path
@@ -9,7 +10,7 @@ from reaxkit.analysis import fort99_analyzer
 from reaxkit.analysis.plotter import single_plot
 from reaxkit.utils.alias import normalize_choice
 from reaxkit.io.fort74_handler import Fort74Handler
-
+from reaxkit.utils.path import resolve_output_path
 
 # ---------- tasks ----------
 
@@ -17,7 +18,7 @@ def fort99_get_task(args: argparse.Namespace) -> int:
     handler = Fort99Handler(args.file)
     sortby = normalize_choice(args.sort, domain="sort")
 
-    df = fort99_analyzer.get(
+    df = fort99_analyzer.get_fort99(
         handler,
         sortby=sortby,
         ascending=args.ascending,
@@ -28,8 +29,9 @@ def fort99_get_task(args: argparse.Namespace) -> int:
         print("[Warning] fort.99 result is empty.")
         return 0
 
+    workflow_name = args.kind
     if args.export:
-        out = Path(args.export)
+        out = resolve_output_path(args.export, workflow_name)
         df.to_csv(out, index=False)
         print(f"[Done] Exported fort.99 table to {out}")
     else:
@@ -72,9 +74,10 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
             print(f"[Warning] No rows found for iden1 == {args.iden!r}.")
             return 0
 
+    workflow_name = args.kind
     # Export table
     if args.export:
-        out = Path(args.export)
+        out = resolve_output_path(args.export, workflow_name)
         df.to_csv(out, index=False)
         print(f"[Done] Exported ENERGY vs volume table to {out}")
 
@@ -85,8 +88,7 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
 
     save_dir = None
     if args.save:
-        save_dir = Path(args.save)
-        save_dir.mkdir(parents=True, exist_ok=True)
+        save_dir = resolve_output_path(args.save, workflow_name)
 
     # ----------- PLOTTING -------------
     for iden1, g in df.groupby("iden1"):
@@ -102,10 +104,6 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
         y_ff = g["ffield_value"]
         y_qm = g["qm_value"]
 
-        save_arg = None
-        if save_dir:
-            save_arg = str(save_dir / f"{iden1}.png")
-
         single_plot(
             series=[
                 {"x": x, "y": y_ff, "label": "Force-field"},
@@ -114,7 +112,7 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
             title="",
             xlabel="Volume",
             ylabel="Relative Energy (kcal/mole)",
-            save=save_arg,
+            save=save_dir,
             legend=True,
             figsize=(6,4),
         )
@@ -127,9 +125,15 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
 
     # ---- fort99 get ----
-    p_get = subparsers.add_parser("get", help="Compute fort.99 ENERGY errors and sort/export the table || "
-                                              "reaxkit fort99 get --file fort.99 --sort error --ascending --export X.csv"
-                                  )
+    p_get = subparsers.add_parser(
+        "get",
+        help="Compute fort.99 ENERGY errors and sort/export the table \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit fort99 get --sort error --ascending --export fort99_sorted_data.csv \n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_get.add_argument("--file", default="fort.99", help="Path to fort.99 file")
     p_get.add_argument("--sort", default="error", help="Column to sort by (e.g., error, ffield_value, qm_value)")
     p_get.add_argument("--ascending", action="store_true", help="Sort ascending (default: descending)")
@@ -137,12 +141,17 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_get.set_defaults(_run=fort99_get_task)
 
     # ---- fort99 eos ----
-    p_eos = subparsers.add_parser("eos", help="Energy vs volume (EOS) plots from fort.99 + fort.74 || "
-                                              "reaxkit fort99 eos --iden all --save eos_plots --flip || "
-                                              "reaxkit fort99 eos --iden bulk_0 --save eos_plots --export eos_bulk0.csv"
-                                  )
+    p_eos = subparsers.add_parser(
+        "eos", help="Energy vs volume (EOS) plots from fort.99 + fort.74 \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit fort99 eos --iden all --save reaxkit_outputs/fort99/eos_plots/ --flip --export eos_plots.csv \n"
+            "  reaxkit fort99 eos --iden bulk_0 --save eos_bulk_0.png --export eos_bulk0.csv"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_eos.add_argument("--fort99", default="fort.99", help="Path to fort.99 file")
-    p_eos.add_argument("--fort74", default=None, help="Path to fort.74 (default: same directory as fort.99)")
+    p_eos.add_argument("--fort74", default='fort.74', help="Path to fort.74 (default: same directory as fort.99)")
     p_eos.add_argument("--iden", default="all", help="iden1 to include ('all' or specific e.g. bulk_0)")
     p_eos.add_argument("--plot", action="store_true", help="Show plots interactively")
     p_eos.add_argument("--save", default=None, help="Directory to save plots as <iden1>.png")

@@ -1,13 +1,14 @@
-# reaxkit/io/fort73_handler.py
+"""handler for parsing and cleaning data in fort.73 file"""
+
 from __future__ import annotations
 from pathlib import Path
 import pandas as pd
 from typing import List, Dict, Any
 
-from reaxkit.io.template_handler import TemplateHandler
+from reaxkit.io.file_handler import FileHandler
 
 
-class Fort73Handler(TemplateHandler):
+class Fort73Handler(FileHandler):
     """
     Handler for fort.73 files.
     - Reads energy terms vs iteration

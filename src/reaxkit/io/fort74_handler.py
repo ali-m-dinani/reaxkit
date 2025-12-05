@@ -1,21 +1,40 @@
+"""handler for parsing and cleaning data in fort.74 file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
-import re
+
 import pandas as pd
 
-from reaxkit.io.template_handler import TemplateHandler
+from reaxkit.io.file_handler import FileHandler
 
 
-class Fort74Handler(TemplateHandler):
+def _safe_float(s: str) -> float | None:
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_int(s: str) -> int | None:
+    try:
+        # sometimes written as "0", "0.0", etc.
+        return int(float(s))
+    except (ValueError, TypeError):
+        return None
+
+
+class Fort74Handler(FileHandler):
     """
     Handler for fort.74 files.
 
-    Expected line format (no strict header required):
+    Example line formats (fields may be missing):
 
         bulk_c5             Emin:     -180.170 Iter.:     0 Hf:    221.861 Vol:     26.731 Dens):     16.180
+        Zn_nh3-1_P2         Emin:      103.888 Iter.:     0 Heatfo:    677.707
+        N2                  Emin:     -236.672 Iter.:     0 Hf:      5.665 Vol:  15625.000 Dens):      0.003
 
-    Parsed columns:
+    Parsed columns (all optional except identifier):
         identifier, Emin, iter, Hf, V, D
     """
 
@@ -31,31 +50,57 @@ class Fort74Handler(TemplateHandler):
                 if not line:
                     continue
 
-                parts = line.split()
-
-                # Format:
-                # 0: identifier
-                # 1: Emin:
-                # 2: Emin_value
-                # 3: Iter.:
-                # 4: Iter_value
-                # 5: Hf:
-                # 6: Hf_value
-                # 7: Vol:
-                # 8: Vol_value
-                # 9: Dens) or Dens:
-                # 10: Dens_value
-
-                try:
-                    identifier = parts[0]
-                    Emin = float(parts[2])
-                    Iter = int(float(parts[4]))
-                    Hf = float(parts[6])
-                    Vol = float(parts[8])
-                    Dens = float(parts[10])
-                except Exception:
-                    # If parsing fails → skip line
+                tokens = line.split()
+                if not tokens:
                     continue
+
+                # identifier is always the first token
+                identifier = tokens[0]
+
+                Emin = None
+                Iter = None
+                Hf = None
+                Vol = None
+                Dens = None
+
+                # Walk through tokens and look for known labels like "Emin:", "Iter.:", etc.
+                i = 1
+                n = len(tokens)
+                while i < n:
+                    t = tokens[i]
+
+                    # Emin:
+                    if t == "Emin:" and i + 1 < n:
+                        Emin = _safe_float(tokens[i + 1])
+                        i += 2
+                        continue
+
+                    # Iter.: or Iter:
+                    if (t == "Iter.:" or t == "Iter:") and i + 1 < n:
+                        Iter = _safe_int(tokens[i + 1])
+                        i += 2
+                        continue
+
+                    # Hf: or Heatfo:
+                    if (t == "Hf:" or t == "Heatfo:") and i + 1 < n:
+                        Hf = _safe_float(tokens[i + 1])
+                        i += 2
+                        continue
+
+                    # Vol:
+                    if t == "Vol:" and i + 1 < n:
+                        Vol = _safe_float(tokens[i + 1])
+                        i += 2
+                        continue
+
+                    # Dens: or Dens):
+                    if (t == "Dens:" or t == "Dens):") and i + 1 < n:
+                        Dens = _safe_float(tokens[i + 1])
+                        i += 2
+                        continue
+
+                    # anything else → skip
+                    i += 1
 
                 rows.append(
                     {
@@ -75,10 +120,9 @@ class Fort74Handler(TemplateHandler):
 
         return df, meta
 
-    # Optional: override frame-related methods to avoid confusion
+    # fort.74 is effectively a single "table", not frame-based
     def n_frames(self) -> int:
         return 0
 
     def frame(self, i: int) -> Dict[str, Any]:
         raise IndexError("fort.74 has no per-frame data")
-

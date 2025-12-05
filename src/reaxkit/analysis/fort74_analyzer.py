@@ -1,4 +1,5 @@
-# reaxkit/analysis/fort74_analyzer.py
+"""analyzer for fort.74 file"""
+
 from __future__ import annotations
 import pandas as pd
 from typing import Optional
@@ -6,7 +7,7 @@ from typing import Optional
 from reaxkit.io.fort74_handler import Fort74Handler
 
 
-def get(
+def get_fort74(
     handler: Fort74Handler,
     *,
     sort: Optional[str] = None,

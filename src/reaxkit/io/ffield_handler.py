@@ -1,5 +1,6 @@
-from __future__ import annotations
+"""handler for parsing and cleaning data in ffield file"""
 
+from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 
@@ -16,14 +17,6 @@ class FFieldHandler(TemplateHandler):
     - The main DataFrame (`dataframe()`) is intentionally empty.
       All useful data lives in per-section DataFrames exposed via
       `sections` or convenience properties (general_df, atom_df, ...).
-    - Sections currently supported:
-        * general
-        * atom
-        * bond
-        * off_diagonal
-        * angle
-        * torsion
-        * hbond
     """
 
     SECTION_GENERAL = "general"
@@ -33,6 +26,51 @@ class FFieldHandler(TemplateHandler):
     SECTION_ANGLE = "angle"
     SECTION_TORSION = "torsion"
     SECTION_HBOND = "hbond"
+
+    # ---------------- General parameter names --------------------
+    # Fixed order, 39 parameters. "Not used" ones are tagged by
+    # their 1-based line number in the general section.
+    _GENERAL_PARAM_NAMES: List[str] = [
+        "overcoord_1",                   # 1
+        "overcoord_2",                   # 2
+        "valency_angle_conj_1",          # 3
+        "triple_bond_stab_1",            # 4
+        "triple_bond_stab_2",            # 5
+        "not_used_line_num_6",           # 6
+        "undercoord_1",                  # 7
+        "triple_bond_stab_3",            # 8
+        "undercoord_2",                  # 9
+        "undercoord_3",                  # 10
+        "triple_bond_stab_energy",       # 11
+        "taper_radius_lower",            # 12
+        "taper_radius_upper",            # 13
+        "not_used_line_num_14",          # 14
+        "valency_undercoord",            # 15
+        "valency_angle_lonepair",        # 16
+        "valency_angle",                 # 17
+        "valency_angle_param",           # 18
+        "not_used_line_num_19",          # 19
+        "double_bond_angle",             # 20
+        "double_bond_angle_overcoord_1", # 21
+        "double_bond_angle_overcoord_2", # 22
+        "not_used_line_num_23",          # 23
+        "torsion_bo",                    # 24
+        "torsion_overcoord_1",           # 25
+        "torsion_overcoord_2",           # 26
+        "conj_0_not_used",               # 27
+        "conj",                          # 28
+        "vdw_shielding",                 # 29
+        "bo_cutoff_scaled",              # 30
+        "valency_angle_conj_2",          # 31
+        "overcoord_3",                   # 32
+        "overcoord_4",                   # 33
+        "valency_lonepair",              # 34
+        "not_used_line_num_35",          # 35
+        "not_used_line_num_36",          # 36
+        "molecular_energy_1_not_used",   # 37
+        "molecular_energy_2_not_used",   # 38
+        "valency_angle_conj_3",          # 39
+    ]
 
     # ---------------- parameter name templates --------------------
     # Atom: 4 × 8 parameters
@@ -78,79 +116,32 @@ class FFieldHandler(TemplateHandler):
     # ---------------- init / public API ---------------------------
     def __init__(self, file_path: str | Path = "ffield") -> None:
         super().__init__(file_path)
-        # per-section dataframes, filled in _parse()
         self._sections: Dict[str, pd.DataFrame] = {}
-
-    # we can use TemplateHandler/FileHandler.dataframe() directly;
-    # it will call parse() -> _parse() and return self._df.
 
     @property
     def sections(self) -> Dict[str, pd.DataFrame]:
-        """Mapping of section name -> section DataFrame."""
         if not self._parsed:
             self.parse()
         return self._sections
 
     def section_df(self, name: str) -> pd.DataFrame:
-        """Convenience accessor for a single section by name."""
         if not self._parsed:
             self.parse()
         return self._sections[name]
 
-    # Shorthands
-    @property
-    def general_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_GENERAL)
-
-    @property
-    def atom_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_ATOM)
-
-    @property
-    def bond_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_BOND)
-
-    @property
-    def off_diagonal_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_OFF_DIAGONAL)
-
-    @property
-    def angle_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_ANGLE)
-
-    @property
-    def torsion_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_TORSION)
-
-    @property
-    def hbond_df(self) -> pd.DataFrame:
-        return self.section_df(self.SECTION_HBOND)
-
     # ---------------- core parsing -------------------------------
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-        """
-        Parse the ffield file into section-specific DataFrames.
-
-        Returns
-        -------
-        df : pd.DataFrame
-            Empty summary DataFrame (no single unified table for ffield).
-        meta : dict
-            Metadata dictionary; includes at least:
-              - "description": first non-empty line (ffield description).
-        """
         path = self.path
         lines = path.read_text().splitlines()
 
         meta: Dict[str, Any] = {}
 
-        # Capture ffield description: first non-empty line
+        # description: first non-empty line
         for ln in lines:
             if ln.strip():
                 meta["description"] = ln.strip()
                 break
 
-        # reset containers
         sections: Dict[str, pd.DataFrame] = {}
 
         i = 0
@@ -172,9 +163,9 @@ class FFieldHandler(TemplateHandler):
                     continue
                 general_df, i = self._parse_general_section(lines, i + 1, n)
                 sections[self.SECTION_GENERAL] = general_df
+                meta["n_general_params"] = len(general_df)
                 continue
 
-            # Atom header: e.g. " 19    ! Nr of atoms; cov.r; ..."
             if "atom" in lower:
                 n = self._first_int_in_line(line)
                 if n is None:
@@ -182,9 +173,9 @@ class FFieldHandler(TemplateHandler):
                     continue
                 atom_df, i = self._parse_atom_section(lines, i + 1, n)
                 sections[self.SECTION_ATOM] = atom_df
+                meta["n_atoms"] = len(atom_df)
                 continue
 
-            # Bonds (but not off-diagonal or hydrogen bonds)
             if "bond" in lower and "off" not in lower and "hydrogen" not in lower:
                 n = self._first_int_in_line(line)
                 if n is None:
@@ -192,6 +183,7 @@ class FFieldHandler(TemplateHandler):
                     continue
                 bond_df, i = self._parse_bond_section(lines, i + 1, n)
                 sections[self.SECTION_BOND] = bond_df
+                meta["n_bonds"] = len(bond_df)
                 continue
 
             if "off-diagonal" in lower or "off diagonal" in lower:
@@ -201,6 +193,7 @@ class FFieldHandler(TemplateHandler):
                     continue
                 off_df, i = self._parse_off_diagonal_section(lines, i + 1, n)
                 sections[self.SECTION_OFF_DIAGONAL] = off_df
+                meta["n_off_diagonal"] = len(off_df)
                 continue
 
             if "angle" in lower:
@@ -210,6 +203,7 @@ class FFieldHandler(TemplateHandler):
                     continue
                 angle_df, i = self._parse_angle_section(lines, i + 1, n)
                 sections[self.SECTION_ANGLE] = angle_df
+                meta["n_angles"] = len(angle_df)
                 continue
 
             if "torsion" in lower:
@@ -219,6 +213,7 @@ class FFieldHandler(TemplateHandler):
                     continue
                 torsion_df, i = self._parse_torsion_section(lines, i + 1, n)
                 sections[self.SECTION_TORSION] = torsion_df
+                meta["n_torsions"] = len(torsion_df)
                 continue
 
             if "hydrogen" in lower and "bond" in lower:
@@ -228,11 +223,11 @@ class FFieldHandler(TemplateHandler):
                     continue
                 hbond_df, i = self._parse_hbond_section(lines, i + 1, n)
                 sections[self.SECTION_HBOND] = hbond_df
+                meta["n_hbonds"] = len(hbond_df)
                 continue
 
             i += 1
 
-        # Attach to self so properties can see them after parse()
         self._sections = sections
 
         # Summary DataFrame for ffield is intentionally empty
@@ -243,15 +238,16 @@ class FFieldHandler(TemplateHandler):
     def _parse_general_section(
         self, lines: List[str], start: int, n_params: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        General section:
+        """Parse General parameters using fixed names, not inline comments."""
+        expected = len(self._GENERAL_PARAM_NAMES)
+        if n_params == expected:
+            print("[FFieldHandler] Number of general parameters is 39 (expected).")
+        else:
+            print(
+                f"[FFieldHandler] WARNING: expected {expected} general parameters, "
+                f"but header says {n_params}."
+            )
 
-        Each line: "<value> ! title".
-        - Title is taken from the comment text.
-        - If title starts with 'Not used', we store it as
-          "Not used: line X" where X is the *index within the general block*
-          (1-based, i.e., parameter #).
-        """
         records: List[Dict[str, Any]] = []
 
         for idx in range(n_params):
@@ -261,25 +257,25 @@ class FFieldHandler(TemplateHandler):
 
             if "!" in raw_line:
                 left, comment = raw_line.split("!", 1)
-                title_raw = comment.strip()
+                raw_comment = comment.strip()
             else:
                 left = raw_line
-                title_raw = f"param_{idx + 1}"
+                raw_comment = ""
 
             tokens = left.split()
             value = float(tokens[0]) if tokens else float("nan")
 
-            if title_raw.lower().startswith("not used"):
-                title = f"Not used: line {idx + 1}"
+            if idx < expected:
+                name = self._GENERAL_PARAM_NAMES[idx]
             else:
-                title = title_raw
+                name = f"general_param_{idx + 1}"
 
             records.append(
                 {
                     "index": idx + 1,
-                    "name": title,
+                    "name": name,
                     "value": value,
-                    "raw_comment": title_raw,
+                    "raw_comment": raw_comment,
                 }
             )
 
@@ -290,32 +286,13 @@ class FFieldHandler(TemplateHandler):
     def _parse_atom_section(
         self, lines: List[str], start: int, n_atoms: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        Atom section:
-
-        For each atom, we collect 4×8 = 32 numeric parameters in order:
-            cov.r; valency; a.m; Rvdw; Evdw; gammaEEM; cov.r2; #el
-            alfa; gammavdW; valency; Eunder; n.u.; chiEEM; etaEEM; n.u.
-            cov r3; Elp; Heat inc.; 13BO1; 13BO2; 13BO3; n.u.; n.u.
-            ov/un; val1; n.u.; val3; vval4; n.u.; n.u.; n.u.
-
-        For titles "n.u." we use numbered names: n.u.1, n.u.2, ...
-
-        We also try to read:
-        - atom_index: leading integer on the first line
-        - symbol: token after atom_index (if non-numeric)
-        """
         names = self._number_unused_titles(self._ATOM_PARAM_NAMES_BASE)
         n_per_atom = len(names)
 
         records: List[Dict[str, Any]] = []
         n_lines = len(lines)
 
-        # Skip the 4 description lines after the atom header:
-        #  ! Nr of atoms; cov.r; ...
-        #          alfa; gammavdW; ...
-        #          cov r3; Elp; ...
-        #          ov/un; val1; ...
+        # Skip the 4 description lines after the atom header
         i = min(start + 3, n_lines)
 
         for atom_idx in range(1, n_atoms + 1):
@@ -335,7 +312,6 @@ class FFieldHandler(TemplateHandler):
 
                 if first_line:
                     j = 0
-                    # optional leading integer index
                     try:
                         atom_no = int(tokens[0])
                         j = 1
@@ -343,7 +319,6 @@ class FFieldHandler(TemplateHandler):
                         atom_no = atom_idx
                         j = 0
 
-                    # optional symbol
                     if j < len(tokens):
                         try:
                             float(tokens[j])
@@ -381,25 +356,13 @@ class FFieldHandler(TemplateHandler):
     def _parse_bond_section(
         self, lines: List[str], start: int, n_bonds: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        Bond section:
-
-        For each bond we collect:
-            Edis1; Edis2; Edis3; pbe1; pbo5; 13corr; pbo6; kov
-            pbe2; pbo3; pbo4; n.u.; pbo1; pbo2; ovcorr; n.u.
-        with "n.u." renamed to n.u.1, n.u.2, ...
-
-        We also try to read atom-type indices `i` and `j` on the first line.
-        """
         names = self._number_unused_titles(self._BOND_PARAM_NAMES_BASE)
         n_per_bond = len(names)
 
         records: List[Dict[str, Any]] = []
         n_lines = len(lines)
 
-        # Skip the 2 description lines after the bond header:
-        #  ! Nr of bonds; ...
-        #              pbe2; pbo3; ...
+        # Skip the 2 description lines after the bond header
         i = min(start + 1, n_lines)
 
         for bond_idx in range(1, n_bonds + 1):
@@ -463,13 +426,6 @@ class FFieldHandler(TemplateHandler):
     def _parse_off_diagonal_section(
         self, lines: List[str], start: int, n_entries: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        Off-diagonal section:
-
-        For each entry:
-            Evdw; Rvdw; alfa; cov.r; cov.r2; cov.r3
-        plus atom-type indices `i` and `j` (if present).
-        """
         names = list(self._OFF_DIAGONAL_PARAM_NAMES)
         n_per = len(names)
 
@@ -538,13 +494,6 @@ class FFieldHandler(TemplateHandler):
     def _parse_angle_section(
         self, lines: List[str], start: int, n_angles: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        Angle section:
-
-        Parameters per angle:
-            Theta0; ka; kb; pconj; pv2; kpenal; pv3
-        We also try to read atom-type indices i, j, k on the first line.
-        """
         names = list(self._ANGLE_PARAM_NAMES)
         n_per = len(names)
 
@@ -621,15 +570,6 @@ class FFieldHandler(TemplateHandler):
     def _parse_torsion_section(
         self, lines: List[str], start: int, n_torsions: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        Torsion section:
-
-        Parameters per torsion:
-            V1; V2; V3; V2(BO); vconj; n.u.; n.u.
-        with n.u. -> n.u.1, n.u.2, ...
-
-        We also try to read atom-type indices i, j, k, l.
-        """
         names = self._number_unused_titles(self._TORSION_PARAM_NAMES_BASE)
         n_per = len(names)
 
@@ -714,13 +654,6 @@ class FFieldHandler(TemplateHandler):
     def _parse_hbond_section(
         self, lines: List[str], start: int, n_hbonds: int
     ) -> Tuple[pd.DataFrame, int]:
-        """
-        H-bond section:
-
-        Parameters per hydrogen bond:
-            Rhb; Dehb; vhb1; vhb2
-        plus i, j, k atom-type indices when present.
-        """
         names = list(self._HBOND_PARAM_NAMES)
         n_per = len(names)
 
@@ -797,7 +730,6 @@ class FFieldHandler(TemplateHandler):
     # ---------------- helpers ------------------------------------
     @staticmethod
     def _first_int_in_line(line: str) -> Optional[int]:
-        """Return the first integer found in a line, or None."""
         for tok in line.split():
             try:
                 return int(tok)
@@ -810,10 +742,6 @@ class FFieldHandler(TemplateHandler):
         names: List[str],
         label: str = "n.u.",
     ) -> List[str]:
-        """
-        Replace occurrences of `label` in `names` with numbered variants:
-        n.u.1, n.u.2, ...
-        """
         result: List[str] = []
         counter = 0
         for name in names:

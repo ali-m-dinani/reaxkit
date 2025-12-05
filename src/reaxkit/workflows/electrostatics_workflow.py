@@ -12,13 +12,17 @@ from reaxkit.io.xmolout_handler import XmoloutHandler
 from reaxkit.io.fort7_handler import Fort7Handler
 from reaxkit.io.fort78_handler import Fort78Handler
 from reaxkit.io.control_handler import ControlHandler
+from reaxkit.analysis.xmolout_analyzer import get_atom_trajectories
+from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
+from reaxkit.utils.frame_utils import parse_frames, resolve_indices
+from reaxkit.utils.alias import resolve_alias_from_columns
+from reaxkit.utils.path import resolve_output_path
+from reaxkit.analysis.plotter import single_plot
 
 from reaxkit.analysis.electrostatics_analyzer import (
     single_frame_dipoles_polarizations,
     polarization_field_analysis,
 )
-from reaxkit.analysis.plotter import single_plot
-
 from reaxkit.utils.alias import (
     normalize_choice,
     _resolve_alias,
@@ -26,11 +30,6 @@ from reaxkit.utils.alias import (
 from reaxkit.analysis.electrostatics_analyzer import (
     dipoles_polarizations_over_multiple_frames,
 )
-from reaxkit.analysis.xmolout_analyzer import get_atom_trajectories
-from reaxkit.analysis.plotter import scatter3d_points, heatmap2d_from_3d
-
-from reaxkit.utils.frame_utils import parse_frames, resolve_indices
-from reaxkit.utils.alias import resolve_alias_from_columns
 
 
 # -------------------------------------------------------------------------
@@ -76,10 +75,11 @@ def dipole_task(args: argparse.Namespace) -> int:
         mode=mode,
     )
 
+    workflow_name = args.kind
     # Export
-    out_path = Path(args.export)
-    df.to_csv(out_path, index=False)
-    print(f"\n[Done] Exported data to {out_path}")
+    out = resolve_output_path(args.export, workflow_name)
+    df.to_csv(out, index=False)
+    print(f"\n[Done] Exported data to {out}")
 
     return 0
 
@@ -92,7 +92,7 @@ def hyst_task(args: argparse.Namespace) -> int:
         [--yaxis pol_z] [--xaxis time|field_z]
         [--aggregate mean|max|min|last]
         [--export hysteresis.csv]
-        [--summary summary.txt]
+        [--summary hysteresis_summary.txt]
         [--roots]
 
     - Uses polarization_field_analysis to build polarization + field dataset.
@@ -138,9 +138,10 @@ def hyst_task(args: argparse.Namespace) -> int:
     # ------------------------------------------------------------------
     # Export aggregated joint DataFrame
     # ------------------------------------------------------------------
+    workflow_name = args.kind
     if args.export:
         # Export aggregated data (agg_df)
-        out_csv = Path(args.export)
+        out_csv = resolve_output_path(args.export, workflow_name)
         agg_df.to_csv(out_csv, index=False)
         print(f"\n[Done] Exported aggregated joint hysteresis data to {out_csv}")
 
@@ -436,42 +437,67 @@ def local_pol_heatmap2d_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---------------------- dipole ----------------------
-    p_dip = subparsers.add_parser("dipole", help="Compute dipole moment or polarization for a single frame || "
-                                                 "reaxkit elect dipole --frame 10 --scope total --export total_frame10.csv --polarization || "
-                                                 "reaxkit elect dipole --frame 10 --scope local --core Al --export local_frame10.csv --polarization")
+    p_dip = subparsers.add_parser(
+        "dipole",
+        help="Compute dipole moment or polarization for a single frame\n",
+        description=(
+            "Examples:\n"
+            "  reaxkit elect dipole --frame 10 --scope total --export dipole_pol_total_frame10.csv --polarization \n"
+            "  reaxkit elect dipole --frame 10 --scope local --core Al --export dipole_pol_local_frame10.csv --polarization \n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_dip.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
     p_dip.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
     p_dip.add_argument("--frame", type=int, required=True, help="0-based frame index in xmolout")
-    p_dip.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope: total or local")
-    p_dip.add_argument("--core", default=None, help="Comma-separated core atom types for local scope (e.g. Al,Mg)")
+    p_dip.add_argument("--scope", choices=["total", "local"],
+                       default="total", help="Electrostatics scope: total or local")
+    p_dip.add_argument("--core", default=None,
+                       help="Comma-separated core atom types for local scope (e.g. Al,Mg)")
     p_dip.add_argument("--export", required=True, help="CSV file to export the dipole/polarization data")
-    p_dip.add_argument("--polarization", action="store_true", help="If present, compute polarization instead of dipole")
+    p_dip.add_argument("--polarization", action="store_true",
+                       help="If present, compute polarization instead of dipole")
     p_dip.set_defaults(_run=dipole_task)
 
     # ---------------------- hysteresis ----------------------
-    p_hyst = subparsers.add_parser("hyst", help="Polarization-field hysteresis analysis || "
-                                                "reaxkit elect hyst --plot --yaxis pol_z --xaxis field_z --aggregate mean --roots")
+    p_hyst = subparsers.add_parser(
+        "hyst",
+        help="Polarization-field hysteresis analysis\n",
+        description=(
+            "Examples:\n"
+            "  reaxkit elect hyst --plot --yaxis pol_z --xaxis field_z --aggregate mean --roots"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_hyst.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
     p_hyst.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
     p_hyst.add_argument("--fort78", default="fort.78", help="Path to fort.78 file")
     p_hyst.add_argument("--control", default="control", help="Path to control file")
     p_hyst.add_argument("--plot", action="store_true", help="Show the hysteresis or time-series plot")
-    p_hyst.add_argument("--save", default='hysteresis_aggregated.png', help="If set, save plot to file (e.g. hyst.png)")
+    p_hyst.add_argument("--save", default='hysteresis_aggregated.png',
+                        help="If set, save plot to file (e.g. hyst.png)")
+    p_hyst.add_argument("--export", default='hysteresis_aggregated.csv',
+                        help="CSV file to export aggregated hysteresis data")
+    p_hyst.add_argument("--summary", default="hysteresis_summary.txt",
+                        help="Text file to write coercive fields and remnant polarizations")
     p_hyst.add_argument("--yaxis", default="pol_z", help="Quantity for y-axis (e.g. pol_z, mu_z, time, P_z)")
     p_hyst.add_argument("--xaxis", default="field_z", help="Quantity for x-axis (e.g. field_z, time, iter)")
-    p_hyst.add_argument("--aggregate", choices=["mean", "max", "min", "last"], default="mean", help="Aggregation method")
-    p_hyst.add_argument("--export", default='hysteresis_aggregated.csv', help="CSV file to export aggregated hysteresis data")
-    p_hyst.add_argument("--summary", default=None, help="Text file to write coercive fields and remnant polarizations")
+    p_hyst.add_argument("--aggregate", choices=["mean", "max", "min", "last"],
+                        default="mean", help="Aggregation method")
+
     p_hyst.add_argument("--roots", action="store_true", help="Also print coercive and remnant values to terminal")
     p_hyst.set_defaults(_run=hyst_task)
 
     # ---------------------- 3D local polarization scatter ----------------------
     p3d = subparsers.add_parser(
         "plot3d",
-        help=(
-            "3D scatter of local polarization/dipole on core-atom positions || "
-            "reaxkit elect plot3d --core Al --component mu_z --frames 0:3:1 --save figs/local_pol3d"
+        help="3D scatter of local polarization/dipole on core-atom positions\n",
+        description=(
+            "Examples:\n"
+            "  reaxkit elect plot3d --core Al --component mu_z --frames 0:3:1 "
+            "--save reaxkit_outputs/elect/local_mu_3d/"
         ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p3d.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
     p3d.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
@@ -494,10 +520,13 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---------------------- 2D local polarization heatmap ----------------------
     p2d = subparsers.add_parser(
         "heatmap2d",
-        help=(
-            "2D heatmap of local polarization/dipole on core-atom positions || "
-            "reaxkit elect heatmap2d --core Al --component mu_z --plane xz --bins 10 --frames 0:2:1 --save figs/local_pol_heat"
+        help="2D heatmap of local polarization/dipole on core-atom positions",
+        description=(
+            "Examples:\n"
+            "  reaxkit elect heatmap2d --core Al --component mu_z --plane xz --bins 10 --frames 0:2:1 "
+            "--save reaxkit_outputs/elect/local_mu_2d"
         ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p2d.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
     p2d.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")

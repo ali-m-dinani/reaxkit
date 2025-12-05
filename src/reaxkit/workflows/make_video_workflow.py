@@ -1,4 +1,4 @@
-# reaxkit/workflows/make_video_workflow.py
+"""a workflow for generating video (.mp4) based on a series of images in a folder."""
 
 from __future__ import annotations
 import argparse
@@ -14,15 +14,23 @@ def make_task(args: argparse.Namespace) -> int:
         fps=args.fps,
         ext=exts,
     )
-    print(f"[Done] Video saved to {out_path}")
+    print(f"[Done] Video saved to {args.output}")
     return 0
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    # video make: reaxkit video make --folder ./figs/local_pol3d --output local_polarization_3D.mp4 --fps 5
-    p = subparsers.add_parser("make", help="Create a video from a sequence of image files")
+    p = subparsers.add_parser(
+        "make",
+        help="Create a video from a sequence of image files",
+        description=(
+            "Examples:\n"
+            "  reaxkit video make --folder reaxkit_outputs/elect/local_mu_3d "
+            "--output reaxkit_outputs/video/local_mu_3D.mp4 --fps 5\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p.add_argument("--folder", default=".", help="Folder containing image files (default: current directory)")
-    p.add_argument("--output", default="output_video.mp4", help="Output video filename (default: output_video.mp4)")
+    p.add_argument("--output", default="reaxkit_outputs/video/output_video.mp4", help="Output video filename")
     p.add_argument("--fps", type=int, default=10, help="Frames per second (default: 10)")
     p.add_argument("--ext", default=".png,.jpg,.jpeg",
                    help="Comma-separated list of accepted image extensions (default: .png,.jpg,.jpeg)",

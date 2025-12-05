@@ -1,4 +1,4 @@
-"""workflow for control file: query control keys like 'nmdit'"""
+"""workflow for control file: query control keys like 'nmdit' """
 
 from __future__ import annotations
 import argparse
@@ -47,17 +47,14 @@ def control_get_task(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    """
-    Register 'get' task for 'control' workflow.
-
-    Examples:
-        reaxkit control get nmdit
-        reaxkit control get nmdit --file control
-        reaxkit control get nmdit --section md
-    """
     p = subparsers.add_parser(
         "get",
         help="Get the value of a control key (e.g. nmdit)",
+        description=(
+            "Examples:\n"
+            "  reaxkit control get nmdit\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p.add_argument("key", help="Control key to look up, e.g. 'nmdit'.")
     p.add_argument(

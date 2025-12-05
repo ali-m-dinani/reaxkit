@@ -1,3 +1,5 @@
+"""analyzer for params file"""
+
 from __future__ import annotations
 import pandas as pd
 from reaxkit.io.params_handler import ParamsHandler

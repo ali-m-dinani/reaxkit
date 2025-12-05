@@ -1,14 +1,15 @@
-# reaxkit/io/fort99_handler.py
+"""handler for parsing and cleaning data in fort.99 file"""
+
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Dict, Any
 import re
 import pandas as pd
 
-from .template_handler import TemplateHandler
+from reaxkit.io.file_handler import FileHandler
 
 
-class Fort99Handler(TemplateHandler):
+class Fort99Handler(FileHandler):
     """
     Handler for fort.99 (ReaxFF training set error report).
 

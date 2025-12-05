@@ -1,4 +1,4 @@
-"""Workflow for GEO-related tasks (xtob: XYZ→GEO, make: build slabs)."""
+"""Workflow for GEO-related tasks (xtob: XYZ→GEO, make: build slabs), etc."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def _parse_csv_ints(value: str, expected: int, name: str) -> List[int]:
 
 
 # ----------------------------------------------------------------------
-# Task 1: xyz -> geo (xtob)
+# Task 1: xyz -> geo (xtob) format conversion
 # ----------------------------------------------------------------------
 
 def xtob_task(args: argparse.Namespace) -> int:
@@ -220,9 +220,9 @@ def sort_task(args: argparse.Namespace) -> int:
     print(f"[Done] Sorted {in_path} by {sort_label} ({direction}) → {out_path}")
     return 0
 
-# ----------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # Task 4: convert a hexagonal cell (90°, 90°, 120°) into an orthorhombic (90°, 90°, 90°) cell
-# ----------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def ortho_task(args: argparse.Namespace) -> int:
     """
@@ -249,9 +249,10 @@ def ortho_task(args: argparse.Namespace) -> int:
     print(f"[Done] Converted hexagonal → orthorhombic: {in_path} → {out_path}")
     return 0
 
-# ----------------------------------------------------------------------
-# task 5: place2 algorithm for placing n instances of a structure into a simulation box or within another structure
-# ----------------------------------------------------------------------
+# ------------------------------------------------------------------------------------
+# task 5: place2 algorithm for placing n instances of a structure into a
+# simulation box or within another structure
+# ------------------------------------------------------------------------------------
 def place2_task(args: argparse.Namespace) -> int:
     """
     Randomly place copies of an insert molecule into a simulation box,
@@ -348,18 +349,16 @@ def place2_task(args: argparse.Namespace) -> int:
 # ----------------------------------------------------------------------
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    """
-    Register GEO workflow tasks under the `geo` command.
-    Commands:
-        reaxkit geo xtob ...
-        reaxkit geo make ...
-        reaxkit geo sort ...
-    """
-
     # ---- xtob ----
-    p_xtob = subparsers.add_parser("xtob",
-                                   help="Convert an XYZ file to GEO (XTLGRF) format || "
-                                        "reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output geo")
+    p_xtob = subparsers.add_parser(
+        "xtob",
+        help="Convert an XYZ file to GEO (XTLGRF) format \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output geo\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_xtob.add_argument("--file", required=True, help="Input XYZ file (X.xyz)")
     p_xtob.add_argument("--dims", required=True, help="Box dimensions a,b,c (e.g., 11.0,12.0,100.0)")
     p_xtob.add_argument("--angles", required=True, help="Box angles alpha,beta,gamma (e.g., 90,90,90)")
@@ -369,9 +368,15 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_xtob.set_defaults(_run=xtob_task)
 
     # ---- make ----
-    p_make = subparsers.add_parser("make",
-                                   help="Build a surface slab from bulk and write XYZ/CIF || "
-                                        "reaxkit geo make --file bulk.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15")
+    p_make = subparsers.add_parser(
+        "make",
+        help="Build a surface slab from bulk and write XYZ/CIF || ",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo make --file bulk.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_make.add_argument("--file", required=True, help="Input bulk file (CIF, POSCAR, etc.)")
     p_make.add_argument("--output", required=True, help="Output file (XYZ, CIF, etc.)")
     p_make.add_argument("--surface", required=True, help="Miller indices h,k,l (e.g., 1,0,0)")
@@ -380,28 +385,50 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_make.set_defaults(_run=make_task)
 
     # ---- sort ----
-    p_sort = subparsers.add_parser("sort", help="Sort atoms in a GEO file and write a new GEO || "
-                                                "reaxkit geo sort --file geo --output sorted_geo --sort x")
+    p_sort = subparsers.add_parser(
+        "sort",
+        help="Sort atoms in a GEO file and write a new GEO \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo sort --file geo --output sorted_geo --sort x\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_sort.add_argument("--file", required=True, help="Input GEO file (X.geo)")
     p_sort.add_argument("--output", required=True, help="Output GEO file (Y.geo)")
-    p_sort.add_argument("--sort", required=True, choices=["m", "x", "y", "z", "atom_type"], help="Sort key: m=atom index, x/y/z=coordinates, atom_type=element")
+    p_sort.add_argument("--sort", required=True, choices=["m", "x", "y", "z", "atom_type"],
+                        help="Sort key: m=atom index, x/y/z=coordinates, atom_type=element")
     p_sort.add_argument("--descending", action="store_true", help="Sort in descending order")
     p_sort.set_defaults(_run=sort_task)
 
     # ---- ortho (orthogonalize) ----
-    p_ortho = subparsers.add_parser("ortho",
-                                    help="Convert hexagonal (90,90,120) cell to orthorhombic (90,90,90) || "
-                                         "reaxkit geo ortho --file AlN_hex.cif --output AlN_ortho.cif")
+    p_ortho = subparsers.add_parser(
+        "ortho",
+        help="Convert hexagonal (90,90,120) cell to orthorhombic (90,90,90) \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo ortho --file AlN_hex.cif --output AlN_ortho.cif\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_ortho.add_argument("--file", required=True, help="Input CIF/POSCAR/GEO file to orthogonalize")
     p_ortho.add_argument("--output", required=True, help="Output file (e.g., AlN_ortho.cif)")
     p_ortho.set_defaults(_run=ortho_task)
 
     # ---- place2 ----
-    p_place2 = subparsers.add_parser("place2",
-        help="Randomly place copies of a molecule into a box and optionally around a base structure || "
-             "reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --output place2_no_base.xyz || "
-             "reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --output place2_with_base.xyz --base base.xyz"
-             "reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --output place2_geo --base base.xyz"
+    p_place2 = subparsers.add_parser(
+        "place2",
+        help="Randomly place copies of a molecule into a box and optionally around a base structure || ",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
+            "--angles 90,90,90 --output place2_no_base.xyz\n"
+            "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
+            "--angles 90,90,90 --output place2_with_base.xyz --base base.xyz\n"
+            "  reaxkit geo place2 --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 "
+            "--angles 90,90,90 --output place2_geo --base base.xyz"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_place2.add_argument("--insert", required=True,
         help="Insert molecule (XYZ or any ASE-readable format, e.g., X.xyz)",

@@ -1,3 +1,5 @@
+"""analyzer for trainset file"""
+
 from __future__ import annotations
 
 from typing import Any

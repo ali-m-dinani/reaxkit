@@ -1,4 +1,5 @@
 """analyzer for summary.txt file"""
+
 from __future__ import annotations
 from typing import Optional, Sequence, Union
 import pandas as pd

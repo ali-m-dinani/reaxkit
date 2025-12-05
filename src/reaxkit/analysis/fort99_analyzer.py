@@ -1,9 +1,10 @@
-# reaxkit/analysis/fort99_analyzer.py
+"""analyzer for fort.99 file"""
+
 from __future__ import annotations
 import pandas as pd
 from reaxkit.io.template_handler import TemplateHandler
 
-def get(
+def get_fort99(
     handler: TemplateHandler,
     *,
     sortby: str = "lineno",
@@ -11,7 +12,7 @@ def get(
 ) -> pd.DataFrame:
     """
     Compute:
-        difference = qm_value - ffield_value
+        qm_ff_difference = qm_value - ffield_value
     Then sort by a user-chosen column ('sortby').
 
     Parameters
@@ -29,8 +30,8 @@ def get(
     """
     df = handler.dataframe().copy()
 
-    # Add difference column
-    df["difference"] = df["qm_value"] - df["ffield_value"]
+    # Add qm_ff_difference column
+    df["qm_ff_difference"] = df["qm_value"] - df["ffield_value"]
 
     # Validate requested sort column
     if sortby not in df.columns:
@@ -44,9 +45,9 @@ def get(
 
     return df
 
-#------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 # getting the EOS data (i.e., rows where section = ENERGY and have 2 identifiers in their title
-#------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 def parse_fort99_two_body_energy_terms(handler: TemplateHandler) -> pd.DataFrame:
     """
@@ -169,7 +170,7 @@ def fort99_energy_vs_volume(
         )
 
     # 3) Load fort.74 data and extract identifier → volume
-    fort74_df = fort74_analyzer.get(fort74_handler)
+    fort74_df = fort74_analyzer.get_fort74(fort74_handler)
 
     if (
         fort74_df.empty

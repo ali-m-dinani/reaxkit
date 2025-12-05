@@ -6,10 +6,10 @@ from typing import List, Dict, Any
 
 import pandas as pd
 
-from reaxkit.io.template_handler import TemplateHandler
+from reaxkit.io.file_handler import FileHandler
 
 
-class ParamsHandler(TemplateHandler):
+class ParamsHandler(FileHandler):
     """
     Handler for ReaxFF params-like files, with lines such as:
 

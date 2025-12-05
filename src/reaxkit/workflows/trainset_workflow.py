@@ -1,4 +1,4 @@
-"""Workflow for ReaxFF trainset / fort.99-style files."""
+"""Workflow for ReaxFF trainset files."""
 
 from __future__ import annotations
 
@@ -8,13 +8,11 @@ from typing import Any, Dict
 
 from reaxkit.io.trainset_handler import TrainsetHandler
 from reaxkit.analysis.trainset_analyzer import trainset_group_comments
-
+from reaxkit.utils.path import resolve_output_path
 
 # ----------------------------------------------------------------------
 # Task 1: reaxkit trainset get --file ... --section ...
 # ----------------------------------------------------------------------
-
-
 def get_task(args: argparse.Namespace) -> int:
     """
     Read trainset and save section DataFrames to CSV files.
@@ -64,7 +62,7 @@ def get_task(args: argparse.Namespace) -> int:
         fname = f"{stem}_{sec_name.lower()}.csv"
         outpath = outdir / fname
         df.to_csv(outpath, index=False)
-        print(f"[Done] Saved section '{sec_name}' to {outpath}")
+        print(f"[Done] Exported section '{sec_name}' to {outpath}")
 
     return 0
 
@@ -72,8 +70,6 @@ def get_task(args: argparse.Namespace) -> int:
 # ----------------------------------------------------------------------
 # Task 2: reaxkit trainset category --file ... --section ...
 # ----------------------------------------------------------------------
-
-
 def category_task(args: argparse.Namespace) -> int:
     """
     Print or export unique group comments (categories) for trainset sections.
@@ -96,8 +92,9 @@ def category_task(args: argparse.Namespace) -> int:
     # ---------------------------------
     # EXPORT OPTION
     # ---------------------------------
+    workflow_name = args.kind
     if args.export:
-        outpath = Path(args.export)
+        outpath = resolve_output_path(args.export, workflow_name)
         df.to_csv(outpath, index=False)
         print(f"[Done] Exported categories to: {outpath}")
         return 0
@@ -114,13 +111,18 @@ def category_task(args: argparse.Namespace) -> int:
 # ----------------------------------------------------------------------
 # Register tasks with the CLI
 # ----------------------------------------------------------------------
-
-
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
 
     # ---- get ----
-    p_get = subparsers.add_parser("get", help="Save trainset sections as CSV files. || "
-                                              "reaxkit trainset get --section all --export trainset_analysis")
+    p_get = subparsers.add_parser(
+        "get",
+        help="Save trainset sections as CSV files. \n",
+        description=(
+            "Examples:\n"
+            "  reaxkit trainset get --section all --export reaxkit_outputs/trainset\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p_get.add_argument("--file", default="trainset.in", help="Path to trainset/fort.99 file")
     p_get.add_argument("--section", default="all",
                        help="Section to export: all, charge, heatfo, geometry, cell_parameters, energy")
@@ -128,11 +130,16 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_get.set_defaults(_run=get_task)
 
     # ---- category ----
-    p_cat = subparsers.add_parser("category",
-                                  help="List or export unique trainset categories (group comments) || "
-                                       "reaxkit trainset category --section all --export trainset_categories.csv"
-                                       "reaxkit trainset category --section all --sort"
-                                       "reaxkit trainset category --section energy --export energy_categories.csv",
+    p_cat = subparsers.add_parser(
+        "category",
+        help="List or export unique trainset categories (group comments) || ",
+        description=(
+            "Examples:\n"
+            "  reaxkit trainset category --section all --export trainset_categories.csv\n"
+            "  reaxkit trainset category --section all --sort"
+            "  reaxkit trainset category --section energy --export energy_categories.csv"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     p_cat.add_argument("--file", default="trainset.in", help="Path to trainset/fort.99 file")
     p_cat.add_argument("--section", default="all",

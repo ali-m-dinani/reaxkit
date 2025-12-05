@@ -1,4 +1,5 @@
-#electrostatics_analyzer.py
+"""analyzer for electrostatics calculations such as dipole moment calculation for a molecule, slab, etc."""
+
 from typing import Literal, Sequence, Optional, Tuple
 
 import numpy as np

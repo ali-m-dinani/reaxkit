@@ -1,4 +1,5 @@
-"""reads fort7 coordination data (i.e., total BO) and then re-writes a xmolout based on coordination of atoms."""
+"""reads fort7 coordination data (i.e., total BO) and then re-writes a xmolout file based on coordination of atoms."""
+
 from __future__ import annotations
 import argparse
 from pathlib import Path

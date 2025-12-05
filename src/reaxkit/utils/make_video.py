@@ -1,9 +1,11 @@
+
+
 import os
 import re
 import imageio
 
 
-def extract_numeric_index(filename: str) -> int:
+def _extract_numeric_index(filename: str) -> int:
     """Extract first numeric occurrence from filename for sorting."""
     nums = re.findall(r"\d+", filename)
     return int(nums[0]) if nums else -1
@@ -52,7 +54,7 @@ def images_to_video(
         raise FileNotFoundError(f"No image files with extensions {ext} in {folder_path}")
 
     # Sort numerically
-    files.sort(key=extract_numeric_index)
+    files.sort(key=_extract_numeric_index)
 
     # Read images
     images = [

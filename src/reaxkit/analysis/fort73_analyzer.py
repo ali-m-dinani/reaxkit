@@ -1,4 +1,4 @@
-# reaxkit/analysis/fort73_analyzer.py
+"""analyzer for fort.73 file"""
 from __future__ import annotations
 from typing import List, Optional
 import pandas as pd
@@ -6,7 +6,7 @@ import pandas as pd
 from reaxkit.io.template_handler import TemplateHandler
 
 
-def fort73_get(handler: TemplateHandler, columns: Optional[List[str]] = None) -> pd.DataFrame:
+def get_fort73_data(handler: TemplateHandler, columns: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Return a DataFrame view of the fort.73 data.
 
