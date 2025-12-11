@@ -56,6 +56,8 @@ class SummaryHandler(FileHandler):
                 continue
             if s_lower.startswith("iteration"):
                 continue
+            if not s[0].isdigit():  # skipping comment or warning lines that may occur at the end of the file
+                continue
             data_lines.append(ln)
 
         if not data_lines:
