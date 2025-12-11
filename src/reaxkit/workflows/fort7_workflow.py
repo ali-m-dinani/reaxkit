@@ -27,6 +27,30 @@ FramesT = Optional[Union[slice, Sequence[int]]]
 # ==========================================================
 # Task: GET  (atomic or summary feature)
 # ==========================================================
+def _parse_atom_selection(atom_arg, max_atoms=None):
+    """
+    Parse --atom argument.
+
+    Returns:
+      - None          → no atom selection (summary mode)
+      - "all"         → all atoms (if max_atoms unknown)
+      - [int, ...]    → list of atom numbers
+    """
+    if atom_arg is None:
+        return None
+
+    s = str(atom_arg).strip().lower()
+    if s == "all":
+        if max_atoms is None:
+            return "all"
+        return list(range(1, max_atoms + 1))
+
+    if "," in s:
+        return [int(tok) for tok in s.split(",") if tok.strip()]
+
+    return [int(s)]
+
+
 def _task_get(args: argparse.Namespace) -> int:
     h = Fort7Handler(args.file)
 
@@ -34,14 +58,15 @@ def _task_get(args: argparse.Namespace) -> int:
     feat = (args.yaxis or "").strip()
     feat = normalize_choice(feat, domain="feature")
     use_regex = bool(args.regex)
-    is_atom_scope = args.atom is not None
+    atom_sel = _parse_atom_selection(args.atom, max_atoms=getattr(h, "num_atoms", None))
+    is_atom_scope = atom_sel is not None
 
     if is_atom_scope:
-        if args.atom is None:
-            raise SystemExit("❌ For atom-level features, provide --atom <1-based atom_num>.")
         df = get_features_atom(h, feat, frames=frames_sel, regex=use_regex, add_index_cols=True)
         if df.empty:
             raise SystemExit("❌ No atom-level rows matched your request.")
+
+        # Ensure atom_num exists
         if "atom_num" not in df.columns:
             needed = {"frame_idx", "atom_idx"}
             if not needed.issubset(df.columns):
@@ -53,33 +78,56 @@ def _task_get(args: argparse.Namespace) -> int:
                 take["atom_num"] = fr.loc[take["atom_idx"].values, "atom_num"].to_numpy()
                 rows.append(take)
             df = pd.concat(rows, ignore_index=True)
-        df = df[df["atom_num"] == int(args.atom)].copy()
-        if df.empty:
-            raise SystemExit(f"❌ Atom with atom_num={args.atom} not found in selected frames.")
 
+        # Filter to requested atoms (unless "all")
+        if atom_sel != "all":
+            df = df[df["atom_num"].isin(atom_sel)].copy()
+            if df.empty:
+                raise SystemExit(f"❌ No atoms {atom_sel} found in selected frames.")
+
+        # --- pick feature column(s) and collapse to a single value per row ---
         keep_meta = {"frame_idx", "iter", "atom_idx", "atom_num"}
         ycols = [c for c in df.columns if c not in keep_meta]
         if not ycols:
             raise SystemExit("❌ No feature columns found after selection.")
-        if len(ycols) == 1:
-            ylab = ycols[0]
-            y = df[ylab].to_numpy()
-        else:
-            ylab = f"mean({feat})"
-            y = df[ycols].mean(axis=1).to_numpy()
 
+        if len(ycols) == 1:
+            df["__value__"] = df[ycols[0]]
+            base_name = (args.yaxis or ycols[0]).strip()
+        else:
+            df["__value__"] = df[ycols].mean(axis=1)
+            base_name = (feat or "value").strip()
+
+        # --- choose x-axis column ---
         xchoice = normalize_choice(args.xaxis, domain="xaxis")
         if xchoice == "frame":
-            x_raw = df["frame_idx"].to_numpy(); xlabel = "frame"
-        else:
-            x_raw = df["iter"].to_numpy(); xlabel = "iter"
-        if xchoice == "time":
-            x, xlabel = convert_xaxis(x_raw, "time", control_file=args.control)
-        else:
-            x = x_raw
+            x_col = "frame_idx"
+            xlabel = "frame"
+        elif xchoice == "iter":
+            x_col = "iter"
+            xlabel = "iter"
+        else:  # time
+            x_vals, xlabel = convert_xaxis(df["iter"].to_numpy(), "time", control_file=args.control)
+            df["time"] = x_vals
+            x_col = "time"
 
-        out_df = pd.DataFrame({xlabel: x, ylab: y})
-        out_df.insert(0, "atom_num", int(args.atom))
+        # --- wide pivot: one column per atom ---
+        wide = (
+            df.groupby([x_col, "atom_num"], as_index=False)["__value__"]
+            .mean()
+            .pivot(index=x_col, columns="atom_num", values="__value__")
+            .reset_index()
+        )
+
+        # Rename columns: e.g. iter, charge_atom_1, charge_atom_2, ...
+        new_cols = [xlabel]
+        for c in wide.columns[1:]:
+            new_cols.append(f"{base_name}_atom_{c}")
+        wide.columns = new_cols
+
+        out_df = wide
+        ylab = base_name  # for plot labels later
+
     else:
         df = get_features_summary(h, feat, frames=frames_sel, regex=use_regex, add_index_cols=True)
         if df.empty:
@@ -366,11 +414,17 @@ def _add_common_io_args(
 def _wire_get(p: argparse.ArgumentParser) -> None:
     _add_common_fort7_file_arg(p)
     p.add_argument("--yaxis", required=True, help="Feature name or regex (with --regex).")
-    p.add_argument("--atom", type=int, default=None, help="1-based atom index for atom-level features.")
+    p.add_argument(
+        "--atom",
+        type=str,
+        default=None,
+        help="Atom selection: a number (e.g., 5), a list (e.g., 1,2,7), or 'all'."
+    )
     p.add_argument("--frames", default=None, help="Frame selection: 'a:b[:c]' or 'i,j,k'.")
     p.add_argument("--xaxis", default="iter", choices=["iter","frame","time"], help="X-axis mode.")
     p.add_argument("--control", default="control", help="Control file (for --xaxis time).")
-    p.add_argument("--regex", action="store_true", help="Interpret --feature as regex.")
+    p.add_argument("--regex", action="store_true", help="Interpret --feature as regex, which calls all"
+                                                        "y-columns with the given --yaxis")
     _add_common_io_args(p, include_plot=True,
                         save_help="Save feature plot image.",
                         export_help="Export extracted feature(s) as CSV.")
@@ -455,7 +509,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         description=(
             "Examples:\n"
             "  reaxkit fort7 get --yaxis charge --atom 1 --plot\n"
-            "  reaxkit fort7 get --yaxis q_.* --regex --export charges.csv\n"
+            "  reaxkit fort7 get --yaxis q_.* --regex --export charges.csv to get all columns starting with 'q_' \n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
