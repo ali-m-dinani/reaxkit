@@ -118,16 +118,18 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
 
     return 0
 
-def task_bulk_modulus(args, fort99_handler, fort74_handler) -> None:
+def task_bulk_modulus(args) -> None:
     """
     Compute and print the bulk modulus from ENERGY vs volume data
     using a Vinet equation-of-state fit.
     """
     from reaxkit.analysis.fort99_analyzer import fort99_bulk_modulus
+    fort99_handler_to_use = Fort99Handler(args.fort99)
+    fort74_handler_to_use = Fort74Handler(args.fort74)
 
     res = fort99_bulk_modulus(
-        fort99_handler=fort99_handler,
-        fort74_handler=fort74_handler,
+        fort99_handler=fort99_handler_to_use,
+        fort74_handler=fort74_handler_to_use,
         iden=args.iden,
         source=args.source,
     )
@@ -181,21 +183,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
                        help="Flip the sign of both QM and force-field energies before plotting")
     p_eos.set_defaults(_run=fort99_eos_task)
 
+    # ---- fort99 bulk modulus calculator ----
     bulk = subparsers.add_parser(
         "bulk",
         help="Compute bulk modulus from ENERGY vs volume (Vinet EOS)",
         description=(
             "Examples:\n"
-            "  reaxkit fort99 bulk --iden Al2N2_w_opt2 \n"
+            "  reaxkit fort99 bulk --iden 'Al2N2_w_opt2' \n"
             "  reaxkit fort99 bulk --iden Al2N2_w_opt2 --source qm\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
-
-    bulk.add_argument("--iden",required=True,help="ENERGY identifier (iden1) to use for EOS fitting")
-
+    bulk.add_argument("--fort99", default="fort.99", help="fort.99 file to use")
+    bulk.add_argument("--fort74", default="fort.74", help="fort.74 file to use")
+    bulk.add_argument("--iden", required=True, help="ENERGY identifier (iden1) to use for EOS fitting")
     bulk.add_argument("--source", default="ffield", choices=["ffield", "qm"],
         help="Energy source to use (ffield or qm)",
     )
 
-    bulk.set_defaults(func=task_bulk_modulus)
+    bulk.set_defaults(_run=task_bulk_modulus)
