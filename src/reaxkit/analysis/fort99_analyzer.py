@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 import pandas as pd
+import numpy as np
+
 from reaxkit.io.template_handler import TemplateHandler
+from reaxkit.utils.constants import *
 
 def get_fort99(
     handler: TemplateHandler,
@@ -199,4 +202,174 @@ def fort99_energy_vs_volume(
     return out.sort_values(["iden1", "iden2"]).reset_index(drop=True)
 
 
+#################################################################################
+# Finding the bulk modulus of a system using Rose–Vinet equation of state
+# according to doi:10.1029/JB092iB09p09319
+#################################################################################
+def _vinet_energy(V: np.ndarray, E0: float, K0: float, V0: float, C: float) -> np.ndarray:
+    """
+    Vinet equation of state (EOS) — energy–volume form.
+
+    This function models the total energy of a solid as a function of volume
+    using the Vinet EOS, which is well-suited for describing both compression
+    and moderate expansion around equilibrium.
+
+    Parameters
+    ----------
+    V : np.ndarray [Å³]
+        System volume(s) at which the energy is evaluated. Typically obtained
+        from scaled-cell calculations around the equilibrium volume.
+
+    E0 : float [eV]
+        Equilibrium energy at the minimum of the EOS curve.
+        This is the total energy of the system at the equilibrium volume V0.
+        (An arbitrary constant shift in energy does not affect the bulk modulus.)
+
+    K0 : float [eV/Å³]
+        Bulk modulus at equilibrium volume V0.
+        Physically, K0 measures the resistance of the material to uniform
+        (hydrostatic) compression:
+            K0 = V * (∂²E / ∂V²) |_{V = V0}
+        This parameter is converted to GPa after fitting.
+
+    V0 : float [Å³]
+        Equilibrium volume corresponding to the minimum of the energy–volume curve.
+        This represents the relaxed unit-cell (or supercell) volume of the system.
+
+    C : float [dimensionless]
+        Shape parameter of the Vinet EOS, related to the pressure derivative
+        of the bulk modulus (K′).
+        It controls the asymmetry of the E(V) curve under compression vs expansion.
+        Typical values are ~3–6 for many solids.
+
+    Returns
+    -------
+    E : np.ndarray [eV]
+        Predicted total energy of the system at volume(s) V according to
+        the Vinet equation of state.
+    """
+    nu = V / V0
+    eta = nu ** (1.0 / 3.0)
+    term = 1.0 - (1.0 + C * (eta - 1.0)) * np.exp(C * (1.0 - eta))
+    return E0 + 9.0 * K0 * V0 / (C ** 2) * term
+
+
+def fort99_bulk_modulus(
+    fort99_handler,
+    fort74_handler,
+    *,
+    iden: str,
+    source: str = "ffield",          # "ffield" or "qm" which defines which source of energy data should be used
+    shift_min_to_zero: bool = True,  # helps conditioning; doesn't change K0
+    flip_sign: bool = False,
+    dropna: bool = True,
+) -> dict:
+    """
+    Compute bulk modulus K0 (GPa) for a selected fort.99 ENERGY identifier (iden1),
+    using E(V) data from fort99_energy_vs_volume(...) and a Vinet EOS fit.
+
+    Notes
+    -----
+    - fort99_energy_vs_volume currently returns energies in kcal/mol and volumes in Å^3
+      (consistent with fort99_workflow plotting). We convert kcal/mol -> eV before fitting.
+    - Fit returns K0 in eV/Å^3, then converted to GPa via 160.21766208.
+
+    Returns
+    -------
+    dict with:
+      iden, source, n_points, V0_A3, K0_eV_A3, K0_GPa, E0_eV, C, success
+    """
+    from scipy.optimize import curve_fit # local import to avoid overload
+
+    df = fort99_energy_vs_volume(
+        fort99_handler=fort99_handler,
+        fort74_handler=fort74_handler,
+    )
+
+    if df.empty:
+        raise ValueError("No ENERGY vs volume data found (fort99_energy_vs_volume returned empty).")
+
+    g = df[df["iden1"] == iden].copy()
+    if g.empty:
+        raise ValueError(f"No rows found for iden1 == {iden!r}.")
+
+    # Choose energy column
+    src = (source or "").strip().lower()
+    if src in {"ffield", "ff", "forcefield", "force-field"}:
+        e_col = "ffield_value"
+        src_name = "ffield"
+    elif src in {"qm", "dft", "reference"}:
+        e_col = "qm_value"
+        src_name = "qm"
+    else:
+        raise ValueError("source must be one of {'ffield','qm'}.")
+
+    # Pull V and E
+    V = g["V_iden2"].to_numpy(dtype=float)
+    E_kcal = g[e_col].to_numpy(dtype=float)
+
+    if dropna:
+        m = np.isfinite(V) & np.isfinite(E_kcal)
+        V = V[m]
+        E_kcal = E_kcal[m]
+
+    if len(V) < 6:
+        raise ValueError(
+            f"Need at least ~6 E(V) points for a stable EOS fit; got {len(V)} for iden={iden!r}."
+        )
+
+    # Sort by V for stability
+    order = np.argsort(V)
+    V = V[order]
+    E_kcal = E_kcal[order]
+
+    # Optional sign flip (kept for parity with plotting)
+    if flip_sign:
+        E_kcal = -E_kcal
+
+    # Convert kcal/mol -> eV
+    E = E_kcal * CONSTANTS["energy_kcalmol_to_eV"]
+
+    # Optional energy shift (doesn't affect K0)
+    if shift_min_to_zero:
+        E = E - np.nanmin(E)
+
+    # Initial guesses
+    V0_guess = float(V[np.nanargmin(E)])
+    E0_guess = float(np.nanmin(E))
+    K0_guess = 0.5 / CONSTANTS['eV_per_A3_to_GPa']
+    C_guess = 4.0
+
+    p0 = [E0_guess, K0_guess, V0_guess, C_guess]
+
+    # Basic bounds to prevent nonsense fits
+    # K0 > 0, V0 > 0, C > 0
+    bounds = (
+        [-np.inf, 1e-12, 1e-9, 1e-6],
+        [ np.inf, 1e3,   np.inf, 1e3],
+    )
+
+    popt, pcov = curve_fit(
+        _vinet_energy,
+        V,
+        E,
+        p0=p0,
+        bounds=bounds,
+        maxfev=20000,
+    )
+
+    E0_fit, K0_fit, V0_fit, C_fit = popt
+    K0_GPa = float(K0_fit * CONSTANTS['eV_per_A3_to_GPa'])
+
+    return {
+        "iden": iden,
+        "source": src_name,
+        "n_points": int(len(V)),
+        "V0_A3": float(V0_fit),
+        "K0_eV_A3": float(K0_fit),
+        "K0_GPa": K0_GPa,
+        "E0_eV": float(E0_fit),
+        "C": float(C_fit),
+        "success": True,
+    }
 

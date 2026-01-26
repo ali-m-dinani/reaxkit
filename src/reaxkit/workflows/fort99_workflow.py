@@ -118,6 +118,28 @@ def fort99_eos_task(args: argparse.Namespace) -> int:
 
     return 0
 
+def task_bulk_modulus(args, fort99_handler, fort74_handler) -> None:
+    """
+    Compute and print the bulk modulus from ENERGY vs volume data
+    using a Vinet equation-of-state fit.
+    """
+    from reaxkit.analysis.fort99_analyzer import fort99_bulk_modulus
+
+    res = fort99_bulk_modulus(
+        fort99_handler=fort99_handler,
+        fort74_handler=fort74_handler,
+        iden=args.iden,
+        source=args.source,
+    )
+
+    print("\nBulk modulus (Vinet EOS fit)")
+    print("-" * 40)
+    print(f"Identifier : {res['iden']}")
+    print(f"Source     : {res['source']}")
+    print(f"Points     : {res['n_points']}")
+    print(f"V0         : {res['V0_A3']:.4f} Å^3")
+    print(f"K0         : {res['K0_GPa']:.2f} GPa")
+    print(f"C          : {res['C']:.3f}")
 
 # ---------- registration ----------
 
@@ -158,3 +180,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_eos.add_argument("--flip", action="store_true",
                        help="Flip the sign of both QM and force-field energies before plotting")
     p_eos.set_defaults(_run=fort99_eos_task)
+
+    bulk = subparsers.add_parser(
+        "bulk",
+        help="Compute bulk modulus from ENERGY vs volume (Vinet EOS)",
+        description=(
+            "Examples:\n"
+            "  reaxkit fort99 bulk --iden Al2N2_w_opt2 \n"
+            "  reaxkit fort99 bulk --iden Al2N2_w_opt2 --source qm\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+
+    bulk.add_argument("--iden",required=True,help="ENERGY identifier (iden1) to use for EOS fitting")
+
+    bulk.add_argument("--source", default="ffield", choices=["ffield", "qm"],
+        help="Energy source to use (ffield or qm)",
+    )
+
+    bulk.set_defaults(func=task_bulk_modulus)

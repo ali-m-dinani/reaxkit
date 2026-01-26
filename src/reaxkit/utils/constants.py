@@ -17,5 +17,8 @@ CONSTANTS = {
 
     # Polarization (dipole/volume)
     "ea3_to_uC_cm2": 1.602176634e+3,        # (e·Å)/Å³ → μC/cm²
+
+    # Pressure
+    "eV_per_A3_to_GPa": 160.21766208        # eV/Å³ -> GPa
 }
 
