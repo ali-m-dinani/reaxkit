@@ -22,7 +22,7 @@ from reaxkit import introspection
 
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
-# important note: energylog is exactly the same as fort.73 in structure, hence it should map to fort.73
+# important note: energylog and fort.58 have exactly the same structure as fort.73, hence they should map to fort.73
 WORKFLOW_MODULES = {
     "fort78": fort78_workflow, "xmolout": xmolout_workflow, "summary": summary_workflow,
     "eregime": eregime_workflow, "molfra": molfra_workflow, "fort13": fort13_workflow,
@@ -32,7 +32,7 @@ WORKFLOW_MODULES = {
     "fort73": fort73_workflow, "elect": electrostatics_workflow, "video": make_video_workflow,
     "plotter": plotter_workflow, "control": control_workflow, "fort76": fort76_workflow,
     "fort74": fort74_workflow, "ffield": ffield_workflow, "params": params_workflow,
-    "energylog": fort73_workflow, "fort57": fort57_workflow,
+    "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57": fort57_workflow,
 }
 
 

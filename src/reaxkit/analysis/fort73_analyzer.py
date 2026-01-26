@@ -1,4 +1,4 @@
-"""analyzer for fort.73 and energylog files"""
+"""analyzer for fort.73, energylog, and fort.58 files"""
 
 from __future__ import annotations
 from typing import List, Optional

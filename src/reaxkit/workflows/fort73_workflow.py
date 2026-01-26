@@ -1,4 +1,4 @@
-"""a workflow for getting fort.73 data"""
+"""a workflow for getting fort.73, energylog, and fort.58 data"""
 
 from __future__ import annotations
 
@@ -12,7 +12,14 @@ from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.path import resolve_output_path
 
 def fort73_get_task(args: argparse.Namespace) -> int:
-    default_file = "energylog" if args.kind == "energylog" else "fort.73"
+    DEFAULT_FILES = {
+        "fort73": "fort.73",
+        "energylog": "energylog",
+        "fort58": "fort.58",
+    }
+
+    default_file = DEFAULT_FILES.get(args.kind, "fort.73")
+
     file_path = args.file or default_file
 
     handler = Fort73Handler(file_path)
