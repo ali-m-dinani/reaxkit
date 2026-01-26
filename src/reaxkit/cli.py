@@ -15,7 +15,7 @@ from reaxkit.workflows import (
     trainset_workflow, fort83_workflow, fort73_workflow,
     electrostatics_workflow, make_video_workflow, plotter_workflow,
     control_workflow, fort76_workflow, fort74_workflow,
-
+    ffield_workflow,
 )
 from reaxkit import introspection
 
@@ -29,7 +29,7 @@ WORKFLOW_MODULES = {
     "fort99": fort99_workflow, "trainset": trainset_workflow, "fort83": fort83_workflow,
     "fort73": fort73_workflow, "elect": electrostatics_workflow, "video": make_video_workflow,
     "plotter": plotter_workflow, "control": control_workflow, "fort76": fort76_workflow,
-    "fort74": fort74_workflow,
+    "fort74": fort74_workflow, "ffield": ffield_workflow,
 }
 
 
