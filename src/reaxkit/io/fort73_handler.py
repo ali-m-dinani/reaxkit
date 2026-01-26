@@ -34,16 +34,16 @@ class Fort73Handler(FileHandler):
                     continue
 
                 parts = line.strip().split()
-                # Ensure matching number of columns
-                if len(parts) == len(cols):
-                    rows.append(parts)
+                if len(parts) < len(cols):
+                    parts = parts + [None] * (len(cols) - len(parts))
+                rows.append(parts[:len(cols)])
 
         # Build DataFrame
         df = pd.DataFrame(rows, columns=cols)
 
         # Convert numeric columns
         for c in df.columns:
-            df[c] = pd.to_numeric(df[c])
+            df[c] = pd.to_numeric(df[c], errors="coerce")
 
         # Rename only Iter. → iter
         if "Iter." in df.columns:

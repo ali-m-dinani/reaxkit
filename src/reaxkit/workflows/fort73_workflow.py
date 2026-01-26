@@ -12,7 +12,10 @@ from reaxkit.utils.plotter import single_plot
 from reaxkit.utils.path import resolve_output_path
 
 def fort73_get_task(args: argparse.Namespace) -> int:
-    handler = Fort73Handler(args.file)
+    default_file = "energylog" if args.kind == "energylog" else "fort.73"
+    file_path = args.file or default_file
+
+    handler = Fort73Handler(file_path)
     df = get_fort73_data(handler)
 
     if "iter" not in df.columns:
@@ -112,7 +115,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    p_get.add_argument("--file", default="fort.73", help="Path to fort.73 file")
+    p_get.add_argument("--file", default=None, help="Path to fort.73 / energylog file")
     p_get.add_argument("--yaxis", required=True, help="Energy column (e.g. Ebond) or 'all'")
     p_get.add_argument("--xaxis", default="iter", choices=["iter", "frame", "time"], help="X-axis type")
     p_get.add_argument("--control", default="control", help="Control file (used when xaxis=time)")
