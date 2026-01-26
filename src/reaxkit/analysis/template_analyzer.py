@@ -17,15 +17,10 @@ import pandas as pd
 from reaxkit.io.template_handler import TemplateHandler
 
 
-def example_metric(handler: TemplateHandler) -> pd.DataFrame:
-    """Compute an example metric from TemplateHandler data.
-    """
-    df = handler.dataframe()
-    # Example: just return energy vs iteration
-    return df[["iteration", "energy"]].copy()
+def calculate_x(handler: TemplateHandler) -> pd.DataFrame:
+    """there should be a single-line here describing what the function does in compact way.
 
-
-def record_series(handler: TemplateHandler, field: str) -> List[float]:
-    """Extract a list of values for a given field across frames.
+    name of the function should be descriptive following conceptual integrity concerns. therefore, using get_x or
+    compute_y is meaningful for many cases.
     """
-    return handler.dataframe()[field].tolist()
+
