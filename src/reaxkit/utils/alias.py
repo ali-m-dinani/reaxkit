@@ -23,7 +23,7 @@ from typing import Dict, List, Iterable, Optional
 _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
     # Common summary aliases
     "iter": ["iteration", "Iter", "Iter.", "Iteration", "#start", "start"],
-    "E_pot": ["Epot(kcal)", "Epot(kcal/mol)", "E_potential"], #used in xmolout and summary.txt
+    "E_pot": ["Epot(kcal)", "Epot(kcal/mol)", "E_potential"], #used in xmolout, summary.txt, fort.76
     "frame": ['frm'],
     "time": ["Time(fs)", "Time"], #also in summary.txt
     "num_of_atoms": ['num_atoms','number_of_atoms','count_of_atoms'], #used in xmolout and fort.7
@@ -87,6 +87,9 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
     "P_x (uC/cm^2)": ["pol_x", "polarization_x"],
     "P_y (uC/cm^2)": ["pol_y", "polarization_y"],
     "P_z (uC/cm^2)": ["pol_z", "polarization_z"],
+
+    # fort.76 alias
+    "E_res": ["Eres(kcal)", "Eres(kcal/mol)", "E_restraint", "restraint_energy", "restraint_E"],
 }
 
 def resolve_alias_from_columns(

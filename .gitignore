@@ -78,6 +78,7 @@ requirements_to_add_to_pyproject_toml.txt
 gen_requirements.py
 src/reaxkit/count_loc.py
 src/reaxkit/loc_report.csv
+src/reaxkit/under_dev
 
 # Large intermediate analysis outputs
 cache/

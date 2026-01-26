@@ -55,7 +55,17 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     next, there should be a file organiztion where all processed results are saved in reaxkit_output folder.
 
     """
-    p = subparsers.add_parser("metric", help="Plot example metric")
+    p = subparsers.add_parser(
+        "metric",
+        help="Plot example metric",
+        description=(
+            "Examples:\n"
+            "  reaxkit fort76 get --yaxis Ebond --xaxis time --plot ...\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     p.add_argument("--file", required=True, help="Path to <filetype> file")
-    p.add_argument("--save", default=None, help="Path to save plot (optional)")
+    p.add_argument("--export", default=None, help="Path to export CSV (x + selected y columns)")
+    p.add_argument("--save", default=None, help="Path to save plot image (suffix _<col> if yaxis=all)")
+    p.add_argument("--plot", action="store_true", help="If set, generate plot(s).")
     p.set_defaults(_run=metric_task)
