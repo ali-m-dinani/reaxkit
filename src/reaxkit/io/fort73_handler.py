@@ -10,7 +10,12 @@ from reaxkit.io.file_handler import FileHandler
 
 class Fort73Handler(FileHandler):
     """
-    Handler for fort.73 files.
+    Handler for ReaxFF energy-vs-iteration logs.
+
+    Supported filenames:
+      - fort.73
+      - energylog
+
     - Reads energy terms vs iteration
     - Parses into a clean DataFrame (no analysis here)
     """

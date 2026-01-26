@@ -16,6 +16,18 @@ def metric_task(args: argparse.Namespace) -> int:
         print(f"[Done] Saved plot to {args.save}")
     return 0
 
+##################################################################################
+
+def _add_common_kind_io_args(
+        p: argparse.ArgumentParser,
+        *,
+        include_plot: bool = False,
+) -> None:
+    p.add_argument("--file", default="xmolout", help="Path to xmolout file.")
+    if include_plot:
+        p.add_argument("--plot", action="store_true", help="Show plot interactively.")
+    p.add_argument("--save", default=None, help="Path to save plot image.")
+    p.add_argument("--export", default=None, help="Path to export CSV data.")
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
