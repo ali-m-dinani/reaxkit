@@ -421,6 +421,7 @@ def write_structure(
     atoms: Atoms,
     path: str | Path,
     format: Optional[str] = None,
+    comment: Optional[str] = None,
 ) -> None:
     """
     Write a structure to file in any ASE-supported format.
@@ -442,7 +443,7 @@ def write_structure(
     None
     """
     path = Path(path)
-    write(path, atoms, format=format)
+    write(path, atoms, format=format, comment=comment)
 
 # ---------------------------------------------------------------------------
 # convert a hexagonal cell (90°, 90°, 120°) into an orthorhombic (90°, 90°, 90°) cell

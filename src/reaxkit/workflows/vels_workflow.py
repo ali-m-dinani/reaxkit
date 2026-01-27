@@ -1,4 +1,5 @@
-# reaxkit/workflows/vels_workflow.py
+"""this is a workflow for vels, moldyn.vel, and molsav files"""
+
 from __future__ import annotations
 
 import argparse

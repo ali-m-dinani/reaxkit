@@ -1,4 +1,5 @@
-# reaxkit/analysis/vels_analyzer.py
+"""this is an analyzer for vels, moldyn.vel, and molsav files"""
+
 from __future__ import annotations
 
 from typing import Literal, Sequence

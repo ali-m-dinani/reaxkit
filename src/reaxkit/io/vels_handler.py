@@ -1,4 +1,5 @@
-# reaxkit/io/vels_handler.py
+"""this is a handler for vels, moldyn.vel, and molsav files"""
+
 from __future__ import annotations
 
 from pathlib import Path
