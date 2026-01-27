@@ -11,18 +11,30 @@ This code is used to generate trainset data, and is structured into 4 parts:
     - Bulk modulus: Energy vs Volume using an EOS (Vinet)
     - Elastic constants (c11..c66): Energy vs strain using quadratic strain-energy forms
 
+    there is a top-level function here, generate_all_energy_vs_volume_data, which calls
+    two other functions generate_bulk_data and generate_elastic_data to compute energy
+    vs volume change according to the explanation above.
+
 2. ELASTIC_GEO SECTION:
     which is used to obtain expanded or compressed geometries in xyz and bgf format for any
-    crystal structure (i.e., not limited to orthognal systems).
+    crystal structure (i.e., not limited to orthognal systems), using the main function
+    generate_strained_geometries_with_xtob, which calls other related functions.
 
 3. YAML file management for settings of trainset
-    this part is used to generate or read a settings file with .yaml format which determines
-    cell dimensions, bulk modulus, and any other required settings for gettign elastic energy
-    or expanded/compressed geo files.
+    this part is used to write (using write_trainset_settings_yaml fucntion) or read
+    (using read_trainset_settings_yaml) a settings file  with .yaml format. This file determines
+    cell dimensions, bulk modulus, and any other required settings for getting
+    (using generate_trainset_from_yaml function) elastic energy or expanded/compressed geo files.
 
 4. MP API Handler:
     which is used to get crystal structure, cell dimension and angles, and mechanical properties
     directly from material's project website, and generate the corresponding trainset.
+    The main function here is generate_trainset_settings_yaml_from_mp_simple which:
+        1. makes the connection to MP website and gets the data
+        2. writes an informative yaml file using write_trainset_settings_yaml fucntion
+        3. makes two geometry files in .xyz and .cif format of the material
+        4. generates training set using Yaml file and xyz file using generate_trainset_from_yaml
+
 """
 
 from __future__ import annotations
@@ -308,7 +320,7 @@ def index_from_grid_value(grid_value: float, step: float) -> int:
 # Public API: generators for elastic_energy
 # -----------------------------------------------------------------------------
 
-def generate_bulk_targets(
+def generate_bulk_data(
     *,
     bulk_modulus_gpa: float,
     bulk_modulus_pressure_derivative: float,
@@ -397,7 +409,7 @@ def generate_bulk_targets(
     return bulk_table, trainset_lines
 
 
-def generate_elastic_targets(
+def generate_elastic_data(
     *,
     elastic_constants_gpa: Dict[str, float],
     max_strain_percent: float,
@@ -502,7 +514,7 @@ def generate_elastic_targets(
     return result
 
 
-def generate_elastic_energy_data(
+def generate_all_energy_vs_volume_data(
     *,
     out_dir: str,
     bulk_inputs: Dict[str, float],
@@ -553,7 +565,7 @@ def generate_elastic_energy_data(
     # -------------------------
     # Bulk targets
     # -------------------------
-    bulk_table, bulk_trainset_lines = generate_bulk_targets(
+    bulk_table, bulk_trainset_lines = generate_bulk_data(
         bulk_modulus_gpa=bulk_inputs["B0_gpa"],
         bulk_modulus_pressure_derivative=bulk_inputs["B0_prime"],
         max_volumetric_strain_percent=bulk_inputs["max_volumetric_strain_percent"],
@@ -570,7 +582,7 @@ def generate_elastic_energy_data(
         for k in ("c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
     }
 
-    elastic_targets = generate_elastic_targets(
+    elastic_targets = generate_elastic_data(
         elastic_constants_gpa=elastic_constants,
         max_strain_percent=elastic_inputs["max_strain_percent"],
         volume_reference_cell=elastic_volume_cell,
@@ -1205,7 +1217,7 @@ def generate_trainset_from_yaml(
     # -------------------------
     # Generate elastic energy data (writes into out_dir)
     # -------------------------
-    generate_elastic_energy_data(
+    generate_all_energy_vs_volume_data(
         bulk_inputs=bulk_inputs,
         elastic_inputs=elastic_inputs,
         bulk_cell=bulk_cell,
