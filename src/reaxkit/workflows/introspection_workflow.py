@@ -19,7 +19,7 @@ import sys
 from typing import List, Tuple, Optional
 from tabulate import tabulate
 
-from .utils.introspection_utils import (
+from reaxkit.utils.introspection_utils import (
     get_function_summaries,
     list_package_modules_with_summaries,
 )

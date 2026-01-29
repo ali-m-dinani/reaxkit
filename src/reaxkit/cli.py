@@ -16,24 +16,27 @@ from reaxkit.workflows import (
     electrostatics_workflow, make_video_workflow, plotter_workflow,
     control_workflow, fort76_workflow, fort74_workflow,
     ffield_workflow, params_workflow, fort57_workflow,
-    vels_workflow,
+    vels_workflow, introspection_workflow, help_workflow
 )
-from reaxkit import introspection
 
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
+
 # important note: energylog and fort.58 have exactly the same structure as fort.73, hence they should map to fort.73
+# also, fort.8 is similar to fort.7 in the same way
+# same for molsav and moldyn which are similar to vels
 WORKFLOW_MODULES = {
     "fort78": fort78_workflow, "xmolout": xmolout_workflow, "summary": summary_workflow,
     "eregime": eregime_workflow, "molfra": molfra_workflow, "fort13": fort13_workflow,
     "fort79": fort79_workflow, "fort7": fort7_workflow, "xmolfort7": xmolout_fort7_workflow,
-    "coord": coordination_workflow, "intspec": introspection, "geo": geo_workflow,
+    "coord": coordination_workflow, "intspec": introspection_workflow, "geo": geo_workflow,
     "fort99": fort99_workflow, "trainset": trainset_workflow, "fort83": fort83_workflow,
     "fort73": fort73_workflow, "elect": electrostatics_workflow, "video": make_video_workflow,
     "plotter": plotter_workflow, "control": control_workflow, "fort76": fort76_workflow,
     "fort74": fort74_workflow, "ffield": ffield_workflow, "params": params_workflow,
     "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57": fort57_workflow,
-    "vels": vels_workflow,
+    "vels": vels_workflow, "help": help_workflow, "fort8": fort7_workflow,
+    "moldyn": vels_workflow, "molsav": vels_workflow,
 }
 
 
@@ -76,7 +79,7 @@ def _intspec_default_runner(args):
     If the user supplies `--file` or `--folder`, pass those through to
     `introspection.run_main` and let that module decide what to do.
     """
-    return introspection.run_main(
+    return introspection_workflow.run_main(
         getattr(args, "file", None),
         getattr(args, "folder", None),
     )
@@ -119,6 +122,30 @@ def main():
 
             # If no explicit task is given, use the default introspection runner.
             kp.set_defaults(_run=_intspec_default_runner)
+
+        elif kind == "help":
+            # Like `intspec`: runs without a second-level task.
+            # Accept an optional query string.
+            kp.add_argument(
+                "query",
+                nargs="?",
+                help='Search phrase, e.g. "restraint", "bond order", "bulk modulus".',
+            )
+            kp.add_argument("--top", type=int, default=8, help="Max number of results to show.")
+            kp.add_argument("--min-score", type=float, default=35.0, help="Minimum match score threshold.")
+            kp.add_argument("--why", action="store_true", help="Show brief reasons for each match.")
+            kp.add_argument("--examples", action="store_true", help="Show one example command per match.")
+            kp.add_argument("--tags", action="store_true", help="Show tags for each matched file.")
+            kp.add_argument("--core-vars", action="store_true", help="Show core_vars for each matched file.")
+            kp.add_argument("--optional-vars", action="store_true", help="Show optional_vars for each matched file.")
+            kp.add_argument("--derived-vars", action="store_true", help="Show derived_vars for each matched file.")
+            kp.add_argument("--notes", action="store_true", help="Show notes for each matched file.")
+            kp.add_argument("--all-info", action="store_true",
+                            help="Show why/examples/tags/core/optional/derived/notes.")
+
+            # Call the help workflow's runner directly (no tasks).
+            kp.set_defaults(_run=help_workflow.run_main)
+
         else:
             # Normal workflows: require a task unless the kind is in DEFAULTABLE.
             # e.g. `reaxkit summary get ...`

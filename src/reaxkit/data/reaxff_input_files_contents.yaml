@@ -1,0 +1,182 @@
+_meta:
+  version: "1.0"
+  comment: "generated using reaxff_input_files_contents.xlsx"
+  last_updated: "2026-01-28"
+
+files:
+  control:
+    desc: "Run-control keyword file: sets simulation mode (MD/MM/FF-optimization) and common settings (thermostat/barostat, timestep, output frequencies, charge method, etc.)."
+    related_run: [MD, MM, FF-optimization]
+    tags: [run-control, control parameters, keywords, settings]
+    core_vars:
+      - General run-control parameters
+      - MD (molecular dynamics) run-control parameters
+      - MM (energy minimization) run-control parameters
+      - FF (ffield optimization) run-control parameters
+      - Outdated run-control parameters
+    notes:
+      - "The control-file is format free and keywords can be arranged in any order."
+      - "ReaxFF will re-check control-file during an MD-simulation of a force field optimization run, giving the user the option to modify a ongoing simulation."
+      - "If a keyword is left out of the control-file ReaxFF will use a default value."
+    derived_vars: []
+    best_for: [choose run mode, set timestep, set temperature and pressure, set output frequency]
+    examples:
+      - "reaxkit control get nmdit"
+
+  eregime.in:
+    desc: "Optional electric-field schedule for MD: impose time-dependent external electric field components (x/y/z)."
+    related_run: [MD]
+    tags: [electric-field, schedule, md]
+    core_vars:
+      - "electric field schedule: iterations, zones, and directions"
+      - "electric field schedule: electric field magnitude"
+    notes:
+      - "the electric field will not function correctly if a molecule moves across the periodic boundary in the field direction – this will lead to an energy discontinuity."
+      - "When an eregime.in file is provided the ReaxFF program will generate a new output file in fort.78, containing information regarding the electric field(s) strength in the x/y/z directions and its associated energy term."
+    derived_vars:
+      - "hysteresis loops for a material under electric field application"
+    best_for: [E-field ramps, electric-field-driven processes]
+    examples:
+      - "reaxkit eregime get --column E1 --xaxis time --export eregime_E1_vs_time.csv"
+
+  exe (run script):
+    desc: "Executable run script/wrapper that stages input files, calls the ReaxFF executable, and optionally copies outputs (used in the original distribution workflow)."
+    related_run: [MD, MM, FF-optimization]
+    tags: [run-script, staging, execution]
+    core_vars: []
+    derived_vars: []
+    best_for: [batch runs, staging inputs/outputs]
+    examples: []
+
+  ffield:
+    desc: "ReaxFF force-field parameter file (7 sections: general, atom, bond, off-diagonal, angle, torsion, hydrogen bond)."
+    related_run: [MD, MM, FF-optimization]
+    tags: [force-field, ffield, ffield parameters]
+    core_vars:
+      - Force-field header / identifier line
+      - General force-field parameters
+      - Atomic force-field parameters
+      - Bond force-field parameters
+      - Off-diagonal force-field parameters
+      - Valence angle force-field parameters
+      - Torsion force-field parameters
+      - Hydrogen-bond force-field parameters
+    notes:
+      - "n.u. identifiers in the ffield-file signify ‘not used’"
+    derived_vars: []
+    best_for: [force-field definition, inspect/compare parameter sections]
+    examples:
+      - "reaxkit ffield get --section bond --term C-H --format interpreted --export CH_bond.csv"
+
+  geo:
+    desc: "System geometry input (structure) used to start a run. Can be provided as .geo, .bgf (legacy), .xyz, or z-matrix; may include periodic cell information."
+    related_run: [MD, MM, FF-optimization]
+    tags: [structure, geometry, input-structure, cell]
+    core_vars:
+      - geo description (simulation name)
+      - Lattice parameters
+      - Atom symbols and types
+      - Atomic coordinates
+    optional_vars:
+      - "cell parameters (a, b, c, α, β, γ)"
+    notes:
+      - "Currently, ReaxFF supports the .geo, .bgf, .xyz and z-matrix input formats"
+      - "By default, ReaxFF assumes geo contains a .geo or a z-matrix format; to use other formats the igeofor-switch in the control-file should be given a value of 1 for .bgf format and a value of 2 for .xyz format."
+      - "All geo-input formats are format sensitive."
+    derived_vars: []
+    best_for: [initial structure, atom types/coords, periodic cell]
+    examples:
+      - "reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output slab_geo_from_xyz"
+
+  iopt:
+    desc: "Optional toggle file indicating normal run (0) vs force-field optimization mode (1)."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, toggle]
+    core_vars:
+      - "Toggle between normal run and force-field optimization"
+    derived_vars: []
+    best_for: [switch to optimization workflow]
+    examples: []
+
+  params:
+    desc: "Force-field optimization parameter list: specifies which ffield parameters are allowed to vary, with bounds/search intervals and bookkeeping to locate them in ffield."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, parameter-selection, bounds]
+    core_vars:
+      - ff_section
+      - ff_section_line
+      - ff_parameter
+    notes:
+      - "also stores: search_interval, min_value, max_value, inline_comment"
+      - "ff_section maps to ffield sections (general/atom/bond/off-diagonal/angle/torsion/h-bond)"
+      - "ff_section_line is the row index within the chosen ffield section"
+    derived_vars: []
+    best_for: [choose optimizable parameters, set bounds]
+    examples:
+      - "reaxkit params get --export params.csv"
+
+  trainset.in:
+    desc: "Force-field optimization training-set definition: declares targets (energies/charges/forces/geometries/etc. depending on setup) and weights to build the cost function."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, training-set, cost-function]
+    core_vars:
+      - "Training set / cost-function definition blocks (targets + weights)"
+    derived_vars:
+      - "fort.99 is the result file showing how the ffield performed compared to the QM/literature values"
+    best_for: [define optimization targets, weights]
+    examples:
+      - "reaxkit trainset get --section all --export reaxkit_outputs/trainset"
+
+  tregime.in:
+    desc: "Optional temperature-regime schedule for MD: define zones/atom ranges and time-dependent target temperatures and damping/heating rates."
+    related_run: [MD]
+    tags: [temperature, schedule, md]
+    core_vars:
+      - "Temperature schedule: iterations, zones and atoms"
+      - "Temperature schedule: set point temperatures"
+      - "Temperature schedule: temperature dampings"
+      - "Temperature schedule: heating/cooling rate"
+    notes:
+      - "When a tregime.in-file is used the ReaxFF program generates a new output file (fort.75) providing temperature information for every temperature zone."
+    derived_vars:
+      - "fort.75 shows how the MD simulation worked to obtain the set-point temperature regimes"
+    best_for: [temperature ramps, multi-zone heating/cooling]
+    examples:
+      - "reaxkit tregime intspec"
+
+  vels:
+    desc: "Optional restart file for MD containing last saved coordinates/velocities/accelerations and temperature state; can override geometry from geo."
+    related_run: [MD]
+    tags: [restart, md, velocities]
+    core_vars:
+      - Atom coordinates
+      - Atom velocities
+      - Atom accelerations
+      - MD temperature
+    optional_vars:
+      - Previous atom accelerations
+    notes:
+      - "used to restart an MD-simulation."
+      - "During an MD-simulation ReaxFF will, at intervals defined by control-keywords iout2 and iout6, generate moldyn.vel and molsav.xxxx restart files."
+      - "moldyn.vel contains the most recent system information."
+      - "The geometry in vels will override any geometry given in the geo-file."
+    derived_vars: []
+    best_for: [restart MD, continue run with velocities]
+    examples:
+      - "reaxkit vels get --key velocities --atoms 1,3,7 --print"
+
+  vregime.in:
+    desc: "Optional volume/cell-regime schedule for MD: manipulate periodic cell parameters over time (with optional coordinate rescaling)."
+    related_run: [MD]
+    tags: [cell, volume, schedule, md, strain]
+    core_vars:
+      - "Volume/cell schedule: iterations, zones and types"
+      - "Volume/cell schedule: change rate, rescale (y) or target cell dimensions (n)"
+    notes:
+      - "When a vregime.in-file is provided, the ReaxFF program will generate a new output file (fort.77) that contains information regarding the cell parameters targeted in the vregime.in-file."
+      - "If rescale=y then all atom coordinates get rescaled, if rescale=n only the cell parameters are changed, effectively putting all strain on the edge of the periodic cell."
+    derived_vars:
+      - "fort.77 file will show information regarding the cell parameters targeted in the vregime.in-file."
+    best_for: [strain/cell ramps, volume changes, barostat-like schedules]
+    examples:
+      - "reaxkit vregime intspec"

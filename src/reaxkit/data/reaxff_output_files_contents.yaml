@@ -1,0 +1,297 @@
+_meta:
+  version: "1.0"
+  comment: "generated using reaxff_output_files_contents.xlsx"
+  last_updated: "2026-01-28"
+
+files:
+  energylog:
+    desc: "Energy log written during MD by AMS: iteration/time and per-term energy contributions, which resembles fort.73 in structure."
+    related_run: [MD]
+    tags: [energy, md, thermodynamics, log]
+    core_vars:
+      - iteration
+      - Partial energy contribution report (Energy terms)
+    derived_vars: []
+    best_for: [energy vs time, monitoring MD stability]
+    notes:
+      - "The output-frequency to fort.73 is regulated by control-file keyword iout1"
+      - "The sum of these terms should be the same as the number in the Epot-column in fort.71."
+    examples:
+      - "reaxkit energylog get --yaxis Ebond --xaxis time --plot"
+
+  fort.13:
+    desc: "Force-field optimization error summary: reports total error (objective) for the current force field."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, error, objective]
+    core_vars:
+      - total error of the force field
+    derived_vars: []
+    best_for: [monitor optimization error]
+    examples:
+      - "reaxkit fort13 get --save total_ff_error_vs_epoch.png"
+
+  fort.57:
+    desc: "MM/minimization progress log: iteration, potential energy, RMS force (RMSG), and optimizer diagnostics."
+    related_run: [MM]
+    tags: [mm, minimization, convergence, optimizer]
+    core_vars:
+      - iteration
+      - potential energy
+      - RMSG (force RMS gradient)
+      - Optimizer diagnostics (max move, factor, nfc)
+    derived_vars: []
+    best_for: [minimization convergence]
+    notes:
+      - "When RMSG drops below the value of control-file keyword endmm the MM run terminates."
+      - "Alternatively, the run terminates when the maximum number of iterations (control-file keyword maxit) has been reached."
+    examples:
+      - "reaxkit fort57 get --yaxis RMSG --xaxis iter --save rmsg_vs_iter.png"
+
+  fort.58:
+    desc: "MM/minimization energy-term report: iteration and partial energy contribution table, which resembles fort.73 in structure."
+    related_run: [MM]
+    tags: [energy, mm, minimization]
+    core_vars:
+      - simulation name (=geo description)
+      - iteration
+      - Partial energy contribution report (Energy terms)
+    derived_vars: []
+    best_for: [energy breakdown in MM runs]
+    examples:
+      - "reaxkit fort58 get --yaxis Ebond --xaxis time --plot"
+
+  fort.7:
+    desc: "Connectivity (bond-order) table: per-atom neighbor list, bond orders, molecule IDs, charges (only bonds above a cutoff are stored)."
+    related_run: [MD, MM, FF-optimization]
+    tags: [connectivity, bond-order, species, charges, coordination analysis, dipole moments, polarization]
+    core_vars:
+      - "Header: number of atoms & structure identifier (=geo descriptor)"
+      - atom number
+      - atom type number
+      - atom connectivity (neighbor indices)
+      - Molecule number
+      - Bond orders for each listed connectivity (neighbor)
+      - Sum of bond orders
+      - Number of lone pairs
+      - Partial charge
+    derived_vars:
+      - "coordination workflow (accessed through CLI by reaxkit coord) analyzes and relabels atoms based on their coordination status"
+      - "electrostatics workflow (accessed through CLI by reaxkit elect) obtains dipole moments, polarization, hysteresis, etc."
+    best_for: [bonding topology, species tracking, electrostatics]
+    notes:
+      - "This file gets updated with the same frequency as the xmolout-file; every iout2 iterations during MD simulations or every iout4 iterations during an MM-run."
+      - "fort.7 contains only the bonds with a bond order greater then control-file keyword cutof2."
+      - "fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though, causes output to these files to get appended."
+    examples:
+      - "reaxkit fort7 get --yaxis charge --atom 1 --plot"
+
+  fort.73:
+    desc: "Energy-term output: iteration/time and partial energy contributions (bonded, nonbonded, total)."
+    related_run: [MD]
+    tags: [energy, thermodynamics, output]
+    core_vars:
+      - iteration
+      - Partial energy contribution report (Energy terms)
+    derived_vars: []
+    best_for: [energy decomposition, run diagnostics]
+    notes:
+      - "The output-frequency to fort.73 is regulated by control-file keyword iout1"
+      - "The sum of these terms should be the same as the number in the Epot-column in fort.71."
+    examples:
+      - "reaxkit fort73 get --yaxis Ebond --xaxis time --plot"
+
+  fort.74:
+    desc: "MM/FF-optimization summary table: per-structure/epoch values such as minimum energy, heat of formation, volume, and density."
+    related_run: [MM, FF-optimization]
+    tags: [summary, mm, ff-optimization, thermo]
+    core_vars:
+      - simulation name (=geo description)
+      - MM energy (minimum potential energy)
+      - epoch
+      - heat of formation
+      - volume
+      - density
+    derived_vars:
+      - "in conjunction with fort.99, it is used to obtain energy-volume data and bulk modulus (accessed through reaxkit fort99)"
+    best_for: [tabulated MM/optimization summary, EOS, equation of state. bulk modulus]
+    examples:
+      - "reaxkit fort99 bulk --iden 'Al2N2_w_opt2'"
+
+  fort.76:
+    desc: "Restraint output: iteration, restraint energy, potential energy, and target vs actual restraint distances."
+    related_run: [MD]
+    tags: [restraint, constraints, bias, md]
+    core_vars:
+      - iteration
+      - restraint energy
+      - potential energy
+      - "restraint distances: target and actual pairs"
+    derived_vars: []
+    best_for: [restraint diagnostics]
+    examples:
+      - "reaxkit fort76 get --ycol E_res --xaxis time --save E_res_vs_time.png"
+
+  fort.78:
+    desc: "Electric-field output: iteration, field components/magnitudes and the associated electric-field energy term."
+    related_run: [MD]
+    tags: [electric-field, md, external-field]
+    core_vars:
+      - iteration
+      - electric field magnitude in different directions (x,y,z)
+      - electric field magnitude
+      - energy of electric field in different directions (x,y,z)
+      - energy of electric field
+    derived_vars:
+      - "used in electrostatics workflow to obtain polarization hystereis loops"
+    best_for: [field schedule diagnostics, polarization hysteresis]
+    examples:
+      - "reaxkit fort78 get --xaxis time --yaxis E_field_x --save E_field_x.png --export E_field_x.csv"
+
+  fort.79:
+    desc: "FF-optimization parabola-fit report: logs parameter trial values, fitted parabola coefficients, optimum estimate, and error values."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, parabola-fit, line-search]
+    core_vars:
+      - parameter identifier (shown by the first 3 values)
+      - parameter values (3 initial values)
+      - total errors of the force field (for the 3 initial values)
+      - parabola parameters (a,b,c)
+      - parabola minumum (optimal parameter value)
+      - total errors of the force field for the parabola minimum
+      - new parameter value
+      - total errors of the force field for the new parameter value
+    derived_vars: []
+    best_for: [debug/inspect optimization steps]
+    notes:
+      - "This file contains the report from the parabolic extrapolation procedure used by ReaxFF to optimize the force field parameters."
+    examples:
+      - "reaxkit fort79 most-sensitive --plot"
+
+  fort.8:
+    desc: "Connectivity (bond-order) table similar to fort.7, typically updated at a given frequency and overwritten by the latest snapshot."
+    related_run: [MD, MM, FF-optimization]
+    tags: [connectivity, bond-order, snapshot]
+    core_vars:
+      - "Header: number of atoms & structure identifier (=geo descriptor)"
+      - "atom number [integer]"
+      - "atom type number [integer]"
+      - "atom connectivity (neighbor indices) [integer]"
+      - "Molecule number [integer]"
+      - Bond orders for each listed connectivity (neighbor)
+      - Sum of bond orders
+      - Number of lone pairs
+      - Partial charge
+    derived_vars: []
+    best_for: [latest bonding snapshot]
+    notes:
+      - "This file gets updated with the same frequency as the xmolout-file; every iout2 iterations during MD simulations or every iout4 iterations during an MM-run."
+      - "fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though, causes output to these files to get appended."
+    examples:
+      - "reaxkit fort8 get --yaxis charge --atom 1 --plot"
+
+  fort.99:
+    desc: "FF-optimization results summary: reports optimized ffield values and reference/target comparison metrics (e.g., QM/literature targets)."
+    related_run: [FF-optimization]
+    tags: [ff-optimization, results, summary]
+    core_vars:
+      - "ff-optimization results (ffield value, QM/literature value, weight, error, total error)"
+    derived_vars:
+      - "equation of state, bulk modulus, etc."
+    best_for: [final optimization report, EOS, equation of state, bulk modulus]
+    examples:
+      - "reaxkit fort99 get --sort error --ascending --export fort99_sorted_data.csv"
+
+  moldyn.vel:
+    desc: "MD restart file (latest): coordinates, velocities, accelerations, and temperature state for restarting a run."
+    related_run: [MD]
+    tags: [restart, md, velocities]
+    core_vars:
+      - Atom coordinates
+      - Atom velocities
+      - Atom accelerations
+      - Previous atom accelerations
+      - MD temperature
+    derived_vars: []
+    best_for: [restart MD]
+    examples:
+      - "reaxkit moldyn get --key velocities --atoms 1,3,7 --print"
+
+  molfra.out:
+    desc: "Molecular species report: per-iteration species counts/fractions (molecule fragments) during MD."
+    related_run: [MD]
+    tags: [species, fragments, md]
+    core_vars:
+      - "molecular species report (iteration, frequency, molecular formula, molecular mass, total molecules, total atoms, total molecular mass)"
+    derived_vars:
+      - "ReaxKit: species time series; plot counts vs iteration"
+    best_for: [species evolution]
+    examples:
+      - "reaxkit molfra occur --molecules H2O N128Al128 --save water_and_slab_occurrence.png"
+
+  molsav.####:
+    desc: "MD restart snapshots written periodically: same contents as moldyn.vel but saved with an index."
+    related_run: [MD]
+    tags: [restart, md, snapshots]
+    core_vars:
+      - Atom coordinates
+      - Atom velocities
+      - Atom accelerations
+      - Previous atom accelerations
+      - MD temperature
+    derived_vars: []
+    best_for: [restart from earlier point]
+    examples:
+      - "reaxkit molsav get --key velocities --atoms 1,3,7 --print"
+
+  summary:
+    desc: "Compact run summary time series: iteration/time plus global quantities like temperature, pressure, density, volume, potential energy, and molecule count."
+    related_run: [MD, MM, FF-optimization]
+    tags: [summary, thermo, time-series]
+    core_vars:
+      - iteration
+      - number of molecules
+      - simulation time (fs)
+      - potential energy
+      - volume
+      - temperature
+      - pressure
+      - density
+      - "elapsed time (s)"
+    derived_vars: []
+    best_for: [quick run monitoring]
+    examples:
+      - "reaxkit summary get --yaxis E_pot --xaxis time --plot"
+
+  xmolout:
+    desc: "Trajectory output: per-frame atomic positions; may also include cell parameters and per-frame energies; optional velocities/molecule IDs."
+    related_run: [MD, MM, FF-optimization]
+    tags: [trajectory, coordinates, structure, unit-cell, msd, rdf, coordination, connectivity, dipole moment, polarization]
+    core_vars:
+      - number of atoms
+      - simulation name (=geo description)
+      - iteration
+      - potential energy
+      - "unit cell dimensions (a,b,c)"
+      - "unit cell angles (alpha, beta, gamma)"
+      - atom types
+      - "atom coordinates (x,y,z)"
+    optional_vars:
+      - velocities
+      - molecule number
+      - strain energy
+      - total bond order
+    derived_vars:
+      - "MSD (mean square displacement)"
+      - "RDF (radial distribution function)"
+      - "diffusion coefficient"
+      - "connectivity workflow is used to analyze and relabel the coordination status of atoms (xmolout is used in conjunction with fort.7)"
+      - "electrostatics workflow is used to obtain dipole moments, polarizations, etc. (xmolout is used in conjunction with fort.7)"
+      - "xmolfort7 workflow is used to plot the spatial resolution of properties in fort.7 file (i.e., plotting charges of atoms at their locations)"
+    best_for: [trajectory analysis, structure evolution]
+    notes:
+      - "In MD-runs, the frequency of structure output to xmolout is controlled by the control-file keyword iout2; a frame is saved every iout2 MD-iterations."
+      - "In a similar way, iout4 controls the frame output frequency during MM simulations."
+      - "If the ixmolo control-switch has a value of 1 additional velocity and molecule number output is generated in the xmolout-file."
+      - "Optional fields depend on control settings and build options."
+    examples:
+      - "reaxkit xmolout trajget --atoms 1 --dims z --xaxis time --save atom1_z.png --export atom1_z.csv"
