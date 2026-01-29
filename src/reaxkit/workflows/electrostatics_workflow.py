@@ -19,16 +19,13 @@ from reaxkit.utils.alias import resolve_alias_from_columns
 from reaxkit.utils.path import resolve_output_path
 from reaxkit.utils.plotter import single_plot
 
-from reaxkit.analysis.electrostatics_analyzer import (
-    single_frame_dipoles_polarizations,
-    polarization_field_analysis,
-)
 from reaxkit.utils.alias import (
     normalize_choice,
     _resolve_alias,
 )
 from reaxkit.analysis.electrostatics_analyzer import (
     dipoles_polarizations_over_multiple_frames,
+    polarization_field_analysis,
 )
 
 
@@ -45,10 +42,11 @@ def dipole_task(args: argparse.Namespace) -> int:
         [--core Al,Mg] --export out.csv [--polarization]
 
     total scope:
-        renders total dipole or polarization for a single frame and exports it.
+        exports total dipole or polarization for a single frame.
 
     local scope:
-        renders local dipole or polarization for each core atom cluster and exports it.
+        exports local dipole or polarization for each core atom cluster for a single frame.
+        NOTE: local polarization uses bbox volume by default (fast). Use hull only if you add an option.
     """
     # Handlers
     xh = XmoloutHandler(args.xmolout)
@@ -65,17 +63,26 @@ def dipole_task(args: argparse.Namespace) -> int:
             raise ValueError("When --scope local is used, --core must be provided (e.g. --core Al,Mg).")
         core_types = [c.strip() for c in args.core.split(",") if c.strip()]
 
-    # Compute for the requested frame
-    df = single_frame_dipoles_polarizations(
+    # Volume method policy (per your new analyzer design)
+    # - total polarization: hull (reasonable)
+    # - local polarization: bbox (fast default)
+    volume_method = None
+    if mode == "polarization":
+        volume_method = "bbox" if scope == "local" else "hull"
+
+    # Compute for the requested single frame (by passing frames=[...])
+    df = dipoles_polarizations_over_multiple_frames(
         xh,
         f7,
-        frame=args.frame,
+        frames=[args.frame],
         scope=scope,
         core_types=core_types,
         mode=mode,
+        volume_method=volume_method,
     )
 
     workflow_name = args.kind
+
     # Export
     out = resolve_output_path(args.export, workflow_name)
     df.to_csv(out, index=False)

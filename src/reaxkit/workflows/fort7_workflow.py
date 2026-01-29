@@ -508,6 +508,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Extract a feature and optionally plot/save/export.",
         description=(
             "Examples:\n"
+            "  reaxkit fort7 get --yaxis charge --atom 'all' --plot\n"
             "  reaxkit fort7 get --yaxis charge --atom 1 --plot\n"
             "  reaxkit fort7 get --yaxis q_.* --regex --export charges.csv to get all columns starting with 'q_' \n"
         ),

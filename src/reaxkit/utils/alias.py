@@ -75,7 +75,7 @@ _DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
 
     # fort.7 alias
     "molecule_num": ['molecular_number', 'molecular_num'],
-    "partial_charge": ['charge', 'q'],
+    "partial_charge": ['charge', 'q', 'total_charge'],
 
     #fort.99 alias
     "error": ["Err", "Error"],

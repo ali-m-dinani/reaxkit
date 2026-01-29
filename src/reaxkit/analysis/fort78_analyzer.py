@@ -90,7 +90,7 @@ def match_electric_field_to_iout2(
     """
     # Access iout2 from control (not strictly needed for the matching logic,
     # but useful for consistency/sanity checks with xmolout/summary output rate).
-    iout2 = control_get(ctrl, "iout2", section="md", default=1)
+    iout2 = get_control(ctrl, "iout2", section="md", default=1)
     _ = iout2  # currently not used explicitly, but kept for future use/logging
 
     df_E = get_iter_vs_fort78_data(f78, variables=field_var)  # columns: ['iter', field_var]
