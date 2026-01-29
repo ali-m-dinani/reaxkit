@@ -17,7 +17,7 @@ from reaxkit.workflows import (
     control_workflow, fort76_workflow, fort74_workflow,
     ffield_workflow, params_workflow, fort57_workflow,
     vels_workflow, introspection_workflow, help_workflow,
-    tregime_workflow,
+    tregime_workflow, vregime_workflow,
 )
 
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
@@ -38,7 +38,7 @@ WORKFLOW_MODULES = {
     "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57": fort57_workflow,
     "vels": vels_workflow, "help": help_workflow, "fort8": fort7_workflow,
     "moldyn": vels_workflow, "molsav": vels_workflow, "tregime": tregime_workflow,
-
+    "vregime": vregime_workflow,
 }
 
 
