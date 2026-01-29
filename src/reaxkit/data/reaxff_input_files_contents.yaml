@@ -142,7 +142,7 @@ files:
       - "fort.75 shows how the MD simulation worked to obtain the set-point temperature regimes"
     best_for: [temperature ramps, multi-zone heating/cooling]
     examples:
-      - "reaxkit tregime intspec"
+      - "reaxkit tregime gen"
 
   vels:
     desc: "Optional restart file for MD containing last saved coordinates/velocities/accelerations and temperature state; can override geometry from geo."
@@ -179,4 +179,4 @@ files:
       - "fort.77 file will show information regarding the cell parameters targeted in the vregime.in-file."
     best_for: [strain/cell ramps, volume changes, barostat-like schedules]
     examples:
-      - "reaxkit vregime intspec"
+      - "reaxkit vregime gen"

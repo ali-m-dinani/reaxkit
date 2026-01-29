@@ -18,7 +18,7 @@ from reaxkit.io.geo_generator import (
     orthogonalize_hexagonal_cell,
     place2,
 )
-
+from reaxkit.io.geo_generator import add_restraints_to_geo
 
 # ----------------------------------------------------------------------
 # Helpers
@@ -345,6 +345,54 @@ def place2_task(args: argparse.Namespace) -> int:
 
 
 # ----------------------------------------------------------------------
+# Task 6: add restraint block to GEO
+# ----------------------------------------------------------------------
+def add_restraint_task(args: argparse.Namespace) -> int:
+    in_path = Path(args.file)
+    if not in_path.is_file():
+        raise FileNotFoundError(f"Input GEO file not found: {in_path}")
+
+    out_path = Path(args.output) if args.output else (in_path.parent / f"{in_path.name}_with_restraints")
+
+    # Build params dict: user can pass per-kind params or nothing -> defaults
+    params = {}
+    if args.bond is not None:
+        params["BOND"] = args.bond.strip()
+    if args.angle is not None:
+        params["ANGLE"] = args.angle.strip()
+    if args.torsion is not None:
+        params["TORSION"] = args.torsion.strip()
+    if args.mascen is not None:
+        params["MASCEN"] = args.mascen.strip()
+
+    # kinds are inferred from which flags user provided
+    kinds = []
+    if args.bond is not None:
+        kinds.append("BOND")
+    if args.angle is not None:
+        kinds.append("ANGLE")
+    if args.torsion is not None:
+        kinds.append("TORSION")
+    if args.mascen is not None:
+        kinds.append("MASCEN")
+
+    if not kinds:
+        raise ValueError(
+            "No restraints requested. Provide at least one of: "
+            "--bond, --angle, --torsion, --mascen"
+        )
+
+    out_written = add_restraints_to_geo(
+        in_path,
+        out_file=out_path,
+        kinds=kinds,
+        params=params,
+    )
+
+    print(f"[Done] Added restraints to {in_path} and the result is exported as {out_written}")
+    return 0
+
+# ----------------------------------------------------------------------
 # CLI registration
 # ----------------------------------------------------------------------
 
@@ -447,6 +495,37 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p_place2.add_argument("--maxattempt", default=50000, help="Maximum placement attempts per copy (default: 50000)")
     p_place2.add_argument("--randomseed", default=None, help="Random seed for reproducible placement (optional)")
     p_place2.set_defaults(_run=place2_task)
+
+    # ---- add-restraint ----
+    p_rest = subparsers.add_parser(
+        "add-restraint",
+        help="Insert a sample restraint block (BOND/ANGLE/TORSION/MASCEN) into a GEO file",
+        description=(
+            "Examples:\n"
+            "  reaxkit geo add-restraint --bond \n"
+            "  reaxkit geo add-restraint --file geo --output geo_r --angle '1   2   3 109.5000 600.00 0.25000 0.0000000'\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+
+    p_rest.add_argument("--file", default="geo", help="Input GEO file (e.g., geo)")
+    p_rest.add_argument("--output", default="reaxkit_generated_inputs/geo_with_restraints",
+                        help="Output GEO file (default: <input>_with_restraints)")
+
+    # Each flag can be:
+    #  - omitted (not requested)
+    #  - provided with "" (empty) to request a default sample
+    #  - provided with a params string to use exactly that
+    p_rest.add_argument("--bond", nargs="?", const="", default=None,
+                        help="Add ONE BOND restraint (optional params string; empty => default sample).")
+    p_rest.add_argument("--angle", nargs="?", const="", default=None,
+                        help="Add ONE ANGLE restraint (optional params string; empty => default sample).")
+    p_rest.add_argument("--torsion", nargs="?", const="", default=None,
+                        help="Add ONE TORSION restraint (optional params string; empty => default sample).")
+    p_rest.add_argument("--mascen", nargs="?", const="", default=None,
+                        help="Add ONE MASCEN restraint (optional params string; empty => default sample).")
+
+    p_rest.set_defaults(_run=add_restraint_task)
 
 
 

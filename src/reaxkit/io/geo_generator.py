@@ -25,7 +25,7 @@ ReaxFF simulations.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, Literal, Optional, Tuple, List, Dict, Any
+from typing import Iterable, Literal, Optional, Tuple, List, Dict, Any, Sequence
 
 import pandas as pd
 import numpy as np
@@ -660,6 +660,223 @@ def place2(
         pbc=True,
     )
     return final_atoms
+
+# ---------------------------------------------------------------------------
+# adding a restraint of any type (bond, angle, torsion, mascen) to a geo file
+# ---------------------------------------------------------------------------
+
+def add_restraints_to_geo(
+    geo_file: str | Path,
+    *,
+    out_file: str | Path | None = None,
+    kinds: Sequence[str],
+    params: Optional[Dict[str, str]] = None,
+) -> Path:
+    """
+    Insert ONE sample restraint line per requested kind into a GEO/XTLGRF file.
+
+    Insert BEFORE first line starting with any of:
+      CRYSTX, FORMAT ATOM, HETATM, ATOM
+    else before END, else EOF.
+
+    For each kind write exactly 3 lines (NO blank lines):
+      FORMAT ...
+      # (guide)
+      <KIND> RESTRAINT ...   (fields LEFT-aligned under guide headers)
+    """
+    geo_file = Path(geo_file)
+    if not geo_file.is_file():
+        raise FileNotFoundError(f"Input GEO file not found: {geo_file}")
+
+    out_path = Path(out_file) if out_file is not None else geo_file
+    params = params or {}
+
+    wanted = [str(k).strip().upper() for k in kinds if str(k).strip()]
+    if not wanted:
+        raise ValueError("No restraint kinds provided (kinds is empty).")
+
+    order = ["BOND", "ANGLE", "TORSION", "MASCEN"]
+    wanted_sorted = [k for k in order if k in set(wanted)]
+
+    default_params: Dict[str, str] = {
+        "BOND":    "1   2  1.0900 7500.00 0.25000 0.0000000",
+        "ANGLE":   "1   2   3 109.5000 600.00 0.25000 0.0000000",
+        "TORSION": "1   2   3   4 180.0000 100.00 0.25000 0.0000000",
+        "MASCEN":  "1   0.0000 0.0000 0.0000 500.00 0.25000 0.0000000",
+    }
+
+    format_lines: Dict[str, str] = {
+        "BOND":    "FORMAT BOND RESTRAINT (15x,2i4,f8.4,f8.2,f8.5,f10.7)",
+        "ANGLE":   "FORMAT ANGLE RESTRAINT (15x,3i4,f8.3,f8.2,f8.5,f10.7)",
+        "TORSION": "FORMAT TORSION RESTRAINT (15x,4i4,f8.3,f8.2,f8.5,f10.7)",
+        "MASCEN":  "FORMAT MASCEN RESTRAINT (15x,i4,3f10.4,f8.2,f8.5,f10.7)",
+    }
+
+    # Keep these exactly like your working example style: a short "#", then spaces, then headers.
+    guide_lines: Dict[str, str] = {
+        "BOND":    "#                                 At1 At2  R12     Force1  Force2  dR12/dIteration(MD only)",
+        "ANGLE":   "#                                 At1 At2 At3  A123    Force1  Force2  dA123/dIteration(MD only)",
+        "TORSION": "#                                 At1 At2 At3 At4  T1234   Force1  Force2  dT1234/dIteration(MD only)",
+        "MASCEN":  "#                                 At1    X          Y          Z          Force1  Force2  dR/dIteration(MD only)",
+    }
+
+    # We will align under the *actual token starts* in the guide line (left-aligned).
+    # Each spec gives: token_name, formatter(kind-specific), min_width (fallback)
+    token_layout: Dict[str, List[Tuple[str, str, int]]] = {
+        "BOND": [
+            ("At1", "i", 3),
+            ("At2", "i", 3),
+            ("R12", "f4", 7),
+            ("Force1", "f2", 7),
+            ("Force2", "f5", 7),
+            ("dR12/dIteration(MD only)", "f7", 10),
+        ],
+        "ANGLE": [
+            ("At1", "i", 3),
+            ("At2", "i", 3),
+            ("At3", "i", 3),
+            ("A123", "f3", 7),
+            ("Force1", "f2", 7),
+            ("Force2", "f5", 7),
+            ("dA123/dIteration(MD only)", "f7", 10),
+        ],
+        "TORSION": [
+            ("At1", "i", 3),
+            ("At2", "i", 3),
+            ("At3", "i", 3),
+            ("At4", "i", 3),
+            ("T1234", "f3", 7),
+            ("Force1", "f2", 7),
+            ("Force2", "f5", 7),
+            ("dT1234/dIteration(MD only)", "f7", 10),
+        ],
+        "MASCEN": [
+            ("At1", "i", 3),
+            ("X", "f4_10", 10),
+            ("Y", "f4_10", 10),
+            ("Z", "f4_10", 10),
+            ("Force1", "f2", 7),
+            ("Force2", "f5", 7),
+            ("dR/dIteration(MD only)", "f7", 10),
+        ],
+    }
+
+    def _format_value(tok: str, fmt: str) -> str:
+        # ints
+        if fmt == "i":
+            return str(int(float(tok)))
+        # floats
+        if fmt == "f2":
+            return f"{float(tok):.2f}"
+        if fmt == "f3":
+            return f"{float(tok):.3f}"
+        if fmt == "f4":
+            return f"{float(tok):.4f}"
+        if fmt == "f5":
+            return f"{float(tok):.5f}"
+        if fmt == "f7":
+            return f"{float(tok):.7f}"
+        if fmt == "f4_10":  # for X/Y/Z use wider 10.4 style
+            return f"{float(tok):.4f}"
+        return tok
+
+    def _token_starts(guide: str, names: List[str]) -> List[int]:
+        """
+        Find start indices of each token name in the guide line.
+        Uses find() from left to right; if missing, falls back to spaced layout.
+        """
+        starts: List[int] = []
+        cursor = 0
+        for nm in names:
+            j = guide.find(nm, cursor)
+            if j < 0:
+                # fallback: place after last start + 4
+                j = (starts[-1] + 4) if starts else guide.find("#") + 2
+            starts.append(j)
+            cursor = j + len(nm)
+        return starts
+
+    def _build_aligned_data_line(kind: str, param_str: str) -> str:
+        """
+        Build:
+            "BOND RESTRAINT" + spaces + values
+        where each value is LEFT-aligned to the same column as the header token in guide line.
+        """
+        guide = guide_lines[kind]
+        layout = token_layout[kind]
+        names = [x[0] for x in layout]
+        starts = _token_starts(guide, names)
+
+        toks = [t for t in (param_str or "").split() if t.strip()]
+
+        # Basic validation: ensure enough tokens
+        need = len(layout)
+        if len(toks) < need:
+            raise ValueError(f"{kind} params need {need} tokens but got {len(toks)}: {toks}")
+        toks = toks[:need]
+
+        label = f"{kind} RESTRAINT"
+        # Start with label, then pad up to the first header start
+        s = label
+        if len(s) < starts[0]:
+            s += " " * (starts[0] - len(s))
+        else:
+            s += " "
+
+        # Place each field at exact start column; LEFT-aligned, no right-justification
+        for (nm, fmt, minw), start, tok in zip(layout, starts, toks):
+            val = _format_value(tok, fmt)
+
+            if len(s) < start:
+                s += " " * (start - len(s))
+            # left align within a reasonable width so next field doesn't collide
+            # width = distance to next start (or minw for last token)
+            idx = names.index(nm)
+            if idx < len(starts) - 1:
+                width = max(minw, starts[idx + 1] - start - 1)
+            else:
+                width = max(minw, len(val))
+            s += val.ljust(width) + " "
+
+        return s.rstrip()
+
+    # Read file
+    lines = geo_file.read_text().splitlines()
+
+    # Insert BEFORE first CRYSTX / FORMAT ATOM / HETATM / ATOM
+    insert_idx: Optional[int] = None
+    triggers = ("CRYSTX", "FORMAT ATOM", "HETATM", "ATOM")
+    for i, ln in enumerate(lines):
+        s = ln.lstrip()
+        if any(s.startswith(t) for t in triggers):
+            insert_idx = i
+            break
+    if insert_idx is None:
+        for i, ln in enumerate(lines):
+            if ln.strip() == "END":
+                insert_idx = i
+                break
+    if insert_idx is None:
+        insert_idx = len(lines)
+
+    block: list[str] = []
+    block.append("REMARK Restraints added by ReaxKit (sample lines; edit as needed)")
+
+    for k in wanted_sorted:
+        block.append(format_lines[k])
+        block.append(guide_lines[k])
+
+        p = (params.get(k) or "").strip()
+        if not p:
+            p = default_params[k]
+
+        block.append(_build_aligned_data_line(k, p))
+
+    new_lines = lines[:insert_idx] + block + lines[insert_idx:]
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(new_lines) + "\n")
+    return out_path
 
 
 
