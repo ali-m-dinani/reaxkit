@@ -5,7 +5,7 @@ import argparse
 
 from reaxkit.io.control_handler import ControlHandler
 from reaxkit.analysis.control_analyzer import get_control
-
+from reaxkit.io.control_generator import write_control_template
 
 def _format_value(value):
     """
@@ -45,8 +45,16 @@ def control_get_task(args: argparse.Namespace) -> int:
     print(f'{args.key} = {formatted}')
     return 0
 
+def control_make_task(args: argparse.Namespace) -> int:
+    """
+    CLI task: generate a default control file with all sections and default values.
+    """
+    output = write_control_template(args.output)
+    print(f"[Done] control file written to {output}")
+    return 0
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    # --- get ---
     p = subparsers.add_parser(
         "get",
         help="Get the value of a control key (e.g. nmdit)",
@@ -66,3 +74,21 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Optional control section (general, md, mm, ff, outdated).",
     )
     p.set_defaults(_run=control_get_task)
+
+    # --- make ---
+    m = subparsers.add_parser(
+        "make",
+        help="Generate a default control file with all sections and default values",
+        description=(
+            "Examples:\n"
+            "  reaxkit control make\n"
+            "  reaxkit control make --output control\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    m.add_argument(
+        "--output",
+        default="reaxkit_generated_inputs/control",
+        help="Output path for the generated control file (default: 'control').",
+    )
+    m.set_defaults(_run=control_make_task)
