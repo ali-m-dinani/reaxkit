@@ -241,10 +241,10 @@ class FFieldHandler(TemplateHandler):
         """Parse General parameters using fixed names, not inline comments."""
         expected = len(self._GENERAL_PARAM_NAMES)
         if n_params == expected:
-            print("[FFieldHandler] Number of general parameters is 39 (expected).")
+            print("[FFieldHandler Check] Number of general parameters is 39 (expected).")
         else:
             print(
-                f"[FFieldHandler] WARNING: expected {expected} general parameters, "
+                f"[FFieldHandler Check] WARNING: expected {expected} general parameters, "
                 f"but header says {n_params}."
             )
 

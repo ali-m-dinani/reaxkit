@@ -10,6 +10,7 @@ from reaxkit.io.xmolout_handler import XmoloutHandler
 from reaxkit.io.xmolout_generator import write_xmolout_from_frames
 from reaxkit.analysis.fort7_analyzer import coordination_status_over_frames
 from reaxkit.utils.path import resolve_output_path
+from reaxkit.io.ffield_handler import FFieldHandler
 
 # -----------------------------
 # Helpers
@@ -56,6 +57,60 @@ def _normalize_frames(xh: XmoloutHandler, frames: Optional[str]) -> list[int]:
         if 0 <= i < n:
             idx.append(i)
     return sorted(set(idx))
+
+
+def _valences_from_ffield(ffield_path: str) -> Dict[str, float]:
+    """
+    Read atom valencies from ffield atom section.
+
+    Returns a dict that includes BOTH:
+      - symbol -> valency  (e.g., "O": 2)
+      - atom_index -> valency as string key (e.g., "2": 2)
+    This makes it robust whether xmolout uses symbols or numeric atom types.
+    """
+    fh = FFieldHandler(ffield_path)
+    atom_df = fh.section_df(FFieldHandler.SECTION_ATOM)
+
+    if "valency" not in atom_df.columns:
+        raise SystemExit("❌ ffield atom section missing 'valency' column.")
+
+    out: Dict[str, float] = {}
+    used_pairs = []  # for printing
+
+    for atom_idx, row in atom_df.iterrows():
+        # atom_idx is the ffield atom index (usually 1-based)
+        sym = row.get("symbol")
+        val = row.get("valency")
+
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            continue
+
+        try:
+            v = float(val)
+        except Exception:
+            continue
+
+        # key by atom index (string) too, for numeric xmolout types
+        out[str(int(atom_idx))] = v
+
+        # key by symbol if present
+        if sym is not None and not (isinstance(sym, float) and pd.isna(sym)):
+            s = str(sym).strip()
+            if s:
+                out[s] = v
+                used_pairs.append(f"{s}={v:g}")
+            else:
+                used_pairs.append(f"{int(atom_idx)}={v:g}")
+        else:
+            used_pairs.append(f"{int(atom_idx)}={v:g}")
+
+    if not out:
+        raise SystemExit("❌ No usable valencies found in ffield atom section.")
+
+    # Print one clean line showing what you used (symbol-first when available)
+    # (You can keep it in this helper so both tasks benefit.)
+    print("[Valences] " + ", ".join(used_pairs))
+    return out
 
 
 def _parse_kv_map(s: Optional[str], value_cast=float) -> Dict[str, float]:
@@ -118,6 +173,11 @@ def _task_analyze(args: argparse.Namespace) -> int:
     f7 = Fort7Handler(args.fort7)
 
     valences = _parse_kv_map(args.valences, float)
+    if valences:
+        # User explicitly provided valences; print what will be used
+        print("[Valences] " + ", ".join(f"{k}={v:g}" for k, v in valences.items()))
+    else:
+        valences = _valences_from_ffield(args.ffield)
     if not valences:
         raise SystemExit("❌ Provide --valences like 'Mg=2,O=2'.")
 
@@ -152,6 +212,11 @@ def _task_relabel(args: argparse.Namespace) -> int:
     f7 = Fort7Handler(args.fort7)
 
     valences = _parse_kv_map(args.valences, float)
+    if valences:
+        # User explicitly provided valences; print what will be used
+        print("[Valences] " + ", ".join(f"{k}={v:g}" for k, v in valences.items()))
+    else:
+        valences = _valences_from_ffield(args.ffield)
     if not valences:
         raise SystemExit("❌ Provide --valences like 'Mg=2,O=2'.")
 
@@ -244,7 +309,10 @@ def _add_common_coord_args(p: argparse.ArgumentParser) -> None:
     """Common args shared by coord analyze / relabel."""
     p.add_argument("--xmolout", default="xmolout", help="Path to xmolout.")
     p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file.")
-    p.add_argument("--valences", required=True, help="Type valences, e.g. 'Mg=2,O=2,H=1'.")
+    p.add_argument("--valences", default=None,
+                   help="Optional: override type valences, e.g. 'Mg=2,O=2,H=1'. "
+                        "If omitted, reads from ffield atom section ('valency').")
+    p.add_argument("--ffield", default="ffield", help="Path to ffield (used if --valences not given).")
     p.add_argument("--threshold", type=float, default=0.3, help="Tolerance around valence.")
     p.add_argument("--frames", default=None,
                    help="Frame selection, e.g. '0:100:5' or '0,5,10'.")
@@ -265,7 +333,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Analyze coordination per atom per frame.",
         description=(
             "Examples:\n"
-            "  reaxkit coord analyze --valences 'Mg=2,O=2,Zn=2' --export coord_analysis.csv\n"
+            "  reaxkit coord analyze --export coord_analysis.csv\n"
             "  reaxkit coord analyze --valences 'Mg=2,O=2' --frames 0:200:2 --export coord_0_200_2.csv\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
@@ -282,10 +350,8 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="Relabel atom types by coordination and write a new xmolout.",
         description=(
             "Examples:\n"
-            "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --output xmolout_relabeled "
-            "--mode global --labels=-1=U,0=C,1=O\n"
-            "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --output xmolout_type "
-            "--mode by_type --keep-coord-original\n"
+            "  reaxkit coord relabel --output xmolout_relabeled --mode global --labels=-1=U,0=C,1=O\n"
+            "  reaxkit coord relabel --output xmolout_type --mode by_type --keep-coord-original\n"
             "  reaxkit coord relabel --valences 'Mg=2,O=2,Zn=2' --frames 0:400:5 "
             "--output xmolout_relabeled --mode global\n"
         ),
