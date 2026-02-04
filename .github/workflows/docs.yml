@@ -1,0 +1,57 @@
+name: Deploy MkDocs
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -U pip
+          pip install mkdocs mkdocs-material
+
+      - name: Generate API docs
+        run: |
+          python reaxkit/docs/api/analysis/_gen_analysis_docs.py
+          python reaxkit/docs/api/io/_gen_io_docs.py
+          python reaxkit/docs/api/utils/_gen_utils_docs.py
+          python reaxkit/docs/api/workflows/_gen_workflows_docs.py
+          python reaxkit/_gen_mkdocs.py
+
+      - name: Build MkDocs
+        run: mkdocs build --strict
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
