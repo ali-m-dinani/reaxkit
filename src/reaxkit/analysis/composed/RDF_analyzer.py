@@ -170,7 +170,8 @@ def _rdf_ovito_total_frame(
     except Exception as e:
         raise ImportError(
             "OVITO is required for RDF analysis. "
-            "Install reaxkit[viz] and run in an environment with EGL/Qt."
+            "Install it with: pip install 'reaxkit[ovito]' "
+            "and run in an environment with EGL/Qt."
         ) from e
 
     try:
@@ -239,7 +240,8 @@ def _rdf_ovito_partial_frame(
     except Exception as e:
         raise ImportError(
             "OVITO is required for RDF analysis. "
-            "Install reaxkit[viz] and run in an environment with EGL/Qt."
+            "Install it with: pip install 'reaxkit[ovito]' "
+            "and run in an environment with EGL/Qt."
         ) from e
 
     try:
