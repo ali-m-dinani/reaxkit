@@ -18,10 +18,10 @@ from typing import List
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-def example_metric(handler: FileHandler) -> pd.DataFrame:
+def example_metric(handler: BaseHandler) -> pd.DataFrame:
     """
     Extract iteration and energy as a minimal analysis table.
 
@@ -47,7 +47,7 @@ def example_metric(handler: FileHandler) -> pd.DataFrame:
     return df[["iteration", "energy"]].copy()
 
 
-def record_series(handler: FileHandler, field: str) -> List[float]:
+def record_series(handler: BaseHandler, field: str) -> List[float]:
     """
     Extract a single column as a Python list across all rows.
 

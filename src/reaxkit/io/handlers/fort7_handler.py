@@ -18,10 +18,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort7Handler(FileHandler):
+class Fort7Handler(BaseHandler):
     """
     Parser for ReaxFF connectivity output files (``fort.7``).
 

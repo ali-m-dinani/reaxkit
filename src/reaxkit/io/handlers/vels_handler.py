@@ -20,10 +20,10 @@ from typing import Any, Dict, Tuple
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class VelsHandler(FileHandler):
+class VelsHandler(BaseHandler):
     """
     Parser for ReaxFF atomic kinematics output files
     (``vels``, ``moldyn.vel``, ``molsav``).

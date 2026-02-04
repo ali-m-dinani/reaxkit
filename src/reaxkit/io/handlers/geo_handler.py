@@ -19,10 +19,10 @@ from typing import List, Optional, Dict, Any
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class GeoHandler(FileHandler):
+class GeoHandler(BaseHandler):
     """
     Parser for ReaxFF geometry structure files (``.geo`` / XTLGRF format).
 

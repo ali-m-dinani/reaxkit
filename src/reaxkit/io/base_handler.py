@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 import pandas as pd
 
-class FileHandler(ABC):
+class BaseHandler(ABC):
     """
     Abstract base class for ReaxKit file handlers.
 

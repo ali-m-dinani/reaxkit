@@ -21,7 +21,7 @@ import math
 import numpy as np
 
 __all__ = [
-    "_write_a_given_eregime",
+    "write_a_given_eregime",
     "write_eregime_sinusoidal",
     "write_eregime_smooth_pulse",
     "write_eregime_from_function",
@@ -45,7 +45,7 @@ def _write_header(f) -> None:
         f.write(line)
 
 
-def _write_a_given_eregime(
+def write_a_given_eregime(
     file_path: Union[str, Path],
     rows: Iterable[Tuple[int, int, str, float]],
 ) -> Path:
@@ -78,7 +78,7 @@ def _write_a_given_eregime(
     Examples
     ---
     >>> rows = [(0, 1, "z", 0.01), (100, 1, "z", -0.01)]
-    >>> _write_a_given_eregime("eregime.in", rows)
+    >>> write_a_given_eregime("eregime.in", rows)
     PosixPath('eregime.in')
     """
     file_path = Path(file_path)
@@ -166,7 +166,7 @@ def write_eregime_sinusoidal(
         it = start_iter + k * iteration_step
         rows.append((it, voltage_idx, direction, float(mag)))
 
-    out = _write_a_given_eregime(file_path, rows)
+    out = write_a_given_eregime(file_path, rows)
     print(f"[Done] Sinusoidal eregime saved to {out} ({npts} entry rows).")
     return out
 
@@ -265,7 +265,7 @@ def write_eregime_smooth_pulse(
         it = start_iter + idx * iteration_step
         rows.append((it, voltage_idx, direction, float(mag)))
 
-    out = _write_a_given_eregime(file_path, rows)
+    out = write_a_given_eregime(file_path, rows)
     print(f"[Done] Smooth pulse eregime saved to {out} ({len(rows)} entry rows).")
     return out
 
@@ -335,7 +335,7 @@ def write_eregime_from_function(
         it = start_iter + i * iteration_step
         rows.append((it, voltage_idx, direction, mag))
 
-    out = _write_a_given_eregime(file_path, rows)
+    out = write_a_given_eregime(file_path, rows)
     print(f"[Done] Functional eregime saved to {out} ({len(rows)} entry rows).")
     return out
 

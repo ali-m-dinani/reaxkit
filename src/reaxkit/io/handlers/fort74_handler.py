@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
 def _safe_float(s: str) -> float | None:
@@ -37,7 +37,7 @@ def _safe_int(s: str) -> int | None:
         return None
 
 
-class Fort74Handler(FileHandler):
+class Fort74Handler(BaseHandler):
     """
     Parser for ReaxFF structure summary files (``fort.74``).
 

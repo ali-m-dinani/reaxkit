@@ -1,4 +1,4 @@
-# docs/_gen_workflow_docs.py
+# docs/_gen_workflows_docs.py
 from __future__ import annotations
 
 import argparse

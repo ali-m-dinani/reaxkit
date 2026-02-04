@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
 # Map raw section labels in the file to canonical section names
@@ -483,7 +483,7 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
     return df
 
 
-class TrainsetHandler(FileHandler):
+class TrainsetHandler(BaseHandler):
     """
     Parser for ReaxFF training set definition files (TRAINSET).
 

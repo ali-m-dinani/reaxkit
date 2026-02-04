@@ -17,7 +17,7 @@ from typing import Dict, Iterable, Optional, Sequence
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 from reaxkit.io.handlers.ffield_handler import FFieldHandler
 
 
@@ -53,7 +53,7 @@ def _normalize_section_name(section: str) -> str:
     return section.strip().lower().replace("-", "_").replace(" ", "_")
 
 
-def get_ffield_data(handler: FileHandler, *, section: str) -> pd.DataFrame:
+def get_ffield_data(handler: BaseHandler, *, section: str) -> pd.DataFrame:
     """
     Retrieve a specific section of the ReaxFF force-field file as a DataFrame.
 

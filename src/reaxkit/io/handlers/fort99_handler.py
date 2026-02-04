@@ -19,10 +19,10 @@ from typing import List, Dict, Any
 import re
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort99Handler(FileHandler):
+class Fort99Handler(BaseHandler):
     """
     Parser for ReaxFF training set error reports (``fort.99``).
 

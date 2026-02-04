@@ -17,10 +17,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort73Handler(FileHandler):
+class Fort73Handler(BaseHandler):
     """
     Parser for ReaxFF energy time-series output files
     (``fort.73``, ``energylog``, ``fort.58``).

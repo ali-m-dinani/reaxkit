@@ -19,12 +19,12 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 from reaxkit.utils.constants import const
 from reaxkit.utils.equation_of_states import vinet_energy_ev
 
 def get_fort99_data(
-    handler: FileHandler,
+    handler: BaseHandler,
     *,
     sortby: str = "lineno",
     ascending: bool = True
@@ -78,7 +78,7 @@ def get_fort99_data(
 # getting the EOS data (i.e., rows where section = ENERGY and have 2 identifiers in their title
 # --------------------------------------------------------------------------------------------------
 
-def parse_fort99_two_body_energy_terms(handler: FileHandler) -> pd.DataFrame:
+def parse_fort99_two_body_energy_terms(handler: BaseHandler) -> pd.DataFrame:
     """
     Parse pairwise ENERGY terms from the ``ENERGY`` section of fort.99.
 
@@ -174,8 +174,8 @@ def parse_fort99_two_body_energy_terms(handler: FileHandler) -> pd.DataFrame:
 
 
 def fort99_energy_vs_volume(
-    fort99_handler: FileHandler,
-    fort74_handler: FileHandler,
+    fort99_handler: BaseHandler,
+    fort74_handler: BaseHandler,
 ) -> pd.DataFrame:
     """
     Construct an energy–volume table from fort.99 and fort.74 data.

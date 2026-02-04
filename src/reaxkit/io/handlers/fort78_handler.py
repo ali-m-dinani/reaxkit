@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 # Canonical names as requested
 _CANONICAL_5 = [
@@ -37,7 +37,7 @@ _CANONICAL_8 = [
 _NUMERIC_CANONICAL = set(_CANONICAL_8)  # superset of _CANONICAL_5
 
 
-class Fort78Handler(FileHandler):
+class Fort78Handler(BaseHandler):
     """
     Parser for ReaxFF electric-field output files (``fort.78``).
 

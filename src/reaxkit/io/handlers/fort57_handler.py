@@ -20,10 +20,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort57Handler(FileHandler):
+class Fort57Handler(BaseHandler):
     """
     Parser for ReaxFF geometry-optimization output files (``fort.57``).
 

@@ -14,9 +14,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Iterator, Dict, Any
 import pandas as pd
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
-class XmoloutHandler(FileHandler):
+class XmoloutHandler(BaseHandler):
     """
     Parser for ReaxFF trajectory output files (``xmolout``).
 

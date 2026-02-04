@@ -17,10 +17,10 @@ from __future__ import annotations
 from typing import List, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-def get_fort73_data(handler: FileHandler, columns: Optional[List[str]] = None) -> pd.DataFrame:
+def get_fort73_data(handler: BaseHandler, columns: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Extract energy data from a ReaxFF energy output file as a DataFrame.
 

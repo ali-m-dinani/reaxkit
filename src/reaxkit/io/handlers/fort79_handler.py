@@ -21,7 +21,7 @@ import re
 import math
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 # ----------------------------------------------------------------------
 # Regex that matches:
@@ -51,7 +51,7 @@ def _f(s: str) -> float:
         return float("nan")
 
 
-class Fort79Handler(FileHandler):
+class Fort79Handler(BaseHandler):
     """
     Parser for ReaxFF parameter optimization diagnostic files (``fort.79``).
 

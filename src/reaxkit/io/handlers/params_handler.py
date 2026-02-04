@@ -20,10 +20,10 @@ from typing import List, Dict, Any
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class ParamsHandler(FileHandler):
+class ParamsHandler(BaseHandler):
     """
     Parser for ReaxFF parameter search definition files (``params``).
 

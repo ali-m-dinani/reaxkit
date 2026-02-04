@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import argparse
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
 def metric_task(args: argparse.Namespace) -> int:
@@ -40,7 +40,7 @@ def metric_task(args: argparse.Namespace) -> int:
     >>> # From CLI:
     >>> # reaxkit template metric --file <filetype> --save energy.png
     """
-    handler = FileHandler(args.file)
+    handler = BaseHandler(args.file)
 
     # Some analysis is done here using analyzers
     # .....

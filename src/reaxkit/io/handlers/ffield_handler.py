@@ -16,10 +16,10 @@ from typing import Dict, List, Tuple, Any, Optional
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class FFieldHandler(FileHandler):
+class FFieldHandler(BaseHandler):
     """
     Parser for ReaxFF force-field parameter files (``ffield``).
 

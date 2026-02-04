@@ -5,7 +5,7 @@ This module provides functions for resolving canonical ReaxKit keys
 (e.g., ``iter``, ``time``, ``D``) against the actual column names present
 in parsed DataFrames, using a packaged alias map.
 
-The canonical→alias definitions are stored in ``reaxkit/data/aliases.yaml``.
+The canonical→alias definitions are stored in ``reaxkit/data/alias.yaml``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Dict, List, Iterable, Optional
 from functools import lru_cache
 
 # You can load this via importlib.resources so it works after pip install.
-# Requires: aliases.yaml included as package data.
+# Requires: alias.yaml included as package data.
 import yaml
 import importlib.resources as ir
 
@@ -24,7 +24,7 @@ def load_default_alias_map() -> Dict[str, List[str]]:
     """
     Load the packaged canonical→aliases mapping.
 
-    The alias map is read from ``reaxkit/data/aliases.yaml`` and cached after
+    The alias map is read from ``reaxkit/data/alias.yaml`` and cached after
     the first call.
 
     Returns
@@ -35,12 +35,12 @@ def load_default_alias_map() -> Dict[str, List[str]]:
     Raises
     ------
     FileNotFoundError
-        If the packaged ``aliases.yaml`` cannot be found.
+        If the packaged ``alias.yaml`` cannot be found.
     """
     # reaxkit.data is NOT a package; we read by file location within package resources.
     # If you later make data/ a package, you can switch to ir.files("reaxkit.data").
     pkg = "reaxkit"
-    rel = "data/aliases.yaml"
+    rel = "data/alias.yaml"
 
     try:
         with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as f:
@@ -48,7 +48,7 @@ def load_default_alias_map() -> Dict[str, List[str]]:
     except FileNotFoundError as e:
         raise FileNotFoundError(
             f"Could not find packaged alias map at '{pkg}/{rel}'. "
-            "Make sure aliases.yaml is included as package data."
+            "Make sure alias.yaml is included as package data."
         ) from e
 
     aliases = doc.get("aliases") or {}
@@ -83,7 +83,7 @@ def resolve_alias_from_columns(
         Canonical key to resolve (e.g., ``"iter"``, ``"time"``, ``"D"``).
     aliases : dict[str, list[str]], optional
         Canonical→aliases mapping to use. If not provided, the packaged map
-        from ``aliases.yaml`` is loaded.
+        from ``alias.yaml`` is loaded.
 
     Returns
     -------
@@ -186,7 +186,7 @@ def normalize_choice(value: str, domain: str = "xaxis") -> str:
     Normalize a user-provided keyword to its canonical alias key.
 
     This is intended for tolerant CLI inputs where users may provide
-    any alias defined in ``aliases.yaml`` (e.g., ``Time(fs)`` → ``time``).
+    any alias defined in ``alias.yaml`` (e.g., ``Time(fs)`` → ``time``).
 
     Parameters
     ----------

@@ -20,10 +20,10 @@ from typing import Any, Dict, Iterator, List, Optional
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort76Handler(FileHandler):
+class Fort76Handler(BaseHandler):
     """
     Parser for ReaxFF restraint monitor files (``fort.76``).
 

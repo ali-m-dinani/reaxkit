@@ -20,10 +20,10 @@ from typing import Dict, Any
 
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class ControlHandler(FileHandler):
+class ControlHandler(BaseHandler):
     """
     Parser for ReaxFF ``control`` input files.
 

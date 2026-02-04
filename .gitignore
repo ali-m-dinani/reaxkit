@@ -71,8 +71,6 @@ docs/file_templates/xmolout
 README.txt
 README_full_version.md
 README_convert_to_txt.py
-folder_structure.py
-folder_structure.txt
 requirements.txt
 requirements_to_add_to_pyproject_toml.txt
 requirements_gen.py
@@ -82,6 +80,7 @@ src/reaxkit/under_dev
 src/reaxkit/webui
 ../other/Reax_user_manual_June_2017_converted_to_md.md
 ../other/Reax_user_manual_June_2017.docx
+requirements_all.txt
 
 
 # Large intermediate analysis outputs

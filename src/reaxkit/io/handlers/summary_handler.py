@@ -19,10 +19,10 @@ from typing import Dict, Any, Tuple, List
 import pandas as pd
 from io import StringIO
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class SummaryHandler(FileHandler):
+class SummaryHandler(BaseHandler):
     """
     Parser for ReaxFF simulation summary files (``summary.txt``).
 

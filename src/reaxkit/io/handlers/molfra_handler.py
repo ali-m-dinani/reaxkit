@@ -18,10 +18,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Iterator, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class MolFraHandler(FileHandler):
+class MolFraHandler(BaseHandler):
     """
     Parser for ReaxFF molecular fragment output files
     (``molfra.out``, ``molfra_ig.out``).

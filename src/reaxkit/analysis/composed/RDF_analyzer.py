@@ -530,9 +530,9 @@ def rdf_property_over_frames(
             rp, gp = _dominant_peak(r, g)
             out = {"r_peak": rp, "g_peak": gp}
         elif prop == "area":
-            out = {"area": float(np.trapz(g, r)) if len(r) else np.nan}
+            out = {"area": float(np.trapezoid(g, r)) if len(r) else np.nan}
         else:  # "excess_area"
-            out = {"excess_area": float(np.trapz(g - 1.0, r)) if len(r) else np.nan}
+            out = {"excess_area": float(np.trapezoid(g - 1.0, r)) if len(r) else np.nan}
 
         rows.append({
             "frame_index": int(i),

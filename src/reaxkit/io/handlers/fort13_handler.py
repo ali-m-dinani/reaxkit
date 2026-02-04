@@ -18,10 +18,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Iterator, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class Fort13Handler(FileHandler):
+class Fort13Handler(BaseHandler):
     """
     Parser for ReaxFF force-field optimization output files (``fort.13``).
 

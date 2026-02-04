@@ -17,10 +17,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 import pandas as pd
 
-from reaxkit.io.base_handler import FileHandler
+from reaxkit.io.base_handler import BaseHandler
 
 
-class EregimeHandler(FileHandler):
+class EregimeHandler(BaseHandler):
     """
     Parser for ReaxFF electric-field schedule files (``eregime.in``).
 
