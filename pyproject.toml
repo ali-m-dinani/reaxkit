@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "0.1.0"
+version = "1.0.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
   { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },

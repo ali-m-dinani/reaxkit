@@ -36,7 +36,7 @@ ReaxKit is designed for researchers who want a transparent, scriptable bridge be
 - Publication‑ready plotting utilities (2D, dual‑axis, tornado plots, 3D scatter, heatmaps)
 - Trajectory and plot video generation
 
-See the full documentation (API reference, tutorials, examples) on []. #TODO
+See the full documentation (API reference, tutorials, examples) on [ReaxKit Site](https://ali-m-dinani.github.io/reaxkit/).
 
 ---
 
@@ -56,20 +56,20 @@ Additional resources:
 
 - [Installation notes](docs/installation.md) — Full installation instructions (requires **Python ≥ 3.9**).
 - [Quickstart](docs/quickstart.md) — Get up and running with core ReaxKit workflows in minutes.
-- #TODO [Tutorials notes](docs/tutorials/index.md) and [source files]— Step-by-step guides for common ReaxKit workflows and use cases.
-- #TODO [Examples](docs/examples/README.md) and [source files]({{ config.repo_url }}/blob/main/docs/examples/) — Minimal, runnable Python examples using public APIs.
+- [Tutorials notes](docs/tutorials/index.md) and [source files](https://ali-m-dinani.github.io/reaxkit/tutorials/) — Step-by-step guides for common ReaxKit workflows and use cases.
+- [Examples](docs/examples/README.md) and [source files](https://ali-m-dinani.github.io/reaxkit/examples/) — Minimal, runnable Python examples using public APIs.
 - [ReaxFF Reference](docs/reaxff_reference/index.md) — Reference documentation for ReaxFF input and output files.
 - [Contributing](docs/contributing.md) — Guidelines for contributing to ReaxKit.
 - [File Templates](docs/file_templates/index.md) and [Docstring Conventions](docs/file_templates/docstrings.md) — Development guidelines and code templates.
 
 ---
 
-##  Testing #TODO
+##  Testing
 
 Run unit tests with:
 
 ```bash
-pytest file_templates/
+pytest -s tests/
 ```
 
 ---
@@ -88,7 +88,7 @@ Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for full 
 
 ## Citation
 
-If you use ReaxKit in your work, please cite: #TODO
+If you use ReaxKit in your work, please cite:
 
 > Mohammadi, A. (2025). *ReaxKit: A Modular Python Toolkit for ReaxFF Simulation Analysis.*  
 > GitHub: https://github.com/<your-username>/reaxkit

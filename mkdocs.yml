@@ -1,4 +1,5 @@
 site_name: ReaxKit
+site_url: https://ali-m-dinani.github.io/reaxkit/
 site_description: ReaxKit — tools for parsing, analyzing, and visualizing ReaxFF simulations
 repo_url: https://github.com/ali-m-dinani/reaxkit
 repo_name: ali-m-dinani/reaxkit
