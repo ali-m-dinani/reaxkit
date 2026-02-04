@@ -90,8 +90,13 @@ Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for full 
 
 If you use ReaxKit in your work, please cite:
 
-> Mohammadi, A. (2025). *ReaxKit: A Modular Python Toolkit for ReaxFF Simulation Analysis.*  
-> GitHub: https://github.com/<your-username>/reaxkit
+```text
+Dinani, A. M., van Duin, A., Shin, Y. K., & Sepehrinezhad, A. (2025).
+ReaxKit: A modular Python toolkit for ReaxFF simulation analysis.
+Zenodo. https://doi.org/10.5281/zenodo.18485384
+
+Source code: https://github.com/ali-m-dinani/reaxkit
+```
 
 ---
 
