@@ -26,6 +26,7 @@ dependencies = [
     "tqdm",
     "rich",
     "freud-analysis",
+    "ovito",
     "tabulate",
     "ase",
     "imageio",
@@ -33,9 +34,6 @@ dependencies = [
     "PyYAML",
     "rapidfuzz",
 ]
-
-[project.optional-dependencies]
-ovito = ["ovito"]
 
 [project.scripts]
 reaxkit = "reaxkit.cli:main"
