@@ -14,7 +14,8 @@ The templates illustrate ReaxKit’s core architectural principles:
 
 ### 1. `template_handler.py` — File Parsers (I/O layer)
 
-Use [template_handler.py]({{ config.repo_url }}/blob/main/docs/file_templates/template_handler.py) when implementing a **new ReaxFF file handler**.
+Use [template_handler.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_handler.py)
+when implementing a **new ReaxFF file handler**.
 
 A handler’s responsibility is strictly limited to:
 - reading a raw file,
@@ -36,7 +37,7 @@ CLI commands, and future GUIs.
 
 ### 2. `template_analyzer.py` — Data Analysis (analysis layer)
 
-Use [template_analyzer.py]({{ config.repo_url }}/blob/main/docs/file_templates/template_analyzer.py) to implement **analysis routines** that operate on data
+Use [template_analyzer.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_analyzer.py) to implement **analysis routines** that operate on data
 provided by handlers.
 
 Analyzers:
@@ -58,7 +59,7 @@ Analyzers should remain **pure and testable**, with no CLI or plotting logic.
 
 ### 3. `template_workflow.py` — CLI Tasks (workflow layer)
 
-Use [template_workflow.py]({{ config.repo_url }}/blob/main/docs/file_templates/template_workflow.py) to expose analysis functionality through the **ReaxKit CLI**.
+Use [template_workflow.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_workflow.py) to expose analysis functionality through the **ReaxKit CLI**.
 
 Workflows:
 - define CLI subcommands and arguments,
