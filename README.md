@@ -61,6 +61,8 @@ Additional resources:
 - [ReaxFF Reference](docs/reaxff_reference/index.md) — Reference documentation for ReaxFF input and output files.
 - [Contributing](docs/contributing.md) — Guidelines for contributing to ReaxKit.
 - [File Templates](docs/file_templates/index.md) and [Docstring Conventions](docs/file_templates/docstrings.md) — Development guidelines and code templates.
+- [AUTHORS.md](AUTHORS.md) —  Full credits and acknowledgments.
+- [LICENSE](LICENSE) — Full license terms under the **MIT License**
 
 ---
 
@@ -72,17 +74,7 @@ Run unit tests with:
 pytest -s tests/
 ```
 
----
-
-##  Acknowledgements
-
-See [AUTHORS.md](AUTHORS.md) for full credits and acknowledgments.
-
----
-
-## License
-
-Licensed under the **MIT License** — see the [LICENSE](LICENSE) file for full terms.
+to test the package and get the timing for their execution.
 
 ---
 
