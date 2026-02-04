@@ -1,0 +1,38 @@
+# Canonical unit definitions and conversion metadata for ReaxFF-related quantities.
+# The CLI uses these mappings to accept user-friendly unit names and perform conversions.
+# The Python API relies on canonical units internally for consistency and correctness.
+
+units:
+  # molfra.out
+  molecular_mass: "a.u."
+  total_molecular_mass: "a.u."
+
+  # fort.78
+  field_x: "V/Å"
+  field_y: "V/Å"
+  field_z: "V/Å"
+
+  E_field_x: "kcal/mol"
+  E_field_y: "kcal/mol"
+  E_field_z: "kcal/mol"
+  E_field: "kcal/mol"
+
+  # summary.txt
+  time: "fs"
+  E_pot: "kcal/mol"
+  V: "Å³"
+  T: "K"
+  P: "MPa"
+  D: "kg/dm³"
+  elap_time: "s"
+
+  # eregime.in
+  field: "V/Å"
+  field1: "V/Å"
+  field2: "V/Å"
+  field3: "V/Å"
+
+  # xmolout
+  x: "Å"
+  y: "Å"
+  z: "Å"

@@ -1,8 +1,26 @@
+"""
+ReaxKit help index search utilities.
+
+This module provides a lightweight search engine used by the
+``reaxkit help`` command to map natural-language queries
+(e.g. "electric field", "bond order", "restraint")
+to relevant ReaxFF input and output files.
+
+The search operates on curated YAML indices shipped with ReaxKit
+and ranks matches based on keyword overlap and fuzzy similarity.
+
+Typical use cases include:
+
+- discovering which ReaxFF file controls a given concept
+- exploring available variables in input/output files
+- guiding users toward the correct handler or workflow
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
-
+from functools import lru_cache
 import re
 
 try:
@@ -15,10 +33,99 @@ except Exception as e:  # pragma: no cover
 # Data access (package files)
 # ----------------------------
 
+@lru_cache(maxsize=1)
+def load_input_index() -> Dict[str, Any]:
+    """
+    Load the ReaxFF input-file help index.
+
+    Returns
+    -------
+    dict
+    Parsed contents of ``reaxff_input_files_contents.yaml``.
+    """
+    return _read_yaml_from_pkg_data("reaxff_input_files_contents.yaml")
+
+
+@lru_cache(maxsize=1)
+def load_output_index() -> Dict[str, Any]:
+    """
+    Load the ReaxFF output-file help index.
+
+    Returns
+    -------
+    dict
+        Parsed contents of ``reaxff_output_files_contents.yaml``.
+    """
+    return _read_yaml_from_pkg_data("reaxff_output_files_contents.yaml")
+
+@dataclass(frozen=True)
+class PreparedEntry:
+    """
+    Preprocessed help entry used for search.
+
+    This class stores precomputed text fields and tokenized
+    representations for a single ReaxFF file entry.
+
+    Attributes
+    ----------
+    file : str
+        Canonical ReaxFF file name.
+    entry : dict
+        Raw YAML entry.
+    blobs : dict
+        Concatenated searchable text fields.
+    tokens : dict
+        Tokenized versions of searchable fields.
+    """
+    file: str
+    entry: Dict[str, Any]
+    blobs: Dict[str, str]
+    tokens: Dict[str, set[str]]
+
+def _prepare_index(idx: Dict[str, Any]) -> Dict[str, PreparedEntry]:
+    files = idx.get("files", {}) or {}
+    prepared = {}
+
+    for file_key, entry in files.items():
+        if not isinstance(entry, dict):
+            continue
+
+        blobs = _entry_search_blobs(file_key, entry)
+        tokens = {k: set(_tokens(v)) for k, v in blobs.items()}
+
+        prepared[file_key] = PreparedEntry(
+            file=file_key,
+            entry=entry,
+            blobs=blobs,
+            tokens=tokens,
+        )
+
+    return prepared
+
+
+@lru_cache(maxsize=1)
+def load_prepared_input_index() -> Dict[str, PreparedEntry]:
+    return _prepare_index(_load_input_index())
+
+
+@lru_cache(maxsize=1)
+def load_prepared_output_index() -> Dict[str, PreparedEntry]:
+    return _prepare_index(_load_output_index())
+
+
 def _read_yaml_from_pkg_data(filename: str) -> Dict[str, Any]:
     """
-    Load a YAML file shipped inside `reaxkit/data/` using importlib.resources.
-    Works in editable installs and normal pip installs.
+    Load a YAML file bundled inside the ``reaxkit.data`` package.
+
+    Parameters
+    ----------
+    filename : str
+        Name of the YAML file to load.
+
+    Returns
+    -------
+    dict
+        Parsed YAML contents.
     """
     try:
         from importlib import resources
@@ -37,11 +144,11 @@ def _read_yaml_from_pkg_data(filename: str) -> Dict[str, Any]:
     return obj
 
 
-def load_input_index() -> Dict[str, Any]:
+def _load_input_index() -> Dict[str, Any]:
     return _read_yaml_from_pkg_data("reaxff_input_files_contents.yaml")
 
 
-def load_output_index() -> Dict[str, Any]:
+def _load_output_index() -> Dict[str, Any]:
     return _read_yaml_from_pkg_data("reaxff_output_files_contents.yaml")
 
 
@@ -53,6 +160,9 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 
 
 def _norm(s: str) -> str:
+    """
+    Normalize a string for case-insensitive search matching.
+    """
     s = s.lower()
     s = s.replace("_", " ").replace("-", " ")
     s = re.sub(r"\s+", " ", s).strip()
@@ -60,13 +170,20 @@ def _norm(s: str) -> str:
 
 
 def _tokens(s: str) -> List[str]:
+    """
+    Tokenize a normalized string into alphanumeric search terms.
+    """
     return _WORD_RE.findall(_norm(s))
 
 
 def _fuzzy_ratio(a: str, b: str) -> float:
     """
-    Returns 0..100 similarity.
-    Uses rapidfuzz if available; falls back to difflib.
+    Compute fuzzy similarity between two strings.
+
+    Returns
+    -------
+    float
+        Similarity score in the range 0–100.
     """
     a = _norm(a)
     b = _norm(b)
@@ -82,6 +199,9 @@ def _fuzzy_ratio(a: str, b: str) -> float:
 
 
 def _as_list(v: Any) -> List[str]:
+    """
+    Normalize a YAML value into a list of strings.
+    """
     if v is None:
         return []
     if isinstance(v, str):
@@ -93,7 +213,19 @@ def _as_list(v: Any) -> List[str]:
 
 def _entry_search_blobs(file_key: str, entry: Dict[str, Any]) -> Dict[str, str]:
     """
-    Create concatenated strings for different searchable fields.
+    Build concatenated searchable text fields for a help entry.
+
+    Parameters
+    ----------
+    file_key : str
+        Canonical ReaxFF file name.
+    entry : dict
+        YAML entry describing the file.
+
+    Returns
+    -------
+    dict
+        Mapping of field name to searchable text.
     """
     aliases = _as_list(entry.get("aliases"))
     desc = str(entry.get("desc") or "")
@@ -105,7 +237,7 @@ def _entry_search_blobs(file_key: str, entry: Dict[str, Any]) -> Dict[str, str]:
     # some YAMLs might use related_run or related_runs
     related = _as_list(entry.get("related_runs") or entry.get("related_run"))
     notes = _as_list(entry.get("notes"))
-    examples = _as_list(entry.get("examples"))
+    examples = _as_list(entry.get("file_templates"))
 
     return {
         "names": " ".join([file_key] + aliases),
@@ -117,12 +249,28 @@ def _entry_search_blobs(file_key: str, entry: Dict[str, Any]) -> Dict[str, str]:
         "best_for": " ".join(best_for),
         "related": " ".join(related),
         "notes": " ".join(notes),
-        "examples": " ".join(examples),
+        "file_templates": " ".join(examples),
     }
 
 
 @dataclass(frozen=True)
 class HelpHit:
+    """
+    Ranked result returned by the help index search.
+
+    Attributes
+    ----------
+    kind : str
+        Either ``"input"`` or ``"output"``.
+    file : str
+        ReaxFF file name.
+    score : float
+        Relevance score.
+    why : list of str
+        Short explanations for why the file matched.
+    entry : dict
+        Raw YAML entry.
+    """
     kind: str                 # "input" or "output"
     file: str                 # key in YAML
     score: float
@@ -137,16 +285,33 @@ def search_help_indices(
     min_score: float = 35.0,
 ) -> List[HelpHit]:
     """
-    Search across BOTH input and output YAML indices and return ranked hits.
+    Search ReaxKit help indices for relevant ReaxFF files.
 
-    Returns a flat list of HelpHit with hit.kind in {"input","output"}.
-    Call `group_hits()` to split into input/output sections for printing.
+    Parameters
+    ----------
+    query : str
+        Natural-language search query.
+    top_k : int, optional
+        Maximum number of results to return.
+    min_score : float, optional
+        Minimum relevance score for a result to be included.
+
+    Returns
+    -------
+    list of HelpHit
+        Ranked search results across input and output files.
+
+    Examples
+    --------
+    >>> hits = search_help_indices("electric field")
+    >>> hits[0].file
+    'eregime.in'
     """
     q = _norm(query)
     q_toks = set(_tokens(query))
 
-    in_idx = load_input_index()
-    out_idx = load_output_index()
+    in_idx = load_prepared_input_index()
+    out_idx = load_prepared_output_index()
 
     hits: List[HelpHit] = []
     hits.extend(_search_one_index("input", in_idx, q, q_toks))
@@ -158,18 +323,43 @@ def search_help_indices(
     return hits[:top_k]
 
 
-def _search_one_index(kind: str, idx: Dict[str, Any], q: str, q_toks: set[str]) -> List[HelpHit]:
+def _search_one_index(
+    kind: str,
+    idx: Dict[str, PreparedEntry],
+    q: str,
+    q_toks: set[str],
+) -> List[HelpHit]:
+    """
+    Search a single help index (input or output).
+
+    Parameters
+    ----------
+    kind : str
+        Either ``"input"`` or ``"output"``.
+    idx : dict
+        Parsed YAML index.
+    q : str
+        Normalized query string.
+    q_toks : set of str
+        Tokenized query terms.
+
+    Returns
+    -------
+    list of HelpHit
+        Ranked matches from the given index.
+    """
     files = idx.get("files", {}) or {}
     if not isinstance(files, dict):
         return []
 
     res: List[HelpHit] = []
 
-    for file_key, entry in files.items():
-        if not isinstance(entry, dict):
-            continue
+    for file_key, prep in idx.items():
+        fast_score = 0.0
 
-        blobs = _entry_search_blobs(file_key, entry)
+        entry = prep.entry
+        blobs = prep.blobs
+        tokens = prep.tokens
 
         score = 0.0
         why: List[str] = []
@@ -182,12 +372,10 @@ def _search_one_index(kind: str, idx: Dict[str, Any], q: str, q_toks: set[str]) 
 
         # token overlaps (fast and robust)
         def _overlap(field_name: str, weight: float) -> None:
-            nonlocal score
-            toks = set(_tokens(blobs[field_name]))
-            ov = q_toks & toks
+            nonlocal fast_score
+            ov = q_toks & tokens[field_name]
             if ov:
-                score += weight + 4.0 * len(ov)
-                why.append(f"{field_name} match: {', '.join(sorted(list(ov))[:5])}")
+                fast_score += weight + 4.0 * len(ov)
 
         _overlap("tags", 30.0)
         _overlap("best_for", 22.0)
@@ -197,7 +385,12 @@ def _search_one_index(kind: str, idx: Dict[str, Any], q: str, q_toks: set[str]) 
         _overlap("related", 14.0)
         _overlap("desc", 10.0)
 
+        if fast_score < 10.0:
+            continue
+
         # 2) fuzzy matching over key fields (weighted)
+        score = fast_score
+
         score += 0.35 * _fuzzy_ratio(q, blobs["tags"])
         score += 0.30 * _fuzzy_ratio(q, blobs["names"])
         score += 0.22 * _fuzzy_ratio(q, blobs["core"])
@@ -217,10 +410,21 @@ def _search_one_index(kind: str, idx: Dict[str, Any], q: str, q_toks: set[str]) 
     return res
 
 
-def group_hits(hits: Iterable[HelpHit]) -> Tuple[List[HelpHit], List[HelpHit]]:
+def _group_hits(hits: Iterable[HelpHit]) -> Tuple[List[HelpHit], List[HelpHit]]:
     """
-    Split hits into (input_hits, output_hits), each sorted by score desc.
+    Split search results into input and output file groups.
+
+    Parameters
+    ----------
+    hits : iterable of HelpHit
+        Search results.
+
+    Returns
+    -------
+    tuple of list of HelpHit
+        ``(input_hits, output_hits)`` sorted by score.
     """
+
     ins = [h for h in hits if h.kind == "input"]
     outs = [h for h in hits if h.kind == "output"]
     ins.sort(key=lambda h: h.score, reverse=True)
@@ -228,7 +432,7 @@ def group_hits(hits: Iterable[HelpHit]) -> Tuple[List[HelpHit], List[HelpHit]]:
     return ins, outs
 
 
-def format_hits(
+def _format_hits(
     hits: List[HelpHit],
     *,
     show_why: bool = True,
@@ -239,12 +443,22 @@ def format_hits(
     show_derived_vars: bool = False,
     show_notes: bool = False,
 ) -> str:
+    """
+    Format help search results for CLI display.
 
+    Parameters
+    ----------
+    hits : list of HelpHit
+        Search results.
+    show_why, show_examples, show_tags, show_core_vars, show_optional_vars, show_derived_vars, show_notes : bool
+        Flags controlling which metadata fields are displayed.
+
+    Returns
+    -------
+    str
+        Human-readable formatted output.
     """
-    Pretty output that divides INPUT and OUTPUT with a dashed line.
-    If show_kind_flag=True, shows '--input'/'--output' next to each result.
-    """
-    in_hits, out_hits = group_hits(hits)
+    in_hits, out_hits = _group_hits(hits)
 
     def _fmt_one(h: HelpHit) -> str:
         e = h.entry
@@ -260,7 +474,7 @@ def format_hits(
         if show_why and h.why:
             lines.append(f"  why: {', '.join(h.why[:3])}")
         if show_examples:
-            ex = e.get("examples") or []
+            ex = e.get("file_templates") or []
             if ex:
                 lines.append(f"  ex:  {ex[0]}")
         if show_tags:
@@ -311,7 +525,7 @@ def format_hits(
     parts.append(
         "Tip: use `reaxkit <filename> -h` or `reaxkit <filename> <task> -h` "
         "to see a more comprehensive description of available options, "
-        "examples, and usage details."
+        "file_templates, and usage details.\n"
     )
 
     return "\n".join(parts)

@@ -1,16 +1,16 @@
-"""utility module helping the ReaxKit output organization
+"""
+Output path resolution utilities for ReaxKit workflows.
 
-This module centralizes the logic that determines where analysis results,
-exports, and generated files should be stored. It enforces a consistent
-directory layout such as:
+This module centralizes the logic used to determine where analysis results,
+exports, and generated files are written. By default, outputs are placed
+under a standardized directory structure:
 
     reaxkit_outputs/<workflow>/<filename>
 
-unless the user provides an explicit absolute or directory-containing path.
-This ensures that all ReaxKit workflows create their outputs in a predictable,
-well-structured location while still allowing users full control when desired.
-
+If the user supplies an explicit path (absolute or containing directories),
+that path is respected exactly.
 """
+
 
 from pathlib import Path
 
@@ -18,8 +18,28 @@ DEFAULT_OUTROOT = Path("reaxkit_outputs")
 
 def resolve_output_path(user_value: str, workflow: str) -> Path:
     """
-    Put outputs under reaxkit_outputs/<workflow> by default,
-    unless the user explicitly gave a directory.
+    Resolve the output path for a workflow result.
+
+    If the user provides only a bare filename, the file is written under
+    ``reaxkit_outputs/<workflow>/``. If the user provides an absolute path
+    or a path containing directories, that path is used directly.
+
+    Parameters
+    ----------
+    user_value : str
+        User-specified output path or filename.
+    workflow : str
+        Name of the workflow producing the output.
+
+    Returns
+    -------
+    pathlib.Path
+        Resolved output path with parent directories created if needed.
+
+    Examples
+    --------
+    >>> resolve_output_path("results.csv", workflow="xmolout")
+    >>> resolve_output_path("out/results.csv", workflow="fort7")
     """
     p = Path(user_value)
 

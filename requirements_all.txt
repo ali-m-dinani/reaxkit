@@ -1,0 +1,13 @@
+ase
+freud-analysis
+imageio
+matplotlib
+mp_api
+mpl_toolkits
+numpy
+ovito
+pandas
+PyYAML
+rapidfuzz
+scipy
+tabulate

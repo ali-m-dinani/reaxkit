@@ -1,24 +1,75 @@
-"""constants for different quantities such as electron charge, etc. across ReaxFF files."""
+"""
+Physical and numerical constants utilities for ReaxKit.
 
-CONSTANTS = {
-    # Electric field
-    "electric_field_VA_to_MVcm": 100.0,  # V/Å → MV/cm
+This module provides access to commonly used constants defined in a packaged
+YAML file and exposes a small, cached API for retrieving them by name.
 
-    # Energies
-    "energy_kcalmol_to_eV": 0.0433634,
+Constant values are stored in ``reaxkit/data/constants.yaml`` and loaded on
+demand.
+"""
 
-    # Fundamental constants
-    "electron_charge_C": 1.602176634e-19,   # Coulomb
-    "electron_charge_e": 1.0,               # dimensionless charge
+from __future__ import annotations
 
-    # Dipole moment
-    "ea_to_debye": 4.80320427,              # e·Å → Debye
-    "debye_to_ea": 0.20819434,              # Debye → e·Å
+from functools import lru_cache
+from typing import Dict, Optional
 
-    # Polarization (dipole/volume)
-    "ea3_to_uC_cm2": 1.602176634e+3,        # (e·Å)/Å³ → μC/cm²
+import yaml
+import importlib.resources as ir
 
-    # Pressure
-    "eV_per_A3_to_GPa": 160.21766208        # eV/Å³ -> GPa
-}
 
+@lru_cache(maxsize=1)
+def _load_constants() -> Dict[str, float]:
+    """
+    Load packaged constants into a dictionary.
+
+    Constants are read from ``constants.yaml`` and cached after the first call
+    to avoid repeated disk access.
+
+    Returns
+    -------
+    dict[str, float]
+        Mapping of constant names to numeric values.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the packaged constants file cannot be located.
+    """
+    pkg = "reaxkit"
+    rel = "data/constants.yaml"
+
+    try:
+        with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as f:
+            doc = yaml.safe_load(f) or {}
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Could not find packaged constants at '{pkg}/{rel}'. "
+            "Make sure constants.yaml is included as package data."
+        ) from e
+
+    raw = doc.get("constants") or {}
+    return {str(k): float(v) for k, v in raw.items()}
+
+
+def const(name: str, default: Optional[float] = None) -> Optional[float]:
+    """
+    Retrieve a named constant.
+
+    Parameters
+    ----------
+    name : str
+        Name of the constant to retrieve.
+    default : float, optional
+        Value to return if the constant is not defined.
+
+    Returns
+    -------
+    float or None
+        Constant value if found; otherwise ``default``.
+
+    Examples
+    --------
+    >>> const("kB")
+    >>> const("e_charge", default=1.0)
+    """
+    return _load_constants().get(name, default)

@@ -1,3 +1,7 @@
+# Structured descriptions of ReaxFF input files and their contents.
+# Used by the CLI to provide contextual help, validation, and file-aware guidance.
+# The Python API consumes this metadata to enable introspection and documentation generation.
+
 _meta:
   version: "1.0"
   comment: "generated using reaxff_input_files_contents.xlsx"

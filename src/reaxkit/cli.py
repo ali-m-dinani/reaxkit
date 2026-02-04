@@ -1,24 +1,22 @@
-"""Command-line interface entry point for running ReaxKit workflows.
-
-This module builds the top-level `reaxkit` CLI and delegates per-file/feature
-commands to individual workflow modules (summary, xmolout, fort7, etc.).
-
 """
+Top-level command-line interface for ReaxKit workflows.
+
+Works on: ReaxKit CLI (`reaxkit`) → dispatches to workflow modules under `reaxkit.workflows`.
+
+This module defines the `reaxkit` entry point and routes each top-level subcommand
+("kind") to its corresponding workflow module, which then registers task-level
+subcommands (or runs as a kind-level workflow such as `help` / `intspec`).
+"""
+
 import argparse
 import sys
 
-from reaxkit.workflows import (
-    eregime_workflow, fort13_workflow, fort78_workflow,
-    fort79_workflow, molfra_workflow, summary_workflow,
-    xmolout_workflow, fort7_workflow, coordination_workflow,
-    xmolout_fort7_workflow, geo_workflow, fort99_workflow,
-    trainset_workflow, fort83_workflow, fort73_workflow,
-    electrostatics_workflow, make_video_workflow, plotter_workflow,
-    control_workflow, fort76_workflow, fort74_workflow,
-    ffield_workflow, params_workflow, fort57_workflow,
-    vels_workflow, introspection_workflow, help_workflow,
-    tregime_workflow, vregime_workflow,
-)
+from reaxkit.workflows.meta import make_video_workflow, plotter_workflow, help_workflow, introspection_workflow
+from reaxkit.workflows.per_file import fort57_workflow, summary_workflow, geo_workflow, trainset_workflow, \
+    fort76_workflow, fort78_workflow, xmolout_workflow, fort83_workflow, eregime_workflow, fort79_workflow, \
+    fort99_workflow, control_workflow, ffield_workflow, vels_workflow, fort13_workflow, tregime_workflow, \
+    params_workflow, fort7_workflow, vregime_workflow, molfra_workflow, fort73_workflow, fort74_workflow
+from reaxkit.workflows.composed import coordination_workflow, xmolout_fort7_workflow, electrostatics_workflow
 
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
@@ -34,8 +32,8 @@ WORKFLOW_MODULES = {
     "fort99": fort99_workflow, "trainset": trainset_workflow, "fort83": fort83_workflow,
     "fort73": fort73_workflow, "elect": electrostatics_workflow, "video": make_video_workflow,
     "plotter": plotter_workflow, "control": control_workflow, "fort76": fort76_workflow,
-    "fort74": fort74_workflow, "ffield": ffield_workflow, "params": params_workflow,
-    "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57": fort57_workflow,
+    "fort74.md": fort74_workflow, "ffield": ffield_workflow, "params": params_workflow,
+    "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57.md": fort57_workflow,
     "vels": vels_workflow, "help": help_workflow, "fort8": fort7_workflow,
     "moldyn": vels_workflow, "molsav": vels_workflow, "tregime": tregime_workflow,
     "vregime": vregime_workflow,
@@ -52,13 +50,26 @@ DEFAULT_TASKS = {}
 
 
 def _preinject(argv):
-    """Optionally inject a default task for certain workflows.
+    """
+    Inject a default task for selected workflows before argparse parsing.
 
-    For workflows listed in DEFAULTABLE, if the user calls, e.g.,
-        reaxkit gplot somefile
-    this rewrites the argument list to:
-        reaxkit gplot _default somefile
-    so that argparse sees an explicit task name (`_default`).
+    Works on: CLI argv preprocessing for workflows that allow omitting an explicit task.
+
+    Parameters
+    ----------
+    argv : Sequence[str]
+        Raw argument vector (typically `sys.argv`).
+
+    Returns
+    -------
+    list[str]
+        A rewritten argv where a synthetic `_default` task is inserted for
+        workflows in `DEFAULTABLE` when the next token is not a known task.
+
+    Examples
+    --------
+    >>> _preinject(["reaxkit", "gplot", "file.txt"])
+    ['reaxkit', 'gplot', '_default', 'file.txt']
     """
     out = list(argv)
     for i, tok in enumerate(out):
@@ -76,10 +87,26 @@ def _preinject(argv):
 
 
 def _intspec_default_runner(args):
-    """Default runner for the `intspec` (introspection) workflow.
+    """
+    Run the `intspec` workflow without requiring a task subcommand.
 
-    If the user supplies `--file` or `--folder`, pass those through to
-    `introspection.run_main` and let that module decide what to do.
+    Works on: `intspec` kind-level workflow (introspection).
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments; may include `file` and/or `folder`.
+
+    Returns
+    -------
+    int
+        Workflow exit code returned by `introspection_workflow.run_main(...)`.
+
+    Examples
+    --------
+    # Equivalent CLI calls:
+    # reaxkit intspec --file fort7_analyzer
+    # reaxkit intspec --folder workflow
     """
     return introspection_workflow.run_main(
         getattr(args, "file", None),
@@ -88,13 +115,30 @@ def _intspec_default_runner(args):
 
 
 def main():
-    """Build and execute the top-level `reaxkit` CLI.
+    """
+    Build and execute the `reaxkit` CLI dispatcher.
+
+    Works on: ReaxKit CLI (`reaxkit`) and registered workflow modules.
 
     This function:
       1. Preprocesses argv to inject default tasks where needed.
       2. Creates the top-level parser and the `kind` subparsers.
       3. Lets each workflow module register its own `task` subparsers.
       4. Parses the CLI and dispatches to the selected task's `_run` function.
+
+    Returns
+    -------
+    int
+        Exit code returned by the selected workflow task runner.
+
+    Examples
+    --------
+    # Per-file workflow with task:
+    # reaxkit fort7 get --file fort.7
+    #
+    # Kind-level workflow without task:
+    # reaxkit help --query "fort.7"
+    # reaxkit intspec --folder workflows
     """
     # Preprocess argv so DEFAULTABLE workflows can omit an explicit task.
     sys_argv = _preinject(sys.argv)
@@ -112,41 +156,16 @@ def main():
         kp = sub.add_parser(kind, help=f"{kind} workflows")
 
         if kind == "intspec":
-            # Introspection is a bit special: it can run without an explicit task
-            # and accepts either a file or a folder (mutually exclusive).
-            g = kp.add_mutually_exclusive_group(required=False)
-            g.add_argument("--file")
-            g.add_argument("--folder")
-
-            # Optional second-level tasks for `intspec`, if provided.
-            tasks = kp.add_subparsers(dest="task", required=False)
-            module.register_tasks(tasks)
-
-            # If no explicit task is given, use the default introspection runner.
+            # Kind-level workflow: no subcommands
+            if hasattr(module, "build_parser"):
+                module.build_parser(kp)
             kp.set_defaults(_run=_intspec_default_runner)
 
         elif kind == "help":
-            # Like `intspec`: runs without a second-level task.
-            # Accept an optional query string.
-            kp.add_argument(
-                "query",
-                nargs="?",
-                help='Search phrase, e.g. "restraint", "bond order", "bulk modulus".',
-            )
-            kp.add_argument("--top", type=int, default=8, help="Max number of results to show.")
-            kp.add_argument("--min-score", type=float, default=35.0, help="Minimum match score threshold.")
-            kp.add_argument("--why", action="store_true", help="Show brief reasons for each match.")
-            kp.add_argument("--examples", action="store_true", help="Show one example command per match.")
-            kp.add_argument("--tags", action="store_true", help="Show tags for each matched file.")
-            kp.add_argument("--core-vars", action="store_true", help="Show core_vars for each matched file.")
-            kp.add_argument("--optional-vars", action="store_true", help="Show optional_vars for each matched file.")
-            kp.add_argument("--derived-vars", action="store_true", help="Show derived_vars for each matched file.")
-            kp.add_argument("--notes", action="store_true", help="Show notes for each matched file.")
-            kp.add_argument("--all-info", action="store_true",
-                            help="Show why/examples/tags/core/optional/derived/notes.")
-
-            # Call the help workflow's runner directly (no tasks).
-            kp.set_defaults(_run=help_workflow.run_main)
+            # Kind-level workflow: no subcommands
+            if hasattr(module, "build_parser"):
+                module.build_parser(kp)
+            kp.set_defaults(_run=module.run_main)
 
         else:
             # Normal workflows: require a task unless the kind is in DEFAULTABLE.

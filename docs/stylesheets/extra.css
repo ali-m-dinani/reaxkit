@@ -1,0 +1,18 @@
+.md-typeset {
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+/* Standard figure sizing for diagrams */
+.figure-large img {
+  width: 80%;
+  max-height: 1300px;
+  height: auto;
+}
+
+/* Optional: center figures nicely */
+.figure-large {
+  text-align: center;
+}
+
+

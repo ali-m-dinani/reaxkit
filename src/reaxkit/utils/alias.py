@@ -1,118 +1,105 @@
-"""Alias resolution utilities for tolerant column/key matching across ReaxKit files.
+"""
+Alias resolution utilities for tolerant column and key matching.
 
-ReaxFF output formats (summary.txt, xmolout, fort.7, fort.78, fort.99, molfra,
-eregime.in, etc.) frequently use inconsistent naming conventions for the same
-quantities. This module provides a centralized alias-mapping and resolution
-system that:
+This module provides functions for resolving canonical ReaxKit keys
+(e.g., ``iter``, ``time``, ``D``) against the actual column names present
+in parsed DataFrames, using a packaged alias map.
 
-  • normalizes heterogeneous column names to canonical keys,
-  • detects the correct column even if formats vary in case, spacing,
-    prefixes/suffixes, or ReaxFF zone numbering,
-  • supports backwards-compatible resolution for DataFrames and handlers,
-  • exposes utilities for discovering available canonical keys.
-
-These tools enable analysis modules and CLI commands to access data fields
-consistently without requiring users to remember file-specific naming quirks.
-
+The canonical→alias definitions are stored in ``reaxkit/data/aliases.yaml``.
 """
 
 from __future__ import annotations
+
 from typing import Dict, List, Iterable, Optional
+from functools import lru_cache
 
-# Canonical → aliases. Keep both generic (for 1-zone) and enumerated (for multi-zone).
-_DEFAULT_ALIAS_MAP: Dict[str, List[str]] = {
-    # Common summary aliases
-    "iter": ["iteration", "Iter", "Iter.", "Iteration", "#start", "start"],
-    "E_pot": ["Epot(kcal)", "Epot(kcal/mol)", "E_potential"], #used in xmolout, summary.txt, fort.76, fort.57
-    "frame": ['frm'],
-    "time": ["Time(fs)", "Time"], #also in summary.txt
-    "num_of_atoms": ['num_atoms','number_of_atoms','count_of_atoms'], #used in xmolout and fort.7
-    "V": ["Vol(A^3)", "Volume", "volume"], #summary.txt and fort.74
-    "D": ["Dens(kg/dm3)", "Density", "density"], #summary.txt and fort.74
+# You can load this via importlib.resources so it works after pip install.
+# Requires: aliases.yaml included as package data.
+import yaml
+import importlib.resources as ir
 
-    # molfra.out alias
-    "freq": ["frequency", "count"],
-    "molecular_formula": ["mol_formula", "molecule_formula", "molecule"],
-    "molecular_mass": ["mol_mass", "mass"],
-    "total_molecules": ["tot_mol"],
-    "total_atoms": ["tot_atom"],
-    "total_molecular_mass": ["tot_mol_mass"],
 
-    # fort.78 alias
-    "field_x":   ["Ex", "Efield_x", "Field_x", "fieldX"],
-    "field_y":   ["Ey", "Efield_y", "Field_y", "fieldY"],
-    "field_z":   ["Ez", "Efield_z", "Field_z", "fieldZ"],
-    "E_field_x": ["Efx"],
-    "E_field_y": ["Efy"],
-    "E_field_z": ["Efz"],
-    "E_field":   ["Ef"],
+@lru_cache(maxsize=1)
+def load_default_alias_map() -> Dict[str, List[str]]:
+    """
+    Load the packaged canonical→aliases mapping.
 
-    # summary.txt alias
-    "nmol": ["Nmol"],
-    "T": ["T(K)", "Temp", "temp"],
-    "P": ["Pres(MPa)", "Pressure", "pressure"],
-    "elap_time": ["Elap", "time_elapsed", "elapsed_time"],
+    The alias map is read from ``reaxkit/data/aliases.yaml`` and cached after
+    the first call.
 
-    # fort.13 alias
-    "total_ff_error": ["tot_err", "err_tot"],
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping of canonical keys to accepted alias strings.
 
-    # eregime.in (generic + enumerated)
-    "field_zones": ["#V", "V"],
-    "field_dir": ["direction", "dir", "direction1"],
-    "field": ["E", "Magnitude(V/A)", "Magnitude1(V/A)", "E1"],
-    "field_dir1": ["direction1"],
-    "field1": ["Magnitude1(V/A)", "E1"],
-    "field_dir2": ["direction2"],
-    "field2": ["Magnitude2(V/A)", "E2"],
-    "field_dir3": ["direction3"],
-    "field3": ["Magnitude3(V/A)", "E3"],
+    Raises
+    ------
+    FileNotFoundError
+        If the packaged ``aliases.yaml`` cannot be found.
+    """
+    # reaxkit.data is NOT a package; we read by file location within package resources.
+    # If you later make data/ a package, you can switch to ir.files("reaxkit.data").
+    pkg = "reaxkit"
+    rel = "data/aliases.yaml"
 
-    # xmolout alias
-    "atom_type": ['type_of_atom', 'atm_type'],
-    'x': ['x_coordinate', 'x_coord', 'coord_x', 'coordinate_x'],
-    'y': ['y_coordinate', 'y_coord', 'coord_y', 'coordinate_y'],
-    'z': ['z_coordinate', 'z_coord', 'coord_z', 'coordinate_z'],
+    try:
+        with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as f:
+            doc = yaml.safe_load(f) or {}
+    except FileNotFoundError as e:
+        raise FileNotFoundError(
+            f"Could not find packaged alias map at '{pkg}/{rel}'. "
+            "Make sure aliases.yaml is included as package data."
+        ) from e
 
-    # fort.7 alias
-    "molecule_num": ['molecular_number', 'molecular_num'],
-    "partial_charge": ['charge', 'q', 'total_charge'],
+    aliases = doc.get("aliases") or {}
+    # Normalize to Dict[str, List[str]]
+    out: Dict[str, List[str]] = {}
+    for k, v in aliases.items():
+        if v is None:
+            out[str(k)] = []
+        elif isinstance(v, list):
+            out[str(k)] = [str(x) for x in v]
+        else:
+            out[str(k)] = [str(v)]
+    return out
 
-    #fort.99 alias
-    "error": ["Err", "Error"],
-
-    #electrostatics
-    "mu_x (debye)": ["mu_x", "dipole_x", "dipole_moment_x"],
-    "mu_y (debye)": ["mu_y", "dipole_y", "dipole_moment_y"],
-    "mu_z (debye)": ["mu_z", "dipole_z", "dipole_moment_z"],
-    "P_x (uC/cm^2)": ["pol_x", "polarization_x"],
-    "P_y (uC/cm^2)": ["pol_y", "polarization_y"],
-    "P_z (uC/cm^2)": ["pol_z", "polarization_z"],
-
-    # fort.76 alias
-    "E_res": ["Eres(kcal)", "Eres(kcal/mol)", "E_restraint", "restraint_energy", "restraint_E"],
-
-    # fort.57 alias
-    "T_set": ["Tset", "Tset(K)", "Tset (K)", "T_set(K)"],
-    "RMSG":  ["rmsg", "RmsG", "RMSg"],
-    "nfc":   ["NFC"],
-
-}
 
 def resolve_alias_from_columns(
     cols: Iterable[str],
     canonical: str,
-    aliases: Optional[Dict[str, List[str]]] = None
+    aliases: Optional[Dict[str, List[str]]] = None,
 ) -> Optional[str]:
     """
-    Return the actual column present in 'cols' that matches 'canonical' or any of its aliases.
-    Case-insensitive, with forgiving heuristics.
+    Resolve a canonical key to the matching column name in a column list.
+
+    Matching is case-insensitive and falls back to simple heuristics when an
+    exact alias match is not found.
+
+    Parameters
+    ----------
+    cols : iterable of str
+        Available column names (e.g., DataFrame columns).
+    canonical : str
+        Canonical key to resolve (e.g., ``"iter"``, ``"time"``, ``"D"``).
+    aliases : dict[str, list[str]], optional
+        Canonical→aliases mapping to use. If not provided, the packaged map
+        from ``aliases.yaml`` is loaded.
+
+    Returns
+    -------
+    str or None
+        The matching column name if found, otherwise ``None``.
+
+    Examples
+    --------
+    >>> resolve_alias_from_columns(df.columns, "time")
     """
     if cols is None:
         return None
 
     orig_cols = list(cols)
     lower_map = {c.lower(): c for c in orig_cols}
-    aliases = aliases or _DEFAULT_ALIAS_MAP
+    aliases = aliases or load_default_alias_map()
 
     candidates = [canonical]
     if canonical in aliases:
@@ -120,12 +107,12 @@ def resolve_alias_from_columns(
 
     # Exact (case-insensitive)
     for cand in candidates:
-        hit = lower_map.get(cand.lower())
+        hit = lower_map.get(str(cand).lower())
         if hit is not None:
             return hit
 
     # Heuristics on canonical (startswith/contains)
-    cname = canonical.lower()
+    cname = str(canonical).lower()
     for c in orig_cols:
         cl = c.lower()
         if cl.startswith(cname) or cname in cl:
@@ -133,13 +120,15 @@ def resolve_alias_from_columns(
 
     return None
 
+
 def _resolve_alias(source, canonical: str) -> str:
     """
-    Backwards-compatible resolver:
-      - If 'source' has .dataframe(), use its columns.
-      - Else if 'source' is a DataFrame, use its columns.
-      - Else if it's an iterable of column names, use that.
-    Raises KeyError if nothing resolves.
+    Resolve a canonical key from a DataFrame-like source.
+
+    Notes
+    -----
+    This is a compatibility helper that accepts a handler (with ``.dataframe()``),
+    a pandas DataFrame, or an iterable of column names.
     """
     try:
         cols = list(source.dataframe().columns)  # type: ignore[attr-defined]
@@ -149,43 +138,80 @@ def _resolve_alias(source, canonical: str) -> str:
         except Exception:
             cols = list(source)  # assume iterable of str
 
-    hit = resolve_alias_from_columns(cols, canonical, _DEFAULT_ALIAS_MAP)
+    hit = resolve_alias_from_columns(cols, canonical)
     if hit is None:
         raise KeyError(
-            f"Could not resolve alias '{canonical}'. "
-            f"Available columns: {list(cols)}"
+            f"Could not resolve alias '{canonical}'. Available columns: {list(cols)}"
         )
     return hit
 
-def available_keys_from_columns(cols: Iterable[str]) -> List[str]:
+
+def _available_keys_from_columns(cols: Iterable[str]) -> List[str]:
     """
-    Return all usable keys: raw columns + any aliases that resolve.
+    List canonical keys that are usable for a given column set.
+
+    The returned list includes:
+    - raw columns already present in ``cols``
+    - canonical keys whose aliases resolve against ``cols``
+
+    Parameters
+    ----------
+    cols : iterable of str
+        Available column names.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of usable keys for lookup and CLI choices.
+
+    Examples
+    --------
+    >>> _available_keys_from_columns(df.columns)
     """
+    amap = load_default_alias_map()
     cols_set = set(cols)
     keys = set(cols_set)
-    for alias, cands in _DEFAULT_ALIAS_MAP.items():
+    for alias, cands in amap.items():
         if any(c in cols_set for c in cands) or alias in cols_set:
             keys.add(alias)
     return sorted(keys)
 
+
 # Re-export for callers that already import these names
-available_keys = available_keys_from_columns
+available_keys = _available_keys_from_columns
+
 
 def normalize_choice(value: str, domain: str = "xaxis") -> str:
     """
-    Normalize user-provided keywords (e.g., CLI flags like --xaxis iter)
-    using the _DEFAULT_ALIAS_MAP definitions.
+    Normalize a user-provided keyword to its canonical alias key.
 
-    Example:
-        normalize_choice("iter") -> "iter"
-        normalize_choice("frm")  -> "frame"
-        normalize_choice("Time")    -> "time"
+    This is intended for tolerant CLI inputs where users may provide
+    any alias defined in ``aliases.yaml`` (e.g., ``Time(fs)`` → ``time``).
+
+    Parameters
+    ----------
+    value : str
+        User-provided keyword or alias.
+    domain : str, optional
+        Reserved for future domain-specific normalization rules.
+
+    Returns
+    -------
+    str
+        Canonical key if an alias match is found; otherwise the normalized
+        input string.
+
+    Examples
+    --------
+    >>> normalize_choice("Time(fs)")
+    >>> normalize_choice("frm")
     """
     v = (value or "").strip().lower()
     if not v:
         return v
 
-    for canonical, aliases in _DEFAULT_ALIAS_MAP.items():
+    amap = load_default_alias_map()
+    for canonical, aliases in amap.items():
         all_names = [canonical.lower()] + [a.lower() for a in aliases]
         if v in all_names:
             return canonical

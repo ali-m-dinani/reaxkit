@@ -1,0 +1,155 @@
+site_name: ReaxKit
+site_description: ReaxKit — tools for parsing, analyzing, and visualizing ReaxFF simulations
+repo_url: https://github.com/ali-m-dinani/reaxkit
+repo_name: ali-m-dinani/reaxkit
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+
+extra_css:
+  - stylesheets/extra.css
+
+theme:
+  name: material
+  palette:
+  - media: '(prefers-color-scheme: light)'
+    scheme: default
+    primary: indigo
+    accent: indigo
+    toggle:
+      icon: material/brightness-7
+      name: Switch to dark mode
+  - media: '(prefers-color-scheme: dark)'
+    scheme: slate
+    primary: indigo
+    accent: indigo
+    toggle:
+      icon: material/brightness-4
+      name: Switch to light mode
+  features:
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.top
+  - navigation.sections
+  - toc.integrate
+  - search.suggest
+  - search.highlight
+  - search.share
+  - content.code.copy
+
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        paths:
+        - src
+        options:
+          docstring_style: numpy
+          show_source: false
+          show_submodules: false
+
+nav:
+- Home: index.md
+- Installation: installation.md
+- Quickstart: quickstart.md
+- Tutorials: tutorials/index.md
+- Examples: examples/README.md
+- IO:
+  - 🔎 Overview: api/io/index.md
+  - Base: api/io/base_handler_doc.md
+  - Generators:
+    - 🔎 Overview: api/io/generators/index.md
+    - Control: api/io/generators/control_generator_doc.md
+    - Eregime: api/io/generators/eregime_generator_doc.md
+    - Geo: api/io/generators/geo_generator_doc.md
+    - Trainset: api/io/generators/trainset_generator_doc.md
+    - Tregime: api/io/generators/tregime_generator_doc.md
+    - Vregime: api/io/generators/vregime_generator_doc.md
+    - Xmolout: api/io/generators/xmolout_generator_doc.md
+  - Handlers:
+    - 🔎 Overview: api/io/handlers/index.md
+    - Control: api/io/handlers/control_handler_doc.md
+    - Eregime: api/io/handlers/eregime_handler_doc.md
+    - Ffield: api/io/handlers/ffield_handler_doc.md
+    - Fort13: api/io/handlers/fort13_handler_doc.md
+    - Fort57: api/io/handlers/fort57_handler_doc.md
+    - Fort73: api/io/handlers/fort73_handler_doc.md
+    - Fort74: api/io/handlers/fort74_handler_doc.md
+    - Fort76: api/io/handlers/fort76_handler_doc.md
+    - Fort78: api/io/handlers/fort78_handler_doc.md
+    - Fort79: api/io/handlers/fort79_handler_doc.md
+    - Fort7: api/io/handlers/fort7_handler_doc.md
+    - Fort99: api/io/handlers/fort99_handler_doc.md
+    - Geo: api/io/handlers/geo_handler_doc.md
+    - Molfra: api/io/handlers/molfra_handler_doc.md
+    - Params: api/io/handlers/params_handler_doc.md
+    - Summary: api/io/handlers/summary_handler_doc.md
+    - Trainset: api/io/handlers/trainset_handler_doc.md
+    - Vels: api/io/handlers/vels_handler_doc.md
+    - Xmolout: api/io/handlers/xmolout_handler_doc.md
+- Analysis:
+  - 🔎 Overview: api/analysis/index.md
+  - Composed:
+    - 🔎 Overview: api/analysis/composed/index.md
+    - Connectivity: api/analysis/composed/connectivity_analyzer_doc.md
+    - Coordination: api/analysis/composed/coordination_analyzer_doc.md
+    - Electrostatics: api/analysis/composed/electrostatics_analyzer_doc.md
+    - RDF: api/analysis/composed/RDF_analyzer_doc.md
+  - Per File:
+    - 🔎 Overview: api/analysis/per_file/index.md
+    - Control: api/analysis/per_file/control_analyzer_doc.md
+    - Eregime: api/analysis/per_file/eregime_analyzer_doc.md
+    - Ffield: api/analysis/per_file/ffield_analyzer_doc.md
+    - Fort13: api/analysis/per_file/fort13_analyzer_doc.md
+    - Fort57: api/analysis/per_file/fort57_analyzer_doc.md
+    - Fort73: api/analysis/per_file/fort73_analyzer_doc.md
+    - Fort74: api/analysis/per_file/fort74_analyzer_doc.md
+    - Fort76: api/analysis/per_file/fort76_analyzer_doc.md
+    - Fort78: api/analysis/per_file/fort78_analyzer_doc.md
+    - Fort79: api/analysis/per_file/fort79_analyzer_doc.md
+    - Fort7: api/analysis/per_file/fort7_analyzer_doc.md
+    - Fort99: api/analysis/per_file/fort99_analyzer_doc.md
+    - Molfra: api/analysis/per_file/molfra_analyzer_doc.md
+    - Params: api/analysis/per_file/params_analyzer_doc.md
+    - Summary: api/analysis/per_file/summary_analyzer_doc.md
+    - Trainset: api/analysis/per_file/trainset_analyzer_doc.md
+    - Vels: api/analysis/per_file/vels_analyzer_doc.md
+    - Xmolout: api/analysis/per_file/xmolout_analyzer_doc.md
+- Utils:
+  - 🔎 Overview: api/utils/index.md
+  - Alias: api/utils/alias_doc.md
+  - Cache: api/utils/cache_doc.md
+  - Constants: api/utils/constants_doc.md
+  - Exceptions: api/utils/exceptions_doc.md
+  - Frame Utils: api/utils/frame_utils_doc.md
+  - Log: api/utils/log_doc.md
+  - Path: api/utils/path_doc.md
+  - Units: api/utils/units_doc.md
+  - Media:
+    - 🔎 Overview: api/utils/media/index.md
+    - Convert: api/utils/media/convert_doc.md
+    - Make Video: api/utils/media/make_video_doc.md
+    - Plotter: api/utils/media/plotter_doc.md
+  - Numerical:
+    - 🔎 Overview: api/utils/numerical/index.md
+    - Extrema Finder: api/utils/numerical/extrema_finder_doc.md
+    - Moving Average: api/utils/numerical/moving_average_doc.md
+    - Numerical Calcs: api/utils/numerical/numerical_calcs_doc.md
+    - Signal Ops: api/utils/numerical/signal_ops_doc.md
+- Workflows:
+  - 🔎 Overview: api/workflows/index.md
+  - Composed:
+    - 🔎 Overview: api/workflows/composed/index.md
+    - Coordination: api/workflows/composed/coordination_doc.md
+  - Meta:
+    - 🔎 Overview: api/workflows/meta/index.md
+  - Per File:
+    - 🔎 Overview: api/workflows/per_file/index.md
+- For Developers:
+  - Contribution: contributing.md
+  - Docstrings: file_templates/docstrings.md
+  - Template Files: file_templates/index.md
+- ReaxFF Reference: reaxff_reference/index.md
+

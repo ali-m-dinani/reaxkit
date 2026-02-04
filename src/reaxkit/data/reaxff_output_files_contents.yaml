@@ -1,3 +1,7 @@
+# Structured descriptions of ReaxFF output files and the data they contain.
+# Used by the CLI to provide file-aware help, variable discovery, and validation.
+# The Python API consumes this metadata for introspection, analysis routing, and documentation generation.
+
 _meta:
   version: "1.0"
   comment: "generated using reaxff_output_files_contents.xlsx"
@@ -45,7 +49,7 @@ files:
       - "When RMSG drops below the value of control-file keyword endmm the MM run terminates."
       - "Alternatively, the run terminates when the maximum number of iterations (control-file keyword maxit) has been reached."
     examples:
-      - "reaxkit fort57 get --yaxis RMSG --xaxis iter --save rmsg_vs_iter.png"
+      - "reaxkit fort57.md get --yaxis RMSG --xaxis iter --save rmsg_vs_iter.png"
 
   fort.58:
     desc: "MM/minimization energy-term report: iteration and partial energy contribution table, which resembles fort.73 in structure."

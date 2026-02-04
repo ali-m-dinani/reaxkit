@@ -1,21 +1,19 @@
-"""Utilities to parse and resolve frame/atom selections into concrete DataFrame/handler indices.
-
-ReaxFF analyses frequently require flexible user input for selecting frames
-(e.g., "0:100:5", "10,20,30") and atom indices. This module provides the common
-parsing and resolution logic used across handlers and analyzers:
-
-  • parse_frames(): interprets slice-like or comma-separated frame strings,
-  • select_frames(): applies frame selections to DataFrames,
-  • resolve_indices(): converts user-specified frames or iteration numbers into
-    concrete frame indices using handler metadata,
-  • parse_atoms(): parses atom-index lists,
-  • helper utilities for range construction and backwards compatibility.
-
-These functions ensure that all modules can accept flexible frame/atom notation
-(including CLI inputs) and resolve them into consistent, ordered Python
-indices before analysis.
-
 """
+Frame and atom selection utilities for ReaxKit analyses.
+
+This module provides common helpers for parsing flexible user input
+(e.g., CLI arguments or configuration strings) that specify frame and
+atom selections, and for resolving those selections into concrete,
+ordered indices usable by handlers and analyzers.
+
+Typical use cases include:
+
+- parsing frame ranges such as ``"0:100:5"`` or explicit lists like ``"10,20,30"``
+- selecting subsets of rows from DataFrames by frame index
+- resolving iteration numbers into frame indices via handler metadata
+- parsing atom index lists for per-atom analyses
+"""
+
 
 from __future__ import annotations
 from typing import Optional, Sequence, Union, Iterable, List
@@ -25,10 +23,22 @@ FramesT = Optional[Union[slice, Sequence[int]]]
 
 def parse_frames(arg: Optional[str]) -> FramesT:
     """
-    Parse frame selection string:
-      - 'start:stop[:step]' -> slice
-      - 'i,j,k'             -> list of ints
-      - None or ''          -> None (keep all)
+    Parse a frame-selection string into a slice or index list.
+
+    Supported formats are:
+    - ``"start:stop[:step]"`` → ``slice``
+    - ``"i,j,k"`` → list of integers
+    - ``None`` or empty string → ``None`` (select all frames)
+
+    Parameters
+    ----------
+    arg : str or None
+        Frame selection string.
+
+    Returns
+    -------
+    slice or list[int] or None
+        Parsed frame selection.
     """
     if arg is None or str(arg).strip() == "":
         return None
@@ -45,7 +55,23 @@ def parse_frames(arg: Optional[str]) -> FramesT:
 _parse_frames = parse_frames
 
 def select_frames(df: pd.DataFrame, frames: FramesT) -> pd.DataFrame:
-    """Apply a slice or explicit index list to a DataFrame (row-position based)."""
+    """
+    Select rows from a DataFrame based on frame indices.
+
+    Selection is performed using row-position indexing.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame containing per-frame data.
+    frames : slice or list[int] or None
+        Frame selection returned by ``parse_frames``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame restricted to the selected frames.
+        """
     if frames is None:
         return df
     if isinstance(frames, slice):
@@ -53,7 +79,14 @@ def select_frames(df: pd.DataFrame, frames: FramesT) -> pd.DataFrame:
     return df.iloc[list(frames)]
 
 def _select_frames(xh, start: Optional[int], stop: Optional[int], every: int) -> range:
-    """Return a range of frame indices [start, stop] with stride 'every' for a handler."""
+    """
+    Construct a range of frame indices for a handler.
+
+    Notes
+    -----
+    This is an internal helper used to support legacy workflows and
+    handler-based frame iteration.
+    """
     try:
         n_frames = xh.n_frames()
     except Exception:
@@ -68,7 +101,19 @@ def _select_frames(xh, start: Optional[int], stop: Optional[int], every: int) ->
     return range(s, e + 1, ev)
 
 def parse_atoms(arg: Optional[str]) -> Optional[List[int]]:
-    """Parse comma/space separated atom indices into list[int], or None."""
+    """
+    Parse an atom-index selection string.
+
+    Parameters
+    ----------
+    arg : str or None
+        Comma- or space-separated atom indices.
+
+    Returns
+    -------
+    list[int] or None
+        Parsed atom indices, or ``None`` if no selection is provided.
+        """
     if arg is None or str(arg).strip() == "":
         return None
     parts = [p for chunk in str(arg).split(",") for p in chunk.split()]
@@ -82,10 +127,29 @@ def parse_atoms(arg: Optional[str]) -> Optional[List[int]]:
 
 def resolve_indices(handler, frames: FramesT = None, iterations: Optional[Iterable[int]] = None, step: Optional[int] = None) -> list[int]:
     """
-    Return an ordered list of frame indices selected by either:
-      - frames: slice or explicit indices (preferred if provided)
-      - iterations: iter numbers mapped via handler.dataframe()['iter']
-    Optionally decimate with 'step'.
+    Resolve user-specified frame or iteration selections into frame indices.
+
+    Frame selection is resolved in the following order:
+    1. Explicit frame indices or slices (if provided)
+    2. Iteration numbers mapped to frame indices via ``handler.dataframe()['iter']``
+
+    An optional stride may be applied to decimate the result.
+
+    Parameters
+    ----------
+    handler
+        Handler providing access to per-frame simulation data.
+    frames : slice or list[int], optional
+        Explicit frame selection.
+    iterations : iterable of int, optional
+        Iteration numbers to map to frame indices.
+    step : int, optional
+        Stride applied to the resolved frame indices.
+
+    Returns
+    -------
+    list[int]
+        Ordered list of resolved frame indices.
     """
     sim_df = handler.dataframe()
     n = len(sim_df)
