@@ -16,12 +16,16 @@ dependencies = [
     "matplotlib",
     "seaborn",
     "scipy",
-    "argparse",
     "tqdm",
     "rich",
     "freud-analysis",
     "ovito",
     "tabulate",
+    "ase",
+    "imageio",
+    "mp_api",
+    "PyYAML",
+    "rapidfuzz",
 ]
 
 [project.scripts]
