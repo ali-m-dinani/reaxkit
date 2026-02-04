@@ -20,10 +20,14 @@ import pandas as pd
 
 # FREUD backend (pip install freud-analysis)
 import freud
-
 # OVITO backend (pip install ovito)
-from ovito.io import import_file
-from ovito.modifiers import CoordinationAnalysisModifier
+try:
+    import ovito
+    from ovito.io import import_file
+    from ovito.modifiers import CoordinationAnalysisModifier
+except ImportError:
+    raise ImportError("Install reaxkit[viz] to use OVITO features")
+
 from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
 
 
