@@ -20,13 +20,6 @@ import pandas as pd
 
 # FREUD backend (pip install freud-analysis)
 import freud
-# OVITO backend (pip install ovito)
-try:
-    import ovito
-    from ovito.io import import_file
-    from ovito.modifiers import CoordinationAnalysisModifier
-except ImportError:
-    raise ImportError("Install reaxkit[viz] to use OVITO features")
 
 from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
 
@@ -170,6 +163,16 @@ def _rdf_ovito_total_frame(
 
     import os
     xyz = _write_xyz_temp(coords, types)
+
+    try:
+        from ovito.io import import_file
+        from ovito.modifiers import CoordinationAnalysisModifier
+    except Exception as e:
+        raise ImportError(
+            "OVITO is required for RDF analysis. "
+            "Install reaxkit[viz] and run in an environment with EGL/Qt."
+        ) from e
+
     try:
         pipe = import_file(xyz)
         pipe.modifiers.append(CoordinationAnalysisModifier(cutoff=float(r_max), number_of_bins=int(bins), partial=False))
@@ -229,6 +232,16 @@ def _rdf_ovito_partial_frame(
 
     import os
     xyz = _write_xyz_temp(coords, types)
+
+    try:
+        from ovito.io import import_file
+        from ovito.modifiers import CoordinationAnalysisModifier
+    except Exception as e:
+        raise ImportError(
+            "OVITO is required for RDF analysis. "
+            "Install reaxkit[viz] and run in an environment with EGL/Qt."
+        ) from e
+
     try:
         pipe = import_file(xyz)
         pipe.modifiers.append(CoordinationAnalysisModifier(cutoff=float(r_max), number_of_bins=int(bins), partial=True))
