@@ -71,12 +71,18 @@ def run_main(args: argparse.Namespace) -> None:
     Run the `reaxkit help` command.
 
     Behavior:
+    -----------
     - If no query is provided, prints a short usage message and exits.
     - If a query is provided, searches curated help indices and prints ranked matches.
     - Use `--top` and `--min-score` to control result count and filtering.
     - Use detail flags (`--why`, `--file_templates`, `--tags`, `--core-vars`, `--optional-vars`,
       `--derived-vars`, `--notes`) to expand what is shown per match.
     - `--all-info` enables all detail flags together.
+
+    Examples
+    -----------
+    reaxkit help 'restraint'
+    reaxkit help 'electric field'
     """
     # Allow: `reaxkit help` (no query)
     if getattr(args, "query", None) is None:

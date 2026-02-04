@@ -133,12 +133,15 @@ def main():
 
     Examples
     --------
-    # Per-file workflow with task:
-    # reaxkit fort7 get --file fort.7
-    #
-    # Kind-level workflow without task:
-    # reaxkit help --query "fort.7"
-    # reaxkit intspec --folder workflows
+    Per-file workflow with task:
+
+      - reaxkit fort7 get --file fort.7
+
+    Kind-level workflow without task:
+
+      - reaxkit help --query "fort.7"
+
+      - reaxkit intspec --folder workflows
     """
     # Preprocess argv so DEFAULTABLE workflows can omit an explicit task.
     sys_argv = _preinject(sys.argv)

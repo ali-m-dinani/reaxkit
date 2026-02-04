@@ -3,13 +3,11 @@ site_url: https://ali-m-dinani.github.io/reaxkit/
 site_description: ReaxKit — tools for parsing, analyzing, and visualizing ReaxFF simulations
 repo_url: https://github.com/ali-m-dinani/reaxkit
 repo_name: ali-m-dinani/reaxkit
-
 markdown_extensions:
-  - attr_list
-  - md_in_html
-
+- attr_list
+- md_in_html
 extra_css:
-  - stylesheets/extra.css
+- stylesheets/extra.css
 
 theme:
   name: material
@@ -123,6 +121,7 @@ nav:
   - Alias: api/utils/alias_doc.md
   - Cache: api/utils/cache_doc.md
   - Constants: api/utils/constants_doc.md
+  - Equation Of States: api/utils/equation_of_states_doc.md
   - Exceptions: api/utils/exceptions_doc.md
   - Frame Utils: api/utils/frame_utils_doc.md
   - Log: api/utils/log_doc.md
@@ -144,13 +143,41 @@ nav:
   - Composed:
     - 🔎 Overview: api/workflows/composed/index.md
     - Coordination: api/workflows/composed/coordination_doc.md
+    - Electrostatics: api/workflows/composed/electrostatics_doc.md
+    - Xmolout Fort7: api/workflows/composed/xmolout_fort7_doc.md
   - Meta:
     - 🔎 Overview: api/workflows/meta/index.md
+    - Help: api/workflows/meta/help_doc.md
+    - Introspection: api/workflows/meta/introspection_doc.md
+    - Make Video: api/workflows/meta/make_video_doc.md
+    - Plotter: api/workflows/meta/plotter_doc.md
   - Per File:
     - 🔎 Overview: api/workflows/per_file/index.md
+    - Control: api/workflows/per_file/control_doc.md
+    - Eregime: api/workflows/per_file/eregime_doc.md
+    - Ffield: api/workflows/per_file/ffield_doc.md
+    - Fort13: api/workflows/per_file/fort13_doc.md
+    - Fort57: api/workflows/per_file/fort57_doc.md
+    - Fort73: api/workflows/per_file/fort73_doc.md
+    - Fort74: api/workflows/per_file/fort74_doc.md
+    - Fort76: api/workflows/per_file/fort76_doc.md
+    - Fort78: api/workflows/per_file/fort78_doc.md
+    - Fort79: api/workflows/per_file/fort79_doc.md
+    - Fort7: api/workflows/per_file/fort7_doc.md
+    - Fort83: api/workflows/per_file/fort83_doc.md
+    - Fort99: api/workflows/per_file/fort99_doc.md
+    - Geo: api/workflows/per_file/geo_doc.md
+    - Molfra: api/workflows/per_file/molfra_doc.md
+    - Params: api/workflows/per_file/params_doc.md
+    - Summary: api/workflows/per_file/summary_doc.md
+    - Trainset: api/workflows/per_file/trainset_doc.md
+    - Tregime: api/workflows/per_file/tregime_doc.md
+    - Vels: api/workflows/per_file/vels_doc.md
+    - Vregime: api/workflows/per_file/vregime_doc.md
+    - Xmolout: api/workflows/per_file/xmolout_doc.md
 - For Developers:
   - Contribution: contributing.md
   - Docstrings: file_templates/docstrings.md
   - Template Files: file_templates/index.md
+  - CLI: api/cli.md
 - ReaxFF Reference: reaxff_reference/index.md
-

@@ -1,12 +1,17 @@
-"""Introspect modules or packages to understand what is available in ReaxKit.
-
-Examples:
-  reaxkit intspec --folder workflow
-  reaxkit intspec run --folder workflow
-
-  reaxkit intspec --file fort7_analyzer
-  reaxkit intspec run --file fort7_analyzer
 """
+CLI workflow for introspecting ReaxKit modules and folders.
+
+This workflow powers the `reaxkit intspec` command, allowing users to:
+- Inspect a single Python module and view its top-level docstring summary
+  along with public functions/classes and their one-line descriptions.
+- Recursively scan a folder or package and list all contained `.py` files
+  with their module docstring first lines.
+
+It is designed as a lightweight discovery and navigation tool to help users
+understand what functionality exists inside ReaxKit without opening files
+manually.
+"""
+
 
 from __future__ import annotations
 
@@ -211,7 +216,19 @@ def run_main(file: str | None, folder: str | None) -> int:
 
 def register_tasks(subparsers) -> None:
     """Task-level entry: `reaxkit intspec run ...`."""
-    p = subparsers.add_parser("run", help="Introspect a module (--file) or folder (--folder).")
+    p = subparsers.add_parser(
+        "run",
+        help="Introspect a module (--file) or folder (--folder).",
+        description=(
+            "Introspect a module (--file) or folder (--folder).\n"
+            "Examples:\n"
+            "  reaxkit intspec --folder workflow\n"
+            "  reaxkit intspec run --folder workflow\n"
+            "  reaxkit intspec --file fort7_analyzer\n"
+            "  reaxkit intspec run --file fort7_analyzer\n"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
     g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")

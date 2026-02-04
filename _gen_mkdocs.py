@@ -25,6 +25,23 @@ except ImportError as e:  # pragma: no cover
 
 NavItem = Union[str, Dict[str, Any]]
 
+# -------------------- Skip rules --------------------
+
+SKIP_FILES = {
+    "cli.md",
+}
+
+SKIP_FOLDERS = {
+    "__pycache__",
+    ".git",
+}
+
+def _should_skip_path(p: Path) -> bool:
+    if p.name in SKIP_FILES:
+        return True
+    if any(part in SKIP_FOLDERS for part in p.parts):
+        return True
+    return False
 
 # -------------------- Titles --------------------
 
@@ -156,6 +173,8 @@ def build_sections_from_api_dir(api_dir: Path) -> Dict[str, List[NavItem]]:
     top_tree: Dict[str, Any] = {}
 
     for md in sorted(api_dir.rglob("*.md")):
+        if _should_skip_path(md):
+            continue
         rel_to_api = md.relative_to(api_dir)           # e.g., analysis/composed/index.md
         rel_to_docs = Path("api") / rel_to_api         # mkdocs path: api/analysis/...
         rel_str = rel_to_docs.as_posix()

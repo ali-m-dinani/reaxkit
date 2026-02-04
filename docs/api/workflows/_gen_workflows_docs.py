@@ -380,8 +380,12 @@ def main() -> int:
 
     workflow_files = sorted(WORKFLOWS_DIR.rglob("*_workflow.py"))
 
+    n = 0
+    skipped = 0
+
     for wf in workflow_files:
         if wf.name.startswith("_") or wf.name == "__init__.py":
+            skipped += 1
             continue
 
         category = _detect_category(wf)
@@ -393,8 +397,12 @@ def main() -> int:
         out_path = CATEGORY_DIRS[category] / out_name
         out_path.write_text(md, encoding="utf-8")
 
-        print(f"[gen] {import_path} -> {out_path.relative_to(REPO_ROOT)}")
+        n += 1
+        # (no per-file prints)
 
+    print(f"[Done] Generated {n} workflow doc pages under: {DOCS_OUT_ROOT}")
+    if skipped:
+        print(f"       Skipped {skipped} internal files.")
     return 0
 
 
