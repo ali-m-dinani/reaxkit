@@ -6,7 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "reaxkit"
 version = "0.1.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
-authors = "AUTHORS.md"
+authors = [
+  { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
+  { name = "Adri van Duin", email = "acv13@psu.edu" },
+  { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
+  { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
+]
 readme = "README.md"
 license = { text = "MIT" }
 
