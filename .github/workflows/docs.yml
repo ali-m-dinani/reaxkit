@@ -33,7 +33,7 @@ jobs:
           python docs/api/analysis/_gen_analysis_docs.py
           python docs/api/io/_gen_io_docs.py
           python docs/api/utils/_gen_utils_docs.py
-          python docs/api/workflows/_gen_worlflows_docs.py
+          python docs/api/workflows/_gen_workflows_docs.py
           python _gen_mkdocs.py
 
       - name: Build MkDocs
