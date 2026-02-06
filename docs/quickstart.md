@@ -44,6 +44,26 @@ reaxkit help "electric field"
 
 This helps you decide which file you need for a given analysis.
 
+Moreover, if you prefer to work with CLI commands to know which files are available
+in a director or to know what that files is about, you can easily obtain
+this information without any need to check the online documentation.
+
+For this purpose, 
+
+```bash
+reaxkit intspec --folder workflow
+```
+
+will show you what files are available in the `workflow/` directory,
+while
+
+```bash
+reaxkit intspec --file fort7_analyzer
+```
+
+shows the explanations (i.e., docstrings) for a specific file and its
+public functions.
+
 ---
 
 ## Step 3: Finding the supported tasks for a given ReaxFF file
