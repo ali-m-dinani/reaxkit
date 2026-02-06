@@ -4,8 +4,9 @@ site_description: ReaxKit — tools for parsing, analyzing, and visualizing Reax
 repo_url: https://github.com/ali-m-dinani/reaxkit
 repo_name: ali-m-dinani/reaxkit
 markdown_extensions:
-- attr_list
-- md_in_html
+  - attr_list
+  - md_in_html
+  - tables
 extra_css:
 - stylesheets/extra.css
 
@@ -180,4 +181,6 @@ nav:
   - Docstrings: file_templates/docstrings.md
   - Template Files: file_templates/index.md
   - CLI: api/cli.md
+- Resources: resources.md
 - ReaxFF Reference: reaxff_reference/index.md
+
