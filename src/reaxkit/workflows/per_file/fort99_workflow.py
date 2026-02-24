@@ -33,6 +33,27 @@ from reaxkit.utils.path import resolve_output_path
 # ---------- tasks ----------
 
 def _fort99_get_task(args: argparse.Namespace) -> int:
+    """
+    Fort99 get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     handler = Fort99Handler(args.file)
     sortby = normalize_choice(args.sort, domain="sort")
 
@@ -167,6 +188,22 @@ def _task_bulk_modulus(args) -> None:
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
 
     # ---- fort99 get ----
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p_get = subparsers.add_parser(
         "get",
         help="Compute fort.99 ENERGY errors and sort/export the table \n",

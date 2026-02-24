@@ -57,12 +57,35 @@ class Fort76Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.76"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []  # optional, kept for template consistency
         self._n_records: Optional[int] = None
 
     @staticmethod
     def _is_float(token: str) -> bool:
+        """
+         is float.
+
+        Parameters
+        ----------
+        token : str
+            Parameter description.
+
+        Returns
+        -------
+        bool
+            Return value description.
+
+        """
         try:
             float(token)
             return True
@@ -70,6 +93,15 @@ class Fort76Handler(BaseHandler):
             return False
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         rows: List[List[float]] = []
         n_restraints_max = 0
 
@@ -158,9 +190,27 @@ class Fort76Handler(BaseHandler):
     # ---- File-specific accessors
     def n_frames(self) -> int:
         # 1 row per iteration
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return int(self.metadata().get("n_frames", len(self.dataframe())))
 
     def n_restraints(self) -> int:
+        """
+        N restraints.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return int(self.metadata().get("n_restraints", 0))
 
     def frame(self, i: int) -> Dict[str, Any]:
@@ -191,5 +241,19 @@ class Fort76Handler(BaseHandler):
         }
 
     def iter_frames(self, step: int = 1) -> Iterator[Dict[str, Any]]:
+        """
+        Iter frames.
+
+        Parameters
+        ----------
+        step : int
+            Parameter description.
+
+        Yields
+        -------
+        Iterator[Dict[str, Any]]
+            Return value description.
+
+        """
         for i in range(0, self.n_frames(), max(1, int(step))):
             yield self.frame(i)

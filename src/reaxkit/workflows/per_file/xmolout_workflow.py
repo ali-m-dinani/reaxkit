@@ -51,12 +51,56 @@ from reaxkit.utils.media.convert import convert_xaxis
 from reaxkit.utils.units import unit_for
 
 def _parse_types(s: Optional[str]):
+    """
+    Parse types.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    s : Optional[str]
+        Parameter description.
+
+    Returns
+    -------
+    Any
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if s is None or str(s).strip() == "":
         return None
     parts = [p for chunk in str(s).split(",") for p in chunk.split()]
     return set(parts)
 
 def _frames_from_args(xh: XmoloutHandler, args: argparse.Namespace) -> Iterable[int]:
+    """
+    Frames from args.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    xh : XmoloutHandler
+        Parameter description.
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    Iterable[int]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if getattr(args, "frames", None):
         sel = _parse_frames(args.frames)
         if sel is None:
@@ -78,6 +122,27 @@ def _frames_from_args(xh: XmoloutHandler, args: argparse.Namespace) -> Iterable[
 # TASK IMPLEMENTATIONS
 # --------------------------
 def _trajget_task(args: argparse.Namespace) -> int:
+    """
+    Trajget task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.file)
     frames = _frames_from_args(xh, args)
 
@@ -173,6 +238,27 @@ def _trajget_task(args: argparse.Namespace) -> int:
     return 0
 
 def _msd_task(args: argparse.Namespace) -> int:
+    """
+    Msd task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.file)
 
     if not args.atoms:
@@ -303,6 +389,27 @@ def _msd_task(args: argparse.Namespace) -> int:
     return 0
 
 def _rdf_task(args: argparse.Namespace) -> int:
+    """
+    Rdf task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.file)
     types_a = _parse_types(args.types_a)
     types_b = _parse_types(args.types_b)
@@ -440,6 +547,27 @@ def _rdf_task(args: argparse.Namespace) -> int:
     return 0
 
 def _boxdims_task(args: argparse.Namespace) -> int:
+    """
+    Boxdims task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.file)
 
     # frames: use all if not provided
@@ -517,7 +645,24 @@ def _add_common_xmolout_io_args(
     *,
     include_plot: bool = False,
 ) -> None:
-    """Common I/O flags for xmolout-based tasks."""
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="xmolout", help="Path to xmolout file.")
     if include_plot:
         p.add_argument("--plot", action="store_true", help="Show plot interactively.")
@@ -529,6 +674,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ------------------------------------------------------------------
     # trajget (single or multi-atom trajectories)
     # ------------------------------------------------------------------
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     pt = subparsers.add_parser(
         "trajget",
         help="Get atom trajectories per frame (single or multiple atoms).",

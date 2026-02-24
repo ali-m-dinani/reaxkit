@@ -88,11 +88,29 @@ class Fort79Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.79"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []
         self._n_records: Optional[int] = None
 
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         rows: List[Dict[str, Any]] = []
 
         with open(self.path, "r", encoding="utf-8", errors="ignore") as fh:
@@ -220,8 +238,31 @@ class Fort79Handler(BaseHandler):
         return df, meta
 
     def n_frames(self) -> int:
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return 0
 
     def iter_frames(self, step: int = 1) -> Iterator[Dict[str, Any]]:
+        """
+        Iter frames.
+
+        Parameters
+        ----------
+        step : int
+            Parameter description.
+
+        Yields
+        -------
+        Iterator[Dict[str, Any]]
+            Return value description.
+
+        """
         if False:
             yield {}

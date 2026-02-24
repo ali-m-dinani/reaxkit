@@ -36,7 +36,31 @@ def _resolve_columns(
     must_exist: bool = True,
 ) -> List[str]:
     """
-    Map requested column name(s) or regex pattern(s) to real DataFrame columns.
+    Resolve requested column specs to concrete DataFrame column names.
+
+    Works on
+    --------
+    Fort7-derived pandas tables
+
+    Parameters
+    ----------
+    df_example : pandas.DataFrame
+        Example frame used to resolve available columns.
+    columns : str or Sequence[str]
+        Column names or regex patterns to resolve.
+    regex : bool, optional
+        If True, treat ``columns`` entries as regular expressions.
+    must_exist : bool, optional
+        If True, raise errors for missing columns.
+
+    Returns
+    -------
+    list[str]
+        Resolved column names in output order.
+
+    Examples
+    --------
+    >>>
     """
     if isinstance(columns, str):
         columns = [columns]

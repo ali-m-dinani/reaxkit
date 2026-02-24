@@ -31,6 +31,27 @@ from reaxkit.utils.path import resolve_output_path
 
 
 def _task_get(args: argparse.Namespace) -> int:
+    """
+    Run the ``get`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     params_handler = ParamsHandler(args.file)
 
     if args.interpret:
@@ -78,6 +99,22 @@ def _task_get(args: argparse.Namespace) -> int:
 
 def _add_common_params_io_args(p: argparse.ArgumentParser) -> None:
     # Core IO
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="params", help="Path to params file.")
     p.add_argument("--export", default=None, help="Path to export CSV data.")
 
@@ -101,6 +138,22 @@ def _add_common_params_io_args(p: argparse.ArgumentParser) -> None:
     )
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "get",
         help="Load params table (optionally interpret pointers into ffield)",

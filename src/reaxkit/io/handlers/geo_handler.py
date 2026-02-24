@@ -62,6 +62,15 @@ class GeoHandler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "geo"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._n_atoms: Optional[int] = None
 
@@ -69,6 +78,15 @@ class GeoHandler(BaseHandler):
     # Core parser
     # ------------------------------------------------------------------
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         atoms: List[Dict[str, Any]] = []
 
         descriptor: Optional[str] = None
@@ -181,7 +199,15 @@ class GeoHandler(BaseHandler):
     # Convenience accessors
     # ------------------------------------------------------------------
     def n_atoms(self) -> int:
-        """Return the number of atoms in the .geo file."""
+        """
+        N atoms.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         if self._n_atoms is None:
             self._n_atoms = int(self.metadata().get("n_atoms", len(self.dataframe())))
         return self._n_atoms

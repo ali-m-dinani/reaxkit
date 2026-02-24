@@ -241,7 +241,29 @@ def _hyst_task(args: argparse.Namespace) -> int:
 # ------------------------- internals -------------------------
 
 def _indices_from_spec(xh: XmoloutHandler, frames_spec) -> list[int]:
-    """Turn a frames spec (slice or list) into concrete frame indices for xh."""
+    """
+    Indices from spec.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    xh : XmoloutHandler
+        Parameter description.
+    frames_spec : Any
+        Parameter description.
+
+    Returns
+    -------
+    list[int]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     return resolve_indices(xh, frames=frames_spec, iterations=None, step=None)
 
 
@@ -381,6 +403,27 @@ def _local_pol_plot3d_task(args: argparse.Namespace) -> int:
 # ========================= 2D HEATMAP =========================
 
 def _parse_bins(bins: str) -> Union[int, Tuple[int, int]]:
+    """
+    Parse bins.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    bins : str
+        Parameter description.
+
+    Returns
+    -------
+    Union[int, Tuple[int, int]]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if "," in bins:
         nx, ny = [int(x) for x in bins.split(",")]
         return (nx, ny)

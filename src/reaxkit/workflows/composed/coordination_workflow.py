@@ -129,6 +129,29 @@ def _valences_from_ffield(ffield_path: str) -> Dict[str, float]:
 
 
 def _parse_kv_map(s: Optional[str], value_cast=float) -> Dict[str, float]:
+    """
+    Parse kv map.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    s : Optional[str]
+        Parameter description.
+    value_cast : Any
+        Parameter description.
+
+    Returns
+    -------
+    Dict[str, float]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if not s:
         return {}
     out: Dict[str, float] = {}
@@ -143,6 +166,27 @@ def _parse_kv_map(s: Optional[str], value_cast=float) -> Dict[str, float]:
 
 
 def _parse_status_labels(s: Optional[str]) -> Dict[int, str]:
+    """
+    Parse status labels.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    s : Optional[str]
+        Parameter description.
+
+    Returns
+    -------
+    Dict[int, str]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if not s:
         return {-1: "U", 0: "C", 1: "O"}
     out: Dict[int, str] = {}
@@ -162,6 +206,29 @@ def _parse_status_labels(s: Optional[str]) -> Dict[int, str]:
 
 
 def _frame_record_from_handler(xh: XmoloutHandler, i: int) -> Dict[str, Any]:
+    """
+    Frame record from handler.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    xh : XmoloutHandler
+        Parameter description.
+    i : int
+        Parameter description.
+
+    Returns
+    -------
+    Dict[str, Any]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     fr = xh.frame(i)
     df = xh.dataframe()
     row = df.iloc[i] if i < len(df) else pd.Series()
@@ -183,6 +250,27 @@ def _frame_record_from_handler(xh: XmoloutHandler, i: int) -> Dict[str, Any]:
 # Action implementations
 # -----------------------------
 def _task_analyze(args: argparse.Namespace) -> int:
+    """
+    Run the ``analyze`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.xmolout)
     from reaxkit.io.handlers.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
@@ -222,6 +310,27 @@ def _task_analyze(args: argparse.Namespace) -> int:
 
 
 def _task_relabel(args: argparse.Namespace) -> int:
+    """
+    Run the ``relabel`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.xmolout)
     from reaxkit.io.handlers.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
@@ -321,7 +430,22 @@ def _task_relabel(args: argparse.Namespace) -> int:
 # Template-style registration
 # -----------------------------
 def _add_common_coord_args(p: argparse.ArgumentParser) -> None:
-    """Common args shared by coord analyze / relabel."""
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--xmolout", default="xmolout", help="Path to xmolout.")
     p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file.")
     p.add_argument("--valences", default=None,

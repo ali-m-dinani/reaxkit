@@ -22,6 +22,27 @@ from pathlib import Path
 from reaxkit.io.generators.vregime_generator import write_sample_vregime
 
 def _task_generate(args: argparse.Namespace) -> int:
+    """
+    Run the ``generate`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     out_default = Path("reaxkit_outputs") / "vregime" / "vregime.in"
 
     if args.out:
@@ -48,6 +69,22 @@ def _task_generate(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "gen",
         help="Generate a sample vregime.in file (Volume regimes).",

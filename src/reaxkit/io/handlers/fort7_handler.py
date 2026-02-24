@@ -77,6 +77,15 @@ class Fort7Handler(BaseHandler):
         self._sim_name: Optional[str] = None
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         sim_rows: List[List[Any]] = []
         frames: List[pd.DataFrame] = []
         totals: List[List[float]] = []

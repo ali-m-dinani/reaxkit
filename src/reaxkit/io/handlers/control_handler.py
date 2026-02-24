@@ -65,6 +65,15 @@ class ControlHandler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "control"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
         # Backward-compatible per-section dicts

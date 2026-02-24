@@ -66,6 +66,15 @@ class ParamsHandler(BaseHandler):
     ]
 
     def __init__(self, file_path: str | Path = "params.in"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:

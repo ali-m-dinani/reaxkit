@@ -46,7 +46,25 @@ from reaxkit.io.generators.trainset_generator import (
 # ----------------------------------------------------------------------
 def _get_task(args: argparse.Namespace) -> int:
     """
-    Read trainset and save section DataFrames to CSV files.
+    Get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     handler = TrainsetHandler(args.file)
     meta: Dict[str, Any] = handler.metadata()
@@ -103,7 +121,25 @@ def _get_task(args: argparse.Namespace) -> int:
 # ----------------------------------------------------------------------
 def _category_task(args: argparse.Namespace) -> int:
     """
-    Print or export unique group comments (categories) for trainset sections.
+    Category task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     handler = TrainsetHandler(args.file)
     df = get_trainset_group_comments(handler, sort=args.sort)   # columns: section, group_comment
@@ -264,6 +300,22 @@ def _generate_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- get ---- (existing)
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p_get = subparsers.add_parser(
         "get",
         help="Save trainset sections as CSV files. \n",

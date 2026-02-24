@@ -42,7 +42,25 @@ from reaxkit.utils.path import resolve_output_path
 
 def _eregime_get_task(args: argparse.Namespace) -> int:
     """
-    Parse eregime.in and return Y vs chosen X axis (iter/frame/time), with optional plotting/export.
+    Eregime get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     handler = EregimeHandler(args.file)
 
@@ -99,6 +117,27 @@ def _eregime_get_task(args: argparse.Namespace) -> int:
 # ====================================================================
 
 def _task_gen_sin(args: argparse.Namespace) -> int:
+    """
+    Run the ``gen_sin`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     write_eregime_sinusoidal(
         args.output,
         max_magnitude=args.max_magnitude,
@@ -116,6 +155,27 @@ def _task_gen_sin(args: argparse.Namespace) -> int:
 
 
 def _task_gen_pulse(args: argparse.Namespace) -> int:
+    """
+    Run the ``gen_pulse`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     write_eregime_smooth_pulse(
         args.output,
         amplitude=args.amplitude,
@@ -151,6 +211,27 @@ def _safe_build_func(expr: str) -> Callable[[float], float]:
 
 
 def _task_gen_func(args: argparse.Namespace) -> int:
+    """
+    Run the ``gen_func`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     func = _safe_build_func(args.expr)
     write_eregime_from_function(
         args.output,
@@ -172,7 +253,20 @@ def _task_gen_func(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Wire subcommands under the *existing* 'eregime' command provided by the top-level CLI.
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
     """
     # ---- 'get' ----
     p_get = subparsers.add_parser(

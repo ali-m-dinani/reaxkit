@@ -54,10 +54,33 @@ class SummaryHandler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "summary.txt") -> None:
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     @staticmethod
     def _canonical_names(ncols: int) -> List[str]:
+        """
+         canonical names.
+
+        Parameters
+        ----------
+        ncols : int
+            Parameter description.
+
+        Returns
+        -------
+        List[str]
+            Return value description.
+
+        """
         if ncols == 8:
             return ["iter", "nmol", "time", "E_pot", "V", "T", "P", "D"]
         if ncols == 9:
@@ -68,6 +91,15 @@ class SummaryHandler(BaseHandler):
         )
 
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         p = Path(self.path)
         if not p.exists():
             raise FileNotFoundError(f"Summary file not found: {p}")
@@ -123,12 +155,39 @@ class SummaryHandler(BaseHandler):
 
     # Convenience accessors on canonical schema
     def fields(self) -> List[str]:
+        """
+        Fields.
+
+        Returns
+        -------
+        List[str]
+            Return value description.
+
+        """
         return list(self.dataframe().columns)
 
     def has_times(self) -> bool:
+        """
+        Has times.
+
+        Returns
+        -------
+        bool
+            Return value description.
+
+        """
         return "time" in self.dataframe().columns
 
     def iterations(self) -> pd.Series:
+        """
+        Iterations.
+
+        Returns
+        -------
+        pd.Series
+            Return value description.
+
+        """
         df = self.dataframe()
         if "iter" not in df.columns:
             raise KeyError("'iter' column not found in summary.")

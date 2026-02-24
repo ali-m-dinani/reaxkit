@@ -32,6 +32,27 @@ from reaxkit.utils.path import resolve_output_path
 
 
 def _split_cols(s: str | None) -> List[str]:
+    """
+    Split cols.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    s : str | None
+        Parameter description.
+
+    Returns
+    -------
+    List[str]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if not s:
         return []
     # support "a,b,c" or "a b c"
@@ -44,6 +65,27 @@ def _split_cols(s: str | None) -> List[str]:
 
 
 def _get_task(args: argparse.Namespace) -> int:
+    """
+    Get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = Fort57Handler(args.file)
 
     # --- decide which y columns user wants ---
@@ -110,6 +152,24 @@ def _get_task(args: argparse.Namespace) -> int:
 ###################################################################################
 
 def _add_common_fort57_io_args(p: argparse.ArgumentParser, *, include_plot: bool = False) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="fort.57", help="Path to fort.57 file.")
     p.add_argument("--control", default="control", help="Path to control file (for --xaxis time).")
     p.add_argument("--xaxis", default="iter", choices=["iter", "frame", "time"],
@@ -122,6 +182,22 @@ def _add_common_fort57_io_args(p: argparse.ArgumentParser, *, include_plot: bool
     p.add_argument("--export", default=None, help="Path to export CSV (x + selected y columns).")
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "get",
         help="Get/plot selected columns from fort.57 (with x-axis conversion).",

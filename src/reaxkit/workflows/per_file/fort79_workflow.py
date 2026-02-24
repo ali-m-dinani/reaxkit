@@ -246,7 +246,22 @@ def _add_common_fort79_io_args(
     include_plot: bool = True,
 ) -> None:
     """
-    Common I/O flags for fort.79-based tasks.
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+
+    Examples
+    --------
+    >>>
     """
     p.add_argument("--file", default="fort.79", help="Path to fort.79 file.")
 
@@ -269,6 +284,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ------------------------------------------------------
     # most-sensitive
     # ------------------------------------------------------
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     most_sensitive = subparsers.add_parser(
         "most-sensitive",
         help="Identify the parameter with the minimum sensitivity and optionally plot or export results.",

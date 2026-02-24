@@ -25,6 +25,22 @@ FrameSel = Optional[Union[Sequence[int], range, slice]]
 AtomSel  = Optional[Union[Sequence[int], slice]]
 
 def _normalize_frames_for_write(xh: XmoloutHandler, frames: FrameSel) -> list[int]:
+    """
+     normalize frames for write.
+
+    Parameters
+    ----------
+    xh : XmoloutHandler
+        Parameter description.
+    frames : FrameSel
+        Parameter description.
+
+    Returns
+    -------
+    list[int]
+        Return value description.
+
+    """
     n = xh.n_frames()
     if frames is None:
         return list(range(n))
@@ -35,6 +51,24 @@ def _normalize_frames_for_write(xh: XmoloutHandler, frames: FrameSel) -> list[in
 def _normalize_atoms_for_write(frame_dict: Dict[str, Any],
                                atoms: AtomSel,
                                atom_types: Optional[Sequence[str]]) -> list[int]:
+    """
+     normalize atoms for write.
+
+    Parameters
+    ----------
+    frame_dict : Dict[str, Any]
+        Parameter description.
+    atoms : AtomSel
+        Parameter description.
+    atom_types : Optional[Sequence[str]]
+        Parameter description.
+
+    Returns
+    -------
+    list[int]
+        Return value description.
+
+    """
     n_atoms = frame_dict["coords"].shape[0]
     if atoms is not None:
         if isinstance(atoms, slice):
@@ -51,6 +85,38 @@ def _format_header_line(sim_name: str,
                         a: float, b: float, c: float,
                         alpha: float, beta: float, gamma: float,
                         prec: int) -> str:
+    """
+     format header line.
+
+    Parameters
+    ----------
+    sim_name : str
+        Parameter description.
+    iter : int
+        Parameter description.
+    E_pot : float
+        Parameter description.
+    a : float
+        Parameter description.
+    b : float
+        Parameter description.
+    c : float
+        Parameter description.
+    alpha : float
+        Parameter description.
+    beta : float
+        Parameter description.
+    gamma : float
+        Parameter description.
+    prec : int
+        Parameter description.
+
+    Returns
+    -------
+    str
+        Return value description.
+
+    """
     f = f"{{:.{prec}f}}"
     return (
         f"{sim_name} {iter} "
@@ -59,6 +125,24 @@ def _format_header_line(sim_name: str,
     )
 
 def _safe_get(row: pd.Series, key: str, default: float = 0.0) -> float:
+    """
+     safe get.
+
+    Parameters
+    ----------
+    row : pd.Series
+        Parameter description.
+    key : str
+        Parameter description.
+    default : float
+        Parameter description.
+
+    Returns
+    -------
+    float
+        Return value description.
+
+    """
     return float(row[key]) if (isinstance(row, pd.Series) and key in row and pd.notna(row[key])) else float(default)
 
 def _get_frame_table(xh: XmoloutHandler, i: int) -> pd.DataFrame:
@@ -78,7 +162,22 @@ def _get_frame_table(xh: XmoloutHandler, i: int) -> pd.DataFrame:
 
 def _format_atom_line_extended(row: pd.Series, prec: int, extra_order: list[str] | None) -> str:
     """
-    Format one atom line: type, x, y, z, then (optional) extras in the given order.
+     format atom line extended.
+
+    Parameters
+    ----------
+    row : pd.Series
+        Parameter description.
+    prec : int
+        Parameter description.
+    extra_order : list[str] | None
+        Parameter description.
+
+    Returns
+    -------
+    str
+        Return value description.
+
     """
     f = f"{{:.{prec}f}}"
     t = str(row["atom_type"])

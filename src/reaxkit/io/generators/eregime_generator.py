@@ -34,6 +34,20 @@ HEADER_LINES: Sequence[str] = (
 
 
 def _normalize_direction(direction: str) -> str:
+    """
+     normalize direction.
+
+    Parameters
+    ----------
+    direction : str
+        Parameter description.
+
+    Returns
+    -------
+    str
+        Return value description.
+
+    """
     d = direction.strip().lower()
     if d not in {"x", "y", "z"}:
         raise ValueError(f"direction must be one of 'x','y','z'; got {direction!r}")
@@ -41,6 +55,15 @@ def _normalize_direction(direction: str) -> str:
 
 
 def _write_header(f) -> None:
+    """
+     write header.
+
+    Parameters
+    ----------
+    f : Any
+        Parameter description.
+
+    """
     for line in HEADER_LINES:
         f.write(line)
 

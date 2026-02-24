@@ -26,6 +26,27 @@ from reaxkit.utils.path import resolve_output_path
 from reaxkit.utils.alias import normalize_choice, resolve_alias_from_columns
 
 def _get_task(args: argparse.Namespace) -> int:
+    """
+    Get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     handler = Fort74Handler(args.file)
     df = get_fort74_data(handler)
 
@@ -63,6 +84,22 @@ def _get_task(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "get",
         help="Export one column or all columns from fort.74 to CSV.",

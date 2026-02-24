@@ -73,6 +73,27 @@ def _parse_atoms_1based(spec: Optional[str]) -> Optional[list[int]]:
 
 
 def _parse_bins(bins: str) -> Union[int, Tuple[int, int]]:
+    """
+    Parse bins.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    bins : str
+        Parameter description.
+
+    Returns
+    -------
+    Union[int, Tuple[int, int]]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if "," in bins:
         nx, ny = [int(x) for x in bins.split(",")]
         return (nx, ny)
@@ -101,6 +122,22 @@ def _value_column_to_key(value_col: str) -> tuple[str, str]:
 # ------------------------- common args -------------------------
 
 def _add_common_vels_io_args(p: argparse.ArgumentParser) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="vels", help="Path to vels/moldyn.vel/molsav file.")
     p.add_argument("--atoms", default=None,
                    help='1-based atom indices (optional). Examples: "1,3,7" or "1-10,25".')
@@ -109,6 +146,22 @@ def _add_common_vels_io_args(p: argparse.ArgumentParser) -> None:
 
 
 def _add_common_plot_args(p: argparse.ArgumentParser) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--save", default=None, help="Path to save plot image (dir or full filename).")
     p.add_argument("--vmin", type=float, default=None, help="Color scale min (auto if not set).")
     p.add_argument("--vmax", type=float, default=None, help="Color scale max (auto if not set).")
@@ -118,6 +171,27 @@ def _add_common_plot_args(p: argparse.ArgumentParser) -> None:
 # ------------------------- tasks -------------------------
 
 def _get_task(args: argparse.Namespace) -> int:
+    """
+    Get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = VelsHandler(args.file)
 
     atoms = _parse_atoms_1based(args.atoms)
@@ -153,6 +227,27 @@ def _get_task(args: argparse.Namespace) -> int:
 
 
 def _plot3d_task(args: argparse.Namespace) -> int:
+    """
+    Plot3d task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = VelsHandler(args.file)
     atoms = _parse_atoms_1based(args.atoms)
 
@@ -199,6 +294,27 @@ def _plot3d_task(args: argparse.Namespace) -> int:
 
 
 def _heatmap2d_task(args: argparse.Namespace) -> int:
+    """
+    Heatmap2d task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = VelsHandler(args.file)
     atoms = _parse_atoms_1based(args.atoms)
 
@@ -246,6 +362,22 @@ def _heatmap2d_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---------------- get ----------------
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     g = subparsers.add_parser(
         "get",
         help="Get vels data (coords/vels/accels/prev) for all or selected atoms.",

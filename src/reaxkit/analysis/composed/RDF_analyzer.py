@@ -107,6 +107,29 @@ def _rdf_freud_frame(
 
 
 def _write_xyz_temp(coords: np.ndarray, types: Sequence[str]) -> str:
+    """
+    Write a temporary single-frame XYZ file for RDF backends.
+
+    Works on
+    --------
+    Coordinate arrays plus per-atom element labels
+
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        Atomic coordinates as an ``(N, 3)`` array.
+    types : Sequence[str]
+        Element symbols aligned with ``coords`` rows.
+
+    Returns
+    -------
+    str
+        Path to the generated temporary ``.xyz`` file.
+
+    Examples
+    --------
+    >>>
+    """
     import tempfile, os
     def _norm(sym: str) -> str:
         s = str(sym).strip()

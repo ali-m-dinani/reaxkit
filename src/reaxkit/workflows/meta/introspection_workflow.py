@@ -59,6 +59,29 @@ FOLDER_ROOTS: List[str] = [
 
 
 def _print_table(rows: List[Tuple[str, str]], headers: Tuple[str, str]) -> int:
+    """
+    Print table.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    rows : List[Tuple[str, str]]
+        Parameter description.
+    headers : Tuple[str, str]
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if not rows:
         print("No items found.")
         return 0
@@ -67,6 +90,27 @@ def _print_table(rows: List[Tuple[str, str]], headers: Tuple[str, str]) -> int:
 
 
 def _resolve_pkg_dir_from_module_name(modname: str) -> Optional[str]:
+    """
+    Resolve pkg dir from module name.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    modname : str
+        Parameter description.
+
+    Returns
+    -------
+    Optional[str]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     try:
         mod = importlib.import_module(modname)
         if getattr(mod, "__path__", None):
@@ -77,6 +121,27 @@ def _resolve_pkg_dir_from_module_name(modname: str) -> Optional[str]:
 
 
 def _looks_like_path(hint: str) -> bool:
+    """
+    Looks like path.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    hint : str
+        Parameter description.
+
+    Returns
+    -------
+    bool
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     return hint.endswith(".py") or ("/" in hint) or ("\\" in hint) or (os.sep in hint)
 
 
@@ -127,7 +192,22 @@ def _resolve_folder_hint_to_dir(folder_hint: str) -> Optional[str]:
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
-    """Define CLI args for `reaxkit intspec` (kind-level)."""
+    """
+    Build parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
     g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
@@ -187,7 +267,25 @@ def run_file(module_hint: str) -> int:
 
 def run_folder(folder_hint: str) -> int:
     """
-    Recursively list all .py files under the folder/package with module docstring first line.
+    Run folder.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    folder_hint : str
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     pkg_dir = _resolve_folder_hint_to_dir(folder_hint)
     if not pkg_dir:
@@ -215,7 +313,22 @@ def run_main(file: str | None, folder: str | None) -> int:
 
 
 def register_tasks(subparsers) -> None:
-    """Task-level entry: `reaxkit intspec run ...`."""
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : Any
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "run",
         help="Introspect a module (--file) or folder (--folder).",

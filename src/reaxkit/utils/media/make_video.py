@@ -20,7 +20,25 @@ import imageio
 
 def _extract_numeric_index(filename: str) -> int:
     """
-    Extract the first numeric index from a filename for sorting purposes.
+    Extract the first numeric index from a filename for sorting.
+
+    Works on
+    --------
+    Image/video filename strings
+
+    Parameters
+    ----------
+    filename : str
+        Input filename.
+
+    Returns
+    -------
+    int
+        First integer token in ``filename``; returns ``-1`` when none is found.
+
+    Examples
+    --------
+    >>>
     """
     nums = re.findall(r"\d+", filename)
     return int(nums[0]) if nums else -1

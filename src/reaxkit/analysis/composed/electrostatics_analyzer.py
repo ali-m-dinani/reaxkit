@@ -56,7 +56,27 @@ AggregateKind = Optional[Literal["mean", "max", "min", "last"]]
 # -------------------------------------------------------------------------------------
 
 def _convex_hull_volume(coords: np.ndarray) -> float:
-    """Convex-hull volume; NaN if not computable."""
+    """
+    Compute convex-hull volume for 3D coordinates.
+
+    Works on
+    --------
+    Numeric coordinate arrays (N, 3)
+
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        Atomic coordinates as an ``(N, 3)`` array.
+
+    Returns
+    -------
+    float
+        Hull volume, or ``numpy.nan`` when not computable.
+
+    Examples
+    --------
+    >>>
+    """
     coords = np.asarray(coords, float)
     if coords.ndim != 2 or coords.shape[1] != 3 or coords.shape[0] < 4:
         return np.nan
@@ -67,7 +87,27 @@ def _convex_hull_volume(coords: np.ndarray) -> float:
 
 
 def _bbox_volume(coords: np.ndarray) -> float:
-    """Axis-aligned bounding box volume; NaN if empty/invalid."""
+    """
+    Compute axis-aligned bounding-box volume for 3D coordinates.
+
+    Works on
+    --------
+    Numeric coordinate arrays (N, 3)
+
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        Atomic coordinates as an ``(N, 3)`` array.
+
+    Returns
+    -------
+    float
+        Bounding-box volume, or ``numpy.nan`` for empty/invalid inputs.
+
+    Examples
+    --------
+    >>>
+    """
     coords = np.asarray(coords, float)
     if coords.ndim != 2 or coords.shape[1] != 3 or coords.shape[0] == 0:
         return np.nan

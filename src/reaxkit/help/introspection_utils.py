@@ -17,6 +17,27 @@ from typing import Any, Iterable, List, Optional, Tuple
 # ---------------------------- helpers ----------------------------
 
 def _first_line(s: str | None) -> str:
+    """
+    Return the first non-empty line from a docstring-like text.
+
+    Works on
+    --------
+    Optional multi-line strings
+
+    Parameters
+    ----------
+    s : str or None
+        Source string.
+
+    Returns
+    -------
+    str
+        First meaningful line, or ``"No description"``.
+
+    Examples
+    --------
+    >>>
+    """
     if not s:
         return "No description"
     for line in s.strip().splitlines():
@@ -26,12 +47,53 @@ def _first_line(s: str | None) -> str:
 
 
 def _parse_ast_from_file(pyfile: str) -> ast.Module:
+    """
+    Parse a Python file into an AST module object.
+
+    Works on
+    --------
+    Local ``.py`` source files
+
+    Parameters
+    ----------
+    pyfile : str
+        Path to a Python file.
+
+    Returns
+    -------
+    ast.Module
+        Parsed AST tree.
+
+    Examples
+    --------
+    >>>
+    """
     with open(pyfile, "r", encoding="utf-8") as f:
         return ast.parse(f.read(), filename=pyfile)
 
 
 def module_docstring_first_line_from_file(pyfile: str) -> str:
-    """Return first non-empty line of a module's docstring (no import)."""
+    """
+    Return the first non-empty line of a module docstring without importing it.
+
+    Works on
+    --------
+    Local ``.py`` source files
+
+    Parameters
+    ----------
+    pyfile : str
+        Path to a Python module file.
+
+    Returns
+    -------
+    str
+        One-line module summary, or ``"No description"``.
+
+    Examples
+    --------
+    >>>
+    """
     try:
         tree = _parse_ast_from_file(pyfile)
         return _first_line(ast.get_docstring(tree))
@@ -41,13 +103,45 @@ def module_docstring_first_line_from_file(pyfile: str) -> str:
 
 @dataclass(frozen=True)
 class PublicSymbolSummary:
+    """
+    Summary record for a public symbol discovered via AST inspection.
+
+    Attributes
+    ----------
+    name : str
+        Public symbol name.
+    kind : str
+        Symbol kind (``"function"`` or ``"class"``).
+    summary : str
+        One-line docstring summary.
+    """
     name: str
     kind: str   # "function" | "class"
     summary: str
 
 
 def public_symbols_from_file(pyfile: str) -> List[PublicSymbolSummary]:
-    """Return public functions/classes defined in a .py file using AST (no import)."""
+    """
+    Return public functions and classes from a Python file using AST only.
+
+    Works on
+    --------
+    Local ``.py`` source files
+
+    Parameters
+    ----------
+    pyfile : str
+        Path to a Python module file.
+
+    Returns
+    -------
+    list[PublicSymbolSummary]
+        Sorted public symbol summaries.
+
+    Examples
+    --------
+    >>>
+    """
     try:
         tree = _parse_ast_from_file(pyfile)
     except Exception:
@@ -83,7 +177,33 @@ def iter_py_files_recursive(
     skip_init: bool = True,
     skip_dirs: Optional[Iterable[str]] = None,
 ) -> List[str]:
-    """Return a sorted list of .py files under root_dir (recursively)."""
+    """
+    Collect Python files recursively from a root directory.
+
+    Works on
+    --------
+    Local filesystem directory trees
+
+    Parameters
+    ----------
+    root_dir : str
+        Root directory to scan.
+    skip_private : bool, optional
+        If True, skip private files/directories prefixed with ``_``.
+    skip_init : bool, optional
+        If True, skip ``__init__.py`` files.
+    skip_dirs : Iterable[str] or None, optional
+        Directory names to exclude from recursion.
+
+    Returns
+    -------
+    list[str]
+        Sorted absolute paths to ``.py`` files.
+
+    Examples
+    --------
+    >>>
+    """
     root_dir = os.path.abspath(root_dir)
     skip_dirs = set(skip_dirs or {"__pycache__", ".git", ".venv", "venv", "site-packages", "dist", "build"})
 
@@ -106,7 +226,27 @@ def iter_py_files_recursive(
 
 
 def list_modules_recursive_with_summaries(pkg_dir: str) -> List[Tuple[str, str]]:
-    """Return [(relative_path, module_docstring_first_line), ...] for all .py files under pkg_dir."""
+    """
+    List Python modules under a directory with one-line docstring summaries.
+
+    Works on
+    --------
+    Local filesystem directory trees
+
+    Parameters
+    ----------
+    pkg_dir : str
+        Package directory to scan.
+
+    Returns
+    -------
+    list[tuple[str, str]]
+        ``(relative_path, module_summary)`` rows.
+
+    Examples
+    --------
+    >>>
+    """
     rows: List[Tuple[str, str]] = []
     for py in iter_py_files_recursive(pkg_dir):
         rel = os.path.relpath(py, pkg_dir).replace("\\", "/")

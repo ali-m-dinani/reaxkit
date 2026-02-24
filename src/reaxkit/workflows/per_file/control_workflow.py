@@ -49,7 +49,27 @@ def _format_value(value):
 
 
 def _control_get_task(args: argparse.Namespace) -> int:
-    """CLI task: get a single control key value (e.g., nmdit)."""
+    """
+    Control get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     handler = ControlHandler(args.file)
     value = get_control_data(handler, args.key, section=args.section, default=None)
 
@@ -63,7 +83,25 @@ def _control_get_task(args: argparse.Namespace) -> int:
 
 def _control_make_task(args: argparse.Namespace) -> int:
     """
-    CLI task: generate a default control file with all sections and default values.
+    Control make task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     output = write_control_template(args.output)
     print(f"[Done] control file written to {output}")
@@ -71,6 +109,22 @@ def _control_make_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # --- get ---
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "get",
         help="Get the value of a control key (e.g. nmdit)",

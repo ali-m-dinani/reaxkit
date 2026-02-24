@@ -49,7 +49,20 @@ def _fort83_update_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Directly register 'get' under fort83 without extra nesting.
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
     """
     p = subparsers.add_parser(
         "update",

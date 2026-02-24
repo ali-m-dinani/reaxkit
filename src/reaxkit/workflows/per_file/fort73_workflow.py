@@ -31,6 +31,27 @@ from reaxkit.utils.media.plotter import single_plot
 from reaxkit.utils.path import resolve_output_path
 
 def _fort73_get_task(args: argparse.Namespace) -> int:
+    """
+    Fort73 get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     DEFAULT_FILES = {
         "fort73": "fort.73",
         "energylog": "energylog",
@@ -131,6 +152,22 @@ def _fort73_get_task(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p_get = subparsers.add_parser(
         "get",
         help="Extract and plot energy data from fort.73\n",

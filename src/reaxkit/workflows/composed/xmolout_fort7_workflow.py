@@ -42,12 +42,56 @@ from reaxkit.utils.media.plotter import scatter3d_points, heatmap2d_from_3d
 # ------------------------- internals -------------------------
 
 def _indices_from_spec(xh: XmoloutHandler, frames_spec: Optional[Union[slice, Sequence[int]]]) -> list[int]:
-    """Turn a frames spec (slice or list) into concrete frame indices for xh."""
+    """
+    Indices from spec.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    xh : XmoloutHandler
+        Parameter description.
+    frames_spec : Optional[Union[slice, Sequence[int]]]
+        Parameter description.
+
+    Returns
+    -------
+    list[int]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     return resolve_indices(xh, frames=frames_spec, iterations=None, step=None)
 
 
 def _select_atoms(n_atoms: int, atoms: Optional[Sequence[int]]) -> np.ndarray:
-    """Return a boolean mask over 0..n_atoms-1 for the selected atom indices."""
+    """
+    Select atoms.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    n_atoms : int
+        Parameter description.
+    atoms : Optional[Sequence[int]]
+        Parameter description.
+
+    Returns
+    -------
+    np.ndarray
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if not atoms:
         return np.ones(n_atoms, dtype=bool)
     mask = np.zeros(n_atoms, dtype=bool)
@@ -76,7 +120,44 @@ def _plot_fort7_property_3d(
     azim: float = 38.0,
 ) -> None:
     """
-    Plot any scalar property (e.g., partial_charge/charge/q) from fort.7 in 3D across frames.
+    Plot fort7 property 3d.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    xmolout_handler : XmoloutHandler
+        Parameter description.
+    fort7_handler : Fort7Handler
+        Parameter description.
+    property_name : str
+        Parameter description.
+    frames_spec : Optional[Union[slice, Sequence[int]]]
+        Parameter description.
+    atoms_list : Optional[Sequence[int]]
+        Parameter description.
+    save_dir : Optional[Union[str, Path]]
+        Parameter description.
+    vmin : Optional[float]
+        Parameter description.
+    vmax : Optional[float]
+        Parameter description.
+    size : float
+        Parameter description.
+    alpha : float
+        Parameter description.
+    cmap : str
+        Parameter description.
+    elev : float
+        Parameter description.
+    azim : float
+        Parameter description.
+
+    Examples
+    --------
+    >>>
     """
     # Pull all per-atom data we need from fort7 (tidy: frame_idx, iter, atom_idx, <props...>)
     df_all = f7.get_features_atom(fort7_handler, columns=".*", frames=frames_spec, regex=True)
@@ -141,6 +222,27 @@ def _plot_fort7_property_3d(
 
 
 def _plot_property_task(args: argparse.Namespace) -> int:
+    """
+    Plot property task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     xh = XmoloutHandler(args.xmolout)
     fh = Fort7Handler(args.fort7)
 
@@ -171,6 +273,27 @@ def _plot_property_task(args: argparse.Namespace) -> int:
 # ==================== 2D HEATMAP (projection + aggregation) ====================
 
 def _parse_bins(bins: str) -> Union[int, Tuple[int, int]]:
+    """
+    Parse bins.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    bins : str
+        Parameter description.
+
+    Returns
+    -------
+    Union[int, Tuple[int, int]]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if "," in bins:
         nx, ny = [int(x) for x in bins.split(",")]
         return (nx, ny)
@@ -255,6 +378,24 @@ def _add_common_xmolout_io_args(
     *,
     include_plot: bool = False,
 ) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--xmolout", default="xmolout", help="Path to xmolout file.")
     p.add_argument("--fort7", default="fort.7", help="Path to fort.7 file.")
     if include_plot:

@@ -93,7 +93,25 @@ def _parse_csv_ints(value: str, expected: int, name: str) -> List[int]:
 
 def _xtob_task(args: argparse.Namespace) -> int:
     """
-    Convert XYZ → GEO (XTLGRF) using reaxkit.io.geo_generator.xtob.
+    Xtob task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     xyz_path = Path(args.file)
 
@@ -371,6 +389,27 @@ def _place2_task(args: argparse.Namespace) -> int:
 # Task 6: add restraint block to GEO
 # ----------------------------------------------------------------------
 def _add_restraint_task(args: argparse.Namespace) -> int:
+    """
+    Add restraint task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     in_path = Path(args.file)
     if not in_path.is_file():
         raise FileNotFoundError(f"Input GEO file not found: {in_path}")
@@ -421,6 +460,22 @@ def _add_restraint_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- xtob ----
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p_xtob = subparsers.add_parser(
         "xtob",
         help="Convert an XYZ file to GEO (XTLGRF) format \n",

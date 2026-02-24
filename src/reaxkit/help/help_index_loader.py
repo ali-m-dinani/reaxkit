@@ -83,6 +83,27 @@ class PreparedEntry:
     tokens: Dict[str, set[str]]
 
 def _prepare_index(idx: Dict[str, Any]) -> Dict[str, PreparedEntry]:
+    """
+    Precompute searchable blobs and token sets for an index mapping.
+
+    Works on
+    --------
+    ReaxKit help-index dictionaries with a ``files`` section
+
+    Parameters
+    ----------
+    idx : dict[str, Any]
+        Raw parsed YAML index.
+
+    Returns
+    -------
+    dict[str, PreparedEntry]
+        Mapping from file key to prepared entry used by ranking/search.
+
+    Examples
+    --------
+    >>>
+    """
     files = idx.get("files", {}) or {}
     prepared = {}
 
@@ -105,11 +126,43 @@ def _prepare_index(idx: Dict[str, Any]) -> Dict[str, PreparedEntry]:
 
 @lru_cache(maxsize=1)
 def load_prepared_input_index() -> Dict[str, PreparedEntry]:
+    """
+    Load and cache the prepared input help index.
+
+    Works on
+    --------
+    Packaged ``reaxff_input_files_contents.yaml`` data
+
+    Returns
+    -------
+    dict[str, PreparedEntry]
+        Preprocessed input index for search.
+
+    Examples
+    --------
+    >>>
+    """
     return _prepare_index(_load_input_index())
 
 
 @lru_cache(maxsize=1)
 def load_prepared_output_index() -> Dict[str, PreparedEntry]:
+    """
+    Load and cache the prepared output help index.
+
+    Works on
+    --------
+    Packaged ``reaxff_output_files_contents.yaml`` data
+
+    Returns
+    -------
+    dict[str, PreparedEntry]
+        Preprocessed output index for search.
+
+    Examples
+    --------
+    >>>
+    """
     return _prepare_index(_load_output_index())
 
 
@@ -145,10 +198,42 @@ def _read_yaml_from_pkg_data(filename: str) -> Dict[str, Any]:
 
 
 def _load_input_index() -> Dict[str, Any]:
+    """
+    Load raw input index YAML data.
+
+    Works on
+    --------
+    Packaged ReaxKit help index files
+
+    Returns
+    -------
+    dict[str, Any]
+        Parsed input-index mapping.
+
+    Examples
+    --------
+    >>>
+    """
     return _read_yaml_from_pkg_data("reaxff_input_files_contents.yaml")
 
 
 def _load_output_index() -> Dict[str, Any]:
+    """
+    Load raw output index YAML data.
+
+    Works on
+    --------
+    Packaged ReaxKit help index files
+
+    Returns
+    -------
+    dict[str, Any]
+        Parsed output-index mapping.
+
+    Examples
+    --------
+    >>>
+    """
     return _read_yaml_from_pkg_data("reaxff_output_files_contents.yaml")
 
 
@@ -162,6 +247,24 @@ _WORD_RE = re.compile(r"[a-z0-9]+")
 def _norm(s: str) -> str:
     """
     Normalize a string for case-insensitive search matching.
+
+    Works on
+    --------
+    Free-text query and index strings
+
+    Parameters
+    ----------
+    s : str
+        Input string.
+
+    Returns
+    -------
+    str
+        Lowercased, whitespace-normalized text.
+
+    Examples
+    --------
+    >>>
     """
     s = s.lower()
     s = s.replace("_", " ").replace("-", " ")
@@ -172,6 +275,24 @@ def _norm(s: str) -> str:
 def _tokens(s: str) -> List[str]:
     """
     Tokenize a normalized string into alphanumeric search terms.
+
+    Works on
+    --------
+    Free-text query and index strings
+
+    Parameters
+    ----------
+    s : str
+        Input string.
+
+    Returns
+    -------
+    list[str]
+        Token sequence for matching.
+
+    Examples
+    --------
+    >>>
     """
     return _WORD_RE.findall(_norm(s))
 
@@ -201,6 +322,24 @@ def _fuzzy_ratio(a: str, b: str) -> float:
 def _as_list(v: Any) -> List[str]:
     """
     Normalize a YAML value into a list of strings.
+
+    Works on
+    --------
+    YAML scalar/list fields in help index entries
+
+    Parameters
+    ----------
+    v : Any
+        Input field value.
+
+    Returns
+    -------
+    list[str]
+        Normalized list representation.
+
+    Examples
+    --------
+    >>>
     """
     if v is None:
         return []

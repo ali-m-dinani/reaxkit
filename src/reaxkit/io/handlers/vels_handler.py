@@ -85,21 +85,62 @@ class VelsHandler(BaseHandler):
     SECTION_PREV_ACCELS = "Previous atom accelerations"
 
     def __init__(self, file_path: str | Path = "vels") -> None:
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._sections: Dict[str, pd.DataFrame] = {}
 
     @property
     def sections(self) -> Dict[str, pd.DataFrame]:
+        """
+        Sections.
+
+        Returns
+        -------
+        Dict[str, pd.DataFrame]
+            Return value description.
+
+        """
         if not self._parsed:
             self.parse()
         return self._sections
 
     def section_df(self, name: str) -> pd.DataFrame:
+        """
+        Section df.
+
+        Parameters
+        ----------
+        name : str
+            Parameter description.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         if not self._parsed:
             self.parse()
         return self._sections[name]
 
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         lines = self.path.read_text().splitlines()
         meta: Dict[str, Any] = {}
         sections: Dict[str, pd.DataFrame] = {}

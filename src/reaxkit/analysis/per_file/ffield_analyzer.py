@@ -49,7 +49,27 @@ _SECTION_ALIASES: Dict[str, str] = {
 
 
 def _normalize_section_name(section: str) -> str:
-    """Normalize user input like 'Off-Diagonal', ' off diag ' -> 'off_diagonal'."""
+    """
+    Normalize a force-field section name to canonical snake_case form.
+
+    Works on
+    --------
+    FField section labels
+
+    Parameters
+    ----------
+    section : str
+        User-provided section name.
+
+    Returns
+    -------
+    str
+        Normalized section key (e.g., ``"off_diagonal"``).
+
+    Examples
+    --------
+    >>>
+    """
     return section.strip().lower().replace("-", "_").replace(" ", "_")
 
 

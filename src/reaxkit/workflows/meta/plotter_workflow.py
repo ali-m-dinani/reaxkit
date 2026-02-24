@@ -40,6 +40,27 @@ from reaxkit.utils.media.plotter import (
 # ---------- Helpers ----------
 
 def _load_table(path: str | Path) -> pd.DataFrame:
+    """
+    Load table.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    path : str | Path
+        Parameter description.
+
+    Returns
+    -------
+    pd.DataFrame
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     path = Path(path)
     suf = path.suffix.lower()
 
@@ -94,7 +115,25 @@ def _parse_col_token(token: str) -> int:
 
 def _parse_col_list(spec: str) -> List[int]:
     """
-    Parse a comma-separated list like 'c1,c3' -> [0, 2].
+    Parse col list.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    spec : str
+        Parameter description.
+
+    Returns
+    -------
+    List[int]
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     tokens = [s for s in spec.split(",") if s.strip()]
     if not tokens:
@@ -213,7 +252,25 @@ def _plotter_single_task(args: argparse.Namespace) -> int:
 
 def _plotter_directed_task(args: argparse.Namespace) -> int:
     """
-    reaxkit plotter directed --file summary.txt --xaxis c1 --yaxis c2 [--save dir.png]
+    Plotter directed task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.xaxis)
@@ -250,7 +307,25 @@ def _plotter_directed_task(args: argparse.Namespace) -> int:
 
 def _plotter_dual_task(args: argparse.Namespace) -> int:
     """
-    reaxkit plotter dual --file summary.txt --xaxis c1 --y1 c2 --y2 c3 [--save dual.png]
+    Plotter dual task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.xaxis)
@@ -366,7 +441,25 @@ def _plotter_tornado_task(args: argparse.Namespace) -> int:
 
 def _plotter_scatter3d_task(args: argparse.Namespace) -> int:
     """
-    reaxkit plotter scatter3d --file summary.txt --x c1 --y c2 --z c3 --value c4 [--save out.png]
+    Plotter scatter3d task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.x)
@@ -468,6 +561,22 @@ def _plotter_heatmap2d_task(args: argparse.Namespace) -> int:
 # ---------- Registration ----------
 
 def _add_common_io_args(p: argparse.ArgumentParser) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument(
         "--file",
         required=True,

@@ -56,9 +56,27 @@ class Fort99Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.99"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         rows: List[Dict[str, Any]] = []
 
         # float like -17.8000, 1.54, 1.0e-03, etc.

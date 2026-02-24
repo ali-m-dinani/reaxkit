@@ -28,6 +28,30 @@ from reaxkit.utils.media.convert import convert_xaxis
 from reaxkit.utils.path import resolve_output_path
 
 def _export_csv(x, x_label: str, y, y_label: str, path: str) -> None:
+    """
+    Export csv.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    x : Any
+        Parameter description.
+    x_label : str
+        Parameter description.
+    y : Any
+        Parameter description.
+    y_label : str
+        Parameter description.
+    path : str
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     import pandas as pd
     df = pd.DataFrame({x_label: x, y_label: y})
     out = Path(path)
@@ -38,7 +62,25 @@ def _export_csv(x, x_label: str, y, y_label: str, path: str) -> None:
 
 def _get_task(args: argparse.Namespace) -> int:
     """
-    Get/plot/export a single yaxis from fort.78 vs iter/frame/time.
+    Get task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
     """
     handler = Fort78Handler(args.file)
 

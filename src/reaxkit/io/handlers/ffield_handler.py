@@ -174,22 +174,63 @@ class FFieldHandler(BaseHandler):
 
     # ---------------- init / public API ---------------------------
     def __init__(self, file_path: str | Path = "ffield") -> None:
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._sections: Dict[str, pd.DataFrame] = {}
 
     @property
     def sections(self) -> Dict[str, pd.DataFrame]:
+        """
+        Sections.
+
+        Returns
+        -------
+        Dict[str, pd.DataFrame]
+            Return value description.
+
+        """
         if not self._parsed:
             self.parse()
         return self._sections
 
     def section_df(self, name: str) -> pd.DataFrame:
+        """
+        Section df.
+
+        Parameters
+        ----------
+        name : str
+            Parameter description.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         if not self._parsed:
             self.parse()
         return self._sections[name]
 
     # ---------------- core parsing -------------------------------
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         path = self.path
         lines = path.read_text().splitlines()
 
@@ -297,7 +338,24 @@ class FFieldHandler(BaseHandler):
     def _parse_general_section(
         self, lines: List[str], start: int, n_params: int
     ) -> Tuple[pd.DataFrame, int]:
-        """Parse General parameters using fixed names, not inline comments."""
+        """
+         parse general section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_params : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         expected = len(self._GENERAL_PARAM_NAMES)
         if n_params == expected:
             print("[FFieldHandler Check] Number of general parameters is 39 (expected).")
@@ -345,6 +403,24 @@ class FFieldHandler(BaseHandler):
     def _parse_atom_section(
         self, lines: List[str], start: int, n_atoms: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse atom section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_atoms : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = self._number_unused_titles(self._ATOM_PARAM_NAMES_BASE)
         n_per_atom = len(names)
 
@@ -415,6 +491,24 @@ class FFieldHandler(BaseHandler):
     def _parse_bond_section(
         self, lines: List[str], start: int, n_bonds: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse bond section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_bonds : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = self._number_unused_titles(self._BOND_PARAM_NAMES_BASE)
         n_per_bond = len(names)
 
@@ -485,6 +579,24 @@ class FFieldHandler(BaseHandler):
     def _parse_off_diagonal_section(
         self, lines: List[str], start: int, n_entries: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse off diagonal section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_entries : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = list(self._OFF_DIAGONAL_PARAM_NAMES)
         n_per = len(names)
 
@@ -553,6 +665,24 @@ class FFieldHandler(BaseHandler):
     def _parse_angle_section(
         self, lines: List[str], start: int, n_angles: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse angle section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_angles : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = list(self._ANGLE_PARAM_NAMES)
         n_per = len(names)
 
@@ -629,6 +759,24 @@ class FFieldHandler(BaseHandler):
     def _parse_torsion_section(
         self, lines: List[str], start: int, n_torsions: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse torsion section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_torsions : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = self._number_unused_titles(self._TORSION_PARAM_NAMES_BASE)
         n_per = len(names)
 
@@ -713,6 +861,24 @@ class FFieldHandler(BaseHandler):
     def _parse_hbond_section(
         self, lines: List[str], start: int, n_hbonds: int
     ) -> Tuple[pd.DataFrame, int]:
+        """
+         parse hbond section.
+
+        Parameters
+        ----------
+        lines : List[str]
+            Parameter description.
+        start : int
+            Parameter description.
+        n_hbonds : int
+            Parameter description.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, int]
+            Return value description.
+
+        """
         names = list(self._HBOND_PARAM_NAMES)
         n_per = len(names)
 
@@ -789,6 +955,20 @@ class FFieldHandler(BaseHandler):
     # ---------------- helpers ------------------------------------
     @staticmethod
     def _first_int_in_line(line: str) -> Optional[int]:
+        """
+         first int in line.
+
+        Parameters
+        ----------
+        line : str
+            Parameter description.
+
+        Returns
+        -------
+        Optional[int]
+            Return value description.
+
+        """
         for tok in line.split():
             try:
                 return int(tok)
@@ -801,6 +981,22 @@ class FFieldHandler(BaseHandler):
         names: List[str],
         label: str = "n.u.",
     ) -> List[str]:
+        """
+         number unused titles.
+
+        Parameters
+        ----------
+        names : List[str]
+            Parameter description.
+        label : str
+            Parameter description.
+
+        Returns
+        -------
+        List[str]
+            Return value description.
+
+        """
         result: List[str] = []
         counter = 0
         for name in names:

@@ -55,6 +55,17 @@ class XmoloutHandler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "xmolout", *, extra_atom_cols: Optional[list[str]] = None):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+        extra_atom_cols : Optional[list[str]]
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []     # list of per-frame atom tables
         self._n_atoms: Optional[int] = None
@@ -63,6 +74,15 @@ class XmoloutHandler(BaseHandler):
 
     # ---- FileHandler requirement
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         sim_rows: List[list] = []
         frames: List[pd.DataFrame] = []
 
@@ -146,13 +166,44 @@ class XmoloutHandler(BaseHandler):
 
     # ---- Explicit, file-specific accessors (no generic get())
     def n_frames(self) -> int:
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return int(self.metadata().get("n_frames", 0))
 
     def n_atoms(self) -> Optional[int]:
+        """
+        N atoms.
+
+        Returns
+        -------
+        Optional[int]
+            Return value description.
+
+        """
         return self._n_atoms
 
     def frame(self, i: int) -> Dict[str, Any]:
-        """Return a lightweight frame dict: coords + atom_types + iter for frame i."""
+        """
+        Frame.
+
+        Parameters
+        ----------
+        i : int
+            Parameter description.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Return value description.
+
+        """
         df = self.dataframe()
         if i < 0 or i >= len(self._frames):
             raise IndexError(f"frame index {i} out of range [0, {len(self._frames) - 1}]")
@@ -170,5 +221,19 @@ class XmoloutHandler(BaseHandler):
         }
 
     def iter_frames(self, step: int = 1) -> Iterator[Dict[str, Any]]:
+        """
+        Iter frames.
+
+        Parameters
+        ----------
+        step : int
+            Parameter description.
+
+        Yields
+        -------
+        Iterator[Dict[str, Any]]
+            Return value description.
+
+        """
         for i in range(0, self.n_frames(), max(1, int(step))):
             yield self.frame(i)

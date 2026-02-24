@@ -52,12 +52,35 @@ class Fort73Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.73"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     @staticmethod
     def _is_int_token(tok: str) -> bool:
         # Iteration index appears as an integer token
         # (allow leading +/-, though usually non-negative)
+        """
+         is int token.
+
+        Parameters
+        ----------
+        tok : str
+            Parameter description.
+
+        Returns
+        -------
+        bool
+            Return value description.
+
+        """
         if not tok:
             return False
         if tok[0] in "+-":
@@ -65,6 +88,15 @@ class Fort73Handler(BaseHandler):
         return tok.isdigit()
 
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         cols: List[str] = []
         rows: List[List[Optional[str]]] = []
 

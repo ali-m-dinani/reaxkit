@@ -2,13 +2,13 @@
 Control file analysis utilities.
 
 This module provides helper functions for querying and retrieving
-parameters from a parsed ReaxFF control file via `ControlHandler`.
+parameters from a parsed ReaxFF control file via ``ControlHandler``.
 
 Typical use cases include:
 
-    - discovering available parameter sections
-    - listing available control keys
-    - retrieving parameter values with safe defaults
+- discovering available parameter sections
+- listing available control keys
+- retrieving parameter values with safe defaults
 """
 
 
@@ -19,11 +19,12 @@ from reaxkit.io.handlers.control_handler import ControlHandler
 
 
 def _get_available_sections(handler: ControlHandler) -> list[str]:
-    """List the available parameter sections in a ReaxFF control file.
+    """
+    List the available parameter sections in a ReaxFF control file.
 
     Works on
     --------
-    ControlHandler (control)
+    ControlHandler - ``control``
 
     Parameters
     ----------
@@ -33,14 +34,11 @@ def _get_available_sections(handler: ControlHandler) -> list[str]:
     Returns
     -------
     list[str]
-        Section names present in the file (e.g., "general", "md", "mm", "ff", "outdated").
+        Section names present in the file.
 
     Examples
     --------
-    >>> from reaxkit.io.handlers.control_handler import ControlHandler
-    >>> from reaxkit.analysis.per_file.control_analyzer import _get_available_sections
-    >>> h = ControlHandler("control")
-    >>> sections = _get_available_sections(h)
+    >>>
     """
     sections = []
     if handler.general_parameters:
@@ -57,18 +55,19 @@ def _get_available_sections(handler: ControlHandler) -> list[str]:
 
 
 def _get_available_keys(handler: ControlHandler, section: Optional[str] = None) -> list[str]:
-    """List available control-file parameter keys, optionally within a specific section.
+    """
+    List available control-file parameter keys, optionally within a section.
 
     Works on
     --------
-    ControlHandler (control)
+    ControlHandler - ``control``
 
     Parameters
     ----------
     handler : ControlHandler
         Parsed control file handler.
     section : str, optional
-        Section to query (one of: "general", "md", "mm", "ff", "outdated").
+        Section to query (one of: ``"general"``, ``"md"``, ``"mm"``, ``"ff"``, ``"outdated"``).
         If None, keys from all sections are combined.
 
     Returns
@@ -78,10 +77,7 @@ def _get_available_keys(handler: ControlHandler, section: Optional[str] = None) 
 
     Examples
     --------
-    >>> from reaxkit.io.handlers.control_handler import ControlHandler
-    >>> from reaxkit.analysis.per_file.control_analyzer import _get_available_keys
-    >>> h = ControlHandler("control")
-    >>> keys = _get_available_keys(h, section="md")
+    >>>
     """
     section_map = {
         "general": handler.general_parameters,
@@ -115,7 +111,7 @@ def get_control_data(
 
     Works on
     --------
-    ControlHandler (control)
+    ControlHandler - ``control``
 
     Parameters
     ----------
@@ -124,22 +120,19 @@ def get_control_data(
     key : str
         Parameter name (case-insensitive).
     section : str, optional
-        Section to search (one of: "general", "md", "mm", "ff", "outdated").
+        Section to search (one of: ``"general"``, ``"md"``, ``"mm"``, ``"ff"``, ``"outdated"``).
         If None, all sections are searched in order.
-    default : any, optional
+    default : Any, optional
         Value to return if the key is not found.
 
     Returns
     -------
-    any
-        The parameter value if found; otherwise `default`.
+    Any
+        The parameter value if found; otherwise ``default``.
 
     Examples
     --------
-    >>> from reaxkit.io.handlers.control_handler import ControlHandler
-    >>> from reaxkit.analysis.per_file.control_analyzer import get_control_data
-    >>> h = ControlHandler("control")
-    >>> tstep = get_control_data(h, "tstep", section="md", default=None)
+    >>>
     """
     key = key.lower()
     section_map = {

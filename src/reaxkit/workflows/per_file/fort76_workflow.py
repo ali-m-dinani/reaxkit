@@ -144,6 +144,24 @@ def _add_common_fort76_io_args(
     *,
     include_plot: bool = False,
 ) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="fort.76", help="Path to fort.76 file.")
     p.add_argument("--xaxis", default="iter", choices=["iter", "frame", "time"])
     p.add_argument("--control", default="control", help="Needed for --xaxis time.")
@@ -158,6 +176,22 @@ def _add_common_fort76_io_args(
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # --- get ---
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p = subparsers.add_parser(
         "get",
         help="Plot, export, or save one fort.76 column vs iter/frame/time.\n",

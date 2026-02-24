@@ -47,11 +47,28 @@ class Fort13Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.13"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._n_records: Optional[int] = None
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
-        """Parse fort.13 file into a summary DataFrame."""
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         sim_rows: List[list] = []
         with open(self.path, "r") as fh:
             for idx, line in enumerate(fh, start=1):

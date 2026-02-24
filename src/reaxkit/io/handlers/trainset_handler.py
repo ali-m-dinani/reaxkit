@@ -31,7 +31,20 @@ SECTION_MAP = {
 
 
 def _split_inline_comment(line: str) -> tuple[str, str]:
-    """Return (data_part, inline_comment) split on '!' (if present)."""
+    """
+     split inline comment.
+
+    Parameters
+    ----------
+    line : str
+        Parameter description.
+
+    Returns
+    -------
+    tuple[str, str]
+        Return value description.
+
+    """
     if "!" in line:
         data, comment = line.split("!", 1)
         return data.strip(), comment.strip()
@@ -357,6 +370,22 @@ def _parse_cell_parameters(lines: List[str], section_name: str) -> pd.DataFrame:
 
 
 def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
+    """
+     parse energy.
+
+    Parameters
+    ----------
+    lines : List[str]
+        Parameter description.
+    section_name : str
+        Parameter description.
+
+    Returns
+    -------
+    pd.DataFrame
+        Return value description.
+
+    """
     rows: List[Dict[str, Any]] = []
     group_comment = ""
     last_was_comment = False  # track if previous processed line was a comment
@@ -631,7 +660,20 @@ class TrainsetHandler(BaseHandler):
     # Convenience accessors
     # ------------------------------------------------------------------
     def section(self, name: str) -> pd.DataFrame:
-        """Return table for a given section (case-insensitive)."""
+        """
+        Section.
+
+        Parameters
+        ----------
+        name : str
+            Parameter description.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         meta = self.metadata()
         tables = meta.get("tables", {})
         key = name.upper()
@@ -643,16 +685,61 @@ class TrainsetHandler(BaseHandler):
         return tables[key]
 
     def charges(self) -> pd.DataFrame:
+        """
+        Charges.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         return self.section("CHARGE")
 
     def heatfo(self) -> pd.DataFrame:
+        """
+        Heatfo.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         return self.section("HEATFO")
 
     def geometry(self) -> pd.DataFrame:
+        """
+        Geometry.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         return self.section("GEOMETRY")
 
     def cell_parameters(self) -> pd.DataFrame:
+        """
+        Cell parameters.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         return self.section("CELL_PARAMETERS")
 
     def energy_terms(self) -> pd.DataFrame:
+        """
+        Energy terms.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         return self.section("ENERGY")

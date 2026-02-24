@@ -883,7 +883,19 @@ def _make_base_atoms_from_xyz_and_cell(
     cell: np.ndarray,
 ) -> Atoms:
     """
-    Read XYZ via read_structure(), attach the provided cell, and enable PBC.
+    Read an XYZ structure, attach a provided cell, and enable periodic boundaries.
+
+    Parameters
+    ----------
+    xyz_path : str or pathlib.Path
+        Path to the input XYZ structure file.
+    cell : numpy.ndarray
+        Cell matrix assigned to the returned atoms object.
+
+    Returns
+    -------
+    ase.Atoms
+        Structure with updated cell and PBC enabled.
     """
     atoms = read_structure(xyz_path, format="xyz")
     atoms.set_cell(cell, scale_atoms=False)
@@ -1433,7 +1445,7 @@ def generate_trainset_from_yaml(
 
     Works on
     --------
-    YAML settings + XYZ inputs (optional) → trainset files and strained structures
+    YAML settings + XYZ inputs (optional) -> trainset files and strained structures
 
     Parameters
     ----------
@@ -1584,6 +1596,20 @@ def generate_trainset_from_yaml(
 BulkModulusMode = Literal["voigt", "reuss", "vrh"]
 
 def _tensor6x6_to_cij_dict(t6: List[List[float]]) -> Dict[str, float]:
+    """
+    Convert a 6x6 elastic tensor matrix into a ``cij`` dictionary.
+
+    Parameters
+    ----------
+    t6 : list[list[float]]
+        Elastic tensor in Voigt notation as a 6x6 matrix.
+
+    Returns
+    -------
+    dict[str, float]
+        Mapping with keys ``c11``, ``c22``, ``c33``, ``c12``, ``c13``, ``c23``,
+        ``c44``, ``c55``, and ``c66``.
+    """
     if t6 is None or len(t6) != 6 or any(len(row) != 6 for row in t6):
         raise ValueError("Elastic tensor must be a 6x6 matrix.")
     f = lambda i, j: float(t6[i][j])
@@ -1595,7 +1621,19 @@ def _tensor6x6_to_cij_dict(t6: List[List[float]]) -> Dict[str, float]:
 
 
 def _extract_tensor6(elastic_tensor_obj: Any) -> Optional[List[List[float]]]:
-    """Keep this tiny: support the 2–3 common mp-api shapes."""
+    """
+    Extract a 6x6 elastic tensor from common MP API object shapes.
+
+    Parameters
+    ----------
+    elastic_tensor_obj : Any
+        Elastic tensor object returned by MP API.
+
+    Returns
+    -------
+    list[list[float]] or None
+        6x6 matrix if found, otherwise ``None``.
+    """
     if elastic_tensor_obj is None:
         return None
     et = elastic_tensor_obj
@@ -1609,6 +1647,21 @@ def _extract_tensor6(elastic_tensor_obj: Any) -> Optional[List[List[float]]]:
 
 
 def _pick_bulk_modulus(bm: Any, mode: BulkModulusMode) -> Optional[float]:
+    """
+    Select a bulk modulus value from an MP bulk-modulus object.
+
+    Parameters
+    ----------
+    bm : Any
+        Bulk modulus object with ``voigt``, ``reuss``, and ``vrh`` attributes.
+    mode : BulkModulusMode
+        Selection mode: ``"voigt"``, ``"reuss"``, or ``"vrh"``.
+
+    Returns
+    -------
+    float or None
+        Selected bulk modulus value, or ``None`` if unavailable.
+    """
     if bm is None:
         return None
     val = getattr(bm, mode, None)  # bm.voigt / bm.reuss / bm.vrh

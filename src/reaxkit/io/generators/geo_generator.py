@@ -191,6 +191,28 @@ def _format_crystx(
 
 
 def _format_hetatm_line(atom_id: int, atom_type: str, x: float, y: float, z: float) -> str:
+    """
+     format hetatm line.
+
+    Parameters
+    ----------
+    atom_id : int
+        Parameter description.
+    atom_type : str
+        Parameter description.
+    x : float
+        Parameter description.
+    y : float
+        Parameter description.
+    z : float
+        Parameter description.
+
+    Returns
+    -------
+    str
+        Return value description.
+
+    """
     at2 = atom_type.strip()[:2]      # a2 field
     at5 = atom_type.strip()[:5]      # a5 field
 

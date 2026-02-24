@@ -39,10 +39,52 @@ from reaxkit.utils.path import resolve_output_path
 # ------------------------ helpers ------------------------
 
 def _normalize_section(s: str) -> str:
+    """
+    Normalize section.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    s : str
+        Parameter description.
+
+    Returns
+    -------
+    str
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     return s.strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def _atom_maps(handler: FFieldHandler) -> Tuple[Dict[int, str], Dict[str, int]]:
+    """
+    Atom maps.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    handler : FFieldHandler
+        Parameter description.
+
+    Returns
+    -------
+    Tuple[Dict[int, str], Dict[str, int]]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     atom_df = handler.section_df(FFieldHandler.SECTION_ATOM)
     if "symbol" not in atom_df.columns:
         raise KeyError("Atom section missing 'symbol' column.")
@@ -98,6 +140,27 @@ def _split_term_string(term: str) -> List[str]:
 
 
 def _term_cols_for_section(section: str) -> List[str]:
+    """
+    Term cols for section.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    section : str
+        Parameter description.
+
+    Returns
+    -------
+    List[str]
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     if section in (FFieldHandler.SECTION_BOND, FFieldHandler.SECTION_OFF_DIAGONAL):
         return ["i", "j"]
     if section in (FFieldHandler.SECTION_ANGLE, FFieldHandler.SECTION_HBOND):
@@ -221,6 +284,24 @@ def _filter_df_by_term(
 
 
 def _export_df(df: pd.DataFrame, export_path: str | Path) -> None:
+    """
+    Export df.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Parameter description.
+    export_path : str | Path
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     export_path = Path(export_path)
     export_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(export_path, index=True)
@@ -231,6 +312,27 @@ def _export_df(df: pd.DataFrame, export_path: str | Path) -> None:
 
 
 def _task_get(args: argparse.Namespace) -> int:
+    """
+    Run the ``get`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     handler = FFieldHandler(args.file)
     section = _normalize_section(args.section)
 
@@ -270,6 +372,27 @@ def _task_get(args: argparse.Namespace) -> int:
 
 
 def _task_export(args: argparse.Namespace) -> int:
+    """
+    Run the ``export`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     handler = FFieldHandler(args.file)
     interpreted = args.format == "interpreted"
 
@@ -311,6 +434,22 @@ def _task_export(args: argparse.Namespace) -> int:
 
 # ------------------------ CLI registration ------------------------
 def _add_common_ffield_args(p: argparse.ArgumentParser) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="ffield", help="Path to ffield file.")
     p.add_argument(
         "--format",

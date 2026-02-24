@@ -54,9 +54,27 @@ class EregimeHandler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "eregime.in"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         rows: List[Dict[str, Any]] = []
         max_pairs = 0
 

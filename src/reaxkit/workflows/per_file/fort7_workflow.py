@@ -71,6 +71,27 @@ def _parse_atom_selection(atom_arg, max_atoms=None):
 
 
 def _task_get(args: argparse.Namespace) -> int:
+    """
+    Run the ``get`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = Fort7Handler(args.file)
 
     frames_sel = parse_frames(args.frames)
@@ -203,6 +224,27 @@ def _task_get(args: argparse.Namespace) -> int:
 # Task: EDGES  (connection_list → tidy edge table)
 # ==========================================================
 def _task_edges(args: argparse.Namespace) -> int:
+    """
+    Run the ``edges`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = Fort7Handler(args.file)
     frames_sel = parse_frames(args.frames)
     edges = connection_list(
@@ -258,6 +300,27 @@ def _task_edges(args: argparse.Namespace) -> int:
 # Task: CONSTATs (connection_stats_over_frames)
 # ==========================================================
 def _task_constats(args: argparse.Namespace) -> int:
+    """
+    Run the ``constats`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = Fort7Handler(args.file)
     frames_sel = parse_frames(args.frames)
     stats = connection_stats_over_frames(
@@ -284,6 +347,27 @@ def _task_constats(args: argparse.Namespace) -> int:
 # Task: BOND-TS (bond_timeseries)
 # ==========================================================
 def _task_bond_ts(args: argparse.Namespace) -> int:
+    """
+    Run the ``bond_ts`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     h = Fort7Handler(args.file)
     frames_sel = parse_frames(args.frames)
     ts = bond_timeseries(
@@ -339,6 +423,27 @@ def _task_bond_ts(args: argparse.Namespace) -> int:
 # Task: BOND-EVENTS (bond_events + optional overlay)
 # ==========================================================
 def _task_bond_events(args: argparse.Namespace) -> int:
+    """
+    Run the ``bond_events`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     print('This is a time-consuming task; please be patient ...')
     h = Fort7Handler(args.file)
     frames_sel = parse_frames(args.frames)
@@ -412,6 +517,22 @@ import argparse
 # ---------------------------------------------------------------------------
 
 def _add_common_fort7_file_arg(p: argparse.ArgumentParser) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--file", default="fort.7", help="Path to fort.7 file.")
 
 def _add_common_io_args(
@@ -421,6 +542,28 @@ def _add_common_io_args(
     save_help: str = "Path to save plot image.",
     export_help: str = "Path to export CSV data.",
 ) -> None:
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    include_plot : bool
+        Parameter description.
+    save_help : str
+        Parameter description.
+    export_help : str
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     if include_plot:
         p.add_argument("--plot", action="store_true", help="Show plot interactively.")
     p.add_argument("--save", default=None, help=save_help)
@@ -431,6 +574,22 @@ def _add_common_io_args(
 # ---------------------------------------------------------------------------
 
 def _wire_get(p: argparse.ArgumentParser) -> None:
+    """
+    Wire CLI parser options for ``get``.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     _add_common_fort7_file_arg(p)
     p.add_argument("--yaxis", required=True, help="Feature name or regex (with --regex).")
     p.add_argument(
@@ -450,6 +609,22 @@ def _wire_get(p: argparse.ArgumentParser) -> None:
     p.set_defaults(_run=_task_get)
 
 def _wire_edges(p: argparse.ArgumentParser) -> None:
+    """
+    Wire CLI parser options for ``edges``.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     _add_common_fort7_file_arg(p)
     p.add_argument("--frames", default=None, help="Frame selection.")
     p.add_argument("--min-bo", type=float, default=0.0, dest="min_bo", help="Minimum BO.")
@@ -466,6 +641,22 @@ def _wire_edges(p: argparse.ArgumentParser) -> None:
     p.set_defaults(_run=_task_edges)
 
 def _wire_constats(p: argparse.ArgumentParser) -> None:
+    """
+    Wire CLI parser options for ``constats``.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     _add_common_fort7_file_arg(p)
     p.add_argument("--frames", default=None, help="Frame selection.")
     p.add_argument("--min-bo", type=float, default=0.0, dest="min_bo", help="BO threshold before stats.")
@@ -477,6 +668,22 @@ def _wire_constats(p: argparse.ArgumentParser) -> None:
     p.set_defaults(_run=_task_constats)
 
 def _wire_bond_ts(p: argparse.ArgumentParser) -> None:
+    """
+    Wire CLI parser options for ``bond_ts``.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     _add_common_fort7_file_arg(p)
     p.add_argument("--frames", default=None, help="Frame selection.")
     p.add_argument("--directed", action="store_true", help="Do not merge A–B with B–A.")
@@ -494,6 +701,22 @@ def _wire_bond_ts(p: argparse.ArgumentParser) -> None:
     p.set_defaults(_run=_task_bond_ts)
 
 def _wire_bond_events(p: argparse.ArgumentParser) -> None:
+    """
+    Wire CLI parser options for ``bond_events``.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     _add_common_fort7_file_arg(p)
     p.add_argument("--frames", default=None, help="Frame selection.")
     p.add_argument("--src", type=int, help="Source atom.")
@@ -518,7 +741,20 @@ def _wire_bond_events(p: argparse.ArgumentParser) -> None:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Register subcommands under the 'fort7' namespace.
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
     """
 
     # GET

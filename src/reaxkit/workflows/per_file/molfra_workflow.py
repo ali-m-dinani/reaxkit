@@ -48,6 +48,27 @@ FramesT = Optional[Union[slice, Sequence[int]]]
 # ============================================================
 def _molfra_occur_task(args: argparse.Namespace) -> int:
     # Normalize x-axis alias
+    """
+    Molfra occur task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     args.xaxis = normalize_choice(args.xaxis, domain="xaxis") or "iter"
 
     handler = MolFraHandler(args.file)
@@ -283,6 +304,27 @@ def _molfra_total_task(args: argparse.Namespace) -> int:
 # ============================================================
 def _molfra_largest_task(args: argparse.Namespace) -> int:
     # Normalize x-axis alias
+    """
+    Molfra largest task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     args.xaxis = normalize_choice(args.xaxis, domain="xaxis") or "iter"
 
     handler = MolFraHandler(args.file)
@@ -451,7 +493,22 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
 # Registry
 # ============================================================
 def _add_common_molfra_axes_args(p: argparse.ArgumentParser) -> None:
-    """Common axis and frame-selection flags for molfra-based tasks."""
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument(
         "--xaxis",
         default="iter",
@@ -476,7 +533,28 @@ def _add_common_molfra_output_args(
     save_help: str = "Save the plot (path or directory, resolved via resolve_output_path).",
     export_help: str = "Export the data table to CSV (path or directory, resolved via resolve_output_path).",
 ) -> None:
-    """Common output / I/O flags for molfra-based tasks."""
+    """
+    Add shared CLI arguments to the provided parser.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    p : argparse.ArgumentParser
+        Parameter description.
+    plot_help : str
+        Parameter description.
+    save_help : str
+        Parameter description.
+    export_help : str
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p.add_argument("--title", default=None, help="Custom plot title.")
     p.add_argument("--plot", action="store_true", help=plot_help)
     p.add_argument("--save", default=None, help=save_help)
@@ -487,6 +565,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # -----------------------
     # Occurrences subcommand
     # -----------------------
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     p_occur = subparsers.add_parser(
         "occur",
         help="Get molecule occurrences across frames and optionally plot, save, or export.",

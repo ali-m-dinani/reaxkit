@@ -57,6 +57,15 @@ class MolFraHandler(BaseHandler):
 
 
     def __init__(self, file_path: str | Path = "molfra.out"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._n_records: Optional[int] = None
         self._types: Optional[List[str]] = None
@@ -138,18 +147,57 @@ class MolFraHandler(BaseHandler):
 
     # ---- Convenience accessors (file-specific)
     def n_records(self) -> int:
+        """
+        N records.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return int(self.metadata().get("n_records", 0))
 
     def molecular_formulas(self) -> List[str]:
+        """
+        Molecular formulas.
+
+        Returns
+        -------
+        List[str]
+            Return value description.
+
+        """
         return list(self.metadata().get("molecular_formulas", []))
 
     def by_type(self, mtype: str) -> pd.DataFrame:
-        """Return rows for a given molecule type."""
+        """
+        By type.
+
+        Parameters
+        ----------
+        mtype : str
+            Parameter description.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         df = self.dataframe()
         return df[df["molecular_formula"] == mtype].reset_index(drop=True)
 
     def totals(self) -> pd.DataFrame:
-        """Return total molecules/atoms/molecular_mass per iter."""
+        """
+        Totals.
+
+        Returns
+        -------
+        pd.DataFrame
+            Return value description.
+
+        """
         if hasattr(self, "_df_totals"):
             return self._df_totals.copy()
         else:
@@ -157,7 +205,15 @@ class MolFraHandler(BaseHandler):
 
     # ---- Frame-oriented API (kept minimal for template parity)
     def n_frames(self) -> int:
-        """molfra.out is not frame-based; expose unique iters instead."""
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return int(self.metadata().get("n_iters", 0))
 
     def frame(self, i: int) -> Dict[str, Any]:
@@ -180,5 +236,19 @@ class MolFraHandler(BaseHandler):
         return {"iter": it, "freqs": sub}
 
     def iter_frames(self, step: int = 1) -> Iterator[Dict[str, Any]]:
+        """
+        Iter frames.
+
+        Parameters
+        ----------
+        step : int
+            Parameter description.
+
+        Yields
+        -------
+        Iterator[Dict[str, Any]]
+            Return value description.
+
+        """
         for i in range(0, self.n_frames(), step):
             yield self.frame(i)

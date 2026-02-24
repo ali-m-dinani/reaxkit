@@ -74,10 +74,28 @@ class Fort78Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.78"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._n_rows: int = 0
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         path = Path(self.path)
 
         # Peek first line to decide if it's a header or data
@@ -131,10 +149,33 @@ class Fort78Handler(BaseHandler):
         return df, meta
 
     def n_rows(self) -> int:
+        """
+        N rows.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return self._n_rows
 
     @staticmethod
     def _is_number(tok: str) -> bool:
+        """
+         is number.
+
+        Parameters
+        ----------
+        tok : str
+            Parameter description.
+
+        Returns
+        -------
+        bool
+            Return value description.
+
+        """
         try:
             float(tok.replace("D", "E").replace("d", "E"))
             return True

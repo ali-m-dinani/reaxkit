@@ -21,7 +21,27 @@ from reaxkit.utils.media.make_video import images_to_video
 
 
 def _make_task(args: argparse.Namespace) -> int:
-    """Create a video from images in a folder."""
+    """
+    Make task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     exts = tuple(e.strip() for e in args.ext.split(","))
     out_path = images_to_video(
         folder_path=args.folder,

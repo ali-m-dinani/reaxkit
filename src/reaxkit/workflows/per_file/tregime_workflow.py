@@ -25,6 +25,27 @@ from reaxkit.io.generators.tregime_generator import write_sample_tregime
 
 def _task_generate(args: argparse.Namespace) -> int:
     # Default output location: reaxkit_outputs/tregime/tregime.in
+    """
+    Run the ``generate`` workflow task.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parameter description.
+
+    Returns
+    -------
+    int
+        Return value description.
+
+    Examples
+    --------
+    >>>
+    """
     out_default = Path("reaxkit_outputs") / "tregime" / "tregime.in"
 
     # Prefer your project resolver if available
@@ -52,6 +73,22 @@ def _task_generate(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """
+    Register workflow tasks under the given argparse subparser collection.
+
+    Works on
+    --------
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    ----------
+    subparsers : argparse._SubParsersAction
+        Parameter description.
+
+    Examples
+    --------
+    >>>
+    """
     gen = subparsers.add_parser(
         "gen",
         help="Generate a sample tregime.in file (fixed-width columns).",

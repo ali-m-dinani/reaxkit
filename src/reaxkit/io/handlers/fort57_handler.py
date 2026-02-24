@@ -53,10 +53,28 @@ class Fort57Handler(BaseHandler):
     _COLS = ["iter", "E_pot", "T", "T_set", "RMSG", "nfc"]
 
     def __init__(self, file_path: str | Path = "fort.57"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
         self._geo_descriptor: str = ""
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
         with open(self.path, "r") as fh:
             lines = fh.readlines()
 

@@ -23,6 +23,20 @@ from reaxkit.io.base_handler import BaseHandler
 
 
 def _safe_float(s: str) -> float | None:
+    """
+     safe float.
+
+    Parameters
+    ----------
+    s : str
+        Parameter description.
+
+    Returns
+    -------
+    float | None
+        Return value description.
+
+    """
     try:
         return float(s)
     except (ValueError, TypeError):
@@ -30,6 +44,20 @@ def _safe_float(s: str) -> float | None:
 
 
 def _safe_int(s: str) -> int | None:
+    """
+     safe int.
+
+    Parameters
+    ----------
+    s : str
+        Parameter description.
+
+    Returns
+    -------
+    int | None
+        Return value description.
+
+    """
     try:
         # sometimes written as "0", "0.0", etc.
         return int(float(s))
@@ -66,9 +94,27 @@ class Fort74Handler(BaseHandler):
     """
 
     def __init__(self, file_path: str | Path = "fort.74"):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
         super().__init__(file_path)
 
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        Tuple[pd.DataFrame, Dict[str, Any]]
+            Return value description.
+
+        """
         rows: List[Dict[str, Any]] = []
 
         with open(self.path, "r") as fh:
@@ -149,7 +195,30 @@ class Fort74Handler(BaseHandler):
 
     # fort.74 is effectively a single "table", not frame-based
     def n_frames(self) -> int:
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
         return 0
 
     def frame(self, i: int) -> Dict[str, Any]:
+        """
+        Frame.
+
+        Parameters
+        ----------
+        i : int
+            Parameter description.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Return value description.
+
+        """
         raise IndexError("fort.74 has no per-frame data")
