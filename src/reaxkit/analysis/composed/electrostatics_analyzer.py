@@ -25,6 +25,7 @@ from __future__ import annotations
 from typing import Literal, Sequence, Optional, Tuple, Dict, Any, List
 
 import re
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -49,6 +50,22 @@ Scope = Literal["total", "local"]
 Mode = Literal["dipole", "polarization"]
 VolumeMethod = Literal["hull", "bbox"]
 AggregateKind = Optional[Literal["mean", "max", "min", "last"]]
+_WARNED_NON_ORTHO_CELL = False
+
+
+# -------------------------------------------------------------------------------------
+# PBC helpers
+# -------------------------------------------------------------------------------------
+
+def _minimum_image_delta(delta: np.ndarray, box_lengths: np.ndarray) -> np.ndarray:
+    """Apply minimum-image convention to displacement vectors."""
+    delta = np.asarray(delta, dtype=float)
+    box_lengths = np.asarray(box_lengths, dtype=float)
+    if box_lengths.shape != (3,):
+        return delta
+    if np.any(~np.isfinite(box_lengths)) or np.any(box_lengths <= 0):
+        return delta
+    return delta - box_lengths * np.round(delta / box_lengths)
 
 
 # -------------------------------------------------------------------------------------
@@ -267,6 +284,33 @@ def _preload_electrostatics(
         dtype=int,
     )
 
+    # orthorhombic cell lengths (x, y, z) from Summary table columns (a, b, c)
+    if all(c in df_sim.columns for c in ("a", "b", "c")):
+        box_lengths_arr = np.asarray(
+            [[float(df_sim.iloc[fi]["a"]), float(df_sim.iloc[fi]["b"]), float(df_sim.iloc[fi]["c"])]
+             for fi in frame_list],
+            dtype=float,
+        )
+        if all(c in df_sim.columns for c in ("alpha", "beta", "gamma")):
+            angles_arr = np.asarray(
+                [[float(df_sim.iloc[fi]["alpha"]), float(df_sim.iloc[fi]["beta"]), float(df_sim.iloc[fi]["gamma"])]
+                 for fi in frame_list],
+                dtype=float,
+            )
+            orth_mask = np.all(np.isclose(angles_arr, 90.0, atol=1.0e-3), axis=1)
+            box_lengths_arr[~orth_mask] = np.nan
+            global _WARNED_NON_ORTHO_CELL
+            if np.any(~orth_mask) and not _WARNED_NON_ORTHO_CELL:
+                warnings.warn(
+                    "Non-orthorhombic cells detected (alpha/beta/gamma != 90). "
+                    "Local PBC minimum-image correction is skipped for those frames.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                _WARNED_NON_ORTHO_CELL = True
+    else:
+        box_lengths_arr = np.full((len(frame_list), 3), np.nan, dtype=float)
+
     # --- coords + types from xmolout (per frame) ---
     coords_list: List[np.ndarray] = []
     types_list: List[np.ndarray] = []
@@ -337,6 +381,7 @@ def _preload_electrostatics(
         "charges": charges_arr,
         "cnn": cnn_arr,
         "cnn_cols": cnn_cols,
+        "box_lengths": box_lengths_arr,
     }
 
 
@@ -421,6 +466,7 @@ def _local_dipole_calc(
     charges: np.ndarray,     # (nA,)
     atom_types: np.ndarray,  # (nA,)
     cnn_mat: np.ndarray,     # (nA, max_cnn) 1-based neighbors, 0 padded
+    box_lengths: Optional[np.ndarray] = None,  # (3,)
     *,
     core_types: Sequence[str],
     mode: Mode = "dipole",
@@ -494,14 +540,22 @@ def _local_dipole_calc(
     q_g = charges[idx_clip]               # (n_core, k)
     mask = (cluster_idx0 >= 0)            # (n_core, k)
 
+    # Use core-centered coordinates so local dipoles are origin-invariant.
+    core_xyz = coords_g[:, :1, :]
+    coords_rel = coords_g - core_xyz
+    if box_lengths is not None:
+        box_lengths = np.asarray(box_lengths, dtype=float)
+        if box_lengths.shape == (3,) and np.all(np.isfinite(box_lengths)) and np.all(box_lengths > 0):
+            coords_rel = _minimum_image_delta(coords_rel, box_lengths)
+
     q_g = q_g * mask
 
     n_neigh = mask[:, 1:].sum(axis=1).astype(float)  # (n_core,)
     scale = np.where(n_neigh > 0, 1.0 / n_neigh, 0.0)
     q_g[:, 1:] = q_g[:, 1:] * scale[:, None]
 
-    mu_ea = (coords_g * q_g[..., None]).sum(axis=1)   # (n_core, 3)
-    mu_debye = mu_ea * CONSTANTS["ea_to_debye"]
+    mu_ea = (coords_rel * q_g[..., None]).sum(axis=1)   # (n_core, 3)
+    mu_debye = mu_ea * const["ea_to_debye"]
 
     out: Dict[str, Any] = {
         "core_atom_type": [str(atom_types[i]) for i in core_idx0],
@@ -515,20 +569,20 @@ def _local_dipole_calc(
     if mode == "polarization":
         if volume_method == "bbox":
             # broadcast-safe masking: (n_core, k, 3)
-            cc = np.where(mask[..., None], coords_g, np.nan)
+            cc = np.where(mask[..., None], coords_rel, np.nan)
             mn = np.nanmin(cc, axis=1)
             mx = np.nanmax(cc, axis=1)
             d = mx - mn
             volumes = d[:, 0] * d[:, 1] * d[:, 2]
         else:
             for i in range(core_idx0.size):
-                pts = coords_g[i][mask[i]]
+                pts = coords_rel[i][mask[i]]
                 volumes[i] = _convex_hull_volume(pts)
 
         P = np.full_like(mu_ea, np.nan, dtype=float)
         good = np.isfinite(volumes) & (volumes > 0)
         if np.any(good):
-            P[good] = (mu_ea[good] / volumes[good, None]) * CONSTANTS["ea3_to_uC_cm2"]
+            P[good] = (mu_ea[good] / volumes[good, None]) * const["ea3_to_uC_cm2"]
 
         out["P_x (uC/cm^2)"] = P[:, 0]
         out["P_y (uC/cm^2)"] = P[:, 1]
@@ -595,6 +649,7 @@ def dipoles_polarizations_over_multiple_frames(
     iters = pre["iter"]
     coords = pre["coords"]
     charges = pre["charges"]
+    box_lengths = pre.get("box_lengths", np.full((len(fidx), 3), np.nan, dtype=float))
 
     if scope == "total":
         df = _total_dipole_calc(coords, charges, mode=mode, volume_method=volume_method)
@@ -612,6 +667,7 @@ def dipoles_polarizations_over_multiple_frames(
             charges[i],
             types_list[i],
             cnn[i] if cnn.shape[2] > 0 else np.zeros((coords.shape[1], 0), dtype=np.int32),
+            box_lengths=box_lengths[i],
             core_types=core_types or [],
             mode=mode,
             volume_method=volume_method,
