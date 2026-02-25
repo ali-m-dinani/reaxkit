@@ -17,7 +17,6 @@ associated with each file.
 from __future__ import annotations
 
 import argparse
-from reaxkit.help.help_index_loader import search_help_indices, _format_hits
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
@@ -90,6 +89,9 @@ def run_main(args: argparse.Namespace) -> None:
         print('Usage:\n  reaxkit help "restraint"\n  reaxkit help bond\n  reaxkit help "electric field"\n')
         print("Tip: put multi-word queries in quotes.")
         return
+
+    # Lazy import: avoids loading help-index dependencies for no-query usage.
+    from reaxkit.help.help_index_loader import search_help_indices, _format_hits
 
     hits = search_help_indices(
         args.query,

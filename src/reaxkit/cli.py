@@ -10,13 +10,7 @@ subcommands (or runs as a kind-level workflow such as `help` / `intspec`).
 
 import argparse
 import sys
-
-from reaxkit.workflows.meta import make_video_workflow, plotter_workflow, help_workflow, introspection_workflow
-from reaxkit.workflows.per_file import fort57_workflow, summary_workflow, geo_workflow, trainset_workflow, \
-    fort76_workflow, fort78_workflow, xmolout_workflow, fort83_workflow, eregime_workflow, fort79_workflow, \
-    fort99_workflow, control_workflow, ffield_workflow, vels_workflow, fort13_workflow, tregime_workflow, \
-    params_workflow, fort7_workflow, vregime_workflow, molfra_workflow, fort73_workflow, fort74_workflow
-from reaxkit.workflows.composed import coordination_workflow, xmolout_fort7_workflow, electrostatics_workflow
+from importlib import import_module
 
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
@@ -25,18 +19,40 @@ from reaxkit.workflows.composed import coordination_workflow, xmolout_fort7_work
 # also, fort.8 is similar to fort.7 in the same way
 # same for molsav and moldyn which are similar to vels
 WORKFLOW_MODULES = {
-    "fort78": fort78_workflow, "xmolout": xmolout_workflow, "summary": summary_workflow,
-    "eregime": eregime_workflow, "molfra": molfra_workflow, "fort13": fort13_workflow,
-    "fort79": fort79_workflow, "fort7": fort7_workflow, "xmolfort7": xmolout_fort7_workflow,
-    "coord": coordination_workflow, "intspec": introspection_workflow, "geo": geo_workflow,
-    "fort99": fort99_workflow, "trainset": trainset_workflow, "fort83": fort83_workflow,
-    "fort73": fort73_workflow, "elect": electrostatics_workflow, "video": make_video_workflow,
-    "plotter": plotter_workflow, "control": control_workflow, "fort76": fort76_workflow,
-    "fort74.md": fort74_workflow, "ffield": ffield_workflow, "params": params_workflow,
-    "energylog": fort73_workflow, "fort58": fort73_workflow, "fort57.md": fort57_workflow,
-    "vels": vels_workflow, "help": help_workflow, "fort8": fort7_workflow,
-    "moldyn": vels_workflow, "molsav": vels_workflow, "tregime": tregime_workflow,
-    "vregime": vregime_workflow,
+    "fort78": "reaxkit.workflows.per_file.fort78_workflow",
+    "xmolout": "reaxkit.workflows.per_file.xmolout_workflow",
+    "summary": "reaxkit.workflows.per_file.summary_workflow",
+    "eregime": "reaxkit.workflows.per_file.eregime_workflow",
+    "molfra": "reaxkit.workflows.per_file.molfra_workflow",
+    "fort13": "reaxkit.workflows.per_file.fort13_workflow",
+    "fort79": "reaxkit.workflows.per_file.fort79_workflow",
+    "fort7": "reaxkit.workflows.per_file.fort7_workflow",
+    "xmolfort7": "reaxkit.workflows.composed.xmolout_fort7_workflow",
+    "coord": "reaxkit.workflows.composed.coordination_workflow",
+    "intspec": "reaxkit.workflows.meta.introspection_workflow",
+    "geo": "reaxkit.workflows.per_file.geo_workflow",
+    "fort99": "reaxkit.workflows.per_file.fort99_workflow",
+    "trainset": "reaxkit.workflows.per_file.trainset_workflow",
+    "fort83": "reaxkit.workflows.per_file.fort83_workflow",
+    "fort73": "reaxkit.workflows.per_file.fort73_workflow",
+    "elect": "reaxkit.workflows.composed.electrostatics_workflow",
+    "video": "reaxkit.workflows.meta.make_video_workflow",
+    "plotter": "reaxkit.workflows.meta.plotter_workflow",
+    "control": "reaxkit.workflows.per_file.control_workflow",
+    "fort76": "reaxkit.workflows.per_file.fort76_workflow",
+    "fort74.md": "reaxkit.workflows.per_file.fort74_workflow",
+    "ffield": "reaxkit.workflows.per_file.ffield_workflow",
+    "params": "reaxkit.workflows.per_file.params_workflow",
+    "energylog": "reaxkit.workflows.per_file.fort73_workflow",
+    "fort58": "reaxkit.workflows.per_file.fort73_workflow",
+    "fort57.md": "reaxkit.workflows.per_file.fort57_workflow",
+    "vels": "reaxkit.workflows.per_file.vels_workflow",
+    "help": "reaxkit.workflows.meta.help_workflow",
+    "fort8": "reaxkit.workflows.per_file.fort7_workflow",
+    "moldyn": "reaxkit.workflows.per_file.vels_workflow",
+    "molsav": "reaxkit.workflows.per_file.vels_workflow",
+    "tregime": "reaxkit.workflows.per_file.tregime_workflow",
+    "vregime": "reaxkit.workflows.per_file.vregime_workflow",
 }
 
 
@@ -108,6 +124,7 @@ def _intspec_default_runner(args):
     # reaxkit intspec --file fort7_analyzer
     # reaxkit intspec --folder workflow
     """
+    introspection_workflow = import_module("reaxkit.workflows.meta.introspection_workflow")
     return introspection_workflow.run_main(
         getattr(args, "file", None),
         getattr(args, "folder", None),
@@ -146,6 +163,11 @@ def main():
     # Preprocess argv so DEFAULTABLE workflows can omit an explicit task.
     sys_argv = _preinject(sys.argv)
 
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("kind", nargs="?")
+    kind_ns, _ = probe.parse_known_args(sys_argv[1:])
+    selected_kind = getattr(kind_ns, "kind", None)
+
     # Top-level parser for `reaxkit`
     parser = argparse.ArgumentParser("reaxkit CLI")
 
@@ -154,9 +176,14 @@ def main():
 
     # For each workflow module, create its own subparser and let it
     # register its internal tasks (second-level subcommands).
-    for kind, module in WORKFLOW_MODULES.items():
+    for kind, module_path in WORKFLOW_MODULES.items():
         # e.g. `reaxkit summary ...`, `reaxkit xmolout ...`
         kp = sub.add_parser(kind, help=f"{kind} workflows")
+
+        if kind != selected_kind:
+            continue
+
+        module = import_module(module_path)
 
         if kind == "intspec":
             # Kind-level workflow: no subcommands
