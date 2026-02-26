@@ -27,9 +27,9 @@ import pandas as pd
 
 from reaxkit.io.handlers.fort76_handler import Fort76Handler
 from reaxkit.analysis.per_file.fort76_analyzer import get_fort76_data, get_fort76_restraint_pairs
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.presentation.plot import single_plot
+from reaxkit.cli.path import resolve_output_path
 
 
 def _fort76_get_task(args: argparse.Namespace) -> int:

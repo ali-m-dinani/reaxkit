@@ -30,13 +30,13 @@ from reaxkit.io.handlers.fort7_handler import Fort7Handler
 from reaxkit.analysis.per_file import fort7_analyzer as f7
 
 # Utils (NEW: replace local parsers with these)
-from reaxkit.utils.frame_utils import parse_frames, parse_atoms, resolve_indices
+from reaxkit.core.frame_utils import parse_frames, parse_atoms, resolve_indices
 
 # Aliases (NEW: accept canonical or alias names like 'charge', 'q', etc.)
-from reaxkit.utils.alias import resolve_alias_from_columns
+from reaxkit.core.alias import resolve_alias_from_columns
 
 # Plotting
-from reaxkit.utils.media.plotter import scatter3d_points, heatmap2d_from_3d
+from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
 
 
 # ------------------------- internals -------------------------

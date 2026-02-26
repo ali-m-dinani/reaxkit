@@ -26,9 +26,9 @@ import pandas as pd
 
 from reaxkit.io.handlers.fort73_handler import Fort73Handler
 from reaxkit.analysis.per_file.fort73_analyzer import get_fort73_data
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.presentation.plot import single_plot
+from reaxkit.cli.path import resolve_output_path
 
 def _fort73_get_task(args: argparse.Namespace) -> int:
     """

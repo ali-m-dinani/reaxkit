@@ -29,8 +29,8 @@ import pandas as pd
 
 from reaxkit.io.handlers.vels_handler import VelsHandler
 from reaxkit.analysis.per_file.vels_analyzer import get_vels_data
-from reaxkit.utils.media.plotter import scatter3d_points, heatmap2d_from_3d
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
+from reaxkit.cli.path import resolve_output_path
 
 
 # ------------------------- small parsers -------------------------

@@ -18,7 +18,7 @@ from typing import Optional, Sequence, Union
 import pandas as pd
 
 from reaxkit.io.handlers.summary_handler import SummaryHandler
-from reaxkit.utils.alias import _resolve_alias, available_keys, normalize_choice
+from reaxkit.core.alias import _resolve_alias, available_keys, normalize_choice
 
 __all__ = ["get_summary_data"]
 

@@ -26,9 +26,9 @@ import pandas as pd
 
 from reaxkit.io.handlers.fort57_handler import Fort57Handler
 from reaxkit.analysis.per_file.fort57_analyzer import get_fort57_data
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.presentation.plot import single_plot
+from reaxkit.cli.path import resolve_output_path
 
 
 def _split_cols(s: str | None) -> List[str]:

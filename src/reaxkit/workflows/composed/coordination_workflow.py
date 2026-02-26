@@ -19,13 +19,15 @@ and multiple labeling modes.
 from __future__ import annotations
 import argparse
 from typing import Dict, Any, Optional, Literal, List
+import numpy as np
 import pandas as pd
 
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
-from reaxkit.io.generators.xmolout_generator import write_xmolout_from_frames
-from reaxkit.analysis.per_file.fort7_analyzer import per_atom_coordination_status_over_frames
-from reaxkit.utils.path import resolve_output_path
-from reaxkit.io.handlers.ffield_handler import FFieldHandler
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames
+from reaxkit.analysis.connectivity.coordination import CoordinationStatusRequest, CoordinationStatusTask
+from reaxkit.domain.data_models import ConnectivityData
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
 
 # -----------------------------
 # Helpers
@@ -246,6 +248,51 @@ def _frame_record_from_handler(xh: XmoloutHandler, i: int) -> Dict[str, Any]:
     }
 
 
+def _coordination_status_over_frames(
+    f7_handler,
+    xh: XmoloutHandler,
+    *,
+    valences: Dict[str, float],
+    threshold: float,
+    frames: list[int],
+    require_all_valences: bool,
+) -> pd.DataFrame:
+    """Build ConnectivityData from fort.7 and run engine-agnostic CoordinationStatusTask."""
+    f7_df = f7_handler.dataframe()
+    n_frames = len(f7_handler._frames)
+    if n_frames == 0:
+        return pd.DataFrame()
+
+    sum_bos_rows: list[np.ndarray] = []
+    for fi in range(n_frames):
+        fr_atoms = f7_handler._frames[fi]
+        if "sum_BOs" not in fr_atoms.columns:
+            raise KeyError("fort.7 frame data must contain 'sum_BOs' column.")
+        sum_bos_rows.append(fr_atoms["sum_BOs"].to_numpy(dtype=float))
+    sum_bond_orders = np.vstack(sum_bos_rows)
+
+    first_types = [str(t) for t in xh.frame(0)["atom_types"]]
+    n_atoms = len(first_types)
+    if sum_bond_orders.shape[1] != n_atoms:
+        raise ValueError(
+            f"Atom count mismatch: fort.7 ({sum_bond_orders.shape[1]}) vs xmolout ({n_atoms})"
+        )
+
+    conn = ConnectivityData(
+        sum_bond_orders=sum_bond_orders,
+        atom_ids=np.arange(1, n_atoms + 1, dtype=int),
+        elements=first_types,
+        iterations=f7_df["iter"].to_numpy() if "iter" in f7_df.columns else np.arange(n_frames),
+    )
+    req = CoordinationStatusRequest(
+        valences=valences,
+        threshold=threshold,
+        frames=frames,
+        require_all_valences=require_all_valences,
+    )
+    return CoordinationStatusTask().run(conn, req).table
+
+
 # -----------------------------
 # Action implementations
 # -----------------------------
@@ -272,7 +319,7 @@ def _task_analyze(args: argparse.Namespace) -> int:
     >>>
     """
     xh = XmoloutHandler(args.xmolout)
-    from reaxkit.io.handlers.fort7_handler import Fort7Handler
+    from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
 
     valences = _parse_kv_map(args.valences, float)
@@ -286,12 +333,11 @@ def _task_analyze(args: argparse.Namespace) -> int:
 
     frames = _normalize_frames(xh, args.frames)
 
-    df = per_atom_coordination_status_over_frames(
+    df = _coordination_status_over_frames(
         f7, xh,
         valences=valences,
         threshold=args.threshold,
         frames=frames,
-        iterations=None,
         require_all_valences=not args.allow_missing_valences,
     )
 
@@ -332,7 +378,7 @@ def _task_relabel(args: argparse.Namespace) -> int:
     >>>
     """
     xh = XmoloutHandler(args.xmolout)
-    from reaxkit.io.handlers.fort7_handler import Fort7Handler
+    from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
     f7 = Fort7Handler(args.fort7)
 
     valences = _parse_kv_map(args.valences, float)
@@ -348,12 +394,11 @@ def _task_relabel(args: argparse.Namespace) -> int:
     mode: Literal["global", "by_type"] = args.mode
     frames = _normalize_frames(xh, args.frames)
 
-    status_df = per_atom_coordination_status_over_frames(
+    status_df = _coordination_status_over_frames(
         f7, xh,
         valences=valences,
         threshold=args.threshold,
         frames=frames,
-        iterations=None,
         require_all_valences=not args.allow_missing_valences,
     )
 

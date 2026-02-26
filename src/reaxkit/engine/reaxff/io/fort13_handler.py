@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Iterator, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 class Fort13Handler(BaseHandler):

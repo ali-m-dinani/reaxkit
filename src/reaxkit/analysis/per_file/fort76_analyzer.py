@@ -18,7 +18,7 @@ from typing import List, Sequence
 import pandas as pd
 
 from reaxkit.io.handlers.fort76_handler import Fort76Handler
-from reaxkit.utils.alias import _resolve_alias, available_keys
+from reaxkit.core.alias import _resolve_alias, available_keys
 
 
 # ---------- Internal helpers ----------

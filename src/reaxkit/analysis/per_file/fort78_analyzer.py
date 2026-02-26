@@ -17,7 +17,7 @@ from typing import Sequence
 import pandas as pd
 
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
-from reaxkit.utils.alias import resolve_alias_from_columns, load_default_alias_map
+from reaxkit.core.alias import resolve_alias_from_columns, load_default_alias_map
 from reaxkit.io.handlers.control_handler import ControlHandler
 from reaxkit.analysis.per_file.control_analyzer import get_control_data
 

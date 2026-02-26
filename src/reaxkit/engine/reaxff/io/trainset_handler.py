@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 # Map raw section labels in the file to canonical section names

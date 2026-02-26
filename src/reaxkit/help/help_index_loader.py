@@ -168,7 +168,7 @@ def load_prepared_output_index() -> Dict[str, PreparedEntry]:
 
 def _read_yaml_from_pkg_data(filename: str) -> Dict[str, Any]:
     """
-    Load a YAML file bundled inside the ``reaxkit.data`` package.
+    Load a YAML file bundled inside the ``reaxkit.engine.reaxff.data`` package.
 
     Parameters
     ----------
@@ -182,13 +182,13 @@ def _read_yaml_from_pkg_data(filename: str) -> Dict[str, Any]:
     """
     try:
         from importlib import resources
-        data_pkg = resources.files("reaxkit.data")
+        data_pkg = resources.files("reaxkit.engine.reaxff.data")
         path = data_pkg / filename
         text = path.read_text(encoding="utf-8")
     except Exception as e:
         raise FileNotFoundError(
-            f"Could not read '{filename}' from package 'reaxkit.data'. "
-            f"Make sure it exists under src/reaxkit/data/ and is included in package data."
+            f"Could not read '{filename}' from package 'reaxkit.engine.reaxff.data'. "
+            f"Make sure it exists under src/reaxkit/engine/reaxff/data/ and is included in package data."
         ) from e
 
     obj = yaml.safe_load(text) or {}

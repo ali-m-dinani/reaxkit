@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Iterator, Dict, Any
 import pandas as pd
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 class XmoloutHandler(BaseHandler):
     """

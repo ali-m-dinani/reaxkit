@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 
 from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401 (registration side effects)
+from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.task_registry import TASK_REGISTRY
-from reaxkit.domain.data_models import MSDRequest
 
 
 def _run_msd(args: argparse.Namespace) -> int:

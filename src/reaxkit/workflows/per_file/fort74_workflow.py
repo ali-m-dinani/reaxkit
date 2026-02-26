@@ -22,8 +22,8 @@ import argparse
 
 from reaxkit.io.handlers.fort74_handler import Fort74Handler
 from reaxkit.analysis.per_file.fort74_analyzer import get_fort74_data
-from reaxkit.utils.path import resolve_output_path
-from reaxkit.utils.alias import normalize_choice, resolve_alias_from_columns
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 
 def _get_task(args: argparse.Namespace) -> int:
     """

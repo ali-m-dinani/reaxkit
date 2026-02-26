@@ -25,10 +25,10 @@ from pathlib import Path
 
 from reaxkit.io.handlers.fort99_handler import Fort99Handler
 from reaxkit.analysis.per_file import fort99_analyzer
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.alias import normalize_choice
+from reaxkit.presentation.plot import single_plot
+from reaxkit.core.alias import normalize_choice
 from reaxkit.io.handlers.fort74_handler import Fort74Handler
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.cli.path import resolve_output_path
 
 # ---------- tasks ----------
 

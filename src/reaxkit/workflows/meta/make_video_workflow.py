@@ -17,7 +17,7 @@ through a CLI task for reproducible and scriptable media generation.
 
 from __future__ import annotations
 import argparse
-from reaxkit.utils.media.make_video import images_to_video
+from reaxkit.presentation.movie.make_video import images_to_video
 
 
 def _make_task(args: argparse.Namespace) -> int:

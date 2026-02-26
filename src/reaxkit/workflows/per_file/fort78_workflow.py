@@ -20,12 +20,12 @@ responses, and post-processing of ReaxFF simulations involving external fields.
 
 import argparse
 from pathlib import Path
-from reaxkit.utils.units import unit_for
+from reaxkit.presentation.units import unit_for
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
 from reaxkit.analysis.per_file.fort78_analyzer import get_fort78_data
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.plot import single_plot
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.cli.path import resolve_output_path
 
 def _export_csv(x, x_label: str, y, y_label: str, path: str) -> None:
     """

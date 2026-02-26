@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 import re
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 class Fort99Handler(BaseHandler):

@@ -22,25 +22,93 @@ connectivity, dynamics, and event-based analyses in a reproducible, CLI-driven w
 from __future__ import annotations
 import argparse
 import pandas as pd
+import numpy as np
 from typing import Optional, Sequence, Union
 
 # --- Direct imports (no _import_or_die, no fallbacks) ---
-from reaxkit.utils.path import resolve_output_path
-from reaxkit.io.handlers.fort7_handler import Fort7Handler
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.analysis.per_file.fort7_analyzer import get_fort7_data_per_atom, get_fort7_data_summaries
-from reaxkit.analysis.composed.connectivity_analyzer import (
-    connection_list,
-    connection_stats_over_frames,
-    bond_timeseries,
-    bond_events,
-    debug_bond_trace_overlay,
+from reaxkit.analysis.connectivity.connectivity import (
+    BondEventsRequest,
+    BondEventsTask,
+    BondTimeseriesRequest,
+    BondTimeseriesTask,
+    ConnectionListRequest,
+    ConnectionListTask,
+    ConnectionStatsRequest,
+    ConnectionStatsTask,
 )
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.frame_utils import parse_frames
-from reaxkit.utils.alias import normalize_choice
-from reaxkit.utils.media.convert import convert_xaxis
+from reaxkit.domain.data_models import ConnectivityData
+from reaxkit.presentation.plot import single_plot
+from reaxkit.core.frame_utils import parse_frames
+from reaxkit.core.alias import normalize_choice
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.utils.numerical.moving_average import exponential_moving_average, simple_moving_average
+from reaxkit.utils.numerical.signal_ops import clean_flicker, schmitt_hysteresis
 
 FramesT = Optional[Union[slice, Sequence[int]]]
+
+
+def _frames_to_list(handler: Fort7Handler, frames_sel: FramesT) -> Optional[list[int]]:
+    if frames_sel is None:
+        return None
+    n = len(handler._frames)
+    if isinstance(frames_sel, slice):
+        return list(range(*frames_sel.indices(n)))
+    return [int(i) for i in frames_sel if 0 <= int(i) < n]
+
+
+def _connectivity_data_from_fort7(handler: Fort7Handler) -> ConnectivityData:
+    sim_df = handler.dataframe()
+    frames_df = handler._frames
+    if not frames_df:
+        return ConnectivityData(bond_orders=np.empty((0, 0, 0), dtype=float), sum_bond_orders=np.empty((0, 0), dtype=float))
+
+    first = frames_df[0]
+    if "atom_num" in first.columns:
+        atom_ids = first["atom_num"].astype(int).to_numpy()
+    else:
+        atom_ids = np.arange(1, len(first) + 1, dtype=int)
+    n_atoms = len(atom_ids)
+    atom_to_idx = {int(a): i for i, a in enumerate(atom_ids)}
+
+    bo_frames = []
+    sum_rows = []
+    for fr in frames_df:
+        mat = np.zeros((n_atoms, n_atoms), dtype=float)
+        bo_cols = [c for c in fr.columns if str(c).startswith("BO")]
+        for _, row in fr.iterrows():
+            src_atom = int(row["atom_num"]) if "atom_num" in fr.columns else int(_)
+            if src_atom not in atom_to_idx:
+                continue
+            src_i = atom_to_idx[src_atom]
+            for bo_col in bo_cols:
+                slot = bo_col[2:]
+                cnn_col = f"atom_cnn{slot}"
+                if cnn_col not in fr.columns:
+                    continue
+                dst_atom = int(row[cnn_col]) if pd.notna(row[cnn_col]) else 0
+                bo = float(row[bo_col]) if pd.notna(row[bo_col]) else 0.0
+                if dst_atom <= 0 or bo <= 0.0:
+                    continue
+                dst_i = atom_to_idx.get(dst_atom)
+                if dst_i is None:
+                    continue
+                mat[src_i, dst_i] = max(mat[src_i, dst_i], bo)
+        bo_frames.append(mat)
+        sum_rows.append(mat.sum(axis=1))
+
+    bo_arr = np.stack(bo_frames, axis=0) if bo_frames else np.empty((0, 0, 0), dtype=float)
+    sum_arr = np.vstack(sum_rows) if sum_rows else np.empty((0, 0), dtype=float)
+    iters = sim_df["iter"].to_numpy(dtype=int) if "iter" in sim_df.columns else np.arange(len(bo_frames), dtype=int)
+    return ConnectivityData(
+        bond_orders=bo_arr,
+        sum_bond_orders=sum_arr,
+        atom_ids=atom_ids,
+        iterations=iters,
+        metadata={"source": "fort7"},
+    )
 
 
 # ==========================================================
@@ -246,16 +314,18 @@ def _task_edges(args: argparse.Namespace) -> int:
     >>>
     """
     h = Fort7Handler(args.file)
-    frames_sel = parse_frames(args.frames)
-    edges = connection_list(
-        h,
-        frames=frames_sel,
-        iterations=None,
-        min_bo=args.min_bo,
-        undirected=not args.directed,
-        aggregate=args.aggregate,
-        include_self=args.include_self,
-    )
+    conn = _connectivity_data_from_fort7(h)
+    frames_sel = _frames_to_list(h, parse_frames(args.frames))
+    edges = ConnectionListTask().run(
+        conn,
+        ConnectionListRequest(
+            frames=frames_sel,
+            min_bo=args.min_bo,
+            undirected=not args.directed,
+            aggregate=args.aggregate,
+            include_self=args.include_self,
+        ),
+    ).table
     if edges.empty:
         print("ℹ️ No edges found for the given selection.")
 
@@ -322,15 +392,17 @@ def _task_constats(args: argparse.Namespace) -> int:
     >>>
     """
     h = Fort7Handler(args.file)
-    frames_sel = parse_frames(args.frames)
-    stats = connection_stats_over_frames(
-        h,
-        frames=frames_sel,
-        iterations=None,
-        min_bo=args.min_bo,
-        undirected=not args.directed,
-        how=args.how,
-    )
+    conn = _connectivity_data_from_fort7(h)
+    frames_sel = _frames_to_list(h, parse_frames(args.frames))
+    stats = ConnectionStatsTask().run(
+        conn,
+        ConnectionStatsRequest(
+            frames=frames_sel,
+            min_bo=args.min_bo,
+            undirected=not args.directed,
+            how=args.how,
+        ),
+    ).table
     if stats.empty:
         print("ℹ️ No connection stats for the given selection.")
     workflow_name = args.kind
@@ -369,15 +441,17 @@ def _task_bond_ts(args: argparse.Namespace) -> int:
     >>>
     """
     h = Fort7Handler(args.file)
-    frames_sel = parse_frames(args.frames)
-    ts = bond_timeseries(
-        h,
-        frames=frames_sel,
-        iterations=None,
-        undirected=not args.directed,
-        bo_threshold=args.bo_threshold,
-        as_wide=args.wide,
-    )
+    conn = _connectivity_data_from_fort7(h)
+    frames_sel = _frames_to_list(h, parse_frames(args.frames))
+    ts = BondTimeseriesTask().run(
+        conn,
+        BondTimeseriesRequest(
+            frames=frames_sel,
+            undirected=not args.directed,
+            bo_threshold=args.bo_threshold,
+            as_wide=args.wide,
+        ),
+    ).table
     if ts is None or getattr(ts, "empty", False):
         print("ℹ️ No bond time series produced.")
         return 0
@@ -419,6 +493,69 @@ def _task_bond_ts(args: argparse.Namespace) -> int:
     return 0
 
 
+def _debug_bond_trace_overlay_from_data(
+    data: ConnectivityData,
+    src: int,
+    dst: int,
+    *,
+    smooth: str = "ema",
+    window: int = 8,
+    hysteresis: float = 0.05,
+    threshold: float = 0.10,
+    min_run: int = 0,
+    xaxis: str = "iter",
+    save: str | None = None,
+):
+    ts = BondTimeseriesTask().run(data, BondTimeseriesRequest(as_wide=False)).table
+    a, b = (src, dst) if src <= dst else (dst, src)
+    g = ts[(ts["src"] == a) & (ts["dst"] == b)].sort_values("frame_idx")
+    if g.empty:
+        print(f"No data for bond {a}-{b}.")
+        return
+
+    x = g["iter"].to_numpy() if xaxis == "iter" else g["frame_idx"].to_numpy()
+    y = g["bo"].to_numpy(dtype=float)
+    y_s = (
+        exponential_moving_average(pd.Series(y), window=window).to_numpy()
+        if smooth == "ema"
+        else simple_moving_average(pd.Series(y), window=window).to_numpy()
+    )
+    th, hys = float(threshold), float(hysteresis)
+    st = schmitt_hysteresis(y_s, th=th, hys=hys)
+    if min_run and min_run > 1:
+        st = clean_flicker(st, min_run=min_run)
+
+    prev = np.r_[st[0], st[:-1]]
+    rising = (~prev) & st
+    falling = prev & (~st)
+    n_form, n_break = int(rising.sum()), int(falling.sum())
+
+    series = [
+        {"x": x, "y": y, "label": "raw", "marker": ".", "linewidth": 0, "markersize": 3, "alpha": 0.75},
+        {"x": x, "y": y_s, "label": f"{smooth} (w={window})", "marker": None, "linewidth": 1.6, "alpha": 1.0},
+    ]
+    if n_form:
+        series.append({"x": x[rising], "y": y_s[rising], "label": f"formation x{n_form}", "marker": "^", "linewidth": 0, "markersize": 7, "alpha": 1.0})
+    if n_break:
+        series.append({"x": x[falling], "y": y_s[falling], "label": f"breakage x{n_break}", "marker": "v", "linewidth": 0, "markersize": 7, "alpha": 1.0})
+
+    hlines = [
+        {"y": th + hys / 2.0, "label": f"ON >= {th + hys / 2.0:.3f}", "linestyle": "--", "linewidth": 1},
+        {"y": th - hys / 2.0, "label": f"OFF <= {th - hys / 2.0:.3f}", "linestyle": "--", "linewidth": 1},
+    ]
+    title = f"Bond {a}-{b} | th={th:.3f}, hyst={hys:.3f} | min_run={min_run} | events: +{n_form}/-{n_break}"
+    single_plot(
+        series=series,
+        hlines=hlines,
+        title=title,
+        xlabel=("iter" if xaxis == "iter" else "frame"),
+        ylabel="BO",
+        save=save,
+        legend=True,
+        figsize=(9.0, 3.8),
+    )
+
+
 # ==========================================================
 # Task: BOND-EVENTS (bond_events + optional overlay)
 # ==========================================================
@@ -446,22 +583,25 @@ def _task_bond_events(args: argparse.Namespace) -> int:
     """
     print('This is a time-consuming task; please be patient ...')
     h = Fort7Handler(args.file)
-    frames_sel = parse_frames(args.frames)
-    events = bond_events(
-        h,
-        frames=frames_sel,
-        iterations=None,
-        src=args.src,
-        dst=args.dst,
-        threshold=args.threshold,
-        hysteresis=args.hysteresis,
-        smooth=args.smooth,
-        window=args.window,
-        ema_alpha=args.ema_alpha,
-        min_run=args.min_run,
-        xaxis=args.xaxis if args.xaxis in ("iter", "frame") else "iter",
-        undirected=not args.directed,
-    )
+    conn = _connectivity_data_from_fort7(h)
+    frames_sel = _frames_to_list(h, parse_frames(args.frames))
+    smooth = None if args.smooth == "none" else args.smooth
+    events = BondEventsTask().run(
+        conn,
+        BondEventsRequest(
+            frames=frames_sel,
+            src=args.src,
+            dst=args.dst,
+            threshold=args.threshold,
+            hysteresis=args.hysteresis,
+            smooth=smooth,
+            window=args.window,
+            ema_alpha=args.ema_alpha,
+            min_run=args.min_run,
+            xaxis=args.xaxis if args.xaxis in ("iter", "frame") else "iter",
+            undirected=not args.directed,
+        ),
+    ).table
     if events.empty:
         print("ℹ️ No bond formation/breakage events detected with the given settings.")
 
@@ -474,8 +614,8 @@ def _task_bond_events(args: argparse.Namespace) -> int:
     if args.save or args.plot and args.src and args.dst:
         out = resolve_output_path(args.save, workflow_name)
         if args.save:
-            debug_bond_trace_overlay(
-                h,
+            _debug_bond_trace_overlay_from_data(
+                conn,
                 src=int(args.src),
                 dst=int(args.dst),
                 smooth=("ema" if args.smooth == "ema" else "ma"),
@@ -487,8 +627,8 @@ def _task_bond_events(args: argparse.Namespace) -> int:
                 save=out,
             )
         else:
-            debug_bond_trace_overlay(
-                h,
+            _debug_bond_trace_overlay_from_data(
+                conn,
                 src=int(args.src),
                 dst=int(args.dst),
                 smooth=("ema" if args.smooth == "ema" else "ma"),

@@ -21,19 +21,19 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 from typing import Callable, Dict, Any
-from reaxkit.utils.units import unit_for
+from reaxkit.presentation.units import unit_for
 
 from reaxkit.io.handlers.eregime_handler import EregimeHandler
 from reaxkit.analysis.per_file.eregime_analyzer import get_eregime_data
-from reaxkit.utils.media.plotter import single_plot
+from reaxkit.presentation.plot import single_plot
 from reaxkit.io.generators.eregime_generator import (
     write_eregime_sinusoidal,
     write_eregime_smooth_pulse,
     write_eregime_from_function,
 )
-from reaxkit.utils.alias import normalize_choice
-from reaxkit.utils.frame_utils import parse_frames, select_frames
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.core.alias import normalize_choice
+from reaxkit.core.frame_utils import parse_frames, select_frames
+from reaxkit.cli.path import resolve_output_path
 
 
 # ====================================================================

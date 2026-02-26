@@ -15,8 +15,8 @@ from __future__ import annotations
 import pandas as pd
 
 from reaxkit.io.handlers.eregime_handler import EregimeHandler
-from reaxkit.utils.alias import resolve_alias_from_columns, normalize_choice  # uses shared alias map
-from reaxkit.utils.media.convert import convert_xaxis  # converts iter → time or frame
+from reaxkit.core.alias import resolve_alias_from_columns, normalize_choice  # uses shared alias map
+from reaxkit.presentation.convert import convert_xaxis  # converts iter → time or frame
 
 
 def _resolve_with_fallback(df: pd.DataFrame, name: str) -> str:

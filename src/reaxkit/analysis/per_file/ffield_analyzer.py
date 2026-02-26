@@ -17,7 +17,7 @@ from typing import Dict, Iterable, Optional, Sequence
 
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 from reaxkit.io.handlers.ffield_handler import FFieldHandler
 
 

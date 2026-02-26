@@ -18,8 +18,8 @@ assessing convergence behavior in training or fitting workflows.
 import argparse
 from reaxkit.io.handlers.fort13_handler import Fort13Handler
 from reaxkit.analysis.per_file.fort13_analyzer import get_fort13_data
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.plot import single_plot
+from reaxkit.cli.path import resolve_output_path
 
 def _fort13_get_task(args: argparse.Namespace) -> int:
     """

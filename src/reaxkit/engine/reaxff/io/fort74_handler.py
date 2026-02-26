@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 def _safe_float(s: str) -> float | None:

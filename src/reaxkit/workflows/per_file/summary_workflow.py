@@ -24,13 +24,13 @@ from __future__ import annotations
 import argparse
 from typing import Optional, Sequence, Union
 import pandas as pd
-from reaxkit.utils.units import unit_for
-from reaxkit.utils.media.plotter import single_plot
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.frame_utils import parse_frames, select_frames
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.units import unit_for
+from reaxkit.presentation.plot import single_plot
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.core.frame_utils import parse_frames, select_frames
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.io.handlers.summary_handler import SummaryHandler
-from reaxkit.utils.alias import available_keys
+from reaxkit.core.alias import available_keys
 from reaxkit.analysis.per_file.summary_analyzer import get_summary_data
 
 FramesT = Optional[Union[slice, Sequence[int]]]

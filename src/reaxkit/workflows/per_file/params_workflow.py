@@ -27,7 +27,7 @@ from reaxkit.io.handlers.params_handler import ParamsHandler
 from reaxkit.io.handlers.ffield_handler import FFieldHandler
 
 from reaxkit.analysis.per_file.params_analyzer import get_params_data, interpret_params
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.cli.path import resolve_output_path
 
 
 def _task_get(args: argparse.Namespace) -> int:

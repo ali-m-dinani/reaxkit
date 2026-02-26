@@ -54,7 +54,7 @@ def _task_generate(args: argparse.Namespace) -> int:
         out_path = Path(args.out)
     else:
         try:
-            from reaxkit.utils.path import resolve_output_path  # type: ignore
+            from reaxkit.cli.path import resolve_output_path  # type: ignore
 
             out_path = Path(
                 resolve_output_path(

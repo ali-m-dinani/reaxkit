@@ -23,6 +23,11 @@ def trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
     df = handler.dataframe()
     iterations = df["iter"].to_numpy() if "iter" in df.columns else np.arange(n_frames)
     times = df["time"].to_numpy() if "time" in df.columns else None
+    cell_lengths = df[["a", "b", "c"]].to_numpy() if {"a", "b", "c"}.issubset(df.columns) else None
+    if {"alpha", "beta", "gamma"}.issubset(df.columns):
+        cell_angles = df[["alpha", "beta", "gamma"]].to_numpy()
+    else:
+        cell_angles = np.full((n_frames, 3), 90.0)
 
     return TrajectoryData(
         positions=positions,
@@ -30,6 +35,8 @@ def trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
         atom_ids=atom_ids,
         time=times,
         iterations=iterations,
+        cell_lengths=cell_lengths,
+        cell_angles=cell_angles,
     )
 
 

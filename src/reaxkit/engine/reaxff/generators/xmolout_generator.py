@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence, Union, Dict, Any, List
 import numpy as np
 import pandas as pd
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 FrameSel = Optional[Union[Sequence[int], range, slice]]
 AtomSel  = Optional[Union[Sequence[int], slice]]

@@ -33,20 +33,27 @@ from reaxkit.io.handlers.fort7_handler import Fort7Handler
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
 from reaxkit.io.handlers.control_handler import ControlHandler
 from reaxkit.analysis.per_file.xmolout_analyzer import get_atom_trajectories
-from reaxkit.utils.media.plotter import scatter3d_points, heatmap2d_from_3d
-from reaxkit.utils.frame_utils import parse_frames, resolve_indices
-from reaxkit.utils.alias import resolve_alias_from_columns
-from reaxkit.utils.path import resolve_output_path
-from reaxkit.utils.media.plotter import single_plot
+from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
+from reaxkit.core.frame_utils import parse_frames, resolve_indices
+from reaxkit.core.alias import resolve_alias_from_columns
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.presentation.plot import single_plot
 
-from reaxkit.utils.alias import (
+from reaxkit.core.alias import (
     normalize_choice,
     _resolve_alias,
 )
-from reaxkit.analysis.composed.electrostatics_analyzer import (
-    dipoles_polarizations_over_multiple_frames,
-    polarization_field_analysis,
+from reaxkit.analysis.electrostatics.electrostatics import (
+    DipoleRequest,
+    DipoleTask,
+    PolarizationFieldRequest,
+    PolarizationFieldTask,
+    PolarizationRequest,
+    PolarizationTask,
+    _electrostatics_data_from_handlers,
 )
+from reaxkit.analysis.per_file.fort78_analyzer import match_electric_field_to_iout2
+from reaxkit.domain.data_models import ElectricFieldData
 
 
 # -------------------------------------------------------------------------
@@ -90,16 +97,26 @@ def _dipole_task(args: argparse.Namespace) -> int:
     if mode == "polarization":
         volume_method = "bbox" if scope == "local" else "hull"
 
-    # Compute for the requested single frame (by passing frames=[...])
-    df = dipoles_polarizations_over_multiple_frames(
-        xh,
-        f7,
-        frames=[args.frame],
-        scope=scope,
-        core_types=core_types,
-        mode=mode,
-        volume_method=volume_method,
-    )
+    data = _electrostatics_data_from_handlers(xh, f7)
+    if mode == "dipole":
+        df = DipoleTask().run(
+            data,
+            DipoleRequest(
+                scope=scope,
+                atom_types=core_types if scope == "local" else None,
+                frames=[args.frame],
+            ),
+        ).table
+    else:
+        df = PolarizationTask().run(
+            data,
+            PolarizationRequest(
+                scope=scope,
+                atom_types=core_types if scope == "local" else None,
+                frames=[args.frame],
+                volume_method=volume_method,
+            ),
+        ).table
 
     workflow_name = args.kind
 
@@ -122,7 +139,7 @@ def _hyst_task(args: argparse.Namespace) -> int:
         [--summary hysteresis_summary.txt]
         [--roots]
 
-    - Uses polarization_field_analysis to build polarization + field dataset.
+    - Uses PolarizationFieldTask to build polarization + field dataset.
     - Aggregates according to --aggregate.
     - Exports aggregated joint DataFrame (if --export is given).
     - Writes coercive fields and remnant polarizations to a text file (summary).
@@ -136,17 +153,32 @@ def _hyst_task(args: argparse.Namespace) -> int:
     f78 = Fort78Handler(args.fort78)
     ctrl = ControlHandler(args.control)
 
-    # Run basic polarization vs field analysis; keep x/y for roots as field_z vs P_z
-    full_df, agg_df, coercive_fields, remnant_pols = polarization_field_analysis(
-        xh,
-        f7,
-        f78,
-        ctrl,
-        field_var="field_z",
-        aggregate=args.aggregate,
-        x_variable="field_z",
-        y_variable="P_z (uC/cm^2)",
+    data = _electrostatics_data_from_handlers(xh, f7)
+    iters = np.asarray(
+        data.trajectory.iterations
+        if data.trajectory.iterations is not None
+        else np.arange(data.trajectory.positions.shape[0]),
+        dtype=int,
     )
+    ef = match_electric_field_to_iout2(f78, ctrl, target_iters=iters.tolist(), field_var="field_z")
+    data.electric_field = ElectricFieldData(
+        values=np.asarray(ef.to_numpy(dtype=float)),
+        components=("field_z",),
+        iterations=np.asarray(ef.index.to_numpy(dtype=int)),
+    )
+    hyst = PolarizationFieldTask().run(
+        data,
+        PolarizationFieldRequest(
+            field_component="field_z",
+            aggregate=args.aggregate,
+            x_variable="field_z",
+            y_variable="P_z (uC/cm^2)",
+        ),
+    )
+    full_df = hyst.full_table
+    agg_df = hyst.aggregated_table
+    coercive_fields = hyst.polarization_zero_crossings
+    remnant_pols = hyst.field_zero_crossings
 
     # ------------------------------------------------------------------
     # Optionally add time information to full_df (for plotting vs time)
@@ -284,14 +316,17 @@ def _local_pol_with_coords(
       mu_x (debye), mu_y (debye), mu_z (debye),
       P_x (uC/cm^2), P_y (uC/cm^2), P_z (uC/cm^2), volume (angstrom^3)
     """
-    # 1) local dipole/polarization over all frames
-    df_local = dipoles_polarizations_over_multiple_frames(
-        xh,
-        f7,
-        scope="local",
-        core_types=core_types,
-        mode=mode,
-    )
+    data = _electrostatics_data_from_handlers(xh, f7)
+    if mode == "dipole":
+        df_local = DipoleTask().run(
+            data,
+            DipoleRequest(scope="local", atom_types=core_types),
+        ).table
+    else:
+        df_local = PolarizationTask().run(
+            data,
+            PolarizationRequest(scope="local", atom_types=core_types),
+        ).table
     if df_local.empty:
         raise ValueError("No local polarization/dipole data found. Check core types and files.")
 

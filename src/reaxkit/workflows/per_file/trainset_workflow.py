@@ -34,7 +34,7 @@ from typing import Any, Dict
 
 from reaxkit.io.handlers.trainset_handler import TrainsetHandler
 from reaxkit.analysis.per_file.trainset_analyzer import get_trainset_group_comments
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.io.generators.trainset_generator import (
     write_trainset_settings_yaml,
     generate_trainset_from_yaml,

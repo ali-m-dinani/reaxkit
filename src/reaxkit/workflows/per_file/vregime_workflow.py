@@ -50,7 +50,7 @@ def _task_generate(args: argparse.Namespace) -> int:
     else:
         # Prefer your project resolver if available
         try:
-            from reaxkit.utils.path import resolve_output_path  # type: ignore
+            from reaxkit.cli.path import resolve_output_path  # type: ignore
 
             out_path = Path(
                 resolve_output_path(

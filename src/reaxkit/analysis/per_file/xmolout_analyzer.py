@@ -5,8 +5,7 @@ This module provides atomistic and trajectory-level analysis tools for
 ReaxFF ``xmolout`` files via ``XmoloutHandler``.
 
 It supports extraction of atom properties, trajectories, simulation box
-information, displacement metrics, atom-type mappings, and radial
-distribution functions (RDFs) using multiple backends.
+information, displacement metrics, and atom-type mappings.
 
 Typical use cases include:
 
@@ -14,23 +13,16 @@ Typical use cases include:
 - building atom trajectories in long or wide format
 - tracking box dimensions and thermodynamic scalars over time
 - computing mean-squared displacement (MSD)
-- computing total or partial RDFs and RDF-derived properties
 """
 
 
 from __future__ import annotations
-from typing import Iterable, Optional, Sequence, Union, Dict, Any, List
+from typing import Optional, Sequence, Union, Dict, Any, List
 import numpy as np
 import pandas as pd
 
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
-from reaxkit.utils.frame_utils import select_frames as _df_select
-
-from reaxkit.analysis.composed.RDF_analyzer import (
-        rdf_using_freud as _rdf_freud_many,
-        rdf_using_ovito as _rdf_ovito_many,
-        rdf_property_over_frames as _rdf_props,
-    )
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+from reaxkit.core.frame_utils import select_frames as _df_select
 
 # ==========================================================
 # === non-RDF helpers (atom tables/trajectories/box) ===
@@ -341,75 +333,3 @@ def get_atom_type_mapping(
 # ========== Single public entry for RDF & properties ======
 # ==========================================================
 
-def get_radial_dist_fnc(
-    xh: XmoloutHandler,
-    *,
-    backend: str = "freud",                 # 'freud' or 'ovito'
-    frames: Optional[Iterable[int]] = None, # frame indices; None => all
-    types_a: Optional[Iterable[str]] = None,
-    types_b: Optional[Iterable[str]] = None,
-    r_max: Optional[float] = None,          # OVITO accepts float; FREUD accepts Optional[float]
-    bins: int = 200,
-    property: Optional[str] = None,         # None => return RDF curve; else 'first_peak'|'dominant_peak'|'area'|'excess_area'
-    average: bool = True,                   # for curves: average across frames
-    return_stack: bool = False              # for curves: if average=False, optionally return list of per-frame g(r)
-):
-    """Compute radial distribution functions (RDFs) or RDF-derived properties.
-
-    Works on
-    --------
-    XmoloutHandler — ``xmolout``
-
-    Parameters
-    ----------
-    xh : XmoloutHandler
-        Parsed xmolout handler.
-    backend : {"freud", "ovito"}, default="freud"
-        RDF backend to use.
-    frames : iterable of int, optional
-        Frame indices to include.
-    types_a, types_b : iterable of str, optional
-        Atom types defining a partial RDF.
-    r_max : float, optional
-        Maximum radius cutoff.
-    bins : int, default=200
-        Number of RDF bins.
-    property : str, optional
-        RDF-derived quantity (e.g. ``first_peak``, ``dominant_peak``,
-        ``area``, ``excess_area``).
-    average : bool, default=True
-        Average RDF curves across frames.
-    return_stack : bool, default=False
-        Return per-frame RDF curves when not averaging.
-
-    Returns
-    -------
-    numpy.ndarray, tuple, or pandas.DataFrame
-        RDF curves or per-frame RDF-derived properties.
-
-    Examples
-    --------
-    >>> r, g = get_radial_dist_fnc(xh, types_a=["Al"], types_b=["N"])
-    >>> df = get_radial_dist_fnc(xh, property="first_peak")
-    """
-
-
-    if property is None:
-        if backend.lower() == "freud":
-            return _rdf_freud_many(
-                xh, frames=frames, types_a=types_a, types_b=types_b,
-                r_max=r_max, bins=bins, average=average, return_stack=return_stack
-            )
-        elif backend.lower() == "ovito":
-            return _rdf_ovito_many(
-                xh, frames=frames, r_max=float(r_max or 4.0), bins=bins,
-                types_a=types_a, types_b=types_b, average=average, return_stack=return_stack
-            )
-        else:
-            raise ValueError("backend must be 'freud' or 'ovito'")
-
-    # property mode
-    return _rdf_props(
-        xh, backend=backend, frames=frames, property=property,
-        r_max=r_max, bins=bins, types_a=types_a, types_b=types_b
-    )

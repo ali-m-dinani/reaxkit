@@ -29,7 +29,7 @@ from pathlib import Path
 
 from reaxkit.io.generators.geo_generator import read_structure, write_structure, xtob
 from reaxkit.utils.equation_of_states import vinet_energy_trainset
-from reaxkit.utils.constants import const
+from reaxkit.core.constants import const
 
 # =============================================================================
 # OVERVIEW OF THE THE CODE

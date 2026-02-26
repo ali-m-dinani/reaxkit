@@ -1,5 +1,5 @@
 """Core orchestration components."""
 
-from .executor import AnalysisExecutor
+from .analysis_executor import AnalysisExecutor
 
 __all__=["AnalysisExecutor"]

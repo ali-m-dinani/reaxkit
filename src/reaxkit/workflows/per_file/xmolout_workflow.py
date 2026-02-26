@@ -10,8 +10,8 @@ It supports:
   tabular formats, with flexible frame selection and axis conversion.
 - Computing mean squared displacement (MSD) for one or multiple atoms, with
   support for combined plots or per-atom subplots.
-- Computing radial distribution functions (RDFs) using FREUD or OVITO backends,
-  either as averaged curves or as RDF-derived properties over frames.
+- Computing radial distribution functions (RDFs) using FREUD or OVITO
+  backends, either as averaged curves or as RDF-derived properties.
 - Extracting simulation box (cell) dimensions as functions of frame, iteration,
   or time, with optional plotting.
 - Writing trimmed `xmolout` files that retain only atom types and coordinates
@@ -27,11 +27,11 @@ from typing import Optional, Iterable
 import numpy as np
 import pandas as pd
 
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
-from reaxkit.utils.path import resolve_output_path
-from reaxkit.io.generators.xmolout_generator import write_xmolout_from_handler
-from reaxkit.utils.media.plotter import single_plot, multi_subplots
-from reaxkit.utils.frame_utils import (
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_handler
+from reaxkit.presentation.plot import single_plot, multi_subplots
+from reaxkit.core.frame_utils import (
     _select_frames,
     parse_frames as _parse_frames,
     parse_atoms,
@@ -41,15 +41,10 @@ from reaxkit.analysis.per_file.xmolout_analyzer import (
     get_unit_cell_dimensions_across_frames,
     get_atom_trajectories,
 )
-from reaxkit.analysis.composed.RDF_analyzer import (
-    rdf_using_freud,
-    rdf_using_ovito,
-    rdf_property_over_frames,
-)
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.units import unit_for
-from reaxkit.analysis.trajectory.msd_task import MSDTask
-from reaxkit.domain.data_models import MSDRequest
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.presentation.units import unit_for
+from reaxkit.analysis.trajectory.msd import MSDRequest, MSDTask
+from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFPropertyTask, RDFRequest, RDFTask
 from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
 
 def _parse_types(s: Optional[str]):
@@ -416,22 +411,27 @@ def _rdf_task(args: argparse.Namespace) -> int:
     xh = XmoloutHandler(args.file)
     types_a = _parse_types(args.types_a)
     types_b = _parse_types(args.types_b)
-    frames = _frames_from_args(xh, args)
+    frames = list(_frames_from_args(xh, args))
     backend = args.backend.lower()
     workflow_name = args.kind
 
+    traj = trajectory_from_xmolout_handler(xh)
     # Property mode
     if args.prop is not None:
-        df = rdf_property_over_frames(
-            xh,
+        req = RDFPropertyRequest(
+            property=args.prop,
             frames=frames,
-            backend=backend,
-            property=args.prop,  # one of: first_peak, dominant_peak, area, excess_area
-            r_max=args.r_max,
+            every=getattr(args, "every", 1),
             bins=args.bins,
-            types_a=sorted(types_a) if types_a else None,
-            types_b=sorted(types_b) if types_b else None,
+            r_max=args.r_max,
+            atom_types_a=sorted(types_a) if types_a else None,
+            atom_types_b=sorted(types_b) if types_b else None,
+            backend=backend,
         )
+        df = RDFPropertyTask().run(traj, req).table
+        if df.empty:
+            print("No RDF property data found for the selected atoms/types/frames.")
+            return 1
         if args.export:
             out = resolve_output_path(args.export, workflow_name)
             df.to_csv(out, index=False)
@@ -480,30 +480,24 @@ def _rdf_task(args: argparse.Namespace) -> int:
         return 0
 
     # Curve mode (averaged g(r) vs r)
-    if backend == "freud":
-        r, g = rdf_using_freud(
-            xh,
-            frames=frames,
-            types_a=types_a,
-            types_b=types_b,
-            r_max=args.r_max if args.r_max is not None else None,
-            bins=args.bins,
-            average=True,
-            return_stack=False,
-        )
-    elif backend == "ovito":
-        r, g = rdf_using_ovito(
-            xh,
-            frames=frames,
-            r_max=(args.r_max if args.r_max is not None else 4.0),
-            bins=args.bins,
-            types_a=types_a,
-            types_b=types_b,
-            average=True,
-            return_stack=False,
-        )
-    else:
-        raise ValueError(f"Unknown backend: {backend}")
+    req = RDFRequest(
+        frames=frames,
+        every=getattr(args, "every", 1),
+        bins=args.bins,
+        r_max=args.r_max,
+        atom_types_a=sorted(types_a) if types_a else None,
+        atom_types_b=sorted(types_b) if types_b else None,
+        average=True,
+        return_stack=False,
+        backend=backend,
+    )
+    df = RDFTask().run(traj, req).table
+    if df.empty:
+        print("No RDF data found for the selected atoms/types/frames.")
+        return 1
+
+    r = df["r"].to_numpy()
+    g = df["g"].to_numpy()
 
     sel_txt = ""
     if types_a or types_b:
@@ -768,8 +762,8 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_xmolout_io_args(p3, include_plot=True)
-    p3.add_argument("--backend", choices=["freud", "ovito"], default="ovito",
-        help="RDF backend: freud or ovito (default: ovito).")
+    p3.add_argument("--backend", choices=["freud", "ovito"], default="freud",
+        help="RDF backend (default: freud).")
     p3.add_argument(
         "--prop",
         choices=["first_peak", "dominant_peak", "area", "excess_area"],
@@ -791,10 +785,6 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         help="First frame index (0-based).")
     p3.add_argument("--stop", type=int, default=None,
         help="Last frame index (0-based).")
-    p3.add_argument("--norm", choices=["extent", "cell"], default="extent",
-        help="FREUD normalization: extent or cell (default: extent).")
-    p3.add_argument("--c-eff", type=float, default=None,
-        help="FREUD only: effective c-length for --norm cell.")
     p3.set_defaults(_run=_rdf_task)
 
     # ------------------------------------------------------------------

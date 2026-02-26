@@ -24,8 +24,8 @@ import argparse
 from pathlib import Path
 from reaxkit.io.handlers.fort79_handler import Fort79Handler
 from reaxkit.analysis.per_file.fort79_analyzer import get_fort79_data_with_diff_sensitivities
-from reaxkit.utils.media.plotter import single_plot, tornado_plot
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.presentation.plot import single_plot, tornado_plot
+from reaxkit.cli.path import resolve_output_path
 
 
 def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:

@@ -20,7 +20,7 @@ from typing import Sequence
 import pandas as pd
 
 from reaxkit.io.handlers.fort57_handler import Fort57Handler
-from reaxkit.utils.alias import normalize_choice, resolve_alias_from_columns
+from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 
 
 _F57_CANONICAL = ("iter", "E_pot", "T", "T_set", "RMSG", "nfc")

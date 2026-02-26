@@ -33,7 +33,7 @@ from reaxkit.analysis.per_file.ffield_analyzer import get_ffield_data
 # If the names differ in your repo, update these imports accordingly.
 from reaxkit.analysis.per_file.ffield_analyzer import interpret_one_section, interpret_ffield_terms
 
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.cli.path import resolve_output_path
 
 
 # ------------------------ helpers ------------------------

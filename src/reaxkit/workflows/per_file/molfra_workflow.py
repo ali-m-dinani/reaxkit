@@ -34,11 +34,11 @@ from reaxkit.analysis.per_file.molfra_analyzer import (
     largest_molecule_by_individual_mass,
     atoms_in_the_largest_molecule_wide_format,
 )
-from reaxkit.utils.frame_utils import parse_frames, select_frames
-from reaxkit.utils.media.convert import convert_xaxis
-from reaxkit.utils.media.plotter import single_plot, multi_subplots
-from reaxkit.utils.alias import normalize_choice
-from reaxkit.utils.path import resolve_output_path
+from reaxkit.core.frame_utils import parse_frames, select_frames
+from reaxkit.presentation.convert import convert_xaxis
+from reaxkit.presentation.plot import single_plot, multi_subplots
+from reaxkit.core.alias import normalize_choice
+from reaxkit.cli.path import resolve_output_path
 
 FramesT = Optional[Union[slice, Sequence[int]]]
 

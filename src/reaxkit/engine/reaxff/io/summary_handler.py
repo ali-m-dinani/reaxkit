@@ -19,7 +19,7 @@ from typing import Dict, Any, Tuple, List
 import pandas as pd
 from io import StringIO
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 class SummaryHandler(BaseHandler):

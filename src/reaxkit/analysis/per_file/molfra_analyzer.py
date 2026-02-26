@@ -19,7 +19,7 @@ import pandas as pd
 from typing import Optional, Iterable, Dict, Sequence
 
 from reaxkit.io.handlers.molfra_handler import MolFraHandler
-from reaxkit.utils.media.convert import convert_xaxis
+from reaxkit.presentation.convert import convert_xaxis
 
 # =======================
 # Molecule-level analysis

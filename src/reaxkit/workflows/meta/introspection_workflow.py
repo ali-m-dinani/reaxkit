@@ -43,7 +43,7 @@ CANDIDATE_PREFIXES: List[str] = [
     "reaxkit.io.handlers.",
     "reaxkit.io.generators.",
     "reaxkit.utils.",
-    "reaxkit.utils.media.",
+    "reaxkit.presentation.movie.",
     "reaxkit.utils.numerical.",
     "reaxkit.help.",
 ]

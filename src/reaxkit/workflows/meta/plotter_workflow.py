@@ -27,7 +27,7 @@ from typing import List, Dict, Any, Sequence
 import numpy as np
 import pandas as pd
 
-from reaxkit.utils.media.plotter import (
+from reaxkit.presentation.plot import (
     single_plot,
     directed_plot,
     dual_yaxis_plot,

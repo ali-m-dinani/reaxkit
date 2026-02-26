@@ -21,7 +21,7 @@ import re
 import math
 import pandas as pd
 
-from reaxkit.io.base_handler import BaseHandler
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 # ----------------------------------------------------------------------
 # Regex that matches:

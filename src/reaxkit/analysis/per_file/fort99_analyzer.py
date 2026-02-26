@@ -19,8 +19,8 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 
-from reaxkit.io.base_handler import BaseHandler
-from reaxkit.utils.constants import const
+from reaxkit.engine.reaxff.io.base import BaseHandler
+from reaxkit.core.constants import const
 from reaxkit.utils.equation_of_states import vinet_energy_ev
 
 def get_fort99_data(

@@ -2,29 +2,21 @@
 fort.7 analysis utilities.
 
 This module provides functions for extracting atom-level and iteration-level
-features from a parsed ReaxFF ``fort.7`` file, as well as higher-level
-coordination analysis when combined with ``xmolout``.
+features from a parsed ReaxFF ``fort.7`` file.
 
 Typical use cases include:
 
 - extracting per-atom quantities such as partial charges or bond-order sums
 - extracting per-iteration (summary) quantities from the simulation table
-- classifying atomic coordination (under / proper / over) across frames
 """
 
 
 from __future__ import annotations
 import re
 import pandas as pd
-from collections.abc import Mapping
 
-from reaxkit.utils.frame_utils import resolve_indices
+from reaxkit.core.frame_utils import resolve_indices
 from typing import Iterable, List, Sequence, Union
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
-from reaxkit.analysis.composed.coordination_analyzer import (
-    classify_coordination_for_frame,
-    status_label,
-)
 
 Indexish = Union[int, Iterable[int], None]
 
@@ -317,101 +309,4 @@ def get_sum_bos_conv_fnc(
         regex=False,
         add_index_cols=True,
     )
-
-
-# --- Coordination classification using features_atom("sum_BOs") --------------
-def per_atom_coordination_status_over_frames(
-    f7_handler,
-    xh: XmoloutHandler,
-    *,
-    valences: Mapping[str, float],
-    threshold: float = 0.9,
-    frames: Indexish = None,
-    iterations: Indexish = None,
-    require_all_valences: bool = True,
-) -> pd.DataFrame:
-    """Classify atomic coordination status across frames using bond-order sums.
-
-    Works on
-    --------
-    Fort7Handler + XmoloutHandler — ``fort.7`` + ``xmolout``
-
-    Parameters
-    ----------
-    f7_handler : Fort7Handler
-        Parsed ``fort.7`` handler providing bond-order information.
-    xh : XmoloutHandler
-        Parsed ``xmolout`` handler providing atom types per frame.
-    valences : mapping of str to float
-        Reference valence values for each atom type.
-    threshold : float, default=0.9
-        Tolerance window for under/over-coordination classification.
-    frames, iterations
-        Frame indices or iteration numbers to include.
-    require_all_valences : bool, default=True
-        If True, raise an error when a valence is missing for any atom type.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per atom per frame with columns including:
-        ``frame_index``, ``iter``, ``atom_id``, ``atom_type``,
-        ``sum_BOs``, ``valence``, ``delta``, ``status``, ``status_label``.
-
-    Examples
-    --------
-    >>> df = per_atom_coordination_status_over_frames(
-    ...     f7, xh, valences={"C": 4.0, "H": 1.0}
-    ... )
-    """
-    # Pull sum_BOs in tidy form (frame_idx, iter, atom_idx, sum_BOs)
-    df_sum = get_sum_bos_conv_fnc(f7_handler, frames=frames, iterations=iterations)
-    if df_sum.empty:
-        return pd.DataFrame(columns=[
-            "frame_index","iter","atom_id","atom_type","sum_BOs",
-            "valence","delta","status","status_label"
-        ])
-
-    # Group by frame and classify
-    rows = []
-    for fi, g in df_sum.groupby("frame_idx", sort=True):
-        g = g.sort_values("atom_idx")
-        sum_vals = g["sum_BOs"].to_numpy(dtype=float)
-
-        # Atom types for this frame come from xmolout
-        fr = xh.frame(int(fi))
-        atom_types = fr["atom_types"]
-        if len(sum_vals) != len(atom_types):
-            raise ValueError(
-                f"Length mismatch at frame {fi}: sum_BOs({len(sum_vals)}) vs atom_types({len(atom_types)})"
-            )
-
-        per_atom = classify_coordination_for_frame(
-            sum_bos=sum_vals,
-            atom_types=atom_types,
-            valences=valences,
-            threshold=threshold,
-            require_all_valences=require_all_valences,
-        )
-
-        # Attach frame metadata
-        iter = int(g["iter"].iloc[0]) if "iter" in g.columns else int(fi)
-        per_atom.insert(0, "iter", iter)
-        per_atom.insert(0, "frame_index", int(fi))
-
-        # Friendly label
-        per_atom["status_label"] = status_label(per_atom["status"])
-
-        rows.append(per_atom)
-
-    out = pd.concat(rows, ignore_index=True)
-    out = out.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
-    return out
-
-
-
-
-
-
-
 
