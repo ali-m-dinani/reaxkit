@@ -16,10 +16,12 @@ import pandas as pd
 from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
 from reaxkit.analysis.per_file.xmolout_analyzer import (
     get_atom_trajectories,
-    get_mean_squared_displacement,
     get_unit_cell_dimensions_across_frames,
     get_atom_type_mapping,
 )
+from reaxkit.analysis.trajectory.msd_task import MSDTask
+from reaxkit.domain.data_models import MSDRequest
+from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
 
 
 # ---------------------------------------------------------
@@ -75,12 +77,13 @@ print()
 # Compute mean squared displacement (MSD)
 # ---------------------------------------------------------
 
-msd = get_mean_squared_displacement(
-    xh,
-    frames=FRAMES,
-    atoms=ATOM_ID,
+traj_data = trajectory_from_xmolout_handler(xh)
+msd_req = MSDRequest(
+    atom_ids=ATOM_ID,
     dims=DIMS,
+    frames=list(range(FRAMES.start or 0, FRAMES.stop or len(xh.dataframe()))),
 )
+msd = MSDTask().run(traj_data, msd_req).table
 
 print("MSD preview:")
 print(msd.head())
