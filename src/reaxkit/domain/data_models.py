@@ -8,15 +8,8 @@ from typing import Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 
-
-@dataclass
-class BaseRequest:
-    """Base request model."""
-
-
-@dataclass
-class BaseResult:
-    """Base result model."""
+from reaxkit.domain.base_request import BaseRequest
+from reaxkit.domain.base_result import BaseResult
 
 
 @dataclass
