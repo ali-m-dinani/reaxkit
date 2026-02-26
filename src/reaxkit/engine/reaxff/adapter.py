@@ -9,7 +9,7 @@ import numpy as np
 from reaxkit.core.engine_registry import register_engine
 from reaxkit.domain.data_models import ConnectivityData, TrajectoryData
 from reaxkit.engine.base import EngineAdapter
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 
 def trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:

@@ -1,5 +1,2 @@
-"""
-IO utilities for ``__init__``.
+"""Compatibility exports for moved modules in `reaxkit.engine.reaxff.generators`."""
 
-This module provides handlers or generators used for ReaxFF file IO.
-"""
