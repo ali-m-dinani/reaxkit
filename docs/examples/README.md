@@ -26,6 +26,7 @@ examples/
     xmolout_basic_example.py
     xmolout_fort7_example.py
     plotter_meta_example.py
+    multi_engine_msd_cli_blueprint.py
     README.md
 ```
 
@@ -87,6 +88,23 @@ Shows how to:
 - export results for further analysis or plotting.
 
 This example corresponds to the concepts explained in [02_xmolout_fort7_coordination.md](../tutorials/02_xmolout_fort7_coordination.md).
+
+
+---
+
+### `multi_engine_msd_cli_blueprint.py`
+
+Demonstrates a **task-first, multi-engine architecture** for a single CLI command
+(`reaxkit msd`) with engine-specific input handling.
+
+Shows how to:
+- define a shared lazy `TrajectoryData` container,
+- keep one engine-agnostic `MSDTask(request)` that does not accept engine args,
+- implement engine adapters (`ReaxFFAdapter`, `AMSAdapter`),
+- validate inputs per engine (`--xmolout/--fort7` vs `--input`),
+- resolve the engine via `--engine` override or auto-detection.
+
+This file is a blueprint and intentionally uses placeholder file readers and synthetic trajectory payloads.
 
 ---
 

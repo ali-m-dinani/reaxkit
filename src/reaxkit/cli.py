@@ -53,6 +53,7 @@ WORKFLOW_MODULES = {
     "molsav": "reaxkit.workflows.per_file.vels_workflow",
     "tregime": "reaxkit.workflows.per_file.tregime_workflow",
     "vregime": "reaxkit.workflows.per_file.vregime_workflow",
+    "analysis": "reaxkit.workflows.diffusion_workflow",
 }
 
 
