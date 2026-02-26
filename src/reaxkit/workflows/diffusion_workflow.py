@@ -27,8 +27,7 @@ def _run_msd(args: argparse.Namespace) -> int:
         },
     )
 
-    print("lag:", result.lag.tolist())
-    print("msd:", result.msd.tolist())
+    print(result.table.to_string(index=False))
     return 0
 
 

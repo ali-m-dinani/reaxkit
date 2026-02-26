@@ -38,7 +38,6 @@ from reaxkit.utils.frame_utils import (
 )
 
 from reaxkit.analysis.per_file.xmolout_analyzer import (
-    get_mean_squared_displacement,
     get_unit_cell_dimensions_across_frames,
     get_atom_trajectories,
 )
@@ -49,6 +48,9 @@ from reaxkit.analysis.composed.RDF_analyzer import (
 )
 from reaxkit.utils.media.convert import convert_xaxis
 from reaxkit.utils.units import unit_for
+from reaxkit.analysis.trajectory.msd_task import MSDTask
+from reaxkit.domain.data_models import MSDRequest
+from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
 
 def _parse_types(s: Optional[str]):
     """
@@ -277,8 +279,9 @@ def _msd_task(args: argparse.Namespace) -> int:
         print("❌ Could not parse any atoms from --atoms.")
         return 1
 
-    # Long-format MSD: frame_index, iter, atom_id, msd  (per-atom, no averaging)
-    df_long = get_mean_squared_displacement(xh, atoms=atoms)
+    traj = trajectory_from_xmolout_handler(xh)
+    req = MSDRequest(atom_ids=atoms)
+    df_long = MSDTask().run(traj, req).table
     if df_long.empty:
         print("No MSD data found for the selected atoms.")
         return 1

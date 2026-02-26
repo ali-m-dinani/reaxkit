@@ -52,5 +52,7 @@ def test_executor_runs_engine_agnostic_msd_task(tmp_path: Path):
         {"engine": "reaxff", "input": str(tmp_path), "xmolout": str(x)},
     )
 
-    assert result.lag.tolist() == [1]
-    assert np.isclose(result.msd[0], 0.25)
+    assert result.table["frame_index"].tolist() == [0, 1]
+    assert result.table["atom_id"].tolist() == [1, 1]
+    assert np.isclose(result.table["msd"].iloc[0], 0.0)
+    assert np.isclose(result.table["msd"].iloc[1], 0.25)

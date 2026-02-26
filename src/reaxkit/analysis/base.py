@@ -1,4 +1,4 @@
-"""Base protocol for analysis tasks."""
+"""Base interfaces for analysis layer."""
 
 from __future__ import annotations
 
