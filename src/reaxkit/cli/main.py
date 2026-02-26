@@ -12,6 +12,8 @@ import argparse
 import sys
 from importlib import import_module
 
+from reaxkit.workflows.meta import help_workflow, introspection_workflow
+
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
 
@@ -53,6 +55,7 @@ WORKFLOW_MODULES = {
     "molsav": "reaxkit.workflows.per_file.vels_workflow",
     "tregime": "reaxkit.workflows.per_file.tregime_workflow",
     "vregime": "reaxkit.workflows.per_file.vregime_workflow",
+    "analysis": "reaxkit.workflows.diffusion_workflow",
 }
 
 
@@ -124,7 +127,6 @@ def _intspec_default_runner(args):
     # reaxkit intspec --file fort7_analyzer
     # reaxkit intspec --folder workflow
     """
-    introspection_workflow = import_module("reaxkit.workflows.meta.introspection_workflow")
     return introspection_workflow.run_main(
         getattr(args, "file", None),
         getattr(args, "folder", None),

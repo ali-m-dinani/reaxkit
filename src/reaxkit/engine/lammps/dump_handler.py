@@ -1,0 +1,1 @@
+"""LAMMPS dump handler scaffold."""

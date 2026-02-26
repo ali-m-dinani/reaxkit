@@ -1,0 +1,1 @@
+"""Coordination analysis scaffold."""

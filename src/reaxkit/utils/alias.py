@@ -18,7 +18,6 @@ from functools import lru_cache
 import yaml
 import importlib.resources as ir
 
-from sphinx.ext.todo import Todo
 
 
 @lru_cache(maxsize=1)

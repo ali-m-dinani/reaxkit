@@ -1,0 +1,1 @@
+"""Math utility scaffold."""
