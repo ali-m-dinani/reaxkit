@@ -459,10 +459,19 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
     # ===============================
     # Largest-molecule atoms (wide)
     # ===============================
-    df_wide = LargestMoleculeCompositionTask().run(
+    df_long = LargestMoleculeCompositionTask().run(
         mol_data,
-        LargestMoleculeCompositionRequest(format="wide"),
+        LargestMoleculeCompositionRequest(),
     ).table
+    if df_long.empty:
+        print("⚠️ No atom data available for largest molecule.")
+        return 0
+
+    df_wide = (
+        df_long.pivot(index=["frame_index", "iter"], columns="element", values="count")
+        .fillna(0)
+        .reset_index()
+    )
     if df_wide.empty:
         print("⚠️ No atom data available for largest molecule.")
         return 0
@@ -480,7 +489,7 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
         x_vals, xlabel = convert_xaxis(iters, args.xaxis, control_file=args.control)
         x_vals = list(x_vals)
 
-    element_cols = [c for c in df_wide.columns if c != "iter"]
+    element_cols = [c for c in df_wide.columns if c not in {"frame_index", "iter"}]
     if not element_cols:
         print("⚠️ No element columns found to plot.")
         return 0

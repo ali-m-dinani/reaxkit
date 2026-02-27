@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Sequence
 import re
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -65,7 +65,6 @@ class LargestMoleculeByMassResult(BaseResult):
 class LargestMoleculeCompositionRequest(BaseRequest):
     frames: Optional[Sequence[int]] = None
     every: int = 1
-    format: Literal["wide", "long"] = "wide"
 
 
 @dataclass
@@ -185,38 +184,28 @@ class LargestMoleculeCompositionTask(AnalysisTask):
             reporter=reporter,
         ).table
         if largest.empty:
-            cols = ["frame_index", "iter"] if request.format == "wide" else ["frame_index", "iter", "element", "count"]
-            return LargestMoleculeCompositionResult(table=pd.DataFrame(columns=cols))
+            return LargestMoleculeCompositionResult(
+                table=pd.DataFrame(columns=["frame_index", "iter", "element", "count"])
+            )
 
         rows = []
-        all_elements = set()
         for _, row in largest.iterrows():
-            counts = {
-                "frame_index": int(row["frame_index"]),
-                "iter": int(row["iter"]),
-            }
             pairs = re.findall(r"([A-Z][a-z]*)(\d+)", str(row["molecular_formula"]))
             for element, count in pairs:
-                count_i = int(count)
-                counts[element] = counts.get(element, 0) + count_i
-                all_elements.add(element)
-            rows.append(counts)
+                rows.append(
+                    {
+                        "frame_index": int(row["frame_index"]),
+                        "iter": int(row["iter"]),
+                        "element": str(element),
+                        "count": int(count),
+                    }
+                )
 
-        wide = pd.DataFrame(rows).sort_values(["frame_index", "iter"], kind="stable").reset_index(drop=True)
-        for element in sorted(all_elements):
-            if element not in wide.columns:
-                wide[element] = 0
-        wide_cols = ["frame_index", "iter"] + sorted(col for col in wide.columns if col not in {"frame_index", "iter"})
-        wide = wide[wide_cols]
-
-        if request.format == "wide":
-            return LargestMoleculeCompositionResult(table=wide)
-
-        long = wide.melt(
-            id_vars=["frame_index", "iter"],
-            var_name="element",
-            value_name="count",
-        ).sort_values(["frame_index", "element"], kind="stable").reset_index(drop=True)
+        long = pd.DataFrame(rows)
+        if long.empty:
+            long = pd.DataFrame(columns=["frame_index", "iter", "element", "count"])
+        else:
+            long = long.sort_values(["frame_index", "element"], kind="stable").reset_index(drop=True)
         return LargestMoleculeCompositionResult(table=long)
 
 
