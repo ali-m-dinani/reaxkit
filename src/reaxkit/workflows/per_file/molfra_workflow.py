@@ -24,15 +24,22 @@ speciation, fragmentation, and growth processes in ReaxFF simulations.
 from __future__ import annotations
 
 import argparse
-from typing import Optional, Sequence, Union, List
+from typing import Iterable, Optional, Sequence, Union, List
 
+from reaxkit.domain.data_models import MolecularAnalysisData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.io.handlers.molfra_handler import MolFraHandler
-from reaxkit.analysis.per_file.molfra_analyzer import (
-    get_molfra_data_wide_format,
-    _qualifying_types,
-    get_molfra_totals_vs_axis,
-    largest_molecule_by_individual_mass,
-    atoms_in_the_largest_molecule_wide_format,
+from reaxkit.analysis.timeseries import (
+    MolecularFrequencySeriesRequest,
+    MolecularFrequencySeriesTask,
+    MolecularTotalsSeriesRequest,
+    MolecularTotalsSeriesTask,
+)
+from reaxkit.analysis.molecular_analysis import (
+    LargestMoleculeByMassRequest,
+    LargestMoleculeByMassTask,
+    LargestMoleculeCompositionRequest,
+    LargestMoleculeCompositionTask,
 )
 from reaxkit.core.frame_utils import parse_frames, select_frames
 from reaxkit.presentation.convert import convert_xaxis
@@ -41,6 +48,21 @@ from reaxkit.core.alias import normalize_choice
 from reaxkit.cli.path import resolve_output_path
 
 FramesT = Optional[Union[slice, Sequence[int]]]
+
+
+def _qualifying_types(
+    handler: MolFraHandler,
+    *,
+    threshold: int = 3,
+    exclude_types: Optional[Iterable[str]] = ("Pt",),
+) -> list[str]:
+    df = handler.dataframe()
+    if df.empty:
+        return []
+    if exclude_types:
+        df = df[~df["molecular_formula"].isin(set(exclude_types))]
+    grp = df.groupby("molecular_formula")["freq"].max()
+    return sorted(grp[grp >= threshold].index.tolist())
 
 
 # ============================================================
@@ -73,6 +95,7 @@ def _molfra_occur_task(args: argparse.Namespace) -> int:
 
     handler = MolFraHandler(args.file)
     handler._parse()
+    mol_data = ReaxFFAdapter().load(MolecularAnalysisData, {"molfra": args.file})
 
     # Plot behavior: export-only suppresses interactive plotting
     do_plot = bool(args.plot) and not bool(args.export)
@@ -96,14 +119,25 @@ def _molfra_occur_task(args: argparse.Namespace) -> int:
         if not molecules:
             print(f"ℹ️ No species reached max occurrence ≥ {args.threshold}.")
             return 0
+    wide_long = MolecularFrequencySeriesTask().run(
+        mol_data,
+        MolecularFrequencySeriesRequest(
+            molecules=molecules,
+        ),
+    ).table
+    if wide_long.empty:
+        print("ℹ️ No data available after selection.")
+        return 0
 
-    wide = get_molfra_data_wide_format(
-        handler,
-        molecules=molecules,
-        iters=None,
-        by_index=False,
-        fill_value=0,
+    wide = (
+        wide_long.pivot(index="iter", columns="molecular_formula", values="freq")
+        .fillna(0.0)
+        .reset_index()
     )
+    for molecule in molecules:
+        if molecule not in wide.columns:
+            wide[molecule] = 0.0
+    wide = wide[["iter"] + molecules]
     if wide.empty:
         print("ℹ️ No data available after selection.")
         return 0
@@ -195,13 +229,14 @@ def _molfra_total_task(args: argparse.Namespace) -> int:
 
     - If --plot and/or --save: create a multi-subplot figure of *all* totals
       (total_molecules, total_atoms, total_molecular_mass) vs chosen x-axis.
-    - If --export: export all totals as CSV using get_molfra_totals_vs_axis().
+    - If --export: export all totals as CSV using MolecularTotalsSeriesTask().
     """
     # Normalize x-axis alias
     args.xaxis = normalize_choice(args.xaxis, domain="xaxis") or "iter"
 
     handler = MolFraHandler(args.file)
     handler._parse()
+    mol_data = ReaxFFAdapter().load(MolecularAnalysisData, {"molfra": args.file})
 
     # Ensure totals table exists so we can inspect which columns are present
     if not hasattr(handler, "_df_totals"):
@@ -220,13 +255,15 @@ def _molfra_total_task(args: argparse.Namespace) -> int:
         print("⚠️ No totals columns (total_molecules / total_atoms / total_molecular_mass) found.")
         return 0
 
-    # Get totals vs requested x-axis using analyzer helper
-    df_tot = get_molfra_totals_vs_axis(
-        handler,
-        xaxis=args.xaxis,
-        control_file=args.control,
-        quantities=quantities,
-    )
+    # Get totals vs requested x-axis using timeseries task
+    df_tot = MolecularTotalsSeriesTask().run(
+        mol_data,
+        MolecularTotalsSeriesRequest(
+            quantities=quantities,
+            xaxis=args.xaxis,
+            control_file=args.control,
+        ),
+    ).table
     if df_tot.empty:
         print("⚠️ Totals table is empty after axis conversion.")
         return 0
@@ -329,6 +366,7 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
 
     handler = MolFraHandler(args.file)
     handler._parse()
+    mol_data = ReaxFFAdapter().load(MolecularAnalysisData, {"molfra": args.file})
 
     do_plot = bool(args.plot) and not bool(args.export)
     frames_sel = parse_frames(args.frames)
@@ -347,7 +385,10 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
         # ===============================
         # Largest molecule mass vs x-axis
         # ===============================
-        df = largest_molecule_by_individual_mass(handler)
+        df = LargestMoleculeByMassTask().run(
+            mol_data,
+            LargestMoleculeByMassRequest(),
+        ).table
         if df.empty:
             print("⚠️ No data for largest molecule by mass.")
             return 0
@@ -418,7 +459,10 @@ def _molfra_largest_task(args: argparse.Namespace) -> int:
     # ===============================
     # Largest-molecule atoms (wide)
     # ===============================
-    df_wide = atoms_in_the_largest_molecule_wide_format(handler)
+    df_wide = LargestMoleculeCompositionTask().run(
+        mol_data,
+        LargestMoleculeCompositionRequest(format="wide"),
+    ).table
     if df_wide.empty:
         print("⚠️ No atom data available for largest molecule.")
         return 0
@@ -669,3 +713,6 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     )
 
     p_largest.set_defaults(_run=_molfra_largest_task, kind="molfra")
+
+
+

@@ -54,6 +54,7 @@ WORKFLOW_MODULES = {
     "tregime": "reaxkit.workflows.per_file.tregime_workflow",
     "vregime": "reaxkit.workflows.per_file.vregime_workflow",
     "analysis": "reaxkit.workflows.diffusion_workflow",
+    "timeseries": "reaxkit.workflows.timeseries_workflow",
 }
 
 
@@ -192,7 +193,7 @@ def main():
                 module.build_parser(kp)
             kp.set_defaults(_run=_intspec_default_runner)
 
-        elif kind == "help":
+        elif kind in {"help", "timeseries"}:
             # Kind-level workflow: no subcommands
             if hasattr(module, "build_parser"):
                 module.build_parser(kp)

@@ -18,9 +18,10 @@ from __future__ import annotations
 import pandas as pd
 from typing import Dict, List, Tuple
 
+from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
 from reaxkit.io.handlers.params_handler import ParamsHandler
 from reaxkit.io.handlers.ffield_handler import FFieldHandler
-from reaxkit.analysis.per_file.ffield_analyzer import interpret_one_section
+from reaxkit.engine.reaxff.adapter import _force_field_from_ffield_handler
 
 def get_params_data(
     handler: ParamsHandler,
@@ -201,8 +202,11 @@ def interpret_params(
                 FFieldHandler.SECTION_TORSION,
                 FFieldHandler.SECTION_HBOND,
             }:
-                # adds i_symbol/j_symbol/... and 'term'
-                base_df = interpret_one_section(ffield_handler, section=section_name, sep=sep)
+                ff_data = _force_field_from_ffield_handler(ffield_handler)
+                base_df = ForceFieldDataTask().run(
+                    ff_data,
+                    ForceFieldDataRequest(section=section_name, format="interpreted", sep=sep),
+                ).table
             sec_cache[section_key] = base_df
 
         sec_df = sec_cache[section_key]

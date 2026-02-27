@@ -55,7 +55,7 @@ class Fort7Handler(BaseHandler):
     - Connectivity and bond-order columns are inferred from the header.
     - Extra, file-dependent columns are preserved as ``unknown*`` fields.
     """
-    def __init__(self, file_path: str | Path = "fort.7"):
+    def __init__(self, file_path: str | Path = "fort.7", reporter=None):
         """Initialize a handler for a ReaxFF ``fort.7`` connectivity file.
 
         Works on
@@ -75,6 +75,7 @@ class Fort7Handler(BaseHandler):
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []
         self._sim_name: Optional[str] = None
+        self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
@@ -113,8 +114,13 @@ class Fort7Handler(BaseHandler):
             frames.append(pd.DataFrame(cur_atoms_rows, columns=atom_cols))
             totals.append(cur_totals[:] if cur_totals else [float("nan")] * 4)
 
+        total_lines = self._count_lines()
         with open(self.path, "r") as fh:
+            lines_read = 0
             for raw in fh:
+                lines_read += 1
+                if self._reporter and (lines_read % 5000 == 0 or lines_read == total_lines):
+                    self._reporter("load", lines_read, total_lines, "Parsing fort.7")
                 values = raw.split()
                 if not values:
                     continue
@@ -173,8 +179,14 @@ class Fort7Handler(BaseHandler):
             "n_records": len(sim_df),
             "simulation_name": sim_name,
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.7")
 
         return sim_df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r") as fh:
+            return sum(1 for _ in fh)
 
     # -------------------------------------------------------
     # Frame utilities (match XmoloutHandler API)

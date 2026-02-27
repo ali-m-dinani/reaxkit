@@ -26,14 +26,10 @@ from typing import Dict, List, Sequence, Tuple
 
 import pandas as pd
 
+from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
 from reaxkit.io.handlers.ffield_handler import FFieldHandler
-from reaxkit.analysis.per_file.ffield_analyzer import get_ffield_data
-
-# You added these in ffield_analyzer in the previous step.
-# If the names differ in your repo, update these imports accordingly.
-from reaxkit.analysis.per_file.ffield_analyzer import interpret_one_section, interpret_ffield_terms
-
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.engine.reaxff.adapter import _force_field_from_ffield_handler
 
 
 # ------------------------ helpers ------------------------
@@ -98,6 +94,29 @@ def _atom_maps(handler: FFieldHandler) -> Tuple[Dict[int, str], Dict[str, int]]:
         # assume unique symbol->index in typical ffield; if repeated, last wins
         sym_to_idx[sym] = i
     return idx_to_sym, sym_to_idx
+
+
+def _interpreted_force_field_tables(
+    handler: FFieldHandler,
+    *,
+    section: str | None = None,
+) -> dict[str, pd.DataFrame]:
+    return _force_field_tables(handler, section=section, fmt="interpreted")
+
+
+def _force_field_tables(
+    handler: FFieldHandler,
+    *,
+    section: str | None = None,
+    fmt: str = "raw",
+) -> dict[str, pd.DataFrame]:
+    ff_data = _force_field_from_ffield_handler(handler)
+    request = (
+        ForceFieldDataRequest(section=section, format=fmt)
+        if section is not None
+        else ForceFieldDataRequest(format=fmt)
+    )
+    return ForceFieldDataTask().run(ff_data, request).tables
 
 
 def _split_term_string(term: str) -> List[str]:
@@ -277,7 +296,7 @@ def _filter_df_by_term(
 
 
     # indices
-    df = get_ffield_data(handler, section=section)
+    df = _force_field_tables(handler, section=section, fmt="raw")[section]
     cols = _term_cols_for_section(section)
     key = _make_term_series_indices(df, cols, unordered_2body=unordered_2body)
     return sorted(set(key.dropna().unique().tolist()))
@@ -340,16 +359,16 @@ def _task_get(args: argparse.Namespace) -> int:
 
     # get df (interpreted or base)
     if interpreted:
-        df = interpret_one_section(handler, section=section)
+        df = _force_field_tables(handler, section=section, fmt="interpreted")[section]
     else:
-        df = get_ffield_data(handler, section=section)
+        df = _force_field_tables(handler, section=section, fmt="raw")[section]
 
     # optional filter
     if args.term:
         df = _filter_df_by_term(
             handler,
             section,
-            df if not interpreted else get_ffield_data(handler, section=section),
+            df if not interpreted else _force_field_tables(handler, section=section, fmt="raw")[section],
             term=args.term,
             out_format=args.format,
             unordered_2body=not args.ordered_2body,
@@ -357,7 +376,7 @@ def _task_get(args: argparse.Namespace) -> int:
         )
         # if interpreted requested, re-interpret the filtered subset for display/export
         if interpreted and not df.empty:
-            df = interpret_one_section(handler, section=section).loc[df.index].copy()
+            df = _force_field_tables(handler, section=section, fmt="interpreted")[section].loc[df.index].copy()
 
     # export or preview
     if args.export:
@@ -413,16 +432,13 @@ def _task_export(args: argparse.Namespace) -> int:
 
     if interpreted:
         # interpret only the term-bearing sections; keep atom/general as-is
-        interpreted_map = interpret_ffield_terms(handler)
+        interpreted_map = _force_field_tables(handler, fmt="interpreted")
     else:
-        interpreted_map = {}
+        interpreted_map = _force_field_tables(handler, fmt="raw")
 
     print('[Done] Exporting all sections data:')
     for sec in sections:
-        if interpreted and sec in interpreted_map:
-            df = interpreted_map[sec]
-        else:
-            df = handler.section_df(sec).copy()
+        df = interpreted_map[sec]
 
         suffix = "interpreted" if interpreted else "indices"
         out_path = out_dir / f"{sec}_{suffix}.csv"

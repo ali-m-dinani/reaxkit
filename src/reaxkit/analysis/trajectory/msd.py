@@ -40,7 +40,7 @@ class MSDTask(AnalysisTask):
 
     required_data = TrajectoryData
 
-    def run(self, data: TrajectoryData, request: MSDRequest) -> MSDResult:
+    def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:
         dims = tuple(d for d in request.dims if d in ("x", "y", "z"))
         if not dims:
             raise ValueError("dims must include at least one of 'x','y','z'")
@@ -78,8 +78,9 @@ class MSDTask(AnalysisTask):
 
         r0 = data.positions[ref_frame][sel[:, None], use_cols].astype(float)
         rows: list[dict] = []
+        n_steps = len(frame_idx)
 
-        for i in frame_idx:
+        for step_i, i in enumerate(frame_idx, start=1):
             coords = data.positions[i][sel[:, None], use_cols].astype(float)
             dr = coords - r0
             sq = np.sum(dr * dr, axis=1)
@@ -94,6 +95,10 @@ class MSDTask(AnalysisTask):
                         "msd": float(msd_val),
                     }
                 )
+            if reporter:
+                reporter("analyze", step_i, n_steps, "Computing MSD")
 
         table = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"]).reset_index(drop=True)
+        if reporter:
+            reporter("analyze", n_steps, n_steps, "Finished MSD")
         return MSDResult(table=table)

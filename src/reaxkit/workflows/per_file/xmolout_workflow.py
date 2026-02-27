@@ -37,15 +37,17 @@ from reaxkit.core.frame_utils import (
     parse_atoms,
 )
 
-from reaxkit.analysis.per_file.xmolout_analyzer import (
-    get_unit_cell_dimensions_across_frames,
-    get_atom_trajectories,
+from reaxkit.analysis.timeseries.timeseries import (
+    CellDimensionsRequest,
+    CellDimensionsTask,
+    TrajectoryCoordinateSeriesRequest,
+    TrajectoryCoordinateSeriesTask,
 )
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.units import unit_for
 from reaxkit.analysis.trajectory.msd import MSDRequest, MSDTask
 from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFPropertyTask, RDFRequest, RDFTask
-from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
+from reaxkit.engine.reaxff.adapter import _trajectory_from_xmolout_handler
 
 def _parse_types(s: Optional[str]):
     """
@@ -158,14 +160,18 @@ def _trajget_task(args: argparse.Namespace) -> int:
         raise ValueError("At least one of --dims x y z must be provided.")
 
     # get trajectories
-    df = get_atom_trajectories(
-        xh,
-        frames=frames,
-        atoms=atoms,
-        atom_types=sorted(types) if types else None,
-        dims=dims,
-        format=args.format,
+    traj = _trajectory_from_xmolout_handler(xh)
+    result = TrajectoryCoordinateSeriesTask().run(
+        traj,
+        TrajectoryCoordinateSeriesRequest(
+            atom_ids=([a + 1 for a in atoms] if atoms is not None else None),
+            atom_types=sorted(types) if types else None,
+            dims=dims,
+            format=args.format,
+            frames=list(frames) if frames is not None else None,
+        ),
     )
+    df = result.table if result.table is not None else pd.DataFrame()
 
     if df.empty:
         print("No trajectory rows selected (check --atoms / --atom-types / frame range).")
@@ -274,7 +280,7 @@ def _msd_task(args: argparse.Namespace) -> int:
         print("❌ Could not parse any atoms from --atoms.")
         return 1
 
-    traj = trajectory_from_xmolout_handler(xh)
+    traj = _trajectory_from_xmolout_handler(xh)
     req = MSDRequest(atom_ids=atoms)
     df_long = MSDTask().run(traj, req).table
     if df_long.empty:
@@ -415,7 +421,7 @@ def _rdf_task(args: argparse.Namespace) -> int:
     backend = args.backend.lower()
     workflow_name = args.kind
 
-    traj = trajectory_from_xmolout_handler(xh)
+    traj = _trajectory_from_xmolout_handler(xh)
     # Property mode
     if args.prop is not None:
         req = RDFPropertyRequest(
@@ -566,17 +572,28 @@ def _boxdims_task(args: argparse.Namespace) -> int:
     >>>
     """
     xh = XmoloutHandler(args.file)
+    frames = list(_frames_from_args(xh, args)) if getattr(args, "frames", None) else None
 
-    # frames: use all if not provided
-    frames = _parse_frames(args.frames) if getattr(args, "frames", None) else None
-
-    df = get_unit_cell_dimensions_across_frames(xh, frames=frames)
-    if df.empty:
+    sim = _trajectory_from_xmolout_handler(xh).simulation
+    result = CellDimensionsTask().run(
+        sim,
+        CellDimensionsRequest(
+            fields=("a", "b", "c", "alpha", "beta", "gamma"),
+            frames=frames,
+        ),
+    )
+    if not result.series:
         print("No box-dimension data found for the requested frames.")
         return 1
+    meta = result.metadata or {}
+    frame_index = np.asarray(meta.get("frame_index", np.empty((0,), dtype=int)), dtype=int)
+    iterations = np.asarray(meta.get("iterations", np.empty((0,), dtype=int)), dtype=int)
+    df = pd.DataFrame({"frame_index": frame_index, "iter": iterations})
+    for series in result.series:
+        df[series.label] = np.asarray(series.y, dtype=float)
 
     # --- X axis: iter / frame / time ---
-    xvals, xlabel = convert_xaxis(df["frame_index"].to_numpy(), args.xaxis)
+    xvals, xlabel = convert_xaxis(df["iter"].to_numpy(), args.xaxis)
     df = df.copy()
     df.insert(0, "x", xvals)
 

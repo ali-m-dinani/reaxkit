@@ -32,7 +32,7 @@ from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
 from reaxkit.io.handlers.fort7_handler import Fort7Handler
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
 from reaxkit.io.handlers.control_handler import ControlHandler
-from reaxkit.analysis.per_file.xmolout_analyzer import get_atom_trajectories
+from reaxkit.analysis.timeseries.timeseries import TrajectoryCoordinateSeriesRequest, TrajectoryCoordinateSeriesTask
 from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
 from reaxkit.core.frame_utils import parse_frames, resolve_indices
 from reaxkit.core.alias import resolve_alias_from_columns
@@ -51,9 +51,10 @@ from reaxkit.analysis.electrostatics.electrostatics import (
     PolarizationRequest,
     PolarizationTask,
     _electrostatics_data_from_handlers,
+    match_electric_field_to_iout2,
 )
-from reaxkit.analysis.per_file.fort78_analyzer import match_electric_field_to_iout2
 from reaxkit.domain.data_models import ElectricFieldData
+from reaxkit.engine.reaxff.adapter import _trajectory_from_xmolout_handler
 
 
 # -------------------------------------------------------------------------
@@ -162,9 +163,9 @@ def _hyst_task(args: argparse.Namespace) -> int:
     )
     ef = match_electric_field_to_iout2(f78, ctrl, target_iters=iters.tolist(), field_var="field_z")
     data.electric_field = ElectricFieldData(
-        values=np.asarray(ef.to_numpy(dtype=float)),
-        components=("field_z",),
-        iterations=np.asarray(ef.index.to_numpy(dtype=int)),
+        applied_field_values=np.asarray(ef.to_numpy(dtype=float)),
+        applied_field_components=("field_z",),
+        sampled_field_iterations=np.asarray(ef.index.to_numpy(dtype=int)),
     )
     hyst = PolarizationFieldTask().run(
         data,
@@ -337,15 +338,16 @@ def _local_pol_with_coords(
         raise ValueError("No local data in the requested frames.")
 
     # 2) coordinates of atoms from xmolout (long format)
-    traj = get_atom_trajectories(
-        xh,
-        frames=idx_list,
-        every=1,
-        atoms=None,
-        atom_types=None,
-        dims=("x", "y", "z"),
-        format="long",
-    )
+    traj_data = _trajectory_from_xmolout_handler(xh)
+    traj = TrajectoryCoordinateSeriesTask().run(
+        traj_data,
+        TrajectoryCoordinateSeriesRequest(
+            dims=("x", "y", "z"),
+            format="long",
+            frames=idx_list,
+            every=1,
+        ),
+    ).table
     if traj.empty:
         raise ValueError("No trajectory data returned for requested frames.")
 

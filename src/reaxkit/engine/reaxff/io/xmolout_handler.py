@@ -54,7 +54,13 @@ class XmoloutHandler(BaseHandler):
       and streaming access via ``iter_frames(step=...)``.
     """
 
-    def __init__(self, file_path: str | Path = "xmolout", *, extra_atom_cols: Optional[list[str]] = None):
+    def __init__(
+        self,
+        file_path: str | Path = "xmolout",
+        *,
+        extra_atom_cols: Optional[list[str]] = None,
+        reporter=None,
+    ):
         """
         Initialize the instance.
 
@@ -71,6 +77,7 @@ class XmoloutHandler(BaseHandler):
         self._n_atoms: Optional[int] = None
         self.simulation_name: str = ""
         self._extra_atom_cols = list(extra_atom_cols) if extra_atom_cols else None
+        self._reporter = reporter
 
     # ---- FileHandler requirement
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -88,14 +95,19 @@ class XmoloutHandler(BaseHandler):
 
         sim_cols = ["num_of_atoms", "iter", "E_pot", "a", "b", "c", "alpha", "beta", "gamma"]
         base_atom_cols = ["atom_type", "x", "y", "z"]
+        total_lines = self._count_lines()
 
         with open(self.path, "r") as fh:
             atom_buf: List[list] = []
             atom_count = 0
             current_atom_cols: Optional[List[str]] = None
             n_atoms: Optional[int] = None
+            lines_read = 0
 
             for line in fh:
+                lines_read += 1
+                if self._reporter and (lines_read % 5000 == 0 or lines_read == total_lines):
+                    self._reporter("load", lines_read, total_lines, "Parsing xmolout")
                 vals = line.strip().split()
                 if not vals:
                     continue
@@ -162,7 +174,13 @@ class XmoloutHandler(BaseHandler):
             "n_frames": len(self._frames),
             "has_time": False,
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing xmolout")
         return df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r") as fh:
+            return sum(1 for _ in fh)
 
     # ---- Explicit, file-specific accessors (no generic get())
     def n_frames(self) -> int:

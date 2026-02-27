@@ -31,7 +31,7 @@ from reaxkit.core.frame_utils import parse_frames, select_frames
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.io.handlers.summary_handler import SummaryHandler
 from reaxkit.core.alias import available_keys
-from reaxkit.analysis.per_file.summary_analyzer import get_summary_data
+from reaxkit.extractors.per_file.summary import extract_summary_data
 
 FramesT = Optional[Union[slice, Sequence[int]]]
 
@@ -68,7 +68,7 @@ def _summary_get_task(args: argparse.Namespace) -> int:
 
     # --- Y axis: use analyzer-level helper for alias resolution ---
     try:
-        y_series = get_summary_data(handler, args.yaxis)  # handles aliases + fallbacks
+        y_series = extract_summary_data(handler, args.yaxis)  # handles aliases + fallbacks
     except KeyError as e:
         # (optional) just re-raise, message already includes available keys
         # from summary_analyzer.get_summary
@@ -206,6 +206,7 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _wire_get_flags(p)
+
 
 
 

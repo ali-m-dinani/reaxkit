@@ -102,15 +102,16 @@ def _frame_grid_and_rdf_freud(
     bins: int,
     r_max: Optional[float],
 ) -> tuple[np.ndarray, np.ndarray]:
-    if data.cell_lengths is None:
-        raise ValueError("TrajectoryData.cell_lengths is required for RDF analysis.")
+    sim = data.simulation
+    if sim is None or sim.cell_lengths is None:
+        raise ValueError("TrajectoryData.simulation.cell_lengths is required for RDF analysis.")
 
-    cell_l = np.asarray(data.cell_lengths[int(frame_index)], dtype=float)
+    cell_l = np.asarray(sim.cell_lengths[int(frame_index)], dtype=float)
     if cell_l.shape[0] != 3:
         raise ValueError("cell_lengths must have shape (n_frames, 3).")
 
-    if data.cell_angles is not None:
-        cell_a = np.asarray(data.cell_angles[int(frame_index)], dtype=float)
+    if sim.cell_angles is not None:
+        cell_a = np.asarray(sim.cell_angles[int(frame_index)], dtype=float)
         if cell_a.shape[0] != 3:
             raise ValueError("cell_angles must have shape (n_frames, 3).")
         alpha, beta, gamma = cell_a
@@ -384,4 +385,3 @@ __all__ = [
     "RDFPropertyResult",
     "RDFPropertyTask",
 ]
-

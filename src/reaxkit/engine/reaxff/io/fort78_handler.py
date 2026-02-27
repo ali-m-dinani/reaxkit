@@ -14,6 +14,7 @@ Typical use cases include:
 
 
 from __future__ import annotations
+from io import StringIO
 from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
@@ -73,7 +74,7 @@ class Fort78Handler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
-    def __init__(self, file_path: str | Path = "fort.78"):
+    def __init__(self, file_path: str | Path = "fort.78", reporter=None):
         """
         Initialize the instance.
 
@@ -85,6 +86,7 @@ class Fort78Handler(BaseHandler):
         """
         super().__init__(file_path)
         self._n_rows: int = 0
+        self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
@@ -97,20 +99,36 @@ class Fort78Handler(BaseHandler):
 
         """
         path = Path(self.path)
+        total_lines = self._count_lines()
+        lines: list[str] = []
+        with open(path, "r") as fh:
+            for lines_read, line in enumerate(fh, start=1):
+                lines.append(line)
+                if self._reporter:
+                    self._reporter("load", lines_read, total_lines, "Parsing fort.78")
+
+        if not lines:
+            self._n_rows = 0
+            return pd.DataFrame(), {
+                "source": "fort.78",
+                "n_rows": 0,
+                "has_time": False,
+                "columns": [],
+            }
 
         # Peek first line to decide if it's a header or data
-        with open(path, "r") as fh:
-            first_line = fh.readline().strip()
+        first_line = lines[0].strip()
         first_tokens = first_line.split()
         is_numeric_row = all(self._is_number(tok) for tok in first_tokens)
+        buf = StringIO("".join(lines))
 
         # Read file using whitespace separator (no deprecation warning)
         if is_numeric_row:
             # No header present
-            df = pd.read_csv(path, sep=r"\s+", header=None, engine="python")
+            df = pd.read_csv(buf, sep=r"\s+", header=None, engine="python")
         else:
             # Header present -> parse with header row, then overwrite with canonical names
-            df = pd.read_csv(path, sep=r"\s+", header=0, engine="python")
+            df = pd.read_csv(buf, sep=r"\s+", header=0, engine="python")
 
         ncols = df.shape[1]
 
@@ -146,7 +164,13 @@ class Fort78Handler(BaseHandler):
             "has_time": False,
             "columns": list(df.columns),
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.78")
         return df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r") as fh:
+            return sum(1 for _ in fh)
 
     def n_rows(self) -> int:
         """

@@ -14,10 +14,11 @@ Typical use cases include:
 
 
 from __future__ import annotations
-from pathlib import Path
-from typing import Dict, Any, Tuple, List
-import pandas as pd
 from io import StringIO
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import pandas as pd
 
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
@@ -53,7 +54,7 @@ class SummaryHandler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
-    def __init__(self, file_path: str | Path = "summary.txt") -> None:
+    def __init__(self, file_path: str | Path = "summary.txt", reporter=None) -> None:
         """
         Initialize the instance.
 
@@ -64,6 +65,7 @@ class SummaryHandler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
     @staticmethod
     def _canonical_names(ncols: int) -> List[str]:
@@ -109,19 +111,30 @@ class SummaryHandler(BaseHandler):
             raw_lines = fh.readlines()
 
         data_lines: List[str] = []
-        for ln in raw_lines:
+        total_lines = len(raw_lines)
+        for line_i, ln in enumerate(raw_lines, start=1):
             s = ln.strip()
             if not s:
+                if self._reporter:
+                    self._reporter("load", line_i, total_lines, "Scanning summary.txt")
                 continue
             s_lower = s.lower()
             # Skip banner/header lines only; keep every other line
             if s_lower.startswith("reax"):
+                if self._reporter:
+                    self._reporter("load", line_i, total_lines, "Scanning summary.txt")
                 continue
             if s_lower.startswith("iteration"):
+                if self._reporter:
+                    self._reporter("load", line_i, total_lines, "Scanning summary.txt")
                 continue
             if not s[0].isdigit():  # skipping comment or warning lines that may occur at the end of the file
+                if self._reporter:
+                    self._reporter("load", line_i, total_lines, "Scanning summary.txt")
                 continue
             data_lines.append(ln)
+            if self._reporter:
+                self._reporter("load", line_i, total_lines, "Scanning summary.txt")
 
         if not data_lines:
             raise ValueError(

@@ -173,7 +173,7 @@ class FFieldHandler(BaseHandler):
     ]
 
     # ---------------- init / public API ---------------------------
-    def __init__(self, file_path: str | Path = "ffield") -> None:
+    def __init__(self, file_path: str | Path = "ffield", reporter=None) -> None:
         """
         Initialize the instance.
 
@@ -185,6 +185,7 @@ class FFieldHandler(BaseHandler):
         """
         super().__init__(file_path)
         self._sections: Dict[str, pd.DataFrame] = {}
+        self._reporter = reporter
 
     @property
     def sections(self) -> Dict[str, pd.DataFrame]:
@@ -232,7 +233,13 @@ class FFieldHandler(BaseHandler):
 
         """
         path = self.path
-        lines = path.read_text().splitlines()
+        total_lines = self._count_lines()
+        lines: List[str] = []
+        with open(path, "r", encoding="utf-8") as fh:
+            for lines_read, line in enumerate(fh, start=1):
+                lines.append(line.rstrip("\n"))
+                if self._reporter:
+                    self._reporter("load", lines_read, total_lines, "Parsing ffield")
 
         meta: Dict[str, Any] = {}
 
@@ -332,7 +339,13 @@ class FFieldHandler(BaseHandler):
 
         # Summary DataFrame for ffield is intentionally empty
         df = pd.DataFrame()
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing ffield")
         return df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r", encoding="utf-8") as fh:
+            return sum(1 for _ in fh)
 
     # ---------------- section parsers ----------------------------
     def _parse_general_section(

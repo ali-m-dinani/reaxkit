@@ -12,7 +12,7 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import AtomReferenceData, ConnectivityData
+from reaxkit.domain.data_models import ConnectivityData, ForceFieldData
 
 
 @dataclass
@@ -20,8 +20,8 @@ class CoordinationStatusRequest(BaseRequest):
     """Request for per-atom coordination status classification."""
 
     valences: Optional[Mapping[str, float]] = None
-    atom_reference: Optional[AtomReferenceData] = None
-    valence_key: str = "valence"
+    force_field: Optional[ForceFieldData] = None
+    valence_key: str = "valency"
     threshold: float = 0.9
     frames: Optional[Sequence[int]] = None
     every: int = 1
@@ -100,16 +100,32 @@ def _status_label(series: Sequence[int | float]) -> list[Optional[str]]:
 def _valence_map_from_request(req: CoordinationStatusRequest) -> dict[str, float]:
     if req.valences:
         return {str(k): float(v) for k, v in req.valences.items()}
-    if req.atom_reference is None:
-        raise ValueError("Provide either request.valences or request.atom_reference with valence data.")
+    if req.force_field is None:
+        raise ValueError("Provide either request.valences or request.force_field with atom valence data.")
+
+    atom_df = req.force_field.atom_parameters
+    if atom_df is None or atom_df.empty:
+        raise ValueError("force_field.atom_parameters is empty; cannot infer valences.")
 
     key = str(req.valence_key)
+    candidate_keys = [key]
+    if key == "valence":
+        candidate_keys.append("valency")
+
+    value_col = next((k for k in candidate_keys if k in atom_df.columns), None)
+    if value_col is None:
+        raise ValueError(f"No valence column found in force_field.atom_parameters for keys={candidate_keys}.")
+    if "symbol" not in atom_df.columns:
+        raise ValueError("force_field.atom_parameters must include 'symbol' column.")
+
     val_map: dict[str, float] = {}
-    for elem, props in (req.atom_reference.element_props or {}).items():
-        if key in props:
-            val_map[str(elem)] = float(props[key])
+    for _, row in atom_df.iterrows():
+        sym = str(row["symbol"]).strip()
+        if not sym or sym.lower() == "nan" or pd.isna(row[value_col]):
+            continue
+        val_map[sym] = float(row[value_col])
     if not val_map:
-        raise ValueError(f"No '{key}' values found in atom_reference.element_props.")
+        raise ValueError(f"No usable '{value_col}' values found in force_field.atom_parameters.")
     return val_map
 
 

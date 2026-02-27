@@ -11,5 +11,5 @@ class AnalysisTask(ABC):
     required_data = None
 
     @abstractmethod
-    def run(self, data, request):
+    def run(self, data, request, reporter=None):
         """Run scientific analysis on normalized domain data."""

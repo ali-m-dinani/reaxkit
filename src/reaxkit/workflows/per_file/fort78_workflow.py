@@ -22,7 +22,7 @@ import argparse
 from pathlib import Path
 from reaxkit.presentation.units import unit_for
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
-from reaxkit.analysis.per_file.fort78_analyzer import get_fort78_data
+from reaxkit.extractors.per_file.fort78 import extract_fort78_data
 from reaxkit.presentation.plot import single_plot
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.cli.path import resolve_output_path
@@ -87,7 +87,7 @@ def _get_task(args: argparse.Namespace) -> int:
     # Pull requested yaxis from fort.78 summary.
     # Analyzer will *rename* the output yaxis to the *requested alias*.
     ykey: str = args.yaxis.strip()
-    df = get_fort78_data(handler, [ykey])  # DataFrame: columns ['iter', ykey]
+    df = extract_fort78_data(handler, [ykey])  # DataFrame: columns ['iter', ykey]
 
     if ykey not in df.columns:
         raise KeyError(f"❌ yaxis '{ykey}' not found in fort.78 data.")
@@ -175,3 +175,4 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     g.add_argument("--export", default=None, help="Export data to CSV at this path")
 
     g.set_defaults(_run=_get_task)
+

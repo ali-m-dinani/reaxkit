@@ -10,13 +10,17 @@ import pandas as pd
 from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.analysis.per_file.fort78_analyzer import match_electric_field_to_iout2
-from reaxkit.analysis.per_file.fort7_analyzer import get_all_atoms_cnn_conv_fnc, get_partial_charges_conv_fnc
+from reaxkit.analysis.per_file.control_analyzer import get_control_data
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ChargeData, ConnectivityData, ElectrostaticsData, ElectricFieldData
-from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
+from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
+from reaxkit.engine.reaxff.adapter import (
+    _charges_from_fort7_handler,
+    _connectivity_from_fort7_handler,
+    _trajectory_from_xmolout_handler,
+)
+from reaxkit.extractors.per_file.fort78 import extract_fort78_data
 from reaxkit.core.constants import const
 from reaxkit.utils.numerical.numerical_calcs import find_zero_crossings
 
@@ -157,7 +161,7 @@ def _atom_selector(
 def _bo_frame_from_connectivity(connectivity: ConnectivityData, frame_index: int) -> np.ndarray:
     bo = connectivity.bond_orders
     if bo is None:
-        raise ValueError("Local electrostatics requires ConnectivityData.bond_orders or adjacency.")
+        raise ValueError("Local electrostatics requires ConnectivityData.bond_orders or connectivity.")
     if isinstance(bo, np.ndarray):
         if bo.ndim != 3:
             raise ValueError("bond_orders ndarray must have shape (n_frames, n_atoms, n_atoms).")
@@ -179,16 +183,27 @@ def _neighbors_from_connectivity(
     n_atoms: int,
     min_bo: float,
 ) -> list[np.ndarray]:
-    if connectivity.adjacency is not None:
-        adj = np.asarray(connectivity.adjacency)
-        if adj.ndim == 2:
-            mat = np.asarray(adj, dtype=float)
-        elif adj.ndim == 3:
-            mat = np.asarray(adj[int(frame_index)], dtype=float)
+    if connectivity.connectivity is not None:
+        conn = connectivity.connectivity
+        if isinstance(conn, np.ndarray):
+            if conn.ndim == 2:
+                mat = np.asarray(conn, dtype=float)
+            elif conn.ndim == 3:
+                mat = np.asarray(conn[int(frame_index)], dtype=float)
+            else:
+                raise ValueError("connectivity must be 2D or 3D when ndarray.")
+        elif isinstance(conn, (list, tuple)):
+            fr = conn[int(frame_index)]
+            if hasattr(fr, "toarray"):
+                mat = np.asarray(fr.toarray(), dtype=float)
+            elif hasattr(fr, "todense"):
+                mat = np.asarray(fr.todense(), dtype=float)
+            else:
+                mat = np.asarray(fr, dtype=float)
         else:
-            raise ValueError("adjacency must be 2D or 3D.")
+            mat = np.asarray(conn, dtype=float)
         if mat.shape != (n_atoms, n_atoms):
-            raise ValueError("adjacency shape must match atom count.")
+            raise ValueError("connectivity shape must match atom count.")
         return [np.where(mat[i] > 0)[0] for i in range(n_atoms)]
 
     mat = _bo_frame_from_connectivity(connectivity, frame_index)
@@ -350,86 +365,100 @@ def _field_component_series(
     component: str,
     target_iters: np.ndarray,
 ) -> np.ndarray:
-    vals = np.asarray(field_data.values, dtype=float)
-    components = [str(c) for c in field_data.components]
+    def _extract(values: np.ndarray, components: Sequence[str], wanted: str) -> Optional[np.ndarray]:
+        vals = np.asarray(values, dtype=float)
+        names = [str(c) for c in components]
+        if wanted not in names:
+            return None
+        if vals.ndim == 1:
+            if len(names) != 1:
+                raise ValueError("1D electric field values require exactly one component label.")
+            return vals
+        if vals.ndim == 2:
+            j = names.index(wanted)
+            if j >= vals.shape[1]:
+                raise ValueError("Electric field values second dimension does not match component labels.")
+            return vals[:, j]
+        raise ValueError("Electric field values must be 1D or 2D.")
 
-    if vals.ndim == 1:
-        if component not in components and component != components[0]:
-            raise KeyError(f"Electric field component '{component}' not found in components={components}.")
-        series = vals
-    elif vals.ndim == 2:
-        if component not in components:
-            raise KeyError(f"Electric field component '{component}' not found in components={components}.")
-        j = components.index(component)
-        if j >= vals.shape[1]:
-            raise ValueError("ElectricFieldData.values second dimension does not match components.")
-        series = vals[:, j]
-    else:
-        raise ValueError("ElectricFieldData.values must be 1D or 2D.")
+    series = _extract(field_data.applied_field_values, field_data.applied_field_components, component)
+    if series is None:
+        series = _extract(field_data.field_energy_values, field_data.field_energy_components, component)
+    if series is None:
+        all_components = [
+            *[str(c) for c in field_data.applied_field_components],
+            *[str(c) for c in field_data.field_energy_components],
+        ]
+        raise KeyError(f"Electric field component '{component}' not found in components={all_components}.")
 
-    if field_data.iterations is None:
+    if field_data.sampled_field_iterations is None:
         if len(series) < len(target_iters):
             raise ValueError("Electric field series shorter than selected polarization frames.")
         return np.asarray(series[: len(target_iters)], dtype=float)
 
-    field_iters = np.asarray(field_data.iterations, dtype=int).reshape(-1)
+    field_iters = np.asarray(field_data.sampled_field_iterations, dtype=int).reshape(-1)
     if field_iters.shape[0] != series.shape[0]:
-        raise ValueError("ElectricFieldData.iterations length must match electric field samples.")
+        raise ValueError("ElectricFieldData.sampled_field_iterations length must match electric field samples.")
     by_iter = pd.Series(np.asarray(series, dtype=float), index=field_iters)
     return by_iter.reindex(target_iters).to_numpy(dtype=float)
 
 
+def match_electric_field_to_iout2(
+    f78,
+    ctrl,
+    target_iters: Sequence[int],
+    field_var: str = "E_field_z",
+) -> pd.Series:
+    """Match fort.78 field values to target iterations using a stepwise hold rule."""
+    iout2 = get_control_data(ctrl, "iout2", section="md", default=1)
+    _ = iout2
+
+    df_e = extract_fort78_data(f78, variables=field_var)
+    if df_e.empty:
+        raise ValueError("fort.78 has no usable data.")
+
+    df_e = df_e.sort_values("iter").reset_index(drop=True)
+    mapping = pd.Series(df_e[field_var].values, index=df_e["iter"].values)
+    sorted_iters = list(mapping.index)
+
+    out_vals = []
+    for it in target_iters:
+        it = int(it)
+        if it == 0:
+            out_vals.append(0.0)
+            continue
+        valid = [f for f in sorted_iters if f <= it]
+        if not valid:
+            raise ValueError(f"No fort.78 iteration <= {it}")
+        out_vals.append(float(mapping[max(valid)]))
+
+    return pd.Series(out_vals, index=list(target_iters), name=field_var)
+
+
 def _electrostatics_data_from_handlers(xh, f7) -> ElectrostaticsData:
-    traj = trajectory_from_xmolout_handler(xh)
+    traj = _trajectory_from_xmolout_handler(xh)
     n_frames, n_atoms = traj.positions.shape[:2]
     iters = np.asarray(traj.iterations if traj.iterations is not None else np.arange(n_frames), dtype=int)
 
-    q_df = get_partial_charges_conv_fnc(f7, iterations=iters.tolist())
-    if q_df.empty:
-        charges = np.zeros((n_frames, n_atoms), dtype=float)
-    else:
-        q_df = q_df[q_df["iter"].isin(iters)].copy().sort_values(["iter", "atom_idx"])
-        q_by_iter: dict[int, np.ndarray] = {}
-        for it in iters.tolist():
-            sub = q_df[q_df["iter"] == it]
-            if sub.empty:
-                q_by_iter[int(it)] = np.zeros((n_atoms,), dtype=float)
-            else:
-                arr = sub["partial_charge"].to_numpy(dtype=float)
-                if arr.shape[0] != n_atoms:
-                    raise ValueError(f"Charge length mismatch at iter={it}: {arr.shape[0]} vs {n_atoms}")
-                q_by_iter[int(it)] = arr
-        charges = np.stack([q_by_iter[int(it)] for it in iters], axis=0)
-
-    adjacency = np.zeros((n_frames, n_atoms, n_atoms), dtype=np.int8)
-    cnn_df = get_all_atoms_cnn_conv_fnc(f7, iterations=iters.tolist())
-    if not cnn_df.empty:
-        cnn_df = cnn_df[cnn_df["iter"].isin(iters)].copy()
-        cnn_cols = sorted(
-            [c for c in cnn_df.columns if c.startswith("atom_cnn")],
-            key=lambda x: int("".join(ch for ch in x if ch.isdigit()) or 0),
+    charge_data = _charges_from_fort7_handler(f7, simulation=traj.simulation)
+    charges = np.asarray(charge_data.charges, dtype=float)
+    if charges.shape != (n_frames, n_atoms):
+        raise ValueError(
+            "ChargeData.charges from fort.7 must have shape (n_frames, n_atoms) matching trajectory."
         )
-        for fi, it in enumerate(iters.tolist()):
-            sub = cnn_df[cnn_df["iter"] == it].sort_values("atom_idx").reset_index(drop=True)
-            if sub.empty:
-                continue
-            mat = sub[cnn_cols].to_numpy(dtype=int)
-            for i in range(min(n_atoms, mat.shape[0])):
-                for nb in mat[i]:
-                    j = int(nb) - 1
-                    if 0 <= j < n_atoms and j != i:
-                        adjacency[fi, i, j] = 1
-                        adjacency[fi, j, i] = 1
+    charge_data.simulation = traj.simulation
+    charge_data.iterations = iters
+
+    conn_data = _connectivity_from_fort7_handler(f7)
+    conn_data.atom_ids = np.asarray(traj.atom_ids, dtype=int)
+    conn_data.elements = list(traj.elements)
+    conn_data.simulation = traj.simulation
+    conn_data.iterations = iters
 
     return ElectrostaticsData(
         trajectory=traj,
-        charges=ChargeData(charges=charges, atom_ids=traj.atom_ids, iterations=iters),
-        connectivity=ConnectivityData(
-            adjacency=adjacency,
-            atom_ids=np.asarray(traj.atom_ids, dtype=int),
-            elements=traj.elements,
-            iterations=iters,
-        ),
+        charges=charge_data,
+        connectivity=conn_data,
     )
 
 
@@ -483,7 +512,7 @@ def _run_electrostatics(
             frame_idx=frame_idx,
             mode=mode,
             volume_method=vm,
-            cell_lengths=data.trajectory.cell_lengths,
+            cell_lengths=(data.trajectory.simulation.cell_lengths if data.trajectory.simulation else None),
         ).reset_index(drop=True)
 
     if data.connectivity is None:
@@ -496,8 +525,8 @@ def _run_electrostatics(
         atom_ids=atom_id_list,
         iterations=iterations,
         frame_idx=frame_idx,
-        cell_lengths=data.trajectory.cell_lengths,
-        cell_angles=data.trajectory.cell_angles,
+        cell_lengths=(data.trajectory.simulation.cell_lengths if data.trajectory.simulation else None),
+        cell_angles=(data.trajectory.simulation.cell_angles if data.trajectory.simulation else None),
         connectivity=data.connectivity,
         mode=mode,
         volume_method=volume_method,
@@ -623,6 +652,7 @@ class PolarizationFieldTask(AnalysisTask):
 
 
 __all__ = [
+    "match_electric_field_to_iout2",
     "DipoleRequest",
     "DipoleResult",
     "DipoleTask",
