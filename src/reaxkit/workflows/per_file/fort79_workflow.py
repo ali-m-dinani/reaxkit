@@ -22,10 +22,28 @@ optimization results.
 
 import argparse
 from pathlib import Path
-from reaxkit.io.handlers.fort79_handler import Fort79Handler
-from reaxkit.analysis.per_file.fort79_analyzer import get_fort79_data_with_diff_sensitivities
-from reaxkit.presentation.plot import single_plot, tornado_plot
+
+from reaxkit.analysis.force_field import (
+    ParameterOptimizationDiagnosticRequest,
+    ParameterOptimizationDiagnosticTask,
+)
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import ForceFieldOptimizationDiagnosticData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
+from reaxkit.presentation.plot import single_plot, tornado_plot
+
+
+def _load_fort79_table(file_path: str):
+    return ParameterOptimizationDiagnosticTask().run(
+        ReaxFFAdapter().load(
+            ForceFieldOptimizationDiagnosticData,
+            {
+                "fort79": file_path,
+                "input": file_path,
+            },
+        ),
+        ParameterOptimizationDiagnosticRequest(),
+    ).table
 
 
 def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
@@ -33,7 +51,7 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
     Compute and visualize the parameter with the minimum sensitivity in a fort.79 file.
 
     This task:
-    - Parses the fort.79 output using `Fort79Handler`
+    - Parses the fort.79 output using the analysis task
     - Identifies the parameter with the lowest `min_sensitivity`
     - Plots its sensitivity values across epoch-sets (optional: --plot / --save)
     - Exports the full sensitivity table and the minimum-identifier subset (optional: --export)
@@ -43,21 +61,19 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
     int
         Exit status code (0 on success).
     """
-    handler = Fort79Handler(args.file)
-    df_sens = get_fort79_data_with_diff_sensitivities(handler)
+    df_sens = _load_fort79_table(args.file)
 
     idx_min = df_sens["min_sensitivity"].idxmin()
-    min_identifier = df_sens.loc[idx_min, "identider"]
+    min_identifier = df_sens.loc[idx_min, "identifier"]
     min_value = df_sens.loc[idx_min, "min_sensitivity"]
     print(f"[Done] Minimum sensitivity value: {min_value:.6f}")
-    print(f"📘 Corresponding identifier: {min_identifier}")
+    print(f"Corresponding identifier: {min_identifier}")
 
     df_sens = df_sens.copy()
     df_sens["epoch-set"] = df_sens.index + 1
 
-    # Columns actually used in plotting
     ratio_cols = ["sensitivity1/3", "sensitivity2/3", "sensitivity4/3"]
-    subset_min = df_sens[df_sens["identider"] == min_identifier].copy()
+    subset_min = df_sens[df_sens["identifier"] == min_identifier].copy()
     long_all = (
         subset_min[["epoch-set"] + ratio_cols]
         .melt(
@@ -82,7 +98,6 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
     title_for_save = "Ratios_per_EpochSet"
     workflow_name = args.kind
 
-    # ---- SAVE / PLOT ----
     if args.save:
         out_save = Path(resolve_output_path(args.save, workflow_name))
         out_save.parent.mkdir(parents=True, exist_ok=True)
@@ -110,7 +125,6 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
             legend=True,
         )
 
-    # ---- EXPORT ----
     if args.export:
         export_base = Path(resolve_output_path(args.export, workflow_name))
         export_base.parent.mkdir(parents=True, exist_ok=True)
@@ -119,18 +133,13 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
         out_min = base_no_suffix.with_name(base_no_suffix.name + "_min").with_suffix(".csv")
         out_all = base_no_suffix.with_name(base_no_suffix.name + "_all").with_suffix(".csv")
 
-        # Use the *real* column names that exist in df_sens
-        # Start with epoch-set and identider, then the sensitivity columns,
-        # then any min/max columns that actually exist.
-        export_cols = ["epoch-set", "identider"]
+        export_cols = ["epoch-set", "identifier"]
         export_cols += [c for c in ratio_cols if c in df_sens.columns]
         export_cols += [c for c in ["min_sensitivity", "max_sensitivity"] if c in df_sens.columns]
 
-        # Min-identifier subset
-        subset_min = df_sens[df_sens["identider"] == min_identifier].copy()
+        subset_min = df_sens[df_sens["identifier"] == min_identifier].copy()
         subset_min[export_cols].to_csv(out_min, index=False)
 
-        # All identifiers
         to_all = df_sens.copy()
         to_all[export_cols].to_csv(out_all, index=False)
 
@@ -138,7 +147,7 @@ def _fort79_most_sensitive_param_task(args: argparse.Namespace) -> int:
         print(f"[Done] Exported all-identifier data to {out_all}")
 
     if not args.plot and not args.save and not args.export:
-        print("ℹ️ No action selected. Use one or more of --plot, --save, --export.")
+        print("No action selected. Use one or more of --plot, --save, --export.")
     return 0
 
 
@@ -157,31 +166,26 @@ def _fort79_tornado_task(args: argparse.Namespace) -> int:
     int
         Exit status code (0 on success).
     """
-    handler = Fort79Handler(args.file)
-    sensitivities = get_fort79_data_with_diff_sensitivities(handler)  # has: identider, min_sensitivity, max_sensitivity, ...
+    sensitivities = _load_fort79_table(args.file)
 
-    # Aggregate per identifier: min & max from their respective columns
     grouped = (
-        sensitivities.groupby("identider", dropna=True)
-        .agg(min_eff=("min_sensitivity", "min"),
-             max_eff=("max_sensitivity", "max"))
+        sensitivities.groupby("identifier", dropna=True)
+        .agg(min_eff=("min_sensitivity", "min"), max_eff=("max_sensitivity", "max"))
         .reset_index()
     )
 
-    # Median across ALL min & max values together (union) per parameter
     eff_union = (
         sensitivities.melt(
-            id_vars=["identider"],
+            id_vars=["identifier"],
             value_vars=["min_sensitivity", "max_sensitivity"],
             var_name="kind",
-            value_name="eff"
+            value_name="eff",
         )
         .dropna(subset=["eff"])
     )
-    median_series = eff_union.groupby("identider", dropna=True)["eff"].median()
-    grouped["median_eff"] = grouped["identider"].map(median_series)
+    median_series = eff_union.groupby("identifier", dropna=True)["eff"].median()
+    grouped["median_eff"] = grouped["identifier"].map(median_series)
 
-    # Sort by span just like before
     grouped["span"] = grouped["max_eff"] - grouped["min_eff"]
     grouped = grouped.sort_values("span", ascending=False)
 
@@ -189,26 +193,22 @@ def _fort79_tornado_task(args: argparse.Namespace) -> int:
         print("No data to plot (empty after grouping).")
         return 0
 
-    # Apply top-N before exporting/plotting
     grouped_top = grouped.head(args.top) if (args.top and args.top > 0) else grouped.copy()
 
     workflow_name = args.kind
-    # Export (now includes median)
     if args.export:
-        print('here!')
         out = resolve_output_path(args.export, workflow_name)
-        export_cols = ["identider", "min_eff", "median_eff", "max_eff", "span"]
+        export_cols = ["identifier", "min_eff", "median_eff", "max_eff", "span"]
         grouped_top[export_cols].to_csv(out, index=False)
         print(f"[Done] Exported tornado data to {out}")
 
-    # Save figure if requested
     if args.save:
         out = resolve_output_path(args.save, workflow_name)
         tornado_plot(
-            labels=grouped_top["identider"].tolist(),
+            labels=grouped_top["identifier"].tolist(),
             min_vals=grouped_top["min_eff"].tolist(),
             max_vals=grouped_top["max_eff"].tolist(),
-            median_vals=grouped_top["median_eff"].tolist(),  # NEW
+            median_vals=grouped_top["median_eff"].tolist(),
             title="Parameter Sensitivity Tornado Plot",
             xlabel="sensitivity (Error Response)",
             ylabel="Parameter",
@@ -217,13 +217,12 @@ def _fort79_tornado_task(args: argparse.Namespace) -> int:
             vline=1.0 if args.vline else None,
         )
 
-    # Interactive plot if requested
     if args.plot:
         tornado_plot(
-            labels=grouped_top["identider"].tolist(),
+            labels=grouped_top["identifier"].tolist(),
             min_vals=grouped_top["min_eff"].tolist(),
             max_vals=grouped_top["max_eff"].tolist(),
-            median_vals=grouped_top["median_eff"].tolist(),  # NEW
+            median_vals=grouped_top["median_eff"].tolist(),
             title="Parameter Sensitivity Tornado Plot",
             xlabel="sensitivity (Error Response)",
             ylabel="Parameter",
@@ -233,36 +232,17 @@ def _fort79_tornado_task(args: argparse.Namespace) -> int:
         )
 
     if not args.plot and not args.save and not args.export:
-        print("ℹ️ No action selected. Use one or more of --plot, --save, --export.")
+        print("No action selected. Use one or more of --plot, --save, --export.")
 
     return 0
 
-# --------------------------
-# CLI REGISTRATION
-# --------------------------
+
 def _add_common_fort79_io_args(
     p: argparse.ArgumentParser,
     *,
     include_plot: bool = True,
 ) -> None:
-    """
-    Add shared CLI arguments to the provided parser.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    p : argparse.ArgumentParser
-        Parameter description.
-    include_plot : bool
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
+    """Add shared CLI arguments to the provided parser."""
     p.add_argument("--file", default="fort.79", help="Path to fort.79 file.")
 
     if include_plot:
@@ -279,27 +259,9 @@ def _add_common_fort79_io_args(
         help="Export processed data to CSV (path or directory, resolved via resolve_output_path).",
     )
 
+
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-
-    # ------------------------------------------------------
-    # most-sensitive
-    # ------------------------------------------------------
-    """
-    Register workflow tasks under the given argparse subparser collection.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    subparsers : argparse._SubParsersAction
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
+    """Register fort.79 workflow tasks."""
     most_sensitive = subparsers.add_parser(
         "most-sensitive",
         help="Identify the parameter with the minimum sensitivity and optionally plot or export results.",
@@ -314,9 +276,6 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     _add_common_fort79_io_args(most_sensitive)
     most_sensitive.set_defaults(_run=_fort79_most_sensitive_param_task)
 
-    # ------------------------------------------------------
-    # tornado
-    # ------------------------------------------------------
     p_tornado = subparsers.add_parser(
         "tornado",
         help="Create a tornado plot of sensitivities from fort.79 and optionally save or export the data.",

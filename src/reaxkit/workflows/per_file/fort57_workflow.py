@@ -3,17 +3,7 @@ fort.57 thermodynamic-output workflow for ReaxKit.
 
 This workflow provides tools for reading, visualizing, and exporting data from
 ReaxFF `fort.57` files, which typically contain thermodynamic and simulation
-monitoring quantities recorded during MD runs.
-
-It supports:
-- Extracting one or more scalar quantities (e.g. potential energy, temperature,
-  RMS force, number of force calls) as functions of iteration, frame, or time.
-- Converting the x-axis between iteration, frame index, and physical time using
-  the associated control file.
-- Plotting selected quantities or exporting them to CSV for downstream analysis.
-
-The workflow is intended for quick inspection and post-processing of ReaxFF
-simulation stability, convergence, and thermodynamic behavior.
+monitoring quantities recorded during geometry optimization runs.
 """
 
 from __future__ import annotations
@@ -24,38 +14,18 @@ from typing import List
 
 import pandas as pd
 
-from reaxkit.io.handlers.fort57_handler import Fort57Handler
-from reaxkit.analysis.per_file.fort57_analyzer import get_fort57_data
+from reaxkit.analysis.timeseries import GeometryOptimizationRequest, GeometryOptimizationTask
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import GeometryOptimizationProgressData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.plot import single_plot
-from reaxkit.cli.path import resolve_output_path
 
 
 def _split_cols(s: str | None) -> List[str]:
-    """
-    Split cols.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    s : str | None
-        Parameter description.
-
-    Returns
-    -------
-    List[str]
-        Return value description.
-
-    Examples
-    --------
-    >>>
-    """
+    """Split comma- or space-delimited column arguments."""
     if not s:
         return []
-    # support "a,b,c" or "a b c"
     toks: List[str] = []
     for part in s.replace(",", " ").split():
         p = part.strip()
@@ -65,71 +35,50 @@ def _split_cols(s: str | None) -> List[str]:
 
 
 def _get_task(args: argparse.Namespace) -> int:
-    """
-    Get task.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parameter description.
-
-    Returns
-    -------
-    int
-        Return value description.
-
-    Examples
-    --------
-    >>>
-    """
-    h = Fort57Handler(args.file)
-
-    # --- decide which y columns user wants ---
+    """Handle `reaxkit fort57.md get ...`."""
     yreq = _split_cols(args.yaxis)
     if len(yreq) == 0:
         yreq = ["E_pot"]
 
-    df_full = h.dataframe()
+    data = ReaxFFAdapter().load(
+        GeometryOptimizationProgressData,
+        {
+            "fort57": args.file,
+            "input": args.file,
+        },
+    )
 
     if len(yreq) == 1 and yreq[0].lower() == "all":
-        # all canonical columns except iter (we’ll add x separately)
-        ycols = [c for c in ["E_pot", "T", "T_set", "RMSG", "nfc"] if c in df_full.columns or True]
+        ycols = ["E_pot", "T", "T_set", "RMSG", "nfc"]
     else:
         ycols = yreq
 
-    # --- pull iter + requested y columns through analyzer (alias-aware) ---
     wanted = ["iter"] + ycols
-    df = get_fort57_data(fort57_handler=h, cols=wanted, include_geo_descriptor=False)
+    df = GeometryOptimizationTask().run(
+        data,
+        GeometryOptimizationRequest(cols=wanted, include_geo_descriptor=False),
+    ).table
 
-    # --- convert x-axis using convert.py ---
     xvals, xlabel = convert_xaxis(df["iter"].to_numpy(), args.xaxis, control_file=args.control)
 
-    # build output table: x + y
-    xname = args.xaxis  # "iter" | "frame" | "time"
+    xname = args.xaxis
     out = pd.DataFrame({xname: xvals})
     for yc in ycols:
         if yc not in df.columns:
-            raise KeyError(f"❌ Requested y column '{yc}' not found. Available: {', '.join(df.columns)}")
+            raise KeyError(f"Requested y column '{yc}' not found. Available: {', '.join(df.columns)}")
         out[yc] = df[yc].to_numpy()
 
-    # --- export CSV (always x + y) ---
     if args.export:
         export_path = resolve_output_path(args.export, "fort57.md")
         out.to_csv(export_path, index=False)
         print(f"[Done] Exported CSV to {export_path}")
 
-    # --- plot (one plot per y if multiple) ---
     if getattr(args, "plot", False) or args.save:
         base_save = args.save
         for yc in ycols:
             save_path = None
             if base_save:
                 sp = Path(base_save)
-                # suffix _<col> when multiple y columns
                 if len(ycols) > 1:
                     sp = sp.with_name(f"{sp.stem}_{yc}{sp.suffix}")
                 save_path = str(resolve_output_path(str(sp), "fort57.md"))
@@ -143,61 +92,35 @@ def _get_task(args: argparse.Namespace) -> int:
                 save=save_path,
             )
 
-    # If user didn't plot or export, at least print a preview
     if not args.export and not getattr(args, "plot", False) and not args.save:
         print(out.head())
 
     return 0
 
-###################################################################################
 
 def _add_common_fort57_io_args(p: argparse.ArgumentParser, *, include_plot: bool = False) -> None:
-    """
-    Add shared CLI arguments to the provided parser.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    p : argparse.ArgumentParser
-        Parameter description.
-    include_plot : bool
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
+    """Add shared CLI arguments to the provided parser."""
     p.add_argument("--file", default="fort.57", help="Path to fort.57 file.")
     p.add_argument("--control", default="control", help="Path to control file (for --xaxis time).")
-    p.add_argument("--xaxis", default="iter", choices=["iter", "frame", "time"],
-                   help="X-axis: iter, frame, or time (time uses control:tstep).")
-    p.add_argument("--yaxis", default="E_pot",
-                   help="Y column(s): e.g. 'RMSG' or 'iter RMSG' or 'E_pot,T' or 'all'.")
+    p.add_argument(
+        "--xaxis",
+        default="iter",
+        choices=["iter", "frame", "time"],
+        help="X-axis: iter, frame, or time (time uses control:tstep).",
+    )
+    p.add_argument(
+        "--yaxis",
+        default="E_pot",
+        help="Y column(s): e.g. 'RMSG' or 'E_pot,T' or 'all'.",
+    )
     if include_plot:
         p.add_argument("--plot", action="store_true", help="Show plot interactively.")
     p.add_argument("--save", default=None, help="Path to save plot image (suffix _<col> if multiple y).")
     p.add_argument("--export", default=None, help="Path to export CSV (x + selected y columns).")
 
+
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    """
-    Register workflow tasks under the given argparse subparser collection.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    subparsers : argparse._SubParsersAction
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
+    """Register workflow tasks under the given argparse subparser collection."""
     p = subparsers.add_parser(
         "get",
         help="Get/plot selected columns from fort.57 (with x-axis conversion).",

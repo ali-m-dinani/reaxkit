@@ -32,9 +32,10 @@ import argparse
 from pathlib import Path
 from typing import Any, Dict
 
-from reaxkit.io.handlers.trainset_handler import TrainsetHandler
-from reaxkit.analysis.per_file.trainset_analyzer import get_trainset_group_comments
+from reaxkit.analysis.force_field import TrainsetGroupCommentsRequest, TrainsetGroupCommentsTask
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.io.generators.trainset_generator import (
     write_trainset_settings_yaml,
     generate_trainset_from_yaml,
@@ -66,9 +67,20 @@ def _get_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    handler = TrainsetHandler(args.file)
-    meta: Dict[str, Any] = handler.metadata()
-    tables: Dict[str, Any] = meta.get("tables", {})
+    data = ReaxFFAdapter().load(
+        ForceFieldOptimizationTrainingSetData,
+        {
+            "trainset": args.file,
+            "input": args.file,
+        },
+    )
+    tables: Dict[str, Any] = {
+        "CHARGE": data.charge,
+        "HEATFO": data.heatfo,
+        "GEOMETRY": data.geometry,
+        "CELL_PARAMETERS": data.cell_parameters,
+        "ENERGY": data.energy,
+    }
 
     # -------------------------------------
     # Determine output directory
@@ -83,17 +95,15 @@ def _get_task(args: argparse.Namespace) -> int:
     section = args.section.lower()
 
     if section == "all":
-        items = list(tables.items())
+        items = [(name, df) for name, df in tables.items() if name in set(data.sections) or not df.empty]
     else:
-        try:
-            df = handler.section(section)
-        except KeyError:
-            print(f"[Error] Section '{section}' not found in trainset.")
-            return 1
-
         canon_name = section.upper()
         if canon_name in ("CELL", "CELL PARAMETERS"):
             canon_name = "CELL_PARAMETERS"
+        df = tables.get(canon_name)
+        if df is None:
+            print(f"[Error] Section '{section}' not found in trainset.")
+            return 1
 
         items = [(canon_name, df)]
 
@@ -141,8 +151,17 @@ def _category_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    handler = TrainsetHandler(args.file)
-    df = get_trainset_group_comments(handler, sort=args.sort)   # columns: section, group_comment
+    data = ReaxFFAdapter().load(
+        ForceFieldOptimizationTrainingSetData,
+        {
+            "trainset": args.file,
+            "input": args.file,
+        },
+    )
+    df = TrainsetGroupCommentsTask().run(
+        data,
+        TrainsetGroupCommentsRequest(sort=bool(args.sort)),
+    ).table
 
     if df.empty:
         print("[Info] No categories found in trainset.")

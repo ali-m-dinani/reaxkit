@@ -25,11 +25,12 @@ import argparse
 
 import pandas as pd
 
-from reaxkit.io.handlers.fort76_handler import Fort76Handler
-from reaxkit.analysis.per_file.fort76_analyzer import get_fort76_data, get_fort76_restraint_pairs
+from reaxkit.analysis.timeseries import RestraintSeriesRequest, RestraintSeriesTask
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.plot import single_plot
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import RestraintData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
 
 def _fort76_get_task(args: argparse.Namespace) -> int:
@@ -37,10 +38,16 @@ def _fort76_get_task(args: argparse.Namespace) -> int:
     Handle: reaxkit fort76 get ...
     Plot/save/export ONE column vs iter/frame/time (derived from iter).
     """
-    handler = Fort76Handler(args.file)
-    handler._parse()
-
-    df = get_fort76_data(handler, ["iter", args.ycol], dropna_rows=True).copy()
+    df = RestraintSeriesTask().run(
+        ReaxFFAdapter().load(
+            RestraintData,
+            {
+                "fort76": args.file,
+                "input": args.file,
+            },
+        ),
+        RestraintSeriesRequest(fields=[args.ycol], dropna_rows=True),
+    ).table.copy()
 
     xvals, xlabel = convert_xaxis(df["iter"].to_numpy(), args.xaxis, control_file=args.control)
     x = pd.Series(xvals)
@@ -87,10 +94,16 @@ def _fort76_respair_task(args: argparse.Namespace) -> int:
     Handle: reaxkit fort76 respair ...
     Plot/save/export restraint target+actual vs iter/frame/time.
     """
-    handler = Fort76Handler(args.file)
-    handler._parse()
-
-    df = get_fort76_restraint_pairs(handler, args.restraint, include_iter=True).copy()
+    df = RestraintSeriesTask().run(
+        ReaxFFAdapter().load(
+            RestraintData,
+            {
+                "fort76": args.file,
+                "input": args.file,
+            },
+        ),
+        RestraintSeriesRequest(restraint_index=args.restraint),
+    ).table.copy()
     target_col = df.columns[1]
     actual_col = df.columns[2]
 

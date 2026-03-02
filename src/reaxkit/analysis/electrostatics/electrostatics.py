@@ -10,11 +10,11 @@ import pandas as pd
 from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.analysis.per_file.control_analyzer import get_control_data
+from reaxkit.analysis.control.control import ControlValueRequest, ControlValueTask
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
+from reaxkit.domain.data_models import ConnectivityData, ControlParametersData, ElectrostaticsData, ElectricFieldData
 from reaxkit.engine.reaxff.adapter import (
     _charges_from_fort7_handler,
     _connectivity_from_fort7_handler,
@@ -81,7 +81,7 @@ class PolarizationFieldRequest(BaseRequest):
     field_component: str = "field_z"
     x_variable: str = "field_z"
     y_variable: str = "P_z (uC/cm^2)"
-    field_scale: float = const["electric_field_VA_to_MVcm"]
+    field_scale: float = const("electric_field_VA_to_MVcm")
 
 
 @dataclass
@@ -228,7 +228,7 @@ def _series_total(
         coords = positions[int(fi)].astype(float)
         q = charges[int(fi)].astype(float)
         mu_ea = (coords * q[:, None]).sum(axis=0)
-        mu_debye = mu_ea * const["ea_to_debye"]
+        mu_debye = mu_ea * const("ea_to_debye")
 
         row: dict[str, Any] = {
             "frame_index": int(fi),
@@ -247,7 +247,7 @@ def _series_total(
                 volume = _convex_hull_volume(coords)
 
             if np.isfinite(volume) and volume > 0:
-                p_vec = mu_ea / volume * const["ea3_to_uC_cm2"]
+                p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
                 row["P_x (uC/cm^2)"] = float(p_vec[0])
                 row["P_y (uC/cm^2)"] = float(p_vec[1])
                 row["P_z (uC/cm^2)"] = float(p_vec[2])
@@ -326,7 +326,7 @@ def _series_local(
                 cluster_q[1:] = cluster_q[1:] / float(neigh.size)
 
             mu_ea = (rel * cluster_q[:, None]).sum(axis=0)
-            mu_debye = mu_ea * const["ea_to_debye"]
+            mu_debye = mu_ea * const("ea_to_debye")
 
             row: dict[str, Any] = {
                 "frame_index": int(fi),
@@ -346,7 +346,7 @@ def _series_local(
                     volume = _bbox_volume(rel)
 
                 if np.isfinite(volume) and volume > 0:
-                    p_vec = mu_ea / volume * const["ea3_to_uC_cm2"]
+                    p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
                     row["P_x (uC/cm^2)"] = float(p_vec[0])
                     row["P_y (uC/cm^2)"] = float(p_vec[1])
                     row["P_z (uC/cm^2)"] = float(p_vec[2])
@@ -405,12 +405,15 @@ def _field_component_series(
 
 def match_electric_field_to_iout2(
     f78,
-    ctrl,
+    ctrl: ControlParametersData,
     target_iters: Sequence[int],
     field_var: str = "E_field_z",
 ) -> pd.Series:
     """Match fort.78 field values to target iterations using a stepwise hold rule."""
-    iout2 = get_control_data(ctrl, "iout2", section="md", default=1)
+    iout2 = ControlValueTask().run(
+        ctrl,
+        ControlValueRequest(key="iout2", section="md", default=1),
+    ).value
     _ = iout2
 
     df_e = extract_fort78_data(f78, variables=field_var)

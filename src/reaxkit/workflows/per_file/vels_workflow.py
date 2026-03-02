@@ -27,8 +27,9 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from reaxkit.io.handlers.vels_handler import VelsHandler
-from reaxkit.analysis.per_file.vels_analyzer import get_vels_data
+from reaxkit.analysis.kinematics import AtomicKinematicsRequest, AtomicKinematicsTask
+from reaxkit.domain.data_models import AtomicKinematicsData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
 from reaxkit.cli.path import resolve_output_path
 
@@ -119,6 +120,25 @@ def _value_column_to_key(value_col: str) -> tuple[str, str]:
     raise ValueError("value_col must be one of: vx,vy,vz, ax,ay,az, pax,pay,paz")
 
 
+def _load_atomic_kinematics(path: str) -> AtomicKinematicsData:
+    return ReaxFFAdapter().load(
+        AtomicKinematicsData,
+        {"vels": path, "input": path},
+    )
+
+
+def _select_kinematics(
+    data: AtomicKinematicsData,
+    key: str,
+    atoms: Optional[list[int]],
+) -> pd.DataFrame | dict:
+    result = AtomicKinematicsTask().run(
+        data,
+        AtomicKinematicsRequest(key=key, atoms=atoms),
+    )
+    return result.metadata if key == "metadata" else result.table
+
+
 # ------------------------- common args -------------------------
 
 def _add_common_vels_io_args(p: argparse.ArgumentParser) -> None:
@@ -192,11 +212,9 @@ def _get_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    h = VelsHandler(args.file)
-
     atoms = _parse_atoms_1based(args.atoms)
-
-    out = get_vels_data(h, args.key, atoms=atoms)
+    data = _load_atomic_kinematics(args.file)
+    out = _select_kinematics(data, args.key, atoms)
 
     # metadata
     if isinstance(out, dict):
@@ -248,17 +266,17 @@ def _plot3d_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    h = VelsHandler(args.file)
     atoms = _parse_atoms_1based(args.atoms)
+    data = _load_atomic_kinematics(args.file)
 
     # coords
-    cdf = get_vels_data(h, "coordinates", atoms=atoms)
+    cdf = _select_kinematics(data, "coordinates", atoms)
     if cdf.empty:
         raise ValueError("No coordinates to plot (empty selection).")
 
     # scalar values from one of the sections
     key, col = _value_column_to_key(args.value)
-    vdf = get_vels_data(h, key, atoms=atoms)
+    vdf = _select_kinematics(data, key, atoms)
     if vdf.empty:
         raise ValueError(f"No data for {args.value} to plot (empty selection or missing section).")
 
@@ -315,15 +333,15 @@ def _heatmap2d_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    h = VelsHandler(args.file)
     atoms = _parse_atoms_1based(args.atoms)
+    data = _load_atomic_kinematics(args.file)
 
-    cdf = get_vels_data(h, "coordinates", atoms=atoms)
+    cdf = _select_kinematics(data, "coordinates", atoms)
     if cdf.empty:
         raise ValueError("No coordinates to plot (empty selection).")
 
     key, col = _value_column_to_key(args.value)
-    vdf = get_vels_data(h, key, atoms=atoms)
+    vdf = _select_kinematics(data, key, atoms)
     if vdf.empty:
         raise ValueError(f"No data for {args.value} to plot (empty selection or missing section).")
 

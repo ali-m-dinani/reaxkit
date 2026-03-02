@@ -1,126 +1,56 @@
-"""
-Params-file workflow for ReaxKit.
-
-This workflow provides tools for inspecting and exporting ReaxFF `params` files,
-which define optimization parameters and search intervals used during
-force-field training.
-
-It supports:
-- Loading the raw params table with optional duplicate removal and flexible
-  column-based sorting.
-- Interpreting params entries by resolving their references into the
-  corresponding sections and rows of the `ffield` file.
-- Optionally constructing human-readable chemical terms (e.g. C–C–H) during
-  interpretation for improved readability.
-- Exporting processed params data to CSV for downstream analysis, auditing,
-  or force-field development workflows.
-
-The workflow is designed to bridge low-level optimization parameter definitions
-with interpretable force-field context in a reproducible, CLI-driven manner.
-"""
+"""Params-file workflow for ReaxKit."""
 
 from __future__ import annotations
 
 import argparse
 
-from reaxkit.io.handlers.params_handler import ParamsHandler
-from reaxkit.io.handlers.ffield_handler import FFieldHandler
-
-from reaxkit.analysis.per_file.params_analyzer import get_params_data, interpret_params
+from reaxkit.analysis.params import (
+    ForceFieldOptimizationParameterRequest,
+    ForceFieldOptimizationParameterTask,
+)
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import ForceFieldOptimizationParameterData, ForceFieldParametersData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
 
 def _task_get(args: argparse.Namespace) -> int:
-    """
-    Run the ``get`` workflow task.
+    adapter = ReaxFFAdapter()
+    params_data = adapter.load(
+        ForceFieldOptimizationParameterData,
+        {"params": args.file, "input": args.file},
+    )
 
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parameter description.
-
-    Returns
-    -------
-    int
-        Return value description.
-
-    Examples
-    --------
-    >>>
-    """
-    params_handler = ParamsHandler(args.file)
-
+    force_field = None
     if args.interpret:
-        # Interpreted params require ffield
-        ffield_handler = FFieldHandler(args.ffield)
-        df = interpret_params(
-            params_handler=params_handler,
-            ffield_handler=ffield_handler,
-            add_term=(not args.no_term),
+        force_field = adapter.load(
+            ForceFieldParametersData,
+            {"ffield": args.ffield, "input": args.ffield},
         )
 
-        # Match default "drop duplicates" behavior to raw get()
-        if not args.keep_duplicates:
-            df = df.drop_duplicates(
-                subset=["ff_section", "ff_section_line", "ff_parameter"],
-                keep="first",
-            )
-    else:
-        df = get_params_data(
-            params_handler,
-            sort_by=None,  # no sorting by default (handled below if user requests)
-            ascending=True,
+    df = ForceFieldOptimizationParameterTask().run(
+        params_data,
+        ForceFieldOptimizationParameterRequest(
+            sort_by=args.sort_by,
+            ascending=(not args.descending),
             drop_duplicate=(not args.keep_duplicates),
-        )
+            interpret=bool(args.interpret),
+            force_field=force_field,
+            add_term=(not args.no_term),
+        ),
+    ).table
 
-    # Optional sorting (default is none)
-    if args.sort_by:
-        if args.sort_by not in df.columns:
-            raise SystemExit(
-                f"❌ sort-by column '{args.sort_by}' not found. Available: {', '.join(df.columns)}"
-            )
-        df = df.sort_values(by=args.sort_by, ascending=(not args.descending))
-
-    # Export or preview
     if args.export:
         out = resolve_output_path(args.export, workflow="params")
         df.to_csv(out, index=False)
         print(f"[Done] Exported the requested data to {out}")
     else:
         print(df.head(20).to_string(index=False))
-
     return 0
 
-#####################################################################################
 
 def _add_common_params_io_args(p: argparse.ArgumentParser) -> None:
-    # Core IO
-    """
-    Add shared CLI arguments to the provided parser.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    p : argparse.ArgumentParser
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
     p.add_argument("--file", default="params", help="Path to params file.")
     p.add_argument("--export", default=None, help="Path to export CSV data.")
-
-    # Default behavior requested:
-    # - remove duplicates by default
-    # - no sorting by default
     p.add_argument(
         "--keep-duplicates",
         action="store_true",
@@ -137,23 +67,8 @@ def _add_common_params_io_args(p: argparse.ArgumentParser) -> None:
         help="If set, sort in descending order (only if --sort-by is used).",
     )
 
+
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    """
-    Register workflow tasks under the given argparse subparser collection.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    subparsers : argparse._SubParsersAction
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
     p = subparsers.add_parser(
         "get",
         help="Load params table (optionally interpret pointers into ffield)",
@@ -168,11 +83,10 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     )
 
     _add_common_params_io_args(p)
-
     p.add_argument(
         "--interpret",
         action="store_true",
-        help="If set, interpret params pointers into the ffield (adds section/row/param/value/term columns).",
+        help="Interpret params pointers into the ffield.",
     )
     p.add_argument(
         "--ffield",
@@ -182,7 +96,6 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     p.add_argument(
         "--no-term",
         action="store_true",
-        help="If set, do not build readable term (e.g., C-C-H) during interpretation.",
+        help="Do not build readable term labels during interpretation.",
     )
-
     p.set_defaults(_run=_task_get)

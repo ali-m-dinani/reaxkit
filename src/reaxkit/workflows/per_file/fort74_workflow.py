@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import argparse
 
-from reaxkit.io.handlers.fort74_handler import Fort74Handler
-from reaxkit.analysis.per_file.fort74_analyzer import get_fort74_data
+from reaxkit.analysis.force_field import StructureSummaryRequest, StructureSummaryTask
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
+from reaxkit.domain.data_models import GeometrySummaryData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
 def _get_task(args: argparse.Namespace) -> int:
     """
@@ -47,8 +48,16 @@ def _get_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    handler = Fort74Handler(args.file)
-    df = get_fort74_data(handler)
+    df = StructureSummaryTask().run(
+        ReaxFFAdapter().load(
+            GeometrySummaryData,
+            {
+                "fort74": args.file,
+                "input": args.file,
+            },
+        ),
+        StructureSummaryRequest(),
+    ).table
 
     col_raw = (args.col or "all").strip()
 

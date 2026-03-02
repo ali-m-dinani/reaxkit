@@ -9,13 +9,17 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
+from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (
     ChargeData,
     ElectricFieldData,
+    EregimeData,
     MolecularAnalysisData,
+    PartialEnergyData,
+    RestraintData,
     SimulationData,
     TrajectoryData,
 )
@@ -78,6 +82,29 @@ class ChargeSeriesRequest(BaseRequest):
 class ElectricFieldSeriesRequest(BaseRequest):
     components: Sequence[str]
     field_kind: Literal["applied", "energy", "auto"] = "auto"
+    frames: Optional[Sequence[int]] = None
+    every: int = 1
+
+
+@dataclass
+class EregimeSeriesRequest(BaseRequest):
+    field: str
+    frames: Optional[Sequence[int]] = None
+    every: int = 1
+
+
+@dataclass
+class PartialEnergySeriesRequest(BaseRequest):
+    components: Optional[Sequence[str]] = None
+    frames: Optional[Sequence[int]] = None
+    every: int = 1
+
+
+@dataclass
+class RestraintSeriesRequest(BaseRequest):
+    fields: Optional[Sequence[str]] = None
+    restraint_index: Optional[int] = None
+    dropna_rows: bool = False
     frames: Optional[Sequence[int]] = None
     every: int = 1
 
@@ -379,6 +406,137 @@ def _electric_field_group(
     return np.empty((0, 0), dtype=float), [], ""
 
 
+def _resolve_eregime_field(df: pd.DataFrame, name: str) -> str:
+    if not name:
+        raise ValueError("Column name is empty.")
+
+    canonical = normalize_choice(name)
+    hit = resolve_alias_from_columns(df.columns, canonical)
+    if hit:
+        return hit
+
+    if canonical in {"field", "field_dir"}:
+        for i in range(1, 16):
+            cand = f"{canonical}{i}" if canonical != "field_dir" else f"field_dir{i}"
+            hit = resolve_alias_from_columns(df.columns, cand)
+            if hit:
+                return hit
+
+    raise ValueError(
+        f"Column '{name}' not found (after alias resolution). "
+        f"Available columns: {list(df.columns)}"
+    )
+
+
+def _partial_energy_frame(data: PartialEnergyData) -> pd.DataFrame:
+    df = pd.DataFrame({"iter": pd.Series(data.iterations, dtype=int)})
+    if data.components:
+        df = pd.concat([df, pd.DataFrame(data.values, columns=list(data.components))], axis=1)
+    return df
+
+
+def _resolve_partial_energy_components(
+    df: pd.DataFrame,
+    components: Optional[Sequence[str]],
+) -> list[str]:
+    available = [str(c) for c in df.columns if str(c) != "iter"]
+    if components is None or len(components) == 0:
+        return available
+
+    resolved: list[str] = []
+    for component in components:
+        canonical = normalize_choice(str(component))
+        actual = resolve_alias_from_columns(available, canonical)
+        if actual is None:
+            raise KeyError(
+                f"Requested component '{component}' not found in partial-energy data. "
+                f"Available components: {available}"
+            )
+        if actual not in resolved:
+            resolved.append(actual)
+    return resolved
+
+
+def _restraint_frame(data: RestraintData) -> pd.DataFrame:
+    df = pd.DataFrame({"iter": pd.Series(data.iterations, dtype=int)})
+    n_restraints = int(data.metadata.get("n_restraints", 0)) if data.metadata else 0
+    if data.restraint_energy is not None:
+        df["E_res"] = pd.Series(data.restraint_energy, dtype=float)
+    else:
+        df["E_res"] = pd.Series([pd.NA] * len(df))
+    if data.potential_energy is not None:
+        df["E_pot"] = pd.Series(data.potential_energy, dtype=float)
+    else:
+        df["E_pot"] = pd.Series([pd.NA] * len(df))
+    for i in range(n_restraints):
+        target_col = f"r{i + 1}_target"
+        actual_col = f"r{i + 1}_actual"
+        if i < data.target_values.shape[1]:
+            df[target_col] = pd.Series(data.target_values[:, i], dtype=float)
+        else:
+            df[target_col] = pd.Series([pd.NA] * len(df))
+        if i < data.actual_values.shape[1]:
+            df[actual_col] = pd.Series(data.actual_values[:, i], dtype=float)
+        else:
+            df[actual_col] = pd.Series([pd.NA] * len(df))
+    return df
+
+
+def _resolve_restraint_field(df: pd.DataFrame, requested: str) -> str:
+    cols = [str(c) for c in df.columns]
+    key = str(requested).strip().lower()
+    if not key:
+        raise KeyError("Requested restraint column is empty.")
+
+    if "restraint" in key or key.startswith("r"):
+        parts = key.replace("_", " ").split()
+        idx = None
+        for part in parts:
+            if part.isdigit():
+                idx = int(part)
+                break
+        if idx is not None:
+            if "target" in parts:
+                col = f"r{idx}_target"
+            elif "actual" in parts:
+                col = f"r{idx}_actual"
+            else:
+                raise KeyError(f"Restraint column must specify target or actual: '{requested}'")
+            if col in cols:
+                return col
+            raise KeyError(
+                f"Resolved '{requested}' to '{col}', but that column is not available. "
+                f"Available columns: {cols}"
+            )
+
+    canonical = normalize_choice(str(requested))
+    hit = resolve_alias_from_columns(cols, canonical)
+    if hit is not None:
+        return hit
+    if str(requested) in cols:
+        return str(requested)
+    raise KeyError(
+        f"Could not resolve requested restraint column '{requested}'. "
+        f"Available columns: {cols}"
+    )
+
+
+def _resolve_restraint_fields(df: pd.DataFrame, request: RestraintSeriesRequest) -> list[str]:
+    if request.restraint_index is not None:
+        idx = int(request.restraint_index)
+        if idx < 1:
+            raise ValueError("restraint_index must be >= 1.")
+        return [f"r{idx}_target", f"r{idx}_actual"]
+    if request.fields is None or len(request.fields) == 0:
+        raise ValueError("RestraintSeriesRequest requires either fields or restraint_index.")
+    resolved: list[str] = []
+    for field in request.fields:
+        actual = _resolve_restraint_field(df, str(field))
+        if actual not in resolved:
+            resolved.append(actual)
+    return resolved
+
+
 @register_task("electric_field_series")
 class ElectricFieldSeriesTask(AnalysisTask):
     """Build time series for applied-field or field-energy components."""
@@ -451,6 +609,135 @@ class ElectricFieldSeriesTask(AnalysisTask):
             y_label=y_label,
             table=table,
             metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
+        )
+
+
+@register_task("eregime_series")
+class EregimeSeriesTask(AnalysisTask):
+    """Build iteration-based series for one eregime field column."""
+
+    required_data = EregimeData
+
+    def run(self, data: EregimeData, request: EregimeSeriesRequest, reporter=None) -> TimeSeriesResult:
+        iterations = np.asarray(data.iter, dtype=int).reshape(-1)
+        field_zones = np.asarray(data.field_zones, dtype=int).reshape(-1)
+        field_dir = np.asarray(data.field_dir, dtype=object).reshape(-1)
+        field = np.asarray(data.field, dtype=float).reshape(-1)
+        df = pd.DataFrame(
+            {
+                "iter": iterations,
+                "field_zones": field_zones,
+                "field_dir": field_dir,
+                "field": field,
+            }
+        )
+        field_col = _resolve_eregime_field(df, request.field)
+        n_frames = iterations.shape[0]
+        frame_idx = _frame_indices(n_frames, request.frames, request.every)
+
+        series = [
+            Series(
+                x=iterations[frame_idx],
+                y=df.iloc[frame_idx][field_col].to_numpy(),
+                label=str(field_col),
+            )
+        ]
+        table = pd.DataFrame(
+            {
+                "frame_index": np.asarray(frame_idx, dtype=int),
+                "iter": iterations[frame_idx],
+                "field": str(field_col),
+                "value": df.iloc[frame_idx][field_col].to_numpy(),
+            }
+        )
+        return TimeSeriesResult(
+            series=series,
+            x_label="iter",
+            y_label=str(field_col),
+            table=table,
+            metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
+        )
+
+
+@register_task("partial_energy_series")
+class PartialEnergySeriesTask(AnalysisTask):
+    """Build iteration-based series for one or more fort.73 energy components."""
+
+    required_data = PartialEnergyData
+
+    def run(self, data: PartialEnergyData, request: PartialEnergySeriesRequest, reporter=None) -> TimeSeriesResult:
+        df = _partial_energy_frame(data)
+        iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
+        n_frames = iterations.shape[0]
+        if len(df) != n_frames:
+            raise ValueError("PartialEnergyData.values length must match PartialEnergyData.iterations length.")
+
+        components = _resolve_partial_energy_components(df, request.components)
+        frame_idx = _frame_indices(n_frames, request.frames, request.every)
+
+        rows: list[dict[str, object]] = []
+        series: list[Series] = []
+        for component in components:
+            y = pd.to_numeric(df.iloc[frame_idx][component], errors="coerce").to_numpy(dtype=float)
+            series.append(Series(x=iterations[frame_idx], y=y, label=str(component)))
+            for rel_i, fi in enumerate(frame_idx):
+                rows.append(
+                    {
+                        "frame_index": int(fi),
+                        "iter": int(iterations[fi]),
+                        "component": str(component),
+                        "value": float(y[rel_i]),
+                    }
+                )
+
+        table = pd.DataFrame(rows)
+        if not table.empty:
+            table = table.sort_values(["frame_index", "component"], kind="stable").reset_index(drop=True)
+
+        return TimeSeriesResult(
+            series=series,
+            x_label="iter",
+            y_label="partial_energy",
+            table=table,
+            metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
+        )
+
+
+@register_task("restraint_series")
+class RestraintSeriesTask(AnalysisTask):
+    """Build iteration-based series for fort.76 restraint data."""
+
+    required_data = RestraintData
+
+    def run(self, data: RestraintData, request: RestraintSeriesRequest, reporter=None) -> TimeSeriesResult:
+        df = _restraint_frame(data)
+        iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
+        n_frames = iterations.shape[0]
+        if len(df) != n_frames:
+            raise ValueError("RestraintData arrays must all align with RestraintData.iterations.")
+
+        fields = _resolve_restraint_fields(df, request)
+        frame_idx = _frame_indices(n_frames, request.frames, request.every)
+        selected = df.iloc[frame_idx].copy()
+        selected["iter"] = iterations[frame_idx]
+        selected = selected.loc[:, ["iter", *[c for c in selected.columns if c != "iter"]]]
+        if request.dropna_rows:
+            non_iter = [c for c in fields if c != "iter"]
+            if non_iter:
+                selected = selected.dropna(axis=0, how="all", subset=non_iter).reset_index(drop=True)
+
+        selected_iters = pd.to_numeric(selected["iter"], errors="coerce").to_numpy(dtype=int)
+        series: list[Series] = []
+        for field in fields:
+            y = pd.to_numeric(selected[field], errors="coerce").to_numpy(dtype=float)
+            series.append(Series(x=selected_iters, y=y, label=str(field)))
+
+        return TimeSeriesResult(
+            series=series,
+            x_label="iter",
+            y_label="restraint",
+            table=selected.loc[:, ["iter", *fields]].copy(),
+            metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": selected_iters},
         )
 
 
@@ -589,6 +876,12 @@ __all__ = [
     "ChargeSeriesTask",
     "ElectricFieldSeriesRequest",
     "ElectricFieldSeriesTask",
+    "EregimeSeriesRequest",
+    "EregimeSeriesTask",
+    "PartialEnergySeriesRequest",
+    "PartialEnergySeriesTask",
+    "RestraintSeriesRequest",
+    "RestraintSeriesTask",
     "MolecularFrequencySeriesRequest",
     "MolecularFrequencySeriesTask",
     "MolecularTotalsSeriesRequest",

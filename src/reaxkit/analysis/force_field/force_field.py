@@ -11,7 +11,7 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ForceFieldData
+from reaxkit.domain.data_models import ForceFieldParametersData
 
 _SECTION_TO_ATTR = {
     "general": "general_parameters",
@@ -49,12 +49,12 @@ def _normalize_section_name(section: str) -> str:
     return _SECTION_ALIASES[norm]
 
 
-def _atom_index_to_symbol_map(data: ForceFieldData) -> dict[int, str]:
+def _atom_index_to_symbol_map(data: ForceFieldParametersData) -> dict[int, str]:
     atom_df = data.atom_parameters
     if atom_df.empty:
-        raise ValueError("ForceFieldData.atom_parameters is empty.")
+        raise ValueError("ForceFieldParametersData.atom_parameters is empty.")
     if "symbol" not in atom_df.columns:
-        raise KeyError("ForceFieldData.atom_parameters must include 'symbol' column.")
+        raise KeyError("ForceFieldParametersData.atom_parameters must include 'symbol' column.")
 
     out: dict[int, str] = {}
     for idx, row in atom_df.iterrows():
@@ -101,7 +101,7 @@ def _add_symbols_for_columns(
     return out
 
 
-def _interpret_section(data: ForceFieldData, section: str, sep: str) -> pd.DataFrame:
+def _interpret_section(data: ForceFieldParametersData, section: str, sep: str) -> pd.DataFrame:
     idx_to_sym = _atom_index_to_symbol_map(data)
     attr = _SECTION_TO_ATTR[section]
     df = getattr(data, attr).copy()
@@ -115,7 +115,7 @@ def _interpret_section(data: ForceFieldData, section: str, sep: str) -> pd.DataF
     return _add_symbols_for_columns(df, idx_to_sym, ["i", "j", "k"], sep=sep)
 
 
-def _section_frame(data: ForceFieldData, section: str, fmt: str, sep: str) -> pd.DataFrame:
+def _section_frame(data: ForceFieldParametersData, section: str, fmt: str, sep: str) -> pd.DataFrame:
     attr = _SECTION_TO_ATTR[section]
     raw_df = getattr(data, attr).copy()
     if fmt == "raw":
@@ -147,11 +147,11 @@ class ForceFieldDataResult(BaseResult):
 class ForceFieldDataTask(AnalysisTask):
     """Return raw or interpreted force-field section data."""
 
-    required_data = ForceFieldData
+    required_data = ForceFieldParametersData
 
     def run(
         self,
-        data: ForceFieldData,
+        data: ForceFieldParametersData,
         request: ForceFieldDataRequest,
         reporter=None,
     ) -> ForceFieldDataResult:

@@ -31,7 +31,6 @@ import pandas as pd
 from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
 from reaxkit.io.handlers.fort7_handler import Fort7Handler
 from reaxkit.io.handlers.fort78_handler import Fort78Handler
-from reaxkit.io.handlers.control_handler import ControlHandler
 from reaxkit.analysis.timeseries.timeseries import TrajectoryCoordinateSeriesRequest, TrajectoryCoordinateSeriesTask
 from reaxkit.presentation.plot import scatter3d_points, heatmap2d_from_3d
 from reaxkit.core.frame_utils import parse_frames, resolve_indices
@@ -54,7 +53,7 @@ from reaxkit.analysis.electrostatics.electrostatics import (
     match_electric_field_to_iout2,
 )
 from reaxkit.domain.data_models import ElectricFieldData
-from reaxkit.engine.reaxff.adapter import _trajectory_from_xmolout_handler
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter, _trajectory_from_xmolout_handler
 
 
 # -------------------------------------------------------------------------
@@ -152,7 +151,7 @@ def _hyst_task(args: argparse.Namespace) -> int:
     xh = XmoloutHandler(args.xmolout)
     f7 = Fort7Handler(args.fort7)
     f78 = Fort78Handler(args.fort78)
-    ctrl = ControlHandler(args.control)
+    ctrl = ReaxFFAdapter().load_control_parameters({"control": args.control, "input": args.control})
 
     data = _electrostatics_data_from_handlers(xh, f7)
     iters = np.asarray(

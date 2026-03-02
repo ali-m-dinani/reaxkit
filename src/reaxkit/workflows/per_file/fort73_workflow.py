@@ -24,8 +24,9 @@ from __future__ import annotations
 import argparse, os
 import pandas as pd
 
-from reaxkit.io.handlers.fort73_handler import Fort73Handler
-from reaxkit.analysis.per_file.fort73_analyzer import get_fort73_data
+from reaxkit.analysis.timeseries import PartialEnergySeriesRequest, PartialEnergySeriesTask
+from reaxkit.domain.data_models import PartialEnergyData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.plot import single_plot
 from reaxkit.cli.path import resolve_output_path
@@ -61,26 +62,29 @@ def _fort73_get_task(args: argparse.Namespace) -> int:
     default_file = DEFAULT_FILES.get(args.kind, "fort.73")
 
     file_path = args.file or default_file
-
-    handler = Fort73Handler(file_path)
-    df = get_fort73_data(handler)
-
-    if "iter" not in df.columns:
-        raise KeyError("Column 'iter' not found in fort.73 DataFrame.")
+    requested_components = None if args.yaxis.lower() == "all" else [args.yaxis]
+    series_result = PartialEnergySeriesTask().run(
+        ReaxFFAdapter().load(
+            PartialEnergyData,
+            {
+                "fort73": file_path,
+                "input": file_path,
+            },
+        ),
+        PartialEnergySeriesRequest(components=requested_components),
+    )
+    df = series_result.table
+    if df is None or df.empty:
+        raise ValueError("No partial-energy data found in fort.73 DataFrame.")
 
     # --- X-axis conversion ---
-    iters = df["iter"].to_numpy()
+    iters = pd.to_numeric(df["iter"], errors="coerce").to_numpy(dtype=int)
     x_vals, x_label = convert_xaxis(iters, args.xaxis, control_file=args.control)
 
     # --- Y columns selection ---
-    if args.yaxis.lower() == "all":
-        y_cols = [c for c in df.columns if c != "iter"]
-        if not y_cols:
-            raise ValueError("No energy columns found in fort.73 DataFrame.")
-    else:
-        if args.yaxis not in df.columns:
-            raise KeyError(f"Requested y-axis column '{args.yaxis}' not found in fort.73 DataFrame.")
-        y_cols = [args.yaxis]
+    y_cols = list(dict.fromkeys(df["component"].astype(str).tolist()))
+    if not y_cols:
+        raise ValueError("No energy columns found in fort.73 DataFrame.")
 
     workflow_name = args.kind
 
@@ -89,7 +93,10 @@ def _fort73_get_task(args: argparse.Namespace) -> int:
         out = resolve_output_path(args.export, workflow_name)
         export_df = pd.DataFrame({"x": x_vals})
         for col in y_cols:
-            export_df[col] = df[col].values
+            export_df[col] = pd.to_numeric(
+                df.loc[df["component"] == col, "value"],
+                errors="coerce",
+            ).to_numpy(dtype=float)
         export_df.to_csv(out, index=False)
         print(f"[Done] Exported fort.73 data to {out}")
 
@@ -117,7 +124,10 @@ def _fort73_get_task(args: argparse.Namespace) -> int:
                     os.makedirs(parent, exist_ok=True)
 
         for col in y_cols:
-            y = df[col].values
+            y = pd.to_numeric(
+                df.loc[df["component"] == col, "value"],
+                errors="coerce",
+            ).to_numpy(dtype=float)
 
             # Decide per-column save path (or None)
             save_path = None

@@ -19,8 +19,9 @@ scriptable, and reproducible from the command line.
 from __future__ import annotations
 import argparse
 
-from reaxkit.io.handlers.control_handler import ControlHandler
-from reaxkit.analysis.per_file.control_analyzer import get_control_data
+from reaxkit.analysis.control.control import ControlValueRequest, ControlValueTask
+from reaxkit.domain.data_models import ControlParametersData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.io.generators.control_generator import write_control_template
 
 def _format_value(value):
@@ -70,8 +71,21 @@ def _control_get_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
-    handler = ControlHandler(args.file)
-    value = get_control_data(handler, args.key, section=args.section, default=None)
+    data = ReaxFFAdapter().load(
+        ControlParametersData,
+        {
+            "control": args.file,
+            "input": args.file,
+        },
+    )
+    value = ControlValueTask().run(
+        data,
+        ControlValueRequest(
+            key=args.key,
+            section=args.section,
+            default=None,
+        ),
+    ).value
 
     if value is None:
         print(f"❌ Key '{args.key}' not found in control file '{args.file}'.")

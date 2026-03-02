@@ -9,20 +9,44 @@ import pandas as pd
 
 from reaxkit.core.engine_registry import register_engine
 from reaxkit.domain.data_models import (
+    AtomicKinematicsData,
     ChargeData,
     ConnectivityData,
+    ControlParametersData,
+    EregimeData,
     ElectricFieldData,
-    ForceFieldData,
+    ForceFieldParametersData,
+    ForceFieldOptimizationProgressData,
+    ForceFieldOptimizationTrainingSetData,
+    ForceFieldOptimizationParameterData,
+    ForceFieldOptimizationReportData,
+    GeometryOptimizationProgressData,
     MolecularAnalysisData,
+    ForceFieldOptimizationDiagnosticData,
+    PartialEnergyData,
+    RestraintData,
+    GeometrySummaryData,
     SimulationData,
     TrajectoryData,
 )
 from reaxkit.engine.base import EngineAdapter
+from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
 from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
+from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
+from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
+from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
+from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
 from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
+from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
+from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
 from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
+from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
 from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
+from reaxkit.engine.reaxff.io.trainset_handler import TrainsetHandler
+from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 
@@ -241,12 +265,12 @@ def _connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> Co
     )
 
 
-def _force_field_from_ffield_handler(handler: FFieldHandler) -> ForceFieldData:
-    """Normalize an ``FFieldHandler`` into ``ForceFieldData``."""
+def _force_field_from_ffield_handler(handler: FFieldHandler) -> ForceFieldParametersData:
+    """Normalize an ``FFieldHandler`` into ``ForceFieldParametersData``."""
     sections = handler.sections
     meta = handler.metadata()
 
-    return ForceFieldData(
+    return ForceFieldParametersData(
         general_parameters=sections.get(FFieldHandler.SECTION_GENERAL, pd.DataFrame()).copy(),
         atom_parameters=sections.get(FFieldHandler.SECTION_ATOM, pd.DataFrame()).copy(),
         bond_parameters=sections.get(FFieldHandler.SECTION_BOND, pd.DataFrame()).copy(),
@@ -256,6 +280,298 @@ def _force_field_from_ffield_handler(handler: FFieldHandler) -> ForceFieldData:
         hydrogen_bond_parameters=sections.get(FFieldHandler.SECTION_HBOND, pd.DataFrame()).copy(),
         source="reaxff/ffield",
         metadata=dict(meta),
+    )
+
+
+def _force_field_optimization_from_fort13_handler(handler: Fort13Handler) -> ForceFieldOptimizationProgressData:
+    """Normalize a ``Fort13Handler`` into ``ForceFieldOptimizationProgressData``."""
+    df = handler.dataframe().copy()
+    epochs = df["epoch"].to_numpy(dtype=int) if "epoch" in df.columns else np.arange(len(df), dtype=int)
+    total_ff_error = (
+        df["total_ff_error"].to_numpy(dtype=float)
+        if "total_ff_error" in df.columns
+        else np.empty((len(df),), dtype=float)
+    )
+    return ForceFieldOptimizationProgressData(
+        epochs=epochs,
+        total_ff_error=total_ff_error,
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _parameter_optimization_diagnostic_from_fort79_handler(
+    handler: Fort79Handler,
+) -> ForceFieldOptimizationDiagnosticData:
+    """Normalize a ``Fort79Handler`` into ``ForceFieldOptimizationDiagnosticData``."""
+    df = handler.dataframe().copy()
+    return ForceFieldOptimizationDiagnosticData(
+        identifiers=(
+            df["identifier"].fillna("").to_numpy(dtype=object)
+            if "identifier" in df.columns
+            else np.empty((0,), dtype=object)
+        ),
+        value1=(df["value1"].to_numpy(dtype=float) if "value1" in df.columns else np.empty((len(df),), dtype=float)),
+        value2=(df["value2"].to_numpy(dtype=float) if "value2" in df.columns else np.empty((len(df),), dtype=float)),
+        value3=(df["value3"].to_numpy(dtype=float) if "value3" in df.columns else np.empty((len(df),), dtype=float)),
+        diff1=(df["diff1"].to_numpy(dtype=float) if "diff1" in df.columns else np.empty((len(df),), dtype=float)),
+        diff2=(df["diff2"].to_numpy(dtype=float) if "diff2" in df.columns else np.empty((len(df),), dtype=float)),
+        diff3=(df["diff3"].to_numpy(dtype=float) if "diff3" in df.columns else np.empty((len(df),), dtype=float)),
+        a=(df["a"].to_numpy(dtype=float) if "a" in df.columns else np.empty((len(df),), dtype=float)),
+        b=(df["b"].to_numpy(dtype=float) if "b" in df.columns else np.empty((len(df),), dtype=float)),
+        c=(df["c"].to_numpy(dtype=float) if "c" in df.columns else np.empty((len(df),), dtype=float)),
+        parabol_min=(
+            df["parabol_min"].to_numpy(dtype=float)
+            if "parabol_min" in df.columns
+            else np.empty((len(df),), dtype=float)
+        ),
+        parabol_min_diff=(
+            df["parabol_min_diff"].to_numpy(dtype=float)
+            if "parabol_min_diff" in df.columns
+            else np.empty((len(df),), dtype=float)
+        ),
+        value4=(df["value4"].to_numpy(dtype=float) if "value4" in df.columns else np.empty((len(df),), dtype=float)),
+        diff4=(df["diff4"].to_numpy(dtype=float) if "diff4" in df.columns else np.empty((len(df),), dtype=float)),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _force_field_optimization_report_from_fort99_handler(
+    handler: Fort99Handler,
+) -> ForceFieldOptimizationReportData:
+    """Normalize a ``Fort99Handler`` into ``ForceFieldOptimizationReportData``."""
+    df = handler.dataframe().copy()
+    n_rows = len(df)
+    return ForceFieldOptimizationReportData(
+        linenos=(df["lineno"].to_numpy(dtype=int) if "lineno" in df.columns else np.arange(1, n_rows + 1, dtype=int)),
+        sections=(
+            df["section"].fillna("").to_numpy(dtype=object)
+            if "section" in df.columns
+            else np.full((n_rows,), "", dtype=object)
+        ),
+        titles=(
+            df["title"].fillna("").to_numpy(dtype=object)
+            if "title" in df.columns
+            else np.full((n_rows,), "", dtype=object)
+        ),
+        ffield_values=(
+            df["ffield_value"].to_numpy(dtype=float)
+            if "ffield_value" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        qm_values=(
+            df["qm_value"].to_numpy(dtype=float)
+            if "qm_value" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        weights=(
+            df["weight"].to_numpy(dtype=float)
+            if "weight" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        errors=(
+            df["error"].to_numpy(dtype=float)
+            if "error" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        total_ff_error=(
+            df["total_ff_error"].to_numpy(dtype=float)
+            if "total_ff_error" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _force_field_optimization_training_set_from_trainset_handler(
+    handler: TrainsetHandler,
+) -> ForceFieldOptimizationTrainingSetData:
+    """Normalize a ``TrainsetHandler`` into ``ForceFieldOptimizationTrainingSetData``."""
+    meta = dict(handler.metadata())
+    tables = dict(meta.get("tables", {}))
+    return ForceFieldOptimizationTrainingSetData(
+        sections=tuple(str(s) for s in meta.get("sections", [])),
+        charge=tables.get("CHARGE", pd.DataFrame()).copy(),
+        heatfo=tables.get("HEATFO", pd.DataFrame()).copy(),
+        geometry=tables.get("GEOMETRY", pd.DataFrame()).copy(),
+        cell_parameters=tables.get("CELL_PARAMETERS", pd.DataFrame()).copy(),
+        energy=tables.get("ENERGY", pd.DataFrame()).copy(),
+        metadata=meta,
+    )
+
+
+def _force_field_optimization_parameters_from_params_handler(
+    handler: ParamsHandler,
+) -> ForceFieldOptimizationParameterData:
+    """Normalize a ``ParamsHandler`` into ``ForceFieldOptimizationParameterData``."""
+    df = handler.dataframe().copy()
+    n_rows = len(df)
+    return ForceFieldOptimizationParameterData(
+        ff_section=(
+            df["ff_section"].to_numpy(dtype=int)
+            if "ff_section" in df.columns
+            else np.empty((n_rows,), dtype=int)
+        ),
+        ff_section_line=(
+            df["ff_section_line"].to_numpy(dtype=int)
+            if "ff_section_line" in df.columns
+            else np.empty((n_rows,), dtype=int)
+        ),
+        ff_parameter=(
+            df["ff_parameter"].to_numpy(dtype=int)
+            if "ff_parameter" in df.columns
+            else np.empty((n_rows,), dtype=int)
+        ),
+        search_interval=(
+            df["search_interval"].to_numpy(dtype=float)
+            if "search_interval" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        min_value=(
+            df["min_value"].to_numpy(dtype=float)
+            if "min_value" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        max_value=(
+            df["max_value"].to_numpy(dtype=float)
+            if "max_value" in df.columns
+            else np.full((n_rows,), np.nan, dtype=float)
+        ),
+        inline_comment=(
+            df["inline_comment"].fillna("").to_numpy(dtype=object)
+            if "inline_comment" in df.columns
+            else np.full((n_rows,), "", dtype=object)
+        ),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _partial_energy_from_energy_log_handler(handler: Fort73Handler) -> PartialEnergyData:
+    """Normalize a partial-energy log handler into ``PartialEnergyData``."""
+    df = handler.dataframe().copy()
+    iterations = df["iter"].to_numpy(dtype=int) if "iter" in df.columns else np.arange(len(df), dtype=int)
+    components = tuple(str(c) for c in df.columns if str(c) != "iter")
+    values = (
+        df.loc[:, list(components)].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        if components
+        else np.empty((len(df), 0), dtype=float)
+    )
+    # The same tabular partial-energy schema may come from fort.73 or energylog for MD,
+    # and from fort.58 for MM optimization/minimization outputs.
+    return PartialEnergyData(
+        iterations=iterations,
+        components=components,
+        values=values,
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _structure_summary_from_fort74_handler(handler: Fort74Handler) -> GeometrySummaryData:
+    """Normalize a ``Fort74Handler`` into ``GeometrySummaryData``."""
+    df = handler.dataframe().copy()
+    return GeometrySummaryData(
+        identifiers=df["identifier"].fillna("").to_numpy(dtype=object) if "identifier" in df.columns else np.empty((0,), dtype=object),
+        minimum_energy=(df["Emin"].to_numpy(dtype=float) if "Emin" in df.columns else None),
+        iterations=(df["iter"].to_numpy(dtype=float) if "iter" in df.columns else None),
+        formation_energy=(df["Hf"].to_numpy(dtype=float) if "Hf" in df.columns else None),
+        volume=(df["V"].to_numpy(dtype=float) if "V" in df.columns else None),
+        density=(df["D"].to_numpy(dtype=float) if "D" in df.columns else None),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _restraint_from_fort76_handler(handler: Fort76Handler) -> RestraintData:
+    """Normalize a ``Fort76Handler`` into ``RestraintData``."""
+    df = handler.dataframe().copy()
+    n_restraints = int(handler.metadata().get("n_restraints", 0))
+    target_cols = [f"r{i}_target" for i in range(1, n_restraints + 1) if f"r{i}_target" in df.columns]
+    actual_cols = [f"r{i}_actual" for i in range(1, n_restraints + 1) if f"r{i}_actual" in df.columns]
+    return RestraintData(
+        iterations=(df["iter"].to_numpy(dtype=int) if "iter" in df.columns else np.arange(len(df), dtype=int)),
+        restraint_energy=(df["E_res"].to_numpy(dtype=float) if "E_res" in df.columns else None),
+        potential_energy=(df["E_pot"].to_numpy(dtype=float) if "E_pot" in df.columns else None),
+        target_values=(
+            df.loc[:, target_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+            if target_cols
+            else np.empty((len(df), 0), dtype=float)
+        ),
+        actual_values=(
+            df.loc[:, actual_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+            if actual_cols
+            else np.empty((len(df), 0), dtype=float)
+        ),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _geometry_optimization_from_fort57_handler(handler: Fort57Handler) -> GeometryOptimizationProgressData:
+    """Normalize a ``Fort57Handler`` into ``GeometryOptimizationProgressData``."""
+    df = handler.dataframe().copy()
+    optimization_iterations = (
+        df["iter"].to_numpy(dtype=int) if "iter" in df.columns else np.arange(len(df), dtype=int)
+    )
+    return GeometryOptimizationProgressData(
+        optimization_iterations=optimization_iterations,
+        potential_energy=(df["E_pot"].to_numpy(dtype=float) if "E_pot" in df.columns else None),
+        temperature=(df["T"].to_numpy(dtype=float) if "T" in df.columns else None),
+        temperature_setpoint=(df["T_set"].to_numpy(dtype=float) if "T_set" in df.columns else None),
+        rms_gradient=(df["RMSG"].to_numpy(dtype=float) if "RMSG" in df.columns else None),
+        n_force_calls=(df["nfc"].to_numpy(dtype=int) if "nfc" in df.columns else None),
+        geo_descriptor=str(handler.geo_descriptor),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _control_parameters_from_control_handler(handler: ControlHandler) -> ControlParametersData:
+    """Normalize a ``ControlHandler`` into ``ControlParametersData``."""
+    return ControlParametersData(
+        general=dict(handler.general_parameters),
+        md=dict(handler.md_parameters),
+        mm=dict(handler.mm_parameters),
+        ff=dict(handler.ff_parameters),
+        outdated=dict(handler.outdated_parameters),
+        metadata=dict(handler.metadata()),
+    )
+
+
+def _atomic_kinematics_from_vels_handler(handler: VelsHandler) -> AtomicKinematicsData:
+    """Normalize a ``VelsHandler`` into ``AtomicKinematicsData``."""
+    meta = dict(handler.metadata())
+    return AtomicKinematicsData(
+        coordinates=handler.section_df(handler.SECTION_COORDS).copy(),
+        velocities=handler.section_df(handler.SECTION_VELS).copy(),
+        accelerations=handler.section_df(handler.SECTION_ACCELS).copy(),
+        previous_accelerations=handler.section_df(handler.SECTION_PREV_ACCELS).copy(),
+        lattice_parameters=meta.get("lattice_parameters"),
+        md_temperature_K=meta.get("md_temperature_K"),
+        metadata=meta,
+    )
+
+
+def _eregime_from_handler(handler: EregimeHandler) -> EregimeData:
+    """Normalize an ``EregimeHandler`` into ``EregimeData``."""
+    df = handler.dataframe().copy()
+    iterations = df["iter"].to_numpy(dtype=int) if "iter" in df.columns else np.arange(len(df), dtype=int)
+    field_zones = (
+        df["field_zones"].to_numpy(dtype=int)
+        if "field_zones" in df.columns
+        else np.ones((len(df),), dtype=int)
+    )
+    field_dir_col = "field_dir" if "field_dir" in df.columns else "field_dir1"
+    field_col = "field" if "field" in df.columns else "field1"
+    return EregimeData(
+        iter=iterations,
+        field_zones=field_zones,
+        field_dir=(
+            df[field_dir_col].fillna("").to_numpy(dtype=object)
+            if field_dir_col in df.columns
+            else np.full((len(df),), "", dtype=object)
+        ),
+        field=(
+            pd.to_numeric(df[field_col], errors="coerce").to_numpy(dtype=float)
+            if field_col in df.columns
+            else np.full((len(df),), np.nan, dtype=float)
+        ),
+        metadata=dict(handler.metadata()),
     )
 
 
@@ -504,13 +820,106 @@ class ReaxFFAdapter(EngineAdapter):
             conn.atom_ids = conn.simulation.atom_ids
         return conn
 
-    def load_force_field(self, args: dict, reporter=None) -> ForceFieldData:
+    def load_force_field(self, args: dict, reporter=None) -> ForceFieldParametersData:
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
         ffield_path = p / "ffield" if p.is_dir() else p
         handler = FFieldHandler(ffield_path, reporter=reporter)
         out = _force_field_from_ffield_handler(handler)
         return out
+
+    def load_force_field_optimization(self, args: dict, reporter=None) -> ForceFieldOptimizationProgressData:
+        raw = args.get("fort13") or args.get("force_field_optimization") or args.get("input") or "fort.13"
+        p = Path(raw)
+        fort13_path = p / "fort.13" if p.is_dir() else p
+        handler = Fort13Handler(fort13_path)
+        return _force_field_optimization_from_fort13_handler(handler)
+
+    def load_force_field_optimization_report(self, args: dict, reporter=None) -> ForceFieldOptimizationReportData:
+        raw = args.get("fort99") or args.get("force_field_optimization_report") or args.get("input") or "fort.99"
+        p = Path(raw)
+        fort99_path = p / "fort.99" if p.is_dir() else p
+        handler = Fort99Handler(fort99_path)
+        return _force_field_optimization_report_from_fort99_handler(handler)
+
+    def load_force_field_optimization_training_set(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationTrainingSetData:
+        raw = args.get("trainset") or args.get("force_field_optimization_training_set") or args.get("input") or "trainset.in"
+        p = Path(raw)
+        trainset_path = p / "trainset.in" if p.is_dir() else p
+        handler = TrainsetHandler(trainset_path)
+        return _force_field_optimization_training_set_from_trainset_handler(handler)
+
+    def load_force_field_optimization_parameters(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationParameterData:
+        raw = args.get("params") or args.get("force_field_optimization_parameters") or args.get("input") or "params"
+        p = Path(raw)
+        params_path = p / "params" if p.is_dir() else p
+        handler = ParamsHandler(params_path)
+        return _force_field_optimization_parameters_from_params_handler(handler)
+
+    def load_parameter_optimization_diagnostic(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationDiagnosticData:
+        raw = args.get("fort79") or args.get("parameter_optimization_diagnostic") or args.get("input") or "fort.79"
+        p = Path(raw)
+        fort79_path = p / "fort.79" if p.is_dir() else p
+        handler = Fort79Handler(fort79_path)
+        return _parameter_optimization_diagnostic_from_fort79_handler(handler)
+
+    def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
+        raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
+        p = Path(raw)
+        fort74_path = p / "fort.74" if p.is_dir() else p
+        handler = Fort74Handler(fort74_path)
+        return _structure_summary_from_fort74_handler(handler)
+
+    def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
+        raw = args.get("fort73") or args.get("partial_energy") or args.get("input") or "fort.73"
+        p = Path(raw)
+        if p.is_dir():
+            candidates = [p / "fort.73", p / "energylog", p / "fort.58"]
+            partial_energy_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
+        else:
+            partial_energy_path = p
+        handler = Fort73Handler(partial_energy_path)
+        return _partial_energy_from_energy_log_handler(handler)
+
+    def load_restraints(self, args: dict, reporter=None) -> RestraintData:
+        raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
+        p = Path(raw)
+        fort76_path = p / "fort.76" if p.is_dir() else p
+        handler = Fort76Handler(fort76_path)
+        return _restraint_from_fort76_handler(handler)
+
+    def load_geometry_optimization(self, args: dict, reporter=None) -> GeometryOptimizationProgressData:
+        raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
+        p = Path(raw)
+        fort57_path = p / "fort.57" if p.is_dir() else p
+        handler = Fort57Handler(fort57_path)
+        return _geometry_optimization_from_fort57_handler(handler)
+
+    def load_control_parameters(self, args: dict, reporter=None) -> ControlParametersData:
+        raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
+        p = Path(raw)
+        control_path = p / "control" if p.is_dir() else p
+        handler = ControlHandler(control_path)
+        return _control_parameters_from_control_handler(handler)
+
+    def load_eregime(self, args: dict, reporter=None) -> EregimeData:
+        raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
+        p = Path(raw)
+        eregime_path = p / "eregime.in" if p.is_dir() else p
+        handler = EregimeHandler(eregime_path)
+        return _eregime_from_handler(handler)
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
         raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
@@ -522,6 +931,23 @@ class ReaxFFAdapter(EngineAdapter):
             self._load_simulation_from_summary(args, reporter=reporter),
         )
         return _charges_from_fort7_handler(handler, simulation=sim, reporter=reporter)
+
+    def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:
+        raw = args.get("vels") or args.get("kinematics") or args.get("input") or "vels"
+        p = Path(raw)
+        if p.is_dir():
+            if (p / "vels").exists():
+                vels_path = p / "vels"
+            elif (p / "moldyn.vel").exists():
+                vels_path = p / "moldyn.vel"
+            elif (p / "molsav").exists():
+                vels_path = p / "molsav"
+            else:
+                vels_path = p / "vels"
+        else:
+            vels_path = p
+        handler = VelsHandler(vels_path)
+        return _atomic_kinematics_from_vels_handler(handler)
 
     def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
         raw = args.get("fort78") or args.get("electric_field") or args.get("input") or "fort.78"

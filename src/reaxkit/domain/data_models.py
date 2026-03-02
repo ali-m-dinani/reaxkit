@@ -69,7 +69,7 @@ class ConnectivityData:
 
 
 @dataclass
-class ForceFieldData:
+class ForceFieldParametersData:
     """Engine-agnostic force-field reference model."""
 
     general_parameters: pd.DataFrame
@@ -80,6 +80,152 @@ class ForceFieldData:
     torsion_parameters: pd.DataFrame
     hydrogen_bond_parameters: pd.DataFrame
     source: str = ""
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationProgressData:
+    """Canonical force-field optimization error model parsed from ``fort.13``."""
+
+    epochs: np.ndarray
+    total_ff_error: np.ndarray
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationDiagnosticData:
+    """Canonical parameter-optimization diagnostic model parsed from ``fort.79``."""
+
+    identifiers: np.ndarray
+    value1: np.ndarray
+    value2: np.ndarray
+    value3: np.ndarray
+    diff1: np.ndarray
+    diff2: np.ndarray
+    diff3: np.ndarray
+    a: np.ndarray
+    b: np.ndarray
+    c: np.ndarray
+    parabol_min: np.ndarray
+    parabol_min_diff: np.ndarray
+    value4: np.ndarray
+    diff4: np.ndarray
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationReportData:
+    """Canonical force-field optimization report model parsed from ``fort.99``."""
+
+    linenos: np.ndarray
+    sections: np.ndarray
+    titles: np.ndarray
+    ffield_values: np.ndarray
+    qm_values: np.ndarray
+    weights: np.ndarray
+    errors: np.ndarray
+    total_ff_error: np.ndarray
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationTrainingSetData:
+    """Canonical ReaxFF training-set model parsed from ``trainset`` files."""
+
+    sections: tuple[str, ...] = ()
+    charge: pd.DataFrame = field(default_factory=pd.DataFrame)
+    heatfo: pd.DataFrame = field(default_factory=pd.DataFrame)
+    geometry: pd.DataFrame = field(default_factory=pd.DataFrame)
+    cell_parameters: pd.DataFrame = field(default_factory=pd.DataFrame)
+    energy: pd.DataFrame = field(default_factory=pd.DataFrame)
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationParameterData:
+    """Canonical optimization-parameter definition model parsed from ``params``."""
+
+    ff_section: np.ndarray
+    ff_section_line: np.ndarray
+    ff_parameter: np.ndarray
+    search_interval: np.ndarray
+    min_value: np.ndarray
+    max_value: np.ndarray
+    inline_comment: np.ndarray
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationData:
+    """Composite force-field optimization view spanning progress and diagnostics."""
+
+    force_field_parameters: Optional[ForceFieldParametersData] = None
+    optimization_parameters: Optional[ForceFieldOptimizationParameterData] = None
+    training_set: Optional[ForceFieldOptimizationTrainingSetData] = None
+    progress: Optional[ForceFieldOptimizationProgressData] = None
+    diagnostics: Optional[ForceFieldOptimizationDiagnosticData] = None
+    report: Optional[ForceFieldOptimizationReportData] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class GeometrySummaryData:
+    """Canonical structure-summary model parsed from ``fort.74``."""
+
+    identifiers: np.ndarray
+    minimum_energy: Optional[np.ndarray] = None
+    iterations: Optional[np.ndarray] = None
+    formation_energy: Optional[np.ndarray] = None
+    volume: Optional[np.ndarray] = None
+    density: Optional[np.ndarray] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class PartialEnergyData:
+    """Canonical partial-energy time-series model parsed from ``fort.73``-style files."""
+
+    iterations: np.ndarray
+    components: tuple[str, ...] = ()
+    values: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class RestraintData:
+    """Canonical restraint-monitor model parsed from ``fort.76``."""
+
+    iterations: np.ndarray
+    restraint_energy: Optional[np.ndarray] = None
+    potential_energy: Optional[np.ndarray] = None
+    target_values: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
+    actual_values: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class GeometryOptimizationProgressData:
+    """Canonical geometry-optimization summary model parsed from ``fort.57``."""
+
+    optimization_iterations: np.ndarray
+    potential_energy: Optional[np.ndarray] = None
+    temperature: Optional[np.ndarray] = None
+    temperature_setpoint: Optional[np.ndarray] = None
+    rms_gradient: Optional[np.ndarray] = None
+    n_force_calls: Optional[np.ndarray] = None
+    geo_descriptor: str = ""
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ControlParametersData:
+    """Engine-agnostic control-parameter model grouped by normalized sections."""
+
+    general: dict[str, Any] = field(default_factory=dict)
+    md: dict[str, Any] = field(default_factory=dict)
+    mm: dict[str, Any] = field(default_factory=dict)
+    ff: dict[str, Any] = field(default_factory=dict)
+    outdated: dict[str, Any] = field(default_factory=dict)
     metadata: Optional[dict[str, Any]] = None
 
 
@@ -103,6 +249,30 @@ class ElectricFieldData:
     field_energy_values: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
     field_energy_components: Sequence[str] = ()
     sampled_field_iterations: Optional[np.ndarray] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class AtomicKinematicsData:
+    """Canonical single-snapshot atomic kinematics model parsed from ``vels``-style files."""
+
+    coordinates: pd.DataFrame = field(default_factory=pd.DataFrame)
+    velocities: pd.DataFrame = field(default_factory=pd.DataFrame)
+    accelerations: pd.DataFrame = field(default_factory=pd.DataFrame)
+    previous_accelerations: pd.DataFrame = field(default_factory=pd.DataFrame)
+    lattice_parameters: Optional[dict[str, float]] = None
+    md_temperature_K: Optional[float] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class EregimeData:
+    """Canonical electric-field schedule model parsed from ``eregime.in``."""
+
+    iter: np.ndarray
+    field_zones: np.ndarray
+    field_dir: np.ndarray
+    field: np.ndarray
     metadata: Optional[dict[str, Any]] = None
 
 

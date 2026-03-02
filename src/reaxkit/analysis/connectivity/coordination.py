@@ -12,7 +12,7 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ForceFieldData
+from reaxkit.domain.data_models import ConnectivityData, ForceFieldParametersData
 
 
 @dataclass
@@ -20,7 +20,7 @@ class CoordinationStatusRequest(BaseRequest):
     """Request for per-atom coordination status classification."""
 
     valences: Optional[Mapping[str, float]] = None
-    force_field: Optional[ForceFieldData] = None
+    force_field: Optional[ForceFieldParametersData] = None
     valence_key: str = "valency"
     threshold: float = 0.9
     frames: Optional[Sequence[int]] = None

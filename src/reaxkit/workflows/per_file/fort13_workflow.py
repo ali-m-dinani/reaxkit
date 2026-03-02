@@ -16,8 +16,9 @@ assessing convergence behavior in training or fitting workflows.
 
 
 import argparse
-from reaxkit.io.handlers.fort13_handler import Fort13Handler
-from reaxkit.analysis.per_file.fort13_analyzer import get_fort13_data
+from reaxkit.analysis.force_field import ForceFieldOptimizationRequest, ForceFieldOptimizationTask
+from reaxkit.domain.data_models import ForceFieldOptimizationProgressData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.presentation.plot import single_plot
 from reaxkit.cli.path import resolve_output_path
 
@@ -26,8 +27,17 @@ def _fort13_get_task(args: argparse.Namespace) -> int:
     Handle 'reaxkit fort13 get ...'
     to plot, export, or save error data vs epoch.
     """
-    handler = Fort13Handler(args.file)
-    df = get_fort13_data(handler)
+    data = ReaxFFAdapter().load(
+        ForceFieldOptimizationProgressData,
+        {
+            "fort13": args.file,
+            "input": args.file,
+        },
+    )
+    df = ForceFieldOptimizationTask().run(
+        data,
+        ForceFieldOptimizationRequest(),
+    ).table
 
     workflow_name = args.kind
     # Export if requested
