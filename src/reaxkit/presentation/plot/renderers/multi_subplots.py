@@ -2,15 +2,41 @@
 
 from __future__ import annotations
 
+import re
 from typing import Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged, save_or_show
 
 
 class MultiSubplotsRenderer(PlotRenderer):
     """Render stacked subplots."""
+
+    @staticmethod
+    def _grid_shape(grid, nplots: int) -> tuple[int, int]:
+        if not grid:
+            return (nplots, 1)
+        if isinstance(grid, (tuple, list)) and len(grid) == 2:
+            rows, cols = int(grid[0]), int(grid[1])
+        else:
+            match = re.fullmatch(r"\s*(\d+)\s*[xX*]\s*(\d+)\s*", str(grid))
+            if not match:
+                raise ValueError("grid must look like '2x2' or '2*2'")
+            rows, cols = int(match.group(1)), int(match.group(2))
+        if rows <= 0 or cols <= 0:
+            raise ValueError("grid rows and columns must be positive")
+        return rows, cols
+
+    @staticmethod
+    def _paged_save_target(save, page_index: int, total_pages: int):
+        if not save or total_pages == 1:
+            return save
+        p = Path(save)
+        if p.suffix:
+            return str(p.with_name(f"{p.stem}_{page_index + 1}{p.suffix}"))
+        return str(p / f"page_{page_index + 1}")
 
     def render(self, result, style=None):
         cfg = merged(result, style)
@@ -42,34 +68,55 @@ class MultiSubplotsRenderer(PlotRenderer):
             global_title = title
         xlabels = _normalize_seq(cfg.get("xlabel"), nplots)
         ylabels = _normalize_seq(cfg.get("ylabel"), nplots)
+        rows, cols = self._grid_shape(cfg.get("grid"), nplots)
+        page_size = rows * cols
+        figures = []
+        total_pages = (nplots + page_size - 1) // page_size
 
-        fig, axes = plt.subplots(
-            nplots,
-            1,
-            figsize=cfg.get("figsize", (8.0, 6.0)),
-            sharex=bool(cfg.get("sharex", False)),
-            sharey=bool(cfg.get("sharey", False)),
-            squeeze=False,
-        )
-        axes = axes.flatten()
-        for idx, ax in enumerate(axes):
-            for series in subplots[idx]:
-                x = series.get("x")
-                y = series.get("y")
-                if x is None or y is None:
-                    continue
-                ax.plot(x, y, label=series.get("label"))
-            if ylabels[idx]:
-                ax.set_ylabel(ylabels[idx])
-            if xlabels[idx]:
-                ax.set_xlabel(xlabels[idx])
-            if per_titles[idx]:
-                ax.set_title(per_titles[idx])
-            if cfg.get("grid", False):
-                ax.grid(True, alpha=0.3)
-            if cfg.get("legend", True):
-                ax.legend(fontsize=9)
-        if global_title:
-            fig.suptitle(global_title, fontsize=14, y=0.98)
-        fig.tight_layout()
-        return save_or_show(fig, cfg)
+        for page_index in range(total_pages):
+            start = page_index * page_size
+            end = min(start + page_size, nplots)
+            page_subplots = subplots[start:end]
+            page_xlabels = xlabels[start:end]
+            page_ylabels = ylabels[start:end]
+            page_titles = per_titles[start:end]
+
+            fig, axes = plt.subplots(
+                rows,
+                cols,
+                figsize=cfg.get("figsize", (8.0, 6.0)),
+                sharex=bool(cfg.get("sharex", False)),
+                sharey=bool(cfg.get("sharey", False)),
+                squeeze=False,
+            )
+            axes = axes.flatten()
+            for idx, ax in enumerate(axes[: len(page_subplots)]):
+                for series in page_subplots[idx]:
+                    x = series.get("x")
+                    y = series.get("y")
+                    if x is None or y is None:
+                        continue
+                    ax.plot(x, y, label=series.get("label"))
+                if page_ylabels[idx]:
+                    ax.set_ylabel(page_ylabels[idx])
+                if page_xlabels[idx]:
+                    ax.set_xlabel(page_xlabels[idx])
+                if page_titles[idx]:
+                    ax.set_title(page_titles[idx])
+                if cfg.get("grid", False):
+                    ax.grid(True, alpha=0.3)
+                if cfg.get("legend", True):
+                    ax.legend(fontsize=9)
+            for ax in axes[len(page_subplots) :]:
+                ax.axis("off")
+            if global_title:
+                title_text = global_title
+                if total_pages > 1:
+                    title_text = f"{global_title} ({page_index + 1}/{total_pages})"
+                fig.suptitle(title_text, fontsize=14, y=0.98)
+            fig.tight_layout()
+            page_cfg = dict(cfg)
+            page_cfg["save"] = self._paged_save_target(cfg.get("save"), page_index, total_pages)
+            figures.append(save_or_show(fig, page_cfg))
+
+        return figures[0] if len(figures) == 1 else figures

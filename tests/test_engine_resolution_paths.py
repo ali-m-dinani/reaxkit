@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+import pandas as pd
+
+from reaxkit.core.analysis_executor import AnalysisExecutor
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
+
+
+class _DummyTask:
+    required_data = object
+
+    def run(self, data, request):
+        return data
+
+
+def test_analysis_executor_prefers_xmolout_for_detection(monkeypatch):
+    captured = {}
+
+    class DummyAdapter:
+        def load(self, required_data, args, reporter=None):
+            return {"ok": True}
+
+    def fake_resolve_engine(path, engine=None):
+        captured["path"] = path
+        captured["engine"] = engine
+        return DummyAdapter()
+
+    monkeypatch.setattr("reaxkit.core.analysis_executor.resolve_engine", fake_resolve_engine)
+
+    executor = AnalysisExecutor()
+    executor.run(
+        _DummyTask(),
+        request=object(),
+        args={"xmolout": "renamed_xmolout", "run_dir": "../sim1", "no_cache": True},
+    )
+
+    assert captured["path"] == "renamed_xmolout"
+    assert captured["engine"] is None
+
+
+def test_analysis_executor_uses_run_dir_when_no_file_hint(monkeypatch):
+    captured = {}
+
+    class DummyAdapter:
+        def load(self, required_data, args, reporter=None):
+            return {"ok": True}
+
+    def fake_resolve_engine(path, engine=None):
+        captured["path"] = path
+        return DummyAdapter()
+
+    monkeypatch.setattr("reaxkit.core.analysis_executor.resolve_engine", fake_resolve_engine)
+
+    executor = AnalysisExecutor()
+    executor.run(_DummyTask(), request=object(), args={"run_dir": "../sim1", "no_cache": True})
+
+    assert captured["path"] == "../sim1"
+
+
+def test_reaxff_adapter_load_trajectory_uses_run_dir_default(monkeypatch, tmp_path):
+    sim_dir = tmp_path / "sim1"
+    sim_dir.mkdir()
+
+    captured = {}
+
+    class DummyHandler:
+        def __init__(self, path, reporter=None):
+            captured["path"] = Path(path)
+
+        def n_frames(self):
+            return 1
+
+        def frame(self, index):
+            return {"coords": np.zeros((1, 3)), "atom_types": ["H"]}
+
+        def dataframe(self):
+            return pd.DataFrame({"iter": [0], "a": [1.0], "b": [1.0], "c": [1.0]})
+
+    monkeypatch.setattr("reaxkit.engine.reaxff.adapter.XmoloutHandler", DummyHandler)
+    monkeypatch.setattr(ReaxFFAdapter, "_load_simulation_from_summary", staticmethod(lambda args, reporter=None: None))
+
+    adapter = ReaxFFAdapter()
+    adapter.load_trajectory({"run_dir": str(sim_dir)})
+
+    assert captured["path"] == sim_dir / "xmolout"
+
+
+def test_reaxff_detect_accepts_renamed_xmolout_file(tmp_path):
+    renamed = tmp_path / "renamed_xmolout"
+    renamed.write_text("dummy", encoding="utf-8")
+
+    adapter = ReaxFFAdapter()
+
+    assert adapter.detect(renamed) > 0.0

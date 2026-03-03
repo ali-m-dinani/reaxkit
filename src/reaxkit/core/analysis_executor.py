@@ -18,6 +18,29 @@ logger = get_logger(__name__)
 class AnalysisExecutor:
     """Orchestrate task execution with strict layer boundaries."""
 
+    DETECTION_HINT_KEYS = (
+        "xmolout",
+        "geo",
+        "fort7",
+        "fort13",
+        "fort57",
+        "fort73",
+        "fort74",
+        "fort76",
+        "fort78",
+        "fort79",
+        "fort99",
+        "summary",
+        "trainset",
+        "params",
+        "control",
+        "eregime",
+        "vels",
+        "molfra",
+        "input",
+        "run_dir",
+    )
+
     @staticmethod
     def _run_task(task, data, request, reporter):
         params = inspect.signature(task.run).parameters
@@ -25,13 +48,22 @@ class AnalysisExecutor:
             return task.run(data, request, reporter=reporter)
         return task.run(data, request)
 
+    @classmethod
+    def _detection_path(cls, args: dict) -> str:
+        for key in cls.DETECTION_HINT_KEYS:
+            value = args.get(key)
+            if value:
+                return str(value)
+        return "."
+
     def run(self, task, request, args: dict):
-        if args.get("verbose"):
+        log_level = args.get("log")
+        if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")
-        elif args.get("quiet"):
+        elif log_level == "quiet" or args.get("quiet"):
             get_logger(__name__, level="WARNING")
 
-        input_path = args.get("input") or args.get("run_dir") or "."
+        input_path = self._detection_path(args)
         forced_engine = args.get("engine")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
         adapter = resolve_engine(input_path, engine=forced_engine)

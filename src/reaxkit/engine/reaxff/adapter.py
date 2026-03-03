@@ -775,13 +775,32 @@ def _molecular_analysis_from_molfra_handler(handler: MolFraHandler) -> Molecular
 class ReaxFFAdapter(EngineAdapter):
     """Adapter that loads ReaxFF outputs into domain models."""
 
+    @staticmethod
+    def _resolve_reaxff_path(args: dict, *keys: str, default: str) -> Path:
+        for key in keys:
+            raw = args.get(key)
+            if raw:
+                path = Path(raw)
+                return path / default if path.is_dir() else path
+
+        run_dir = args.get("run_dir")
+        if run_dir:
+            return Path(run_dir) / default
+
+        input_path = args.get("input")
+        if input_path:
+            path = Path(input_path)
+            return path / default if path.is_dir() else path
+
+        return Path(default)
+
     def detect(self, path: str | Path) -> float:
         p = Path(path)
-        has_xmol = (p / "xmolout").exists() or p.name == "xmolout"
+        has_xmol = (p / "xmolout").exists() or (p.is_file() and "xmolout" in p.name.lower())
         return 0.95 if has_xmol else 0.0
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
-        xmol_path = args.get("xmolout") or args.get("input") or "xmolout"
+        xmol_path = self._resolve_reaxff_path(args, "xmolout", default="xmolout")
         handler = XmoloutHandler(xmol_path, reporter=reporter)
         trj = _trajectory_from_xmolout_handler(handler)
         trj.simulation = _merge_simulation_data(
@@ -806,12 +825,8 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _load_simulation_from_xmolout(args: dict, reporter=None) -> SimulationData | None:
-        raw = args.get("xmolout") or args.get("input")
-        if not raw:
-            return None
-        p = Path(raw)
-        xmol_path = p / "xmolout" if p.is_dir() else p
-        if not xmol_path.exists() or xmol_path.name != "xmolout":
+        xmol_path = ReaxFFAdapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        if not xmol_path.exists():
             return None
         handler = XmoloutHandler(xmol_path, reporter=reporter)
         trj = _trajectory_from_xmolout_handler(handler)
@@ -819,7 +834,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _load_simulation_from_summary(args: dict, reporter=None) -> SimulationData | None:
-        candidates = [args.get("summary"), args.get("input"), args.get("xmolout")]
+        candidates = [args.get("summary"), args.get("xmolout"), args.get("run_dir"), args.get("input")]
         summary_path = None
         for raw in candidates:
             if not raw:

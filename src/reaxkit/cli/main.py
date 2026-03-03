@@ -12,6 +12,8 @@ import argparse
 import sys
 from importlib import import_module
 
+from reaxkit.core.task_resolution_using_alias import resolve_command_name
+
 # Mapping from top-level CLI "kind" (subcommand) to the workflow module
 # that knows how to register its own tasks and arguments.
 
@@ -55,6 +57,12 @@ WORKFLOW_MODULES = {
     "vregime": "reaxkit.workflows.per_file.vregime_workflow",
     "analysis": "reaxkit.workflows.diffusion_workflow",
     "timeseries": "reaxkit.workflows.timeseries_workflow",
+}
+
+DIRECT_COMMAND_MODULES = {
+    "msd": "reaxkit.workflows.trajectory_workflow",
+    "rdf": "reaxkit.workflows.trajectory_workflow",
+    "rdf_property": "reaxkit.workflows.trajectory_workflow",
 }
 
 
@@ -133,6 +141,26 @@ def _intspec_default_runner(args):
     )
 
 
+def _canonicalize_direct_command(argv):
+    """Rewrite direct command aliases to canonical names before parsing."""
+    out = list(argv)
+    if len(out) < 2:
+        return out
+
+    try:
+        out[1] = resolve_command_name(out[1], task_names=DIRECT_COMMAND_MODULES.keys())
+    except KeyError:
+        pass
+    return out
+
+
+def _direct_command_runner(module, command):
+    def _runner(args):
+        return module.run_main(command, args)
+
+    return _runner
+
+
 def main():
     """
     Build and execute the `reaxkit` CLI dispatcher.
@@ -163,18 +191,29 @@ def main():
       - reaxkit intspec --folder workflows
     """
     # Preprocess argv so DEFAULTABLE workflows can omit an explicit task.
-    sys_argv = _preinject(sys.argv)
+    sys_argv = _canonicalize_direct_command(_preinject(sys.argv))
 
     probe = argparse.ArgumentParser(add_help=False)
-    probe.add_argument("kind", nargs="?")
+    probe.add_argument("command", nargs="?")
     kind_ns, _ = probe.parse_known_args(sys_argv[1:])
-    selected_kind = getattr(kind_ns, "kind", None)
+    selected_command = getattr(kind_ns, "command", None)
 
     # Top-level parser for `reaxkit`
     parser = argparse.ArgumentParser("reaxkit CLI")
 
-    # First level of subcommands: the workflow "kind" (summary, xmolout, etc.)
-    sub = parser.add_subparsers(dest="kind", required=True)
+    # First level of subcommands: direct commands and legacy workflow kinds.
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    for command, module_path in DIRECT_COMMAND_MODULES.items():
+        cp = sub.add_parser(command, help=f"{command} command")
+
+        if command != selected_command:
+            continue
+
+        module = import_module(module_path)
+        if hasattr(module, "build_parser"):
+            module.build_parser(cp, command=command)
+        cp.set_defaults(_run=_direct_command_runner(module, command))
 
     # For each workflow module, create its own subparser and let it
     # register its internal tasks (second-level subcommands).
@@ -182,7 +221,7 @@ def main():
         # e.g. `reaxkit summary ...`, `reaxkit xmolout ...`
         kp = sub.add_parser(kind, help=f"{kind} workflows")
 
-        if kind != selected_kind:
+        if kind != selected_command:
             continue
 
         module = import_module(module_path)
