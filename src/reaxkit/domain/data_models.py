@@ -42,6 +42,20 @@ class TrajectoryData:
 
 
 @dataclass
+class GeometryData:
+    """Canonical single-structure geometry model."""
+
+    coordinates: pd.DataFrame = field(default_factory=pd.DataFrame)
+    atom_ids: list[int] = field(default_factory=list)
+    elements: list[str] = field(default_factory=list)
+    descriptor: str = ""
+    remark: str = ""
+    lattice_parameters: Optional[dict[str, float | None]] = None
+    simulation: Optional[SimulationData] = None
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
 class ConnectivityData:
     """Canonical connectivity model.
 

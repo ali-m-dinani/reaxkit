@@ -1,28 +1,21 @@
 """
 ReaxFF control file generation utilities.
 
-This module provides deterministic helpers for writing a default ReaxFF
-``control`` input file from a canonical, aligned template.
-
-Typical use cases include:
----
-
-- generating a baseline ``control`` file for new run directories
-- ensuring consistent spacing/alignment across generated inputs
-- writing a known-good template for tutorials and examples
+This module provides deterministic helpers for generating or writing a
+default ReaxFF ``control`` input file from a canonical, aligned template.
 """
-
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
+from typing import Any
 
 
 CONTROL_TEMPLATE = """# General parameters
-      1 iexx   
-      1 iexy   
-      1 iexz   
+      1 iexx
+      1 iexy
+      1 iexz
     7.5 vlbora
       1 icobo      0: use uncorrected bond orders for mol.nrs. in xmolout, fort.7 and fort.71 1: use corrected bond orders
       0 itrout     1: create diff_traj.xyz-output file with unfolded coordinates
@@ -80,44 +73,96 @@ CONTROL_TEMPLATE = """# General parameters
       1 igeopt     0: Always use same start gemetries 1:Use latest geometries in optimisation
       0 iincop     heat increment optimisation 1: yes 0: no
 25.0000 accerr     Accepted increase in error force field
-#Outdated parameters 
+#Outdated parameters
       0 nreac      0: reactive; 1: non-reactive; 2: Place default atoms
       1 ibiola     0: output *.geo and *.bgf-files 1: surpress *.geo and *.bgf output files
       0 itfix      1:Keep temperature fixed at exactly tset
 """
 
 
-def write_control_template(out_path: Union[str, Path] = "control") -> Path:
+__all__ = [
+    "ControlGeneratorSpec",
+    "DEFAULT_CONTROL_SPEC",
+    "CONTROL_GENERATOR_REGISTRY",
+    "generate_control_template",
+    "write_control",
+    "write_control_template",
+]
+
+
+@dataclass(frozen=True)
+class ControlGeneratorSpec:
     """
-    Write the default ReaxFF ``control`` file template to disk.
+    Declarative settings for generating a ReaxFF ``control`` file.
 
-    This function writes a fully populated ReaxFF control-file template
-    (general, MD, MM, FF-optimization, and outdated sections) to disk,
-    preserving the exact spacing and alignment of the canonical template.
+    Parameters
+    ----------
+    template_text : str, optional
+        Fully formatted ``control`` file content. Defaults to the bundled
+        canonical template.
+    """
 
-    Works on
-    --------
-    None — writes a ReaxFF ``control`` input file
+    template_text: str = CONTROL_TEMPLATE
+
+
+DEFAULT_CONTROL_SPEC = ControlGeneratorSpec()
+
+
+def generate_control_template(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC) -> str:
+    """
+    Generate the default ReaxFF ``control`` file content as text.
+
+    Parameters
+    ----------
+    spec : ControlGeneratorSpec, optional
+        Control generation settings.
+
+    Returns
+    -------
+    str
+        The fully formatted ``control`` file content.
+    """
+    return spec.template_text
+
+
+def write_control(
+    out_path: str | Path = "control",
+    spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+) -> Path:
+    """
+    Write a generated ReaxFF ``control`` file to disk.
 
     Parameters
     ----------
     out_path : str | pathlib.Path, optional
-        Output file path to write (default: ``"control"``). Parent
-        directories are created automatically if they do not exist.
+        Output file path to write. Parent directories are created when needed.
+    spec : ControlGeneratorSpec, optional
+        Control generation settings.
 
     Returns
     -------
     pathlib.Path
-        The resolved path of the written control file.
-
-    Examples
-    --------
-    >>> from reaxkit.io.generators.control_generator import write_control_template
-    >>> p = write_control_template("run_001/control")
-    >>> p.name
-    'control'
+        The path of the written control file.
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(CONTROL_TEMPLATE, encoding="utf-8")
+    out_path.write_text(generate_control_template(spec), encoding="utf-8")
     return out_path
+
+
+def write_control_template(out_path: str | Path = "control") -> Path:
+    """
+    Backward-compatible wrapper for writing the default ``control`` file.
+    """
+    return write_control(out_path=out_path, spec=DEFAULT_CONTROL_SPEC)
+
+
+CONTROL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
+    "control": {
+        "label": "ReaxFF Control File",
+        "default_filename": "control",
+        "spec_type": ControlGeneratorSpec,
+        "generate": generate_control_template,
+        "write": write_control,
+    }
+}

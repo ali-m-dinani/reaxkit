@@ -29,19 +29,20 @@ import argparse
 from pathlib import Path
 from typing import List
 
-from reaxkit.io.handlers.geo_handler import GeoHandler
-from reaxkit.io.generators.geo_generator import (
+from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
+from reaxkit.engine.reaxff.generators.geo_generator import (
     xtob,
-    read_structure,
-    build_surface,
-    make_supercell,
-    write_structure,
     _format_crystx,
     _format_hetatm_line,
+    add_restraints_to_geo,
+)
+from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.geo_transforms import (
+    build_surface,
+    make_supercell,
     orthogonalize_hexagonal_cell,
     place2,
 )
-from reaxkit.io.generators.geo_generator import add_restraints_to_geo
 
 # ----------------------------------------------------------------------
 # Helpers

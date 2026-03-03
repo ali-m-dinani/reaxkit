@@ -18,6 +18,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationTrainingSetData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
+    GeometryData,
     GeometryOptimizationProgressData,
     MolecularAnalysisData,
     ForceFieldOptimizationDiagnosticData,
@@ -42,6 +43,8 @@ class EngineAdapter(ABC):
         """Load requested domain data type from engine-specific sources."""
         if data_type is TrajectoryData:
             return self._invoke_loader("load_trajectory", args, reporter=reporter)
+        if data_type is GeometryData:
+            return self._invoke_loader("load_geometry", args, reporter=reporter)
         if data_type is SimulationData:
             return self._invoke_loader("load_simulation", args, reporter=reporter)
         if data_type is ConnectivityData:

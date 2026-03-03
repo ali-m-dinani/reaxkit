@@ -4,95 +4,31 @@ Volume-regime (vregime.in) file generators.
 This module provides utilities for generating ReaxFF ``vregime.in`` files,
 which define how simulation cell dimensions and angles are modified over
 time during molecular dynamics simulations.
-
-Typical use cases include:
-
-- creating a valid sample ``vregime.in`` file for new simulations
-- inspecting column layout and formatting rules for volume schedules
-- using a template as a starting point for custom volume/strain protocols
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Sequence
+from typing import Any
 
 
-def write_sample_vregime(
-    out_path: str | Path = "vregime.in",
-    *,
-    n_rows: int = 5,
-) -> None:
-    """
-    Write a sample vregime.in file with fixed-width, left-aligned columns.
+__all__ = [
+    "VRegimeSampleSpec",
+    "VREGIME_GENERATOR_REGISTRY",
+    "generate_sample_vregime",
+    "write_vregime",
+    "write_sample_vregime",
+]
 
-    Works on
-    --------
-    ReaxFF volume-regime input — ``vregime.in``
 
-    Parameters
-    ----------
-    out_path : str or pathlib.Path, optional
-        Output file path for the generated vregime file.
-    n_rows : int, optional
-        Number of example data rows to write.
+@dataclass(frozen=True)
+class VRegimeSampleSpec:
+    n_rows: int = 5
 
-    Returns
-    -------
-    None
-        Writes a formatted ``vregime.in`` file to disk.
 
-    Examples
-    --------
-    >>> from reaxkit.io.generators.vregime_generator import write_sample_vregime
-    >>> write_sample_vregime("vregime.in", n_rows=3)
-    """
-    out_path = Path(out_path)
-
-    # Fixed widths (LEFT aligned)
-    W_START = 6     # gives room for 4-digit start + spaces
-    W_V = 4         # '#V' column
-    W_TYPE = 6      # 'alfa', 'beta', 'a', 'b', etc.
-    W_CHANGE = 12   # change/it numeric field
-    W_RESCALE = 8   # 'y' / 'n'
-
-    SEP = " "  # single-space like your working example
-
-    def _pad(s: str, w: int) -> str:
-        s = "" if s is None else str(s)
-        return s[:w].ljust(w)
-
-    def _fmt_start(v: Any) -> str:
-        # match the example: 0000, 0100, 0200, ...
-        return f"{int(v):04d}"
-
-    def _fmt_change(v: Any, *, decimals: int = 6) -> str:
-        # match the example's precision style (0.050000, -0.010000, etc.)
-        return f"{float(v):.{decimals}f}"
-
-    # Header
-    header1 = "#Volume regimes"
-    header2 = (
-        _pad("#start", W_START)
-        + SEP
-        + _pad("#V", W_V)
-        + SEP
-        + _pad("type1", W_TYPE)
-        + SEP
-        + _pad("change/it", W_CHANGE)
-        + SEP
-        + _pad("rescale", W_RESCALE)
-        + SEP
-        + _pad("type 2", W_TYPE)
-        + SEP
-        + _pad("change/it", W_CHANGE)
-        + SEP
-        + _pad("rescale", W_RESCALE)
-    )
-
-    # Sample rows (mirrors your screenshot)
-    # Each row: {"start": int, "terms": [{"type": str, "change": float, "rescale": "y|n"}, ...]}
-    rows: List[Dict[str, Any]] = [
+def _build_sample_rows() -> list[dict[str, Any]]:
+    return [
         {
             "start": 0,
             "terms": [
@@ -130,35 +66,99 @@ def write_sample_vregime(
                 {"type": "beta", "change": 0.050000, "rescale": "y"},
             ],
         },
-    ][:n_rows]
+    ]
 
-    def format_row(r: Dict[str, Any]) -> str:
-        terms = list(r.get("terms", []))
+
+def generate_sample_vregime(spec: VRegimeSampleSpec = VRegimeSampleSpec()) -> str:
+    """
+    Generate sample ``vregime.in`` text with fixed-width, left-aligned columns.
+    """
+    width_start = 6
+    width_v = 4
+    width_type = 6
+    width_change = 12
+    width_rescale = 8
+    sep = " "
+
+    def _pad(value: str, width: int) -> str:
+        return str(value)[:width].ljust(width)
+
+    def _fmt_start(value: Any) -> str:
+        return f"{int(value):04d}"
+
+    def _fmt_change(value: Any, decimals: int = 6) -> str:
+        return f"{float(value):.{decimals}f}"
+
+    header1 = "#Volume regimes"
+    header2 = (
+        _pad("#start", width_start)
+        + sep
+        + _pad("#V", width_v)
+        + sep
+        + _pad("type1", width_type)
+        + sep
+        + _pad("change/it", width_change)
+        + sep
+        + _pad("rescale", width_rescale)
+        + sep
+        + _pad("type 2", width_type)
+        + sep
+        + _pad("change/it", width_change)
+        + sep
+        + _pad("rescale", width_rescale)
+    )
+
+    def format_row(row: dict[str, Any]) -> str:
+        terms = list(row.get("terms", []))
         vcount = len(terms)
-
-        line = (
-            _pad(_fmt_start(r.get("start", 0)), W_START)
-            + SEP
-            + _pad(str(vcount), W_V)
-        )
-
-        # Append each (type, change, rescale) group
-        for t in terms:
+        line = _pad(_fmt_start(row.get("start", 0)), width_start) + sep + _pad(str(vcount), width_v)
+        for term in terms:
             line += (
-                SEP
-                + _pad(str(t.get("type", "")), W_TYPE)
-                + SEP
-                + _pad(_fmt_change(t.get("change", 0.0)), W_CHANGE)
-                + SEP
-                + _pad(str(t.get("rescale", "y")), W_RESCALE)
+                sep
+                + _pad(term.get("type", ""), width_type)
+                + sep
+                + _pad(_fmt_change(term.get("change", 0.0)), width_change)
+                + sep
+                + _pad(term.get("rescale", "y"), width_rescale)
             )
-
         return line.rstrip()
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with out_path.open("w", newline="\n") as fh:
-        fh.write(header1 + "\n")
-        fh.write(header2.rstrip() + "\n")
-        for r in rows:
-            fh.write(format_row(r) + "\n")
+    rows = _build_sample_rows()[: spec.n_rows]
+    lines = [header1, header2.rstrip()]
+    lines.extend(format_row(row) for row in rows)
+    return "\n".join(lines) + "\n"
 
+
+def write_vregime(
+    out_path: str | Path = "vregime.in",
+    spec: VRegimeSampleSpec = VRegimeSampleSpec(),
+) -> Path:
+    """
+    Write generated ``vregime.in`` text to disk.
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(generate_sample_vregime(spec), encoding="utf-8", newline="\n")
+    return out_path
+
+
+def write_sample_vregime(
+    out_path: str | Path = "vregime.in",
+    *,
+    n_rows: int = 5,
+) -> Path:
+    """
+    Backward-compatible wrapper for writing sample ``vregime.in`` text.
+    """
+    return write_vregime(out_path=out_path, spec=VRegimeSampleSpec(n_rows=n_rows))
+
+
+VREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
+    "vregime_sample": {
+        "label": "Volume Regime Sample",
+        "default_filename": "vregime.in",
+        "spec_type": VRegimeSampleSpec,
+        "generate": generate_sample_vregime,
+        "write": write_vregime,
+    }
+}

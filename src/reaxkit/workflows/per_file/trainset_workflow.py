@@ -36,10 +36,10 @@ from reaxkit.analysis.force_field import TrainsetGroupCommentsRequest, TrainsetG
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
-from reaxkit.io.generators.trainset_generator import (
-    write_trainset_settings_yaml,
+from reaxkit.engine.reaxff.generators.trainset_mp import generate_trainset_settings_yaml_from_mp_simple
+from reaxkit.engine.reaxff.generators.trainset_yaml import (
     generate_trainset_from_yaml,
-    generate_trainset_settings_yaml_from_mp_simple,
+    write_trainset_settings_yaml,
 )
 
 # ----------------------------------------------------------------------

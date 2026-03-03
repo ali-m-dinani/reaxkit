@@ -20,6 +20,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationTrainingSetData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
+    GeometryData,
     GeometryOptimizationProgressData,
     MolecularAnalysisData,
     ForceFieldOptimizationDiagnosticData,
@@ -42,6 +43,7 @@ from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
 from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
 from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
 from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
+from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
 from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
 from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
@@ -176,6 +178,32 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
             cell_angles=cell_angles,
         ),
         iterations=iterations,
+    )
+
+
+def _geometry_from_geo_handler(handler: GeoHandler) -> GeometryData:
+    """Normalize a ``GeoHandler`` into ``GeometryData``."""
+    df = handler.coordinates()
+    meta = dict(handler.metadata())
+    atom_ids = df["atom_id"].astype(int).tolist() if "atom_id" in df.columns else list(range(1, len(df) + 1))
+    elements = df["atom_type"].astype(str).tolist() if "atom_type" in df.columns else []
+    cell = handler.cell()
+    simulation = SimulationData(
+        atom_ids=atom_ids,
+        elements=elements,
+        num_of_atoms=np.asarray([handler.n_atoms()], dtype=int),
+        cell_lengths=np.asarray([[cell["a"], cell["b"], cell["c"]]], dtype=object),
+        cell_angles=np.asarray([[cell["alpha"], cell["beta"], cell["gamma"]]], dtype=object),
+    )
+    return GeometryData(
+        coordinates=df,
+        atom_ids=atom_ids,
+        elements=elements,
+        descriptor=str(meta.get("descriptor") or ""),
+        remark=str(meta.get("remark") or ""),
+        lattice_parameters=cell,
+        simulation=simulation,
+        metadata=meta,
     )
 
 
@@ -761,6 +789,13 @@ class ReaxFFAdapter(EngineAdapter):
             self._load_simulation_from_summary(args, reporter=reporter),
         )
         return trj
+
+    def load_geometry(self, args: dict, reporter=None) -> GeometryData:
+        raw = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
+        p = Path(raw)
+        geo_path = p / "geo" if p.is_dir() else p
+        handler = GeoHandler(geo_path)
+        return _geometry_from_geo_handler(handler)
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
         sim = self._load_simulation_from_xmolout(args, reporter=reporter)

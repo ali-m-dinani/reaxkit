@@ -4,28 +4,36 @@ ReaxFF electric-field regime (eregime.in) generators.
 This module provides deterministic utilities for generating ReaxFF
 ``eregime.in`` files, which define time-dependent external electric
 field schedules applied during MD simulations.
-
-Generators in this module:
----
-
-- write fully formatted ``eregime.in`` files
-- do not parse simulation output
-- do not run simulations or perform analysis
 """
 
-
 from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Tuple, Union, Sequence
+from typing import Any, Callable, Iterable, Sequence
 import math
+
 import numpy as np
 
+
 __all__ = [
+    "HEADER_LINES",
+    "ExplicitERegimeSpec",
+    "SinusoidalERegimeSpec",
+    "SmoothPulseERegimeSpec",
+    "FunctionalERegimeSpec",
+    "EREGIME_GENERATOR_REGISTRY",
+    "generate_a_given_eregime",
+    "generate_eregime_sinusoidal",
+    "generate_eregime_smooth_pulse",
+    "generate_eregime_from_function",
+    "write_eregime_rows",
     "write_a_given_eregime",
     "write_eregime_sinusoidal",
     "write_eregime_smooth_pulse",
     "write_eregime_from_function",
 ]
+
 
 HEADER_LINES: Sequence[str] = (
     "#Electric field regimes\n",
@@ -33,92 +41,119 @@ HEADER_LINES: Sequence[str] = (
 )
 
 
+@dataclass(frozen=True)
+class ExplicitERegimeSpec:
+    rows: tuple[tuple[int, int, str, float], ...]
+
+
+@dataclass(frozen=True)
+class SinusoidalERegimeSpec:
+    max_magnitude: float
+    step_angle: float
+    iteration_step: int
+    num_cycles: float
+    direction: str = "z"
+    voltage_idx: int = 1
+    phase: float = 0.0
+    dc_offset: float = 0.0
+    start_iter: int = 0
+
+
+@dataclass(frozen=True)
+class SmoothPulseERegimeSpec:
+    amplitude: float
+    width: float
+    period: float
+    slope: float
+    iteration_step: int
+    num_of_cycles: int | float
+    step_size: float = 0.1
+    direction: str = "z"
+    voltage_idx: int = 1
+    baseline: float = 0.0
+    start_iter: int = 0
+
+
+@dataclass(frozen=True)
+class FunctionalERegimeSpec:
+    func: Callable[[float], float]
+    t_end: float
+    dt: float
+    iteration_step: int
+    direction: str = "z"
+    voltage_idx: int = 1
+    start_iter: int = 0
+
+
 def _normalize_direction(direction: str) -> str:
-    """
-     normalize direction.
-
-    Parameters
-    ----------
-    direction : str
-        Parameter description.
-
-    Returns
-    -------
-    str
-        Return value description.
-
-    """
     d = direction.strip().lower()
     if d not in {"x", "y", "z"}:
         raise ValueError(f"direction must be one of 'x','y','z'; got {direction!r}")
     return d
 
 
-def _write_header(f) -> None:
+def _format_eregime_text(rows: Iterable[tuple[int, int, str, float]]) -> str:
+    lines = list(HEADER_LINES)
+    for it, v, d, mag in rows:
+        d = _normalize_direction(d)
+        lines.append(f"{int(it):6d}     {int(v):d}        {d:<2}              {float(mag): .6f}\n")
+    return "".join(lines)
+
+
+def generate_a_given_eregime(spec: ExplicitERegimeSpec) -> str:
     """
-     write header.
-
-    Parameters
-    ----------
-    f : Any
-        Parameter description.
-
+    Generate ``eregime.in`` text from explicit row definitions.
     """
-    for line in HEADER_LINES:
-        f.write(line)
+    return _format_eregime_text(spec.rows)
 
 
-def write_a_given_eregime(
-    file_path: Union[str, Path],
-    rows: Iterable[Tuple[int, int, str, float]],
+def write_eregime_rows(
+    file_path: str | Path,
+    rows: Iterable[tuple[int, int, str, float]],
 ) -> Path:
     """
-    Write an ``eregime.in`` file from explicit row definitions.
-
-    Each row defines the electric-field magnitude and direction applied
-    at a given iteration.
-
-    Parameters
-    ----------
-    file_path : str | Path
-        Output path (e.g. ``"eregime.in"``).
-    rows : iterable of (iteration, V_index, direction, magnitude)
-        Electric-field schedule entries, where:
-        - iteration : int
-            Simulation iteration number.
-        - V_index : int
-            Voltage index column expected by ReaxFF.
-        - direction : {"x","y","z"}
-            Field direction.
-        - magnitude : float
-            Field magnitude in V/Å.
-
-    Returns
-    -------
-    Path
-        The resolved path of the written ``eregime.in`` file.
-
-    Examples
-    ---
-    >>> rows = [(0, 1, "z", 0.01), (100, 1, "z", -0.01)]
-    >>> write_a_given_eregime("eregime.in", rows)
-    PosixPath('eregime.in')
+    Write ``eregime.in`` text from already prepared rows.
     """
     file_path = Path(file_path)
-    with open(file_path, "w") as f:
-        _write_header(f)
-        for it, v, d, mag in rows:
-            d = _normalize_direction(d)
-            f.write(f"{int(it):6d}     {int(v):d}        {d:<2}              {float(mag): .6f}\n")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(_format_eregime_text(rows), encoding="utf-8")
     return file_path
 
 
-# -----------------------------------------------------------------------------
-# Generators
-# -----------------------------------------------------------------------------
+def write_a_given_eregime(
+    file_path: str | Path,
+    rows: Iterable[tuple[int, int, str, float]],
+) -> Path:
+    """
+    Backward-compatible wrapper for writing explicit ``eregime.in`` rows.
+    """
+    return write_eregime_rows(file_path=file_path, rows=rows)
+
+
+def generate_eregime_sinusoidal(spec: SinusoidalERegimeSpec) -> str:
+    """
+    Generate a sinusoidal electric-field schedule as ``eregime.in`` text.
+    """
+    if spec.step_angle <= 0:
+        raise ValueError("step_angle must be > 0")
+    if spec.iteration_step <= 0:
+        raise ValueError("iteration_step must be > 0")
+
+    direction = _normalize_direction(spec.direction)
+    npts = int(round((2.0 * spec.num_cycles * math.pi) / spec.step_angle)) + 1
+
+    rows: list[tuple[int, int, str, float]] = []
+    for k in range(npts):
+        ang = spec.phase + k * spec.step_angle
+        mag = spec.dc_offset + spec.max_magnitude * math.sin(ang)
+        it = spec.start_iter + k * spec.iteration_step
+        rows.append((it, spec.voltage_idx, direction, float(mag)))
+
+    return _format_eregime_text(rows)
+
 
 def write_eregime_sinusoidal(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     *,
     max_magnitude: float,
     step_angle: float,
@@ -131,78 +166,82 @@ def write_eregime_sinusoidal(
     start_iter: int = 0,
 ) -> Path:
     """
-    Generate a sinusoidal electric-field schedule and write ``eregime.in``.
-
-    The generated field follows:
-        E(t) = dc_offset + max_magnitude · sin(phase + k · step_angle)
-
-    sampled at fixed angular increments.
-
-    Parameters
-    ----------
-    max_magnitude : float
-        Peak field amplitude in V/Å.
-    step_angle : float
-        Angular step size in radians.
-    iteration_step : int
-        Iteration increment between successive samples.
-    num_cycles : float
-        Total number of sinusoidal cycles.
-    direction : {"x","y","z"}, optional
-        Field direction (default: ``"z"``).
-    voltage_idx : int, optional
-        Voltage index column value (default: 1).
-    phase : float, optional
-        Phase offset in radians.
-    dc_offset : float, optional
-        Constant offset added to the field (V/Å).
-    start_iter : int, optional
-        Starting iteration index.
-
-    Returns
-    -------
-    Path
-        The written ``eregime.in`` file path.
-
-    Examples
-    ---
-    >>> write_eregime_sinusoidal(
-    ...     "eregime.in",
-    ...     max_magnitude=0.05,
-    ...     step_angle=0.1,
-    ...     iteration_step=10,
-    ...     num_cycles=2
-    ... )
+    Backward-compatible wrapper for writing a sinusoidal ``eregime.in`` file.
     """
-    if step_angle <= 0:
-        raise ValueError("step_angle must be > 0")
-    if iteration_step <= 0:
+    spec = SinusoidalERegimeSpec(
+        max_magnitude=max_magnitude,
+        step_angle=step_angle,
+        iteration_step=iteration_step,
+        num_cycles=num_cycles,
+        direction=direction,
+        voltage_idx=voltage_idx,
+        phase=phase,
+        dc_offset=dc_offset,
+        start_iter=start_iter,
+    )
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    text = generate_eregime_sinusoidal(spec)
+    file_path.write_text(text, encoding="utf-8")
+    return file_path
+
+
+def generate_eregime_smooth_pulse(spec: SmoothPulseERegimeSpec) -> str:
+    """
+    Generate smooth bipolar electric-field pulses as ``eregime.in`` text.
+    """
+    if spec.period <= 0 or spec.step_size <= 0 or spec.slope < 0 or spec.width < 0:
+        raise ValueError("period>0, step_size>0, slope>=0, width>=0 are required")
+    if 2 * spec.slope + spec.width > (spec.period / 2):
+        raise ValueError("Each half-period must satisfy 2*slope + width <= period/2")
+    if spec.iteration_step <= 0:
         raise ValueError("iteration_step must be > 0")
 
-    direction = _normalize_direction(direction)
-    npts = int(round((2.0 * num_cycles * math.pi) / step_angle)) + 1
+    direction = _normalize_direction(spec.direction)
+    total_time = float(spec.num_of_cycles) * spec.period
+    t = np.arange(0.0, total_time + spec.step_size, spec.step_size)
+    half_period = spec.period / 2.0
 
-    rows = []
-    for k in range(npts):
-        ang = phase + k * step_angle
-        mag = dc_offset + max_magnitude * math.sin(ang)
-        it = start_iter + k * iteration_step
-        rows.append((it, voltage_idx, direction, float(mag)))
+    def half_profile(tin: float) -> float:
+        if tin < spec.slope:
+            return (
+                spec.baseline + (spec.amplitude / spec.slope) * tin
+                if spec.slope > 0
+                else spec.baseline + spec.amplitude
+            )
+        if tin < spec.slope + spec.width:
+            return spec.baseline + spec.amplitude
+        if tin < 2.0 * spec.slope + spec.width:
+            return (
+                spec.baseline
+                + spec.amplitude
+                - (spec.amplitude / spec.slope) * (tin - (spec.slope + spec.width))
+                if spec.slope > 0
+                else spec.baseline
+            )
+        return spec.baseline
 
-    out = write_a_given_eregime(file_path, rows)
-    print(f"[Done] Sinusoidal eregime saved to {out} ({npts} entry rows).")
-    return out
+    rows: list[tuple[int, int, str, float]] = []
+    for idx, ti in enumerate(t):
+        in_cycle = ti % spec.period
+        sign = 1.0 if in_cycle < half_period else -1.0
+        tin = in_cycle if sign > 0 else (in_cycle - half_period)
+        mag = sign * (half_profile(tin) - spec.baseline) + spec.baseline
+        it = spec.start_iter + idx * spec.iteration_step
+        rows.append((it, spec.voltage_idx, direction, float(mag)))
+
+    return _format_eregime_text(rows)
 
 
 def write_eregime_smooth_pulse(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     *,
     amplitude: float,
     width: float,
     period: float,
     slope: float,
     iteration_step: int,
-    num_of_cycles: Union[int, float],
+    num_of_cycles: int | float,
     step_size: float = 0.1,
     direction: str = "z",
     voltage_idx: int = 1,
@@ -210,91 +249,51 @@ def write_eregime_smooth_pulse(
     start_iter: int = 0,
 ) -> Path:
     """
-    Generate smooth bipolar electric-field pulses and write ``eregime.in``.
-
-    Each cycle consists of a positive half-cycle followed by a mirrored
-    negative half-cycle, with linear ramps and flat plateaus.
-
-    Parameters
-    ----------
-    amplitude : float
-        Peak field magnitude in V/Å (positive value).
-    width : float
-        Flat-top duration at peak amplitude.
-    period : float
-        Full cycle duration.
-    slope : float
-        Ramp-up and ramp-down duration.
-    iteration_step : int
-        Iteration increment per sample.
-    num_of_cycles : int | float
-        Number of cycles to generate.
-    step_size : float, optional
-        Time resolution for sampling.
-    direction : {"x","y","z"}, optional
-        Field direction.
-    voltage_idx : int, optional
-        Voltage index column value.
-    baseline : float, optional
-        Baseline field offset in V/Å.
-    start_iter : int, optional
-        Starting iteration index.
-
-    Returns
-    -------
-    Path
-        The written ``eregime.in`` file path.
-
-    Examples
-    ---
-    >>> write_eregime_smooth_pulse(
-    ...     "eregime.in",
-    ...     amplitude=0.1,
-    ...     width=5.0,
-    ...     period=20.0,
-    ...     slope=2.0,
-    ...     iteration_step=10,
-    ...     num_of_cycles=3
-    ... )
+    Backward-compatible wrapper for writing a smooth-pulse ``eregime.in`` file.
     """
-    if period <= 0 or step_size <= 0 or slope < 0 or width < 0:
-        raise ValueError("period>0, step_size>0, slope>=0, width>=0 are required")
-    if 2 * slope + width > (period / 2):
-        raise ValueError("Each half-period must satisfy 2*slope + width <= period/2")
-    if iteration_step <= 0:
+    spec = SmoothPulseERegimeSpec(
+        amplitude=amplitude,
+        width=width,
+        period=period,
+        slope=slope,
+        iteration_step=iteration_step,
+        num_of_cycles=num_of_cycles,
+        step_size=step_size,
+        direction=direction,
+        voltage_idx=voltage_idx,
+        baseline=baseline,
+        start_iter=start_iter,
+    )
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    text = generate_eregime_smooth_pulse(spec)
+    file_path.write_text(text, encoding="utf-8")
+    return file_path
+
+
+def generate_eregime_from_function(spec: FunctionalERegimeSpec) -> str:
+    """
+    Generate an electric-field regime by sampling an arbitrary function.
+    """
+    if spec.dt <= 0 or spec.t_end < 0:
+        raise ValueError("dt must be > 0 and t_end >= 0")
+    if spec.iteration_step <= 0:
         raise ValueError("iteration_step must be > 0")
 
-    direction = _normalize_direction(direction)
+    direction = _normalize_direction(spec.direction)
+    t = np.arange(0.0, spec.t_end + spec.dt, spec.dt)
 
-    total_time = float(num_of_cycles) * period
-    t = np.arange(0.0, total_time + step_size, step_size)
-    halfT = period / 2.0
+    rows: list[tuple[int, int, str, float]] = []
+    for i, ti in enumerate(t):
+        mag = float(spec.func(float(ti)))
+        it = spec.start_iter + i * spec.iteration_step
+        rows.append((it, spec.voltage_idx, direction, mag))
 
-    def half_profile(tin: float) -> float:
-        if tin < slope:
-            return baseline + (amplitude / slope) * tin if slope > 0 else baseline + amplitude
-        if tin < slope + width:
-            return baseline + amplitude
-        if tin < 2.0 * slope + width:
-            return baseline + amplitude - (amplitude / slope) * (tin - (slope + width)) if slope > 0 else baseline
-        return baseline
-
-    rows = []
-    for idx, ti in enumerate(t):
-        in_cycle = ti % period
-        sign = 1.0 if in_cycle < halfT else -1.0
-        tin = in_cycle if sign > 0 else (in_cycle - halfT)
-        mag = sign * (half_profile(tin) - baseline) + baseline
-        it = start_iter + idx * iteration_step
-        rows.append((it, voltage_idx, direction, float(mag)))
-
-    out = write_a_given_eregime(file_path, rows)
-    print(f"[Done] Smooth pulse eregime saved to {out} ({len(rows)} entry rows).")
-    return out
+    return _format_eregime_text(rows)
 
 
 def write_eregime_from_function(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     *,
     func: Callable[[float], float],
     t_end: float,
@@ -305,60 +304,51 @@ def write_eregime_from_function(
     start_iter: int = 0,
 ) -> Path:
     """
-    Generate an electric-field regime from an arbitrary function and
-    write ``eregime.in``.
-
-    The function ``func(t)`` is sampled uniformly in time and mapped
-    to simulation iterations.
-
-    Parameters
-    ----------
-    func : Callable[[float], float]
-        Function returning electric-field magnitude (V/Å) at time ``t``.
-    t_end : float
-        End time for sampling.
-    dt : float
-        Time step for sampling.
-    iteration_step : int
-        Iteration increment per sample.
-    direction : {"x","y","z"}, optional
-        Field direction.
-    voltage_idx : int, optional
-        Voltage index column value.
-    start_iter : int, optional
-        Starting iteration index.
-
-    Returns
-    -------
-    Path
-        The written ``eregime.in`` file path.
-
-    Examples
-    ---
-    >>> f = lambda t: 0.02 * t
-    >>> write_eregime_from_function(
-    ...     "eregime.in",
-    ...     func=f,
-    ...     t_end=10.0,
-    ...     dt=0.5,
-    ...     iteration_step=5
-    ... )
+    Backward-compatible wrapper for writing a function-sampled ``eregime.in`` file.
     """
-    if dt <= 0 or t_end < 0:
-        raise ValueError("dt must be > 0 and t_end >= 0")
-    if iteration_step <= 0:
-        raise ValueError("iteration_step must be > 0")
+    spec = FunctionalERegimeSpec(
+        func=func,
+        t_end=t_end,
+        dt=dt,
+        iteration_step=iteration_step,
+        direction=direction,
+        voltage_idx=voltage_idx,
+        start_iter=start_iter,
+    )
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    text = generate_eregime_from_function(spec)
+    file_path.write_text(text, encoding="utf-8")
+    return file_path
 
-    direction = _normalize_direction(direction)
 
-    t = np.arange(0.0, t_end + dt, dt)
-    rows = []
-    for i, ti in enumerate(t):
-        mag = float(func(float(ti)))
-        it = start_iter + i * iteration_step
-        rows.append((it, voltage_idx, direction, mag))
-
-    out = write_a_given_eregime(file_path, rows)
-    print(f"[Done] Functional eregime saved to {out} ({len(rows)} entry rows).")
-    return out
-
+EREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
+    "eregime_explicit": {
+        "label": "Electric Field Regime From Rows",
+        "default_filename": "eregime.in",
+        "spec_type": ExplicitERegimeSpec,
+        "generate": generate_a_given_eregime,
+        "write": write_a_given_eregime,
+    },
+    "eregime_sinusoidal": {
+        "label": "Electric Field Regime Sinusoidal",
+        "default_filename": "eregime.in",
+        "spec_type": SinusoidalERegimeSpec,
+        "generate": generate_eregime_sinusoidal,
+        "write": write_eregime_sinusoidal,
+    },
+    "eregime_smooth_pulse": {
+        "label": "Electric Field Regime Smooth Pulse",
+        "default_filename": "eregime.in",
+        "spec_type": SmoothPulseERegimeSpec,
+        "generate": generate_eregime_smooth_pulse,
+        "write": write_eregime_smooth_pulse,
+    },
+    "eregime_from_function": {
+        "label": "Electric Field Regime From Function",
+        "default_filename": "eregime.in",
+        "spec_type": FunctionalERegimeSpec,
+        "generate": generate_eregime_from_function,
+        "write": write_eregime_from_function,
+    },
+}
