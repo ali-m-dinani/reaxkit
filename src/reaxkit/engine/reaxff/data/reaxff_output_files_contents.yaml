@@ -21,7 +21,7 @@ files:
       - "The output-frequency to fort.73 is regulated by control-file keyword iout1"
       - "The sum of these terms should be the same as the number in the Epot-column in fort.71."
     examples:
-      - "reaxkit energylog get --yaxis Ebond --xaxis time --plot"
+      - "reaxkit timeseries --field energy.Ebond --fort73 energylog --xaxis time --plot single"
 
   fort.13:
     desc: "Force-field optimization error summary: reports total error (objective) for the current force field."
@@ -32,7 +32,7 @@ files:
     derived_vars: []
     best_for: [monitor optimization error]
     examples:
-      - "reaxkit fort13 get --save total_ff_error_vs_epoch.png"
+      - "reaxkit force_field_optimization --fort13 fort.13 --save total_ff_error_vs_epoch.png"
 
   fort.57:
     desc: "MM/minimization progress log: iteration, potential energy, RMS force (RMSG), and optimizer diagnostics."
@@ -49,7 +49,8 @@ files:
       - "When RMSG drops below the value of control-file keyword endmm the MM run terminates."
       - "Alternatively, the run terminates when the maximum number of iterations (control-file keyword maxit) has been reached."
     examples:
-      - "reaxkit fort57.md get --yaxis RMSG --xaxis iter --save rmsg_vs_iter.png"
+      - "reaxkit timeseries --field geo_opt.RMSG --fort57 fort.57 --xaxis iter --save rmsg_vs_iter.png"
+      - "reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot"
 
   fort.58:
     desc: "MM/minimization energy-term report: iteration and partial energy contribution table, which resembles fort.73 in structure."
@@ -62,7 +63,7 @@ files:
     derived_vars: []
     best_for: [energy breakdown in MM runs]
     examples:
-      - "reaxkit fort58 get --yaxis Ebond --xaxis time --plot"
+      - "reaxkit timeseries --field energy.Ebond --fort73 fort.58 --xaxis time --plot single"
 
   fort.7:
     desc: "Connectivity (bond-order) table: per-atom neighbor list, bond orders, molecule IDs, charges (only bonds above a cutoff are stored)."
@@ -87,7 +88,8 @@ files:
       - "fort.7 contains only the bonds with a bond order greater then control-file keyword cutof2."
       - "fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though, causes output to these files to get appended."
     examples:
-      - "reaxkit fort7 get --yaxis charge --atom 1 --plot"
+      - "reaxkit elect charge_table --atom-ids 1 --plot single"
+      - "reaxkit connection_list --fort7 fort.7 --plot single"
 
   fort.73:
     desc: "Energy-term output: iteration/time and partial energy contributions (bonded, nonbonded, total)."
@@ -102,7 +104,8 @@ files:
       - "The output-frequency to fort.73 is regulated by control-file keyword iout1"
       - "The sum of these terms should be the same as the number in the Epot-column in fort.71."
     examples:
-      - "reaxkit fort73 get --yaxis Ebond --xaxis time --plot"
+      - "reaxkit timeseries --field energy.Ebond --fort73 fort.73 --xaxis time --plot single"
+      - "reaxkit timeseries --field energy.all --fort73 fort.73 --plot subplot"
 
   fort.74:
     desc: "MM/FF-optimization summary table: per-structure/epoch values such as minimum energy, heat of formation, volume, and density."
@@ -116,10 +119,11 @@ files:
       - volume
       - density
     derived_vars:
-      - "in conjunction with fort.99, it is used to obtain energy-volume data and bulk modulus (accessed through reaxkit fort99)"
+      - "in conjunction with fort.99, it is used to obtain energy-volume data and bulk modulus"
     best_for: [tabulated MM/optimization summary, EOS, equation of state. bulk modulus]
     examples:
-      - "reaxkit fort99 bulk --iden 'Al2N2_w_opt2'"
+      - "reaxkit structure_summary_data --col Density --export fort74_density.csv"
+      - "reaxkit force_field_optimization_report_bulk_modulus --iden 'Al2N2_w_opt2'"
 
   fort.76:
     desc: "Restraint output: iteration, restraint energy, potential energy, and target vs actual restraint distances."
@@ -133,7 +137,8 @@ files:
     derived_vars: []
     best_for: [restraint diagnostics]
     examples:
-      - "reaxkit fort76 get --ycol E_res --xaxis time --save E_res_vs_time.png"
+      - "reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --save E_res_vs_time.png"
+      - "reaxkit timeseries --field restraint[2] --fort76 fort.76 --xaxis time --plot single"
 
   fort.78:
     desc: "Electric-field output: iteration, field components/magnitudes and the associated electric-field energy term."
@@ -149,7 +154,7 @@ files:
       - "used in electrostatics workflow to obtain polarization hystereis loops"
     best_for: [field schedule diagnostics, polarization hysteresis]
     examples:
-      - "reaxkit fort78 get --xaxis time --yaxis E_field_x --save E_field_x.png --export E_field_x.csv"
+      - "reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --save E_field_x.png --export E_field_x.csv"
 
   fort.79:
     desc: "FF-optimization parabola-fit report: logs parameter trial values, fitted parabola coefficients, optimum estimate, and error values."
@@ -169,7 +174,9 @@ files:
     notes:
       - "This file contains the report from the parabolic extrapolation procedure used by ReaxFF to optimize the force field parameters."
     examples:
-      - "reaxkit fort79 most-sensitive --plot"
+      - "reaxkit parameter_optimization_diagnostic --export fort79_diag.csv"
+      - "reaxkit parameter_optimization_most_sensitive --plot single"
+      - "reaxkit parameter_optimization_tornado --top 6 --save tornado.png"
 
   fort.8:
     desc: "Connectivity (bond-order) table similar to fort.7, typically updated at a given frequency and overwritten by the latest snapshot."
@@ -191,7 +198,8 @@ files:
       - "This file gets updated with the same frequency as the xmolout-file; every iout2 iterations during MD simulations or every iout4 iterations during an MM-run."
       - "fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though, causes output to these files to get appended."
     examples:
-      - "reaxkit fort8 get --yaxis charge --atom 1 --plot"
+      - "reaxkit elect charge_table --atom-ids 1 --plot single"
+      - "reaxkit connection_list --fort7 fort.8 --plot single"
 
   fort.99:
     desc: "FF-optimization results summary: reports optimized ffield values and reference/target comparison metrics (e.g., QM/literature targets)."
@@ -203,7 +211,8 @@ files:
       - "equation of state, bulk modulus, etc."
     best_for: [final optimization report, EOS, equation of state, bulk modulus]
     examples:
-      - "reaxkit fort99 get --sort error --ascending --export fort99_sorted_data.csv"
+      - "reaxkit force_field_optimization_report --sortby error --descending --export fort99_sorted_data.csv"
+      - "reaxkit force_field_optimization_report_eos --iden all --plot subplot"
 
   moldyn.vel:
     desc: "MD restart file (latest): coordinates, velocities, accelerations, and temperature state for restarting a run."
@@ -218,7 +227,8 @@ files:
     derived_vars: []
     best_for: [restart MD]
     examples:
-      - "reaxkit moldyn get --key velocities --atoms 1,3,7 --print"
+      - "reaxkit kinematics --vels moldyn.vel --key velocities --atoms 1 3 7"
+      - "reaxkit kinematics_plot3d --vels moldyn.vel --value vz --save moldyn_vz.png"
 
   molfra.out:
     desc: "Molecular species report: per-iteration species counts/fractions (molecule fragments) during MD."
@@ -230,7 +240,9 @@ files:
       - "ReaxKit: species time series; plot counts vs iteration"
     best_for: [species evolution]
     examples:
-      - "reaxkit molfra occur --molecules H2O N128Al128 --save water_and_slab_occurrence.png"
+      - "reaxkit timeseries --field molecule[H2O,N128Al128] --molfra molfra.out --plot single"
+      - "reaxkit dominant_species --molfra molfra.out --top-n 3 --export dominant_species.csv"
+      - "reaxkit largest_molecule_by_mass --molfra molfra.out --plot single"
 
   molsav.####:
     desc: "MD restart snapshots written periodically: same contents as moldyn.vel but saved with an index."
@@ -245,7 +257,7 @@ files:
     derived_vars: []
     best_for: [restart from earlier point]
     examples:
-      - "reaxkit molsav get --key velocities --atoms 1,3,7 --print"
+      - "reaxkit kinematics --vels molsav.0001 --key velocities --atoms 1 3 7"
 
   summary:
     desc: "Compact run summary time series: iteration/time plus global quantities like temperature, pressure, density, volume, potential energy, and molecule count."
@@ -264,7 +276,7 @@ files:
     derived_vars: []
     best_for: [quick run monitoring]
     examples:
-      - "reaxkit summary get --yaxis E_pot --xaxis time --plot"
+      - "reaxkit timeseries --field potential_energy --summary summary.txt --xaxis time --plot single"
 
   xmolout:
     desc: "Trajectory output: per-frame atomic positions; may also include cell parameters and per-frame energies; optional velocities/molecule IDs."
@@ -290,7 +302,7 @@ files:
       - "diffusion coefficient"
       - "connectivity workflow is used to analyze and relabel the coordination status of atoms (xmolout is used in conjunction with fort.7)"
       - "electrostatics workflow is used to obtain dipole moments, polarizations, etc. (xmolout is used in conjunction with fort.7)"
-      - "xmolfort7 workflow is used to plot the spatial resolution of properties in fort.7 file (i.e., plotting charges of atoms at their locations)"
+      - "spatial-property direct commands are used to plot charge or connectivity values on atomic coordinates (for example atom_property_plot3d and atom_property_heatmap2d)"
     best_for: [trajectory analysis, structure evolution]
     notes:
       - "In MD-runs, the frequency of structure output to xmolout is controlled by the control-file keyword iout2; a frame is saved every iout2 MD-iterations."
@@ -298,4 +310,6 @@ files:
       - "If the ixmolo control-switch has a value of 1 additional velocity and molecule number output is generated in the xmolout-file."
       - "Optional fields depend on control settings and build options."
     examples:
-      - "reaxkit xmolout trajget --atoms 1 --dims z --xaxis time --save atom1_z.png --export atom1_z.csv"
+      - "reaxkit timeseries --field atom[1].z --xmolout xmolout --xaxis time --save atom1_z.png --export atom1_z.csv"
+      - "reaxkit timeseries --boxdims --cell-fields a b c --xmolout xmolout --plot subplot"
+      - "reaxkit trim-xmolout --file xmolout --output xmolout_trimmed"

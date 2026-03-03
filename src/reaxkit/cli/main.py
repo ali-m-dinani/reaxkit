@@ -21,48 +21,63 @@ from reaxkit.core.task_resolution_using_alias import resolve_command_name
 # also, fort.8 is similar to fort.7 in the same way
 # same for molsav and moldyn which are similar to vels
 WORKFLOW_MODULES = {
-    "fort78": "reaxkit.workflows.per_file.fort78_workflow",
-    "xmolout": "reaxkit.workflows.per_file.xmolout_workflow",
-    "summary": "reaxkit.workflows.per_file.summary_workflow",
-    "eregime": "reaxkit.workflows.per_file.eregime_workflow",
-    "molfra": "reaxkit.workflows.per_file.molfra_workflow",
-    "fort13": "reaxkit.workflows.per_file.fort13_workflow",
-    "fort79": "reaxkit.workflows.per_file.fort79_workflow",
-    "fort7": "reaxkit.workflows.per_file.fort7_workflow",
-    "xmolfort7": "reaxkit.workflows.composed.xmolout_fort7_workflow",
-    "coord": "reaxkit.workflows.composed.coordination_workflow",
     "intspec": "reaxkit.workflows.meta.introspection_workflow",
-    "geo": "reaxkit.workflows.per_file.geo_workflow",
-    "fort99": "reaxkit.workflows.per_file.fort99_workflow",
-    "trainset": "reaxkit.workflows.per_file.trainset_workflow",
-    "fort83": "reaxkit.workflows.per_file.fort83_workflow",
-    "fort73": "reaxkit.workflows.per_file.fort73_workflow",
-    "elect": "reaxkit.workflows.composed.electrostatics_workflow",
+    "elect": "reaxkit.workflows.electrostatics_workflow",
     "video": "reaxkit.workflows.meta.make_video_workflow",
     "plotter": "reaxkit.workflows.meta.plotter_workflow",
-    "control": "reaxkit.workflows.per_file.control_workflow",
-    "fort76": "reaxkit.workflows.per_file.fort76_workflow",
-    "fort74.md": "reaxkit.workflows.per_file.fort74_workflow",
-    "ffield": "reaxkit.workflows.per_file.ffield_workflow",
-    "params": "reaxkit.workflows.per_file.params_workflow",
-    "energylog": "reaxkit.workflows.per_file.fort73_workflow",
-    "fort58": "reaxkit.workflows.per_file.fort73_workflow",
-    "fort57.md": "reaxkit.workflows.per_file.fort57_workflow",
-    "vels": "reaxkit.workflows.per_file.vels_workflow",
     "help": "reaxkit.workflows.meta.help_workflow",
-    "fort8": "reaxkit.workflows.per_file.fort7_workflow",
-    "moldyn": "reaxkit.workflows.per_file.vels_workflow",
-    "molsav": "reaxkit.workflows.per_file.vels_workflow",
-    "tregime": "reaxkit.workflows.per_file.tregime_workflow",
-    "vregime": "reaxkit.workflows.per_file.vregime_workflow",
     "analysis": "reaxkit.workflows.diffusion_workflow",
     "timeseries": "reaxkit.workflows.timeseries_workflow",
 }
 
 DIRECT_COMMAND_MODULES = {
+    "get-control": "reaxkit.workflows.control_workflow",
+    "make-control": "reaxkit.workflows.control_workflow",
+    "make-eregime": "reaxkit.workflows.file_tools.eregime_workflow",
+    "trim-xmolout": "reaxkit.workflows.file_tools.xmolout_workflow",
+    "xtob": "reaxkit.workflows.file_tools.geo_workflow",
+    "make-geo": "reaxkit.workflows.file_tools.geo_workflow",
+    "sort-geo": "reaxkit.workflows.file_tools.geo_workflow",
+    "orthogonalize-geo": "reaxkit.workflows.file_tools.geo_workflow",
+    "place-geo": "reaxkit.workflows.file_tools.geo_workflow",
+    "add-geo-restraint": "reaxkit.workflows.file_tools.geo_workflow",
+    "extract-optimized-ffield": "reaxkit.workflows.file_tools.fort83_workflow",
+    "export-trainset": "reaxkit.workflows.file_tools.trainset_workflow",
+    "make-trainset-settings": "reaxkit.workflows.file_tools.trainset_workflow",
+    "make-trainset": "reaxkit.workflows.file_tools.trainset_workflow",
+    "make-tregime": "reaxkit.workflows.file_tools.tregime_workflow",
+    "make-vregime": "reaxkit.workflows.file_tools.vregime_workflow",
+    "kinematics": "reaxkit.workflows.kinematics_workflow",
+    "kinematics_plot3d": "reaxkit.workflows.kinematics_workflow",
+    "kinematics_heatmap2d": "reaxkit.workflows.kinematics_workflow",
+    "dominant_species": "reaxkit.workflows.molecular_analysis_workflow",
+    "largest_molecule_by_mass": "reaxkit.workflows.molecular_analysis_workflow",
+    "largest_molecule_composition": "reaxkit.workflows.molecular_analysis_workflow",
+    "molecule_lifetime": "reaxkit.workflows.molecular_analysis_workflow",
+    "force_field_data": "reaxkit.workflows.force_field_workflow",
+    "force_field_optimization": "reaxkit.workflows.force_field_workflow",
+    "structure_summary_data": "reaxkit.workflows.force_field_workflow",
+    "parameter_optimization_diagnostic": "reaxkit.workflows.force_field_workflow",
+    "parameter_optimization_most_sensitive": "reaxkit.workflows.force_field_workflow",
+    "parameter_optimization_tornado": "reaxkit.workflows.force_field_workflow",
+    "force_field_optimization_report": "reaxkit.workflows.force_field_workflow",
+    "force_field_optimization_report_eos": "reaxkit.workflows.force_field_workflow",
+    "force_field_optimization_report_bulk_modulus": "reaxkit.workflows.force_field_workflow",
+    "trainset_group_comments": "reaxkit.workflows.force_field_workflow",
+    "get-params": "reaxkit.workflows.params_workflow",
     "msd": "reaxkit.workflows.trajectory_workflow",
     "rdf": "reaxkit.workflows.trajectory_workflow",
     "rdf_property": "reaxkit.workflows.trajectory_workflow",
+    "connection_list": "reaxkit.workflows.connectivity_workflow",
+    "connection_table": "reaxkit.workflows.connectivity_workflow",
+    "connection_stats": "reaxkit.workflows.connectivity_workflow",
+    "bond_timeseries": "reaxkit.workflows.connectivity_workflow",
+    "bond_events": "reaxkit.workflows.connectivity_workflow",
+    "coordination": "reaxkit.workflows.connectivity_workflow",
+    "coordination_relabel": "reaxkit.workflows.connectivity_workflow",
+    "hybridization": "reaxkit.workflows.connectivity_workflow",
+    "atom_property_plot3d": "reaxkit.workflows.spatial_property_workflow",
+    "atom_property_heatmap2d": "reaxkit.workflows.spatial_property_workflow",
 }
 
 
@@ -180,9 +195,9 @@ def main():
 
     Examples
     --------
-    Per-file workflow with task:
+    Direct command:
 
-      - reaxkit fort7 get --file fort.7
+      - reaxkit connection_list --fort7 fort.7 --export connections.csv
 
     Kind-level workflow without task:
 
@@ -218,7 +233,7 @@ def main():
     # For each workflow module, create its own subparser and let it
     # register its internal tasks (second-level subcommands).
     for kind, module_path in WORKFLOW_MODULES.items():
-        # e.g. `reaxkit summary ...`, `reaxkit xmolout ...`
+        # e.g. `reaxkit help ...`, `reaxkit timeseries ...`
         kp = sub.add_parser(kind, help=f"{kind} workflows")
 
         if kind != selected_command:
@@ -240,7 +255,7 @@ def main():
 
         else:
             # Normal workflows: require a task unless the kind is in DEFAULTABLE.
-            # e.g. `reaxkit summary get ...`
+            # e.g. `reaxkit help ...` would not reach this branch
             tasks = kp.add_subparsers(dest="task", required=kind not in DEFAULTABLE)
             module.register_tasks(tasks)
 

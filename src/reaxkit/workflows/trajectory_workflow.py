@@ -92,19 +92,32 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     """Build the parser for a direct trajectory command."""
     canonical = resolve_command_name(command, task_names=TRAJECTORY_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
     _add_presentation_arguments(parser)
     _add_common_arguments(parser)
 
     if canonical == "msd":
-        parser.description = "Compute mean-squared displacement for selected atoms."
+        parser.description = (
+            "Compute mean-squared displacement for selected atoms.\n\n"
+            "Examples:\n"
+            "  reaxkit msd --atom-ids 1 2 3 --plot single\n"
+            "  reaxkit msd --atom-types O --xaxis time --save msd_oxygen.png\n"
+            "  reaxkit msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
+        )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include")
         parser.add_argument("--origin", default="first", help="Reference frame: 'first' or an explicit index")
     elif canonical == "rdf":
-        parser.description = "Compute radial distribution functions for selected atoms."
+        parser.description = (
+            "Compute radial distribution functions for selected atoms.\n\n"
+            "Examples:\n"
+            "  reaxkit rdf --atom-types-a O --atom-types-b H --plot single\n"
+            "  reaxkit rdf --atom-ids-a 1 2 --atom-ids-b 10 11 --bins 300 --save rdf_pairs.png\n"
+            "  reaxkit rdf --atom-types-a Al --atom-types-b O --frames 0 50 100 --plot subplot"
+        )
         parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A")
         parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B")
         parser.add_argument("--atom-types-a", nargs="*", default=None, help="Element symbols for group A")
@@ -113,7 +126,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--r-max", type=float, default=None, help="Maximum radius")
         parser.add_argument("--backend", choices=["freud", "ovito"], default="freud")
     elif canonical == "rdf_property":
-        parser.description = "Compute RDF-derived properties across selected frames."
+        parser.description = (
+            "Compute RDF-derived properties across selected frames.\n\n"
+            "Examples:\n"
+            "  reaxkit rdf_property --property first_peak --atom-types-a O --atom-types-b H --plot single\n"
+            "  reaxkit rdf_property --prop area --atom-types-a Al --atom-types-b O --xaxis iter --save rdf_area.png\n"
+            "  reaxkit rdf_property --property dominant_peak --frames 0 20 40 --export rdf_peak.csv"
+        )
         parser.add_argument("--property", default=None, help="RDF property to extract")
         parser.add_argument("--prop", choices=["first_peak", "dominant_peak", "area", "excess_area"], default=None, help="Legacy alias for --property")
         parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A")

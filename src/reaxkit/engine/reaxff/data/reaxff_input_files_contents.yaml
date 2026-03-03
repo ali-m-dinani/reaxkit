@@ -41,7 +41,8 @@ files:
       - "hysteresis loops for a material under electric field application"
     best_for: [E-field ramps, electric-field-driven processes]
     examples:
-      - "reaxkit eregime get --column E1 --xaxis time --export eregime_E1_vs_time.csv"
+      - "reaxkit timeseries --field eregime.E1 --xaxis time --export eregime_E1_vs_time.csv"
+      - "reaxkit make-eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2"
 
   exe (run script):
     desc: "Executable run script/wrapper that stages input files, calls the ReaxFF executable, and optionally copies outputs (used in the original distribution workflow)."
@@ -70,7 +71,8 @@ files:
     derived_vars: []
     best_for: [force-field definition, inspect/compare parameter sections]
     examples:
-      - "reaxkit ffield get --section bond --term C-H --format interpreted --export CH_bond.csv"
+      - "reaxkit force_field_data --section bond --term C-H --format interpreted --export CH_bond.csv"
+      - "reaxkit force_field_data --sections atom bond angle --format interpreted --outdir ffield_export"
 
   geo:
     desc: "System geometry input (structure) used to start a run. Can be provided as .geo, .bgf (legacy), .xyz, or z-matrix; may include periodic cell information."
@@ -90,7 +92,7 @@ files:
     derived_vars: []
     best_for: [initial structure, atom types/coords, periodic cell]
     examples:
-      - "reaxkit geo xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output slab_geo_from_xyz"
+      - "reaxkit xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output slab_geo_from_xyz"
 
   iopt:
     desc: "Optional toggle file indicating normal run (0) vs force-field optimization mode (1)."
@@ -117,7 +119,7 @@ files:
     derived_vars: []
     best_for: [choose optimizable parameters, set bounds]
     examples:
-      - "reaxkit params get --export params.csv"
+      - "reaxkit get-params --export params.csv"
 
   trainset.in:
     desc: "Force-field optimization training-set definition: declares targets (energies/charges/forces/geometries/etc. depending on setup) and weights to build the cost function."
@@ -129,7 +131,8 @@ files:
       - "fort.99 is the result file showing how the ffield performed compared to the QM/literature values"
     best_for: [define optimization targets, weights]
     examples:
-      - "reaxkit trainset get --section all --export reaxkit_outputs/trainset"
+      - "reaxkit export-trainset --section all --output trainset_export"
+      - "reaxkit trainset_group_comments --export trainset_categories.csv"
 
   tregime.in:
     desc: "Optional temperature-regime schedule for MD: define zones/atom ranges and time-dependent target temperatures and damping/heating rates."
@@ -146,7 +149,7 @@ files:
       - "fort.75 shows how the MD simulation worked to obtain the set-point temperature regimes"
     best_for: [temperature ramps, multi-zone heating/cooling]
     examples:
-      - "reaxkit tregime gen"
+      - "reaxkit make-tregime"
 
   vels:
     desc: "Optional restart file for MD containing last saved coordinates/velocities/accelerations and temperature state; can override geometry from geo."
@@ -167,7 +170,8 @@ files:
     derived_vars: []
     best_for: [restart MD, continue run with velocities]
     examples:
-      - "reaxkit vels get --key velocities --atoms 1,3,7 --print"
+      - "reaxkit kinematics --key velocities --atoms 1 3 7 --vels vels"
+      - "reaxkit kinematics_plot3d --vels vels --value vz --save vz_3d.png"
 
   vregime.in:
     desc: "Optional volume/cell-regime schedule for MD: manipulate periodic cell parameters over time (with optional coordinate rescaling)."
@@ -183,4 +187,4 @@ files:
       - "fort.77 file will show information regarding the cell parameters targeted in the vregime.in-file."
     best_for: [strain/cell ramps, volume changes, barostat-like schedules]
     examples:
-      - "reaxkit vregime gen"
+      - "reaxkit make-vregime"

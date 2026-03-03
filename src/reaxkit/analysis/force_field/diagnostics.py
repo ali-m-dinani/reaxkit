@@ -14,7 +14,7 @@ from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ForceFieldOptimizationDiagnosticData
 
 
-def _fort79_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFrame:
+def _diagnostic_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "identifier": pd.Series(data.identifiers, dtype=object),
@@ -35,11 +35,11 @@ def _fort79_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFrame:
     )
 
 
-def _get_fort79_data_with_diff_sensitivities(
+def _diagnostic_sensitivity_table(
     data: ForceFieldOptimizationDiagnosticData,
 ) -> pd.DataFrame:
-    """Compute relative force-field error sensitivities from fort.79 diagnostics."""
-    df = _fort79_frame(data)
+    """Compute relative force-field error sensitivities from diagnostic data."""
+    df = _diagnostic_frame(data)
     diff3 = pd.to_numeric(df["diff3"], errors="coerce").replace(0.0, np.nan)
 
     result = pd.DataFrame({"identifier": df["identifier"].astype(object)})
@@ -75,7 +75,7 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
         request: ParameterOptimizationDiagnosticRequest,
         reporter=None,
     ) -> ParameterOptimizationDiagnosticResult:
-        table = _get_fort79_data_with_diff_sensitivities(data)
+        table = _diagnostic_sensitivity_table(data)
         return ParameterOptimizationDiagnosticResult(table=table)
 
 

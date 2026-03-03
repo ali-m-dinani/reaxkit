@@ -39,6 +39,7 @@ class TrajectoryData:
     atom_ids: list[int]
     simulation: Optional[SimulationData] = None
     iterations: Optional[np.ndarray] = None
+    atom_labels: Optional[np.ndarray] = None  # (n_frames, n_atoms) optional per-frame output labels
 
 
 @dataclass
@@ -311,5 +312,13 @@ class ElectrostaticsData:
     charges: ChargeData
     connectivity: Optional[ConnectivityData] = None
     electric_field: Optional[ElectricFieldData] = None
+
+
+@dataclass
+class ConnectivityTrajectoryData:
+    """Composite connectivity + trajectory model for coupled workflows."""
+
+    connectivity: ConnectivityData
+    trajectory: TrajectoryData
 
 

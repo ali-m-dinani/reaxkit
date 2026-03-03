@@ -1,6 +1,11 @@
 """Trajectory analysis tasks."""
 
 from reaxkit.analysis.trajectory.msd import MSDRequest, MSDResult, MSDTask
+from reaxkit.analysis.trajectory.relabel import (
+    TrajectoryRelabelByCoordinationRequest,
+    TrajectoryRelabelByCoordinationResult,
+    TrajectoryRelabelByCoordinationTask,
+)
 from reaxkit.analysis.trajectory.rdf import (
     RDFPropertyRequest,
     RDFPropertyResult,
@@ -17,6 +22,9 @@ __all__ = [
     "RDFRequest",
     "RDFResult",
     "RDFTask",
+    "TrajectoryRelabelByCoordinationRequest",
+    "TrajectoryRelabelByCoordinationResult",
+    "TrajectoryRelabelByCoordinationTask",
     "RDFPropertyRequest",
     "RDFPropertyResult",
     "RDFPropertyTask",

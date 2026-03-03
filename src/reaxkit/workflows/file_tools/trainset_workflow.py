@@ -1,0 +1,157 @@
+"""Direct command workflows for trainset export and generation utilities."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+
+from reaxkit.cli.path import resolve_output_path
+from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
+from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
+from reaxkit.engine.reaxff.generators.trainset_mp import generate_trainset_settings_yaml_from_mp_simple
+from reaxkit.engine.reaxff.generators.trainset_yaml import generate_trainset_from_yaml, write_trainset_settings_yaml
+
+TRAINSET_FILE_COMMANDS = ("export-trainset", "make-trainset-settings", "make-trainset")
+
+
+def _load_trainset_tables(path: str) -> dict[str, object]:
+    data = ReaxFFAdapter().load(
+        ForceFieldOptimizationTrainingSetData,
+        {"trainset": path, "input": path},
+    )
+    return {
+        "CHARGE": data.charge,
+        "HEATFO": data.heatfo,
+        "GEOMETRY": data.geometry,
+        "CELL_PARAMETERS": data.cell_parameters,
+        "ENERGY": data.energy,
+    }
+
+
+def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    parser.formatter_class = argparse.RawTextHelpFormatter
+
+    if command == "export-trainset":
+        parser.description = (
+            "Export trainset sections to CSV files.\n\n"
+            "Examples:\n"
+            "  reaxkit export-trainset --section all --output trainset_export\n"
+            "  reaxkit export-trainset --section energy --trainset trainset.in --output energy_export"
+        )
+        parser.add_argument("--trainset", "--file", dest="trainset", default="trainset.in", help="Path to trainset.in")
+        parser.add_argument("--section", default="all", help="Section: all, charge, heatfo, geometry, cell_parameters, energy")
+        parser.add_argument("--output", default="trainset_export", help="Output directory for exported CSV files")
+    elif command == "make-trainset-settings":
+        parser.description = (
+            "Write a sample trainset settings YAML.\n\n"
+            "Examples:\n"
+            "  reaxkit make-trainset-settings\n"
+            "  reaxkit make-trainset-settings --output trainset_settings.yaml"
+        )
+        parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path")
+    elif command == "make-trainset":
+        parser.description = (
+            "Generate an elastic-energy trainset from YAML or Materials Project metadata.\n\n"
+            "Examples:\n"
+            "  reaxkit make-trainset --yaml trainset_settings.yaml\n"
+            "  reaxkit make-trainset --mp-id mp-661 --api-key YOUR_KEY\n"
+            "  reaxkit make-trainset --yaml trainset_settings.yaml --output trainset_generated"
+        )
+        parser.add_argument("--yaml", default=None, help="Existing trainset_settings.yaml file")
+        parser.add_argument("--mp-id", default=None, help="Materials Project material id, for example mp-661")
+        parser.add_argument("--api-key", default=None, help="Materials Project API key or set MP_API_KEY")
+        parser.add_argument("--bulk-mode", default="voigt", choices=["voigt", "reuss", "vrh"], help="MP bulk modulus source")
+        parser.add_argument("--out-yaml", default="trainset_settings_mp.yaml", help="Generated YAML path in MP mode")
+        parser.add_argument("--structure-dir", default=None, help="Directory for MP-downloaded structures")
+        parser.add_argument("--verbose", action="store_true", help="Verbose MP fetching/logging")
+        parser.add_argument("--output", default="trainset_generated", help="Directory for trainset outputs")
+    else:
+        raise KeyError(f"Unsupported trainset file-tool command {command!r}.")
+
+    return parser
+
+
+def _run_export_trainset(args: argparse.Namespace) -> int:
+    tables = _load_trainset_tables(args.trainset)
+    section = str(args.section).strip().lower()
+    outdir = Path(args.output)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    if section == "all":
+        items = [(name, df) for name, df in tables.items() if df is not None and not df.empty]
+    else:
+        section_key = section.upper()
+        if section_key in {"CELL", "CELL PARAMETERS"}:
+            section_key = "CELL_PARAMETERS"
+        df = tables.get(section_key)
+        if df is None:
+            raise ValueError(f"Unknown trainset section {args.section!r}.")
+        items = [(section_key, df)]
+
+    stem = Path(args.trainset).stem
+    for sec_name, df in items:
+        outpath = outdir / f"{stem}_{sec_name.lower()}.csv"
+        df.to_csv(outpath, index=False)
+        print(f"[Done] Exported section {sec_name} to {outpath}")
+    return 0
+
+
+def _run_make_trainset_settings(args: argparse.Namespace) -> int:
+    out = resolve_output_path(args.output, workflow="trainset")
+    write_trainset_settings_yaml(out_path=str(out))
+    print(f"[Done] Wrote sample settings YAML to: {out}")
+    return 0
+
+
+def _run_make_trainset(args: argparse.Namespace) -> int:
+    yaml_path = args.yaml
+    if not yaml_path:
+        if not args.mp_id:
+            raise ValueError("Provide either --yaml or --mp-id.")
+        api_key = args.api_key or os.getenv("MP_API_KEY")
+        if not api_key:
+            raise ValueError("Missing Materials Project API key. Provide --api-key or set MP_API_KEY.")
+
+        out_yaml = resolve_output_path(args.out_yaml, workflow="trainset")
+        structure_dir = args.structure_dir or str(Path(out_yaml).parent / "downloaded_structures")
+        Path(structure_dir).mkdir(parents=True, exist_ok=True)
+        res = generate_trainset_settings_yaml_from_mp_simple(
+            mp_id=args.mp_id,
+            out_yaml=str(out_yaml),
+            structure_dir=structure_dir,
+            bulk_mode=args.bulk_mode,
+            api_key=api_key,
+            verbose=bool(args.verbose),
+        )
+        yaml_path = res["yaml"]
+        print(f"[Done] Generated settings from Materials Project: {yaml_path}")
+
+    out_dir = resolve_output_path(args.output, workflow="trainset")
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    generate_trainset_from_yaml(yaml_path=yaml_path, out_dir=str(out_dir))
+    print(f"[Done] Elastic-energy trainset + tables written to: {out_dir}")
+
+    geo_dir = Path(out_dir) / "geo_strained"
+    all_geo_file = geo_dir / "all_trainset_geo.bgf"
+    if geo_dir.exists():
+        bgf_files = sorted(geo_dir.glob("*.bgf"))
+        if bgf_files:
+            with open(all_geo_file, "w", encoding="utf-8") as fout:
+                for bgf in bgf_files:
+                    fout.write(f"# ===== BEGIN {bgf.name} =====\n")
+                    with open(bgf, "r", encoding="utf-8") as fin:
+                        fout.write(fin.read())
+                    fout.write(f"\n# ===== END {bgf.name} =====\n\n")
+            print(f"[Done] Concatenated strained geometries to: {all_geo_file}")
+    return 0
+
+
+def run_main(command: str, args: argparse.Namespace) -> int:
+    if command == "export-trainset":
+        return _run_export_trainset(args)
+    if command == "make-trainset-settings":
+        return _run_make_trainset_settings(args)
+    if command == "make-trainset":
+        return _run_make_trainset(args)
+    raise KeyError(f"Unsupported trainset file-tool command {command!r}.")

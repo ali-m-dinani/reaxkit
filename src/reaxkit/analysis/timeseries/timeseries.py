@@ -130,6 +130,21 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
     if key == "potential_energy":
         arr = data.potential_energy
         label = "potential_energy"
+    elif key == "V":
+        arr = data.V
+        label = "V"
+    elif key == "T":
+        arr = data.T
+        label = "T"
+    elif key == "P":
+        arr = data.P
+        label = "P"
+    elif key == "D":
+        arr = data.D
+        label = "D"
+    elif key == "elap_time":
+        arr = data.elap_time
+        label = "elap_time"
     elif key == "num_of_atoms":
         arr = data.num_of_atoms
         label = "num_of_atoms"
@@ -150,7 +165,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
     else:
         raise KeyError(
             f"Unsupported simulation field {field!r}. "
-            "Choose from: potential_energy, num_of_atoms, a, b, c, alpha, beta, gamma."
+            "Choose from: potential_energy, V, T, P, D, elap_time, num_of_atoms, a, b, c, alpha, beta, gamma."
         )
 
     if arr is None:

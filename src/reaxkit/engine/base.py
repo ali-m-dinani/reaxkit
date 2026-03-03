@@ -9,6 +9,7 @@ from pathlib import Path
 from reaxkit.domain.data_models import (
     AtomicKinematicsData,
     ChargeData,
+    ConnectivityTrajectoryData,
     ConnectivityData,
     ControlParametersData,
     EregimeData,
@@ -49,6 +50,8 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_simulation", args, reporter=reporter)
         if data_type is ConnectivityData:
             return self._invoke_loader("load_connectivity", args, reporter=reporter)
+        if data_type is ConnectivityTrajectoryData:
+            return self._invoke_loader("load_connectivity_trajectory", args, reporter=reporter)
         if data_type is ChargeData:
             return self._invoke_loader("load_charges", args, reporter=reporter)
         if data_type is AtomicKinematicsData:
@@ -83,6 +86,12 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_molecular_analysis", args, reporter=reporter)
         raise ValueError(f"{self.name} cannot load data type: {data_type}")
 
+    def write(self, data, out_path, args: dict | None = None):
+        """Write a domain data object using an engine-appropriate writer."""
+        if isinstance(data, TrajectoryData):
+            return self._invoke_writer("write_trajectory", data, out_path, args or {})
+        raise ValueError(f"{self.name} cannot write data object of type: {type(data).__name__}")
+
     def _invoke_loader(self, method_name: str, args: dict, reporter=None):
         method = getattr(self, method_name, None)
         if method is None:
@@ -91,3 +100,12 @@ class EngineAdapter(ABC):
         if "reporter" in params:
             return method(args, reporter=reporter)
         return method(args)
+
+    def _invoke_writer(self, method_name: str, data, out_path, args: dict):
+        method = getattr(self, method_name, None)
+        if method is None:
+            raise ValueError(f"{self.name} cannot write data via missing method: {method_name}")
+        params = inspect.signature(method).parameters
+        if "args" in params:
+            return method(data, out_path, args=args)
+        return method(data, out_path)
