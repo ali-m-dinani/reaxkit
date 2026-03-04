@@ -30,6 +30,7 @@ def get_registered_generators() -> dict[str, GeneratorSpec]:
 
 register_generator("get-control", module_path="reaxkit.workflows.control_workflow")
 register_generator("make-control", module_path="reaxkit.workflows.control_workflow")
+register_generator("add-alias", module_path="reaxkit.workflows.meta.command_alias_workflow")
 register_generator("make-eregime", module_path="reaxkit.workflows.file_tools.eregime_workflow")
 register_generator("trim-xmolout", module_path="reaxkit.workflows.file_tools.xmolout_workflow")
 register_generator("xtob", module_path="reaxkit.workflows.file_tools.geo_workflow")

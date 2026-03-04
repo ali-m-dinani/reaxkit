@@ -1,0 +1,96 @@
+_meta:
+  version: "1.0"
+  purpose: "Canonical intent vocabulary for `reaxkit help` capability discovery."
+  last_updated: "2026-03-04"
+
+intents:
+  trajectory:
+    description: "Access trajectory coordinates/frames and trajectory-based analyses."
+    aliases:
+      - get trajectory
+      - trajectory
+      - trajectory data
+      - atomic coordinates
+      - positions
+      - xmolout
+    dataclasses: [TrajectoryData]
+    workflows: [timeseries]
+    generators: [trim-xmolout]
+
+  connectivity:
+    description: "Analyze bonding topology, bond order, and coordination."
+    aliases:
+      - connectivity
+      - connection table
+      - bond order
+      - coordination
+      - get connectivity
+      - fort.7
+    dataclasses: [ConnectivityData, ConnectivityTrajectoryData]
+    workflows: [timeseries]
+    generators: []
+
+  charges:
+    description: "Analyze per-atom charge and charge-derived time series."
+    aliases:
+      - charges
+      - charge table
+      - charge series
+      - get charges
+      - partial charge
+    dataclasses: [ChargeData, ElectrostaticsData]
+    workflows: [timeseries]
+    generators: []
+
+  electric_field:
+    description: "Analyze applied electric field and field-energy series."
+    aliases:
+      - electric field
+      - field series
+      - get electric field
+      - fort.78
+      - polarization field
+    dataclasses: [ElectricFieldData, EregimeData, ElectrostaticsData]
+    workflows: [timeseries]
+    generators: [make-eregime]
+
+  force_field:
+    description: "Inspect force-field parameters and optimization outputs."
+    aliases:
+      - force field
+      - ffield
+      - optimization report
+      - trainset
+      - params
+    dataclasses:
+      - ForceFieldParametersData
+      - ForceFieldOptimizationProgressData
+      - ForceFieldOptimizationDiagnosticData
+      - ForceFieldOptimizationReportData
+      - ForceFieldOptimizationTrainingSetData
+      - ForceFieldOptimizationParameterData
+      - GeometrySummaryData
+    workflows: []
+    generators: [extract-optimized-ffield, export-trainset, make-trainset-settings, make-trainset]
+
+  molecular_species:
+    description: "Analyze molecular fragment/species counts and trends."
+    aliases:
+      - molecular species
+      - molfra
+      - dominant species
+      - molecule lifetime
+    dataclasses: [MolecularAnalysisData]
+    workflows: [timeseries]
+    generators: []
+
+  control:
+    description: "Read or generate run-control parameters."
+    aliases:
+      - control
+      - control file
+      - get control
+      - make control
+    dataclasses: [ControlParametersData]
+    workflows: []
+    generators: [get-control, make-control]

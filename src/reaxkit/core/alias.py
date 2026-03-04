@@ -1,31 +1,30 @@
 """
-Alias resolution utilities for tolerant column and key matching.
+Alias resolution utilities for tolerant variable and column matching.
 
 This module provides functions for resolving canonical ReaxKit keys
-(e.g., ``iter``, ``time``, ``D``) against the actual column names present
-in parsed DataFrames, using a packaged alias map.
+(e.g., ``iterations``, ``time``, ``density``) against the actual column
+names present in parsed DataFrames, using a packaged alias map.
 
-The canonical→alias definitions are stored in ``reaxkit/data/alias.yaml``.
+The canonical-to-alias definitions are stored in
+``reaxkit/data/variable_aliases.yaml``.
 """
 
 from __future__ import annotations
 
-from typing import Dict, List, Iterable, Optional
 from functools import lru_cache
-
-# You can load this via importlib.resources so it works after pip install.
-# Requires: alias.yaml included as package data.
-import yaml
 import importlib.resources as ir
+from typing import Dict, Iterable, List, Optional
+
+import yaml
 
 
 @lru_cache(maxsize=1)
 def load_default_alias_map() -> Dict[str, List[str]]:
     """
-    Load the packaged canonical→aliases mapping.
+    Load the packaged canonical-to-aliases mapping.
 
-    The alias map is read from ``reaxkit/data/alias.yaml`` and cached after
-    the first call.
+    The alias map is read from ``reaxkit/data/variable_aliases.yaml`` and cached
+    after the first call.
 
     Returns
     -------
@@ -35,32 +34,29 @@ def load_default_alias_map() -> Dict[str, List[str]]:
     Raises
     ------
     FileNotFoundError
-        If the packaged ``alias.yaml`` cannot be found.
+        If the packaged ``variable_aliases.yaml`` cannot be found.
     """
-    # reaxkit.data is NOT a package; we read by file location within package resources.
-    # If you later make data/ a package, you can switch to ir.files("reaxkit.data").
     pkg = "reaxkit"
-    rel = "data/alias.yaml"
+    rel = "data/variable_aliases.yaml"
 
     try:
-        with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as f:
-            doc = yaml.safe_load(f) or {}
+        with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as fh:
+            doc = yaml.safe_load(fh) or {}
     except FileNotFoundError as e:
         raise FileNotFoundError(
             f"Could not find packaged alias map at '{pkg}/{rel}'. "
-            "Make sure alias.yaml is included as package data."
+            "Make sure variable_aliases.yaml is included as package data."
         ) from e
 
-    aliases = doc.get("aliases") or {}
-    # Normalize to Dict[str, List[str]]
+    aliases = doc.get("variable_aliases") or {}
     out: Dict[str, List[str]] = {}
-    for k, v in aliases.items():
-        if v is None:
-            out[str(k)] = []
-        elif isinstance(v, list):
-            out[str(k)] = [str(x) for x in v]
+    for key, value in aliases.items():
+        if value is None:
+            out[str(key)] = []
+        elif isinstance(value, list):
+            out[str(key)] = [str(item) for item in value]
         else:
-            out[str(k)] = [str(v)]
+            out[str(key)] = [str(value)]
     return out
 
 
@@ -78,21 +74,18 @@ def resolve_alias_from_columns(
     Parameters
     ----------
     cols : iterable of str
-        Available column names (e.g., DataFrame columns).
+        Available column names.
     canonical : str
-        Canonical key to resolve (e.g., ``"iter"``, ``"time"``, ``"D"``).
+        Canonical key to resolve (e.g., ``"iterations"``, ``"time"``,
+        ``"density"``).
     aliases : dict[str, list[str]], optional
-        Canonical→aliases mapping to use. If not provided, the packaged map
-        from ``alias.yaml`` is loaded.
+        Canonical-to-aliases mapping to use. If not provided, the packaged map
+        from ``variable_aliases.yaml`` is loaded.
 
     Returns
     -------
     str or None
         The matching column name if found, otherwise ``None``.
-
-    Examples
-    --------
-    >>> resolve_alias_from_columns(df.columns, "time")
     """
     if cols is None:
         return None
@@ -105,18 +98,16 @@ def resolve_alias_from_columns(
     if canonical in aliases:
         candidates.extend(aliases[canonical])
 
-    # Exact (case-insensitive)
     for cand in candidates:
         hit = lower_map.get(str(cand).lower())
         if hit is not None:
             return hit
 
-    # Heuristics on canonical (startswith/contains)
-    cname = str(canonical).lower()
-    for c in orig_cols:
-        cl = c.lower()
-        if cl.startswith(cname) or cname in cl:
-            return c
+    canonical_lower = str(canonical).lower()
+    for col in orig_cols:
+        col_lower = col.lower()
+        if col_lower.startswith(canonical_lower) or canonical_lower in col_lower:
+            return col
 
     return None
 
@@ -125,9 +116,7 @@ def _resolve_alias(source, canonical: str) -> str:
     """
     Resolve a canonical key from a DataFrame-like source.
 
-    Notes
-    -----
-    This is a compatibility helper that accepts a handler (with ``.dataframe()``),
+    This compatibility helper accepts a handler (with ``.dataframe()``),
     a pandas DataFrame, or an iterable of column names.
     """
     try:
@@ -136,13 +125,11 @@ def _resolve_alias(source, canonical: str) -> str:
         try:
             cols = list(getattr(source, "columns"))
         except Exception:
-            cols = list(source)  # assume iterable of str
+            cols = list(source)
 
     hit = resolve_alias_from_columns(cols, canonical)
     if hit is None:
-        raise KeyError(
-            f"Could not resolve alias '{canonical}'. Available columns: {list(cols)}"
-        )
+        raise KeyError(f"Could not resolve alias '{canonical}'. Available columns: {list(cols)}")
     return hit
 
 
@@ -153,31 +140,16 @@ def _available_keys_from_columns(cols: Iterable[str]) -> List[str]:
     The returned list includes:
     - raw columns already present in ``cols``
     - canonical keys whose aliases resolve against ``cols``
-
-    Parameters
-    ----------
-    cols : iterable of str
-        Available column names.
-
-    Returns
-    -------
-    list[str]
-        Sorted list of usable keys for lookup and CLI choices.
-
-    Examples
-    --------
-    >>> _available_keys_from_columns(df.columns)
     """
-    amap = load_default_alias_map()
+    alias_map = load_default_alias_map()
     cols_set = set(cols)
     keys = set(cols_set)
-    for alias, cands in amap.items():
-        if any(c in cols_set for c in cands) or alias in cols_set:
+    for alias, candidates in alias_map.items():
+        if any(candidate in cols_set for candidate in candidates) or alias in cols_set:
             keys.add(alias)
     return sorted(keys)
 
 
-# Re-export for callers that already import these names
 available_keys = _available_keys_from_columns
 
 
@@ -185,35 +157,18 @@ def normalize_choice(value: str, domain: str = "xaxis") -> str:
     """
     Normalize a user-provided keyword to its canonical alias key.
 
-    This is intended for tolerant CLI inputs where users may provide
-    any alias defined in ``alias.yaml`` (e.g., ``Time(fs)`` → ``time``).
-
-    Parameters
-    ----------
-    value : str
-        User-provided keyword or alias.
-    domain : str, optional
-        Reserved for future domain-specific normalization rules.
-
-    Returns
-    -------
-    str
-        Canonical key if an alias match is found; otherwise the normalized
-        input string.
-
-    Examples
-    --------
-    >>> normalize_choice("Time(fs)")
-    >>> normalize_choice("frm")
+    This is intended for tolerant CLI inputs where users may provide any alias
+    defined in ``variable_aliases.yaml`` (e.g., ``Time(fs)`` -> ``time``).
     """
-    v = (value or "").strip().lower()
-    if not v:
-        return v
+    _ = domain
+    normalized_value = (value or "").strip().lower()
+    if not normalized_value:
+        return normalized_value
 
-    amap = load_default_alias_map()
-    for canonical, aliases in amap.items():
-        all_names = [canonical.lower()] + [a.lower() for a in aliases]
-        if v in all_names:
+    alias_map = load_default_alias_map()
+    for canonical, aliases in alias_map.items():
+        all_names = [canonical.lower()] + [alias.lower() for alias in aliases]
+        if normalized_value in all_names:
             return canonical
 
-    return v
+    return normalized_value

@@ -668,3 +668,212 @@ def _format_hits(
     )
 
     return "\n".join(parts)
+
+
+# ----------------------------
+# Capability / intent search
+# ----------------------------
+
+@dataclass(frozen=True)
+class IntentHit:
+    """Ranked intent/capability match for `reaxkit help` queries."""
+
+    intent: str
+    score: float
+    description: str
+    dataclasses: Tuple[str, ...]
+    workflows: Tuple[str, ...]
+    generators: Tuple[str, ...]
+    aliases: Tuple[str, ...]
+
+
+def _read_yaml_from_package(package: str, filename: str) -> Dict[str, Any]:
+    """Read and parse a packaged YAML file."""
+    try:
+        from importlib import resources
+        text = resources.files(package).joinpath(filename).read_text(encoding="utf-8")
+    except Exception as e:
+        raise FileNotFoundError(
+            f"Could not read '{filename}' from package '{package}'."
+        ) from e
+
+    obj = yaml.safe_load(text) or {}
+    if not isinstance(obj, dict):
+        raise ValueError(f"YAML root must be a mapping/dict in '{filename}'.")
+    return obj
+
+
+@lru_cache(maxsize=1)
+def load_help_intents() -> Dict[str, Any]:
+    """Load canonical help intents used for capability discovery."""
+    return _read_yaml_from_package("reaxkit.help.data", "help_intents.yaml")
+
+
+@lru_cache(maxsize=1)
+def load_engine_data_maps() -> Dict[str, Any]:
+    """Load mapping of engine name -> loader/dataclass map source."""
+    return _read_yaml_from_package("reaxkit.help.data", "engine_data_maps.yaml")
+
+
+@lru_cache(maxsize=1)
+def load_analysis_task_dataclass_map() -> Dict[str, Any]:
+    """Load analysis task -> dataclass metadata."""
+    return _read_yaml_from_package("reaxkit.analysis.data", "analysis_task_dataclass_map.yaml")
+
+
+def _resolve_engine_loader_map(engine: str) -> Dict[str, Any]:
+    """Load the configured loader/dataclass map for an engine."""
+    engine_key = _norm(engine)
+    maps = load_engine_data_maps().get("engines") or {}
+    for name, meta in maps.items():
+        if _norm(str(name)) != engine_key:
+            continue
+        package = str((meta or {}).get("package") or "").strip()
+        filename = str((meta or {}).get("loader_map_file") or "").strip()
+        if not package or not filename:
+            return {}
+        return _read_yaml_from_package(package, filename)
+    return {}
+
+
+def _analysis_commands_for_dataclasses(dataclasses: Iterable[str]) -> List[str]:
+    """Return analysis task names whose required_data matches any dataclass in the list."""
+    wanted = {str(d).strip() for d in dataclasses if str(d).strip()}
+    if not wanted:
+        return []
+    doc = load_analysis_task_dataclass_map()
+    tasks = doc.get("tasks") or {}
+    out: List[str] = []
+    for task_name, meta in tasks.items():
+        consumes = str((meta or {}).get("consumes_dataclass") or "").strip()
+        if consumes in wanted:
+            out.append(str(task_name))
+    return sorted(set(out))
+
+
+def search_help_intents(
+    query: str,
+    *,
+    top_k: int = 5,
+    min_score: float = 35.0,
+) -> List[IntentHit]:
+    """Search canonical help intents from natural-language queries."""
+    q = _norm(query)
+    q_toks = set(_tokens(query))
+    raw = load_help_intents().get("intents") or {}
+    hits: List[IntentHit] = []
+
+    for intent, meta in raw.items():
+        aliases = [str(a) for a in _as_list((meta or {}).get("aliases"))]
+        description = str((meta or {}).get("description") or "")
+        dataclasses = tuple(str(d) for d in _as_list((meta or {}).get("dataclasses")))
+        workflows = tuple(str(w) for w in _as_list((meta or {}).get("workflows")))
+        generators = tuple(str(g) for g in _as_list((meta or {}).get("generators")))
+
+        names_blob = " ".join([str(intent)] + aliases)
+        names_tokens = set(_tokens(names_blob))
+        desc_tokens = set(_tokens(description))
+
+        score = 0.0
+        overlap_names = q_toks & names_tokens
+        overlap_desc = q_toks & desc_tokens
+        if overlap_names:
+            score += 45.0 + 6.0 * len(overlap_names)
+        if overlap_desc:
+            score += 12.0 + 3.0 * len(overlap_desc)
+
+        score += 0.40 * _fuzzy_ratio(q, names_blob)
+        score += 0.15 * _fuzzy_ratio(q, description)
+
+        if q and q in _norm(names_blob):
+            score += 20.0
+
+        if score >= min_score:
+            hits.append(
+                IntentHit(
+                    intent=str(intent),
+                    score=score,
+                    description=description,
+                    dataclasses=dataclasses,
+                    workflows=workflows,
+                    generators=generators,
+                    aliases=tuple(aliases),
+                )
+            )
+
+    hits.sort(key=lambda h: h.score, reverse=True)
+    return hits[:top_k]
+
+
+def _engine_sources_for_dataclass(engine_loader_map: Dict[str, Any], dataclass_name: str) -> List[Dict[str, Any]]:
+    """Find loader entries that produce the given dataclass."""
+    loaders = (engine_loader_map or {}).get("loaders") or {}
+    out: List[Dict[str, Any]] = []
+    for loader_name, meta in loaders.items():
+        if str((meta or {}).get("dataclass") or "") != dataclass_name:
+            continue
+        out.append(
+            {
+                "loader": str(loader_name),
+                "primary_files": [str(x) for x in _as_list((meta or {}).get("primary_files"))],
+                "supplemental_files": [str(x) for x in _as_list((meta or {}).get("supplemental_files"))],
+                "fallback_files": [str(x) for x in _as_list((meta or {}).get("fallback_files"))],
+            }
+        )
+    return out
+
+
+def _format_intent_hits(hits: List[IntentHit], *, engine: Optional[str] = None) -> str:
+    """Format intent/capability matches for CLI output."""
+    if not hits:
+        return ""
+
+    try:
+        from reaxkit.core.command_catalog import get_registered_commands
+        registered = set(get_registered_commands(include_analysis_tasks=True).keys())
+    except Exception:
+        registered = set()
+
+    engine_map = _resolve_engine_loader_map(engine) if engine else {}
+    parts: List[str] = ["CAPABILITY MATCHES"]
+
+    for hit in hits:
+        parts.append(f"• {hit.intent} (score={hit.score:.1f})")
+        if hit.description:
+            parts.append(f"  {hit.description}")
+
+        parts.append(f"  dataclasses: {list(hit.dataclasses)}")
+
+        analysis_cmds = _analysis_commands_for_dataclasses(hit.dataclasses)
+        if registered:
+            analysis_cmds = [c for c in analysis_cmds if c in registered]
+            workflows = [w for w in hit.workflows if w in registered]
+            generators = [g for g in hit.generators if g in registered]
+        else:
+            workflows = list(hit.workflows)
+            generators = list(hit.generators)
+
+        parts.append(f"  analysis tasks: {analysis_cmds or []}")
+        parts.append(f"  workflows: {workflows or []}")
+        parts.append(f"  generators: {generators or []}")
+
+        if engine:
+            parts.append(f"  engine sources ({engine}):")
+            any_row = False
+            for dataclass_name in hit.dataclasses:
+                rows = _engine_sources_for_dataclass(engine_map, dataclass_name)
+                if not rows:
+                    continue
+                any_row = True
+                for row in rows:
+                    parts.append(
+                        "    - "
+                        f"{dataclass_name} via {row['loader']} "
+                        f"(primary={row['primary_files']}, "
+                        f"supplemental={row['supplemental_files']}, "
+                        f"fallback={row['fallback_files']})"
+                    )
+            if not any_row:
+                parts.append("    - no engine loader mapping found for this intent/dataclass set")
+
+    return "\n".join(parts)

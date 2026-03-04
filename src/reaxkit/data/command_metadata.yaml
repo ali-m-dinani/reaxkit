@@ -32,6 +32,9 @@ commands:
   make-control:
     kind: generator
     help: Generate a control file
+  add-alias:
+    kind: generator
+    help: Add a user-defined command alias
   make-eregime:
     kind: generator
     help: Generate an eregime file

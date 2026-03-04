@@ -7,6 +7,7 @@ import re
 from typing import Iterable, Mapping, Sequence
 
 from reaxkit.core.command_catalog import get_registered_commands
+from reaxkit.core.user_command_aliases import load_user_command_aliases
 
 
 def _normalize_command_token(value: str) -> str:
@@ -14,6 +15,11 @@ def _normalize_command_token(value: str) -> str:
     token = (value or "").strip().lower()
     token = re.sub(r"[\s\-_]+", "", token)
     return token
+
+
+def normalize_command_token(value: str) -> str:
+    """Public wrapper for command token normalization."""
+    return _normalize_command_token(value)
 
 
 def registered_command_names() -> list[str]:
@@ -51,11 +57,13 @@ def build_command_alias_index(
         name: spec.aliases
         for name, spec in get_registered_commands().items()
     }
+    user_aliases = load_user_command_aliases()
 
     for command in command_names:
         canonical = str(command)
         candidates = [canonical, canonical.replace("_", "-"), canonical.replace("-", "_")]
         candidates.extend(registry_aliases.get(canonical, ()))
+        candidates.extend(user_aliases.get(canonical, ()))
         candidates.extend(explicit_aliases.get(canonical, ()))
 
         for candidate in candidates:

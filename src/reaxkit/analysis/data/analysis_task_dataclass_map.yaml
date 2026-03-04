@@ -1,0 +1,159 @@
+_meta:
+  version: "1.0"
+  source: "analysis task required_data declarations"
+  purpose: "Maps analysis tasks to the dataclass each task consumes."
+  last_updated: "2026-03-04"
+
+tasks:
+  atomic_kinematics:
+    consumes_dataclass: AtomicKinematicsData
+    module: reaxkit.analysis.kinematics.kinematics
+  bond_events:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.connectivity
+  bond_timeseries:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.connectivity
+  cell_dimensions:
+    consumes_dataclass: SimulationData
+    module: reaxkit.analysis.timeseries.timeseries
+  charge_series:
+    consumes_dataclass: ChargeData
+    module: reaxkit.analysis.timeseries.timeseries
+  charge_table:
+    consumes_dataclass: ChargeData
+    module: reaxkit.analysis.electrostatics.charges
+  connection_list:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.connectivity
+  connection_stats:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.connectivity
+  connection_table:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.connectivity
+  control_value:
+    consumes_dataclass: ControlParametersData
+    module: reaxkit.analysis.control.control
+  coordination:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.coordination
+  dipole:
+    consumes_dataclass: ElectrostaticsData
+    module: reaxkit.analysis.electrostatics.electrostatics
+  dominant_species:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.molecular_analysis.molecular_analysis
+  electric_field_series:
+    consumes_dataclass: ElectricFieldData
+    module: reaxkit.analysis.timeseries.timeseries
+  eregime_series:
+    consumes_dataclass: EregimeData
+    module: reaxkit.analysis.timeseries.timeseries
+  force_field_data:
+    consumes_dataclass: ForceFieldParametersData
+    module: reaxkit.analysis.force_field.force_field
+  force_field_optimization:
+    consumes_dataclass: ForceFieldOptimizationProgressData
+    module: reaxkit.analysis.force_field.optimization
+  force_field_optimization_parameters:
+    consumes_dataclass: ForceFieldOptimizationParameterData
+    module: reaxkit.analysis.params.params
+  force_field_optimization_report:
+    consumes_dataclass: ForceFieldOptimizationReportData
+    module: reaxkit.analysis.force_field.report
+  force_field_optimization_report_bulk_modulus:
+    consumes_dataclass: ForceFieldOptimizationReportData
+    module: reaxkit.analysis.force_field.report
+  force_field_optimization_report_eos:
+    consumes_dataclass: ForceFieldOptimizationReportData
+    module: reaxkit.analysis.force_field.report
+  geometry_optimization_data:
+    consumes_dataclass: GeometryOptimizationProgressData
+    module: reaxkit.analysis.timeseries.geometry_optimization
+  hybridization:
+    consumes_dataclass: ConnectivityData
+    module: reaxkit.analysis.connectivity.hybridization
+  largest_molecule_by_mass:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.molecular_analysis.molecular_analysis
+  largest_molecule_composition:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.molecular_analysis.molecular_analysis
+  molecular_frequency_series:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.timeseries.timeseries
+  molecular_totals_series:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.timeseries.timeseries
+  molecule_lifetime:
+    consumes_dataclass: MolecularAnalysisData
+    module: reaxkit.analysis.molecular_analysis.molecular_analysis
+  msd:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.trajectory.msd
+  parameter_optimization_diagnostic:
+    consumes_dataclass: ForceFieldOptimizationDiagnosticData
+    module: reaxkit.analysis.force_field.diagnostics
+  partial_energy_series:
+    consumes_dataclass: PartialEnergyData
+    module: reaxkit.analysis.timeseries.timeseries
+  polarization:
+    consumes_dataclass: ElectrostaticsData
+    module: reaxkit.analysis.electrostatics.electrostatics
+  polarization_field:
+    consumes_dataclass: ElectrostaticsData
+    module: reaxkit.analysis.electrostatics.electrostatics
+  rdf:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.trajectory.rdf
+  rdf_property:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.trajectory.rdf
+  restraint_series:
+    consumes_dataclass: RestraintData
+    module: reaxkit.analysis.timeseries.timeseries
+  simulation_series:
+    consumes_dataclass: SimulationData
+    module: reaxkit.analysis.timeseries.timeseries
+  structure_summary_data:
+    consumes_dataclass: GeometrySummaryData
+    module: reaxkit.analysis.force_field.structure_summary
+  trainset_group_comments:
+    consumes_dataclass: ForceFieldOptimizationTrainingSetData
+    module: reaxkit.analysis.force_field.trainset
+  trajectory_coordinate_series:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.timeseries.timeseries
+  trajectory_relabel_by_coordination:
+    consumes_dataclass: ConnectivityTrajectoryData
+    module: reaxkit.analysis.trajectory.relabel
+
+dataclass_usage:
+  AtomicKinematicsData: [atomic_kinematics]
+  ChargeData: [charge_series, charge_table]
+  ConnectivityData: [bond_events, bond_timeseries, connection_list, connection_stats, connection_table, coordination, hybridization]
+  ConnectivityTrajectoryData: [trajectory_relabel_by_coordination]
+  ControlParametersData: [control_value]
+  EregimeData: [eregime_series]
+  ElectricFieldData: [electric_field_series]
+  ElectrostaticsData: [dipole, polarization, polarization_field]
+  ForceFieldOptimizationDiagnosticData: [parameter_optimization_diagnostic]
+  ForceFieldOptimizationParameterData: [force_field_optimization_parameters]
+  ForceFieldOptimizationProgressData: [force_field_optimization]
+  ForceFieldOptimizationReportData: [force_field_optimization_report, force_field_optimization_report_bulk_modulus, force_field_optimization_report_eos]
+  ForceFieldOptimizationTrainingSetData: [trainset_group_comments]
+  ForceFieldParametersData: [force_field_data]
+  GeometryOptimizationProgressData: [geometry_optimization_data]
+  GeometrySummaryData: [structure_summary_data]
+  MolecularAnalysisData: [dominant_species, largest_molecule_by_mass, largest_molecule_composition, molecular_frequency_series, molecular_totals_series, molecule_lifetime]
+  PartialEnergyData: [partial_energy_series]
+  RestraintData: [restraint_series]
+  SimulationData: [cell_dimensions, simulation_series]
+  TrajectoryData: [msd, rdf, rdf_property, trajectory_coordinate_series]
+
+composite_dataclasses:
+  ConnectivityTrajectoryData:
+    components: [ConnectivityData, TrajectoryData]
+  ElectrostaticsData:
+    components: [TrajectoryData, ChargeData, ConnectivityData, ElectricFieldData]

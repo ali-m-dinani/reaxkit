@@ -14,6 +14,7 @@ from .command_catalog import (
 from .command_alias_resolver import (
     is_known_command,
     is_known_task,
+    normalize_command_token,
     resolve_command_name,
     resolve_task_name,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "get_registered_workflows",
     "is_known_command",
     "is_known_task",
+    "normalize_command_token",
     "register_command",
     "register_analysis_command",
     "register_task",
