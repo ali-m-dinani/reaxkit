@@ -1,0 +1,178 @@
+commands:
+  timeseries:
+    kind: workflow
+    help: Time-series workflow
+  help:
+    kind: workflow
+    help: Help and documentation lookup
+  intspec:
+    kind: workflow
+    help: Code introspection workflow
+  video:
+    kind: workflow
+    help: Video generation workflow
+  plotter:
+    kind: workflow
+    help: Plotting workflow
+  dipole:
+    kind: analysis
+    help: Dipole analysis
+  polarization:
+    kind: analysis
+    help: Polarization analysis
+  charge-table:
+    kind: analysis
+    help: Charge table analysis
+  hyst:
+    kind: analysis
+    help: Hysteresis analysis
+  get-control:
+    kind: generator
+    help: Read a control file
+  make-control:
+    kind: generator
+    help: Generate a control file
+  make-eregime:
+    kind: generator
+    help: Generate an eregime file
+  trim-xmolout:
+    kind: generator
+    help: Trim an xmolout trajectory
+  xtob:
+    kind: generator
+    help: Convert xmolout to BGF-like geometry output
+  make-geo:
+    kind: generator
+    help: Generate a geo file
+  sort-geo:
+    kind: generator
+    help: Sort atoms in a geo file
+  orthogonalize-geo:
+    kind: generator
+    help: Orthogonalize a geo structure
+  place-geo:
+    kind: generator
+    help: Place one geometry into another
+  add-geo-restraint:
+    kind: generator
+    help: Add restraints to a geo file
+  extract-optimized-ffield:
+    kind: generator
+    help: Extract optimized force-field parameters
+  export-trainset:
+    kind: generator
+    help: Export a trainset file
+  make-trainset-settings:
+    kind: generator
+    help: Generate trainset settings
+  make-trainset:
+    kind: generator
+    help: Generate a trainset file
+  make-tregime:
+    kind: generator
+    help: Generate a tregime file
+  make-vregime:
+    kind: generator
+    help: Generate a vregime file
+  kinematics:
+    kind: analysis
+    help: Atomic kinematics analysis
+  kinematics_plot3d:
+    kind: analysis
+    help: 3D atomic kinematics view
+  kinematics_heatmap2d:
+    kind: analysis
+    help: 2D atomic kinematics heatmap
+  dominant_species:
+    kind: analysis
+    help: Dominant molecular species analysis
+  largest_molecule_by_mass:
+    kind: analysis
+    help: Largest molecule by mass
+  largest_molecule_composition:
+    kind: analysis
+    help: Largest molecule composition
+  molecule_lifetime:
+    kind: analysis
+    help: Molecule lifetime analysis
+  force_field_data:
+    kind: analysis
+    help: Force-field parameter data
+  force_field_optimization:
+    kind: analysis
+    help: Force-field optimization progress
+  structure_summary_data:
+    kind: analysis
+    help: Structure summary analysis
+  parameter_optimization_diagnostic:
+    kind: analysis
+    help: Parameter optimization diagnostics
+  parameter_optimization_most_sensitive:
+    kind: analysis
+    help: Most sensitive optimization parameters
+  parameter_optimization_tornado:
+    kind: analysis
+    help: Optimization tornado analysis
+  force_field_optimization_report:
+    kind: analysis
+    help: Force-field optimization report
+  force_field_optimization_report_eos:
+    kind: analysis
+    help: Equation-of-state report analysis
+  force_field_optimization_report_bulk_modulus:
+    kind: analysis
+    help: Bulk modulus report analysis
+  trainset_group_comments:
+    kind: analysis
+    help: Trainset group comments
+  get-params:
+    kind: analysis
+    help: Optimization parameter definitions
+  msd:
+    kind: analysis
+    aliases:
+      - mean-square-displacement
+      - mean_square_displacement
+    help: Mean square displacement
+  rdf:
+    kind: analysis
+    aliases:
+      - radial-distribution-function
+      - radial_distribution_function
+    help: Radial distribution function
+  rdf_property:
+    kind: analysis
+    aliases:
+      - rdf-property
+      - rdfproperty
+    help: RDF property analysis
+  connection_list:
+    kind: analysis
+    help: Bond connection list
+  connection_table:
+    kind: analysis
+    help: Bond connection table
+  connection_stats:
+    kind: analysis
+    help: Connectivity statistics
+  bond_timeseries:
+    kind: analysis
+    help: Bond time series
+  bond_events:
+    kind: analysis
+    help: Bond formation and breakage events
+  coordination:
+    kind: analysis
+    help: Coordination analysis
+  coordination_relabel:
+    kind: analysis
+    help: Coordination-based relabeling
+  hybridization:
+    kind: analysis
+    help: Hybridization analysis
+  atom_property_plot3d:
+    kind: analysis
+    help: 3D atom property view
+  atom_property_heatmap2d:
+    kind: analysis
+    help: 2D atom property heatmap

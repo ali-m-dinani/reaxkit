@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -32,26 +33,27 @@ from reaxkit.domain.data_models import (
     TrajectoryData,
 )
 from reaxkit.engine.base import EngineAdapter
-from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames
-from reaxkit.engine.reaxff.io.control_handler import ControlHandler
-from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
-from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
-from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
-from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
-from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
-from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
-from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
-from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
-from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
-from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
-from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
-from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
-from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
-from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
-from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
-from reaxkit.engine.reaxff.io.trainset_handler import TrainsetHandler
-from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
-from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+
+if TYPE_CHECKING:
+    from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+    from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
+    from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+    from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+    from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
+    from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
+    from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
+    from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
+    from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
+    from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
+    from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
+    from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
+    from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
+    from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
+    from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
+    from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
+    from reaxkit.engine.reaxff.io.trainset_handler import TrainsetHandler
+    from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
+    from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 
 class _SparseFrame:
@@ -106,11 +108,11 @@ def _merge_simulation_data(
         elements=base.elements if base.elements is not None else extra.elements,
         num_of_atoms=base.num_of_atoms if base.num_of_atoms is not None else extra.num_of_atoms,
         potential_energy=base.potential_energy if base.potential_energy is not None else extra.potential_energy,
-        V=base.V if base.V is not None else extra.V,
-        T=base.T if base.T is not None else extra.T,
-        P=base.P if base.P is not None else extra.P,
-        D=base.D if base.D is not None else extra.D,
-        elap_time=base.elap_time if base.elap_time is not None else extra.elap_time,
+        volume=base.volume if base.volume is not None else extra.volume,
+        temperature=base.temperature if base.temperature is not None else extra.temperature,
+        pressure=base.pressure if base.pressure is not None else extra.pressure,
+        density=base.density if base.density is not None else extra.density,
+        elapsed_time=base.elapsed_time if base.elapsed_time is not None else extra.elapsed_time,
         atom_type_nums=base.atom_type_nums if base.atom_type_nums is not None else extra.atom_type_nums,
         molecule_nums=base.molecule_nums if base.molecule_nums is not None else extra.molecule_nums,
         cell_lengths=base.cell_lengths if base.cell_lengths is not None else extra.cell_lengths,
@@ -321,15 +323,22 @@ def _force_field_from_ffield_handler(handler: FFieldHandler) -> ForceFieldParame
     """Normalize an ``FFieldHandler`` into ``ForceFieldParametersData``."""
     sections = handler.sections
     meta = handler.metadata()
+    section_general = getattr(handler, "SECTION_GENERAL", "general")
+    section_atom = getattr(handler, "SECTION_ATOM", "atom")
+    section_bond = getattr(handler, "SECTION_BOND", "bond")
+    section_off_diagonal = getattr(handler, "SECTION_OFF_DIAGONAL", "off_diagonal")
+    section_angle = getattr(handler, "SECTION_ANGLE", "angle")
+    section_torsion = getattr(handler, "SECTION_TORSION", "torsion")
+    section_hbond = getattr(handler, "SECTION_HBOND", "hbond")
 
     return ForceFieldParametersData(
-        general_parameters=sections.get(FFieldHandler.SECTION_GENERAL, pd.DataFrame()).copy(),
-        atom_parameters=sections.get(FFieldHandler.SECTION_ATOM, pd.DataFrame()).copy(),
-        bond_parameters=sections.get(FFieldHandler.SECTION_BOND, pd.DataFrame()).copy(),
-        off_diagonal_parameters=sections.get(FFieldHandler.SECTION_OFF_DIAGONAL, pd.DataFrame()).copy(),
-        angle_parameters=sections.get(FFieldHandler.SECTION_ANGLE, pd.DataFrame()).copy(),
-        torsion_parameters=sections.get(FFieldHandler.SECTION_TORSION, pd.DataFrame()).copy(),
-        hydrogen_bond_parameters=sections.get(FFieldHandler.SECTION_HBOND, pd.DataFrame()).copy(),
+        general_parameters=sections.get(section_general, pd.DataFrame()).copy(),
+        atom_parameters=sections.get(section_atom, pd.DataFrame()).copy(),
+        bond_parameters=sections.get(section_bond, pd.DataFrame()).copy(),
+        off_diagonal_parameters=sections.get(section_off_diagonal, pd.DataFrame()).copy(),
+        angle_parameters=sections.get(section_angle, pd.DataFrame()).copy(),
+        torsion_parameters=sections.get(section_torsion, pd.DataFrame()).copy(),
+        hydrogen_bond_parameters=sections.get(section_hbond, pd.DataFrame()).copy(),
         source="reaxff/ffield",
         metadata=dict(meta),
     )
@@ -611,7 +620,7 @@ def _eregime_from_handler(handler: EregimeHandler) -> EregimeData:
     field_dir_col = "field_dir" if "field_dir" in df.columns else "field_dir1"
     field_col = "field" if "field" in df.columns else "field1"
     return EregimeData(
-        iter=iterations,
+        iterations=iterations,
         field_zones=field_zones,
         field_dir=(
             df[field_dir_col].fillna("").to_numpy(dtype=object)
@@ -744,11 +753,11 @@ def _simulation_from_summary_handler(handler: SummaryHandler) -> SimulationData:
         iterations=iterations,
         time=(df["time"].to_numpy(dtype=float) if "time" in df.columns else None),
         potential_energy=(df["E_pot"].to_numpy(dtype=float) if "E_pot" in df.columns else None),
-        V=(df["V"].to_numpy(dtype=float) if "V" in df.columns else None),
-        T=(df["T"].to_numpy(dtype=float) if "T" in df.columns else None),
-        P=(df["P"].to_numpy(dtype=float) if "P" in df.columns else None),
-        D=(df["D"].to_numpy(dtype=float) if "D" in df.columns else None),
-        elap_time=(df["elap_time"].to_numpy(dtype=float) if "elap_time" in df.columns else None),
+        volume=(df["V"].to_numpy(dtype=float) if "V" in df.columns else None),
+        temperature=(df["T"].to_numpy(dtype=float) if "T" in df.columns else None),
+        pressure=(df["P"].to_numpy(dtype=float) if "P" in df.columns else None),
+        density=(df["D"].to_numpy(dtype=float) if "D" in df.columns else None),
+        elapsed_time=(df["elap_time"].to_numpy(dtype=float) if "elap_time" in df.columns else None),
     )
     energy_vals = (
         df[field_energy_components].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
@@ -824,6 +833,8 @@ class ReaxFFAdapter(EngineAdapter):
         return 0.95 if has_xmol else 0.0
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
+        from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+
         xmol_path = self._resolve_reaxff_path(args, "xmolout", default="xmolout")
         handler = XmoloutHandler(xmol_path, reporter=reporter)
         trj = _trajectory_from_xmolout_handler(handler)
@@ -834,6 +845,8 @@ class ReaxFFAdapter(EngineAdapter):
         return trj
 
     def load_geometry(self, args: dict, reporter=None) -> GeometryData:
+        from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
+
         raw = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
         p = Path(raw)
         geo_path = p / "geo" if p.is_dir() else p
@@ -849,6 +862,8 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _load_simulation_from_xmolout(args: dict, reporter=None) -> SimulationData | None:
+        from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+
         xmol_path = ReaxFFAdapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
         if not xmol_path.exists():
             return None
@@ -858,6 +873,8 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _load_simulation_from_summary(args: dict, reporter=None) -> SimulationData | None:
+        from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
+
         candidates = [args.get("summary"), args.get("xmolout"), args.get("run_dir"), args.get("input")]
         summary_path = None
         for raw in candidates:
@@ -879,6 +896,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _simulation_from_summary_handler(handler)
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
+        from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+
         raw = args.get("fort7") or args.get("connectivity") or args.get("input") or "fort.7"
         p = Path(raw)
         fort7_path = p / "fort.7" if p.is_dir() else p
@@ -895,6 +914,9 @@ class ReaxFFAdapter(EngineAdapter):
         return conn
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
+        from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+        from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+
         fort7_raw = args.get("fort7") or args.get("connectivity") or args.get("input") or "fort.7"
         fort7_path = Path(fort7_raw)
         fort7_path = fort7_path / "fort.7" if fort7_path.is_dir() else fort7_path
@@ -911,6 +933,8 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_force_field(self, args: dict, reporter=None) -> ForceFieldParametersData:
+        from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
         ffield_path = p / "ffield" if p.is_dir() else p
@@ -919,6 +943,8 @@ class ReaxFFAdapter(EngineAdapter):
         return out
 
     def load_force_field_optimization(self, args: dict, reporter=None) -> ForceFieldOptimizationProgressData:
+        from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
+
         raw = args.get("fort13") or args.get("force_field_optimization") or args.get("input") or "fort.13"
         p = Path(raw)
         fort13_path = p / "fort.13" if p.is_dir() else p
@@ -926,6 +952,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _force_field_optimization_from_fort13_handler(handler)
 
     def load_force_field_optimization_report(self, args: dict, reporter=None) -> ForceFieldOptimizationReportData:
+        from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
+
         raw = args.get("fort99") or args.get("force_field_optimization_report") or args.get("input") or "fort.99"
         p = Path(raw)
         fort99_path = p / "fort.99" if p.is_dir() else p
@@ -937,6 +965,8 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationTrainingSetData:
+        from reaxkit.engine.reaxff.io.trainset_handler import TrainsetHandler
+
         raw = args.get("trainset") or args.get("force_field_optimization_training_set") or args.get("input") or "trainset.in"
         p = Path(raw)
         trainset_path = p / "trainset.in" if p.is_dir() else p
@@ -948,6 +978,8 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationParameterData:
+        from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
+
         raw = args.get("params") or args.get("force_field_optimization_parameters") or args.get("input") or "params"
         p = Path(raw)
         params_path = p / "params" if p.is_dir() else p
@@ -959,6 +991,8 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationDiagnosticData:
+        from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
+
         raw = args.get("fort79") or args.get("parameter_optimization_diagnostic") or args.get("input") or "fort.79"
         p = Path(raw)
         fort79_path = p / "fort.79" if p.is_dir() else p
@@ -966,6 +1000,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _parameter_optimization_diagnostic_from_fort79_handler(handler)
 
     def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
+        from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
+
         raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
         p = Path(raw)
         fort74_path = p / "fort.74" if p.is_dir() else p
@@ -973,6 +1009,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _structure_summary_from_fort74_handler(handler)
 
     def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
+        from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
+
         raw = args.get("fort73") or args.get("partial_energy") or args.get("input") or "fort.73"
         p = Path(raw)
         if p.is_dir():
@@ -984,6 +1022,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _partial_energy_from_energy_log_handler(handler)
 
     def load_restraints(self, args: dict, reporter=None) -> RestraintData:
+        from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
+
         raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
         p = Path(raw)
         fort76_path = p / "fort.76" if p.is_dir() else p
@@ -991,6 +1031,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _restraint_from_fort76_handler(handler)
 
     def load_geometry_optimization(self, args: dict, reporter=None) -> GeometryOptimizationProgressData:
+        from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
+
         raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
         p = Path(raw)
         fort57_path = p / "fort.57" if p.is_dir() else p
@@ -998,6 +1040,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _geometry_optimization_from_fort57_handler(handler)
 
     def load_control_parameters(self, args: dict, reporter=None) -> ControlParametersData:
+        from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+
         raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
         p = Path(raw)
         control_path = p / "control" if p.is_dir() else p
@@ -1005,6 +1049,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _control_parameters_from_control_handler(handler)
 
     def load_eregime(self, args: dict, reporter=None) -> EregimeData:
+        from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
+
         raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
         p = Path(raw)
         eregime_path = p / "eregime.in" if p.is_dir() else p
@@ -1012,6 +1058,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _eregime_from_handler(handler)
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
+        from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+
         raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
         p = Path(raw)
         fort7_path = p / "fort.7" if p.is_dir() else p
@@ -1023,6 +1071,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _charges_from_fort7_handler(handler, simulation=sim, reporter=reporter)
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:
+        from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
+
         raw = args.get("vels") or args.get("kinematics") or args.get("input") or "vels"
         p = Path(raw)
         if p.is_dir():
@@ -1040,6 +1090,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _atomic_kinematics_from_vels_handler(handler)
 
     def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
+        from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
+
         raw = args.get("fort78") or args.get("electric_field") or args.get("input") or "fort.78"
         p = Path(raw)
         fort78_path = p / "fort.78" if p.is_dir() else p
@@ -1050,6 +1102,8 @@ class ReaxFFAdapter(EngineAdapter):
         return out
 
     def load_molecular_analysis(self, args: dict, reporter=None) -> MolecularAnalysisData:
+        from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
+
         raw = args.get("molfra") or args.get("molecular_analysis") or args.get("input") or "molfra.out"
         p = Path(raw)
         if p.is_dir():
@@ -1065,6 +1119,8 @@ class ReaxFFAdapter(EngineAdapter):
         return _molecular_analysis_from_molfra_handler(handler)
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
+        from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames
+
         args = args or {}
         positions = np.asarray(data.positions, dtype=float)
         if positions.ndim != 3:

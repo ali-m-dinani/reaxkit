@@ -10,8 +10,8 @@ from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401
 from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.task_registry import TASK_REGISTRY
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 

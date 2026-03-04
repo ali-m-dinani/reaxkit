@@ -25,7 +25,7 @@ from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.alias import _resolve_alias, normalize_choice, resolve_alias_from_columns
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.frame_utils import parse_frames
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.domain.data_models import (
     ChargeData,
     ConnectivityData,

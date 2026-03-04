@@ -60,6 +60,7 @@ full_sim_examples/
 output/
 plots/
 results/
+tests/artifacts/
 src/reaxkit/trash/
 src/reaxkit/under_development/
 src/reaxkit/under_dev

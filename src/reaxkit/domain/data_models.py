@@ -19,11 +19,11 @@ class SimulationData:
     elements: Optional[list[str]] = None
     num_of_atoms: Optional[np.ndarray] = None
     potential_energy: Optional[np.ndarray] = None
-    V: Optional[np.ndarray] = None
-    T: Optional[np.ndarray] = None
-    P: Optional[np.ndarray] = None
-    D: Optional[np.ndarray] = None
-    elap_time: Optional[np.ndarray] = None
+    volume: Optional[np.ndarray] = None
+    temperature: Optional[np.ndarray] = None
+    pressure: Optional[np.ndarray] = None
+    density: Optional[np.ndarray] = None
+    elapsed_time: Optional[np.ndarray] = None
     atom_type_nums: Optional[np.ndarray] = None   # (n_frames, n_atoms)
     molecule_nums: Optional[np.ndarray] = None    # (n_frames, n_atoms)
     cell_lengths: Optional[np.ndarray] = None  # (n_frames, 3): a, b, c
@@ -171,19 +171,6 @@ class ForceFieldOptimizationParameterData:
 
 
 @dataclass
-class ForceFieldOptimizationData:
-    """Composite force-field optimization view spanning progress and diagnostics."""
-
-    force_field_parameters: Optional[ForceFieldParametersData] = None
-    optimization_parameters: Optional[ForceFieldOptimizationParameterData] = None
-    training_set: Optional[ForceFieldOptimizationTrainingSetData] = None
-    progress: Optional[ForceFieldOptimizationProgressData] = None
-    diagnostics: Optional[ForceFieldOptimizationDiagnosticData] = None
-    report: Optional[ForceFieldOptimizationReportData] = None
-    metadata: Optional[dict[str, Any]] = None
-
-
-@dataclass
 class GeometrySummaryData:
     """Canonical structure-summary model parsed from ``fort.74``."""
 
@@ -284,7 +271,7 @@ class AtomicKinematicsData:
 class EregimeData:
     """Canonical electric-field schedule model parsed from ``eregime.in``."""
 
-    iter: np.ndarray
+    iterations: np.ndarray
     field_zones: np.ndarray
     field_dir: np.ndarray
     field: np.ndarray
@@ -303,6 +290,18 @@ class MolecularAnalysisData:
 # ---------------------------------------------------------------------
 # Composite Data Models
 # ---------------------------------------------------------------------
+
+@dataclass
+class ForceFieldOptimizationData:
+    """Composite force-field optimization view spanning progress and diagnostics."""
+
+    force_field_parameters: Optional[ForceFieldParametersData] = None
+    optimization_parameters: Optional[ForceFieldOptimizationParameterData] = None
+    training_set: Optional[ForceFieldOptimizationTrainingSetData] = None
+    progress: Optional[ForceFieldOptimizationProgressData] = None
+    diagnostics: Optional[ForceFieldOptimizationDiagnosticData] = None
+    report: Optional[ForceFieldOptimizationReportData] = None
+    metadata: Optional[dict[str, Any]] = None
 
 @dataclass
 class ElectrostaticsData:

@@ -12,73 +12,11 @@ import argparse
 import sys
 from importlib import import_module
 
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
-
-# Mapping from top-level CLI "kind" (subcommand) to the workflow module
-# that knows how to register its own tasks and arguments.
-
-# important note: energylog and fort.58 have exactly the same structure as fort.73, hence they should map to fort.73
-# also, fort.8 is similar to fort.7 in the same way
-# same for molsav and moldyn which are similar to vels
-WORKFLOW_MODULES = {
-    "intspec": "reaxkit.workflows.meta.introspection_workflow",
-    "elect": "reaxkit.workflows.electrostatics_workflow",
-    "video": "reaxkit.workflows.meta.make_video_workflow",
-    "plotter": "reaxkit.workflows.meta.plotter_workflow",
-    "help": "reaxkit.workflows.meta.help_workflow",
-    "analysis": "reaxkit.workflows.diffusion_workflow",
-    "timeseries": "reaxkit.workflows.timeseries_workflow",
-}
-
-DIRECT_COMMAND_MODULES = {
-    "get-control": "reaxkit.workflows.control_workflow",
-    "make-control": "reaxkit.workflows.control_workflow",
-    "make-eregime": "reaxkit.workflows.file_tools.eregime_workflow",
-    "trim-xmolout": "reaxkit.workflows.file_tools.xmolout_workflow",
-    "xtob": "reaxkit.workflows.file_tools.geo_workflow",
-    "make-geo": "reaxkit.workflows.file_tools.geo_workflow",
-    "sort-geo": "reaxkit.workflows.file_tools.geo_workflow",
-    "orthogonalize-geo": "reaxkit.workflows.file_tools.geo_workflow",
-    "place-geo": "reaxkit.workflows.file_tools.geo_workflow",
-    "add-geo-restraint": "reaxkit.workflows.file_tools.geo_workflow",
-    "extract-optimized-ffield": "reaxkit.workflows.file_tools.fort83_workflow",
-    "export-trainset": "reaxkit.workflows.file_tools.trainset_workflow",
-    "make-trainset-settings": "reaxkit.workflows.file_tools.trainset_workflow",
-    "make-trainset": "reaxkit.workflows.file_tools.trainset_workflow",
-    "make-tregime": "reaxkit.workflows.file_tools.tregime_workflow",
-    "make-vregime": "reaxkit.workflows.file_tools.vregime_workflow",
-    "kinematics": "reaxkit.workflows.kinematics_workflow",
-    "kinematics_plot3d": "reaxkit.workflows.kinematics_workflow",
-    "kinematics_heatmap2d": "reaxkit.workflows.kinematics_workflow",
-    "dominant_species": "reaxkit.workflows.molecular_analysis_workflow",
-    "largest_molecule_by_mass": "reaxkit.workflows.molecular_analysis_workflow",
-    "largest_molecule_composition": "reaxkit.workflows.molecular_analysis_workflow",
-    "molecule_lifetime": "reaxkit.workflows.molecular_analysis_workflow",
-    "force_field_data": "reaxkit.workflows.force_field_workflow",
-    "force_field_optimization": "reaxkit.workflows.force_field_workflow",
-    "structure_summary_data": "reaxkit.workflows.force_field_workflow",
-    "parameter_optimization_diagnostic": "reaxkit.workflows.force_field_workflow",
-    "parameter_optimization_most_sensitive": "reaxkit.workflows.force_field_workflow",
-    "parameter_optimization_tornado": "reaxkit.workflows.force_field_workflow",
-    "force_field_optimization_report": "reaxkit.workflows.force_field_workflow",
-    "force_field_optimization_report_eos": "reaxkit.workflows.force_field_workflow",
-    "force_field_optimization_report_bulk_modulus": "reaxkit.workflows.force_field_workflow",
-    "trainset_group_comments": "reaxkit.workflows.force_field_workflow",
-    "get-params": "reaxkit.workflows.params_workflow",
-    "msd": "reaxkit.workflows.trajectory_workflow",
-    "rdf": "reaxkit.workflows.trajectory_workflow",
-    "rdf_property": "reaxkit.workflows.trajectory_workflow",
-    "connection_list": "reaxkit.workflows.connectivity_workflow",
-    "connection_table": "reaxkit.workflows.connectivity_workflow",
-    "connection_stats": "reaxkit.workflows.connectivity_workflow",
-    "bond_timeseries": "reaxkit.workflows.connectivity_workflow",
-    "bond_events": "reaxkit.workflows.connectivity_workflow",
-    "coordination": "reaxkit.workflows.connectivity_workflow",
-    "coordination_relabel": "reaxkit.workflows.connectivity_workflow",
-    "hybridization": "reaxkit.workflows.connectivity_workflow",
-    "atom_property_plot3d": "reaxkit.workflows.spatial_property_workflow",
-    "atom_property_heatmap2d": "reaxkit.workflows.spatial_property_workflow",
-}
+from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+from reaxkit.core.command_catalog import get_registered_commands
+from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.generator_cli_routing_registry import get_registered_generators
+from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
 
 
 # Workflows that are allowed to omit an explicit task; a default task
@@ -88,6 +26,12 @@ DEFAULTABLE = {}
 # Names that are treated as "known tasks" when deciding whether to inject
 # a synthetic `_default` task for DEFAULTABLE workflows.
 DEFAULT_TASKS = {}
+
+
+def _command_help_text(name: str, fallback: str) -> str:
+    """Return help text for a top-level command."""
+    spec = get_registered_commands(include_analysis_tasks=True).get(name)
+    return spec.help_text or fallback if spec is not None else fallback
 
 
 def _preinject(argv):
@@ -162,8 +106,12 @@ def _canonicalize_direct_command(argv):
     if len(out) < 2:
         return out
 
+    direct_commands = {
+        **get_registered_analysis_commands(),
+        **get_registered_generators(),
+    }
     try:
-        out[1] = resolve_command_name(out[1], task_names=DIRECT_COMMAND_MODULES.keys())
+        out[1] = resolve_command_name(out[1], task_names=direct_commands.keys())
     except KeyError:
         pass
     return out
@@ -219,35 +167,41 @@ def main():
     # First level of subcommands: direct commands and legacy workflow kinds.
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for command, module_path in DIRECT_COMMAND_MODULES.items():
-        cp = sub.add_parser(command, help=f"{command} command")
+    direct_commands = {
+        **get_registered_analysis_commands(),
+        **get_registered_generators(),
+    }
+    workflow_commands = get_registered_workflows()
+
+    for command, spec in direct_commands.items():
+        cp = sub.add_parser(command, help=_command_help_text(command, f"{command} command"))
 
         if command != selected_command:
             continue
 
-        module = import_module(module_path)
+        module = import_module(spec.module_path)
         if hasattr(module, "build_parser"):
             module.build_parser(cp, command=command)
         cp.set_defaults(_run=_direct_command_runner(module, command))
 
     # For each workflow module, create its own subparser and let it
     # register its internal tasks (second-level subcommands).
-    for kind, module_path in WORKFLOW_MODULES.items():
+    for kind, spec in workflow_commands.items():
         # e.g. `reaxkit help ...`, `reaxkit timeseries ...`
-        kp = sub.add_parser(kind, help=f"{kind} workflows")
+        kp = sub.add_parser(kind, help=_command_help_text(kind, f"{kind} workflows"))
 
         if kind != selected_command:
             continue
 
-        module = import_module(module_path)
+        module = import_module(spec.module_path)
 
-        if kind == "intspec":
+        if spec.dispatch_mode == "intspec_runner":
             # Kind-level workflow: no subcommands
             if hasattr(module, "build_parser"):
                 module.build_parser(kp)
             kp.set_defaults(_run=_intspec_default_runner)
 
-        elif kind in {"help", "timeseries"}:
+        elif spec.dispatch_mode == "kind_runner":
             # Kind-level workflow: no subcommands
             if hasattr(module, "build_parser"):
                 module.build_parser(kp)

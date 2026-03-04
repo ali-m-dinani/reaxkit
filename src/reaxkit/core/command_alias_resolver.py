@@ -6,11 +6,11 @@ from difflib import get_close_matches
 import re
 from typing import Iterable, Mapping, Sequence
 
-from reaxkit.core.command_registry import get_registered_commands
+from reaxkit.core.command_catalog import get_registered_commands
 
 
-def _normalize_task_token(value: str) -> str:
-    """Normalize a task token for case-insensitive alias matching."""
+def _normalize_command_token(value: str) -> str:
+    """Normalize a command token for case-insensitive alias matching."""
     token = (value or "").strip().lower()
     token = re.sub(r"[\s\-_]+", "", token)
     return token
@@ -26,8 +26,8 @@ def registered_task_names() -> list[str]:
     return registered_command_names()
 
 
-def build_task_alias_index(
-    task_names: Iterable[str],
+def build_command_alias_index(
+    command_names: Iterable[str],
     aliases: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, str]:
     """
@@ -35,15 +35,15 @@ def build_task_alias_index(
 
     Parameters
     ----------
-    task_names
-        Canonical task names.
+    command_names
+        Canonical command names.
     aliases
-        Optional explicit aliases keyed by canonical task name.
+        Optional explicit aliases keyed by canonical command name.
 
     Returns
     -------
     dict[str, str]
-        Mapping from normalized alias token to canonical task name.
+        Mapping from normalized alias token to canonical command name.
     """
     alias_index: dict[str, str] = {}
     explicit_aliases = aliases or {}
@@ -52,14 +52,14 @@ def build_task_alias_index(
         for name, spec in get_registered_commands().items()
     }
 
-    for task in task_names:
-        canonical = str(task)
+    for command in command_names:
+        canonical = str(command)
         candidates = [canonical, canonical.replace("_", "-"), canonical.replace("-", "_")]
         candidates.extend(registry_aliases.get(canonical, ()))
         candidates.extend(explicit_aliases.get(canonical, ()))
 
         for candidate in candidates:
-            normalized = _normalize_task_token(candidate)
+            normalized = _normalize_command_token(candidate)
             if normalized:
                 alias_index[normalized] = canonical
 
@@ -98,11 +98,11 @@ def resolve_command_name(
     if not names:
         raise KeyError("No commands are registered for alias resolution.")
 
-    normalized = _normalize_task_token(value)
+    normalized = _normalize_command_token(value)
     if not normalized:
         raise KeyError("Command name cannot be empty.")
 
-    alias_index = build_task_alias_index(names, aliases=aliases)
+    alias_index = build_command_alias_index(names, aliases=aliases)
     resolved = alias_index.get(normalized)
     if resolved is not None:
         return resolved
@@ -118,6 +118,14 @@ def resolve_command_name(
     if canonical_suggestions:
         message += f" Did you mean: {', '.join(canonical_suggestions)}?"
     raise KeyError(message)
+
+
+def build_task_alias_index(
+    task_names: Iterable[str],
+    aliases: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, str]:
+    """Backward-compatible alias for command alias index construction."""
+    return build_command_alias_index(task_names, aliases=aliases)
 
 
 def resolve_task_name(

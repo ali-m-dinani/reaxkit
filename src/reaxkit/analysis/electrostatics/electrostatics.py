@@ -10,17 +10,15 @@ import pandas as pd
 from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.analysis.control.control import ControlValueRequest, ControlValueTask
-from reaxkit.core.task_registry import register_task
+from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ControlParametersData, ElectrostaticsData, ElectricFieldData
+from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
 from reaxkit.engine.reaxff.adapter import (
     _charges_from_fort7_handler,
     _connectivity_from_fort7_handler,
     _trajectory_from_xmolout_handler,
 )
-from reaxkit.extractors.per_file.fort78 import extract_fort78_data
 from reaxkit.core.constants import const
 from reaxkit.utils.numerical.numerical_calcs import find_zero_crossings
 
@@ -403,41 +401,6 @@ def _field_component_series(
     return by_iter.reindex(target_iters).to_numpy(dtype=float)
 
 
-def match_electric_field_to_iout2(
-    f78,
-    ctrl: ControlParametersData,
-    target_iters: Sequence[int],
-    field_var: str = "E_field_z",
-) -> pd.Series:
-    """Match fort.78 field values to target iterations using a stepwise hold rule."""
-    iout2 = ControlValueTask().run(
-        ctrl,
-        ControlValueRequest(key="iout2", section="md", default=1),
-    ).value
-    _ = iout2
-
-    df_e = extract_fort78_data(f78, variables=field_var)
-    if df_e.empty:
-        raise ValueError("fort.78 has no usable data.")
-
-    df_e = df_e.sort_values("iter").reset_index(drop=True)
-    mapping = pd.Series(df_e[field_var].values, index=df_e["iter"].values)
-    sorted_iters = list(mapping.index)
-
-    out_vals = []
-    for it in target_iters:
-        it = int(it)
-        if it == 0:
-            out_vals.append(0.0)
-            continue
-        valid = [f for f in sorted_iters if f <= it]
-        if not valid:
-            raise ValueError(f"No fort.78 iteration <= {it}")
-        out_vals.append(float(mapping[max(valid)]))
-
-    return pd.Series(out_vals, index=list(target_iters), name=field_var)
-
-
 def _electrostatics_data_from_handlers(xh, f7) -> ElectrostaticsData:
     traj = _trajectory_from_xmolout_handler(xh)
     n_frames, n_atoms = traj.positions.shape[:2]
@@ -655,7 +618,6 @@ class PolarizationFieldTask(AnalysisTask):
 
 
 __all__ = [
-    "match_electric_field_to_iout2",
     "DipoleRequest",
     "DipoleResult",
     "DipoleTask",

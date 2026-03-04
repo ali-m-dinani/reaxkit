@@ -10,8 +10,8 @@ from reaxkit.analysis import params as _params_tasks  # noqa: F401
 from reaxkit.analysis.params.params import ForceFieldOptimizationParameterRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.task_registry import TASK_REGISTRY
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.domain.data_models import ForceFieldParametersData
 from reaxkit.presentation.dispatcher import present_result
 

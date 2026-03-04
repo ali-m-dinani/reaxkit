@@ -21,7 +21,6 @@ import os
 from typing import List, Optional, Tuple
 
 from tabulate import tabulate
-
 from reaxkit.help.introspection_utils import (
     list_modules_recursive_with_summaries,
     module_docstring_first_line_from_file,

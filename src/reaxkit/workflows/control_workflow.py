@@ -8,8 +8,8 @@ from typing import Callable
 from reaxkit.analysis import control as _control_tasks  # noqa: F401
 from reaxkit.analysis.control.control import ControlValueRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.task_registry import TASK_REGISTRY
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.engine.reaxff.generators.control_generator import write_control
 
 CONTROL_COMMANDS = ("get-control",)

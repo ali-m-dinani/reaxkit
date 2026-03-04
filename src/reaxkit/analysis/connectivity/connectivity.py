@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.core.task_registry import register_task
+from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ConnectivityData
@@ -219,7 +219,6 @@ class BondTimeseriesRequest(BaseRequest):
     every: int = 1
     undirected: bool = True
     bo_threshold: float = 0.0
-    as_wide: bool = False
 
 
 @dataclass
@@ -242,8 +241,7 @@ class BondTimeseriesTask(AnalysisTask):
             ),
         ).table
         if edges.empty:
-            cols = [] if request.as_wide else ["frame_idx", "iter", "src", "dst", "bo"]
-            return BondTimeseriesResult(table=pd.DataFrame(columns=cols))
+            return BondTimeseriesResult(table=pd.DataFrame(columns=["frame_idx", "iter", "src", "dst", "bo"]))
 
         # one row per frame/pair with max BO
         edges = edges.groupby(["frame_idx", "iter", "src", "dst"], as_index=False)["bo"].max()
@@ -262,11 +260,6 @@ class BondTimeseriesTask(AnalysisTask):
 
         if request.bo_threshold > 0.0:
             pivot = pivot.mask(pivot < float(request.bo_threshold), 0.0)
-
-        if request.as_wide:
-            wide = pivot.copy()
-            wide.columns = [f"{s}-{d}" for (s, d) in wide.columns.to_list()]
-            return BondTimeseriesResult(table=wide.sort_index(level=[0, 1]))
 
         # tidy
         try:
@@ -430,4 +423,3 @@ __all__ = [
     "BondEventsResult",
     "BondEventsTask",
 ]
-

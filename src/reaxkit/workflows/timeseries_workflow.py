@@ -25,7 +25,7 @@ from reaxkit.analysis.timeseries.timeseries import (
 )
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.frame_utils import parse_frames
-from reaxkit.core.task_registry import TASK_REGISTRY
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import present_result
 
@@ -52,18 +52,18 @@ _SIMULATION_FIELD_MAP = {
     "num_of_atoms": "num_of_atoms",
     "num_atoms": "num_of_atoms",
     "atoms": "num_of_atoms",
-    "volume": "V",
-    "v": "V",
-    "temperature": "T",
-    "temp": "T",
-    "t": "T",
-    "pressure": "P",
-    "p": "P",
-    "density": "D",
-    "d": "D",
-    "elapsed_time": "elap_time",
-    "elap_time": "elap_time",
-    "time_elapsed": "elap_time",
+    "volume": "volume",
+    "v": "volume",
+    "temperature": "temperature",
+    "temp": "temperature",
+    "t": "temperature",
+    "pressure": "pressure",
+    "p": "pressure",
+    "density": "density",
+    "d": "density",
+    "elapsed_time": "elapsed_time",
+    "elap_time": "elapsed_time",
+    "time_elapsed": "elapsed_time",
     "a": "a",
     "b": "b",
     "c": "c",
@@ -413,8 +413,6 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "Examples:\n"
         "  reaxkit timeseries --field temperature --summary summary.txt --plot single\n"
         "  reaxkit timeseries --field atom[1,2].z --xaxis time --save atom_z.png\n"
-        "  reaxkit timeseries --atoms 1,5,12 --dims z --xaxis time --save atom_z.png\n"
-        "  reaxkit timeseries --boxdims --cell-fields a b c --xaxis iter --plot subplot\n"
         "  reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv\n"
         "  reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single\n"
         "  reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot\n"
@@ -424,7 +422,10 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "  reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n"
         "  reaxkit timeseries --field energy.all --fort73 energylog --plot subplot\n"
         "  reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single\n"
-        "  reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot"
+        "  reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n\n"
+        "for legacy CLI commands use\n"
+        "  reaxkit timeseries --atoms 1,5,12 --dims z --xaxis time --save atom_z.png\n"
+        "  reaxkit timeseries --boxdims --cell-fields a b c --xaxis iter --plot subplot\n"
     )
     _add_runtime_arguments(p)
     _add_presentation_arguments(p)

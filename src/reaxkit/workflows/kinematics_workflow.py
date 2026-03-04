@@ -11,8 +11,8 @@ import pandas as pd
 from reaxkit.analysis import kinematics as _kinematics_tasks  # noqa: F401
 from reaxkit.analysis.kinematics.kinematics import AtomicKinematicsRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.task_registry import TASK_REGISTRY
-from reaxkit.core.task_resolution_using_alias import resolve_command_name
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.plot import heatmap2d_from_3d, scatter3d_points
 

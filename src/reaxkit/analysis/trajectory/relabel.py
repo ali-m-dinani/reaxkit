@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.core.task_registry import register_task
+from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, SimulationData, TrajectoryData
@@ -34,11 +34,11 @@ def _subset_simulation(simulation: SimulationData | None, frame_idx: np.ndarray,
         elements=list(elements),
         num_of_atoms=_subset_optional_array(simulation.num_of_atoms, frame_idx),
         potential_energy=_subset_optional_array(simulation.potential_energy, frame_idx),
-        V=_subset_optional_array(simulation.V, frame_idx),
-        T=_subset_optional_array(simulation.T, frame_idx),
-        P=_subset_optional_array(simulation.P, frame_idx),
-        D=_subset_optional_array(simulation.D, frame_idx),
-        elap_time=_subset_optional_array(simulation.elap_time, frame_idx),
+        volume=_subset_optional_array(simulation.volume, frame_idx),
+        temperature=_subset_optional_array(simulation.temperature, frame_idx),
+        pressure=_subset_optional_array(simulation.pressure, frame_idx),
+        density=_subset_optional_array(simulation.density, frame_idx),
+        elapsed_time=_subset_optional_array(simulation.elapsed_time, frame_idx),
         atom_type_nums=_subset_optional_array(simulation.atom_type_nums, frame_idx),
         molecule_nums=_subset_optional_array(simulation.molecule_nums, frame_idx),
         cell_lengths=_subset_optional_array(simulation.cell_lengths, frame_idx),

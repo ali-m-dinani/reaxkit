@@ -10,7 +10,7 @@ import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
-from reaxkit.core.task_registry import register_task
+from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (
@@ -59,7 +59,6 @@ class TrajectoryCoordinateSeriesRequest(BaseRequest):
     atom_ids: Optional[Sequence[int]] = None
     atom_types: Optional[Sequence[str]] = None
     dims: Sequence[str] = ("x",)
-    format: str = "long"
     frames: Optional[Sequence[int]] = None
     every: int = 1
 
@@ -130,21 +129,21 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
     if key == "potential_energy":
         arr = data.potential_energy
         label = "potential_energy"
-    elif key == "V":
-        arr = data.V
-        label = "V"
-    elif key == "T":
-        arr = data.T
-        label = "T"
-    elif key == "P":
-        arr = data.P
-        label = "P"
-    elif key == "D":
-        arr = data.D
-        label = "D"
-    elif key == "elap_time":
-        arr = data.elap_time
-        label = "elap_time"
+    elif key in {"volume", "V"}:
+        arr = data.volume
+        label = "volume"
+    elif key in {"temperature", "T"}:
+        arr = data.temperature
+        label = "temperature"
+    elif key in {"pressure", "P"}:
+        arr = data.pressure
+        label = "pressure"
+    elif key in {"density", "D"}:
+        arr = data.density
+        label = "density"
+    elif key in {"elapsed_time", "elap_time"}:
+        arr = data.elapsed_time
+        label = "elapsed_time"
     elif key == "num_of_atoms":
         arr = data.num_of_atoms
         label = "num_of_atoms"
@@ -165,7 +164,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
     else:
         raise KeyError(
             f"Unsupported simulation field {field!r}. "
-            "Choose from: potential_energy, V, T, P, D, elap_time, num_of_atoms, a, b, c, alpha, beta, gamma."
+            "Choose from: potential_energy, volume, temperature, pressure, density, elapsed_time, num_of_atoms, a, b, c, alpha, beta, gamma."
         )
 
     if arr is None:
@@ -216,9 +215,6 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         dims = tuple(str(d).lower() for d in request.dims if str(d).lower() in {"x", "y", "z"})
         if not dims:
             raise ValueError("TrajectoryCoordinateSeriesRequest.dims must include at least one of: x, y, z.")
-        fmt = str(request.format).lower()
-        if fmt not in {"long", "wide"}:
-            raise ValueError("TrajectoryCoordinateSeriesRequest.format must be 'long' or 'wide'.")
         positions = np.asarray(data.positions, dtype=float)
         n_frames, n_atoms = positions.shape[:2]
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
@@ -272,14 +268,7 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
                     rec[dim] = float(positions[fi, atom_idx, dim_to_col[dim]])
                 rows.append(rec)
 
-        table_long = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"]).reset_index(drop=True)
-        if fmt == "wide":
-            to_pivot = table_long[["frame_index", "iter", "atom_id"] + list(dims)]
-            table = to_pivot.pivot(index=["frame_index", "iter"], columns="atom_id", values=list(dims))
-            table.columns = [f"{d}[{aid}]" for (d, aid) in table.columns.to_flat_index()]
-            table = table.reset_index().sort_values("frame_index").reset_index(drop=True)
-        else:
-            table = table_long
+        table = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"]).reset_index(drop=True)
 
         return TimeSeriesResult(
             series=out,
@@ -634,7 +623,7 @@ class EregimeSeriesTask(AnalysisTask):
     required_data = EregimeData
 
     def run(self, data: EregimeData, request: EregimeSeriesRequest, reporter=None) -> TimeSeriesResult:
-        iterations = np.asarray(data.iter, dtype=int).reshape(-1)
+        iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         field_zones = np.asarray(data.field_zones, dtype=int).reshape(-1)
         field_dir = np.asarray(data.field_dir, dtype=object).reshape(-1)
         field = np.asarray(data.field, dtype=float).reshape(-1)
