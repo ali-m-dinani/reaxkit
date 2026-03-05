@@ -10,6 +10,7 @@ from reaxkit.core.cache_manager import CacheConfig, CacheManager
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.log import get_logger
 from reaxkit.core.progress import resolve_reporter
+from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 
 logger = get_logger(__name__)
@@ -57,6 +58,9 @@ class AnalysisExecutor:
         return "."
 
     def run(self, task, request, args: dict):
+        normalized = normalize_storage_args(args)
+        args.clear()
+        args.update(normalized)
         log_level = args.get("log")
         if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")
@@ -71,6 +75,19 @@ class AnalysisExecutor:
         reporter = resolve_reporter(args)
         t_load0 = perf_counter()
         data = adapter.load(task.required_data, args, reporter=reporter)
+        run_id = args.get("run_id")
+        if run_id:
+            try:
+                layout = ReaxkitStorageLayout(project_root=Path(args.get("project_root") or "."))
+                parser_version = f"{task.__class__.__name__}:{getattr(task.required_data, '__name__', 'data')}"
+                engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()
+                args["_parsed_id"] = layout.register_parsed_dataset(
+                    run_id=str(run_id),
+                    parser_version=parser_version,
+                    engine=engine_name,
+                )
+            except Exception as exc:  # pragma: no cover - best-effort metadata persistence
+                logger.debug("Storage index update skipped: %s", exc)
         t_load = perf_counter() - t_load0
         logger.debug(
             "Loaded data_type=%s for task=%s",

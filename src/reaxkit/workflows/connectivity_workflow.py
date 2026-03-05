@@ -26,6 +26,7 @@ from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, ForceFieldParametersData
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
@@ -102,6 +103,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout")
     parser.add_argument("--summary", default=None, help="Optional summary.txt path")
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
@@ -529,8 +531,12 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = resolve_command_name(command, task_names=CONNECTIVITY_COMMANDS)
     if canonical == "coordination_relabel":
-        adapter = resolve_engine(args.input or args.run_dir or args.xmolout or ".", engine=getattr(args, "engine", None))
-        composite = adapter.load(ConnectivityTrajectoryData, vars(args))
+        normalized = normalize_storage_args(vars(args))
+        adapter = resolve_engine(
+            normalized.get("input") or normalized.get("run_dir") or normalized.get("xmolout") or ".",
+            engine=getattr(args, "engine", None),
+        )
+        composite = adapter.load(ConnectivityTrajectoryData, normalized)
 
         coordination_task_cls = TASK_REGISTRY["coordination"]
         coordination_request = _build_coordination_request(args)

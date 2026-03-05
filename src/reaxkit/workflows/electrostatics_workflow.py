@@ -26,6 +26,7 @@ from reaxkit.core.alias import _resolve_alias, normalize_choice, resolve_alias_f
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.frame_utils import parse_frames
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import (
     ChargeData,
     ConnectivityData,
@@ -45,6 +46,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for detection")
     parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
     parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
+    add_storage_cli_arguments(parser)
 
 
 def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
@@ -121,21 +123,29 @@ def _parse_frame_selector(spec: str | None) -> list[int] | None:
     return [int(idx) for idx in selector]
 
 
-def _detection_path(args: argparse.Namespace) -> str:
+def _normalized_args(args: argparse.Namespace) -> dict:
+    normalized = normalize_storage_args(vars(args))
+    for key, value in normalized.items():
+        setattr(args, key, value)
+    return normalized
+
+
+def _detection_path(args_map: dict) -> str:
     for key in ("xmolout", "fort7", "fort78", "control", "run_dir"):
-        value = getattr(args, key, None)
+        value = args_map.get(key)
         if value:
             return str(value)
     return "."
 
 
 def _resolve_adapter(args: argparse.Namespace):
-    return resolve_engine(_detection_path(args), engine=getattr(args, "engine", None))
+    args_map = _normalized_args(args)
+    return resolve_engine(_detection_path(args_map), engine=getattr(args, "engine", None))
 
 
 def _load_electrostatics_data(args: argparse.Namespace) -> ElectrostaticsData:
     adapter = _resolve_adapter(args)
-    load_args = vars(args)
+    load_args = _normalized_args(args)
     trajectory = adapter.load(TrajectoryData, load_args)
     charges = adapter.load(ChargeData, load_args)
     connectivity = adapter.load(ConnectivityData, load_args)
@@ -194,7 +204,7 @@ def _align_field_to_iterations(
 
 def _load_hysteresis_data(args: argparse.Namespace) -> ElectrostaticsData:
     adapter = _resolve_adapter(args)
-    load_args = vars(args)
+    load_args = _normalized_args(args)
     data = _load_electrostatics_data(args)
     raw_field = adapter.load(ElectricFieldData, load_args)
     target_iters = np.asarray(
@@ -586,7 +596,13 @@ def _run_charge_table(args: argparse.Namespace) -> int:
     result.table = _attach_charge_time_column(data, result.table, control_file=getattr(args, "control", "control"))
 
     if args.export:
-        out = resolve_output_path(args.export, "elect")
+        out = resolve_output_path(
+            args.export,
+            "elect",
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
         args = argparse.Namespace(**vars(args))
         args.export = str(out)
 
@@ -603,7 +619,13 @@ def _run_scalar_command(command: str, args: argparse.Namespace) -> int:
     result = task.run(data, request)
 
     if args.export:
-        out = resolve_output_path(args.export, "elect")
+        out = resolve_output_path(
+            args.export,
+            "elect",
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
         export_result_csv(result, str(out))
         print(f"[Done] Exported data to {out}")
 
@@ -635,7 +657,13 @@ def _run_hyst(args: argparse.Namespace) -> int:
     result.full_table = _attach_time_column(data, result.full_table)
 
     if args.export:
-        out_csv = resolve_output_path(args.export, "elect")
+        out_csv = resolve_output_path(
+            args.export,
+            "elect",
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
         export_result_csv(SimpleNamespace(table=result.aggregated_table), str(out_csv))
         print(f"[Done] Exported aggregated joint hysteresis data to {out_csv}")
 
@@ -659,7 +687,13 @@ def _run_hyst(args: argparse.Namespace) -> int:
     payload = _plot_payload("hyst", result, args)
     if payload is not None:
         if args.save:
-            out_plot = resolve_output_path(args.save, "elect")
+            out_plot = resolve_output_path(
+                args.save,
+                "elect",
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
             render_plot({**payload, "save": out_plot})
         if args.plot or not args.save:
             render_plot(payload)

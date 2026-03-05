@@ -24,6 +24,7 @@ from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ForceFieldParametersData, GeometrySummaryData
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 
@@ -170,8 +171,12 @@ def _filter_force_field_table_by_term(
 
 
 def _load_force_field_data(args: argparse.Namespace) -> ForceFieldParametersData:
-    adapter = resolve_engine(getattr(args, "ffield", None) or getattr(args, "input", ".") or ".", engine=getattr(args, "engine", None))
-    return adapter.load(ForceFieldParametersData, vars(args))
+    normalized = normalize_storage_args(vars(args))
+    adapter = resolve_engine(
+        normalized.get("ffield") or normalized.get("input") or ".",
+        engine=getattr(args, "engine", None),
+    )
+    return adapter.load(ForceFieldParametersData, normalized)
 
 
 def _export_force_field_tables(tables: dict[str, pd.DataFrame], outdir: str | Path, *, fmt: str) -> None:
@@ -193,6 +198,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--fort74", default="fort.74", help="Path to fort.74")
     parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
@@ -205,8 +211,12 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _load_geometry_summary(args: argparse.Namespace) -> GeometrySummaryData:
-    adapter = resolve_engine(getattr(args, "fort74", None) or getattr(args, "input", ".") or ".", engine=getattr(args, "engine", None))
-    return adapter.load(GeometrySummaryData, vars(args))
+    normalized = normalize_storage_args(vars(args))
+    adapter = resolve_engine(
+        normalized.get("fort74") or normalized.get("input") or ".",
+        engine=getattr(args, "engine", None),
+    )
+    return adapter.load(GeometrySummaryData, normalized)
 
 
 def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataRequest:

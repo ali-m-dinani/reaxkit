@@ -10,6 +10,7 @@ from reaxkit.analysis.control.control import ControlValueRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.control_generator import write_control
 
 CONTROL_COMMANDS = ("get-control",)
@@ -40,6 +41,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
     parser.add_argument("--control", "--file", dest="control", default="control", help="Path to control file")
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    add_storage_cli_arguments(parser)
 
 
 def _build_get_request(args: argparse.Namespace) -> ControlValueRequest:

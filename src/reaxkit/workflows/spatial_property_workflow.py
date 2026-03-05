@@ -12,6 +12,7 @@ import reaxkit.engine  # noqa: F401
 
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ChargeData, ConnectivityData, TrajectoryData
 from reaxkit.presentation.dispatcher import export_result_csv
 from reaxkit.presentation.plot import plot as render_plot
@@ -41,6 +42,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
     parser.add_argument("--summary", default=None, help="Optional summary.txt path")
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    add_storage_cli_arguments(parser)
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -82,16 +84,24 @@ def _selected_frames(n_frames: int, frames: list[int] | None, every: int) -> lis
     return [i for i in idx if 0 <= i < n_frames][:: max(1, int(every))]
 
 
-def _detection_path(args: argparse.Namespace) -> str:
+def _normalized_args(args: argparse.Namespace) -> dict:
+    normalized = normalize_storage_args(vars(args))
+    for key, value in normalized.items():
+        setattr(args, key, value)
+    return normalized
+
+
+def _detection_path(args_map: dict) -> str:
     for key in ("input", "xmolout", "fort7", "run_dir"):
-        value = getattr(args, key, None)
+        value = args_map.get(key)
         if value:
             return str(value)
     return "."
 
 
 def _resolve_adapter(args: argparse.Namespace):
-    return resolve_engine(_detection_path(args), engine=getattr(args, "engine", None))
+    args_map = _normalized_args(args)
+    return resolve_engine(_detection_path(args_map), engine=getattr(args, "engine", None))
 
 
 def _load_domain_data(
@@ -100,7 +110,7 @@ def _load_domain_data(
     property_name: str,
 ) -> tuple[TrajectoryData, ChargeData | None, ConnectivityData | None]:
     adapter = _resolve_adapter(args)
-    load_args = vars(args)
+    load_args = _normalized_args(args)
     trajectory = adapter.load(TrajectoryData, load_args)
     charges = adapter.load(ChargeData, load_args) if property_name == "charge" else None
     connectivity = adapter.load(ConnectivityData, load_args) if property_name == "sum_BOs" else None

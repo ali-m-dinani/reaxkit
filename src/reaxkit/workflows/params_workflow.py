@@ -12,6 +12,7 @@ from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ForceFieldParametersData
 from reaxkit.presentation.dispatcher import present_result
 
@@ -24,6 +25,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
     parser.add_argument("--params", "--file", dest="params", default="params", help="Path to params file")
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
@@ -43,14 +45,15 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 def _maybe_load_force_field(args: argparse.Namespace) -> ForceFieldParametersData | None:
     if not getattr(args, "interpret", False):
         return None
-    raw = getattr(args, "ffield", None)
+    normalized = normalize_storage_args(vars(args))
+    raw = normalized.get("ffield")
     if not raw:
         raise ValueError("--ffield is required when --interpret is set.")
     path = Path(raw)
     if not path.exists():
         raise FileNotFoundError(f"ffield file not found: {raw}")
     adapter = resolve_engine(str(path), engine=getattr(args, "engine", None))
-    return adapter.load(ForceFieldParametersData, vars(args))
+    return adapter.load(ForceFieldParametersData, normalized)
 
 
 def _build_params_request(args: argparse.Namespace) -> ForceFieldOptimizationParameterRequest:

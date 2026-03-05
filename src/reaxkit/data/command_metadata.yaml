@@ -77,6 +77,9 @@ commands:
   make-vregime:
     kind: generator
     help: Generate a vregime file
+  free-up:
+    kind: generator
+    help: Prune or compress old raw run outputs
   kinematics:
     kind: analysis
     help: Atomic kinematics analysis
