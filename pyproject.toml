@@ -33,6 +33,7 @@ dependencies = [
     "mp_api",
     "PyYAML",
     "rapidfuzz",
+    "h5py",
 ]
 
 [project.scripts]

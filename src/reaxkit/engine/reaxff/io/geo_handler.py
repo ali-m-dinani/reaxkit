@@ -61,7 +61,7 @@ class GeoHandler(BaseHandler):
     - This handler is not frame-based; the file represents a single structure.
     """
 
-    def __init__(self, file_path: str | Path = "geo"):
+    def __init__(self, file_path: str | Path = "geo", reporter=None):
         """
         Initialize the instance.
 
@@ -73,6 +73,7 @@ class GeoHandler(BaseHandler):
         """
         super().__init__(file_path)
         self._n_atoms: Optional[int] = None
+        self._reporter = reporter
 
     # ------------------------------------------------------------------
     # Core parser
@@ -94,8 +95,13 @@ class GeoHandler(BaseHandler):
         cell_lengths: Optional[Dict[str, float]] = None
         cell_angles: Optional[Dict[str, float]] = None
 
+        total_lines = self._count_lines()
         with open(self.path, "r") as fh:
+            lines_read = 0
             for raw in fh:
+                lines_read += 1
+                if self._reporter and (lines_read % 1000 == 0 or lines_read == total_lines):
+                    self._reporter("load", lines_read, total_lines, "Parsing geo")
                 line = raw.rstrip("\n")
                 stripped = line.strip()
                 if not stripped:
@@ -193,7 +199,13 @@ class GeoHandler(BaseHandler):
             "cell_angles": cell_angles,
             "n_atoms": n_atoms,
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing geo")
         return df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r") as fh:
+            return sum(1 for _ in fh)
 
     # ------------------------------------------------------------------
     # Convenience accessors

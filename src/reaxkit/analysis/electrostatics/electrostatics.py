@@ -275,6 +275,7 @@ def _series_local(
     selected_atom_types: Optional[Sequence[str]],
     min_bo: float,
     scale_neighbor_charges: bool,
+    reporter=None,
 ) -> pd.DataFrame:
     mask = _atom_selector(
         elements,
@@ -287,7 +288,8 @@ def _series_local(
         return pd.DataFrame()
 
     rows: list[dict[str, Any]] = []
-    for fi in frame_idx:
+    total = len(frame_idx)
+    for step_i, fi in enumerate(frame_idx, start=1):
         coords = positions[int(fi)].astype(float)
         q = charges[int(fi)].astype(float)
         neighbors = _neighbors_from_connectivity(
@@ -354,6 +356,8 @@ def _series_local(
                     row["P_z (uC/cm^2)"] = np.nan
                 row["volume (angstrom^3)"] = float(volume)
             rows.append(row)
+        if reporter:
+            reporter("analyze", step_i, total, f"Computing local {mode}")
     return pd.DataFrame(rows)
 
 
@@ -440,6 +444,7 @@ def _run_electrostatics(
     volume_method: Optional[VolumeMethod],
     min_bo: float,
     scale_neighbor_charges: bool,
+    reporter=None,
 ) -> pd.DataFrame:
     positions = np.asarray(data.trajectory.positions, dtype=float)
     charges = np.asarray(data.charges.charges, dtype=float)
@@ -500,6 +505,7 @@ def _run_electrostatics(
         selected_atom_types=atom_types,
         min_bo=min_bo,
         scale_neighbor_charges=scale_neighbor_charges,
+        reporter=reporter,
     )
     if table.empty:
         return table
@@ -512,7 +518,7 @@ class DipoleTask(AnalysisTask):
 
     required_data = ElectrostaticsData
 
-    def run(self, data: ElectrostaticsData, request: DipoleRequest) -> DipoleResult:
+    def run(self, data: ElectrostaticsData, request: DipoleRequest, reporter=None) -> DipoleResult:
         out = _run_electrostatics(
             data,
             mode="dipole",
@@ -524,6 +530,7 @@ class DipoleTask(AnalysisTask):
             volume_method=None,
             min_bo=request.min_bo,
             scale_neighbor_charges=request.scale_neighbor_charges,
+            reporter=reporter,
         )
         return DipoleResult(table=out)
 
@@ -534,7 +541,7 @@ class PolarizationTask(AnalysisTask):
 
     required_data = ElectrostaticsData
 
-    def run(self, data: ElectrostaticsData, request: PolarizationRequest) -> PolarizationResult:
+    def run(self, data: ElectrostaticsData, request: PolarizationRequest, reporter=None) -> PolarizationResult:
         out = _run_electrostatics(
             data,
             mode="polarization",
@@ -546,6 +553,7 @@ class PolarizationTask(AnalysisTask):
             volume_method=request.volume_method,
             min_bo=request.min_bo,
             scale_neighbor_charges=request.scale_neighbor_charges,
+            reporter=reporter,
         )
         return PolarizationResult(table=out)
 

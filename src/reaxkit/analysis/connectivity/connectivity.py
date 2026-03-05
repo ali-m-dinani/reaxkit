@@ -86,7 +86,7 @@ class ConnectionListResult(BaseResult):
 class ConnectionListTask(AnalysisTask):
     required_data = ConnectivityData
 
-    def run(self, data: ConnectivityData, request: ConnectionListRequest) -> ConnectionListResult:
+    def run(self, data: ConnectivityData, request: ConnectionListRequest, reporter=None) -> ConnectionListResult:
         frames = _bond_order_frames(data)
         if not frames:
             return ConnectionListResult(table=pd.DataFrame(columns=["frame_idx", "iter", "src", "dst", "bo"]))
@@ -99,7 +99,8 @@ class ConnectionListTask(AnalysisTask):
 
         rows: list[dict] = []
         min_bo = float(request.min_bo)
-        for fi in idx:
+        total = len(idx)
+        for step_i, fi in enumerate(idx, start=1):
             mat = _as_dense_frame(frames[fi])
             if mat.shape != (n_atoms, n_atoms):
                 raise ValueError("Each bond-order frame must be square with consistent atom dimension.")
@@ -120,6 +121,8 @@ class ConnectionListTask(AnalysisTask):
                             "bo": bo,
                         }
                     )
+            if reporter:
+                reporter("analyze", step_i, total, "Building connection list")
 
         if not rows:
             return ConnectionListResult(table=pd.DataFrame(columns=["frame_idx", "iter", "src", "dst", "bo"]))
@@ -156,7 +159,7 @@ class ConnectionTableResult(BaseResult):
 class ConnectionTableTask(AnalysisTask):
     required_data = ConnectivityData
 
-    def run(self, data: ConnectivityData, request: ConnectionTableRequest) -> ConnectionTableResult:
+    def run(self, data: ConnectivityData, request: ConnectionTableRequest, reporter=None) -> ConnectionTableResult:
         edges = ConnectionListTask().run(
             data,
             ConnectionListRequest(
@@ -164,6 +167,7 @@ class ConnectionTableTask(AnalysisTask):
                 min_bo=float(request.min_bo),
                 undirected=bool(request.undirected),
             ),
+            reporter=reporter,
         ).table
         if edges.empty:
             return ConnectionTableResult(table=pd.DataFrame())
@@ -190,7 +194,7 @@ class ConnectionStatsResult(BaseResult):
 class ConnectionStatsTask(AnalysisTask):
     required_data = ConnectivityData
 
-    def run(self, data: ConnectivityData, request: ConnectionStatsRequest) -> ConnectionStatsResult:
+    def run(self, data: ConnectivityData, request: ConnectionStatsRequest, reporter=None) -> ConnectionStatsResult:
         edges = ConnectionListTask().run(
             data,
             ConnectionListRequest(
@@ -199,6 +203,7 @@ class ConnectionStatsTask(AnalysisTask):
                 min_bo=request.min_bo,
                 undirected=request.undirected,
             ),
+            reporter=reporter,
         ).table
         if edges.empty:
             return ConnectionStatsResult(table=pd.DataFrame(columns=["src", "dst", "value"]))
@@ -230,7 +235,7 @@ class BondTimeseriesResult(BaseResult):
 class BondTimeseriesTask(AnalysisTask):
     required_data = ConnectivityData
 
-    def run(self, data: ConnectivityData, request: BondTimeseriesRequest) -> BondTimeseriesResult:
+    def run(self, data: ConnectivityData, request: BondTimeseriesRequest, reporter=None) -> BondTimeseriesResult:
         edges = ConnectionListTask().run(
             data,
             ConnectionListRequest(
@@ -239,6 +244,7 @@ class BondTimeseriesTask(AnalysisTask):
                 min_bo=0.0,
                 undirected=request.undirected,
             ),
+            reporter=reporter,
         ).table
         if edges.empty:
             return BondTimeseriesResult(table=pd.DataFrame(columns=["frame_idx", "iter", "src", "dst", "bo"]))
@@ -325,7 +331,7 @@ class BondEventsResult(BaseResult):
 class BondEventsTask(AnalysisTask):
     required_data = ConnectivityData
 
-    def run(self, data: ConnectivityData, request: BondEventsRequest) -> BondEventsResult:
+    def run(self, data: ConnectivityData, request: BondEventsRequest, reporter=None) -> BondEventsResult:
         ts = BondTimeseriesTask().run(
             data,
             BondTimeseriesRequest(
@@ -335,6 +341,7 @@ class BondEventsTask(AnalysisTask):
                 bo_threshold=0.0,
                 as_wide=False,
             ),
+            reporter=reporter,
         ).table
         if ts.empty:
             return BondEventsResult(
@@ -359,7 +366,8 @@ class BondEventsTask(AnalysisTask):
         xcol = "iter" if request.xaxis == "iter" else "frame_idx"
         out_rows: list[pd.DataFrame] = []
 
-        for (a, b), g in groups:
+        total_groups = len(groups)
+        for group_i, ((a, b), g) in enumerate(groups, start=1):
             g = g.sort_values(["frame_idx"]).reset_index(drop=True)
             x = g[xcol].to_numpy()
             bo = g["bo"].to_numpy(dtype=float)
@@ -394,6 +402,8 @@ class BondEventsTask(AnalysisTask):
             ev["threshold"] = float(request.threshold)
             ev["hysteresis"] = float(request.hysteresis)
             out_rows.append(ev[["src", "dst", "event", "frame_idx", "iter", "x_axis", "bo_at_event", "threshold", "hysteresis"]])
+            if reporter:
+                reporter("analyze", group_i, total_groups, "Detecting bond events")
 
         if not out_rows:
             return BondEventsResult(

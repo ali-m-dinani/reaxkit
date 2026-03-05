@@ -241,6 +241,7 @@ def _compute_rdfs(
     bins: int,
     r_max: Optional[float],
     backend: str,
+    reporter=None,
 ) -> tuple[np.ndarray, list[np.ndarray], list[int]]:
     backend_l = str(backend).lower()
     if backend_l not in {"freud", "ovito"}:
@@ -260,7 +261,8 @@ def _compute_rdfs(
     r_ref: np.ndarray | None = None
     stack: list[np.ndarray] = []
 
-    for i in frame_idx:
+    total = len(frame_idx)
+    for step_i, i in enumerate(frame_idx, start=1):
         if backend_l == "freud":
             r, g = _frame_grid_and_rdf_freud(
                 data,
@@ -285,6 +287,8 @@ def _compute_rdfs(
         elif len(r) != len(r_ref) or np.max(np.abs(r - r_ref)) > 1e-10:
             raise ValueError("R grids differ between frames; fix bins/r_max.")
         stack.append(g)
+        if reporter:
+            reporter("analyze", step_i, total, "Computing RDF")
 
     if r_ref is None:
         return np.array([]), [], frame_idx
@@ -297,7 +301,7 @@ class RDFTask(AnalysisTask):
 
     required_data = TrajectoryData
 
-    def run(self, data: TrajectoryData, request: RDFRequest) -> RDFResult:
+    def run(self, data: TrajectoryData, request: RDFRequest, reporter=None) -> RDFResult:
         r_ref, stack, frame_idx = _compute_rdfs(
             data,
             atom_ids_a=request.atom_ids_a,
@@ -309,6 +313,7 @@ class RDFTask(AnalysisTask):
             bins=request.bins,
             r_max=request.r_max,
             backend=request.backend,
+            reporter=reporter,
         )
         if len(r_ref) == 0 or not stack:
             return RDFResult(table=pd.DataFrame(columns=["r", "g"]))
@@ -334,7 +339,7 @@ class RDFPropertyTask(AnalysisTask):
 
     required_data = TrajectoryData
 
-    def run(self, data: TrajectoryData, request: RDFPropertyRequest) -> RDFPropertyResult:
+    def run(self, data: TrajectoryData, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
         prop = str(request.property).strip().lower()
         allowed_props = {"first_peak", "dominant_peak", "area", "excess_area"}
         if prop not in allowed_props:
@@ -351,6 +356,7 @@ class RDFPropertyTask(AnalysisTask):
             bins=request.bins,
             r_max=request.r_max,
             backend=request.backend,
+            reporter=reporter,
         )
         if len(r_ref) == 0 or not stack:
             return RDFPropertyResult(table=pd.DataFrame())

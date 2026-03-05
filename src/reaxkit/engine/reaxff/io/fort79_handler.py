@@ -87,7 +87,7 @@ class Fort79Handler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
-    def __init__(self, file_path: str | Path = "fort.79"):
+    def __init__(self, file_path: str | Path = "fort.79", reporter=None):
         """
         Initialize the instance.
 
@@ -100,6 +100,7 @@ class Fort79Handler(BaseHandler):
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []
         self._n_records: Optional[int] = None
+        self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
         """
@@ -118,6 +119,8 @@ class Fort79Handler(BaseHandler):
 
         i, n = 0, len(lines)
         while i < n:
+            if self._reporter and (i % 2000 == 0 or i + 1 == n):
+                self._reporter("load", i + 1, n, "Parsing fort.79")
             line = lines[i]
             if line.strip().startswith("Values used for parameter"):
                 ident = line.split("parameter", 1)[1].strip()
@@ -235,6 +238,8 @@ class Fort79Handler(BaseHandler):
 
         meta: Dict[str, Any] = {"n_records": int(len(df))}
         self._frames = []
+        if self._reporter:
+            self._reporter("load", n, n, "Finished parsing fort.79")
         return df, meta
 
     def n_frames(self) -> int:

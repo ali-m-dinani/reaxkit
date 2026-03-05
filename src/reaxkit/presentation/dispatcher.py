@@ -7,6 +7,7 @@ from typing import Callable
 
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.storage_layout import normalize_storage_args
+from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
 
 
@@ -36,6 +37,7 @@ def present_result(
     normalized = normalize_storage_args(vars(args))
     for key, value in normalized.items():
         setattr(args, key, value)
+    persist_analysis_result(command, result, args)
 
     export_csv = getattr(args, "export", None)
     save = getattr(args, "save", None)

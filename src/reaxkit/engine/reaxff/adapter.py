@@ -120,6 +120,36 @@ def _merge_simulation_data(
     )
 
 
+def _union_atom_ids_from_frames(frames_df: list[pd.DataFrame]) -> list[int]:
+    """Collect stable atom ids across frames, falling back to 1..max(frame_size)."""
+    seen: set[int] = set()
+    ordered: list[int] = []
+    max_rows = 0
+    for fr in frames_df:
+        max_rows = max(max_rows, len(fr))
+        if "atom_num" in fr.columns:
+            vals = pd.to_numeric(fr["atom_num"], errors="coerce").dropna().astype(int).tolist()
+            for aid in vals:
+                if aid not in seen:
+                    seen.add(aid)
+                    ordered.append(int(aid))
+    if ordered:
+        return ordered
+    return list(range(1, max_rows + 1))
+
+
+def _merge_atom_id_lists(primary: list[int], secondary: list[int]) -> list[int]:
+    seen: set[int] = set()
+    out: list[int] = []
+    for aid in primary + secondary:
+        a = int(aid)
+        if a in seen:
+            continue
+        seen.add(a)
+        out.append(a)
+    return out
+
+
 def _fort7_per_atom_arrays(
     frames_df: list[pd.DataFrame],
     atom_ids: list[int],
@@ -129,7 +159,7 @@ def _fort7_per_atom_arrays(
     atom_to_idx = {int(a): i for i, a in enumerate(atom_ids)}
     atom_type_nums = np.zeros((n_frames, n_atoms), dtype=int)
     molecule_nums = np.zeros((n_frames, n_atoms), dtype=int)
-    num_lone_pairs = np.zeros((n_frames, n_atoms), dtype=float)
+    num_lone_pairs = np.full((n_frames, n_atoms), np.nan, dtype=float)
 
     for fi, fr in enumerate(frames_df):
         for _, row in fr.iterrows():
@@ -153,9 +183,33 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
     """Normalize an ``XmoloutHandler`` into ``TrajectoryData``."""
     n_frames = handler.n_frames()
     frames = [handler.frame(i) for i in range(n_frames)]
-    positions = np.stack([f["coords"] for f in frames], axis=0)
-    elements = list(frames[0]["atom_types"]) if frames else []
-    atom_ids = list(range(1, len(elements) + 1))
+    if not frames:
+        positions = np.empty((0, 0, 3), dtype=float)
+        atom_labels = np.empty((0, 0), dtype=object)
+        elements: list[str] = []
+        atom_ids: list[int] = []
+    else:
+        n_atoms = max(int(f["coords"].shape[0]) for f in frames)
+        atom_ids = list(range(1, n_atoms + 1))
+        positions = np.full((n_frames, n_atoms, 3), np.nan, dtype=float)
+        atom_labels = np.full((n_frames, n_atoms), "", dtype=object)
+        element_map: dict[int, str] = {}
+
+        for fi, frame in enumerate(frames):
+            coords = np.asarray(frame.get("coords"), dtype=float)
+            if coords.ndim != 2 or coords.shape[1] != 3:
+                continue
+
+            raw_types = list(frame.get("atom_types") or [])
+            frame_size = min(coords.shape[0], n_atoms)
+            positions[fi, :frame_size, :] = coords[:frame_size, :]
+            for aj in range(frame_size):
+                label = str(raw_types[aj]) if aj < len(raw_types) else ""
+                atom_labels[fi, aj] = label
+                if label and (aj + 1) not in element_map:
+                    element_map[aj + 1] = label
+
+        elements = [element_map.get(aid, "X") for aid in atom_ids]
 
     df = handler.dataframe()
     iterations = df["iter"].to_numpy() if "iter" in df.columns else np.arange(n_frames)
@@ -171,6 +225,7 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
         positions=positions,
         elements=elements,
         atom_ids=atom_ids,
+        atom_labels=atom_labels,
         simulation=SimulationData(
             atom_ids=atom_ids,
             iterations=iterations,
@@ -224,11 +279,7 @@ def _connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> Co
             metadata={"source": "fort7", "simulation_name": handler.metadata().get("simulation_name", "")},
         )
 
-    first = frames_df[0]
-    if "atom_num" in first.columns:
-        atom_ids = first["atom_num"].astype(int).to_numpy()
-    else:
-        atom_ids = np.arange(1, len(first) + 1, dtype=int)
+    atom_ids = np.asarray(_union_atom_ids_from_frames(frames_df), dtype=int)
     n_atoms = len(atom_ids)
     atom_to_idx = {int(a): i for i, a in enumerate(atom_ids)}
     atom_type_nums, molecule_nums, num_lone_pairs = _fort7_per_atom_arrays(frames_df, atom_ids.tolist())
@@ -307,6 +358,28 @@ def _connectivity_trajectory_from_handlers(
     trajectory = _trajectory_from_xmolout_handler(xmolout_handler)
     trajectory.simulation = _merge_simulation_data(trajectory.simulation, summary_simulation)
     connectivity = _connectivity_from_fort7_handler(fort7_handler, reporter=reporter)
+    if connectivity.atom_ids is not None and trajectory.atom_ids:
+        common_atom_ids = _merge_atom_id_lists(list(trajectory.atom_ids), [int(a) for a in connectivity.atom_ids])
+        if common_atom_ids != list(trajectory.atom_ids):
+            atom_to_idx = {aid: i for i, aid in enumerate(trajectory.atom_ids)}
+            padded_pos = np.full((trajectory.positions.shape[0], len(common_atom_ids), 3), np.nan, dtype=float)
+            padded_lbl = np.full((trajectory.positions.shape[0], len(common_atom_ids)), "", dtype=object)
+            padded_elements = ["X"] * len(common_atom_ids)
+            for new_j, aid in enumerate(common_atom_ids):
+                old_j = atom_to_idx.get(aid)
+                if old_j is None:
+                    continue
+                padded_pos[:, new_j, :] = trajectory.positions[:, old_j, :]
+                if trajectory.atom_labels is not None and old_j < trajectory.atom_labels.shape[1]:
+                    padded_lbl[:, new_j] = trajectory.atom_labels[:, old_j]
+                if old_j < len(trajectory.elements):
+                    padded_elements[new_j] = trajectory.elements[old_j]
+            trajectory.positions = padded_pos
+            trajectory.atom_labels = padded_lbl
+            trajectory.elements = padded_elements
+            trajectory.atom_ids = common_atom_ids
+            if trajectory.simulation is not None:
+                trajectory.simulation.atom_ids = common_atom_ids
     if trajectory.simulation is not None:
         connectivity.simulation = _merge_simulation_data(trajectory.simulation, connectivity.simulation)
         connectivity.elements = trajectory.elements
@@ -653,14 +726,11 @@ def _charges_from_fort7_handler(
             metadata={"source": "fort7"},
         )
 
+    discovered_atom_ids = _union_atom_ids_from_frames(frames_df)
     if simulation is not None and simulation.atom_ids:
-        atom_ids = [int(a) for a in simulation.atom_ids]
+        atom_ids = _merge_atom_id_lists([int(a) for a in simulation.atom_ids], discovered_atom_ids)
     else:
-        first = frames_df[0]
-        if "atom_num" in first.columns:
-            atom_ids = first["atom_num"].astype(int).tolist()
-        else:
-            atom_ids = list(range(1, len(first) + 1))
+        atom_ids = discovered_atom_ids
         simulation = SimulationData(atom_ids=atom_ids)
 
     atom_to_idx = {int(a): i for i, a in enumerate(atom_ids)}
@@ -679,7 +749,7 @@ def _charges_from_fort7_handler(
     rows: list[np.ndarray] = []
     n_frames = len(frames_df)
     for step_i, fr in enumerate(frames_df, start=1):
-        q = np.zeros((n_atoms,), dtype=float)
+        q = np.full((n_atoms,), np.nan, dtype=float)
         if "partial_charge" in fr.columns:
             if "atom_num" in fr.columns:
                 for _, row in fr.iterrows():
@@ -850,7 +920,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
         p = Path(raw)
         geo_path = p / "geo" if p.is_dir() else p
-        handler = GeoHandler(geo_path)
+        handler = GeoHandler(geo_path, reporter=reporter)
         return _geometry_from_geo_handler(handler)
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
@@ -892,7 +962,7 @@ class ReaxFFAdapter(EngineAdapter):
                 break
         if summary_path is None:
             return None
-        handler = SummaryHandler(summary_path, reporter=reporter)
+        handler = SummaryHandler(summary_path)
         return _simulation_from_summary_handler(handler)
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
@@ -938,7 +1008,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
         ffield_path = p / "ffield" if p.is_dir() else p
-        handler = FFieldHandler(ffield_path, reporter=reporter)
+        handler = FFieldHandler(ffield_path)
         out = _force_field_from_ffield_handler(handler)
         return out
 
@@ -970,7 +1040,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("trainset") or args.get("force_field_optimization_training_set") or args.get("input") or "trainset.in"
         p = Path(raw)
         trainset_path = p / "trainset.in" if p.is_dir() else p
-        handler = TrainsetHandler(trainset_path)
+        handler = TrainsetHandler(trainset_path, reporter=reporter)
         return _force_field_optimization_training_set_from_trainset_handler(handler)
 
     def load_force_field_optimization_parameters(
@@ -983,7 +1053,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("params") or args.get("force_field_optimization_parameters") or args.get("input") or "params"
         p = Path(raw)
         params_path = p / "params" if p.is_dir() else p
-        handler = ParamsHandler(params_path)
+        handler = ParamsHandler(params_path, reporter=reporter)
         return _force_field_optimization_parameters_from_params_handler(handler)
 
     def load_parameter_optimization_diagnostic(
@@ -996,7 +1066,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort79") or args.get("parameter_optimization_diagnostic") or args.get("input") or "fort.79"
         p = Path(raw)
         fort79_path = p / "fort.79" if p.is_dir() else p
-        handler = Fort79Handler(fort79_path)
+        handler = Fort79Handler(fort79_path, reporter=reporter)
         return _parameter_optimization_diagnostic_from_fort79_handler(handler)
 
     def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
@@ -1086,7 +1156,7 @@ class ReaxFFAdapter(EngineAdapter):
                 vels_path = p / "vels"
         else:
             vels_path = p
-        handler = VelsHandler(vels_path)
+        handler = VelsHandler(vels_path, reporter=reporter)
         return _atomic_kinematics_from_vels_handler(handler)
 
     def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
@@ -1097,7 +1167,7 @@ class ReaxFFAdapter(EngineAdapter):
         fort78_path = p / "fort.78" if p.is_dir() else p
         # ReaxFF writes fort.78 on the iout1 schedule, which may differ from xmolout/fort.7/summary
         # outputs that are typically written on the iout2 schedule.
-        handler = Fort78Handler(fort78_path, reporter=reporter)
+        handler = Fort78Handler(fort78_path)
         out = _electric_field_from_fort78_handler(handler)
         return out
 

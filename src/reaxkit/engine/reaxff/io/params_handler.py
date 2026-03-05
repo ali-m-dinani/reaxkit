@@ -65,7 +65,7 @@ class ParamsHandler(BaseHandler):
         "inline_comment",
     ]
 
-    def __init__(self, file_path: str | Path = "params.in"):
+    def __init__(self, file_path: str | Path = "params.in", reporter=None):
         """
         Initialize the instance.
 
@@ -76,6 +76,7 @@ class ParamsHandler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
@@ -91,8 +92,11 @@ class ParamsHandler(BaseHandler):
         """
         rows: List[Dict[str, Any]] = []
 
+        total_lines = self._count_lines()
         with open(self.path, "r") as fh:
-            for raw_line in fh:
+            for line_i, raw_line in enumerate(fh, start=1):
+                if self._reporter and (line_i % 2000 == 0 or line_i == total_lines):
+                    self._reporter("load", line_i, total_lines, "Parsing params")
                 line = raw_line.strip()
 
                 # Skip empty lines and full-line comments
@@ -143,4 +147,10 @@ class ParamsHandler(BaseHandler):
             "n_records": len(df),
             "n_frames": 0,
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing params")
         return df, meta
+
+    def _count_lines(self) -> int:
+        with open(self.path, "r") as fh:
+            return sum(1 for _ in fh)

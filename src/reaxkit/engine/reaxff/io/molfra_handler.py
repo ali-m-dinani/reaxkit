@@ -14,7 +14,10 @@ Typical use cases include:
 
 
 from __future__ import annotations
+import json
 from pathlib import Path
+import pickle
+import shutil
 from typing import Dict, Any, List, Iterator, Optional
 import pandas as pd
 
@@ -247,3 +250,13 @@ class MolFraHandler(BaseHandler):
         """
         for i in range(0, self.n_frames(), step):
             yield self.frame(i)
+
+    # ---- disk-cache override (parquet + json) -------------------
+    def _disk_cache_dir(self, key: str) -> Path:
+        return self._cache_root() / key
+
+    def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        super()._store_in_disk_cache(key, payload)
+
+    def _load_from_disk_cache(self, key: str) -> bytes | None:
+        return super()._load_from_disk_cache(key)

@@ -15,8 +15,8 @@ from pathlib import Path
 
 from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 
-DEFAULT_DATA_RAW_ROOT = Path("data/raw")
-DEFAULT_ALT_DATA_RAW_ROOT = Path("reaxkit/data/raw")
+DEFAULT_DATA_RAW_ROOT = Path("reaxkit_workkspace/data/raw")
+DEFAULT_ALT_DATA_RAW_ROOT = Path("data/raw")
 FREE_UP_COMMAND = "free-up"
 
 
@@ -165,7 +165,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit free-up --last 5\n"
         "  reaxkit free-up --compress 5\n"
         "  reaxkit free-up --compress 5 --format zst\n"
-        "  reaxkit free-up --last 3 --raw-root reaxkit/data/raw --dry-run"
+        "  reaxkit free-up --last 3 --raw-root reaxkit_workkspace/data/raw --dry-run"
     )
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument("--last", type=_positive_int, metavar="N", help="Keep only the latest N raw runs and delete older ones.")

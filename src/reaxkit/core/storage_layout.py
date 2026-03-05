@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from reaxkit.core.parsed_store import update_parsed_meta, write_parsed_hdf5
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -44,8 +45,7 @@ def _safe_run_id(run_id: str) -> str:
 
 
 def default_project_root() -> Path:
-    candidate = Path("reaxkit")
-    return candidate if candidate.exists() and candidate.is_dir() else Path(".")
+    return Path("reaxkit_workkspace")
 
 
 def generate_run_id() -> str:
@@ -79,6 +79,11 @@ def directory_fingerprint(root: Path) -> str:
         digest.update(file_sha256(path).encode("ascii"))
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def parsed_id_from_raw_and_handler(*, raw_hash: str, handler_version: str) -> str:
+    seed = f"{str(raw_hash)}|{str(handler_version)}"
+    return f"parsed_{hashlib.sha256(seed.encode('utf-8')).hexdigest()[:12]}"
 
 
 @dataclass(frozen=True)
@@ -168,15 +173,15 @@ class ReaxkitStorageLayout:
         self,
         *,
         run_id: str,
-        parser_version: str,
+        handler_version: str,
         engine: str,
     ) -> str:
         run_id = _safe_run_id(run_id)
         self.ensure_run_layout(run_id)
         raw_dir = self.raw_run_dir(run_id)
         raw_hash = directory_fingerprint(raw_dir)
-        parsed_id = run_id
-        parsed_dir = self.parsed_run_dir(run_id)
+        parsed_id = parsed_id_from_raw_and_handler(raw_hash=raw_hash, handler_version=handler_version)
+        parsed_dir = self.parsed_dir(parsed_id)
         parsed_dir.mkdir(parents=True, exist_ok=True)
         _write_json(
             parsed_dir / "meta.json",
@@ -184,8 +189,9 @@ class ReaxkitStorageLayout:
                 "parsed_id": parsed_id,
                 "run_id": run_id,
                 "raw_hash": raw_hash,
+                "run_hash": raw_hash,
                 "engine": engine,
-                "parser_version": parser_version,
+                "handler_version": handler_version,
                 "updated_at": _utc_now_iso(),
             },
         )
@@ -195,13 +201,70 @@ class ReaxkitStorageLayout:
                 "run_id": run_id,
                 "raw_dir": str(raw_dir),
                 "raw_hash": raw_hash,
+                "run_hash": raw_hash,
                 "parsed_id": parsed_id,
                 "engine": engine,
-                "parser_version": parser_version,
+                "handler_version": handler_version,
                 "updated_at": _utc_now_iso(),
             },
         )
         return parsed_id
+
+    def persist_parsed_artifact(
+        self,
+        *,
+        parsed_id: str,
+        artifact_name: str,
+        data: Any,
+    ) -> Path:
+        parsed_dir = self.parsed_dir(parsed_id)
+        parsed_dir.mkdir(parents=True, exist_ok=True)
+        safe_name = "".join(ch if (ch.isalnum() or ch in {"_", "-"}) else "_" for ch in str(artifact_name)).strip("_")
+        if not safe_name:
+            safe_name = "parsed_data"
+        file_name = f"{safe_name}.h5"
+        out_path = write_parsed_hdf5(parsed_dir / file_name, data)
+        update_parsed_meta(parsed_dir, parsed_id=str(parsed_id), artifact_name=safe_name, file_name=file_name)
+        return out_path
+
+    def record_run_analysis(
+        self,
+        *,
+        run_id: str,
+        parsed_id: str | None,
+        analysis_id: str,
+        task_name: str,
+        task_version: str = "1",
+    ) -> Path:
+        run_id = _safe_run_id(run_id)
+        path = self.run_index_path(run_id)
+        payload = _read_json(path, default={})
+        if not payload:
+            payload = {"run_id": run_id}
+
+        analyses = list(payload.get("analyses") or [])
+        existing_idx = None
+        for i, entry in enumerate(analyses):
+            if str(entry.get("analysis_id", "")) == str(analysis_id):
+                existing_idx = i
+                break
+
+        record = {
+            "analysis_id": str(analysis_id),
+            "task": str(task_name),
+            "task_version": str(task_version),
+            "parsed_id": str(parsed_id) if parsed_id is not None else None,
+            "updated_at": _utc_now_iso(),
+        }
+        if existing_idx is None:
+            analyses.append(record)
+        else:
+            analyses[existing_idx] = record
+
+        payload["analyses"] = analyses
+        payload["updated_at"] = _utc_now_iso()
+        _write_json(path, payload)
+        return path
 
 
 def add_storage_cli_arguments(parser: argparse.ArgumentParser) -> None:
@@ -283,7 +346,7 @@ def normalize_storage_args(args: dict) -> dict:
     if not out.get("run_dir") or str(out.get("run_dir")) == ".":
         out["run_dir"] = str(raw_dir)
     if not out.get("cache_dir"):
-        out["cache_dir"] = str(layout.cache_root / str(run_id))
+        out["cache_dir"] = str(layout.cache_root)
 
     # Rewrite default bare filenames to the run-scoped raw directory.
     default_files = {

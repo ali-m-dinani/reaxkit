@@ -575,6 +575,10 @@ class TrainsetHandler(BaseHandler):
 
     filetype = "trainset"
 
+    def __init__(self, file_path: str = "trainset.in", reporter=None):
+        super().__init__(file_path)
+        self._reporter = reporter
+
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
         """
         TemplateHandler expects _parse(self) with NO arguments.
@@ -583,6 +587,7 @@ class TrainsetHandler(BaseHandler):
         # read the file
         with open(self.path, "r") as f:
             lines = f.read().splitlines()
+        total_lines = len(lines)
 
         tables: Dict[str, pd.DataFrame] = {}
         current_raw_label: Optional[str] = None
@@ -619,7 +624,9 @@ class TrainsetHandler(BaseHandler):
 
             buffer = []
 
-        for raw in lines:
+        for line_i, raw in enumerate(lines, start=1):
+            if self._reporter and (line_i % 2000 == 0 or line_i == total_lines):
+                self._reporter("load", line_i, total_lines, "Parsing trainset")
             stripped = raw.strip()
             if not stripped:
                 continue
@@ -649,6 +656,8 @@ class TrainsetHandler(BaseHandler):
 
         # Final flush
         flush_section()
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing trainset")
 
         # RETURN EMPTY summary + metadata
         return pd.DataFrame(), {

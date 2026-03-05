@@ -15,6 +15,7 @@ from importlib import import_module
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.command_catalog import get_registered_commands
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.exceptions import ParseError, AnalysisError
 from reaxkit.core.generator_cli_routing_registry import get_registered_generators
 from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
 
@@ -163,6 +164,16 @@ def main():
 
     # Top-level parser for `reaxkit`
     parser = argparse.ArgumentParser("reaxkit CLI")
+    parser.add_argument(
+        "--timing",
+        action="store_true",
+        help="Print per-task timing to console (timing is always persisted to logs/timing.log).",
+    )
+    parser.add_argument(
+        "--progress",
+        action="store_true",
+        help="Enable progress reporting for supported handlers and analysis tasks.",
+    )
 
     # First level of subcommands: direct commands and legacy workflow kinds.
     sub = parser.add_subparsers(dest="command", required=True)
@@ -215,4 +226,11 @@ def main():
 
     # Parse the CLI (minus the program name) and dispatch to the chosen task.
     args = parser.parse_args(sys_argv[1:])
-    return args._run(args)
+    try:
+        return args._run(args)
+    except ParseError as exc:
+        print(f"[Parse error] {exc}", file=sys.stderr)
+        return 2
+    except AnalysisError as exc:
+        print(f"[Analysis error] {exc}", file=sys.stderr)
+        return 3

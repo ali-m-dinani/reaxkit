@@ -1,6 +1,7 @@
 ase
 freud-analysis
 imageio
+h5py
 matplotlib
 mp_api
 mpl_toolkits

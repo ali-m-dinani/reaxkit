@@ -11,7 +11,10 @@ and structural analysis.
 
 
 from __future__ import annotations
+import json
 from pathlib import Path
+import pickle
+import shutil
 from typing import List, Optional, Iterator, Dict, Any
 import pandas as pd
 from reaxkit.engine.reaxff.io.base import BaseHandler
@@ -181,6 +184,16 @@ class XmoloutHandler(BaseHandler):
     def _count_lines(self) -> int:
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
+
+    # ---- disk-cache override (parquet + json) -------------------
+    def _disk_cache_dir(self, key: str) -> Path:
+        return self._cache_root() / key
+
+    def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        super()._store_in_disk_cache(key, payload)
+
+    def _load_from_disk_cache(self, key: str) -> bytes | None:
+        return super()._load_from_disk_cache(key)
 
     # ---- Explicit, file-specific accessors (no generic get())
     def n_frames(self) -> int:

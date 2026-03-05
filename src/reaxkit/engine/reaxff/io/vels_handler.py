@@ -15,7 +15,11 @@ Typical use cases include:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import pickle
+import re
+import shutil
 from typing import Any, Dict, Tuple
 
 import pandas as pd
@@ -84,7 +88,7 @@ class VelsHandler(BaseHandler):
     SECTION_ACCELS = "Atom accelerations"
     SECTION_PREV_ACCELS = "Previous atom accelerations"
 
-    def __init__(self, file_path: str | Path = "vels") -> None:
+    def __init__(self, file_path: str | Path = "vels", reporter=None) -> None:
         """
         Initialize the instance.
 
@@ -96,6 +100,7 @@ class VelsHandler(BaseHandler):
         """
         super().__init__(file_path)
         self._sections: Dict[str, pd.DataFrame] = {}
+        self._reporter = reporter
 
     @property
     def sections(self) -> Dict[str, pd.DataFrame]:
@@ -277,7 +282,10 @@ class VelsHandler(BaseHandler):
         n_atoms: int | None = None
         prev_acc_present = False
 
+        total_lines = len(lines)
         while i < len(lines):
+            if self._reporter and ((i + 1) % 2000 == 0 or i + 1 == total_lines):
+                self._reporter("load", i + 1, total_lines, "Parsing vels")
             s = lines[i].strip()
             low = s.lower()
 
@@ -331,4 +339,21 @@ class VelsHandler(BaseHandler):
             sections[self.SECTION_PREV_ACCELS] = pd.DataFrame(columns=["atom_index", "ax", "ay", "az"])
 
         self._sections = sections
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing vels")
         return pd.DataFrame(), meta
+
+    # ---- disk-cache override (parquet + json) -------------------
+    def _disk_cache_dir(self, key: str) -> Path:
+        return self._cache_root() / key
+
+    @staticmethod
+    def _section_slug(name: str) -> str:
+        slug = re.sub(r"[^a-z0-9]+", "_", str(name).strip().lower())
+        return slug.strip("_") or "section"
+
+    def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        super()._store_in_disk_cache(key, payload)
+
+    def _load_from_disk_cache(self, key: str) -> bytes | None:
+        return super()._load_from_disk_cache(key)
