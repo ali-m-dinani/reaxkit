@@ -97,6 +97,52 @@ def _merge_simulation_data(
     base: SimulationData | None,
     extra: SimulationData | None,
 ) -> SimulationData | None:
+    def _reindex_to_iterations(
+        values: np.ndarray | None,
+        *,
+        source_iterations: np.ndarray | None,
+        target_iterations: np.ndarray | None,
+    ) -> np.ndarray | None:
+        if values is None or source_iterations is None or target_iterations is None:
+            return values
+        src_it = np.asarray(source_iterations, dtype=int)
+        tgt_it = np.asarray(target_iterations, dtype=int)
+        arr = np.asarray(values)
+        if arr.ndim == 0 or arr.shape[0] != src_it.shape[0]:
+            return values
+
+        idx_by_iter: dict[int, int] = {}
+        for src_i, iter_i in enumerate(src_it):
+            idx_by_iter[int(iter_i)] = int(src_i)
+
+        out_shape = (tgt_it.shape[0],) + tuple(arr.shape[1:])
+        out_dtype = arr.dtype
+        if arr.dtype.kind in "iu":
+            out_dtype = float
+        out = np.full(out_shape, np.nan, dtype=out_dtype)
+
+        for out_i, iter_i in enumerate(tgt_it):
+            src_i = idx_by_iter.get(int(iter_i))
+            if src_i is None:
+                continue
+            out[out_i] = arr[src_i]
+        return out
+
+    def _pick(
+        base_values: np.ndarray | None,
+        extra_values: np.ndarray | None,
+        *,
+        base_iterations: np.ndarray | None,
+        extra_iterations: np.ndarray | None,
+    ) -> np.ndarray | None:
+        if base_values is not None:
+            return base_values
+        return _reindex_to_iterations(
+            extra_values,
+            source_iterations=extra_iterations,
+            target_iterations=base_iterations,
+        )
+
     if base is None:
         return extra
     if extra is None:
@@ -104,19 +150,79 @@ def _merge_simulation_data(
     return SimulationData(
         atom_ids=base.atom_ids if base.atom_ids is not None else extra.atom_ids,
         iterations=base.iterations if base.iterations is not None else extra.iterations,
-        time=base.time if base.time is not None else extra.time,
+        time=_pick(
+            base.time,
+            extra.time,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
         elements=base.elements if base.elements is not None else extra.elements,
-        num_of_atoms=base.num_of_atoms if base.num_of_atoms is not None else extra.num_of_atoms,
-        potential_energy=base.potential_energy if base.potential_energy is not None else extra.potential_energy,
-        volume=base.volume if base.volume is not None else extra.volume,
-        temperature=base.temperature if base.temperature is not None else extra.temperature,
-        pressure=base.pressure if base.pressure is not None else extra.pressure,
-        density=base.density if base.density is not None else extra.density,
-        elapsed_time=base.elapsed_time if base.elapsed_time is not None else extra.elapsed_time,
-        atom_type_nums=base.atom_type_nums if base.atom_type_nums is not None else extra.atom_type_nums,
-        molecule_nums=base.molecule_nums if base.molecule_nums is not None else extra.molecule_nums,
-        cell_lengths=base.cell_lengths if base.cell_lengths is not None else extra.cell_lengths,
-        cell_angles=base.cell_angles if base.cell_angles is not None else extra.cell_angles,
+        num_of_atoms=_pick(
+            base.num_of_atoms,
+            extra.num_of_atoms,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        potential_energy=_pick(
+            base.potential_energy,
+            extra.potential_energy,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        volume=_pick(
+            base.volume,
+            extra.volume,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        temperature=_pick(
+            base.temperature,
+            extra.temperature,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        pressure=_pick(
+            base.pressure,
+            extra.pressure,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        density=_pick(
+            base.density,
+            extra.density,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        elapsed_time=_pick(
+            base.elapsed_time,
+            extra.elapsed_time,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        atom_type_nums=_pick(
+            base.atom_type_nums,
+            extra.atom_type_nums,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        molecule_nums=_pick(
+            base.molecule_nums,
+            extra.molecule_nums,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        cell_lengths=_pick(
+            base.cell_lengths,
+            extra.cell_lengths,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
+        cell_angles=_pick(
+            base.cell_angles,
+            extra.cell_angles,
+            base_iterations=base.iterations,
+            extra_iterations=extra.iterations,
+        ),
     )
 
 

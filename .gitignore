@@ -52,6 +52,7 @@ docs/file_templates/fort.79
 docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
+src/reaxkit/webui/reaxkit_workkspace
 
 # Generated outputs and temporary folders
 examples_to_test/
@@ -64,7 +65,6 @@ tests/artifacts/
 src/reaxkit/trash/
 src/reaxkit/under_development/
 src/reaxkit/under_dev
-src/reaxkit/webui
 
 # Project-local files to ignore
 README.txt

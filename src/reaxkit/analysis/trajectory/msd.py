@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence, Union
+from typing import Any, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
+from reaxkit.presentation.specs import PresentationSpec
 
 
 @dataclass
@@ -39,6 +40,36 @@ class MSDTask(AnalysisTask):
     """Per-atom mean-squared displacement over selected frames/dimensions."""
 
     required_data = TrajectoryData
+
+    @staticmethod
+    def recommended_presentations(_result: MSDResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Common/default typed presentation specs for MSD."""
+        table_rows = payload.get("table")
+        if not isinstance(table_rows, list) or not table_rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = table_rows[0] if isinstance(table_rows[0], dict) else {}
+        x_axis = "iter" if "iter" in sample else "frame_index"
+        group_by = "atom_id" if "atom_id" in sample else ""
+        views: list[PresentationSpec] = [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="MSD vs Time",
+                mapping={
+                    "x_col": x_axis,
+                    "y_col": "msd",
+                    "group_by_col": group_by,
+                },
+                options={
+                    "title": "MSD vs Time",
+                    "xlabel": x_axis,
+                    "ylabel": "msd",
+                    "legend": bool(group_by),
+                },
+                view_type="plot2d",
+            ),
+        ]
+        return views
 
     def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:
         dims = tuple(d for d in request.dims if d in ("x", "y", "z"))

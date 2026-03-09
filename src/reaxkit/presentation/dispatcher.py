@@ -9,6 +9,7 @@ from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.storage_layout import normalize_storage_args
 from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
+from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_plot_payload
 
 
 PlotPayloadBuilder = Callable[[str, object, object], dict[str, object] | None]
@@ -63,6 +64,19 @@ def present_result(
             if payload is None:
                 print("No data available for plotting.")
             else:
+                # Typed presentation specs are adapted to renderer payloads here.
+                spec = ensure_presentation_spec(payload)
+                if spec is None and isinstance(payload, list):
+                    for item in payload:
+                        cand = ensure_presentation_spec(item)
+                        if cand is not None and cand.renderer != "table":
+                            spec = cand
+                            break
+                if spec is not None:
+                    payload = spec_to_plot_payload(spec, result)
+                    if payload is None:
+                        print("No plot-compatible presentation available for this result.")
+                        return
                 if save:
                     save_path = resolve_output_path(
                         save,

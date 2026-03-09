@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Sequence, Tuple, Union
-
 import matplotlib.pyplot as plt
 import numpy as np
 

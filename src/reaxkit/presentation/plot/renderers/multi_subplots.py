@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import re
-from typing import Optional, Sequence, Union
+from pathlib import Path
 
 import matplotlib.pyplot as plt
-from pathlib import Path
 
 from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged, save_or_show
 

@@ -49,4 +49,3 @@ def save_or_show(fig: plt.Figure, cfg: Mapping[str, Any]) -> plt.Figure:
     else:
         plt.show()
     return fig
-
