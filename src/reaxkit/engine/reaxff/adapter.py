@@ -1003,6 +1003,97 @@ class ReaxFFAdapter(EngineAdapter):
 
         return Path(default)
 
+    @staticmethod
+    def _resolve_against_run_dir(args: dict, path: Path) -> Path:
+        run_dir = args.get("run_dir")
+        if run_dir and not path.is_absolute():
+            candidate = Path(run_dir) / path
+            if candidate.exists():
+                return candidate
+        return path
+
+    @staticmethod
+    def _quick_n_frames_from_control(control_path: Path) -> int | None:
+        if not control_path.exists() or not control_path.is_file():
+            return None
+        nmdit: int | None = None
+        iout2: int | None = None
+        try:
+            with open(control_path, "r", encoding="utf-8", errors="replace") as fh:
+                for raw in fh:
+                    line = raw.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+                    parts = line.split()
+                    if len(parts) < 2:
+                        continue
+                    # ReaxFF control commonly uses "<value> <key>" but accept both orders.
+                    for key, value in ((parts[1].lower(), parts[0]), (parts[0].lower(), parts[1])):
+                        if key not in {"nmdit", "iout2"}:
+                            continue
+                        try:
+                            parsed = int(float(value))
+                        except Exception:
+                            continue
+                        if key == "nmdit":
+                            nmdit = parsed
+                        else:
+                            iout2 = parsed
+                    if nmdit is not None and iout2 is not None and iout2 > 0:
+                        break
+        except Exception:
+            return None
+        if nmdit is None or iout2 is None or iout2 <= 0:
+            return None
+        return max(1, int(nmdit / iout2) + 1)
+
+    @staticmethod
+    def _quick_n_frames_from_geo_xmol(geo_path: Path, xmol_path: Path) -> int | None:
+        if not xmol_path.exists() or not xmol_path.is_file():
+            return None
+        descriptor = ""
+        if geo_path.exists() and geo_path.is_file():
+            try:
+                from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
+
+                descriptor = str(GeoHandler(geo_path).metadata().get("descriptor") or "").strip()
+            except Exception:
+                descriptor = ""
+        iterations: set[int] = set()
+        try:
+            with open(xmol_path, "r", encoding="utf-8", errors="replace") as fh:
+                for raw in fh:
+                    if descriptor and descriptor not in raw:
+                        continue
+                    vals = raw.strip().split()
+                    if len(vals) != 9:
+                        continue
+                    try:
+                        iterations.add(int(float(vals[1])))
+                    except Exception:
+                        continue
+        except Exception:
+            return None
+        return len(iterations) if iterations else None
+
+    @classmethod
+    def quick_n_frames(cls, args: dict) -> int | None:
+        """Fast frame-count probe for Web UI metadata updates."""
+        control_path = cls._resolve_reaxff_path(args, "control", "control_file", default="control")
+        control_path = cls._resolve_against_run_dir(args, control_path)
+        n_from_control = cls._quick_n_frames_from_control(control_path)
+        if n_from_control is not None:
+            return n_from_control
+
+        geo_raw = args.get("geo") or args.get("geometry") or args.get("run_dir") or args.get("input") or "geo"
+        geo_path = Path(geo_raw)
+        geo_path = geo_path / "geo" if geo_path.is_dir() else geo_path
+        geo_path = cls._resolve_against_run_dir(args, geo_path)
+
+        xmol_path = cls._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        xmol_path = cls._resolve_against_run_dir(args, xmol_path)
+        return cls._quick_n_frames_from_geo_xmol(geo_path, xmol_path)
+
     def detect(self, path: str | Path) -> float:
         p = Path(path)
         has_xmol = (p / "xmolout").exists() or (p.is_file() and "xmolout" in p.name.lower())

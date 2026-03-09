@@ -88,6 +88,68 @@ class PipelineStore:
         pipeline = self.get_pipeline(pipeline_id)
         return asdict(pipeline)
 
+    def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
+        """Delete a node and its descendants, including associated artifacts."""
+        with self._lock:
+            pipeline = self.get_pipeline(pipeline_id)
+            if node_id not in pipeline.nodes:
+                raise KeyError(f"Unknown node '{node_id}' for pipeline '{pipeline_id}'")
+
+            to_delete: list[str] = []
+            queue = [str(node_id)]
+            seen: set[str] = set()
+            while queue:
+                current = queue.pop(0)
+                if current in seen:
+                    continue
+                seen.add(current)
+                to_delete.append(current)
+                queue.extend(pipeline.children.get(current, []))
+
+            root = pipeline.nodes.get(str(node_id))
+            if root is not None and root.parent_id and root.parent_id in pipeline.children:
+                pipeline.children[root.parent_id] = [cid for cid in pipeline.children[root.parent_id] if cid != str(node_id)]
+
+            artifact_ids: set[str] = set()
+            for nid in to_delete:
+                node = pipeline.nodes.get(nid)
+                if node is None:
+                    continue
+                if node.result_ref:
+                    artifact_ids.add(str(node.result_ref))
+                last_id = node.metadata.get("last_artifact_id")
+                if last_id:
+                    artifact_ids.add(str(last_id))
+
+            for artifact_id, artifact in list(pipeline.artifacts.items()):
+                if str(artifact.node_id) in seen or str(artifact_id) in artifact_ids:
+                    artifact_ids.add(str(artifact_id))
+
+            # Keep artifacts that are still referenced by remaining nodes.
+            referenced_by_remaining: set[str] = set()
+            for rid, rnode in pipeline.nodes.items():
+                if rid in seen:
+                    continue
+                if rnode.result_ref:
+                    referenced_by_remaining.add(str(rnode.result_ref))
+                last_id = rnode.metadata.get("last_artifact_id")
+                if last_id:
+                    referenced_by_remaining.add(str(last_id))
+            artifact_ids = {aid for aid in artifact_ids if aid not in referenced_by_remaining}
+
+            for aid in artifact_ids:
+                pipeline.artifacts.pop(aid, None)
+
+            for nid in to_delete:
+                pipeline.nodes.pop(nid, None)
+                pipeline.children.pop(nid, None)
+
+            pipeline.touch()
+            return {
+                "deleted_node_ids": to_delete,
+                "deleted_artifact_ids": sorted(artifact_ids),
+            }
+
     def load_snapshot(self, snapshot: dict[str, Any]) -> PipelineState:
         """Load a pipeline snapshot into the store (replacing same id if present)."""
         with self._lock:

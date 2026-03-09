@@ -29,6 +29,7 @@ class WebUIApiService:
             run_dir=str(payload.get("run_dir") or "."),
             engine=payload.get("engine"),
             sources=payload.get("sources") or {},
+            project_root=str(payload.get("project_root") or "") or None,
         )
 
     def update_dataset_sources(self, pipeline_id: str, node_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -51,6 +52,9 @@ class WebUIApiService:
             request=payload.get("request"),
             metadata=payload.get("metadata"),
         )
+
+    def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
+        return self.runtime.delete_node(pipeline_id, node_id)
 
     def apply_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
         return self.runtime.apply_node(pipeline_id, node_id)
@@ -151,6 +155,13 @@ def create_fastapi_app():
     def update_node(pipeline_id: str, node_id: str, payload: dict[str, Any]):
         try:
             return service.update_node(pipeline_id, node_id, payload)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.delete("/api/pipelines/{pipeline_id}/nodes/{node_id}")
+    def delete_node(pipeline_id: str, node_id: str):
+        try:
+            return service.delete_node(pipeline_id, node_id)
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

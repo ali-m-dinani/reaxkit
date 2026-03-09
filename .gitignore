@@ -94,3 +94,5 @@ cache/
 # ------------------------------
 .DS_Store
 Thumbs.db
+/.reaxkit_cache/index/handlers.json
+/src/reaxkit/webui/.reaxkit_cache/index/handlers.json

@@ -6,6 +6,7 @@ from dash import dcc, html
 
 from reaxkit.webui.components import (
     dataset_info_panel,
+    log_page_panel,
     pipeline_controls,
     properties_panel,
     result_tabs,
@@ -27,14 +28,71 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
     "info info";
 }
 .rk-panel { background: #fff; border: 1px solid #cedae3; border-radius: 10px; padding: 10px; overflow: auto; }
-.rk-top { grid-area: top; }
+.rk-top { grid-area: top; overflow: visible; z-index: 20; }
 .rk-left { grid-area: left; }
 .rk-canvas { grid-area: canvas; }
 .rk-props { grid-area: props; }
 .rk-results { grid-area: results; }
 .rk-info { grid-area: info; }
 .rk-topbar { display: flex; align-items: center; gap: 16px; }
-.rk-status-wrap { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; min-width: 120px; }
+.rk-nav-btn {
+  border: 1px solid #c8d7e3;
+  background: #f7fbff;
+  color: #2f4a63;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.rk-nav-btn.active {
+  background: #d8e7f8;
+  border-color: #b8cfe8;
+  font-weight: 600;
+}
+.rk-help-menu { position: relative; }
+.rk-help-trigger {
+  border: 1px solid #c8d7e3;
+  background: #f7fbff;
+  color: #2f4a63;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: default;
+  display: inline-flex;
+}
+.rk-help-dropdown {
+  display: none;
+  position: absolute;
+  top: 34px;
+  left: 0;
+  min-width: 220px;
+  z-index: 9999;
+  background: #ffffff;
+  border: 1px solid #c8d7e3;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  gap: 4px;
+}
+.rk-help-menu:hover .rk-help-dropdown { display: grid; }
+.rk-help-item {
+  display: block;
+  text-decoration: none;
+  color: #2f4a63;
+  background: #f8fbfe;
+  border: 1px solid #e0e8ef;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.rk-help-item:hover { background: #eaf3fb; }
+.rk-help-btn { text-align: left; cursor: pointer; font-family: inherit; }
+.rk-help-status {
+  margin-top: 4px;
+  color: #36526b;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.rk-status-wrap { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 120px; }
+.rk-spinner-anchor { width: 18px; height: 18px; }
 .rk-badge { margin-left: auto; background: #e5f2fb; border: 1px solid #b6d2e8; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
 .rk-badge-error { margin-left: auto; background: #fde8e8; border: 1px solid #f1b5b5; color: #8a1c1c; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
 .rk-badge-warn { margin-left: auto; background: #fff5dc; border: 1px solid #f0d18d; color: #7a4f00; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
@@ -82,6 +140,35 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   cursor: help; background: #f2f7fb;
 }
 .rk-canvas-box, .rk-results-box { border: 1px dashed #bfd0de; border-radius: 8px; min-height: 140px; padding: 10px; }
+.rk-page-full {
+  grid-column: 1 / span 2;
+  grid-row: 2 / span 3;
+}
+.rk-log-page {
+  display: grid;
+  gap: 12px;
+}
+.rk-log-section {
+  display: grid;
+  gap: 6px;
+}
+.rk-log-name {
+  color: #4a667c;
+  font-size: 12px;
+}
+.rk-log-box {
+  margin: 0;
+  min-height: 180px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #d4e0e8;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f9fcff;
+  white-space: pre-wrap;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
 @media (max-width: 980px) {
   .rk-grid {
     grid-template-columns: 1fr;
@@ -106,6 +193,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="session-store"),
             dcc.Store(id="pipeline-store"),
             dcc.Store(id="result-store"),
+            dcc.Store(id="ui-store", data={"page": "analysis"}),
             dcc.Store(
                 id="config-store",
                 data={
@@ -113,14 +201,18 @@ def build_layout() -> html.Div:
                     "engine_name": "autodetect",
                     "manual_roles": [],
                     "role_xmolout": "xmolout",
+                    "workspace_default": True,
+                    "workspace_dir": "reaxkit_workspace/",
+                    "draft_viz_type": "plot2d",
                 },
             ),
             html.Div(topbar(), className="rk-panel rk-top"),
-            html.Div(pipeline_controls(), className="rk-panel rk-left"),
-            html.Div(visualization_canvas(), className="rk-panel rk-canvas"),
-            html.Div(properties_panel(), className="rk-panel rk-props"),
-            html.Div(result_tabs(), className="rk-panel rk-results"),
-            html.Div(dataset_info_panel(), className="rk-panel rk-info"),
+            html.Div(pipeline_controls(), id="panel-left", className="rk-panel rk-left"),
+            html.Div(visualization_canvas(), id="panel-canvas", className="rk-panel rk-canvas"),
+            html.Div(properties_panel(), id="panel-props", className="rk-panel rk-props"),
+            html.Div(result_tabs(), id="panel-results", className="rk-panel rk-results"),
+            html.Div(dataset_info_panel(), id="panel-info", className="rk-panel rk-info"),
+            html.Div(log_page_panel(), id="panel-log-page", className="rk-panel rk-page-full", style={"display": "none"}),
         ],
         className="rk-grid",
     )

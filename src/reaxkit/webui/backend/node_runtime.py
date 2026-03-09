@@ -34,6 +34,7 @@ class PipelineRuntime:
         run_dir: str,
         engine: str | None = None,
         sources: dict[str, str] | None = None,
+        project_root: str | None = None,
     ) -> dict[str, Any]:
         engine_detected = detect_engine(run_dir, engine_override=engine)
         source_map = dict(sources or {})
@@ -50,13 +51,36 @@ class PipelineRuntime:
             atoms=atoms,
             fields=sorted(source_map.keys()),
         )
+        pipeline = self.store.get_pipeline(pipeline_id)
+        dataset_nodes = [n for n in pipeline.nodes.values() if n.kind == "dataset"]
+        if dataset_nodes:
+            dataset_nodes.sort(key=lambda n: str(n.updated_at))
+            latest = dataset_nodes[-1]
+            updated = self.store.update_node(
+                pipeline_id,
+                latest.id,
+                request={},
+                metadata={
+                    "dataset": info.__dict__,
+                    "run_dir": run_dir,
+                    "project_root": str(project_root) if project_root else None,
+                },
+                status="done",
+                propagate_dirty=True,
+            )
+            return updated.__dict__
+
         node = PipelineNode(
             id=make_id("node"),
             kind="dataset",
             name="Dataset",
             parent_id=None,
             status="done",
-            metadata={"dataset": info.__dict__, "run_dir": run_dir},
+            metadata={
+                "dataset": info.__dict__,
+                "run_dir": run_dir,
+                "project_root": str(project_root) if project_root else None,
+            },
         )
         self.store.upsert_node(pipeline_id, node)
         return node.__dict__
@@ -82,6 +106,14 @@ class PipelineRuntime:
                 "fort7": sources.get("bonds"),
                 "summary": sources.get("summary"),
             }
+            quick_probe = getattr(adapter, "quick_n_frames", None)
+            if callable(quick_probe):
+                try:
+                    quick_frames = quick_probe(args)
+                except Exception:
+                    quick_frames = None
+                if quick_frames is not None:
+                    return (int(quick_frames), None)
             traj = adapter.load(TrajectoryData, args, reporter=None)
             atoms = len(getattr(traj, "atom_ids", []) or [])
             frames = None
@@ -151,6 +183,10 @@ class PipelineRuntime:
         )
         return updated.__dict__
 
+    def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
+        """Delete a node (and descendants) from the pipeline."""
+        return self.store.delete_node(pipeline_id, node_id)
+
     def apply_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
         node = self.store.get_node(pipeline_id, node_id)
         self.store.update_node(pipeline_id, node_id, status="running", propagate_dirty=False)
@@ -192,6 +228,7 @@ class PipelineRuntime:
             "xmolout": sources.get("trajectory"),
             "fort7": sources.get("bonds"),
             "summary": sources.get("summary"),
+            "project_root": node.metadata.get("project_root") or dataset_node.metadata.get("project_root"),
         }
         task_name = str(node.metadata.get("task_name") or node.name).strip().lower().replace(" ", "_")
         result, task_cls = run_analysis_task(task_name, node.request, runtime_args)
@@ -214,6 +251,31 @@ class PipelineRuntime:
             metadata={"last_artifact_id": artifact.id},
             propagate_dirty=False,
         )
+        # Promote latest utility artifact to the ancestor analysis node so
+        # visualizations under that analysis consume transformed data.
+        try:
+            cursor = self.store.get_node(pipeline_id, str(node.parent_id))
+            visited: set[str] = set()
+            while True:
+                if cursor.id in visited:
+                    break
+                visited.add(cursor.id)
+                if cursor.kind == "analysis":
+                    cursor.result_ref = artifact.id
+                    self.store.upsert_node(pipeline_id, cursor)
+                    self.store.update_node(
+                        pipeline_id,
+                        cursor.id,
+                        status="done",
+                        metadata={"last_artifact_id": artifact.id},
+                        propagate_dirty=False,
+                    )
+                    break
+                if not cursor.parent_id:
+                    break
+                cursor = self.store.get_node(pipeline_id, str(cursor.parent_id))
+        except Exception:
+            pass
         return artifact
 
     @staticmethod
@@ -233,6 +295,17 @@ class PipelineRuntime:
     def _run_utility_node(self, pipeline_id: str, node: PipelineNode) -> ResultArtifact:
         parent = self.store.get_node(pipeline_id, str(node.parent_id))
         artifact_id = parent.result_ref or parent.metadata.get("last_artifact_id")
+        if not artifact_id:
+            # If direct parent has no artifact yet, walk up to nearest ancestor
+            # with materialized results (commonly the analysis node).
+            cursor = parent
+            visited: set[str] = set()
+            while not artifact_id and cursor.parent_id:
+                if cursor.id in visited:
+                    break
+                visited.add(cursor.id)
+                cursor = self.store.get_node(pipeline_id, str(cursor.parent_id))
+                artifact_id = cursor.result_ref or cursor.metadata.get("last_artifact_id")
         if not artifact_id:
             raise ValueError("Parent node has no result artifact to transform")
         parent_artifact = self.store.get_artifact(pipeline_id, str(artifact_id))
@@ -339,7 +412,48 @@ class PipelineRuntime:
             metadata={"last_artifact_id": artifact.id},
             propagate_dirty=False,
         )
+        # Promote utility output to ancestor analysis and invalidate stale
+        # visualization artifacts so table/plot controls read transformed columns.
+        try:
+            cursor = self.store.get_node(pipeline_id, str(node.parent_id))
+            visited: set[str] = set()
+            while True:
+                if cursor.id in visited:
+                    break
+                visited.add(cursor.id)
+                if cursor.kind == "analysis":
+                    cursor.result_ref = artifact.id
+                    self.store.upsert_node(pipeline_id, cursor)
+                    self.store.update_node(
+                        pipeline_id,
+                        cursor.id,
+                        status="done",
+                        metadata={"last_artifact_id": artifact.id},
+                        propagate_dirty=False,
+                    )
+                    self._invalidate_visualization_results(pipeline_id, cursor.id)
+                    break
+                if not cursor.parent_id:
+                    break
+                cursor = self.store.get_node(pipeline_id, str(cursor.parent_id))
+        except Exception:
+            pass
         return artifact
+
+    def _invalidate_visualization_results(self, pipeline_id: str, root_node_id: str) -> None:
+        pipeline = self.store.get_pipeline(pipeline_id)
+        queue = list(pipeline.children.get(root_node_id, []))
+        while queue:
+            child_id = queue.pop(0)
+            child = pipeline.nodes.get(child_id)
+            if child is None:
+                continue
+            if child.kind == "visualization":
+                child.result_ref = None
+                child.metadata.pop("last_artifact_id", None)
+                child.status = "dirty"
+                child.touch()
+            queue.extend(pipeline.children.get(child_id, []))
 
     def _run_visualization_node(self, pipeline_id: str, node: PipelineNode) -> ResultArtifact:
         parent = self.store.get_node(pipeline_id, str(node.parent_id))

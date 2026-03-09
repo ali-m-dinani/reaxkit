@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 from typing import Any
+from numbers import Number
+from datetime import date, datetime
 
 from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_update
 import plotly.graph_objects as go
+import plotly.io as pio
 import os
+import subprocess
+from pathlib import Path
+import re
+import json
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
+from importlib import metadata as importlib_metadata
 
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_dash_request
@@ -57,6 +67,65 @@ def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
         if isinstance(value, list) and value and isinstance(value[0], dict):
             return value
     return []
+
+
+def _build_result_table(rows: list[dict[str, Any]], *, max_rows: int = 200) -> dash_table.DataTable:
+    safe_max = max(10, min(10000, int(max_rows)))
+    column_ids = [str(c) for c in (rows[0].keys() if rows else [])]
+    normalized_rows: list[dict[str, Any]] = []
+    for row in rows[:safe_max]:
+        nr: dict[str, Any] = {}
+        for key, val in row.items():
+            cell = val
+            if hasattr(cell, "item") and callable(getattr(cell, "item")):
+                try:
+                    cell = cell.item()
+                except Exception:
+                    pass
+            if isinstance(cell, (dict, list, tuple, set)):
+                cell = str(cell)
+            nr[str(key)] = cell
+        normalized_rows.append(nr)
+
+    def _infer_col_type(values: list[Any]) -> str:
+        saw_num = False
+        saw_text = False
+        saw_datetime = False
+        for value in values:
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                saw_text = True
+            elif isinstance(value, Number):
+                saw_num = True
+            elif isinstance(value, (datetime, date)):
+                saw_datetime = True
+            else:
+                saw_text = True
+            if saw_text and (saw_num or saw_datetime):
+                return "text"
+        if saw_datetime and not saw_num and not saw_text:
+            return "datetime"
+        if saw_num and not saw_text and not saw_datetime:
+            return "numeric"
+        return "text"
+
+    cols = []
+    for col in column_ids:
+        col_values = [r.get(col) for r in normalized_rows]
+        cols.append({"name": col, "id": col, "type": _infer_col_type(col_values)})
+
+    return dash_table.DataTable(
+        data=normalized_rows,
+        columns=cols,
+        page_size=15,
+        filter_action="native",
+        filter_options={"case": "insensitive"},
+        sort_action="native",
+        sort_mode="multi",
+        style_table={"overflowX": "auto"},
+        style_cell={"fontFamily": "Segoe UI", "fontSize": "12px", "textAlign": "left"},
+    )
 
 
 def _result_cache_from_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
@@ -115,14 +184,21 @@ def _find_source_artifact(
     if not isinstance(nodes, dict):
         return None
     cache = result_store or {}
+    current_node = nodes.get(str(selected_node_id)) if isinstance(nodes, dict) else None
 
     # 1) direct cache
     direct = cache.get(selected_node_id)
-    if isinstance(direct, dict):
-        return direct
+    if isinstance(direct, dict) and isinstance(current_node, dict):
+        direct_id = str(direct.get("id") or "")
+        result_ref = str(current_node.get("result_ref") or "")
+        meta = current_node.get("metadata", {})
+        last_id = str(meta.get("last_artifact_id") or "") if isinstance(meta, dict) else ""
+        # Avoid stale node->artifact cache entries after upstream transformations.
+        if (result_ref and direct_id == result_ref) or (last_id and direct_id == last_id):
+            return direct
 
     # 2) walk to nearest ancestor with artifact reference
-    current = nodes.get(str(selected_node_id))
+    current = current_node
     seen: set[str] = set()
     while isinstance(current, dict):
         cid = str(current.get("id"))
@@ -133,7 +209,9 @@ def _find_source_artifact(
         if result_ref:
             art = cache.get(cid)
             if isinstance(art, dict):
-                return art
+                art_id = str(art.get("id") or "")
+                if art_id == str(result_ref):
+                    return art
             if isinstance(artifacts, dict):
                 snap_art = artifacts.get(str(result_ref))
                 if isinstance(snap_art, dict):
@@ -141,10 +219,16 @@ def _find_source_artifact(
         meta = current.get("metadata", {})
         if isinstance(meta, dict):
             last_id = meta.get("last_artifact_id")
-            if last_id and isinstance(artifacts, dict):
-                snap_art = artifacts.get(str(last_id))
-                if isinstance(snap_art, dict):
-                    return snap_art
+            if last_id:
+                art = cache.get(cid)
+                if isinstance(art, dict):
+                    art_id = str(art.get("id") or "")
+                    if art_id == str(last_id):
+                        return art
+                if isinstance(artifacts, dict):
+                    snap_art = artifacts.get(str(last_id))
+                    if isinstance(snap_art, dict):
+                        return snap_art
         parent_id = current.get("parent_id")
         if not parent_id:
             break
@@ -168,6 +252,203 @@ def _browse_directory() -> str | None:
     except Exception:
         return None
     return None
+
+
+def _default_workspace_dir_for_dataset(dataset_path: str | None) -> str:
+    base = Path(str(dataset_path or ".").strip() or ".")
+    if not base.is_absolute():
+        base = (Path.cwd() / base).resolve()
+    return str((base / "reaxkit_workspace").resolve())
+
+
+def _engine_display_name(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    if raw == "reaxff":
+        return "ReaxFF"
+    if raw == "lammps":
+        return "LAMMPS"
+    if raw == "ams":
+        return "AMS"
+    if raw == "autodetect":
+        return "Autodetect"
+    return str(value or "")
+
+
+def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
+    cfg = dict(config or {})
+    workspace_dir = str(cfg.get("workspace_dir") or "").strip()
+    candidates: list[Path] = []
+    if workspace_dir:
+        p = Path(workspace_dir)
+        candidates.append(p)
+        if not p.is_absolute():
+            candidates.append((Path.cwd() / p).resolve())
+            candidates.append((Path(__file__).resolve().parent / p).resolve())
+    candidates.extend(
+        [
+            Path("reaxkit_workkspace"),
+            Path("reaxkit_workspace"),
+            Path.cwd() / "reaxkit_workkspace",
+            Path.cwd() / "reaxkit_workspace",
+            Path(__file__).resolve().parent / "reaxkit_workkspace",
+            Path(__file__).resolve().parent / "reaxkit_workspace",
+        ]
+    )
+    seen: set[str] = set()
+    deduped: list[Path] = []
+    for c in candidates:
+        key = str(c)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(c)
+    for root in deduped:
+        logs = root / "logs"
+        if logs.exists() and logs.is_dir():
+            return logs
+    return (deduped[0] / "logs") if deduped else (Path.cwd() / "reaxkit_workkspace" / "logs")
+
+
+def _pick_latest(paths: list[Path]) -> Path | None:
+    existing = [p for p in paths if p.exists() and p.is_file()]
+    if not existing:
+        return None
+    existing.sort(key=lambda p: p.stat().st_mtime)
+    return existing[-1]
+
+
+def _read_tail(path: Path | None, *, max_lines: int = 400) -> str:
+    if path is None or not path.exists():
+        return "No log file found."
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception as exc:
+        return f"Failed to read log file: {exc}"
+    lines = text.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+    return "\n".join(lines) if lines else "(empty log)"
+
+
+def _select_log_files(config: dict[str, Any] | None) -> tuple[Path | None, Path | None]:
+    logs_root = _resolve_logs_root(config)
+    human_candidates = sorted(logs_root.glob("run_*.timing.log"))
+    human = _pick_latest(human_candidates) or _pick_latest([logs_root / "timing_human.log"])
+
+    low = _pick_latest([logs_root / "timing.log"])
+    if low is not None:
+        return human, low
+    run_low_candidates = [p for p in logs_root.glob("run_*.log") if not p.name.endswith(".timing.log")]
+    run_low_candidates.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0.0)
+    low = _pick_latest(run_low_candidates)
+    if low is None:
+        low = _pick_latest([logs_root / "reaxkit.log"])
+    return human, low
+
+
+def _default_repo_slug() -> str:
+    # Preferred explicit repo; fallback to local git origin if available.
+    explicit = os.environ.get("REAXKIT_GITHUB_REPO", "").strip()
+    if explicit:
+        return explicit
+    try:
+        cfg = Path(__file__).resolve().parents[3] / ".git" / "config"
+        if cfg.exists():
+            text = cfg.read_text(encoding="utf-8", errors="replace")
+            match = re.search(r"url\s*=\s*https?://github\.com/([^/\s]+/[^/\s]+?)(?:\.git)?\s*$", text, re.MULTILINE)
+            if match:
+                return str(match.group(1))
+    except Exception:
+        pass
+    return "ali-m-dinani/reaxkit"
+
+
+def _installed_reaxkit_version() -> str:
+    try:
+        return importlib_metadata.version("reaxkit")
+    except Exception:
+        try:
+            pyproject = Path(__file__).resolve().parents[3] / "pyproject.toml"
+            if pyproject.exists():
+                text = pyproject.read_text(encoding="utf-8", errors="replace")
+                m = re.search(r'^\s*version\s*=\s*"([^"]+)"\s*$', text, re.MULTILINE)
+                if m:
+                    return str(m.group(1))
+        except Exception:
+            pass
+    return "unknown"
+
+
+def _version_tuple(raw: str) -> tuple[int, ...]:
+    txt = str(raw or "").strip().lstrip("vV")
+    parts = re.split(r"[^0-9]+", txt)
+    nums = [int(p) for p in parts if p.isdigit()]
+    return tuple(nums) if nums else (0,)
+
+
+def _fetch_latest_release_tag(repo_slug: str) -> tuple[str, str]:
+    def _latest_tag_from_git() -> str | None:
+        commands = [
+            # Prefer configured local remote (works with private repos when git auth is set up).
+            ["git", "-C", str(Path(__file__).resolve().parents[3]), "ls-remote", "--tags", "origin"],
+            # Fallback to direct GitHub URL.
+            ["git", "ls-remote", "--tags", f"https://github.com/{repo_slug}.git"],
+        ]
+        tags: set[str] = set()
+        for cmd in commands:
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10, check=False)
+            except Exception:
+                continue
+            if proc.returncode != 0 or not proc.stdout:
+                continue
+            for raw in proc.stdout.splitlines():
+                parts = raw.strip().split()
+                if len(parts) < 2:
+                    continue
+                ref = str(parts[1])
+                if not ref.startswith("refs/tags/"):
+                    continue
+                tag = ref.split("refs/tags/", 1)[1]
+                if tag.endswith("^{}"):
+                    tag = tag[:-3]
+                if tag:
+                    tags.add(tag)
+            if tags:
+                break
+        if not tags:
+            return None
+        return sorted(tags, key=lambda t: (_version_tuple(t), t))[-1]
+
+    api_url = f"https://api.github.com/repos/{repo_slug}/releases/latest"
+    req = Request(api_url, headers={"User-Agent": "ReaxKit-WebUI"})
+    try:
+        with urlopen(req, timeout=8) as resp:
+            payload = json.loads(resp.read().decode("utf-8", errors="replace"))
+        tag = str(payload.get("tag_name") or payload.get("name") or "").strip()
+        if tag:
+            return tag, "release"
+    except HTTPError as exc:
+        if int(getattr(exc, "code", 0)) != 404:
+            raise
+
+    # Fallback for repos without Releases endpoint support.
+    try:
+        tag_req = Request(f"https://api.github.com/repos/{repo_slug}/tags?per_page=1", headers={"User-Agent": "ReaxKit-WebUI"})
+        with urlopen(tag_req, timeout=8) as resp:
+            payload = json.loads(resp.read().decode("utf-8", errors="replace"))
+        if isinstance(payload, list) and payload:
+            tag = str((payload[0] or {}).get("name") or "").strip()
+            if tag:
+                return tag, "tag"
+    except HTTPError as exc:
+        if int(getattr(exc, "code", 0)) != 404:
+            raise
+
+    git_tag = _latest_tag_from_git()
+    if git_tag:
+        return git_tag, "tag"
+    raise ValueError("No release/tag found (GitHub API and git tag fallback failed).")
 
 
 def _analysis_dropdown_options(search_value: str | None = None) -> tuple[list[dict[str, Any]], str]:
@@ -224,6 +505,295 @@ def _visualization_nodes_for_analysis(snapshot: dict[str, Any] | None, analysis_
     ]
     out.sort(key=lambda n: str(n.get("created_at", "")))
     return out
+
+
+def _latest_dataset_node(snapshot: dict[str, Any] | None) -> dict[str, Any] | None:
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(nodes, dict):
+        return None
+    datasets = [n for n in nodes.values() if isinstance(n, dict) and str(n.get("kind")) == "dataset"]
+    if not datasets:
+        return None
+    datasets.sort(key=lambda n: str(n.get("updated_at", "")))
+    return datasets[-1]
+
+
+def _canonical_viz_type(raw: Any) -> str:
+    val = str(raw or "").strip().lower().replace(" ", "")
+    aliases = {
+        "plot": "plot2d",
+        "plot2d": "plot2d",
+        "single_plot": "plot2d",
+        "hist": "histogram",
+        "histogram": "histogram",
+        "scatter": "scatter3d",
+        "scatter3d": "scatter3d",
+        "3d": "scatter3d",
+        "table": "table",
+    }
+    return aliases.get(val, val or "plot2d")
+
+
+def _visualization_display_label(snapshot: dict[str, Any] | None, viz_node_id: str) -> str:
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(nodes, dict):
+        return "visualization"
+    node = nodes.get(str(viz_node_id))
+    if not isinstance(node, dict):
+        return "visualization"
+    if str(node.get("kind")) != "visualization":
+        return str(node.get("name") or "node")
+
+    analysis_id = _ancestor_analysis_id(nodes, str(viz_node_id))
+    if not analysis_id:
+        raw = node.get("request", {}).get("visualization_type") if isinstance(node.get("request"), dict) else node.get("name")
+        return _canonical_viz_type(raw)
+
+    typed_counts: dict[str, int] = {}
+    for vnode in _visualization_nodes_for_analysis(snapshot, analysis_id):
+        current_id = str(vnode.get("id"))
+        req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
+        meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
+        raw_type = req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name")
+        vtype = _canonical_viz_type(raw_type)
+        typed_counts[vtype] = typed_counts.get(vtype, 0) + 1
+        if current_id == str(viz_node_id):
+            return f"{vtype}: {typed_counts[vtype]:02d}"
+    return str(node.get("name") or "visualization")
+
+
+def _analysis_display_label(snapshot: dict[str, Any] | None, analysis_node_id: str) -> str:
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(nodes, dict):
+        return "analysis"
+    node = nodes.get(str(analysis_node_id))
+    if not isinstance(node, dict):
+        return "analysis"
+    raw_name = str(node.get("metadata", {}).get("task_name") or node.get("name") or "analysis")
+    key = raw_name.strip().lower()
+    analyses = [
+        n for n in nodes.values()
+        if isinstance(n, dict) and str(n.get("kind")) == "analysis"
+    ]
+    analyses.sort(key=lambda n: str(n.get("created_at", "")))
+    idx = 0
+    for item in analyses:
+        item_name = str(item.get("metadata", {}).get("task_name") or item.get("name") or "analysis").strip().lower()
+        if item_name == key:
+            idx += 1
+        if str(item.get("id")) == str(analysis_node_id):
+            return f"{raw_name}: {idx:02d}"
+    return raw_name
+
+
+def _utility_display_label(snapshot: dict[str, Any] | None, utility_node_id: str) -> str:
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    if not isinstance(nodes, dict):
+        return "utility"
+    node = nodes.get(str(utility_node_id))
+    if not isinstance(node, dict):
+        return "utility"
+    raw_name = str(node.get("metadata", {}).get("utility_name") or node.get("name") or "utility")
+    key = raw_name.strip().lower()
+    utilities = [
+        n for n in nodes.values()
+        if isinstance(n, dict) and str(n.get("kind")) == "utility"
+    ]
+    utilities.sort(key=lambda n: str(n.get("created_at", "")))
+    idx = 0
+    for item in utilities:
+        item_name = str(item.get("metadata", {}).get("utility_name") or item.get("name") or "utility").strip().lower()
+        if item_name == key:
+            idx += 1
+        if str(item.get("id")) == str(utility_node_id):
+            return f"{raw_name}: {idx:02d}"
+    return raw_name
+
+
+def _viz_request_with_defaults(existing: dict[str, Any] | None, viz_type: str) -> dict[str, Any]:
+    req = dict(existing or {})
+    req["visualization_type"] = str(viz_type)
+    req.setdefault("x_col", "iter")
+    req.setdefault("y_col", "msd")
+    req.setdefault("z_col", "frame_index")
+    req.setdefault("use_plot_title", False)
+    req.setdefault("plot_title", "")
+    req.setdefault("x_title", "")
+    req.setdefault("y_title", "")
+    req.setdefault("z_title", "")
+    req.setdefault("color_col", "")
+    req.setdefault("group_col", "atom_id")
+    req.setdefault("line_color", "blue")
+    req.setdefault("line_color_rgb", "")
+    req.setdefault("line_width", 2.0)
+    req.setdefault("table_filter_col", "")
+    req.setdefault("table_filter_value", "")
+    req.setdefault("table_max_rows", 200)
+    req.setdefault("font_size", 12)
+    req.setdefault("marker_size", 0 if str(viz_type).lower() == "plot2d" else 6)
+    req.setdefault("theme", "plotly_white")
+    req.setdefault("axis_title_size", 13)
+    req.setdefault("grid_on", True)
+    req.setdefault("log_scale", "none")
+    req.setdefault("tick_spacing_x", "")
+    req.setdefault("tick_spacing_y", "")
+    req.setdefault("legend_position", "top-right")
+    req.setdefault("show_legend", True)
+    req.setdefault("show_markers", False)
+    return req
+
+
+def _parse_float(raw: Any, default: float | None = None) -> float | None:
+    if raw is None:
+        return default
+    txt = str(raw).strip()
+    if txt == "":
+        return default
+    try:
+        return float(txt)
+    except Exception:
+        return default
+
+
+def _theme_options() -> list[dict[str, str]]:
+    cached = getattr(_theme_options, "_cache", None)
+    if isinstance(cached, list) and cached:
+        return cached
+    built_in = ["plotly_white", "plotly", "plotly_dark", "simple_white", "ggplot2", "seaborn", "presentation"]
+    bootstrap_like = [
+        "bootstrap",
+        "cerulean",
+        "cosmo",
+        "cyborg",
+        "darkly",
+        "flatly",
+        "journal",
+        "litera",
+        "lumen",
+        "lux",
+        "materia",
+        "minty",
+        "morph",
+        "pulse",
+        "quartz",
+        "sandstone",
+        "simplex",
+        "sketchy",
+        "slate",
+        "solar",
+        "spacelab",
+        "superhero",
+        "united",
+        "vapor",
+        "yeti",
+        "zephyr",
+    ]
+    # Optional bridge package: registers Bootstrap-like Plotly templates.
+    try:
+        from dash_bootstrap_templates import load_figure_template
+
+        load_figure_template(bootstrap_like)
+    except Exception:
+        pass
+
+    names: list[str] = []
+    for t in built_in + bootstrap_like:
+        if t in pio.templates and t not in names:
+            names.append(t)
+    opts = [{"label": n, "value": n} for n in names]
+    setattr(_theme_options, "_cache", opts)
+    return opts
+
+
+def _safe_theme(theme: Any) -> str:
+    candidate = str(theme or "plotly_white").strip()
+    return candidate if candidate in pio.templates else "plotly_white"
+
+
+def _flag_on(raw: Any, default: bool = True) -> bool:
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, list):
+        return any(str(v).strip().lower() == "on" for v in raw)
+    txt = str(raw).strip().lower()
+    if txt in {"on", "true", "1", "yes"}:
+        return True
+    if txt in {"off", "false", "0", "no"}:
+        return False
+    return default
+
+
+def _legend_layout(position: str | None) -> dict[str, Any]:
+    pos = str(position or "top-right").strip().lower()
+    if pos == "hidden":
+        return {"showlegend": False}
+    mapping = {
+        "top-right": {"x": 1.0, "y": 1.0, "xanchor": "right", "yanchor": "top"},
+        "top-left": {"x": 0.0, "y": 1.0, "xanchor": "left", "yanchor": "top"},
+        "bottom-right": {"x": 1.0, "y": 0.0, "xanchor": "right", "yanchor": "bottom"},
+        "bottom-left": {"x": 0.0, "y": 0.0, "xanchor": "left", "yanchor": "bottom"},
+        "right-outside": {"x": 1.02, "y": 1.0, "xanchor": "left", "yanchor": "top"},
+    }
+    return {"showlegend": True, "legend": mapping.get(pos, mapping["top-right"])}
+
+
+def _apply_2d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool = True) -> go.Figure:
+    theme = _safe_theme(req.get("theme"))
+    font_size = _parse_float(req.get("font_size"), 12.0) or 12.0
+    axis_title_size = _parse_float(req.get("axis_title_size"), font_size + 1.0)
+    grid_on = _flag_on(req.get("grid_on"), default=True)
+    log_scale = str(req.get("log_scale") or "none").strip().lower()
+    tick_x = _parse_float(req.get("tick_spacing_x"), None)
+    tick_y = _parse_float(req.get("tick_spacing_y"), None)
+
+    fig.update_layout(template=theme, font={"size": font_size})
+    xaxis_cfg: dict[str, Any] = {"showgrid": grid_on}
+    yaxis_cfg: dict[str, Any] = {"showgrid": grid_on}
+    if axis_title_size is not None:
+        xaxis_cfg["title_font"] = {"size": axis_title_size}
+        yaxis_cfg["title_font"] = {"size": axis_title_size}
+    if tick_x is not None:
+        xaxis_cfg["dtick"] = tick_x
+    if tick_y is not None:
+        yaxis_cfg["dtick"] = tick_y
+    if log_scale in {"x", "both"}:
+        xaxis_cfg["type"] = "log"
+    if log_scale in {"y", "both"}:
+        yaxis_cfg["type"] = "log"
+    fig.update_xaxes(**xaxis_cfg)
+    fig.update_yaxes(**yaxis_cfg)
+    if apply_legend:
+        if _flag_on(req.get("show_legend"), default=True):
+            fig.update_layout(**_legend_layout(str(req.get("legend_position") or "top-right")))
+        else:
+            fig.update_layout(showlegend=False)
+    return fig
+
+
+def _apply_3d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool = False) -> go.Figure:
+    theme = _safe_theme(req.get("theme"))
+    font_size = _parse_float(req.get("font_size"), 12.0) or 12.0
+    axis_title_size = _parse_float(req.get("axis_title_size"), font_size + 1.0)
+    grid_on = _flag_on(req.get("grid_on"), default=True)
+
+    scene_cfg: dict[str, Any] = {
+        "xaxis": {"showgrid": grid_on},
+        "yaxis": {"showgrid": grid_on},
+        "zaxis": {"showgrid": grid_on},
+    }
+    if axis_title_size is not None:
+        scene_cfg["xaxis"]["title"] = {"font": {"size": axis_title_size}}
+        scene_cfg["yaxis"]["title"] = {"font": {"size": axis_title_size}}
+        scene_cfg["zaxis"]["title"] = {"font": {"size": axis_title_size}}
+    fig.update_layout(template=theme, font={"size": font_size}, scene=scene_cfg)
+    if apply_legend:
+        if _flag_on(req.get("show_legend"), default=True):
+            fig.update_layout(**_legend_layout(str(req.get("legend_position") or "top-right")))
+        else:
+            fig.update_layout(showlegend=False)
+    return fig
 
 
 def _build_plot(
@@ -352,12 +922,13 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
     nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
     if not isinstance(nodes, dict):
         nodes = {}
-    dataset_node = next((n for n in nodes.values() if isinstance(n, dict) and n.get("kind") == "dataset"), None)
+    dataset_node = _latest_dataset_node(snapshot)
     engine_text = "(not loaded)"
     if dataset_node:
         meta = dataset_node.get("metadata", {})
         dataset = meta.get("dataset", {}) if isinstance(meta, dict) else {}
-        engine_text = str(dataset.get("engine_override") or dataset.get("engine_detected") or "(not loaded)")
+        raw_engine = str(dataset.get("engine_override") or dataset.get("engine_detected") or "(not loaded)")
+        engine_text = _engine_display_name(raw_engine) if raw_engine != "(not loaded)" else raw_engine
 
     analysis_nodes = [n for n in nodes.values() if isinstance(n, dict) and n.get("kind") == "analysis"]
     utility_nodes = [n for n in nodes.values() if isinstance(n, dict) and n.get("kind") == "utility"]
@@ -397,24 +968,20 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
     ]
     for node in analysis_nodes:
         aid = str(node.get("id"))
-        rendered.append(row(aid, str(node.get("name", "analysis")), 3, str(node.get("status", "idle"))))
-        rendered.append(row(f"virtual:utilities:{aid}", "Utilities", 4))
-        for unode in utilities_by_analysis.get(aid, []):
-            rendered.append(row(str(unode.get("id")), str(unode.get("name", "utility")), 5, str(unode.get("status", "idle"))))
-        rendered.append(row(f"virtual:visualization:{aid}", "Visualization", 4))
-        typed_counts: dict[str, int] = {}
-        for vnode in visualizations_by_analysis.get(aid, []):
-            req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
-            raw_type = str(req.get("visualization_type") or vnode.get("name") or "viz").lower()
-            label_type = {
-                "plot2d": "plot 2d",
-                "scatter3d": "scatter 3d",
-                "histogram": "histogram",
-                "table": "table",
-            }.get(raw_type, raw_type)
-            typed_counts[label_type] = typed_counts.get(label_type, 0) + 1
-            tag = f"{typed_counts[label_type]:02d}"
-            rendered.append(row(str(vnode.get("id")), f"{label_type}: {tag}", 5, str(vnode.get("status", "idle"))))
+        rendered.append(row(aid, _analysis_display_label(snapshot, aid), 3, str(node.get("status", "idle"))))
+        meta = node.get("metadata", {}) if isinstance(node.get("metadata"), dict) else {}
+        has_result = bool(node.get("result_ref") or meta.get("last_artifact_id"))
+        analysis_utils = utilities_by_analysis.get(aid, [])
+        analysis_presentations = visualizations_by_analysis.get(aid, [])
+        if has_result or analysis_utils or analysis_presentations:
+            rendered.append(row(f"virtual:utilities:{aid}", "Utilities", 4))
+            for unode in analysis_utils:
+                uid = str(unode.get("id"))
+                rendered.append(row(uid, _utility_display_label(snapshot, uid), 5, str(unode.get("status", "idle"))))
+            rendered.append(row(f"virtual:visualization:{aid}", "Presentation", 4))
+            for vnode in analysis_presentations:
+                label = _visualization_display_label(snapshot, str(vnode.get("id")))
+                rendered.append(row(str(vnode.get("id")), label, 5, str(vnode.get("status", "idle"))))
     return rendered
 
 
@@ -437,9 +1004,117 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             {"pipeline_id": pipeline["id"], "selected_node_id": "virtual:dataset"},
             snapshot,
             {},
-            {"dataset_path": os.getcwd(), "engine_name": "autodetect", "role_xmolout": "xmolout"},
+            {
+                "dataset_path": os.getcwd(),
+                "engine_name": "autodetect",
+                "role_xmolout": "xmolout",
+                "workspace_default": True,
+                "workspace_dir": _default_workspace_dir_for_dataset(os.getcwd()),
+                "draft_viz_type": "plot2d",
+            },
             "Ready",
         )
+
+    @app.callback(
+        Output("ui-store", "data"),
+        Input("btn-nav-analysis", "n_clicks"),
+        Input("btn-nav-log", "n_clicks"),
+        State("ui-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_nav_page_change(
+        _n_analysis: int,
+        _n_log: int,
+        ui_data: dict[str, Any] | None,
+    ):
+        trig = str(ctx.triggered_id or "")
+        current = str((ui_data or {}).get("page") or "analysis")
+        if trig == "btn-nav-log":
+            return {"page": "log"}
+        if trig == "btn-nav-analysis":
+            return {"page": "analysis"}
+        return {"page": current}
+
+    @app.callback(
+        Output("panel-left", "style"),
+        Output("panel-canvas", "style"),
+        Output("panel-props", "style"),
+        Output("panel-results", "style"),
+        Output("panel-info", "style"),
+        Output("panel-log-page", "style"),
+        Output("btn-nav-analysis", "className"),
+        Output("btn-nav-log", "className"),
+        Input("ui-store", "data"),
+        prevent_initial_call=False,
+    )
+    def render_active_page(ui_data: dict[str, Any] | None):
+        page = str((ui_data or {}).get("page") or "analysis").lower()
+        show_analysis = page == "analysis"
+        show_log = page == "log"
+        base = "rk-nav-btn"
+        return (
+            {} if show_analysis else {"display": "none"},
+            {} if show_analysis else {"display": "none"},
+            {} if show_analysis else {"display": "none"},
+            {} if show_analysis else {"display": "none"},
+            {} if show_analysis else {"display": "none"},
+            {"display": "block"} if show_log else {"display": "none"},
+            f"{base} active" if show_analysis else base,
+            f"{base} active" if show_log else base,
+        )
+
+    @app.callback(
+        Output("help-update-status", "children"),
+        Input("btn-help-check-updates", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def on_help_check_updates(n_clicks: int):
+        if not n_clicks:
+            return no_update
+        repo = _default_repo_slug()
+        local = _installed_reaxkit_version()
+        try:
+            remote, source = _fetch_latest_release_tag(repo)
+        except (URLError, HTTPError, ValueError) as exc:
+            return f"Update check failed: {exc}"
+        except Exception as exc:
+            return f"Update check failed: {exc}"
+
+        local_t = _version_tuple(local)
+        remote_t = _version_tuple(remote)
+        source_label = "release" if source == "release" else "tag"
+        if local == "unknown":
+            return f"Installed: unknown | Latest {source_label}: {remote} ({repo})"
+        if local_t < remote_t:
+            return f"Update available: installed {local} -> latest {source_label} {remote} ({repo})"
+        if local_t > remote_t:
+            return f"Installed {local} is newer than latest {source_label} {remote} ({repo})"
+        return f"Up to date: {local} ({source_label} {remote}, {repo})"
+
+    @app.callback(
+        Output("log-human-name", "children"),
+        Output("log-human-content", "children"),
+        Output("log-low-name", "children"),
+        Output("log-low-content", "children"),
+        Input("ui-store", "data"),
+        Input("pipeline-store", "data"),
+        State("config-store", "data"),
+        prevent_initial_call=False,
+    )
+    def render_log_page(
+        ui_data: dict[str, Any] | None,
+        _snapshot: dict[str, Any] | None,
+        config_data: dict[str, Any] | None,
+    ):
+        page = str((ui_data or {}).get("page") or "analysis").lower()
+        if page != "log":
+            return no_update, no_update, no_update, no_update
+        human, low = _select_log_files(config_data)
+        human_name = human.name if human else "(missing)"
+        low_name = low.name if low else "(missing)"
+        human_content = _read_tail(human)
+        low_content = _read_tail(low)
+        return human_name, human_content, low_name, low_content
 
     @app.callback(
         Output("status-banner", "children", allow_duplicate=True),
@@ -493,7 +1168,10 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     )
     def sync_dataset_path(value: str | None, config: dict[str, Any] | None):
         cfg = dict(config or {})
-        cfg["dataset_path"] = str(value or ".")
+        dataset_path = str(value or ".")
+        cfg["dataset_path"] = dataset_path
+        if bool(cfg.get("workspace_default", True)):
+            cfg["workspace_dir"] = _default_workspace_dir_for_dataset(dataset_path)
         return cfg
 
     @app.callback(
@@ -511,6 +1189,30 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         cfg = dict(config or {})
         cfg["engine_name"] = str(engine_name or "autodetect")
         cfg["role_xmolout"] = str(role_xmolout or "xmolout")
+        return cfg
+
+    @app.callback(
+        Output("config-store", "data", allow_duplicate=True),
+        Input("input-default-workspace", "value"),
+        Input("input-workspace-dir", "value"),
+        State("input-dataset-path", "value"),
+        State("config-store", "data"),
+        prevent_initial_call=True,
+    )
+    def sync_workspace_config(
+        default_flags: list[str] | None,
+        workspace_dir: str | None,
+        dataset_path: str | None,
+        config: dict[str, Any] | None,
+    ):
+        cfg = dict(config or {})
+        use_default = "default" in (default_flags or [])
+        cfg["workspace_default"] = bool(use_default)
+        cfg["workspace_dir"] = (
+            _default_workspace_dir_for_dataset(dataset_path or cfg.get("dataset_path"))
+            if use_default
+            else str(workspace_dir or "reaxkit_workspace/")
+        )
         return cfg
 
     @app.callback(
@@ -539,6 +1241,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     @app.callback(
         Output("session-store", "data", allow_duplicate=True),
         Output("pipeline-store", "data", allow_duplicate=True),
+        Output("config-store", "data", allow_duplicate=True),
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-load-dataset", "n_clicks"),
         State("session-store", "data"),
@@ -551,14 +1254,20 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         config: dict[str, Any] | None,
     ):
         if not n_clicks or not session or "pipeline_id" not in session:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
 
         pipeline_id = str(session["pipeline_id"])
         cfg = dict(config or {})
         dataset_path = str(cfg.get("dataset_path") or ".")
         engine_name = str(cfg.get("engine_name") or "autodetect")
         role_xmolout = str(cfg.get("role_xmolout") or "xmolout")
+        workspace_default = bool(cfg.get("workspace_default", True))
         run_dir = str(dataset_path or ".").strip() or "."
+        workspace_dir = (
+            _default_workspace_dir_for_dataset(run_dir)
+            if workspace_default
+            else str(cfg.get("workspace_dir") or "reaxkit_workspace/")
+        )
         engine_value = str(engine_name or "autodetect").strip().lower()
         forced_engine = None if engine_value == "autodetect" else engine_value
         sources = {"trajectory": "xmolout"}
@@ -571,10 +1280,23 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 "run_dir": run_dir,
                 "engine": forced_engine,
                 "sources": sources,
+                "project_root": workspace_dir,
             },
         )
         snapshot = service.get_pipeline(pipeline_id)
-        return {"pipeline_id": pipeline_id, "selected_node_id": dataset_node["id"]}, snapshot, "Dataset loaded"
+        loaded_dataset = _latest_dataset_node(snapshot) or dataset_node
+        dataset_meta = loaded_dataset.get("metadata", {}) if isinstance(loaded_dataset, dict) else {}
+        dataset_payload = dataset_meta.get("dataset", {}) if isinstance(dataset_meta, dict) else {}
+        detected_engine = str(dataset_payload.get("engine_override") or dataset_payload.get("engine_detected") or "unknown")
+        next_cfg = dict(cfg)
+        next_cfg["dataset_path"] = run_dir
+        next_cfg["workspace_dir"] = workspace_dir
+        next_cfg["role_xmolout"] = str(role_xmolout or "xmolout")
+        if engine_value != "autodetect":
+            next_cfg["engine_name"] = engine_value
+        elif detected_engine != "unknown":
+            next_cfg["engine_name"] = "autodetect"
+        return {"pipeline_id": pipeline_id, "selected_node_id": "virtual:dataset"}, snapshot, next_cfg, "Dataset loaded"
 
     @app.callback(
         Output("session-store", "data", allow_duplicate=True),
@@ -599,9 +1321,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             return no_update, no_update, "WARN: No active pipeline"
 
         nodes = snapshot.get("nodes", {})
-        dataset_node = None
-        if isinstance(nodes, dict):
-            dataset_node = next((n for n in nodes.values() if isinstance(n, dict) and n.get("kind") == "dataset"), None)
+        dataset_node = _latest_dataset_node(snapshot)
         if not dataset_node:
             return no_update, no_update, "WARN: Load a dataset first"
 
@@ -650,9 +1370,17 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     ):
         if not session or not snapshot:
             return no_update, no_update, no_update
+        trig = ctx.triggered_id
+        if trig == "btn-add-filter-node" and int(n_filter or 0) <= 0:
+            return no_update, no_update, no_update
+        if trig == "btn-add-ema-node" and int(n_ema or 0) <= 0:
+            return no_update, no_update, no_update
+        if trig == "btn-add-sma-node" and int(n_sma or 0) <= 0:
+            return no_update, no_update, no_update
         pipeline_id = str(session.get("pipeline_id", ""))
         selected_node_id = str(session.get("selected_node_id") or "")
         node = _selected_node(snapshot, session)
+        parent_id: str | None = None
         if not pipeline_id:
             return no_update, no_update, "WARN: No active pipeline"
         if not node:
@@ -675,12 +1403,14 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 parent_id = _latest_node_id(snapshot, ("utility", "analysis"))
                 if not parent_id:
                     return no_update, no_update, "WARN: Add and apply an analysis node first"
+            if parent_id:
                 nodes = snapshot.get("nodes", {})
                 node = nodes.get(parent_id) if isinstance(nodes, dict) else None
             if not node:
                 return no_update, no_update, "WARN: Select a parent node first"
+        else:
+            parent_id = str(node.get("id"))
 
-        trig = ctx.triggered_id
         util_name = None
         request = {}
         label = ""
@@ -702,7 +1432,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         util_node = service.add_node(
             pipeline_id,
             {
-                "parent_id": node["id"],
+                "parent_id": parent_id or node["id"],
                 "kind": "utility",
                 "name": util_name,
                 "metadata": {"utility_name": util_name},
@@ -775,6 +1505,10 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                     "x_col": str(x_col or ""),
                     "y_col": str(y_col or ""),
                     "z_col": str(z_col or ""),
+                    "plot_title": "",
+                    "x_title": "",
+                    "y_title": "",
+                    "z_title": "",
                     "color_col": str(color_col or ""),
                     "group_col": str(group_col or ""),
                     "line_color": "blue",
@@ -783,11 +1517,66 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                     "table_filter_col": "",
                     "table_filter_value": "",
                     "table_max_rows": 200,
+                    "font_size": 12,
+                    "marker_size": 0 if str(viz_type or "plot2d").lower() == "plot2d" else 6,
+                    "theme": "plotly_white",
+                    "axis_title_size": 13,
+                    "grid_on": True,
+                    "log_scale": "none",
+                    "tick_spacing_x": "",
+                    "tick_spacing_y": "",
+                    "show_markers": False,
+                    "show_legend": True,
+                    "legend_position": "top-right",
                 },
             },
         )
         next_snapshot = service.get_pipeline(pipeline_id)
-        return {"pipeline_id": pipeline_id, "selected_node_id": node["id"]}, next_snapshot, "Visualization added"
+        return {"pipeline_id": pipeline_id, "selected_node_id": node["id"]}, next_snapshot, "Presentation added"
+
+    @app.callback(
+        Output("session-store", "data", allow_duplicate=True),
+        Output("pipeline-store", "data", allow_duplicate=True),
+        Output("result-store", "data", allow_duplicate=True),
+        Output("status-banner", "children", allow_duplicate=True),
+        Input("btn-delete-node", "n_clicks"),
+        State("session-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_delete_node(
+        n_clicks: int,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        if not n_clicks or not session or not snapshot:
+            return no_update, no_update, no_update, no_update
+        pipeline_id = str(session.get("pipeline_id", ""))
+        node = _selected_node(snapshot, session)
+        if not pipeline_id or not node:
+            return no_update, no_update, no_update, "WARN: Select a node first"
+        kind = str(node.get("kind") or "")
+        if kind not in {"utility", "visualization"}:
+            return no_update, no_update, no_update, "WARN: Delete is supported for utilities/presentations only"
+
+        node_id = str(node.get("id"))
+        nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+        analysis_id = _ancestor_analysis_id(nodes, node_id) if isinstance(nodes, dict) else None
+        try:
+            service.delete_node(pipeline_id, node_id)
+        except Exception as exc:
+            return no_update, no_update, no_update, f"ERROR: Delete failed: {exc}"
+
+        next_snapshot = service.get_pipeline(pipeline_id)
+        next_store = _result_cache_from_snapshot(next_snapshot)
+        if analysis_id and kind == "utility":
+            next_selected = f"virtual:utilities:{analysis_id}"
+        elif analysis_id and kind == "visualization":
+            next_selected = f"virtual:visualization:{analysis_id}"
+        else:
+            next_selected = "virtual:dataset"
+        next_session = {"pipeline_id": pipeline_id, "selected_node_id": next_selected}
+        return next_session, next_snapshot, next_store, "Node deleted"
 
     @app.callback(
         Output("status-banner", "className"),
@@ -832,6 +1621,20 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         node_id = trig.get("node_id")
         if not node_id:
             return no_update
+        current_id = str(session.get("selected_node_id") or "")
+        if str(node_id) == current_id:
+            return no_update
+        # Keep long-running execution stable: do not switch into a currently-running task node.
+        try:
+            live = service.get_pipeline(str(session["pipeline_id"]))
+            live_nodes = live.get("nodes", {}) if isinstance(live, dict) else {}
+            live_node = live_nodes.get(str(node_id)) if isinstance(live_nodes, dict) else None
+            if isinstance(live_node, dict):
+                is_running = str(live_node.get("status", "")).lower() == "running"
+                if is_running and str(live_node.get("kind", "")) in {"analysis", "utility"}:
+                    return no_update
+        except Exception:
+            pass
         return {"pipeline_id": session["pipeline_id"], "selected_node_id": node_id}
 
     @app.callback(
@@ -863,35 +1666,32 @@ def register_callbacks(app, service: WebUIApiService) -> None:
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
-        Output("status-banner", "children", allow_duplicate=True),
-        Input("btn-save-node-params", "n_clicks"),
+        Input("msd-atom-ids", "value"),
+        Input("msd-atom-types", "value"),
+        Input("msd-dims", "value"),
+        Input("msd-origin", "value"),
+        Input("msd-frames", "value"),
+        Input("msd-every", "value"),
         State("session-store", "data"),
         State("pipeline-store", "data"),
-        State("msd-atom-ids", "value"),
-        State("msd-atom-types", "value"),
-        State("msd-dims", "value"),
-        State("msd-origin", "value"),
-        State("msd-frames", "value"),
-        State("msd-every", "value"),
         prevent_initial_call=True,
     )
-    def on_save_node_params(
-        n_clicks: int,
-        session: dict[str, Any] | None,
-        snapshot: dict[str, Any] | None,
+    def on_live_msd_params(
         atom_ids_raw: str | None,
         atom_types_raw: str | None,
         dims_raw: str | None,
         origin_raw: str | None,
         frames_raw: str | None,
         every_raw: str | None,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
     ):
-        if not n_clicks or not session or not snapshot:
-            return no_update, no_update
+        if not session or not snapshot:
+            return no_update
         pipeline_id = str(session.get("pipeline_id", ""))
         node = _selected_node(snapshot, session)
-        if not pipeline_id or not node or node.get("kind") != "analysis":
-            return no_update, "WARN: Select an analysis node"
+        if not pipeline_id or not node or str(node.get("kind")) != "analysis" or str(node.get("name", "")).lower() != "msd":
+            return no_update
 
         dims = _parse_csv_strs(dims_raw) or ["x", "y", "z"]
         origin: str | int = str(origin_raw or "first").strip() or "first"
@@ -913,29 +1713,26 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             "frames": _parse_csv_ints(frames_raw),
             "every": every,
         }
+        old_req = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        if old_req == request_payload:
+            return no_update
         service.update_node(pipeline_id, str(node["id"]), {"request": request_payload})
-        next_snapshot = service.get_pipeline(pipeline_id)
-        return next_snapshot, "Parameters saved"
+        return service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
-        Output("status-banner", "children", allow_duplicate=True),
-        Input("btn-save-util-params", "n_clicks"),
+        Input("util-filter-column", "value"),
+        Input("util-filter-values", "value"),
+        Input("util-denoise-column", "value"),
+        Input("util-denoise-alpha", "value"),
+        Input("util-denoise-window", "value"),
+        Input("util-denoise-group", "value"),
+        Input("util-denoise-xcol", "value"),
         State("session-store", "data"),
         State("pipeline-store", "data"),
-        State("util-filter-column", "value"),
-        State("util-filter-values", "value"),
-        State("util-denoise-column", "value"),
-        State("util-denoise-alpha", "value"),
-        State("util-denoise-window", "value"),
-        State("util-denoise-group", "value"),
-        State("util-denoise-xcol", "value"),
         prevent_initial_call=True,
     )
-    def on_save_utility_params(
-        n_clicks: int,
-        session: dict[str, Any] | None,
-        snapshot: dict[str, Any] | None,
+    def on_live_utility_params(
         filter_column: str | None,
         filter_values: str | None,
         denoise_column: str | None,
@@ -943,13 +1740,15 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         denoise_window: int | None,
         denoise_group: str | None,
         denoise_xcol: str | None,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
     ):
-        if not n_clicks or not session or not snapshot:
-            return no_update, no_update
+        if not session or not snapshot:
+            return no_update
         pipeline_id = str(session.get("pipeline_id", ""))
         node = _selected_node(snapshot, session)
-        if not pipeline_id or not node or node.get("kind") != "utility":
-            return no_update, "WARN: Select a utility node"
+        if not pipeline_id or not node or str(node.get("kind")) != "utility":
+            return no_update
 
         util_name = str(node.get("metadata", {}).get("utility_name") or node.get("name") or "").lower()
         if util_name in {"filter_rows", "filter_atoms"}:
@@ -969,15 +1768,18 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 "x_col": denoise_xcol or "iter",
             }
         else:
-            return no_update, "WARN: Unsupported utility node"
+            return no_update
 
+        old_req = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        if old_req == request_payload:
+            return no_update
         service.update_node(pipeline_id, str(node["id"]), {"request": request_payload})
-        next_snapshot = service.get_pipeline(pipeline_id)
-        return next_snapshot, "Utility parameters saved"
+        return service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
         Output("result-store", "data", allow_duplicate=True),
+        Output("execute-loading-proxy", "children", allow_duplicate=True),
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-apply-node", "n_clicks"),
         State("session-store", "data"),
@@ -992,21 +1794,29 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         result_store: dict[str, Any] | None,
     ):
         if not n_clicks or not session or not snapshot:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
         pipeline_id = str(session.get("pipeline_id", ""))
         node = _selected_node(snapshot, session)
         if not pipeline_id or not node:
-            return no_update, no_update, "WARN: Select a node first"
+            return no_update, no_update, no_update, "WARN: Select a node first"
+
+        node_id = str(node.get("id") or "")
 
         try:
-            run_result = service.apply_node(pipeline_id, str(node["id"]))
+            run_result = service.apply_node(pipeline_id, node_id)
         except Exception as exc:
-            return no_update, no_update, f"ERROR: Execute failed: {exc}"
+            return no_update, no_update, html.Span(str(n_clicks), style={"display": "none"}), f"ERROR: Execute failed: {exc}"
 
         artifact = run_result.get("artifact") if isinstance(run_result, dict) else None
         next_store = dict(result_store or {})
         if isinstance(artifact, dict) and "id" in artifact:
-            next_store[str(node["id"])] = artifact
+            next_store[node_id] = artifact
+            if str(node.get("kind")) == "utility":
+                nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+                if isinstance(nodes, dict):
+                    analysis_id = _ancestor_analysis_id(nodes, node_id)
+                    if analysis_id:
+                        next_store[str(analysis_id)] = artifact
         next_snapshot = service.get_pipeline(pipeline_id)
         if str(node.get("kind")) == "analysis" and isinstance(artifact, dict):
             # Create recommended visualization nodes under this analysis (once).
@@ -1042,7 +1852,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                             },
                         )
                 next_snapshot = service.get_pipeline(pipeline_id)
-        return next_snapshot, next_store, "Node executed"
+        return next_snapshot, next_store, html.Span(str(n_clicks), style={"display": "none"}), "Node executed"
 
     @app.callback(
         Output("result-tabs", "children"),
@@ -1063,23 +1873,43 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         if not isinstance(nodes, dict):
             return [], None
 
+        selected_node = nodes.get(selected_id)
         viz_nodes: list[dict[str, Any]] = []
         if selected_id.startswith("virtual:visualization:"):
             analysis_id = selected_id.split(":", 2)[2]
             viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id)
         else:
-            node = nodes.get(selected_id)
-            if isinstance(node, dict) and str(node.get("kind")) == "visualization":
-                viz_nodes = [node]
-            elif isinstance(node, dict) and str(node.get("kind")) == "analysis":
+            if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "visualization":
+                viz_nodes = [selected_node]
+            elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
+                analysis_id = _ancestor_analysis_id(nodes, selected_id)
+                viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id) if analysis_id else []
+            elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
                 viz_nodes = []
 
         if not viz_nodes:
             return [], None
-        tabs = [dcc.Tab(label=str(v.get("name", "visualization")), value=str(v.get("id"))) for v in viz_nodes]
+        tabs = [
+            dcc.Tab(
+                label=_visualization_display_label(snapshot, str(v.get("id"))),
+                value=str(v.get("id")),
+            )
+            for v in viz_nodes
+        ]
         valid = {str(v.get("id")) for v in viz_nodes}
         if selected_id in valid:
             return tabs, selected_id
+        if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
+            table_tab_id = ""
+            for vnode in viz_nodes:
+                req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
+                meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
+                vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
+                if vtype == "table":
+                    table_tab_id = str(vnode.get("id"))
+                    break
+            if table_tab_id:
+                return tabs, table_tab_id
         if current_value and str(current_value) in valid:
             return tabs, str(current_value)
         return tabs, str(viz_nodes[0].get("id"))
@@ -1203,9 +2033,17 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         if selected_id.startswith("virtual:utilities"):
             return "Parameters: Utilities"
         if selected_id.startswith("virtual:visualization"):
-            return "Parameters: Visualization"
+            return "Parameters: Presentation"
         node = _selected_node(snapshot, session)
         if node:
+            node_id = str(node.get("id", ""))
+            kind = str(node.get("kind"))
+            if kind == "visualization":
+                return f"Parameters: {_visualization_display_label(snapshot, node_id)}"
+            if kind == "analysis":
+                return f"Parameters: {_analysis_display_label(snapshot, node_id)}"
+            if kind == "utility":
+                return f"Parameters: {_utility_display_label(snapshot, node_id)}"
             return f"Parameters: {str(node.get('name', 'Node'))}"
         return "Parameters"
 
@@ -1214,30 +2052,40 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         Input("pipeline-store", "data"),
         Input("session-store", "data"),
         Input("result-store", "data"),
+        Input("config-store", "data"),
     )
-    def render_properties(snapshot: dict[str, Any] | None, session: dict[str, Any] | None, result_store_in: dict[str, Any] | None):
+    def render_properties(
+        snapshot: dict[str, Any] | None,
+        session: dict[str, Any] | None,
+        result_store_in: dict[str, Any] | None,
+        config_in: dict[str, Any] | None,
+    ):
         selected_id = str((session or {}).get("selected_node_id") or "")
         result_store = dict(result_store_in or {})
+        config = dict(config_in or {})
 
         if selected_id == "virtual:engine":
+            engine_value = str(config.get("engine_name") or "autodetect")
+            if engine_value not in {"autodetect", "reaxff", "ams", "lammps"}:
+                engine_value = "autodetect"
             return html.Div(
                 [
                     html.Label("Engine name"),
                     dcc.Dropdown(
                         id="input-engine-name",
                         options=[
-                            {"label": "autodetect", "value": "autodetect"},
-                            {"label": "reaxff", "value": "reaxff"},
-                            {"label": "ams", "value": "ams"},
-                            {"label": "lammps", "value": "lammps"},
+                            {"label": "Autodetect", "value": "autodetect"},
+                            {"label": "ReaxFF", "value": "reaxff"},
+                            {"label": "AMS", "value": "ams"},
+                            {"label": "LAMMPS", "value": "lammps"},
                         ],
-                        value="autodetect",
+                        value=engine_value,
                         clearable=False,
                     ),
                     html.Div(
                         [
                             html.Label("xmolout:"),
-                            dcc.Input(id="input-role-xmolout", value="xmolout", type="text"),
+                            dcc.Input(id="input-role-xmolout", value=str(config.get("role_xmolout") or "xmolout"), type="text"),
                         ],
                         id="engine-file-roles",
                         className="rk-stack",
@@ -1275,6 +2123,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
 
         if selected_id.startswith("virtual:visualization"):
             snapshot_nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+            draft_type = str(config.get("draft_viz_type") or "plot2d")
             cols: list[str] = ["iter", "frame_index", "msd", "atom_id"]
             if isinstance(snapshot_nodes, dict):
                 aid = selected_id.split(":", 2)[2] if ":" in selected_id else None
@@ -1285,41 +2134,88 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                     if rows:
                         cols = list(rows[0].keys())
             opts = [{"label": c, "value": c} for c in cols]
-            return html.Div(
+            body: list[Any] = [
+                html.Label("Presentation type"),
+                dcc.Dropdown(
+                    id="viz-type",
+                    options=[
+                        {"label": "plot2d", "value": "plot2d"},
+                        {"label": "histogram", "value": "histogram"},
+                        {"label": "scatter3d", "value": "scatter3d"},
+                        {"label": "table", "value": "table"},
+                    ],
+                    value=draft_type,
+                    clearable=False,
+                ),
+            ]
+            if draft_type == "plot2d":
+                body.extend(
+                    [
+                        html.Label("x axis content"),
+                        dcc.Dropdown(id="viz-x-col", options=opts, value="iter" if "iter" in cols else cols[0], clearable=False),
+                        html.Label("y axis content"),
+                        dcc.Dropdown(id="viz-y-col", options=opts, value="msd" if "msd" in cols else cols[0], clearable=False),
+                        html.Label("group content"),
+                        dcc.Dropdown(id="viz-group-col", options=opts, value="atom_id" if "atom_id" in cols else None, clearable=True),
+                        dcc.Dropdown(id="viz-z-col", options=opts, value=cols[0], clearable=False, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                    ]
+                )
+            elif draft_type == "scatter3d":
+                body.extend(
+                    [
+                        html.Label("x axis content"),
+                        dcc.Dropdown(id="viz-x-col", options=opts, value=cols[0], clearable=False),
+                        html.Label("y axis content"),
+                        dcc.Dropdown(id="viz-y-col", options=opts, value=cols[0], clearable=False),
+                        html.Label("z axis content"),
+                        dcc.Dropdown(id="viz-z-col", options=opts, value=cols[0], clearable=False),
+                        html.Label("color by"),
+                        dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True),
+                        dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                    ]
+                )
+            elif draft_type == "histogram":
+                body.extend(
+                    [
+                        html.Label("value content"),
+                        dcc.Dropdown(id="viz-x-col", options=opts, value="msd" if "msd" in cols else cols[0], clearable=False),
+                        dcc.Dropdown(id="viz-y-col", options=opts, value="", clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                    ]
+                )
+            else:
+                body.extend(
+                    [
+                        dcc.Dropdown(id="viz-x-col", options=opts, value="", clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-y-col", options=opts, value="", clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                    ]
+                )
+            body.extend(
                 [
-                    html.Label("Visualization type"),
-                    dcc.Dropdown(
-                        id="viz-type",
-                        options=[
-                            {"label": "plot2d", "value": "plot2d"},
-                            {"label": "histogram", "value": "histogram"},
-                            {"label": "scatter3d", "value": "scatter3d"},
-                            {"label": "table", "value": "table"},
+                    html.Div(
+                        [
+                            dcc.Dropdown(
+                                id="viz-line-color-name",
+                                options=[
+                                    {"label": "blue", "value": "blue"},
+                                    {"label": "red", "value": "red"},
+                                    {"label": "black", "value": "black"},
+                                    {"label": "green", "value": "green"},
+                                    {"label": "orange", "value": "orange"},
+                                    {"label": "purple", "value": "purple"},
+                                ],
+                                value="blue",
+                                clearable=False,
+                                style={"display": "none"},
+                            )
                         ],
-                        value="plot2d",
-                        clearable=False,
-                    ),
-                    html.Label("x axis content"),
-                    dcc.Dropdown(id="viz-x-col", options=opts, value="iter" if "iter" in cols else cols[0], clearable=False),
-                    html.Label("y axis content"),
-                    dcc.Dropdown(id="viz-y-col", options=opts, value="msd" if "msd" in cols else cols[0], clearable=False),
-                    dcc.Dropdown(id="viz-z-col", options=opts, value=cols[0], clearable=False, style={"display": "none"}),
-                    html.Label("color by"),
-                    dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True),
-                    html.Label("group content"),
-                    dcc.Dropdown(id="viz-group-col", options=opts, value="atom_id" if "atom_id" in cols else None, clearable=True),
-                    dcc.Dropdown(
-                        id="viz-line-color-name",
-                        options=[
-                            {"label": "blue", "value": "blue"},
-                            {"label": "red", "value": "red"},
-                            {"label": "black", "value": "black"},
-                            {"label": "green", "value": "green"},
-                            {"label": "orange", "value": "orange"},
-                            {"label": "purple", "value": "purple"},
-                        ],
-                        value="blue",
-                        clearable=False,
+                        id="viz-color-name-wrap",
                         style={"display": "none"},
                     ),
                     dcc.Input(id="viz-line-color-rgb", type="text", value="", style={"display": "none"}),
@@ -1327,26 +2223,91 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                     dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                     dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
                     dcc.Input(id="viz-table-max-rows", type="number", value=200, style={"display": "none"}),
-                    html.Button("Add Visualization", id="btn-add-visualization-node", n_clicks=0, className="rk-btn-exec"),
-                ],
-                className="rk-stack",
+                    dcc.Input(id="viz-font-size", type="number", value=12, style={"display": "none"}),
+                    dcc.Input(id="viz-marker-size", type="number", value=6, style={"display": "none"}),
+                    dcc.Dropdown(
+                        id="viz-theme",
+                        options=_theme_options(),
+                        value="plotly_white",
+                        clearable=False,
+                        style={"display": "none"},
+                    ),
+                    dcc.Input(id="viz-axis-title-size", type="number", value=13, style={"display": "none"}),
+                    dcc.Checklist(
+                        id="viz-grid-on",
+                        options=[{"label": "show grid", "value": "on"}],
+                        value=["on"],
+                        style={"display": "none"},
+                    ),
+                    dcc.Dropdown(
+                        id="viz-log-scale",
+                        options=[
+                            {"label": "none", "value": "none"},
+                            {"label": "x", "value": "x"},
+                            {"label": "y", "value": "y"},
+                            {"label": "both", "value": "both"},
+                        ],
+                        value="none",
+                        clearable=False,
+                        style={"display": "none"},
+                    ),
+                    dcc.Input(id="viz-tick-spacing-x", type="number", value=None, style={"display": "none"}),
+                    dcc.Input(id="viz-tick-spacing-y", type="number", value=None, style={"display": "none"}),
+                    dcc.Checklist(id="viz-show-markers", options=[{"label": "show markers", "value": "on"}], value=[], style={"display": "none"}),
+                    dcc.Checklist(id="viz-show-legend", options=[{"label": "show legend", "value": "on"}], value=["on"], style={"display": "none"}),
+                    dcc.Checklist(id="viz-use-plot-title", options=[{"label": "use custom plot title", "value": "on"}], value=[], style={"display": "none"}),
+                    dcc.Input(id="viz-plot-title", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="viz-x-title", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="viz-y-title", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="viz-z-title", type="text", value="", style={"display": "none"}),
+                    dcc.Dropdown(
+                        id="viz-legend-position",
+                        options=[
+                            {"label": "top-right", "value": "top-right"},
+                            {"label": "top-left", "value": "top-left"},
+                            {"label": "bottom-right", "value": "bottom-right"},
+                            {"label": "bottom-left", "value": "bottom-left"},
+                            {"label": "right-outside", "value": "right-outside"},
+                            {"label": "hidden", "value": "hidden"},
+                        ],
+                        value="top-right",
+                        clearable=False,
+                        style={"display": "none"},
+                    ),
+                    html.Button("Add Presentation", id="btn-add-visualization-node", n_clicks=0, className="rk-btn-exec"),
+                ]
             )
+            return html.Div(body, className="rk-stack")
 
         if selected_id == "virtual:dataset":
             return html.Div(
                 [
                     html.Label("Dataset path"),
-                    dcc.Input(id="input-dataset-path", value=os.getcwd(), type="text"),
+                    dcc.Input(id="input-dataset-path", value=str(config.get("dataset_path") or os.getcwd()), type="text"),
                     html.Button("Browse...", id="btn-browse-dataset", n_clicks=0),
                     html.Button("Load Dataset", id="btn-load-dataset", n_clicks=0),
                     html.Hr(),
-                    html.Label("Snapshot path"),
-                    dcc.Input(id="input-snapshot-path", value="./reaxkit.pipeline.json", type="text"),
-                    html.Button("Save Snapshot", id="btn-save-snapshot", n_clicks=0),
-                    html.Button("Load Snapshot", id="btn-load-snapshot", n_clicks=0),
-                    html.Label("Bundle output dir"),
-                    dcc.Input(id="input-bundle-dir", value="./reaxkit.bundle", type="text"),
-                    html.Button("Export Bundle", id="btn-export-bundle", n_clicks=0),
+                    html.Label("ReaxKit workspace"),
+                    dcc.Checklist(
+                        id="input-default-workspace",
+                        options=[{"label": "Default workspace", "value": "default"}],
+                        value=["default"] if bool(config.get("workspace_default", True)) else [],
+                    ),
+                    dcc.Input(
+                        id="input-workspace-dir",
+                        value=str(config.get("workspace_dir") or _default_workspace_dir_for_dataset(config.get("dataset_path"))),
+                        type="text",
+                    ),
+                    html.Div(
+                        [
+                            dcc.Input(id="input-snapshot-path", value="./reaxkit.pipeline.json", type="text"),
+                            html.Button("Save Snapshot", id="btn-save-snapshot", n_clicks=0),
+                            html.Button("Load Snapshot", id="btn-load-snapshot", n_clicks=0),
+                            dcc.Input(id="input-bundle-dir", value="./reaxkit.bundle", type="text"),
+                            html.Button("Export Bundle", id="btn-export-bundle", n_clicks=0),
+                        ],
+                        style={"display": "none"},
+                    ),
                 ],
                 className="rk-stack",
             )
@@ -1373,6 +2334,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
 
         if node.get("kind") == "analysis" and str(node.get("name", "")).lower() == "msd":
             req = node.get("request", {}) if isinstance(node.get("request", {}), dict) else {}
+            is_running = str(node.get("status", "")).lower() == "running"
             lines.extend(
                 [
                     html.Div(
@@ -1439,12 +2401,22 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                         className="rk-help-inline",
                     ),
                     dcc.Input(id="msd-every", type="number", value=int(req.get("every", 1)), min=1, step=1),
-                    html.Div(
-                        [
-                            html.Button("Save Params", id="btn-save-node-params", n_clicks=0, className="rk-btn-save"),
-                            html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
-                        ],
-                        className="rk-inline-actions",
+                    dcc.Input(id="util-filter-values", type="text", value="", style={"display": "none"}),
+                    dcc.Dropdown(id="util-filter-column", options=[], value=None, style={"display": "none"}),
+                    dcc.Dropdown(id="util-denoise-column", options=[], value=None, style={"display": "none"}),
+                    dcc.Input(id="util-denoise-alpha", type="number", value=0.3, style={"display": "none"}),
+                    dcc.Input(id="util-denoise-window", type="number", value=5, style={"display": "none"}),
+                    dcc.Dropdown(id="util-denoise-group", options=[], value=None, style={"display": "none"}),
+                    dcc.Dropdown(id="util-denoise-xcol", options=[], value=None, style={"display": "none"}),
+                    (
+                        html.Div("Execution in progress...")
+                        if is_running
+                        else html.Div(
+                            [
+                                html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
+                            ],
+                            className="rk-inline-actions",
+                        )
                     ),
                 ]
             )
@@ -1453,32 +2425,69 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         if node.get("kind") == "utility":
             req = node.get("request", {}) if isinstance(node.get("request", {}), dict) else {}
             util_name = str(node.get("metadata", {}).get("utility_name") or node.get("name") or "").lower()
-            lines.append(html.Div(f"Utility: {util_name}"))
+            is_running = str(node.get("status", "")).lower() == "running"
+            source_art = _find_source_artifact(snapshot, str(node.get("id")), result_store)
+            source_rows = _artifact_rows(source_art if isinstance(source_art, dict) else None)
+            cols = list(source_rows[0].keys()) if source_rows else ["iter", "frame_index", "msd", "atom_id"]
+            col_opts = [{"label": c, "value": c} for c in cols]
+            numeric_cols = [c for c in cols if any(isinstance(r.get(c), (int, float)) for r in (source_rows[:20] if source_rows else []))]
+            numeric_opts = [{"label": c, "value": c} for c in (numeric_cols or cols)]
+            lines.extend(
+                [
+                    html.Div(
+                        [
+                            html.Button("Delete it", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
+                        ],
+                        className="rk-inline-actions",
+                    ),
+                    html.Div(f"Utility: {util_name}"),
+                ]
+            )
             if util_name in {"filter_rows", "filter_atoms"}:
                 lines.extend(
                     [
                         html.Label("column"),
-                        dcc.Input(id="util-filter-column", type="text", value=str(req.get("column", "atom_id"))),
+                        dcc.Dropdown(
+                            id="util-filter-column",
+                            options=col_opts,
+                            value=str(req.get("column") or ("atom_id" if "atom_id" in cols else (cols[0] if cols else ""))),
+                            clearable=False,
+                        ),
                         html.Label("values (comma-separated)"),
                         dcc.Input(id="util-filter-values", type="text", value=str(req.get("values", ""))),
-                        dcc.Input(id="util-denoise-column", type="text", value="msd", style={"display": "none"}),
+                        dcc.Dropdown(id="util-denoise-column", options=numeric_opts, value=(numeric_cols[0] if numeric_cols else (cols[0] if cols else "")), style={"display": "none"}),
                         dcc.Input(id="util-denoise-alpha", type="number", value=0.3, style={"display": "none"}),
                         dcc.Input(id="util-denoise-window", type="number", value=5, style={"display": "none"}),
-                        dcc.Input(id="util-denoise-group", type="text", value="atom_id", style={"display": "none"}),
-                        dcc.Input(id="util-denoise-xcol", type="text", value="iter", style={"display": "none"}),
+                        dcc.Dropdown(id="util-denoise-group", options=col_opts, value=("atom_id" if "atom_id" in cols else (cols[0] if cols else "")), style={"display": "none"}),
+                        dcc.Dropdown(id="util-denoise-xcol", options=col_opts, value=("iter" if "iter" in cols else (cols[0] if cols else "")), style={"display": "none"}),
                     ]
                 )
             elif util_name == "denoise_ema":
                 lines.extend(
                     [
                         html.Label("column"),
-                        dcc.Input(id="util-denoise-column", type="text", value=str(req.get("column", "msd"))),
+                        dcc.Dropdown(
+                            id="util-denoise-column",
+                            options=numeric_opts,
+                            value=str(req.get("column") or ("msd" if "msd" in (numeric_cols or cols) else ((numeric_cols or cols)[0] if (numeric_cols or cols) else ""))),
+                            clearable=False,
+                        ),
                         html.Label("alpha"),
                         dcc.Input(id="util-denoise-alpha", type="number", value=float(req.get("alpha", 0.3)), min=0.01, max=1.0, step=0.01),
                         html.Label("group_by"),
-                        dcc.Input(id="util-denoise-group", type="text", value=str(req.get("group_by", "atom_id"))),
+                        dcc.Dropdown(
+                            id="util-denoise-group",
+                            options=col_opts,
+                            value=str(req.get("group_by") or ("atom_id" if "atom_id" in cols else (cols[0] if cols else ""))),
+                            clearable=False,
+                        ),
                         html.Label("x_col"),
-                        dcc.Input(id="util-denoise-xcol", type="text", value=str(req.get("x_col", "iter"))),
+                        dcc.Dropdown(
+                            id="util-denoise-xcol",
+                            options=col_opts,
+                            value=str(req.get("x_col") or ("iter" if "iter" in cols else (cols[0] if cols else ""))),
+                            clearable=False,
+                        ),
                         dcc.Input(id="util-denoise-window", type="number", value=5, style={"display": "none"}),
                     ]
                 )
@@ -1486,13 +2495,28 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 lines.extend(
                     [
                         html.Label("column"),
-                        dcc.Input(id="util-denoise-column", type="text", value=str(req.get("column", "msd"))),
+                        dcc.Dropdown(
+                            id="util-denoise-column",
+                            options=numeric_opts,
+                            value=str(req.get("column") or ("msd" if "msd" in (numeric_cols or cols) else ((numeric_cols or cols)[0] if (numeric_cols or cols) else ""))),
+                            clearable=False,
+                        ),
                         html.Label("window"),
                         dcc.Input(id="util-denoise-window", type="number", value=int(req.get("window", 5)), min=1, step=1),
                         html.Label("group_by"),
-                        dcc.Input(id="util-denoise-group", type="text", value=str(req.get("group_by", "atom_id"))),
+                        dcc.Dropdown(
+                            id="util-denoise-group",
+                            options=col_opts,
+                            value=str(req.get("group_by") or ("atom_id" if "atom_id" in cols else (cols[0] if cols else ""))),
+                            clearable=False,
+                        ),
                         html.Label("x_col"),
-                        dcc.Input(id="util-denoise-xcol", type="text", value=str(req.get("x_col", "iter"))),
+                        dcc.Dropdown(
+                            id="util-denoise-xcol",
+                            options=col_opts,
+                            value=str(req.get("x_col") or ("iter" if "iter" in cols else (cols[0] if cols else ""))),
+                            clearable=False,
+                        ),
                         dcc.Input(id="util-denoise-alpha", type="number", value=0.3, style={"display": "none"}),
                     ]
                 )
@@ -1500,18 +2524,27 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 lines.append("No editor for this utility yet.")
             lines.extend(
                 [
-                    dcc.Input(id="util-filter-column", type="text", value="", style={"display": "none"})
+                    dcc.Input(id="msd-atom-ids", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="msd-atom-types", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="msd-dims", type="text", value="x,y,z", style={"display": "none"}),
+                    dcc.Input(id="msd-origin", type="text", value="first", style={"display": "none"}),
+                    dcc.Input(id="msd-frames", type="text", value="", style={"display": "none"}),
+                    dcc.Input(id="msd-every", type="number", value=1, style={"display": "none"}),
+                    dcc.Dropdown(id="util-filter-column", options=col_opts, value=(cols[0] if cols else ""), style={"display": "none"})
                     if util_name not in {"filter_rows", "filter_atoms"}
                     else html.Div(style={"display": "none"}),
                     dcc.Input(id="util-filter-values", type="text", value="", style={"display": "none"})
                     if util_name not in {"filter_rows", "filter_atoms"}
                     else html.Div(style={"display": "none"}),
-                    html.Div(
-                        [
-                            html.Button("Save Params", id="btn-save-util-params", n_clicks=0, className="rk-btn-save"),
-                            html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
-                        ],
-                        className="rk-inline-actions",
+                    (
+                        html.Div("Execution in progress...")
+                        if is_running
+                        else html.Div(
+                            [
+                                html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
+                            ],
+                            className="rk-inline-actions",
+                        )
                     ),
                 ]
             )
@@ -1532,8 +2565,23 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 {"label": "orange", "value": "orange"},
                 {"label": "purple", "value": "purple"},
             ]
+            theme_options = _theme_options()
+            legend_options = [
+                {"label": "top-right", "value": "top-right"},
+                {"label": "top-left", "value": "top-left"},
+                {"label": "bottom-right", "value": "bottom-right"},
+                {"label": "bottom-left", "value": "bottom-left"},
+                {"label": "right-outside", "value": "right-outside"},
+                {"label": "hidden", "value": "hidden"},
+            ]
             body: list[Any] = [
-                html.Label("Visualization type"),
+                html.Div(
+                    [
+                        html.Button("Delete it", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
+                    ],
+                    className="rk-inline-actions",
+                ),
+                html.Label("Presentation type"),
                 dcc.Dropdown(
                     id="viz-type",
                     options=[
@@ -1556,9 +2604,22 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-y-col", options=opts, value=str(req.get("y_col") or (cols[0] if cols else "")), clearable=False),
                         html.Label("group content"),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True),
+                        dcc.Checklist(
+                            id="viz-use-plot-title",
+                            options=[{"label": "use custom plot title", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("use_plot_title"), False) else [],
+                        ),
+                        html.Label("Plot title"),
+                        dcc.Input(id="viz-plot-title", type="text", value=str(req.get("plot_title") or ""), debounce=True),
+                        html.Label("X axis title"),
+                        dcc.Input(id="viz-x-title", type="text", value=str(req.get("x_title") or ""), debounce=True),
+                        html.Label("Y axis title"),
+                        dcc.Input(id="viz-y-title", type="text", value=str(req.get("y_title") or ""), debounce=True),
+                        dcc.Input(id="viz-z-title", type="text", value=str(req.get("z_title") or ""), debounce=True, style={"display": "none"}),
+                        html.Div("Level 1 - simple controls", className="rk-subtitle"),
                         html.Div(
                             [
-                                html.Label("Line color"),
+                                html.Label("Color"),
                                 dcc.Dropdown(
                                     id="viz-line-color-name",
                                     options=color_options,
@@ -1569,12 +2630,66 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                             id="viz-color-name-wrap",
                             className="rk-stack",
                         ),
-                        html.Label("Line color (RGB, optional)"),
+                        html.Label("Color (RGB, optional)"),
                         dcc.Input(id="viz-line-color-rgb", type="text", value=str(req.get("line_color_rgb") or ""), placeholder="e.g. rgb(255,0,0)"),
                         html.Label("Line width"),
                         dcc.Input(id="viz-line-width", type="number", value=float(req.get("line_width") or 2), min=1, max=8, step=1),
+                        html.Label("Font size"),
+                        dcc.Input(id="viz-font-size", type="number", value=float(req.get("font_size") or 12), min=8, max=30, step=1),
+                        html.Label("Marker size"),
+                        dcc.Input(id="viz-marker-size", type="number", value=float(req.get("marker_size") or 6), min=0, max=20, step=1),
+                        dcc.Checklist(
+                            id="viz-show-markers",
+                            options=[{"label": "show markers", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("show_markers"), False) else [],
+                        ),
+                        dcc.Checklist(
+                            id="viz-show-legend",
+                            options=[{"label": "show legend", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("show_legend"), True) else [],
+                        ),
+                        html.Label("Theme"),
+                        dcc.Dropdown(id="viz-theme", options=theme_options, value=str(req.get("theme") or "plotly_white"), clearable=False),
+                        html.Details(
+                            [
+                                html.Summary("Advanced Settings"),
+                                html.Div(
+                                    [
+                                        html.Label("axis title size"),
+                                        dcc.Input(id="viz-axis-title-size", type="number", value=float(req.get("axis_title_size") or 13), min=8, max=40, step=1),
+                                        dcc.Checklist(
+                                            id="viz-grid-on",
+                                            options=[{"label": "grid on", "value": "on"}],
+                                            value=["on"] if _flag_on(req.get("grid_on"), True) else [],
+                                        ),
+                                        html.Label("log scale"),
+                                        dcc.Dropdown(
+                                            id="viz-log-scale",
+                                            options=[
+                                                {"label": "none", "value": "none"},
+                                                {"label": "x", "value": "x"},
+                                                {"label": "y", "value": "y"},
+                                                {"label": "both", "value": "both"},
+                                            ],
+                                            value=str(req.get("log_scale") or "none"),
+                                            clearable=False,
+                                        ),
+                                        html.Label("tick spacing (x)"),
+                                        dcc.Input(id="viz-tick-spacing-x", type="number", value=_parse_float(req.get("tick_spacing_x"), None), step=1),
+                                        html.Label("tick spacing (y)"),
+                                        dcc.Input(id="viz-tick-spacing-y", type="number", value=_parse_float(req.get("tick_spacing_y"), None), step=1),
+                                        html.Label("legend position"),
+                                        dcc.Dropdown(id="viz-legend-position", options=legend_options, value=str(req.get("legend_position") or "top-right"), clearable=False),
+                                    ],
+                                    className="rk-stack",
+                                ),
+                            ]
+                        ),
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-table-max-rows", type="number", value=200, style={"display": "none"}),
                     ]
                 )
             elif viz_type == "scatter3d":
@@ -1589,17 +2704,72 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                         html.Label("color by"),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Checklist(
+                            id="viz-use-plot-title",
+                            options=[{"label": "use custom plot title", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("use_plot_title"), False) else [],
+                        ),
+                        html.Label("Plot title"),
+                        dcc.Input(id="viz-plot-title", type="text", value=str(req.get("plot_title") or ""), debounce=True),
+                        html.Label("X axis title"),
+                        dcc.Input(id="viz-x-title", type="text", value=str(req.get("x_title") or ""), debounce=True),
+                        html.Label("Y axis title"),
+                        dcc.Input(id="viz-y-title", type="text", value=str(req.get("y_title") or ""), debounce=True),
+                        html.Label("Z axis title"),
+                        dcc.Input(id="viz-z-title", type="text", value=str(req.get("z_title") or ""), debounce=True),
+                        html.Div("Level 1 - simple controls", className="rk-subtitle"),
                         html.Div(
                             [
-                                html.Label("Line color"),
-                                dcc.Dropdown(id="viz-line-color-name", options=color_options, value="blue", clearable=False),
+                                html.Label("Color (used when color by is empty)"),
+                                dcc.Dropdown(id="viz-line-color-name", options=color_options, value=str(req.get("line_color") or "blue"), clearable=False),
                             ],
                             id="viz-color-name-wrap",
                             className="rk-stack",
-                            style={"display": "none"},
+                            style={"display": "grid"},
                         ),
-                        dcc.Input(id="viz-line-color-rgb", type="text", value="", style={"display": "none"}),
+                        html.Label("Color (RGB, optional)"),
+                        dcc.Input(id="viz-line-color-rgb", type="text", value=str(req.get("line_color_rgb") or ""), placeholder="e.g. rgb(255,0,0)"),
+                        html.Label("Font size"),
+                        dcc.Input(id="viz-font-size", type="number", value=float(req.get("font_size") or 12), min=8, max=30, step=1),
+                        html.Label("Marker size"),
+                        dcc.Input(id="viz-marker-size", type="number", value=float(req.get("marker_size") or 6), min=1, max=30, step=1),
+                        dcc.Checklist(
+                            id="viz-show-markers",
+                            options=[{"label": "show markers", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("show_markers"), True) else [],
+                        ),
+                        dcc.Checklist(
+                            id="viz-show-legend",
+                            options=[{"label": "show legend", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("show_legend"), True) else [],
+                        ),
+                        html.Label("Theme"),
+                        dcc.Dropdown(id="viz-theme", options=theme_options, value=str(req.get("theme") or "plotly_white"), clearable=False),
+                        html.Details(
+                            [
+                                html.Summary("Advanced Settings"),
+                                html.Div(
+                                    [
+                                        html.Label("axis title size"),
+                                        dcc.Input(id="viz-axis-title-size", type="number", value=float(req.get("axis_title_size") or 13), min=8, max=40, step=1),
+                                        dcc.Checklist(
+                                            id="viz-grid-on",
+                                            options=[{"label": "grid on", "value": "on"}],
+                                            value=["on"] if _flag_on(req.get("grid_on"), True) else [],
+                                        ),
+                                    ],
+                                    className="rk-stack",
+                                ),
+                            ]
+                        ),
                         dcc.Input(id="viz-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-log-scale", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-tick-spacing-x", type="number", value=None, style={"display": "none"}),
+                        dcc.Input(id="viz-tick-spacing-y", type="number", value=None, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-legend-position", options=legend_options, value=str(req.get("legend_position") or "top-right"), clearable=False, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-table-max-rows", type="number", value=200, style={"display": "none"}),
                     ]
                 )
             elif viz_type == "histogram":
@@ -1611,31 +2781,88 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Checklist(
+                            id="viz-use-plot-title",
+                            options=[{"label": "use custom plot title", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("use_plot_title"), False) else [],
+                        ),
+                        html.Label("Plot title"),
+                        dcc.Input(id="viz-plot-title", type="text", value=str(req.get("plot_title") or ""), debounce=True),
+                        html.Label("X axis title"),
+                        dcc.Input(id="viz-x-title", type="text", value=str(req.get("x_title") or ""), debounce=True),
+                        html.Label("Y axis title"),
+                        dcc.Input(id="viz-y-title", type="text", value=str(req.get("y_title") or ""), debounce=True),
+                        dcc.Input(id="viz-z-title", type="text", value=str(req.get("z_title") or ""), debounce=True, style={"display": "none"}),
+                        html.Div("Level 1 - simple controls", className="rk-subtitle"),
                         html.Div(
                             [
-                                html.Label("Line color"),
-                                dcc.Dropdown(id="viz-line-color-name", options=color_options, value="blue", clearable=False),
+                                html.Label("Color"),
+                                dcc.Dropdown(id="viz-line-color-name", options=color_options, value=str(req.get("line_color") or "blue"), clearable=False),
                             ],
                             id="viz-color-name-wrap",
                             className="rk-stack",
+                            style={"display": "grid"},
+                        ),
+                        html.Label("Color (RGB, optional)"),
+                        dcc.Input(id="viz-line-color-rgb", type="text", value=str(req.get("line_color_rgb") or ""), placeholder="e.g. rgb(255,0,0)"),
+                        html.Label("Font size"),
+                        dcc.Input(id="viz-font-size", type="number", value=float(req.get("font_size") or 12), min=8, max=30, step=1),
+                        html.Label("Theme"),
+                        dcc.Dropdown(id="viz-theme", options=theme_options, value=str(req.get("theme") or "plotly_white"), clearable=False),
+                        dcc.Checklist(
+                            id="viz-show-markers",
+                            options=[{"label": "show markers", "value": "on"}],
+                            value=[],
                             style={"display": "none"},
                         ),
-                        dcc.Input(id="viz-line-color-rgb", type="text", value="", style={"display": "none"}),
+                        dcc.Checklist(
+                            id="viz-show-legend",
+                            options=[{"label": "show legend", "value": "on"}],
+                            value=["on"] if _flag_on(req.get("show_legend"), True) else [],
+                        ),
+                        html.Details(
+                            [
+                                html.Summary("Advanced Settings"),
+                                html.Div(
+                                    [
+                                        html.Label("axis title size"),
+                                        dcc.Input(id="viz-axis-title-size", type="number", value=float(req.get("axis_title_size") or 13), min=8, max=40, step=1),
+                                        dcc.Checklist(
+                                            id="viz-grid-on",
+                                            options=[{"label": "grid on", "value": "on"}],
+                                            value=["on"] if _flag_on(req.get("grid_on"), True) else [],
+                                        ),
+                                        html.Label("log scale"),
+                                        dcc.Dropdown(
+                                            id="viz-log-scale",
+                                            options=[
+                                                {"label": "none", "value": "none"},
+                                                {"label": "y", "value": "y"},
+                                            ],
+                                            value=str(req.get("log_scale") or "none"),
+                                            clearable=False,
+                                        ),
+                                        html.Label("tick spacing (x)"),
+                                        dcc.Input(id="viz-tick-spacing-x", type="number", value=_parse_float(req.get("tick_spacing_x"), None), step=1),
+                                        html.Label("tick spacing (y)"),
+                                        dcc.Input(id="viz-tick-spacing-y", type="number", value=_parse_float(req.get("tick_spacing_y"), None), step=1),
+                                    ],
+                                    className="rk-stack",
+                                ),
+                            ]
+                        ),
+                        dcc.Input(id="viz-marker-size", type="number", value=6, style={"display": "none"}),
                         dcc.Input(id="viz-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-legend-position", options=legend_options, value="hidden", clearable=False, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-table-max-rows", type="number", value=200, style={"display": "none"}),
                     ]
                 )
             else:
                 body.extend(
                     [
-                        html.Label("filter column"),
-                        dcc.Dropdown(
-                            id="viz-table-filter-col",
-                            options=opts,
-                            value=str(req.get("table_filter_col") or "") or None,
-                            clearable=True,
-                        ),
-                        html.Label("filter value"),
-                        dcc.Input(id="viz-table-filter-value", type="text", value=str(req.get("table_filter_value") or "")),
+                        html.Div("Table filtering/sorting is available directly in Result Tabs.", className="rk-subtitle"),
                         html.Label("Visible rows"),
                         dcc.Input(
                             id="viz-table-max-rows",
@@ -1644,6 +2871,13 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                             min=10,
                             step=10,
                         ),
+                        dcc.Input(id="viz-plot-title", type="text", value=str(req.get("plot_title") or ""), style={"display": "none"}),
+                        dcc.Input(id="viz-x-title", type="text", value=str(req.get("x_title") or ""), style={"display": "none"}),
+                        dcc.Input(id="viz-y-title", type="text", value=str(req.get("y_title") or ""), style={"display": "none"}),
+                        dcc.Input(id="viz-z-title", type="text", value=str(req.get("z_title") or ""), style={"display": "none"}),
+                        dcc.Checklist(id="viz-use-plot-title", options=[{"label": "use custom plot title", "value": "on"}], value=[], style={"display": "none"}),
+                        dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
                         dcc.Dropdown(id="viz-x-col", options=opts, value=str(req.get("x_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-y-col", options=opts, value=str(req.get("y_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
@@ -1660,29 +2894,32 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                         ),
                         dcc.Input(id="viz-line-color-rgb", type="text", value="", style={"display": "none"}),
                         dcc.Input(id="viz-line-width", type="number", value=2, style={"display": "none"}),
-                    ]
-                )
-            if viz_type != "table":
-                body.extend(
-                    [
-                        dcc.Input(id="viz-table-filter-value", type="text", value="", style={"display": "none"}),
-                        dcc.Dropdown(id="viz-table-filter-col", options=opts, value=None, clearable=True, style={"display": "none"}),
-                        dcc.Input(id="viz-table-max-rows", type="number", value=200, style={"display": "none"}),
+                        dcc.Input(id="viz-font-size", type="number", value=12, style={"display": "none"}),
+                        dcc.Input(id="viz-marker-size", type="number", value=6, style={"display": "none"}),
+                        dcc.Checklist(id="viz-show-markers", options=[{"label": "show markers", "value": "on"}], value=[], style={"display": "none"}),
+                        dcc.Checklist(id="viz-show-legend", options=[{"label": "show legend", "value": "on"}], value=["on"], style={"display": "none"}),
+                        dcc.Dropdown(id="viz-theme", options=theme_options, value="plotly_white", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-axis-title-size", type="number", value=13, style={"display": "none"}),
+                        dcc.Checklist(id="viz-grid-on", options=[{"label": "grid on", "value": "on"}], value=["on"], style={"display": "none"}),
+                        dcc.Dropdown(id="viz-log-scale", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-tick-spacing-x", type="number", value=None, style={"display": "none"}),
+                        dcc.Input(id="viz-tick-spacing-y", type="number", value=None, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-legend-position", options=legend_options, value="top-right", clearable=False, style={"display": "none"}),
                     ]
                 )
             lines.extend(
                 body
             )
-            if viz_type in {"scatter3d", "histogram"}:
-                lines.append(
-                    html.Div(
-                        [
-                            html.Button("Save Params", id="btn-save-viz-params", n_clicks=0, className="rk-btn-save"),
-                            html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
-                        ],
-                        className="rk-inline-actions",
-                    )
+            lines.append(
+                html.Div(
+                    [
+                        html.Button("Save Params", id="btn-save-viz-params", n_clicks=0, className="rk-btn-save"),
+                        html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
+                    ],
+                    className="rk-inline-actions",
+                    style={"display": "none"},
                 )
+            )
             return html.Div(lines, className="rk-stack")
 
         lines.append("Custom editor not yet available for this node type.")
@@ -1718,13 +2955,32 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         return options, next_value
 
     @app.callback(
+        Output("config-store", "data", allow_duplicate=True),
+        Input("viz-type", "value"),
+        State("session-store", "data"),
+        State("config-store", "data"),
+        prevent_initial_call=True,
+    )
+    def sync_virtual_viz_type(
+        viz_type: str | None,
+        session: dict[str, Any] | None,
+        config: dict[str, Any] | None,
+    ):
+        selected_id = str((session or {}).get("selected_node_id") or "")
+        if not selected_id.startswith("virtual:visualization"):
+            return no_update
+        cfg = dict(config or {})
+        cfg["draft_viz_type"] = str(viz_type or "plot2d")
+        return cfg
+
+    @app.callback(
         Output("viz-color-name-wrap", "style"),
         Input("viz-line-color-rgb", "value"),
         State("viz-type", "value"),
         prevent_initial_call=False,
     )
     def toggle_viz_color_name(rgb_value: str | None, viz_type: str | None):
-        if str(viz_type or "") != "plot2d":
+        if str(viz_type or "") not in {"plot2d", "histogram", "scatter3d"}:
             return {"display": "none"}
         if rgb_value and str(rgb_value).strip():
             return {"display": "none"}
@@ -1742,9 +2998,25 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         State("viz-z-col", "value"),
         State("viz-color-col", "value"),
         State("viz-group-col", "value"),
+        State("viz-use-plot-title", "value"),
+        State("viz-plot-title", "value"),
+        State("viz-x-title", "value"),
+        State("viz-y-title", "value"),
+        State("viz-z-title", "value"),
         State("viz-line-color-name", "value"),
         State("viz-line-color-rgb", "value"),
         State("viz-line-width", "value"),
+        State("viz-font-size", "value"),
+        State("viz-marker-size", "value"),
+        State("viz-theme", "value"),
+        State("viz-axis-title-size", "value"),
+        State("viz-grid-on", "value"),
+        State("viz-log-scale", "value"),
+        State("viz-tick-spacing-x", "value"),
+        State("viz-tick-spacing-y", "value"),
+        State("viz-show-markers", "value"),
+        State("viz-show-legend", "value"),
+        State("viz-legend-position", "value"),
         State("viz-table-filter-col", "value"),
         State("viz-table-filter-value", "value"),
         State("viz-table-max-rows", "value"),
@@ -1760,9 +3032,25 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         z_col: str | None,
         color_col: str | None,
         group_col: str | None,
+        use_plot_title_values: list[str] | None,
+        plot_title: str | None,
+        x_title: str | None,
+        y_title: str | None,
+        z_title: str | None,
         line_color_name: str | None,
         line_color_rgb: str | None,
         line_width: float | None,
+        font_size: float | None,
+        marker_size: float | None,
+        theme: str | None,
+        axis_title_size: float | None,
+        grid_on_values: list[str] | None,
+        log_scale: str | None,
+        tick_spacing_x: float | None,
+        tick_spacing_y: float | None,
+        show_markers_values: list[str] | None,
+        show_legend_values: list[str] | None,
+        legend_position: str | None,
         table_filter_col: str | None,
         table_filter_value: str | None,
         table_max_rows: int | None,
@@ -1778,18 +3066,34 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             "x_col": str(x_col or ""),
             "y_col": str(y_col or ""),
             "z_col": str(z_col or ""),
+            "use_plot_title": bool("on" in (use_plot_title_values or [])),
+            "plot_title": str(plot_title or ""),
+            "x_title": str(x_title or ""),
+            "y_title": str(y_title or ""),
+            "z_title": str(z_title or ""),
             "color_col": str(color_col or ""),
             "group_col": str(group_col or ""),
             "line_color": str(line_color_name or "blue"),
             "line_color_rgb": str(line_color_rgb or ""),
             "line_width": float(line_width if line_width is not None else 2.0),
+            "font_size": float(font_size if font_size is not None else 12.0),
+            "marker_size": float(marker_size if marker_size is not None else 0.0),
+            "theme": _safe_theme(theme or "plotly_white"),
+            "axis_title_size": float(axis_title_size if axis_title_size is not None else 13.0),
+            "grid_on": bool("on" in (grid_on_values or [])),
+            "log_scale": str(log_scale or "none"),
+            "tick_spacing_x": "" if tick_spacing_x is None else float(tick_spacing_x),
+            "tick_spacing_y": "" if tick_spacing_y is None else float(tick_spacing_y),
+            "show_markers": bool("on" in (show_markers_values or [])),
+            "show_legend": bool("on" in (show_legend_values or [])),
+            "legend_position": str(legend_position or "top-right"),
             "table_filter_col": str(table_filter_col or ""),
             "table_filter_value": str(table_filter_value or ""),
             "table_max_rows": int(table_max_rows) if table_max_rows is not None else 200,
         }
         service.update_node(pipeline_id, str(node["id"]), {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}})
         next_snapshot = service.get_pipeline(pipeline_id)
-        return next_snapshot, "Visualization parameters saved"
+        return next_snapshot, "Presentation parameters saved"
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
@@ -1799,9 +3103,25 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         Input("viz-z-col", "value"),
         Input("viz-color-col", "value"),
         Input("viz-group-col", "value"),
+        Input("viz-use-plot-title", "value"),
+        Input("viz-plot-title", "value"),
+        Input("viz-x-title", "value"),
+        Input("viz-y-title", "value"),
+        Input("viz-z-title", "value"),
         Input("viz-line-color-name", "value"),
         Input("viz-line-color-rgb", "value"),
         Input("viz-line-width", "value"),
+        Input("viz-font-size", "value"),
+        Input("viz-marker-size", "value"),
+        Input("viz-theme", "value"),
+        Input("viz-axis-title-size", "value"),
+        Input("viz-grid-on", "value"),
+        Input("viz-log-scale", "value"),
+        Input("viz-tick-spacing-x", "value"),
+        Input("viz-tick-spacing-y", "value"),
+        Input("viz-show-markers", "value"),
+        Input("viz-show-legend", "value"),
+        Input("viz-legend-position", "value"),
         State("session-store", "data"),
         State("pipeline-store", "data"),
         prevent_initial_call=True,
@@ -1813,33 +3133,85 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         z_col: str | None,
         color_col: str | None,
         group_col: str | None,
+        use_plot_title_values: list[str] | None,
+        plot_title: str | None,
+        x_title: str | None,
+        y_title: str | None,
+        z_title: str | None,
         line_color_name: str | None,
         line_color_rgb: str | None,
         line_width: float | None,
+        font_size: float | None,
+        marker_size: float | None,
+        theme: str | None,
+        axis_title_size: float | None,
+        grid_on_values: list[str] | None,
+        log_scale: str | None,
+        tick_spacing_x: float | None,
+        tick_spacing_y: float | None,
+        show_markers_values: list[str] | None,
+        show_legend_values: list[str] | None,
+        legend_position: str | None,
         session: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
     ):
         if not session or not snapshot:
             return no_update
-        if str(viz_type or "") != "plot2d":
+        use_type = str(viz_type or "").strip().lower()
+        if use_type not in {"plot2d", "scatter3d", "histogram"}:
             return no_update
         pipeline_id = str(session.get("pipeline_id", ""))
         node = _selected_node(snapshot, session)
         if not pipeline_id or not node or node.get("kind") != "visualization":
             return no_update
-        payload = {
-            "visualization_type": "plot2d",
-            "x_col": str(x_col or ""),
-            "y_col": str(y_col or ""),
-            "z_col": str(z_col or ""),
-            "color_col": str(color_col or ""),
-            "group_col": str(group_col or ""),
-            "line_color": str(line_color_name or "blue"),
-            "line_color_rgb": str(line_color_rgb or ""),
-            "line_width": float(line_width if line_width is not None else 2.0),
-            "table_filter_col": "",
-            "table_filter_value": "",
-        }
+        req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        payload = dict(req_old)
+        payload.update(
+            {
+                "visualization_type": use_type,
+                "x_col": str(x_col or payload.get("x_col") or ""),
+                "y_col": str(y_col or payload.get("y_col") or ""),
+                "z_col": str(z_col or payload.get("z_col") or ""),
+                "use_plot_title": bool("on" in (use_plot_title_values or [])),
+                "plot_title": str(plot_title or payload.get("plot_title") or ""),
+                "x_title": str(x_title or payload.get("x_title") or ""),
+                "y_title": str(y_title or payload.get("y_title") or ""),
+                "z_title": str(z_title or payload.get("z_title") or ""),
+                "color_col": str(color_col or payload.get("color_col") or ""),
+                "group_col": str(group_col or payload.get("group_col") or ""),
+                "line_color": str(line_color_name or payload.get("line_color") or "blue"),
+                "line_color_rgb": str(line_color_rgb or payload.get("line_color_rgb") or ""),
+                "line_width": float(line_width if line_width is not None else float(payload.get("line_width") or 2.0)),
+                "font_size": float(font_size if font_size is not None else float(payload.get("font_size") or 12.0)),
+                "marker_size": float(marker_size if marker_size is not None else float(payload.get("marker_size") or 0.0)),
+                "theme": _safe_theme(theme or payload.get("theme") or "plotly_white"),
+                "axis_title_size": float(axis_title_size if axis_title_size is not None else float(payload.get("axis_title_size") or 13.0)),
+                "grid_on": bool("on" in (grid_on_values or [])),
+                "log_scale": str(log_scale or payload.get("log_scale") or "none"),
+                "tick_spacing_x": "" if tick_spacing_x is None else float(tick_spacing_x),
+                "tick_spacing_y": "" if tick_spacing_y is None else float(tick_spacing_y),
+                "show_markers": bool("on" in (show_markers_values or [])),
+                "show_legend": bool("on" in (show_legend_values or [])),
+                "legend_position": str(legend_position or payload.get("legend_position") or "top-right"),
+            }
+        )
+        if use_type == "plot2d":
+            payload["marker_size"] = float(marker_size if marker_size is not None else float(payload.get("marker_size") or 0.0))
+        elif use_type == "scatter3d":
+            payload["line_width"] = float(payload.get("line_width") or 2.0)
+            payload["marker_size"] = float(marker_size if marker_size is not None else float(payload.get("marker_size") or 6.0))
+            payload["log_scale"] = "none"
+            payload["tick_spacing_x"] = ""
+            payload["tick_spacing_y"] = ""
+            if not payload.get("legend_position"):
+                payload["legend_position"] = "top-right"
+        elif use_type == "histogram":
+            payload["line_width"] = float(payload.get("line_width") or 2.0)
+            payload["marker_size"] = 0.0
+            if str(payload.get("log_scale") or "none") not in {"none", "y"}:
+                payload["log_scale"] = "none"
+            if not payload.get("legend_position"):
+                payload["legend_position"] = "top-right"
         service.update_node(
             pipeline_id,
             str(node["id"]),
@@ -1850,8 +3222,6 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
         Input("viz-type", "value"),
-        Input("viz-table-filter-col", "value"),
-        Input("viz-table-filter-value", "value"),
         Input("viz-table-max-rows", "value"),
         State("session-store", "data"),
         State("pipeline-store", "data"),
@@ -1859,8 +3229,6 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     )
     def on_live_table_params(
         viz_type: str | None,
-        table_filter_col: str | None,
-        table_filter_value: str | None,
         table_max_rows: int | None,
         session: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
@@ -1876,9 +3244,45 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
         payload = dict(req_old)
         payload["visualization_type"] = "table"
-        payload["table_filter_col"] = str(table_filter_col or "")
-        payload["table_filter_value"] = str(table_filter_value or "")
+        payload["table_filter_col"] = ""
+        payload["table_filter_value"] = ""
         payload["table_max_rows"] = int(table_max_rows) if table_max_rows is not None else int(req_old.get("table_max_rows") or 200)
+        service.update_node(
+            pipeline_id,
+            str(node["id"]),
+            {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}},
+        )
+        return service.get_pipeline(pipeline_id)
+
+    @app.callback(
+        Output("pipeline-store", "data", allow_duplicate=True),
+        Input("viz-type", "value"),
+        State("session-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_visualization_type_change(
+        viz_type: str | None,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        if not session or not snapshot:
+            return no_update
+        pipeline_id = str(session.get("pipeline_id", ""))
+        node = _selected_node(snapshot, session)
+        if not pipeline_id or not node or node.get("kind") != "visualization":
+            return no_update
+        req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        target_type = str(viz_type or req_old.get("visualization_type") or "plot2d")
+        if str(req_old.get("visualization_type") or "plot2d") == target_type:
+            return no_update
+        payload = _viz_request_with_defaults(req_old, target_type)
+        if target_type == "scatter3d":
+            if _parse_float(payload.get("marker_size"), 0.0) in {0.0, None}:
+                payload["marker_size"] = 6
+        elif target_type == "plot2d":
+            if payload.get("marker_size") is None:
+                payload["marker_size"] = 0
         service.update_node(
             pipeline_id,
             str(node["id"]),
@@ -1901,6 +3305,24 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         return path
 
     @app.callback(
+        Output("input-workspace-dir", "value"),
+        Output("input-workspace-dir", "disabled"),
+        Input("input-default-workspace", "value"),
+        Input("input-dataset-path", "value"),
+        State("input-workspace-dir", "value"),
+        prevent_initial_call=False,
+    )
+    def sync_workspace_dir_input(
+        default_flags: list[str] | None,
+        dataset_path: str | None,
+        current_value: str | None,
+    ):
+        use_default = "default" in (default_flags or [])
+        if use_default:
+            return _default_workspace_dir_for_dataset(dataset_path), True
+        return str(current_value or "reaxkit_workspace/"), False
+
+    @app.callback(
         Output("engine-file-roles", "style"),
         Input("input-engine-name", "value"),
         prevent_initial_call=False,
@@ -1917,21 +3339,17 @@ def register_callbacks(app, service: WebUIApiService) -> None:
     def render_dataset_info(snapshot: dict[str, Any] | None):
         if not snapshot:
             return "No dataset loaded."
-        nodes = snapshot.get("nodes", {})
-        if not isinstance(nodes, dict):
-            return "No dataset loaded."
-        dataset_node = next((n for n in nodes.values() if isinstance(n, dict) and n.get("kind") == "dataset"), None)
+        dataset_node = _latest_dataset_node(snapshot)
         if not dataset_node:
             return "No dataset loaded."
         meta = dataset_node.get("metadata", {})
         dataset = meta.get("dataset", {}) if isinstance(meta, dict) else {}
-        fields = dataset.get("fields", [])
-        fields_text = ", ".join(fields) if isinstance(fields, list) and fields else "unknown"
+        frames = dataset.get("frames")
+        if frames is None:
+            frames = "unknown"
         return (
-            f"frames: {dataset.get('frames', 'unknown')} | "
-            f"atoms: {dataset.get('atoms', 'unknown')} | "
-            f"fields: {fields_text} | "
-            f"engine: {dataset.get('engine_override') or dataset.get('engine_detected') or 'unknown'}"
+            f"Frames: {frames} | "
+            f"Engine: {_engine_display_name(dataset.get('engine_override') or dataset.get('engine_detected') or 'unknown')}"
         )
 
     @app.callback(
@@ -1973,7 +3391,7 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
         selected_node = nodes.get(node_id) if isinstance(nodes, dict) else None
         if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
-            empty = "No visualization selected. Select a visualization node under this analysis."
+            empty = "No presentation selected. Select a presentation node under this analysis."
             return empty, empty
         if str(node_id).startswith("virtual:visualization:") and not tab_node_id:
             empty = "No presentations yet for this analysis."
@@ -1982,8 +3400,30 @@ def register_callbacks(app, service: WebUIApiService) -> None:
         source_node_id = str(tab_node_id or node_id)
         source_node = nodes.get(source_node_id) if isinstance(nodes, dict) else None
         if not isinstance(source_node, dict):
-            empty = "No visualization selected."
+            empty = "No presentation selected."
             return empty, empty
+        if str(source_node.get("kind")) == "utility":
+            analysis_id = _ancestor_analysis_id(nodes, source_node_id) if isinstance(nodes, dict) else None
+            if analysis_id:
+                viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id)
+                if viz_nodes:
+                    selected_viz = None
+                    for vnode in viz_nodes:
+                        req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
+                        meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
+                        vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
+                        if vtype == "table":
+                            selected_viz = vnode
+                            break
+                    source_node = selected_viz or viz_nodes[0]
+                    source_node_id = str(source_node.get("id"))
+        if str(source_node.get("kind")) == "utility":
+            artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
+            rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
+            if not rows:
+                content = "No result rows yet."
+                return content, content
+            return _build_result_table(rows, max_rows=200), _build_result_table(rows, max_rows=200)
         presentation_spec = None
         if isinstance(source_node, dict):
             meta = source_node.get("metadata", {})
@@ -2000,25 +3440,8 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             if not rows:
                 content = "No result rows yet."
                 return content, content
-            table_filter_col = str(req.get("table_filter_col") or "")
-            table_filter_value = str(req.get("table_filter_value") or "")
             table_max_rows = int(req.get("table_max_rows") or 200)
-            if table_filter_col and table_filter_value:
-                q = table_filter_value.strip().lower()
-                if q:
-                    rows = [r for r in rows if q in str(r.get(table_filter_col, "")).lower()]
-            if not rows:
-                content = "No rows match current filter."
-                return content, content
-            cols = [{"name": c, "id": c} for c in rows[0].keys()]
-            table = dash_table.DataTable(
-                data=rows[: max(10, min(10000, int(table_max_rows)))],
-                columns=cols,
-                page_size=15,
-                style_table={"overflowX": "auto"},
-                style_cell={"fontFamily": "Segoe UI", "fontSize": "12px", "textAlign": "left"},
-            )
-            return table, table
+            return _build_result_table(rows, max_rows=table_max_rows), _build_result_table(rows, max_rows=table_max_rows)
 
         if viz_type == "plot2d":
             use_x = str(req.get("x_col") or x_col or "iter")
@@ -2029,6 +3452,8 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                 use_width = float(req.get("line_width")) if req.get("line_width") is not None else None
             except Exception:
                 use_width = None
+            use_marker = _parse_float(req.get("marker_size"), 6.0)
+            show_markers = _flag_on(req.get("show_markers"), default=False)
             fig = render_figure(
                 rows,
                 presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
@@ -2055,6 +3480,29 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                             line_update["width"] = float(use_width)
                         if line_update:
                             tr.update(line=line_update)
+            for tr in fig.data:
+                if not isinstance(tr, go.Scatter):
+                    continue
+                mode = str(tr.mode or "lines")
+                if show_markers and use_marker is not None and use_marker > 0:
+                    if "markers" not in mode:
+                        mode = f"{mode}+markers" if mode else "markers"
+                    tr.update(mode=mode, marker={"size": float(use_marker)})
+                else:
+                    mode_clean = mode.replace("+markers", "").replace("markers+", "")
+                    mode_clean = mode_clean if mode_clean else "lines"
+                    tr.update(mode=mode_clean)
+            _apply_2d_style(fig, req, apply_legend=True)
+            use_custom_title = _flag_on(req.get("use_plot_title"), default=False)
+            plot_title = str(req.get("plot_title") or "").strip()
+            x_title = str(req.get("x_title") or "").strip()
+            y_title = str(req.get("y_title") or "").strip()
+            if use_custom_title and plot_title:
+                fig.update_layout(title=plot_title)
+            if x_title:
+                fig.update_xaxes(title_text=x_title)
+            if y_title:
+                fig.update_yaxes(title_text=y_title)
             graph = dcc.Graph(figure=fig, config={"displaylogo": False})
             return graph, graph
 
@@ -2083,6 +3531,22 @@ def register_callbacks(app, service: WebUIApiService) -> None:
                     return content, content
                 fig = go.Figure(data=[go.Histogram(x=vals, nbinsx=40)])
                 fig.update_layout(template="plotly_white", title=f"{use_col} Distribution")
+            hist_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+            if hist_color:
+                for tr in fig.data:
+                    if isinstance(tr, go.Histogram):
+                        tr.update(marker={"color": hist_color}, name=str(tr.name or "distribution"))
+            _apply_2d_style(fig, req, apply_legend=True)
+            use_custom_title = _flag_on(req.get("use_plot_title"), default=False)
+            plot_title = str(req.get("plot_title") or "").strip()
+            x_title = str(req.get("x_title") or "").strip()
+            y_title = str(req.get("y_title") or "").strip()
+            if use_custom_title and plot_title:
+                fig.update_layout(title=plot_title)
+            if x_title:
+                fig.update_xaxes(title_text=x_title)
+            if y_title:
+                fig.update_yaxes(title_text=y_title)
             graph = dcc.Graph(figure=fig, config={"displaylogo": False})
             return graph, graph
 
@@ -2095,6 +3559,38 @@ def register_callbacks(app, service: WebUIApiService) -> None:
             color_col=str(req.get("color_col") or view3d_color or ""),
         )
         if fig3d is None:
-            fig3d = _build_3d(rows, x_col=view3d_x, y_col=view3d_y, z_col=view3d_z, color_col=view3d_color)
+            fig3d = _build_3d(
+                rows,
+                x_col=str(req.get("x_col") or view3d_x or ""),
+                y_col=str(req.get("y_col") or view3d_y or ""),
+                z_col=str(req.get("z_col") or view3d_z or ""),
+                color_col=str(req.get("color_col") or view3d_color or ""),
+            )
+        marker_size = _parse_float(req.get("marker_size"), 6.0)
+        fixed_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+        color_by = str(req.get("color_col") or "")
+        for tr in fig3d.data:
+            if isinstance(tr, go.Scatter3d):
+                marker_update: dict[str, Any] = {}
+                if marker_size is not None:
+                    marker_update["size"] = float(marker_size)
+                if fixed_color and not color_by:
+                    marker_update["color"] = fixed_color
+                if marker_update:
+                    tr.update(marker=marker_update)
+        _apply_3d_style(fig3d, req, apply_legend=True)
+        use_custom_title = _flag_on(req.get("use_plot_title"), default=False)
+        plot_title = str(req.get("plot_title") or "").strip()
+        x_title = str(req.get("x_title") or "").strip()
+        y_title = str(req.get("y_title") or "").strip()
+        z_title = str(req.get("z_title") or "").strip()
+        if use_custom_title and plot_title:
+            fig3d.update_layout(title=plot_title)
+        if x_title or y_title or z_title:
+            fig3d.update_scenes(
+                xaxis_title=x_title or None,
+                yaxis_title=y_title or None,
+                zaxis_title=z_title or None,
+            )
         graph3d = dcc.Graph(figure=fig3d, config={"displaylogo": False})
         return graph3d, graph3d
