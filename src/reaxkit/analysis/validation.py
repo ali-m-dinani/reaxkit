@@ -211,8 +211,6 @@ def _validate_task_specific(task: Any, data: Any, request: Any) -> None:
         return
 
     if task_name == "ForceFieldOptimizationParameterTask":
-        if bool(getattr(request, "interpret", False)) and getattr(request, "force_field", None) is None:
-            _raise(task_name, "interpret=True requires request.force_field.")
         return
 
     if task_name == "TrajectoryRelabelByCoordinationTask":

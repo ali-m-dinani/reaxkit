@@ -129,15 +129,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
     elif canonical == "molecule_lifetime":
         parser.description = (
-            "Compute molecule lifetimes and birth/death events.\n\n"
+            "Compute molecule lifetimes.\n\n"
             "Examples:\n"
             "  reaxkit molecule_lifetime --molecules H2O OH --export lifetimes.csv\n"
-            "  reaxkit molecule_lifetime --table events --plot single\n"
-            "  reaxkit molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_events.png"
+            "  reaxkit molecule_lifetime --plot single\n"
+            "  reaxkit molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png"
         )
         parser.add_argument("--molecules", nargs="*", default=None, help="Restrict to selected molecular formulae")
         parser.add_argument("--min-freq", type=float, default=1.0, help="Minimum frequency for an active molecule")
-        parser.add_argument("--table", choices=["lifetimes", "events"], default="lifetimes", help="Which result table to present")
     else:
         raise KeyError(f"Unsupported molecular analysis command '{canonical}'.")
 
@@ -145,10 +144,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _selected_table(command: str, result, args: argparse.Namespace) -> pd.DataFrame:
-    if command != "molecule_lifetime":
-        return result.table
-    table_name = getattr(args, "table", "lifetimes")
-    return result.events if table_name == "events" else result.lifetimes
+    return result.table
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
@@ -232,29 +228,10 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         }
 
     if command == "molecule_lifetime":
-        if getattr(args, "table", "lifetimes") == "events":
-            series = []
-            for event, group in table.groupby("event", sort=True):
-                series.append(
-                    {
-                        "x": group[x_col].tolist(),
-                        "y": pd.to_numeric(group["freq"], errors="coerce").tolist(),
-                        "label": str(event),
-                    }
-                )
-            return {
-                "plot_type": "single_plot",
-                "series": series,
-                "xlabel": xlabel,
-                "ylabel": "Frequency",
-                "title": "Molecule Lifetime Events",
-                "legend": True,
-                "plot_type_style": "scatter",
-            }
         return {
             "plot_type": "single_plot",
             "x": table[x_col.replace("frame_index", "start_frame_index").replace("iter", "start_iter")].tolist(),
-            "y": pd.to_numeric(table["n_samples"], errors="coerce").tolist(),
+            "y": pd.to_numeric(table["sampled_step_count"], errors="coerce").tolist(),
             "xlabel": "Start Iteration" if x_col == "iter" else "Start Frame Index",
             "ylabel": "Samples In Lifetime",
             "title": "Molecule Lifetimes",

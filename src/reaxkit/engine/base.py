@@ -17,6 +17,8 @@ from reaxkit.domain.data_models import (
     ForceFieldParametersData,
     ForceFieldOptimizationProgressData,
     ForceFieldOptimizationTrainingSetData,
+    ForceFieldOptimizationData,
+    ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
     GeometryData,
@@ -66,6 +68,10 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_force_field_optimization", args, reporter=reporter)
         if data_type is ForceFieldOptimizationTrainingSetData:
             return self._invoke_loader("load_force_field_optimization_training_set", args, reporter=reporter)
+        if data_type is ForceFieldOptimizationData:
+            return self._invoke_loader("load_force_field_optimization_data", args, reporter=reporter)
+        if data_type is ForceFieldOptimizationParameterBundleData:
+            return self._invoke_loader("load_force_field_optimization_parameter_bundle", args, reporter=reporter)
         if data_type is ForceFieldOptimizationParameterData:
             return self._invoke_loader("load_force_field_optimization_parameters", args, reporter=reporter)
         if data_type is ForceFieldOptimizationReportData:

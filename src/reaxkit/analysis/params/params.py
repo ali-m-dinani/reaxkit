@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -12,7 +12,12 @@ from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, Forc
 from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ForceFieldOptimizationParameterData, ForceFieldParametersData
+from reaxkit.domain.data_models import (
+    ForceFieldOptimizationParameterBundleData,
+    ForceFieldOptimizationParameterData,
+    ForceFieldParametersData,
+)
+from reaxkit.presentation.specs import PresentationSpec
 
 _SECTION_NUM_MAP: Dict[int, Tuple[str, str]] = {
     1: ("general", "general"),
@@ -33,8 +38,6 @@ _SECTION_INDEX_COLS: Dict[str, List[str]] = {
     "torsion": ["i", "j", "k", "l"],
     "hbond": ["i", "j", "k"],
 }
-
-
 def _params_frame(data: ForceFieldOptimizationParameterData) -> pd.DataFrame:
     n_rows = len(data.ff_section)
     return pd.DataFrame(
@@ -58,8 +61,6 @@ def _param_columns_for_section(sec_df: pd.DataFrame, section_key: str) -> List[s
 def _get_params_data(
     data: ForceFieldOptimizationParameterData,
     *,
-    sort_by: str | None = None,
-    ascending: bool = True,
     drop_duplicate: bool = True,
 ) -> pd.DataFrame:
     df = _params_frame(data)
@@ -68,10 +69,6 @@ def _get_params_data(
             subset=["ff_section", "ff_section_line", "ff_parameter"],
             keep="first",
         )
-    if sort_by:
-        if sort_by not in df.columns:
-            raise ValueError(f"'sort_by' must be one of {list(df.columns)}, got {sort_by!r}")
-        df = df.sort_values(by=sort_by, ascending=ascending)
     return df.reset_index(drop=True)
 
 
@@ -79,16 +76,10 @@ def _interpret_params(
     data: ForceFieldOptimizationParameterData,
     force_field: ForceFieldParametersData,
     *,
-    add_term: bool = True,
-    sep: str = "-",
-    sort_by: str | None = None,
-    ascending: bool = True,
     drop_duplicate: bool = True,
 ) -> pd.DataFrame:
     params_df = _get_params_data(
         data,
-        sort_by=sort_by,
-        ascending=ascending,
         drop_duplicate=drop_duplicate,
     )
     out_rows: List[Dict[str, object]] = []
@@ -103,10 +94,10 @@ def _interpret_params(
 
         section_key, section_name = _SECTION_NUM_MAP[sec_num]
         if section_key not in sec_cache:
-            fmt = "interpreted" if add_term and section_key not in {"general", "atom"} else "raw"
+            fmt = "interpreted" if section_key not in {"general", "atom"} else "raw"
             sec_cache[section_key] = ForceFieldDataTask().run(
                 force_field,
-                ForceFieldDataRequest(section=section_name, format=fmt, sep=sep),
+                ForceFieldDataRequest(section=section_name, format=fmt, sep="-"),
             ).table
 
         sec_df = sec_cache[section_key]
@@ -129,6 +120,7 @@ def _interpret_params(
         sec_row = sec_df.iloc[row_idx]
         out_rows.append(
             {
+                "component": param_name,
                 "ff_section": sec_num,
                 "ff_section_line": line_1b,
                 "ff_parameter": par_1b,
@@ -136,91 +128,108 @@ def _interpret_params(
                 "min_value": row.min_value,
                 "max_value": row.max_value,
                 "inline_comment": row.inline_comment,
-                "ffield_section_key": section_key,
                 "ffield_section_name": section_name,
-                "ffield_row_index": row_idx,
-                "ffield_param_name": param_name,
                 "ffield_value": sec_row[param_name],
-                "term": sec_row.get("term") if add_term else None,
+                "term": sec_row.get("term"),
             }
         )
 
     return pd.DataFrame(out_rows)
 
 
+def _with_component_column(table: pd.DataFrame) -> pd.DataFrame:
+    out = table.copy()
+    if "component" in out.columns:
+        return out
+    if "ffield_param_name" in out.columns:
+        out.insert(0, "component", out["ffield_param_name"].astype(str))
+        return out
+    if "ff_parameter" in out.columns:
+        out.insert(0, "component", "p" + out["ff_parameter"].astype(str))
+        return out
+    out.insert(0, "component", "parameter")
+    return out
+
+
 @dataclass
 class ForceFieldOptimizationParameterRequest(BaseRequest):
     """Request for raw or interpreted params data."""
-
-    sort_by: Optional[str] = dc_field(
-        default=None,
-        metadata={'label': 'Sort By', 'help': 'Sort By parameter for ForceFieldOptimizationParameterRequest.'},
-    )
-    ascending: bool = dc_field(
-        default=True,
-        metadata={'label': 'Ascending', 'help': 'Ascending parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
-    )
     drop_duplicate: bool = dc_field(
         default=True,
-        metadata={'label': 'Drop Duplicate', 'help': 'Drop Duplicate parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
+        metadata={
+            "label": "Drop Duplicate",
+            "help": "Remove duplicated params rows by (ff_section, ff_section_line, ff_parameter).",
+            "choices": [True, False],
+        },
     )
     interpret: bool = dc_field(
         default=False,
-        metadata={'label': 'Interpret', 'help': 'Interpret parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
-    )
-    force_field: Optional[ForceFieldParametersData] = dc_field(
-        default=None,
-        metadata={'label': 'Force Field', 'help': 'Force Field parameter for ForceFieldOptimizationParameterRequest.'},
-    )
-    add_term: bool = dc_field(
-        default=True,
-        metadata={'label': 'Add Term', 'help': 'Add Term parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
-    )
-    sep: str = dc_field(
-        default="-",
-        metadata={'label': 'Sep', 'help': 'Sep parameter for ForceFieldOptimizationParameterRequest.'},
+        metadata={
+            "label": "Interpret",
+            "help": "If true, resolve params pointers to named force-field parameters loaded from task required_data.",
+            "choices": [True, False],
+        },
     )
 
 
 @dataclass
 class ForceFieldOptimizationParameterResult(BaseResult):
-    """Result for raw or interpreted params data."""
+    """Optimization-parameter extraction result.
+
+    Output structure:
+    - request: ForceFieldOptimizationParameterRequest used to generate this result
+    - table: pandas.DataFrame with a guaranteed 'component' column plus params columns
+      - component: parameter component label
+        - interpreted mode: resolved ffield parameter name
+        - raw mode: synthetic label from ff_parameter (for example p1, p2)
+      - additional columns include params fields such as ff_section, ff_section_line,
+        ff_parameter, search_interval, min_value, max_value, inline_comment, and
+        interpreted columns when interpret=True (including term and section/value mapping).
+    """
 
     table: pd.DataFrame
+    request: ForceFieldOptimizationParameterRequest
 
 
 @register_task("force_field_optimization_parameters")
 class ForceFieldOptimizationParameterTask(AnalysisTask):
     """Return raw or interpreted optimization-parameter definitions from params."""
 
-    required_data = ForceFieldOptimizationParameterData
+    required_data = ForceFieldOptimizationParameterBundleData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: ForceFieldOptimizationParameterResult, payload: dict[str, Any]
+    ) -> list[PresentationSpec]:
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+        ]
 
     def run(
         self,
-        data: ForceFieldOptimizationParameterData,
+        data: ForceFieldOptimizationParameterBundleData,
         request: ForceFieldOptimizationParameterRequest,
         reporter=None,
     ) -> ForceFieldOptimizationParameterResult:
+        params_data = data.optimization_parameters
+        if params_data is None:
+            raise ValueError("ForceFieldOptimizationParameterBundleData.optimization_parameters is required.")
         if request.interpret:
-            if request.force_field is None:
-                raise ValueError("Interpreting params requires request.force_field.")
+            force_field = data.force_field_parameters
+            if force_field is None:
+                raise ValueError("Interpreting params requires ForceFieldOptimizationParameterBundleData.force_field_parameters.")
             table = _interpret_params(
-                data,
-                request.force_field,
-                add_term=bool(request.add_term),
-                sep=str(request.sep),
-                sort_by=request.sort_by,
-                ascending=bool(request.ascending),
+                params_data,
+                force_field,
                 drop_duplicate=bool(request.drop_duplicate),
             )
         else:
             table = _get_params_data(
-                data,
-                sort_by=request.sort_by,
-                ascending=bool(request.ascending),
+                params_data,
                 drop_duplicate=bool(request.drop_duplicate),
             )
-        return ForceFieldOptimizationParameterResult(table=table)
+        table = _with_component_column(table)
+        return ForceFieldOptimizationParameterResult(table=table, request=request)
 
 
 __all__ = [

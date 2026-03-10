@@ -20,6 +20,8 @@ from reaxkit.domain.data_models import (
     ForceFieldParametersData,
     ForceFieldOptimizationProgressData,
     ForceFieldOptimizationTrainingSetData,
+    ForceFieldOptimizationData,
+    ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
     GeometryData,
@@ -1252,6 +1254,26 @@ class ReaxFFAdapter(EngineAdapter):
         params_path = p / "params" if p.is_dir() else p
         handler = ParamsHandler(params_path, reporter=reporter)
         return _force_field_optimization_parameters_from_params_handler(handler)
+
+    def load_force_field_optimization_data(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationData:
+        return ForceFieldOptimizationData(
+            force_field_parameters=self.load_force_field(args, reporter=reporter),
+            optimization_parameters=self.load_force_field_optimization_parameters(args, reporter=reporter),
+        )
+
+    def load_force_field_optimization_parameter_bundle(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationParameterBundleData:
+        return ForceFieldOptimizationParameterBundleData(
+            optimization_parameters=self.load_force_field_optimization_parameters(args, reporter=reporter),
+            force_field_parameters=self.load_force_field(args, reporter=reporter),
+        )
 
     def load_parameter_optimization_diagnostic(
         self,

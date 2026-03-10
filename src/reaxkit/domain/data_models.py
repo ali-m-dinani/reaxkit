@@ -687,6 +687,20 @@ class ForceFieldOptimizationData:
     report: Optional[ForceFieldOptimizationReportData] = None
     metadata: Optional[dict[str, Any]] = None
 
+
+@dataclass
+class ForceFieldOptimizationParameterBundleData:
+    """Composite data for parameter optimization tasks.
+
+    Contains exactly the two sources needed by parameter tasks:
+    - optimization_parameters: parsed ``params`` data (always required)
+    - force_field_parameters: parsed ``ffield`` data (used when interpretation is requested)
+    """
+
+    optimization_parameters: ForceFieldOptimizationParameterData
+    force_field_parameters: Optional[ForceFieldParametersData] = None
+    metadata: Optional[dict[str, Any]] = None
+
 @dataclass
 class ElectrostaticsData:
     """Composite electrostatics model for engine-agnostic analyses."""

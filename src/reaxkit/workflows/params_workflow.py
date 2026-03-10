@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from typing import Callable
 
 from reaxkit.analysis import params as _params_tasks  # noqa: F401
 from reaxkit.analysis.params.params import ForceFieldOptimizationParameterRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
-from reaxkit.domain.data_models import ForceFieldParametersData
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 
 PARAMS_COMMANDS = ("get-params",)
@@ -42,29 +39,10 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _maybe_load_force_field(args: argparse.Namespace) -> ForceFieldParametersData | None:
-    if not getattr(args, "interpret", False):
-        return None
-    normalized = normalize_storage_args(vars(args))
-    raw = normalized.get("ffield")
-    if not raw:
-        raise ValueError("--ffield is required when --interpret is set.")
-    path = Path(raw)
-    if not path.exists():
-        raise FileNotFoundError(f"ffield file not found: {raw}")
-    adapter = resolve_engine(str(path), engine=getattr(args, "engine", None))
-    return adapter.load(ForceFieldParametersData, normalized)
-
-
 def _build_params_request(args: argparse.Namespace) -> ForceFieldOptimizationParameterRequest:
     return ForceFieldOptimizationParameterRequest(
-        sort_by=args.sort_by,
-        ascending=not args.descending,
         drop_duplicate=not args.keep_duplicates,
         interpret=args.interpret,
-        force_field=_maybe_load_force_field(args),
-        add_term=not args.no_term,
-        sep=args.sep,
     )
 
 
@@ -87,15 +65,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Examples:\n"
             "  reaxkit get-params --export params.csv\n"
             "  reaxkit get-params --interpret --ffield ffield --export params_interpreted.csv\n"
-            "  reaxkit get-params --sort-by search_interval --descending --plot single"
+            "  reaxkit get-params --plot single"
         )
         parser.add_argument("--keep-duplicates", action="store_true", help="Do not drop duplicate parameter rows")
-        parser.add_argument("--sort-by", default=None, help="Optional column name to sort by")
-        parser.add_argument("--descending", action="store_true", help="Sort in descending order when --sort-by is used")
         parser.add_argument("--interpret", action="store_true", help="Interpret params pointers into the ffield")
         parser.add_argument("--ffield", default=None, help="Path to ffield file required for --interpret")
-        parser.add_argument("--no-term", action="store_true", help="Do not build readable term labels during interpretation")
-        parser.add_argument("--sep", default="-", help="Separator used when constructing interpreted term labels")
     else:
         raise KeyError(f"Unsupported params command '{canonical}'.")
 
@@ -115,9 +89,9 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     if y_col not in table.columns:
         return None
 
-    if getattr(args, "plot", None) == "subplot" and "ffield_section_key" in table.columns:
+    if getattr(args, "plot", None) == "subplot" and "ffield_section_name" in table.columns:
         subplots = []
-        for section, group in table.groupby("ffield_section_key", sort=True):
+        for section, group in table.groupby("ffield_section_name", sort=True):
             subplots.append(
                 [{
                     "x": group[x_col].tolist(),
@@ -135,9 +109,9 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "grid": getattr(args, "grid", None),
         }
 
-    if "ffield_section_key" in table.columns:
+    if "ffield_section_name" in table.columns:
         series = []
-        for section, group in table.groupby("ffield_section_key", sort=True):
+        for section, group in table.groupby("ffield_section_name", sort=True):
             series.append(
                 {
                     "x": group[x_col].tolist(),
