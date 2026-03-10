@@ -243,12 +243,11 @@ def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -
 
 
 def _build_force_field_optimization_report_request(args: argparse.Namespace) -> ForceFieldOptimizationReportRequest:
-    return ForceFieldOptimizationReportRequest(sortby=args.sortby, ascending=not args.descending)
+    return ForceFieldOptimizationReportRequest()
 
 
 def _build_force_field_optimization_report_eos_request(args: argparse.Namespace) -> ForceFieldOptimizationReportEOSRequest:
     return ForceFieldOptimizationReportEOSRequest(
-        geometry_summary=_load_geometry_summary(args),
         iden=args.iden,
     )
 
@@ -257,12 +256,10 @@ def _build_force_field_optimization_report_bulk_modulus_request(
     args: argparse.Namespace,
 ) -> ForceFieldOptimizationReportBulkModulusRequest:
     return ForceFieldOptimizationReportBulkModulusRequest(
-        geometry_summary=_load_geometry_summary(args),
         iden=args.iden,
-        source=args.source,
         shift_min_to_zero=not args.no_shift_min_to_zero,
         flip_sign=args.flip_sign,
-        dropna=not args.keep_nan,
+        min_points=int(args.min_points),
     )
 
 
@@ -362,11 +359,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Load fort.99 report rows with QM-FF differences.\n\n"
             "Examples:\n"
             "  reaxkit force_field_optimization_report --export fort99.csv\n"
-            "  reaxkit force_field_optimization_report --sortby error --descending\n"
             "  reaxkit force_field_optimization_report --plot single --xaxis lineno"
         )
-        parser.add_argument("--sortby", default="lineno", help="Sort column")
-        parser.add_argument("--descending", action="store_true", help="Sort in descending order")
     elif canonical == "force_field_optimization_report_eos":
         parser.description = (
             "Build ENERGY-vs-volume data from fort.99 and fort.74.\n\n"
@@ -381,15 +375,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Fit a Vinet bulk modulus from fort.99 and fort.74.\n\n"
             "Examples:\n"
-            "  reaxkit force_field_optimization_report_bulk_modulus --iden MgO\n"
-            "  reaxkit force_field_optimization_report_bulk_modulus --iden MgO --source qm --export bulk_modulus.csv\n"
-            "  reaxkit force_field_optimization_report_bulk_modulus --iden MgO --flip-sign"
+            "  reaxkit force_field_optimization_report_bulk_modulus --iden bulk_0\n"
+            "  reaxkit force_field_optimization_report_bulk_modulus --iden all --export bulk_modulus.csv\n"
+            "  reaxkit force_field_optimization_report_bulk_modulus --flip-sign --min-points 8"
         )
-        parser.add_argument("--iden", required=True, help="Identifier to fit")
-        parser.add_argument("--source", choices=["ffield", "qm"], default="ffield", help="Energy source for the fit")
+        parser.add_argument("--iden", default=None, help="Optional base identifier to fit; use 'all' for all eligible bases")
         parser.add_argument("--no-shift-min-to-zero", action="store_true", help="Do not shift minimum energy to zero before fitting")
         parser.add_argument("--flip-sign", action="store_true", help="Flip the sign of the energy values before fitting")
-        parser.add_argument("--keep-nan", action="store_true", help="Keep NaN rows instead of dropping them before fitting")
+        parser.add_argument("--min-points", type=int, default=6, help="Minimum finite points required per base identifier")
     elif canonical == "trainset_group_comments":
         parser.description = (
             "Return unique trainset group comments by section.\n\n"
@@ -413,8 +406,6 @@ def _prepare_result(command: str, result) -> object:
             df.insert(0, "section", section)
             frames.append(df)
         result.table = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-    elif command == "force_field_optimization_report_bulk_modulus":
-        result.table = pd.DataFrame([result.values])
     return result
 
 
@@ -514,7 +505,7 @@ def _prepare_eos_table(result, *, flip_sign: bool) -> None:
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty or not flip_sign:
         return
-    for col in ("ffield_value", "qm_value"):
+    for col in ("E_other_iden", "ffield_value", "qm_value"):
         if col in table.columns:
             result.table[col] = -pd.to_numeric(table[col], errors="coerce")
 
@@ -681,18 +672,17 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
     if command == "force_field_optimization_report_eos":
         work = table.copy()
-        for col in ("V_iden2", "ffield_value", "qm_value"):
+        for col in ("V_other_iden", "E_other_iden"):
             if col in work.columns:
                 work[col] = pd.to_numeric(work[col], errors="coerce")
-        work = work.sort_values(["iden1", "V_iden2"]).reset_index(drop=True)
-        groups = [(iden, grp.copy()) for iden, grp in work.groupby("iden1", dropna=False)]
+        work = work.sort_values(["base_iden", "V_other_iden"]).reset_index(drop=True)
+        groups = [(iden, grp.copy()) for iden, grp in work.groupby("base_iden", dropna=False)]
         if getattr(args, "plot", None) == "subplot" and len(groups) > 1:
             return {
                 "plot_type": "multi_subplots",
                 "subplots": [
                     [
-                        {"x": grp["V_iden2"].tolist(), "y": grp["ffield_value"].tolist(), "label": f"{iden} ffield"},
-                        {"x": grp["V_iden2"].tolist(), "y": grp["qm_value"].tolist(), "label": f"{iden} qm"},
+                        {"x": grp["V_other_iden"].tolist(), "y": grp["E_other_iden"].tolist(), "label": f"{iden} energy"},
                     ]
                     for iden, grp in groups
                 ],
@@ -704,8 +694,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             }
         series = []
         for iden, grp in groups:
-            series.append({"x": grp["V_iden2"].tolist(), "y": grp["ffield_value"].tolist(), "label": f"{iden} ffield"})
-            series.append({"x": grp["V_iden2"].tolist(), "y": grp["qm_value"].tolist(), "label": f"{iden} qm"})
+            series.append({"x": grp["V_other_iden"].tolist(), "y": grp["E_other_iden"].tolist(), "label": f"{iden} energy"})
         return {
             "plot_type": "single_plot",
             "series": series,

@@ -714,6 +714,19 @@ class ForceFieldOptimizationDiagnosticBundleData:
     force_field_parameters: ForceFieldParametersData
     metadata: Optional[dict[str, Any]] = None
 
+
+@dataclass
+class ForceFieldOptimizationReportEOSBundleData:
+    """Composite data for EOS report tasks.
+
+    - report: optimization report data (required)
+    - geometry_summary: structure-summary data with volume mapping (required)
+    """
+
+    report: ForceFieldOptimizationReportData
+    geometry_summary: GeometrySummaryData
+    metadata: Optional[dict[str, Any]] = None
+
 @dataclass
 class ElectrostaticsData:
     """Composite electrostatics model for engine-agnostic analyses."""

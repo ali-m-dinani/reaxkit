@@ -23,6 +23,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationData,
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationDiagnosticBundleData,
+    ForceFieldOptimizationReportEOSBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
     GeometryData,
@@ -1297,6 +1298,16 @@ class ReaxFFAdapter(EngineAdapter):
         return ForceFieldOptimizationDiagnosticBundleData(
             diagnostics=self.load_parameter_optimization_diagnostic(args, reporter=reporter),
             force_field_parameters=self.load_force_field(args, reporter=reporter),
+        )
+
+    def load_force_field_optimization_report_eos_bundle(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationReportEOSBundleData:
+        return ForceFieldOptimizationReportEOSBundleData(
+            report=self.load_force_field_optimization_report(args, reporter=reporter),
+            geometry_summary=self.load_structure_summary(args, reporter=reporter),
         )
 
     def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
