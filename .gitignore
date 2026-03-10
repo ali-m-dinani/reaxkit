@@ -96,3 +96,4 @@ cache/
 Thumbs.db
 /.reaxkit_cache/index/handlers.json
 /src/reaxkit/webui/.reaxkit_cache/index/handlers.json
+/tests/analysis_tasks/artifcats/

@@ -43,7 +43,7 @@ class HandlerSpec:
 
 HANDLER_SPECS = [
     HandlerSpec("control", ControlHandler, EXAMPLES_DIR / "control"),
-    HandlerSpec("eregime", EregimeHandler, EXAMPLES_DIR / "reaxkit_generated_inputs" / "eregime_func.in"),
+    HandlerSpec("eregime", EregimeHandler, EXAMPLES_DIR /"eregime.in"),
     HandlerSpec("ffield", FFieldHandler, EXAMPLES_DIR / "ffield"),
     HandlerSpec("fort13", Fort13Handler, EXAMPLES_DIR / "fort.13"),
     HandlerSpec("fort57", Fort57Handler, EXAMPLES_DIR / "fort.57"),

@@ -13,6 +13,7 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
+from reaxkit.presentation.specs import PresentationSpec
 
 _RDF_PROPERTY_CHOICES = ("first_peak", "dominant_peak", "area", "excess_area")
 
@@ -59,42 +60,27 @@ class RDFRequest(BaseRequest):
             "units": "distance",
         },
     )
-    average: bool = dc_field(
-        default=True,
-        metadata={"label": "Average across frames", "help": "If true, return frame-averaged RDF.", "choices": [True, False]},
-    )
-    return_stack: bool = dc_field(
-        default=False,
-        metadata={"label": "Return per-frame stack", "help": "If true, include per-frame RDF values.", "choices": [True, False]},
-    )
     backend: str = dc_field(
         default="freud",
         metadata={"label": "RDF backend", "help": "RDF computation backend.", "choices": ["freud", "ovito"]},
-    )
-    include_properties: bool = dc_field(
-        default=False,
-        metadata={
-            "label": "Include RDF properties",
-            "help": "If true, also compute RDF-derived properties from each selected frame.",
-            "choices": [True, False],
-        },
-    )
-    properties: Sequence[str] = dc_field(
-        default=("first_peak", "dominant_peak", "area", "excess_area"),
-        metadata={
-            "label": "RDF properties",
-            "help": "RDF-derived properties to compute.",
-            "choices": list(_RDF_PROPERTY_CHOICES),
-        },
     )
 
 
 @dataclass
 class RDFResult(BaseResult):
-    """Result of RDF curve analysis."""
+    """Result of RDF curve analysis.
+
+    Output structure:
+    - table: pandas.DataFrame with columns ['frame_index', 'iter', 'r', 'g']
+      - frame_index: source frame index
+      - iter: iteration for that frame
+      - r: radial distance grid
+      - g: RDF value g(r) for that frame
+    - request: RDFRequest used to produce this result
+    """
 
     table: pd.DataFrame
-    properties: Optional[pd.DataFrame] = None
+    request: RDFRequest
 
 
 @dataclass
@@ -155,9 +141,21 @@ class RDFPropertyRequest(BaseRequest):
 
 @dataclass
 class RDFPropertyResult(BaseResult):
-    """Result of RDF-derived property analysis."""
+    """Result of RDF-derived property analysis.
+
+    Output structure:
+    - table: pandas.DataFrame with columns:
+      - always: ['frame_index', 'iter']
+      - plus property-specific columns:
+        - first_peak: ['r_first_peak', 'g_first_peak']
+        - dominant_peak: ['r_peak', 'g_peak']
+        - area: ['area']
+        - excess_area: ['excess_area']
+    - request: RDFPropertyRequest used to produce this result
+    """
 
     table: pd.DataFrame
+    request: RDFPropertyRequest
 
 
 def _normalize_property_selection(properties: Optional[Sequence[str]]) -> list[str]:
@@ -485,8 +483,27 @@ class RDFTask(AnalysisTask):
 
     required_data = TrajectoryData
 
+    @staticmethod
+    def recommended_presentations(_result: RDFResult, payload: dict[str, object]) -> list[PresentationSpec]:
+        table_rows = payload.get("table")
+        if not isinstance(table_rows, list) or not table_rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = table_rows[0] if isinstance(table_rows[0], dict) else {}
+        if "r" not in sample or "g" not in sample:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        group_by = "frame_index" if "frame_index" in sample else ""
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="RDF g(r)",
+                mapping={"x_col": "r", "y_col": "g", "group_by_col": group_by},
+                options={"title": "RDF g(r)", "xlabel": "r", "ylabel": "g", "legend": bool(group_by)},
+                view_type="plot2d",
+            ),
+        ]
+
     def run(self, data: TrajectoryData, request: RDFRequest, reporter=None) -> RDFResult:
-        selected_properties = _normalize_property_selection(request.properties)
         r_ref, stack, frame_idx = _compute_rdfs(
             data,
             atom_ids_a=request.atom_ids_a,
@@ -500,42 +517,24 @@ class RDFTask(AnalysisTask):
             backend=request.backend,
             reporter=reporter,
         )
-        properties_table: Optional[pd.DataFrame] = None
         if len(r_ref) == 0 or not stack:
-            if request.include_properties:
-                properties_table = _build_properties_table(
-                    data,
-                    r_ref=np.array([], dtype=float),
-                    stack=[],
-                    frame_idx=[],
-                    selected_properties=selected_properties,
+            return RDFResult(table=pd.DataFrame(columns=["frame_index", "iter", "r", "g"]), request=request)
+        rows: list[dict[str, float | int]] = []
+        for j, i in enumerate(frame_idx):
+            iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
+            for rr, gg in zip(r_ref, stack[j]):
+                rows.append(
+                    {
+                        "frame_index": int(i),
+                        "iter": iter_val,
+                        "r": float(rr),
+                        "g": float(gg),
+                    }
                 )
-            return RDFResult(table=pd.DataFrame(columns=["r", "g"]), properties=properties_table)
-
-        table: pd.DataFrame
-        if request.average:
-            g_out = np.mean(np.vstack(stack), axis=0)
-            table = pd.DataFrame({"r": r_ref, "g": g_out})
-        elif request.return_stack:
-            rows: list[dict] = []
-            for j, i in enumerate(frame_idx):
-                iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
-                for rr, gg in zip(r_ref, stack[j]):
-                    rows.append({"frame_index": int(i), "iter": iter_val, "r": float(rr), "g": float(gg)})
-            table = pd.DataFrame(rows)
-        else:
-            table = pd.DataFrame({"r": r_ref, "g": stack[-1]})
-
-        if request.include_properties:
-            properties_table = _build_properties_table(
-                data,
-                r_ref=r_ref,
-                stack=stack,
-                frame_idx=frame_idx,
-                selected_properties=selected_properties,
-            )
-
-        return RDFResult(table=table, properties=properties_table)
+        table = pd.DataFrame(rows)
+        if not table.empty:
+            table = table.sort_values(["frame_index", "r"], kind="stable").reset_index(drop=True)
+        return RDFResult(table=table, request=request)
 
 
 @register_task("rdf_property")
@@ -544,28 +543,55 @@ class RDFPropertyTask(AnalysisTask):
 
     required_data = TrajectoryData
 
+    @staticmethod
+    def recommended_presentations(_result: RDFPropertyResult, payload: dict[str, object]) -> list[PresentationSpec]:
+        table_rows = payload.get("table")
+        if not isinstance(table_rows, list) or not table_rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = table_rows[0] if isinstance(table_rows[0], dict) else {}
+        x_axis = "iter" if "iter" in sample else ("frame_index" if "frame_index" in sample else "")
+        if not x_axis:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        y_candidates = ("r_first_peak", "g_first_peak", "r_peak", "g_peak", "area", "excess_area")
+        y_axis = next((name for name in y_candidates if name in sample), "")
+        if not y_axis:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label=f"{y_axis} vs {x_axis}",
+                mapping={"x_col": x_axis, "y_col": y_axis, "group_by_col": ""},
+                options={"title": f"{y_axis} vs {x_axis}", "xlabel": x_axis, "ylabel": y_axis, "legend": False},
+                view_type="plot2d",
+            ),
+        ]
+
     def run(self, data: TrajectoryData, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
         prop = _normalize_property_selection([request.property])[0]
-        rdf_result = RDFTask().run(
+        r_ref, stack, frame_idx = _compute_rdfs(
             data,
-            RDFRequest(
-                atom_ids_a=request.atom_ids_a,
-                atom_ids_b=request.atom_ids_b,
-                atom_types_a=request.atom_types_a,
-                atom_types_b=request.atom_types_b,
-                frames=request.frames,
-                every=request.every,
-                bins=request.bins,
-                r_max=request.r_max,
-                backend=request.backend,
-                include_properties=True,
-                properties=[prop],
-            ),
+            atom_ids_a=request.atom_ids_a,
+            atom_ids_b=request.atom_ids_b,
+            atom_types_a=request.atom_types_a,
+            atom_types_b=request.atom_types_b,
+            frames=request.frames,
+            every=request.every,
+            bins=request.bins,
+            r_max=request.r_max,
+            backend=request.backend,
             reporter=reporter,
         )
-        if rdf_result.properties is None or rdf_result.properties.empty:
-            return RDFPropertyResult(table=pd.DataFrame())
-        return RDFPropertyResult(table=rdf_result.properties.copy())
+        properties_table = _build_properties_table(
+            data,
+            r_ref=r_ref,
+            stack=stack,
+            frame_idx=frame_idx,
+            selected_properties=[prop],
+        )
+        if properties_table.empty:
+            return RDFPropertyResult(table=pd.DataFrame(), request=request)
+        return RDFPropertyResult(table=properties_table.copy(), request=request)
 
 
 __all__ = [

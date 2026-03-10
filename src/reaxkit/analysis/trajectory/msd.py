@@ -48,9 +48,22 @@ class MSDRequest(BaseRequest):
 
 @dataclass
 class MSDResult(BaseResult):
-    """Result of MSD analysis."""
+    """Result of MSD analysis.
+
+    Output structure:
+    - table: pandas.DataFrame with columns
+      ['frame_index', 'iter', 'atom_id', 'atom_type', 'dim', 'msd']
+      - frame_index: source frame index
+      - iter: iteration for that frame
+      - atom_id: atom identifier
+      - atom_type: element/type label for the atom
+      - dim: dimension selection label used for MSD (for example 'x,y,z')
+      - msd: mean-squared displacement value
+    - request: MSDRequest used to produce this result
+    """
 
     table: pd.DataFrame
+    request: MSDRequest
 
 
 @register_task("msd")
@@ -90,19 +103,20 @@ class MSDTask(AnalysisTask):
         return views
 
     def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:
+        out_cols = ["frame_index", "iter", "atom_id", "atom_type", "dim", "msd"]
         dims = tuple(d for d in request.dims if d in ("x", "y", "z"))
         if not dims:
             raise ValueError("dims must include at least one of 'x','y','z'")
 
         n_frames = data.positions.shape[0]
         if n_frames == 0:
-            return MSDResult(table=pd.DataFrame(columns=["frame_index", "iter", "atom_id", "msd"]))
+            return MSDResult(table=pd.DataFrame(columns=out_cols), request=request)
 
         frame_idx = list(range(n_frames)) if request.frames is None else [int(i) for i in request.frames]
         step = max(1, int(request.every))
         frame_idx = frame_idx[::step]
         if not frame_idx:
-            return MSDResult(table=pd.DataFrame(columns=["frame_index", "iter", "atom_id", "msd"]))
+            return MSDResult(table=pd.DataFrame(columns=out_cols), request=request)
 
         ref_frame = frame_idx[0] if request.origin == "first" else int(request.origin)
         if ref_frame not in frame_idx:
@@ -117,13 +131,15 @@ class MSDTask(AnalysisTask):
             sel_idx = list(range(data.positions.shape[1]))
 
         if not sel_idx:
-            return MSDResult(table=pd.DataFrame(columns=["frame_index", "iter", "atom_id", "msd"]))
+            return MSDResult(table=pd.DataFrame(columns=out_cols), request=request)
 
         axes = {"x": 0, "y": 1, "z": 2}
         use_cols = [axes[d] for d in dims]
 
         sel = np.asarray(sel_idx, dtype=int)
         atom_ids = [data.atom_ids[i] for i in sel_idx]
+        atom_types = [str(data.elements[i]) for i in sel_idx]
+        dim_label = ",".join(dims)
 
         r0 = data.positions[ref_frame][sel[:, None], use_cols].astype(float)
         rows: list[dict] = []
@@ -135,12 +151,14 @@ class MSDTask(AnalysisTask):
             sq = np.sum(dr * dr, axis=1)
 
             iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
-            for atom_id, msd_val in zip(atom_ids, sq):
+            for atom_id, atom_type, msd_val in zip(atom_ids, atom_types, sq):
                 rows.append(
                     {
                         "frame_index": int(i),
                         "iter": iter_val,
                         "atom_id": int(atom_id),
+                        "atom_type": atom_type,
+                        "dim": dim_label,
                         "msd": float(msd_val),
                     }
                 )
@@ -150,4 +168,4 @@ class MSDTask(AnalysisTask):
         table = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"]).reset_index(drop=True)
         if reporter:
             reporter("analyze", n_steps, n_steps, "Finished MSD")
-        return MSDResult(table=table)
+        return MSDResult(table=table, request=request)

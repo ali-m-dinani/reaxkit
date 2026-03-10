@@ -916,6 +916,19 @@ def _electric_field_from_fort78_handler(handler: Fort78Handler) -> ElectricField
         if applied_components
         else np.empty((len(df), 0), dtype=float)
     )
+    energy_vals = (
+        df[field_energy_components].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        if field_energy_components
+        else np.empty((len(df), 0), dtype=float)
+    )
+    return ElectricFieldData(
+        applied_field_values=applied_vals,
+        applied_field_components=tuple(str(c) for c in applied_components),
+        field_energy_values=energy_vals,
+        field_energy_components=tuple(str(c) for c in field_energy_components),
+        sampled_field_iterations=iters,
+        metadata={"source": "fort.78", "columns": list(df.columns)},
+    )
 
 
 def _simulation_from_summary_handler(handler: SummaryHandler) -> SimulationData:
@@ -934,19 +947,6 @@ def _simulation_from_summary_handler(handler: SummaryHandler) -> SimulationData:
         pressure=(df["P"].to_numpy(dtype=float) if "P" in df.columns else None),
         density=(df["D"].to_numpy(dtype=float) if "D" in df.columns else None),
         elapsed_time=(df["elap_time"].to_numpy(dtype=float) if "elap_time" in df.columns else None),
-    )
-    energy_vals = (
-        df[field_energy_components].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
-        if field_energy_components
-        else np.empty((len(df), 0), dtype=float)
-    )
-    return ElectricFieldData(
-        applied_field_values=applied_vals,
-        applied_field_components=tuple(str(c) for c in applied_components),
-        field_energy_values=energy_vals,
-        field_energy_components=tuple(str(c) for c in field_energy_components),
-        sampled_field_iterations=iters,
-        metadata={"source": "fort.78", "columns": list(df.columns)},
     )
 
 
