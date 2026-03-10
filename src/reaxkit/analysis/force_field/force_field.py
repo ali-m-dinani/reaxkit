@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Literal, Optional, Sequence
 
 import pandas as pd
@@ -129,10 +129,22 @@ def _section_frame(data: ForceFieldParametersData, section: str, fmt: str, sep: 
 class ForceFieldDataRequest(BaseRequest):
     """Request for raw or interpreted force-field sections."""
 
-    section: Optional[str] = None
-    sections: Optional[Sequence[str]] = None
-    format: Literal["raw", "interpreted"] = "interpreted"
-    sep: str = "-"
+    section: Optional[str] = dc_field(
+        default=None,
+        metadata={'label': 'Section', 'help': 'Section parameter for ForceFieldDataRequest.'},
+    )
+    sections: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Sections', 'help': 'Sections parameter for ForceFieldDataRequest.'},
+    )
+    format: Literal["raw", "interpreted"] = dc_field(
+        default="interpreted",
+        metadata={'label': 'Format', 'help': 'Format parameter for ForceFieldDataRequest.', 'choices': ['raw', 'interpreted']},
+    )
+    sep: str = dc_field(
+        default="-",
+        metadata={'label': 'Sep', 'help': 'Sep parameter for ForceFieldDataRequest.'},
+    )
 
 
 @dataclass

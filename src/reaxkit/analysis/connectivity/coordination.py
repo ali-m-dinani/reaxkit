@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Mapping, Optional, Sequence
 
 import numpy as np
@@ -19,13 +19,34 @@ from reaxkit.domain.data_models import ConnectivityData, ForceFieldParametersDat
 class CoordinationStatusRequest(BaseRequest):
     """Request for per-atom coordination status classification."""
 
-    valences: Optional[Mapping[str, float]] = None
-    force_field: Optional[ForceFieldParametersData] = None
-    valence_key: str = "valency"
-    threshold: float = 0.9
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    require_all_valences: bool = True
+    valences: Optional[Mapping[str, float]] = dc_field(
+        default=None,
+        metadata={'label': 'Valences', 'help': 'Valences parameter for CoordinationStatusRequest.'},
+    )
+    force_field: Optional[ForceFieldParametersData] = dc_field(
+        default=None,
+        metadata={'label': 'Force Field', 'help': 'Force Field parameter for CoordinationStatusRequest.'},
+    )
+    valence_key: str = dc_field(
+        default="valency",
+        metadata={'label': 'Valence Key', 'help': 'Valence Key parameter for CoordinationStatusRequest.'},
+    )
+    threshold: float = dc_field(
+        default=0.9,
+        metadata={'label': 'Threshold', 'help': 'Threshold parameter for CoordinationStatusRequest.', 'min': 0.0},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for CoordinationStatusRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for CoordinationStatusRequest.', 'min': 1, 'units': 'frames'},
+    )
+    require_all_valences: bool = dc_field(
+        default=True,
+        metadata={'label': 'Require All Valences', 'help': 'Require All Valences parameter for CoordinationStatusRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

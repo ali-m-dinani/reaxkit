@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 
 import pandas as pd
 
@@ -64,8 +64,14 @@ def _get_fort74_data(
 class StructureSummaryRequest(BaseRequest):
     """Request for fort.74 structure-summary data."""
 
-    sort: str | None = None
-    ascending: bool = True
+    sort: str | None = dc_field(
+        default=None,
+        metadata={'label': 'Sort', 'help': 'Sort parameter for StructureSummaryRequest.'},
+    )
+    ascending: bool = dc_field(
+        default=True,
+        metadata={'label': 'Ascending', 'help': 'Ascending parameter for StructureSummaryRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

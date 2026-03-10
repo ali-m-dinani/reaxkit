@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Optional, Sequence
 
 import numpy as np
@@ -22,10 +22,22 @@ def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -
 
 @dataclass
 class ChargeTableRequest(BaseRequest):
-    atom_ids: Optional[Sequence[int]] = None
-    atom_types: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for ChargeTableRequest.', 'units': 'index'},
+    )
+    atom_types: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for ChargeTableRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for ChargeTableRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for ChargeTableRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass

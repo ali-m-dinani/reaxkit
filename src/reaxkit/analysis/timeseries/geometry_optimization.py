@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Sequence
 
 import pandas as pd
@@ -94,8 +94,14 @@ def _get_fort57_data(
 class GeometryOptimizationRequest(BaseRequest):
     """Request for selected fort.57 geometry-optimization columns."""
 
-    cols: Sequence[str] | None = None
-    include_geo_descriptor: bool = False
+    cols: Sequence[str] | None = dc_field(
+        default=None,
+        metadata={'label': 'Cols', 'help': 'Cols parameter for GeometryOptimizationRequest.'},
+    )
+    include_geo_descriptor: bool = dc_field(
+        default=False,
+        metadata={'label': 'Include Geo Descriptor', 'help': 'Include Geo Descriptor parameter for GeometryOptimizationRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Mapping, Optional, Sequence
 
 import numpy as np
@@ -50,12 +50,29 @@ def _subset_simulation(simulation: SimulationData | None, frame_idx: np.ndarray,
 class TrajectoryRelabelByCoordinationRequest(BaseRequest):
     """Request to relabel a trajectory from coordination-status output."""
 
-    coordination_table: pd.DataFrame
-    labels: Optional[Mapping[int, str]] = None
-    mode: str = "global"
-    keep_coord_original: bool = False
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    coordination_table: pd.DataFrame = dc_field(
+        metadata={'label': 'Coordination Table', 'help': 'Coordination Table parameter for TrajectoryRelabelByCoordinationRequest.'},
+    )
+    labels: Optional[Mapping[int, str]] = dc_field(
+        default=None,
+        metadata={'label': 'Labels', 'help': 'Labels parameter for TrajectoryRelabelByCoordinationRequest.'},
+    )
+    mode: str = dc_field(
+        default="global",
+        metadata={'label': 'Mode', 'help': 'Mode parameter for TrajectoryRelabelByCoordinationRequest.'},
+    )
+    keep_coord_original: bool = dc_field(
+        default=False,
+        metadata={'label': 'Keep Coord Original', 'help': 'Keep Coord Original parameter for TrajectoryRelabelByCoordinationRequest.', 'choices': [True, False]},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for TrajectoryRelabelByCoordinationRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for TrajectoryRelabelByCoordinationRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass

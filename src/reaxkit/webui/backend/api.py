@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from reaxkit.webui.backend.node_runtime import PipelineRuntime
 from reaxkit.webui.backend.pipeline_store import PipelineStore
 from reaxkit.webui.backend.serializer import export_bundle, load_snapshot, save_snapshot
+
+logger = logging.getLogger(__name__)
+
+
+def _payload_keys(payload: dict[str, Any] | None) -> list[str]:
+    if not isinstance(payload, dict):
+        return []
+    return sorted(str(k) for k in payload.keys())
 
 
 class WebUIApiService:
@@ -18,25 +27,57 @@ class WebUIApiService:
 
     def create_pipeline(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
-        return self.runtime.create_pipeline(name=str(payload.get("name") or "Untitled Pipeline"))
+        logger.debug("create_pipeline payload_keys=%s", _payload_keys(payload))
+        out = self.runtime.create_pipeline(name=str(payload.get("name") or "Untitled Pipeline"))
+        logger.debug("create_pipeline -> keys=%s", _payload_keys(out))
+        return out
 
     def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
-        return self.runtime.get_pipeline(pipeline_id)
+        logger.debug("get_pipeline pipeline_id=%s", pipeline_id)
+        out = self.runtime.get_pipeline(pipeline_id)
+        logger.debug("get_pipeline -> keys=%s", _payload_keys(out))
+        return out
 
     def load_dataset(self, pipeline_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.runtime.load_dataset(
+        logger.debug(
+            "load_dataset pipeline_id=%s run_dir=%s engine=%s payload_keys=%s",
+            pipeline_id,
+            payload.get("run_dir"),
+            payload.get("engine"),
+            _payload_keys(payload),
+        )
+        out = self.runtime.load_dataset(
             pipeline_id,
             run_dir=str(payload.get("run_dir") or "."),
             engine=payload.get("engine"),
             sources=payload.get("sources") or {},
             project_root=str(payload.get("project_root") or "") or None,
         )
+        logger.debug("load_dataset -> keys=%s", _payload_keys(out))
+        return out
 
     def update_dataset_sources(self, pipeline_id: str, node_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.runtime.update_dataset_sources(pipeline_id, node_id, sources=dict(payload.get("sources") or {}))
+        logger.debug(
+            "update_dataset_sources pipeline_id=%s node_id=%s source_keys=%s",
+            pipeline_id,
+            node_id,
+            sorted((payload.get("sources") or {}).keys()),
+        )
+        out = self.runtime.update_dataset_sources(pipeline_id, node_id, sources=dict(payload.get("sources") or {}))
+        logger.debug("update_dataset_sources -> keys=%s", _payload_keys(out))
+        return out
 
     def add_node(self, pipeline_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.runtime.add_node(
+        logger.debug(
+            "add_node pipeline_id=%s parent_id=%s kind=%s name=%s request_keys=%s metadata_keys=%s",
+            pipeline_id,
+            payload.get("parent_id"),
+            payload.get("kind"),
+            payload.get("name"),
+            _payload_keys(payload.get("request") if isinstance(payload.get("request"), dict) else {}),
+            _payload_keys(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}),
+        )
+        out = self.runtime.add_node(
             pipeline_id,
             parent_id=str(payload["parent_id"]),
             kind=str(payload["kind"]),
@@ -44,46 +85,94 @@ class WebUIApiService:
             request=payload.get("request") or {},
             metadata=payload.get("metadata") or {},
         )
+        logger.debug("add_node -> node_id=%s kind=%s status=%s", out.get("id"), out.get("kind"), out.get("status"))
+        return out
 
     def update_node(self, pipeline_id: str, node_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.runtime.update_node(
+        logger.debug(
+            "update_node pipeline_id=%s node_id=%s request_keys=%s metadata_keys=%s",
+            pipeline_id,
+            node_id,
+            _payload_keys(payload.get("request") if isinstance(payload.get("request"), dict) else {}),
+            _payload_keys(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}),
+        )
+        out = self.runtime.update_node(
             pipeline_id,
             node_id,
             request=payload.get("request"),
             metadata=payload.get("metadata"),
         )
+        logger.debug("update_node -> status=%s", out.get("status"))
+        return out
 
     def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
-        return self.runtime.delete_node(pipeline_id, node_id)
+        logger.debug("delete_node pipeline_id=%s node_id=%s", pipeline_id, node_id)
+        out = self.runtime.delete_node(pipeline_id, node_id)
+        logger.debug(
+            "delete_node -> deleted_nodes=%s deleted_artifacts=%s",
+            len(out.get("deleted_node_ids", [])),
+            len(out.get("deleted_artifact_ids", [])),
+        )
+        return out
 
     def apply_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
-        return self.runtime.apply_node(pipeline_id, node_id)
+        logger.debug("apply_node pipeline_id=%s node_id=%s", pipeline_id, node_id)
+        out = self.runtime.apply_node(pipeline_id, node_id)
+        artifact = out.get("artifact") if isinstance(out, dict) else None
+        artifact_keys = _payload_keys(artifact if isinstance(artifact, dict) else {})
+        logger.debug("apply_node -> keys=%s artifact_keys=%s", _payload_keys(out), artifact_keys)
+        return out
 
     def get_node_result(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
-        return self.runtime.get_result(pipeline_id, node_id)
+        logger.debug("get_node_result pipeline_id=%s node_id=%s", pipeline_id, node_id)
+        out = self.runtime.get_result(pipeline_id, node_id)
+        payload = out.get("payload") if isinstance(out, dict) else None
+        logger.debug(
+            "get_node_result -> artifact_keys=%s payload_keys=%s",
+            _payload_keys(out),
+            _payload_keys(payload if isinstance(payload, dict) else {}),
+        )
+        return out
 
     def get_catalog(self) -> dict[str, Any]:
-        return self.runtime.get_catalog()
+        out = self.runtime.get_catalog()
+        logger.debug(
+            "get_catalog -> tasks=%s schemas=%s utilities=%s",
+            len(out.get("analysis_tasks", [])),
+            len((out.get("analysis_schemas") or {}).keys()),
+            len(out.get("utility_nodes", [])),
+        )
+        return out
 
     def export_pipeline(self, pipeline_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
         out_path = str(payload.get("path") or f"./{pipeline_id}.pipeline.json")
+        logger.debug("export_pipeline pipeline_id=%s path=%s", pipeline_id, out_path)
         snapshot = self.store.snapshot(pipeline_id)
         written = save_snapshot(snapshot, out_path)
+        logger.debug("export_pipeline -> path=%s", written)
         return {"path": written}
 
     def load_pipeline_snapshot(self, payload: dict[str, Any]) -> dict[str, Any]:
         path = str(payload.get("path") or "")
         if not path:
             raise ValueError("Snapshot path is required")
+        logger.debug("load_pipeline_snapshot path=%s", path)
         snapshot = load_snapshot(path)
         pipeline = self.store.load_snapshot(snapshot)
+        logger.debug("load_pipeline_snapshot -> nodes=%s", len(pipeline.nodes))
         return pipeline.to_dict()
 
     def export_pipeline_bundle(self, pipeline_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}
         out_dir = str(payload.get("path") or f"./{pipeline_id}.bundle")
         selected_node_id = payload.get("selected_node_id")
+        logger.debug(
+            "export_pipeline_bundle pipeline_id=%s out_dir=%s selected_node_id=%s",
+            pipeline_id,
+            out_dir,
+            selected_node_id,
+        )
         snapshot = self.store.snapshot(pipeline_id)
         selected_artifact = None
         if selected_node_id:
@@ -94,12 +183,14 @@ class WebUIApiService:
                     selected_artifact = self.store.get_artifact(pipeline_id, str(artifact_id)).__dict__
             except Exception:
                 selected_artifact = None
-        return export_bundle(
+        out = export_bundle(
             snapshot=snapshot,
             output_dir=out_dir,
             selected_node_id=str(selected_node_id) if selected_node_id else None,
             selected_artifact=selected_artifact,
         )
+        logger.debug("export_pipeline_bundle -> files=%s", sorted((out.get("files") or {}).keys()))
+        return out
 
 
 def create_fastapi_app():

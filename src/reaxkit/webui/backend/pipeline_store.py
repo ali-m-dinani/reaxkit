@@ -207,6 +207,15 @@ class PipelineStore:
     def _mark_descendants_dirty(self, pipeline_id: str, node_id: str) -> None:
         pipeline = self.get_pipeline(pipeline_id)
         queue = list(pipeline.children.get(node_id, []))
+        for candidate in pipeline.nodes.values():
+            if not isinstance(candidate, PipelineNode):
+                continue
+            req = candidate.request if isinstance(candidate.request, dict) else {}
+            meta = candidate.metadata if isinstance(candidate.metadata, dict) else {}
+            right_source_id = str(req.get("right_source_node_id") or "").strip()
+            source_node_ids = [str(v).strip() for v in (meta.get("source_node_ids") or []) if str(v).strip()]
+            if right_source_id == str(node_id) or str(node_id) in source_node_ids:
+                queue.append(candidate.id)
         while queue:
             child = queue.pop(0)
             child_node = pipeline.nodes.get(child)

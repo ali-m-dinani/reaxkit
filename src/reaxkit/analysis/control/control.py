@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Optional
 
 from reaxkit.analysis.base import AnalysisTask
@@ -73,9 +73,17 @@ def _get_control_data(
 class ControlValueRequest(BaseRequest):
     """Request for a single control-parameter lookup."""
 
-    key: str
-    section: Optional[str] = None
-    default: object = None
+    key: str = dc_field(
+        metadata={'label': 'Key', 'help': 'Key parameter for ControlValueRequest.'},
+    )
+    section: Optional[str] = dc_field(
+        default=None,
+        metadata={'label': 'Section', 'help': 'Section parameter for ControlValueRequest.'},
+    )
+    default: object = dc_field(
+        default=None,
+        metadata={'label': 'Default', 'help': 'Default parameter for ControlValueRequest.'},
+    )
 
 
 @dataclass

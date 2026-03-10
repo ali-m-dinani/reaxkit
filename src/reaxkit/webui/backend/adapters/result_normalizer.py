@@ -10,6 +10,8 @@ try:  # pragma: no cover - optional runtime dependency
 except Exception:  # pragma: no cover - fallback for minimal environments
     pd = None
 
+from reaxkit.webui.backend.tabular_payload import infer_columns, infer_numeric_columns
+
 
 def _serialize_value(value: Any) -> Any:
     if pd is not None:
@@ -48,36 +50,40 @@ def recommend_views(payload: dict[str, Any]) -> list[dict[str, Any]]:
             records = value
             break
     if records:
-        sample = records[0]
-        if {"frame_index", "msd"}.issubset(sample.keys()):
-            x_axis = "iter" if "iter" in sample else "frame_index"
-            views.append(
-                {
-                    "type": "plot",
-                    "label": "MSD vs Time",
-                    "x": x_axis,
-                    "y": "msd",
-                    "group_by": "atom_id" if "atom_id" in sample else None,
-                }
-            )
-            views.append({"type": "histogram", "label": "MSD Distribution", "value": "msd"})
-            views.append({"type": "3d", "label": "3D"})
-            return views
+        sample = records[0] if isinstance(records[0], dict) else {}
+        cols = infer_columns(records)
+        numeric_cols = infer_numeric_columns(records)
 
-        numeric_cols = []
-        for key, val in sample.items():
-            if isinstance(val, (int, float)):
-                numeric_cols.append(key)
-        if len(numeric_cols) >= 2:
+        x_pref = ("iter", "frame_index", "time", "step", "x")
+        x_col = next((name for name in x_pref if name in cols), numeric_cols[0] if numeric_cols else (cols[0] if cols else ""))
+        y_col = ""
+        for name in numeric_cols:
+            if name != x_col:
+                y_col = name
+                break
+        if not y_col and numeric_cols:
+            y_col = numeric_cols[0]
+
+        if x_col and y_col:
+            group_col = "atom_id" if "atom_id" in cols else None
             views.append(
                 {
                     "type": "plot",
-                    "label": "Recommended Plot",
-                    "x": numeric_cols[0],
-                    "y": numeric_cols[1],
+                    "label": f"{y_col} vs {x_col}",
+                    "x": x_col,
+                    "y": y_col,
+                    "group_by": group_col,
                 }
             )
-        if numeric_cols:
-            views.append({"type": "histogram", "label": "Histogram", "value": numeric_cols[0]})
+
+        hist_col = y_col or (numeric_cols[0] if numeric_cols else "")
+        if hist_col:
+            views.append({"type": "histogram", "label": f"{hist_col} Distribution", "value": hist_col})
+
+        if len(numeric_cols) >= 3 or {"x", "y", "z"}.issubset(set(cols)):
+            z_col = "z" if "z" in cols else (numeric_cols[2] if len(numeric_cols) > 2 else y_col)
+            if x_col and y_col and z_col:
+                views.append({"type": "3d", "label": "3D", "x": x_col, "y": y_col, "z": z_col})
+                return views
     views.append({"type": "3d", "label": "3D"})
     return views

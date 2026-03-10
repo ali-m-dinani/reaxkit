@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Optional, Sequence
 
 import pandas as pd
@@ -40,7 +40,10 @@ def _error_series_across_epochs(data: ForceFieldOptimizationProgressData) -> lis
 class ForceFieldOptimizationRequest(BaseRequest):
     """Request for fort.13 optimization error data."""
 
-    epochs: Optional[Sequence[int]] = None
+    epochs: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Epochs', 'help': 'Epochs parameter for ForceFieldOptimizationRequest.'},
+    )
 
 
 @dataclass

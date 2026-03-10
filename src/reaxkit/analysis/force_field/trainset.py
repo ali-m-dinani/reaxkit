@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 
 import pandas as pd
 
@@ -48,7 +48,10 @@ def _get_trainset_group_comments(
 class TrainsetGroupCommentsRequest(BaseRequest):
     """Request for unique trainset group comments."""
 
-    sort: bool = False
+    sort: bool = dc_field(
+        default=False,
+        metadata={'label': 'Sort', 'help': 'Sort parameter for TrainsetGroupCommentsRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

@@ -22,8 +22,12 @@ def render_single_plot(
         fig.update_layout(title="No plottable data")
         return fig
 
-    use_x = x_col or spec.mapping.get("x_col") or ("iter" if "iter" in rows[0] else "frame_index")
-    use_y = y_col or spec.mapping.get("y_col") or ("msd" if "msd" in rows[0] else None)
+    cols = [str(col) for col in rows[0].keys()]
+    numeric_cols = _numeric_columns(rows)
+    use_x = x_col or spec.mapping.get("x_col") or ("iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (cols[0] if cols else "")))
+    use_y = y_col or spec.mapping.get("y_col")
+    if not use_y:
+        use_y = next((col for col in numeric_cols if col != use_x), numeric_cols[0] if numeric_cols else None)
     use_group = group_col or spec.mapping.get("group_by_col") or ""
     if not use_y:
         fig.update_layout(title="No Y column selected")
@@ -59,3 +63,20 @@ def render_single_plot(
         showlegend=bool(spec.options.get("legend", bool(use_group))),
     )
     return fig
+
+
+def _numeric_columns(rows: list[dict[str, Any]], *, sample_size: int = 50) -> list[str]:
+    if not rows:
+        return []
+    cols = [str(col) for col in rows[0].keys()]
+    sample = rows[: max(1, int(sample_size))]
+    out: list[str] = []
+    for col in cols:
+        for row in sample:
+            val = row.get(col)
+            if isinstance(val, bool):
+                continue
+            if isinstance(val, (int, float)):
+                out.append(col)
+                break
+    return out

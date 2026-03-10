@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Literal, Optional, Sequence
 
 import pandas as pd
@@ -56,8 +56,13 @@ def _get_vels_data(
 class AtomicKinematicsRequest(BaseRequest):
     """Request for selected atomic kinematics data."""
 
-    key: KinematicsKey
-    atoms: Optional[Sequence[int]] = None
+    key: KinematicsKey = dc_field(
+        metadata={'label': 'Key', 'help': 'Key parameter for AtomicKinematicsRequest.'},
+    )
+    atoms: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atoms', 'help': 'Atoms parameter for AtomicKinematicsRequest.'},
+    )
 
 
 @dataclass

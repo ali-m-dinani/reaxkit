@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Any, Optional, Sequence, Union
 
 import numpy as np
@@ -20,12 +20,30 @@ from reaxkit.presentation.specs import PresentationSpec
 class MSDRequest(BaseRequest):
     """Request for MSD analysis."""
 
-    atom_ids: Optional[list[int]] = None
-    atom_types: Optional[list[str]] = None
-    dims: Sequence[str] = ("x", "y", "z")
-    origin: Union[str, int] = "first"
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    atom_ids: Optional[list[int]] = dc_field(
+        default=None,
+        metadata={"label": "Atom IDs", "help": "Atom IDs to include. Empty means all atoms.", "units": "index"},
+    )
+    atom_types: Optional[list[str]] = dc_field(
+        default=None,
+        metadata={"label": "Atom types", "help": "Element symbols to include when atom_ids is empty."},
+    )
+    dims: Sequence[str] = dc_field(
+        default=("x", "y", "z"),
+        metadata={"label": "Dimensions", "help": "Coordinate axes used in MSD calculation.", "choices": ["x", "y", "z"]},
+    )
+    origin: Union[str, int] = dc_field(
+        default="first",
+        metadata={"label": "Reference origin", "help": "Reference frame: 'first' or an explicit frame index."},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Frames", "help": "Frame indices to evaluate. Empty means all frames.", "units": "frame_index"},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={"label": "Stride", "help": "Stride over selected frames.", "min": 1, "units": "frames"},
+    )
 
 
 @dataclass

@@ -8,6 +8,8 @@ from typing import Any
 from datetime import datetime, timezone
 import csv
 
+from reaxkit.webui.backend.tabular_payload import extract_tabular_rows
+
 
 def save_snapshot(snapshot: dict[str, Any], path: str) -> str:
     """Persist a pipeline snapshot as JSON."""
@@ -54,12 +56,7 @@ def export_bundle(
         manifest["files"]["selected_result_json"] = str(artifact_json)
 
         payload = selected_artifact.get("payload", {})
-        rows = None
-        if isinstance(payload, dict):
-            for value in payload.values():
-                if isinstance(value, list) and value and isinstance(value[0], dict):
-                    rows = value
-                    break
+        rows = extract_tabular_rows(payload if isinstance(payload, dict) else None)
         if rows:
             csv_path = root / "selected_result.csv"
             with csv_path.open("w", encoding="utf-8", newline="") as fh:

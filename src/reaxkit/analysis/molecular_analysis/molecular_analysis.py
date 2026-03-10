@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 import re
 from typing import Optional, Sequence
 
@@ -25,10 +25,22 @@ def _selected_iterations(data: MolecularAnalysisData, frames: Optional[Sequence[
 
 @dataclass
 class DominantSpeciesRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    top_n: int = 1
-    min_freq: float = 0.0
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for DominantSpeciesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for DominantSpeciesRequest.', 'min': 1, 'units': 'frames'},
+    )
+    top_n: int = dc_field(
+        default=1,
+        metadata={'label': 'Top N', 'help': 'Top N parameter for DominantSpeciesRequest.', 'min': 1},
+    )
+    min_freq: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Freq', 'help': 'Min Freq parameter for DominantSpeciesRequest.', 'min': 0.0},
+    )
 
 
 @dataclass
@@ -38,10 +50,22 @@ class DominantSpeciesResult(BaseResult):
 
 @dataclass
 class MoleculeLifetimeRequest(BaseRequest):
-    molecules: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    min_freq: float = 1.0
+    molecules: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Molecules', 'help': 'Molecules parameter for MoleculeLifetimeRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for MoleculeLifetimeRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for MoleculeLifetimeRequest.', 'min': 1, 'units': 'frames'},
+    )
+    min_freq: float = dc_field(
+        default=1.0,
+        metadata={'label': 'Min Freq', 'help': 'Min Freq parameter for MoleculeLifetimeRequest.', 'min': 0.0},
+    )
 
 
 @dataclass
@@ -52,8 +76,14 @@ class MoleculeLifetimeResult(BaseResult):
 
 @dataclass
 class LargestMoleculeByMassRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for LargestMoleculeByMassRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for LargestMoleculeByMassRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
@@ -63,8 +93,14 @@ class LargestMoleculeByMassResult(BaseResult):
 
 @dataclass
 class LargestMoleculeCompositionRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for LargestMoleculeCompositionRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for LargestMoleculeCompositionRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -152,13 +152,34 @@ def _interpret_params(
 class ForceFieldOptimizationParameterRequest(BaseRequest):
     """Request for raw or interpreted params data."""
 
-    sort_by: Optional[str] = None
-    ascending: bool = True
-    drop_duplicate: bool = True
-    interpret: bool = False
-    force_field: Optional[ForceFieldParametersData] = None
-    add_term: bool = True
-    sep: str = "-"
+    sort_by: Optional[str] = dc_field(
+        default=None,
+        metadata={'label': 'Sort By', 'help': 'Sort By parameter for ForceFieldOptimizationParameterRequest.'},
+    )
+    ascending: bool = dc_field(
+        default=True,
+        metadata={'label': 'Ascending', 'help': 'Ascending parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
+    )
+    drop_duplicate: bool = dc_field(
+        default=True,
+        metadata={'label': 'Drop Duplicate', 'help': 'Drop Duplicate parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
+    )
+    interpret: bool = dc_field(
+        default=False,
+        metadata={'label': 'Interpret', 'help': 'Interpret parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
+    )
+    force_field: Optional[ForceFieldParametersData] = dc_field(
+        default=None,
+        metadata={'label': 'Force Field', 'help': 'Force Field parameter for ForceFieldOptimizationParameterRequest.'},
+    )
+    add_term: bool = dc_field(
+        default=True,
+        metadata={'label': 'Add Term', 'help': 'Add Term parameter for ForceFieldOptimizationParameterRequest.', 'choices': [True, False]},
+    )
+    sep: str = dc_field(
+        default="-",
+        metadata={'label': 'Sep', 'help': 'Sep parameter for ForceFieldOptimizationParameterRequest.'},
+    )
 
 
 @dataclass

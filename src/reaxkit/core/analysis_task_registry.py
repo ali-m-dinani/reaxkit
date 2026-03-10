@@ -12,6 +12,16 @@ def register_task(name: str) -> Callable:
 
     def wrapper(cls):
         TASK_REGISTRY[name] = cls
+        setattr(cls, "_reaxkit_task_name", str(name))
+        if "recommended_presentations" not in cls.__dict__:
+            task_name = str(name)
+
+            def _recommended_presentations(_result, payload):
+                from reaxkit.analysis.base import default_recommended_presentations
+
+                return default_recommended_presentations(payload, task_name=task_name)
+
+            cls.recommended_presentations = staticmethod(_recommended_presentations)
         return cls
 
     return wrapper

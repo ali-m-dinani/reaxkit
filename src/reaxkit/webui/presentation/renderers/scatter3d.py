@@ -24,9 +24,15 @@ def render_scatter3d(
         return fig
 
     cols = list(rows[0].keys())
-    use_x = x_col or spec.mapping.get("x_col") or ("x" if "x" in cols else ("iter" if "iter" in cols else "frame_index"))
-    use_y = y_col or spec.mapping.get("y_col") or ("y" if "y" in cols else ("atom_id" if "atom_id" in cols else use_x))
-    use_z = z_col or spec.mapping.get("z_col") or ("z" if "z" in cols else ("msd" if "msd" in cols else use_y))
+    numeric_cols = _numeric_columns(rows)
+    use_x = x_col or spec.mapping.get("x_col") or ("x" if "x" in cols else ("iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (numeric_cols[0] if numeric_cols else cols[0]))))
+    use_y = y_col or spec.mapping.get("y_col") or ("y" if "y" in cols else next((col for col in numeric_cols if col != use_x), use_x))
+    use_z = z_col or spec.mapping.get("z_col")
+    if not use_z:
+        if "z" in cols:
+            use_z = "z"
+        else:
+            use_z = next((col for col in numeric_cols if col not in {use_x, use_y}), use_y)
     use_color = color_col or spec.mapping.get("color_col") or ""
 
     xvals: list[float] = []
@@ -60,3 +66,20 @@ def render_scatter3d(
         scene={"xaxis_title": use_x, "yaxis_title": use_y, "zaxis_title": use_z},
     )
     return fig
+
+
+def _numeric_columns(rows: list[dict[str, Any]], *, sample_size: int = 50) -> list[str]:
+    if not rows:
+        return []
+    cols = [str(col) for col in rows[0].keys()]
+    sample = rows[: max(1, int(sample_size))]
+    out: list[str] = []
+    for col in cols:
+        for row in sample:
+            val = row.get(col)
+            if isinstance(val, bool):
+                continue
+            if isinstance(val, (int, float)):
+                out.append(col)
+                break
+    return out

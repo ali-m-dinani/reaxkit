@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Any, Literal, Optional, Sequence
 
 import numpy as np
@@ -32,13 +32,34 @@ AggregateKind = Optional[Literal["mean", "max", "min", "last"]]
 class DipoleRequest(BaseRequest):
     """Request for dipole analysis."""
 
-    scope: Scope = "total"
-    atom_ids: Optional[Sequence[int]] = None
-    atom_types: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    min_bo: float = 0.0
-    scale_neighbor_charges: bool = True
+    scope: Scope = dc_field(
+        default="total",
+        metadata={'label': 'Scope', 'help': 'Scope parameter for DipoleRequest.'},
+    )
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for DipoleRequest.', 'units': 'index'},
+    )
+    atom_types: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for DipoleRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for DipoleRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for DipoleRequest.', 'min': 1, 'units': 'frames'},
+    )
+    min_bo: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for DipoleRequest.', 'min': 0.0},
+    )
+    scale_neighbor_charges: bool = dc_field(
+        default=True,
+        metadata={'label': 'Scale Neighbor Charges', 'help': 'Scale Neighbor Charges parameter for DipoleRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass
@@ -52,14 +73,38 @@ class DipoleResult(BaseResult):
 class PolarizationRequest(BaseRequest):
     """Request for polarization analysis."""
 
-    scope: Scope = "total"
-    atom_ids: Optional[Sequence[int]] = None
-    atom_types: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    volume_method: Optional[VolumeMethod] = None
-    min_bo: float = 0.0
-    scale_neighbor_charges: bool = True
+    scope: Scope = dc_field(
+        default="total",
+        metadata={'label': 'Scope', 'help': 'Scope parameter for PolarizationRequest.'},
+    )
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for PolarizationRequest.', 'units': 'index'},
+    )
+    atom_types: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for PolarizationRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for PolarizationRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for PolarizationRequest.', 'min': 1, 'units': 'frames'},
+    )
+    volume_method: Optional[VolumeMethod] = dc_field(
+        default=None,
+        metadata={'label': 'Volume Method', 'help': 'Volume Method parameter for PolarizationRequest.'},
+    )
+    min_bo: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for PolarizationRequest.', 'min': 0.0},
+    )
+    scale_neighbor_charges: bool = dc_field(
+        default=True,
+        metadata={'label': 'Scale Neighbor Charges', 'help': 'Scale Neighbor Charges parameter for PolarizationRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass
@@ -73,13 +118,34 @@ class PolarizationResult(BaseResult):
 class PolarizationFieldRequest(BaseRequest):
     """Request for polarization-electric field hysteresis analysis."""
 
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    aggregate: AggregateKind = None
-    field_component: str = "field_z"
-    x_variable: str = "field_z"
-    y_variable: str = "P_z (uC/cm^2)"
-    field_scale: float = const("electric_field_VA_to_MVcm")
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for PolarizationFieldRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for PolarizationFieldRequest.', 'min': 1, 'units': 'frames'},
+    )
+    aggregate: AggregateKind = dc_field(
+        default=None,
+        metadata={'label': 'Aggregate', 'help': 'Aggregate parameter for PolarizationFieldRequest.'},
+    )
+    field_component: str = dc_field(
+        default="field_z",
+        metadata={'label': 'Field Component', 'help': 'Field Component parameter for PolarizationFieldRequest.'},
+    )
+    x_variable: str = dc_field(
+        default="field_z",
+        metadata={'label': 'X Variable', 'help': 'X Variable parameter for PolarizationFieldRequest.'},
+    )
+    y_variable: str = dc_field(
+        default="P_z (uC/cm^2)",
+        metadata={'label': 'Y Variable', 'help': 'Y Variable parameter for PolarizationFieldRequest.'},
+    )
+    field_scale: float = dc_field(
+        default=const("electric_field_VA_to_MVcm"),
+        metadata={'label': 'Field Scale', 'help': 'Field Scale parameter for PolarizationFieldRequest.'},
+    )
 
 
 @dataclass

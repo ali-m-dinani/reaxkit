@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Optional, Sequence
 
-import freud
 import numpy as np
 import pandas as pd
 
@@ -15,22 +14,79 @@ from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
 
+_RDF_PROPERTY_CHOICES = ("first_peak", "dominant_peak", "area", "excess_area")
+
 
 @dataclass
 class RDFRequest(BaseRequest):
     """Request for RDF curve analysis."""
 
-    atom_ids_a: Optional[Sequence[int]] = None
-    atom_ids_b: Optional[Sequence[int]] = None
-    atom_types_a: Optional[Sequence[str]] = None
-    atom_types_b: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    bins: int = 200
-    r_max: Optional[float] = None
-    average: bool = True
-    return_stack: bool = False
-    backend: str = "freud"  # freud | ovito
+    atom_ids_a: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Group A atom IDs", "help": "Atom IDs for group A. Empty means all atoms.", "units": "index"},
+    )
+    atom_ids_b: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Group B atom IDs", "help": "Atom IDs for group B. Empty means all atoms.", "units": "index"},
+    )
+    atom_types_a: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={"label": "Group A atom types", "help": "Element symbols for group A when atom_ids_a is empty."},
+    )
+    atom_types_b: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={"label": "Group B atom types", "help": "Element symbols for group B when atom_ids_b is empty."},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Frames", "help": "Frame indices to include. Empty means all frames.", "units": "frame_index"},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={"label": "Stride", "help": "Stride over selected frames.", "min": 1, "units": "frames"},
+    )
+    bins: int = dc_field(
+        default=200,
+        metadata={"label": "Number of bins", "help": "Number of radial bins.", "min": 1, "max": 5000, "units": "bins"},
+    )
+    r_max: Optional[float] = dc_field(
+        default=None,
+        metadata={
+            "label": "Maximum radius",
+            "help": "Maximum radius. Empty uses half of the shortest box length.",
+            "min": 0.0,
+            "max": 20.0,
+            "units": "distance",
+        },
+    )
+    average: bool = dc_field(
+        default=True,
+        metadata={"label": "Average across frames", "help": "If true, return frame-averaged RDF.", "choices": [True, False]},
+    )
+    return_stack: bool = dc_field(
+        default=False,
+        metadata={"label": "Return per-frame stack", "help": "If true, include per-frame RDF values.", "choices": [True, False]},
+    )
+    backend: str = dc_field(
+        default="freud",
+        metadata={"label": "RDF backend", "help": "RDF computation backend.", "choices": ["freud", "ovito"]},
+    )
+    include_properties: bool = dc_field(
+        default=False,
+        metadata={
+            "label": "Include RDF properties",
+            "help": "If true, also compute RDF-derived properties from each selected frame.",
+            "choices": [True, False],
+        },
+    )
+    properties: Sequence[str] = dc_field(
+        default=("first_peak", "dominant_peak", "area", "excess_area"),
+        metadata={
+            "label": "RDF properties",
+            "help": "RDF-derived properties to compute.",
+            "choices": list(_RDF_PROPERTY_CHOICES),
+        },
+    )
 
 
 @dataclass
@@ -38,22 +94,63 @@ class RDFResult(BaseResult):
     """Result of RDF curve analysis."""
 
     table: pd.DataFrame
+    properties: Optional[pd.DataFrame] = None
 
 
 @dataclass
 class RDFPropertyRequest(BaseRequest):
     """Request for RDF-derived property analysis."""
 
-    property: str = "first_peak"  # first_peak | dominant_peak | area | excess_area
-    atom_ids_a: Optional[Sequence[int]] = None
-    atom_ids_b: Optional[Sequence[int]] = None
-    atom_types_a: Optional[Sequence[str]] = None
-    atom_types_b: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    bins: int = 200
-    r_max: Optional[float] = None
-    backend: str = "freud"  # freud | ovito
+    property: str = dc_field(
+        default="first_peak",
+        metadata={
+            "label": "Property",
+            "help": "RDF-derived property to compute from g(r).",
+            "choices": ["first_peak", "dominant_peak", "area", "excess_area"],
+        },
+    )
+    atom_ids_a: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Group A atom IDs", "help": "Atom IDs for group A. Empty means all atoms.", "units": "index"},
+    )
+    atom_ids_b: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Group B atom IDs", "help": "Atom IDs for group B. Empty means all atoms.", "units": "index"},
+    )
+    atom_types_a: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={"label": "Group A atom types", "help": "Element symbols for group A when atom_ids_a is empty."},
+    )
+    atom_types_b: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={"label": "Group B atom types", "help": "Element symbols for group B when atom_ids_b is empty."},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={"label": "Frames", "help": "Frame indices to include. Empty means all frames.", "units": "frame_index"},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={"label": "Stride", "help": "Stride over selected frames.", "min": 1, "units": "frames"},
+    )
+    bins: int = dc_field(
+        default=200,
+        metadata={"label": "Number of bins", "help": "Number of radial bins.", "min": 1, "max": 5000, "units": "bins"},
+    )
+    r_max: Optional[float] = dc_field(
+        default=None,
+        metadata={
+            "label": "Maximum radius",
+            "help": "Maximum radius. Empty uses half of the shortest box length.",
+            "min": 0.0,
+            "max": 20.0,
+            "units": "distance",
+        },
+    )
+    backend: str = dc_field(
+        default="freud",
+        metadata={"label": "RDF backend", "help": "RDF computation backend.", "choices": ["freud", "ovito"]},
+    )
 
 
 @dataclass
@@ -61,6 +158,72 @@ class RDFPropertyResult(BaseResult):
     """Result of RDF-derived property analysis."""
 
     table: pd.DataFrame
+
+
+def _normalize_property_selection(properties: Optional[Sequence[str]]) -> list[str]:
+    if properties is None:
+        selected = list(_RDF_PROPERTY_CHOICES)
+    elif isinstance(properties, str):
+        selected = [properties]
+    else:
+        selected = [str(p) for p in properties]
+
+    normalized: list[str] = []
+    for item in selected:
+        key = str(item).strip().lower()
+        if key == "all":
+            return list(_RDF_PROPERTY_CHOICES)
+        if key and key not in normalized:
+            normalized.append(key)
+    if not normalized:
+        return list(_RDF_PROPERTY_CHOICES)
+
+    invalid = [p for p in normalized if p not in _RDF_PROPERTY_CHOICES]
+    if invalid:
+        raise ValueError(f"Unknown RDF property selection: {invalid}. Allowed: {list(_RDF_PROPERTY_CHOICES)}")
+    return normalized
+
+
+def _rdf_properties_for_curve(r: np.ndarray, g: np.ndarray, selected: Sequence[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    selected_set = set(selected)
+    if "first_peak" in selected_set:
+        rp, gp = _first_local_max(r, g)
+        out["r_first_peak"] = rp
+        out["g_first_peak"] = gp
+    if "dominant_peak" in selected_set:
+        rp, gp = _dominant_peak(r, g)
+        out["r_peak"] = rp
+        out["g_peak"] = gp
+    if "area" in selected_set:
+        out["area"] = float(np.trapezoid(g, r)) if len(r) else np.nan
+    if "excess_area" in selected_set:
+        out["excess_area"] = float(np.trapezoid(g - 1.0, r)) if len(r) else np.nan
+    return out
+
+
+def _build_properties_table(
+    data: TrajectoryData,
+    *,
+    r_ref: np.ndarray,
+    stack: list[np.ndarray],
+    frame_idx: list[int],
+    selected_properties: Sequence[str],
+) -> pd.DataFrame:
+    if len(r_ref) == 0 or not stack:
+        cols = ["frame_index", "iter"]
+        sample = _rdf_properties_for_curve(np.array([], dtype=float), np.array([], dtype=float), selected_properties)
+        cols.extend(list(sample.keys()))
+        return pd.DataFrame(columns=cols)
+
+    rows: list[dict[str, float | int]] = []
+    for j, i in enumerate(frame_idx):
+        r = r_ref
+        g = stack[j]
+        out = _rdf_properties_for_curve(r, g, selected_properties)
+        iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
+        rows.append({"frame_index": int(i), "iter": iter_val, **out})
+    return pd.DataFrame(rows).sort_values("frame_index").reset_index(drop=True)
 
 
 def _dominant_peak(r: np.ndarray, g: np.ndarray) -> tuple[float, float]:
@@ -102,6 +265,13 @@ def _frame_grid_and_rdf_freud(
     bins: int,
     r_max: Optional[float],
 ) -> tuple[np.ndarray, np.ndarray]:
+    try:
+        import freud
+    except Exception as e:
+        raise ImportError(
+            "freud backend is not available. Install it or set backend='ovito'."
+        ) from e
+
     sim = data.simulation
     if sim is None or sim.cell_lengths is None:
         raise ValueError("TrajectoryData.simulation.cell_lengths is required for RDF analysis.")
@@ -119,8 +289,22 @@ def _frame_grid_and_rdf_freud(
         alpha = beta = gamma = 90.0
 
     a, b, c = float(cell_l[0]), float(cell_l[1]), float(cell_l[2])
+    half_box = 0.5 * float(min(a, b, c))
+    # Freud AABBQuery can fail when r_max is at/above half-box; keep a small safety margin.
+    max_safe_r = max(0.0, half_box - 1e-6)
+    if max_safe_r <= 0.0:
+        raise ValueError("Cell is too small for RDF cutoff selection.")
     if r_max is None:
-        r_max = 0.5 * float(min(a, b, c))
+        r_eff = max_safe_r
+    else:
+        try:
+            r_eff = float(r_max)
+        except Exception:
+            r_eff = max_safe_r
+        if r_eff > max_safe_r:
+            r_eff = max_safe_r
+        if r_eff <= 0.0:
+            raise ValueError("r_max must be > 0.")
 
     box = freud.box.Box.from_box_lengths_and_angles(
         a, b, c, np.radians(float(alpha)), np.radians(float(beta)), np.radians(float(gamma))
@@ -130,7 +314,7 @@ def _frame_grid_and_rdf_freud(
     a_coords = coords[a_mask]
     b_coords = coords[b_mask]
 
-    rdf = freud.density.RDF(bins=int(bins), r_max=float(r_max))
+    rdf = freud.density.RDF(bins=int(bins), r_max=float(r_eff))
     rdf.compute((box, b_coords), query_points=a_coords)
 
     r = rdf.bin_centers.copy()
@@ -302,6 +486,7 @@ class RDFTask(AnalysisTask):
     required_data = TrajectoryData
 
     def run(self, data: TrajectoryData, request: RDFRequest, reporter=None) -> RDFResult:
+        selected_properties = _normalize_property_selection(request.properties)
         r_ref, stack, frame_idx = _compute_rdfs(
             data,
             atom_ids_a=request.atom_ids_a,
@@ -315,22 +500,42 @@ class RDFTask(AnalysisTask):
             backend=request.backend,
             reporter=reporter,
         )
+        properties_table: Optional[pd.DataFrame] = None
         if len(r_ref) == 0 or not stack:
-            return RDFResult(table=pd.DataFrame(columns=["r", "g"]))
+            if request.include_properties:
+                properties_table = _build_properties_table(
+                    data,
+                    r_ref=np.array([], dtype=float),
+                    stack=[],
+                    frame_idx=[],
+                    selected_properties=selected_properties,
+                )
+            return RDFResult(table=pd.DataFrame(columns=["r", "g"]), properties=properties_table)
 
+        table: pd.DataFrame
         if request.average:
             g_out = np.mean(np.vstack(stack), axis=0)
-            return RDFResult(table=pd.DataFrame({"r": r_ref, "g": g_out}))
-
-        if request.return_stack:
+            table = pd.DataFrame({"r": r_ref, "g": g_out})
+        elif request.return_stack:
             rows: list[dict] = []
             for j, i in enumerate(frame_idx):
                 iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
                 for rr, gg in zip(r_ref, stack[j]):
                     rows.append({"frame_index": int(i), "iter": iter_val, "r": float(rr), "g": float(gg)})
-            return RDFResult(table=pd.DataFrame(rows))
+            table = pd.DataFrame(rows)
+        else:
+            table = pd.DataFrame({"r": r_ref, "g": stack[-1]})
 
-        return RDFResult(table=pd.DataFrame({"r": r_ref, "g": stack[-1]}))
+        if request.include_properties:
+            properties_table = _build_properties_table(
+                data,
+                r_ref=r_ref,
+                stack=stack,
+                frame_idx=frame_idx,
+                selected_properties=selected_properties,
+            )
+
+        return RDFResult(table=table, properties=properties_table)
 
 
 @register_task("rdf_property")
@@ -340,47 +545,27 @@ class RDFPropertyTask(AnalysisTask):
     required_data = TrajectoryData
 
     def run(self, data: TrajectoryData, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
-        prop = str(request.property).strip().lower()
-        allowed_props = {"first_peak", "dominant_peak", "area", "excess_area"}
-        if prop not in allowed_props:
-            raise ValueError(f"property must be one of {allowed_props}")
-
-        r_ref, stack, frame_idx = _compute_rdfs(
+        prop = _normalize_property_selection([request.property])[0]
+        rdf_result = RDFTask().run(
             data,
-            atom_ids_a=request.atom_ids_a,
-            atom_ids_b=request.atom_ids_b,
-            atom_types_a=request.atom_types_a,
-            atom_types_b=request.atom_types_b,
-            frames=request.frames,
-            every=request.every,
-            bins=request.bins,
-            r_max=request.r_max,
-            backend=request.backend,
+            RDFRequest(
+                atom_ids_a=request.atom_ids_a,
+                atom_ids_b=request.atom_ids_b,
+                atom_types_a=request.atom_types_a,
+                atom_types_b=request.atom_types_b,
+                frames=request.frames,
+                every=request.every,
+                bins=request.bins,
+                r_max=request.r_max,
+                backend=request.backend,
+                include_properties=True,
+                properties=[prop],
+            ),
             reporter=reporter,
         )
-        if len(r_ref) == 0 or not stack:
+        if rdf_result.properties is None or rdf_result.properties.empty:
             return RDFPropertyResult(table=pd.DataFrame())
-
-        rows: list[dict] = []
-        for j, i in enumerate(frame_idx):
-            r = r_ref
-            g = stack[j]
-            if prop == "first_peak":
-                rp, gp = _first_local_max(r, g)
-                out = {"r_first_peak": rp, "g_first_peak": gp}
-            elif prop == "dominant_peak":
-                rp, gp = _dominant_peak(r, g)
-                out = {"r_peak": rp, "g_peak": gp}
-            elif prop == "area":
-                out = {"area": float(np.trapezoid(g, r)) if len(r) else np.nan}
-            else:
-                out = {"excess_area": float(np.trapezoid(g - 1.0, r)) if len(r) else np.nan}
-
-            iter_val = int(data.iterations[i]) if data.iterations is not None else int(i)
-            rows.append({"frame_index": int(i), "iter": iter_val, **out})
-
-        table = pd.DataFrame(rows).sort_values("frame_index").reset_index(drop=True)
-        return RDFPropertyResult(table=table)
+        return RDFPropertyResult(table=rdf_result.properties.copy())
 
 
 __all__ = [

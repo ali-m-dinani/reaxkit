@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Mapping, Optional, Sequence
 
 import numpy as np
@@ -19,14 +19,38 @@ from reaxkit.domain.data_models import ConnectivityData
 class HybridizationStatusRequest(BaseRequest):
     """Request for per-atom hybridization status classification."""
 
-    hybridizations: Optional[Mapping[str, float]] = None
-    element_hybridizations: Optional[Mapping[str, Mapping[str, float]]] = None
-    target_elements: Optional[Sequence[str]] = None
-    target_atom_ids: Optional[Sequence[int]] = None
-    threshold: float = 0.3
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    require_defined_hybridization: bool = True
+    hybridizations: Optional[Mapping[str, float]] = dc_field(
+        default=None,
+        metadata={'label': 'Hybridizations', 'help': 'Hybridizations parameter for HybridizationStatusRequest.'},
+    )
+    element_hybridizations: Optional[Mapping[str, Mapping[str, float]]] = dc_field(
+        default=None,
+        metadata={'label': 'Element Hybridizations', 'help': 'Element Hybridizations parameter for HybridizationStatusRequest.'},
+    )
+    target_elements: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Target Elements', 'help': 'Target Elements parameter for HybridizationStatusRequest.'},
+    )
+    target_atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Target Atom Ids', 'help': 'Target Atom Ids parameter for HybridizationStatusRequest.'},
+    )
+    threshold: float = dc_field(
+        default=0.3,
+        metadata={'label': 'Threshold', 'help': 'Threshold parameter for HybridizationStatusRequest.', 'min': 0.0},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for HybridizationStatusRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for HybridizationStatusRequest.', 'min': 1, 'units': 'frames'},
+    )
+    require_defined_hybridization: bool = dc_field(
+        default=True,
+        metadata={'label': 'Require Defined Hybridization', 'help': 'Require Defined Hybridization parameter for HybridizationStatusRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

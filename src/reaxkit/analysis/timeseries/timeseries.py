@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal, Optional, Sequence
+from dataclasses import dataclass, field as dc_field
+from typing import Any, Literal, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -23,12 +23,94 @@ from reaxkit.domain.data_models import (
     SimulationData,
     TrajectoryData,
 )
+from reaxkit.presentation.specs import PresentationSpec
 from reaxkit.presentation.convert import convert_xaxis
 
 
 def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -> list[int]:
     idx = list(range(n_frames)) if frames is None else [int(i) for i in frames]
     return [i for i in idx if 0 <= i < n_frames][:: max(1, int(every))]
+
+
+def _rows_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = payload.get("table")
+    if not isinstance(rows, list):
+        return []
+    return [dict(row) for row in rows if isinstance(row, dict)]
+
+
+def _table_only_presentation() -> list[PresentationSpec]:
+    return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
+
+def _single_plot_presentation(
+    *,
+    x_col: str,
+    y_col: str,
+    label: str,
+    group_col: str = "",
+) -> PresentationSpec:
+    return PresentationSpec(
+        renderer="single_plot",
+        label=label,
+        mapping={"x_col": x_col, "y_col": y_col, "group_by_col": group_col},
+        options={
+            "title": label,
+            "xlabel": x_col,
+            "ylabel": y_col,
+            "legend": bool(group_col),
+        },
+        view_type="plot2d",
+    )
+
+
+def _value_series_presentations(
+    payload: dict[str, Any],
+    *,
+    y_col: str,
+    group_col: str = "",
+    label: str | None = None,
+    x_candidates: Sequence[str] = ("iter", "frame_index"),
+) -> list[PresentationSpec]:
+    rows = _rows_from_payload(payload)
+    if not rows:
+        return _table_only_presentation()
+    cols = {str(key) for key in rows[0].keys()}
+    x_col = next((candidate for candidate in x_candidates if candidate in cols), "")
+    if not x_col or y_col not in cols:
+        return _table_only_presentation()
+    return [
+        PresentationSpec(renderer="table", label="Table", view_type="table"),
+        _single_plot_presentation(
+            x_col=x_col,
+            y_col=y_col,
+            group_col=group_col if group_col in cols else "",
+            label=label or f"{y_col} vs {x_col}",
+        ),
+    ]
+
+
+def _wide_series_presentations(
+    payload: dict[str, Any],
+    *,
+    y_cols: Sequence[str],
+    label_prefix: str = "",
+    x_candidates: Sequence[str] = ("iter", "frame_index"),
+) -> list[PresentationSpec]:
+    rows = _rows_from_payload(payload)
+    if not rows:
+        return _table_only_presentation()
+    cols = {str(key) for key in rows[0].keys()}
+    x_col = next((candidate for candidate in x_candidates if candidate in cols), "")
+    if not x_col:
+        return _table_only_presentation()
+    views: list[PresentationSpec] = [PresentationSpec(renderer="table", label="Table", view_type="table")]
+    for y_col in y_cols:
+        if y_col not in cols:
+            continue
+        label = f"{label_prefix}{y_col} vs {x_col}" if label_prefix else f"{y_col} vs {x_col}"
+        views.append(_single_plot_presentation(x_col=x_col, y_col=y_col, label=label))
+    return views or _table_only_presentation()
 
 
 @dataclass
@@ -48,80 +130,238 @@ class TimeSeriesResult(BaseResult):
 
 
 @dataclass
+class SimulationScalarSeriesResult(TimeSeriesResult):
+    """Scalar simulation series with canonical long-form table output."""
+
+
+@dataclass
+class TrajectoryCoordinateSeriesResult(BaseResult):
+    """Trajectory coordinate series as a simple table result."""
+
+    table: pd.DataFrame = dc_field(default_factory=pd.DataFrame)
+
+
+@dataclass
+class CellDimensionsResult(TimeSeriesResult):
+    """Cell-dimension series with canonical long-form table output."""
+
+
+@dataclass
+class ChargeSeriesResult(TimeSeriesResult):
+    """Charge series with canonical long-form table output."""
+
+
+@dataclass
+class ElectricFieldSeriesResult(TimeSeriesResult):
+    """Electric-field series with canonical long-form table output."""
+
+
+@dataclass
+class EregimeSeriesResult(TimeSeriesResult):
+    """Eregime series with canonical long-form table output."""
+
+
+@dataclass
+class PartialEnergySeriesResult(TimeSeriesResult):
+    """Partial-energy series with canonical long-form table output."""
+
+
+@dataclass
+class RestraintSeriesResult(TimeSeriesResult):
+    """Restraint series with canonical table output."""
+
+
+@dataclass
+class MolecularFrequencySeriesResult(TimeSeriesResult):
+    """Molecular-frequency series with canonical long-form table output."""
+
+
+@dataclass
+class MolecularTotalsSeriesResult(TimeSeriesResult):
+    """Molecular totals series with canonical long-form table output."""
+
+
+@dataclass
 class SimulationScalarSeriesRequest(BaseRequest):
-    field: str
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    field: str = dc_field(
+        metadata={'label': 'Field', 'help': 'Field parameter for SimulationScalarSeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for SimulationScalarSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for SimulationScalarSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class TrajectoryCoordinateSeriesRequest(BaseRequest):
-    atom_ids: Optional[Sequence[int]] = None
-    atom_types: Optional[Sequence[str]] = None
-    dims: Sequence[str] = ("x",)
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for TrajectoryCoordinateSeriesRequest.', 'units': 'index'},
+    )
+    atom_types: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for TrajectoryCoordinateSeriesRequest.'},
+    )
+    dims: Sequence[str] = dc_field(
+        default=("x",),
+        metadata={'label': 'Dims', 'help': 'Dims parameter for TrajectoryCoordinateSeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for TrajectoryCoordinateSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for TrajectoryCoordinateSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class CellDimensionsRequest(BaseRequest):
-    fields: Sequence[str] = ("a", "b", "c")
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    fields: Sequence[str] = dc_field(
+        default=("a", "b", "c"),
+        metadata={'label': 'Fields', 'help': 'Fields parameter for CellDimensionsRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for CellDimensionsRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for CellDimensionsRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class ChargeSeriesRequest(BaseRequest):
-    atom_ids: Sequence[int]
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    atom_ids: Sequence[int] = dc_field(
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for ChargeSeriesRequest.', 'units': 'index'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for ChargeSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for ChargeSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class ElectricFieldSeriesRequest(BaseRequest):
-    components: Sequence[str]
-    field_kind: Literal["applied", "energy", "auto"] = "auto"
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    components: Sequence[str] = dc_field(
+        metadata={'label': 'Components', 'help': 'Components parameter for ElectricFieldSeriesRequest.'},
+    )
+    field_kind: Literal["applied", "energy", "auto"] = dc_field(
+        default="auto",
+        metadata={'label': 'Field Kind', 'help': 'Field Kind parameter for ElectricFieldSeriesRequest.', 'choices': ['applied', 'energy', 'auto']},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for ElectricFieldSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for ElectricFieldSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class EregimeSeriesRequest(BaseRequest):
-    field: str
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    field: str = dc_field(
+        metadata={'label': 'Field', 'help': 'Field parameter for EregimeSeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for EregimeSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for EregimeSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class PartialEnergySeriesRequest(BaseRequest):
-    components: Optional[Sequence[str]] = None
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    components: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Components', 'help': 'Components parameter for PartialEnergySeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for PartialEnergySeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for PartialEnergySeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class RestraintSeriesRequest(BaseRequest):
-    fields: Optional[Sequence[str]] = None
-    restraint_index: Optional[int] = None
-    dropna_rows: bool = False
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    fields: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Fields', 'help': 'Fields parameter for RestraintSeriesRequest.'},
+    )
+    restraint_index: Optional[int] = dc_field(
+        default=None,
+        metadata={'label': 'Restraint Index', 'help': 'Restraint Index parameter for RestraintSeriesRequest.'},
+    )
+    dropna_rows: bool = dc_field(
+        default=False,
+        metadata={'label': 'Dropna Rows', 'help': 'Dropna Rows parameter for RestraintSeriesRequest.', 'choices': [True, False]},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for RestraintSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for RestraintSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class MolecularFrequencySeriesRequest(BaseRequest):
-    molecules: Sequence[str]
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    molecules: Sequence[str] = dc_field(
+        metadata={'label': 'Molecules', 'help': 'Molecules parameter for MolecularFrequencySeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for MolecularFrequencySeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for MolecularFrequencySeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 @dataclass
 class MolecularTotalsSeriesRequest(BaseRequest):
-    quantities: Sequence[str] = ("total_molecules", "total_atoms", "total_molecular_mass")
-    xaxis: Literal["iter", "frame", "time"] = "iter"
-    control_file: str = "control"
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
+    quantities: Sequence[str] = dc_field(
+        default=("total_molecules", "total_atoms", "total_molecular_mass"),
+        metadata={'label': 'Quantities', 'help': 'Quantities parameter for MolecularTotalsSeriesRequest.'},
+    )
+    xaxis: Literal["iter", "frame", "time"] = dc_field(
+        default="iter",
+        metadata={'label': 'Xaxis', 'help': 'Xaxis parameter for MolecularTotalsSeriesRequest.', 'choices': ['iter', 'frame', 'time']},
+    )
+    control_file: str = dc_field(
+        default="control",
+        metadata={'label': 'Control File', 'help': 'Control File parameter for MolecularTotalsSeriesRequest.'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for MolecularTotalsSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for MolecularTotalsSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
 
 
 def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarray, str]:
@@ -178,7 +418,11 @@ class SimulationScalarSeriesTask(AnalysisTask):
 
     required_data = SimulationData
 
-    def run(self, data: SimulationData, request: SimulationScalarSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: SimulationScalarSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="value", group_col="field", label="value vs iter")
+
+    def run(self, data: SimulationData, request: SimulationScalarSeriesRequest, reporter=None) -> SimulationScalarSeriesResult:
         values, label = _simulation_field_array(data, request.field)
         n_frames = int(values.shape[0])
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
@@ -197,10 +441,19 @@ class SimulationScalarSeriesTask(AnalysisTask):
                 label=label,
             )
         ]
-        return TimeSeriesResult(
+        table = pd.DataFrame(
+            {
+                "frame_index": np.asarray(frame_idx, dtype=int),
+                "iter": iterations[frame_idx],
+                "field": label,
+                "value": np.asarray(values[frame_idx], dtype=float),
+            }
+        )
+        return SimulationScalarSeriesResult(
             series=series,
             x_label="iter",
             y_label=label,
+            table=table,
             metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
         )
 
@@ -210,8 +463,39 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
     """Build coordinate time series for one or more atoms."""
 
     required_data = TrajectoryData
+    VERSION = "2"
 
-    def run(self, data: TrajectoryData, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: TrajectoryCoordinateSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        rows = _rows_from_payload(payload)
+        if not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        cols = {str(key) for key in rows[0].keys()}
+        x_col = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else "")
+        if not x_col or "coord" not in cols:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        group_col = "series_label" if "series_label" in cols else ("direction" if "direction" in cols else "atom_id")
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label=f"coord vs {x_col}",
+                mapping={
+                    "x_col": x_col,
+                    "y_col": "coord",
+                    "group_by_col": group_col if group_col in cols else "",
+                },
+                options={
+                    "title": f"coord vs {x_col}",
+                    "xlabel": x_col,
+                    "ylabel": "coord",
+                    "legend": bool(group_col and group_col in cols),
+                },
+                view_type="plot2d",
+            ),
+        ]
+
+    def run(self, data: TrajectoryData, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TrajectoryCoordinateSeriesResult:
         dims = tuple(str(d).lower() for d in request.dims if str(d).lower() in {"x", "y", "z"})
         if not dims:
             raise ValueError("TrajectoryCoordinateSeriesRequest.dims must include at least one of: x, y, z.")
@@ -242,41 +526,29 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
             atom_indices = list(range(n_atoms))
             atom_ids = [int(a) for a in data.atom_ids]
 
-        rows = []
-        out: list[Series] = []
+        rows: list[dict[str, object]] = []
         dim_to_col = {"x": 0, "y": 1, "z": 2}
         for atom_id, atom_idx in zip(atom_ids, atom_indices):
-            atom_type = str(data.elements[atom_idx]) if atom_idx < len(data.elements) else ""
             for dim in dims:
                 col = dim_to_col[dim]
                 values = positions[frame_idx, atom_idx, col]
-                out.append(
-                    Series(
-                        x=iterations[frame_idx],
-                        y=np.asarray(values, dtype=float),
-                        label=f"atom[{atom_id}].{dim}",
+                for rel_i, fi in enumerate(frame_idx):
+                    rows.append(
+                        {
+                            "frame_index": int(fi),
+                            "iter": int(iterations[fi]),
+                            "atom_id": int(atom_id),
+                            "direction": str(dim),
+                            "coord": float(values[rel_i]),
+                        }
                     )
-                )
-            for rel_i, fi in enumerate(frame_idx):
-                rec = {
-                    "frame_index": int(fi),
-                    "iter": int(iterations[fi]),
-                    "atom_id": int(atom_id),
-                    "atom_type": atom_type,
-                }
-                for dim in dims:
-                    rec[dim] = float(positions[fi, atom_idx, dim_to_col[dim]])
-                rows.append(rec)
 
-        table = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"]).reset_index(drop=True)
+        table = pd.DataFrame(rows)
+        print(table.head())
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id", "direction"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
-            series=out,
-            x_label="iter",
-            y_label="coordinate",
-            table=table,
-            metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
-        )
+        return TrajectoryCoordinateSeriesResult(table=table)
 
 
 @register_task("cell_dimensions")
@@ -285,7 +557,11 @@ class CellDimensionsTask(AnalysisTask):
 
     required_data = SimulationData
 
-    def run(self, data: SimulationData, request: CellDimensionsRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: CellDimensionsResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="value", group_col="field", label="value vs iter")
+
+    def run(self, data: SimulationData, request: CellDimensionsRequest, reporter=None) -> CellDimensionsResult:
         if data.cell_lengths is not None:
             n_frames = len(data.cell_lengths)
         elif data.cell_angles is not None:
@@ -305,6 +581,7 @@ class CellDimensionsTask(AnalysisTask):
             else np.arange(n_frames, dtype=int)
         )
         tables: list[Series] = []
+        rows: list[dict[str, object]] = []
         for field in request.fields:
             values, label = _simulation_field_array(data, str(field))
             tables.append(
@@ -314,10 +591,23 @@ class CellDimensionsTask(AnalysisTask):
                     label=label,
                 )
             )
-        return TimeSeriesResult(
+            for rel_i, fi in enumerate(frame_idx):
+                rows.append(
+                    {
+                        "frame_index": int(fi),
+                        "iter": int(iterations[fi]),
+                        "field": str(label),
+                        "value": float(values[frame_idx][rel_i]),
+                    }
+                )
+        table = pd.DataFrame(rows)
+        if not table.empty:
+            table = table.sort_values(["frame_index", "field"], kind="stable").reset_index(drop=True)
+        return CellDimensionsResult(
             series=tables,
             x_label="iter",
             y_label="cell_dimension",
+            table=table,
             metadata={"frame_index": np.asarray(frame_idx, dtype=int), "iterations": iterations[frame_idx]},
         )
 
@@ -328,7 +618,11 @@ class ChargeSeriesTask(AnalysisTask):
 
     required_data = ChargeData
 
-    def run(self, data: ChargeData, request: ChargeSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: ChargeSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="charge", group_col="atom_id", label="charge vs iter")
+
+    def run(self, data: ChargeData, request: ChargeSeriesRequest, reporter=None) -> ChargeSeriesResult:
         charges = np.asarray(data.charges, dtype=float)
         if charges.ndim != 2:
             raise ValueError("ChargeData.charges must have shape (n_frames, n_atoms).")
@@ -381,7 +675,7 @@ class ChargeSeriesTask(AnalysisTask):
         if not table.empty:
             table = table.sort_values(["frame_index", "atom_id"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
+        return ChargeSeriesResult(
             series=out,
             x_label="iter",
             y_label="charge",
@@ -410,7 +704,7 @@ def _electric_field_group(
     return np.empty((0, 0), dtype=float), [], ""
 
 
-def _resolve_eregime_field(df: pd.DataFrame, name: str) -> str:
+def _resolve_eregime_dc_field(df: pd.DataFrame, name: str) -> str:
     if not name:
         raise ValueError("Column name is empty.")
 
@@ -486,7 +780,7 @@ def _restraint_frame(data: RestraintData) -> pd.DataFrame:
     return df
 
 
-def _resolve_restraint_field(df: pd.DataFrame, requested: str) -> str:
+def _resolve_restraint_dc_field(df: pd.DataFrame, requested: str) -> str:
     cols = [str(c) for c in df.columns]
     key = str(requested).strip().lower()
     if not key:
@@ -535,7 +829,7 @@ def _resolve_restraint_fields(df: pd.DataFrame, request: RestraintSeriesRequest)
         raise ValueError("RestraintSeriesRequest requires either fields or restraint_index.")
     resolved: list[str] = []
     for field in request.fields:
-        actual = _resolve_restraint_field(df, str(field))
+        actual = _resolve_restraint_dc_field(df, str(field))
         if actual not in resolved:
             resolved.append(actual)
     return resolved
@@ -547,7 +841,11 @@ class ElectricFieldSeriesTask(AnalysisTask):
 
     required_data = ElectricFieldData
 
-    def run(self, data: ElectricFieldData, request: ElectricFieldSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: ElectricFieldSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="value", group_col="component", label="value vs iter")
+
+    def run(self, data: ElectricFieldData, request: ElectricFieldSeriesRequest, reporter=None) -> ElectricFieldSeriesResult:
         frame_values: np.ndarray
         component_names: list[str]
         y_label: str
@@ -607,7 +905,7 @@ class ElectricFieldSeriesTask(AnalysisTask):
         if not table.empty:
             table = table.sort_values(["frame_index", "component"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
+        return ElectricFieldSeriesResult(
             series=out,
             x_label="iter",
             y_label=y_label,
@@ -622,7 +920,11 @@ class EregimeSeriesTask(AnalysisTask):
 
     required_data = EregimeData
 
-    def run(self, data: EregimeData, request: EregimeSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: EregimeSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="value", group_col="field", label="value vs iter")
+
+    def run(self, data: EregimeData, request: EregimeSeriesRequest, reporter=None) -> EregimeSeriesResult:
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         field_zones = np.asarray(data.field_zones, dtype=int).reshape(-1)
         field_dir = np.asarray(data.field_dir, dtype=object).reshape(-1)
@@ -635,7 +937,7 @@ class EregimeSeriesTask(AnalysisTask):
                 "field": field,
             }
         )
-        field_col = _resolve_eregime_field(df, request.field)
+        field_col = _resolve_eregime_dc_field(df, request.field)
         n_frames = iterations.shape[0]
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
 
@@ -654,7 +956,7 @@ class EregimeSeriesTask(AnalysisTask):
                 "value": df.iloc[frame_idx][field_col].to_numpy(),
             }
         )
-        return TimeSeriesResult(
+        return EregimeSeriesResult(
             series=series,
             x_label="iter",
             y_label=str(field_col),
@@ -669,7 +971,11 @@ class PartialEnergySeriesTask(AnalysisTask):
 
     required_data = PartialEnergyData
 
-    def run(self, data: PartialEnergyData, request: PartialEnergySeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(_result: PartialEnergySeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="value", group_col="component", label="value vs iter")
+
+    def run(self, data: PartialEnergyData, request: PartialEnergySeriesRequest, reporter=None) -> PartialEnergySeriesResult:
         df = _partial_energy_frame(data)
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -698,7 +1004,7 @@ class PartialEnergySeriesTask(AnalysisTask):
         if not table.empty:
             table = table.sort_values(["frame_index", "component"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
+        return PartialEnergySeriesResult(
             series=series,
             x_label="iter",
             y_label="partial_energy",
@@ -713,7 +1019,12 @@ class RestraintSeriesTask(AnalysisTask):
 
     required_data = RestraintData
 
-    def run(self, data: RestraintData, request: RestraintSeriesRequest, reporter=None) -> TimeSeriesResult:
+    @staticmethod
+    def recommended_presentations(result: RestraintSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        y_cols = [str(series.label) for series in result.series]
+        return _wide_series_presentations(payload, y_cols=y_cols)
+
+    def run(self, data: RestraintData, request: RestraintSeriesRequest, reporter=None) -> RestraintSeriesResult:
         df = _restraint_frame(data)
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -736,7 +1047,7 @@ class RestraintSeriesTask(AnalysisTask):
             y = pd.to_numeric(selected[field], errors="coerce").to_numpy(dtype=float)
             series.append(Series(x=selected_iters, y=y, label=str(field)))
 
-        return TimeSeriesResult(
+        return RestraintSeriesResult(
             series=series,
             x_label="iter",
             y_label="restraint",
@@ -751,12 +1062,16 @@ class MolecularFrequencySeriesTask(AnalysisTask):
 
     required_data = MolecularAnalysisData
 
+    @staticmethod
+    def recommended_presentations(_result: MolecularFrequencySeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return _value_series_presentations(payload, y_col="freq", group_col="molecular_formula", label="freq vs iter")
+
     def run(
         self,
         data: MolecularAnalysisData,
         request: MolecularFrequencySeriesRequest,
         reporter=None,
-    ) -> TimeSeriesResult:
+    ) -> MolecularFrequencySeriesResult:
         df = data.molecular_species.copy()
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -786,7 +1101,7 @@ class MolecularFrequencySeriesTask(AnalysisTask):
         if not table.empty:
             table = table.sort_values(["frame_index", "molecular_formula"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
+        return MolecularFrequencySeriesResult(
             series=out,
             x_label="iter",
             y_label="molecular_frequency",
@@ -801,15 +1116,36 @@ class MolecularTotalsSeriesTask(AnalysisTask):
 
     required_data = MolecularAnalysisData
 
+    @staticmethod
+    def recommended_presentations(result: MolecularTotalsSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        x_col = str(result.x_label or "iter")
+        rows = _rows_from_payload(payload)
+        if not rows:
+            return _table_only_presentation()
+        cols = {str(key) for key in rows[0].keys()}
+        if x_col not in cols:
+            x_col = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else "")
+        if not x_col:
+            return _table_only_presentation()
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            _single_plot_presentation(
+                x_col=x_col,
+                y_col="value",
+                group_col="quantity" if "quantity" in cols else "",
+                label=f"value vs {x_col}",
+            ),
+        ]
+
     def run(
         self,
         data: MolecularAnalysisData,
         request: MolecularTotalsSeriesRequest,
         reporter=None,
-    ) -> TimeSeriesResult:
+    ) -> MolecularTotalsSeriesResult:
         df = data.totals.copy()
         if df.empty:
-            return TimeSeriesResult(
+            return MolecularTotalsSeriesResult(
                 series=[],
                 x_label=str(request.xaxis),
                 y_label="molecular_totals",
@@ -821,7 +1157,7 @@ class MolecularTotalsSeriesTask(AnalysisTask):
         n_frames = len(iterations)
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
         if not frame_idx:
-            return TimeSeriesResult(
+            return MolecularTotalsSeriesResult(
                 series=[],
                 x_label=str(request.xaxis),
                 y_label="molecular_totals",
@@ -858,7 +1194,7 @@ class MolecularTotalsSeriesTask(AnalysisTask):
             table.insert(2, xlabel, np.tile(np.asarray(x_vals), len(quantities)))
             table = table.sort_values(["frame_index", "quantity"], kind="stable").reset_index(drop=True)
 
-        return TimeSeriesResult(
+        return MolecularTotalsSeriesResult(
             series=out,
             x_label=xlabel,
             y_label="molecular_totals",
@@ -870,6 +1206,16 @@ class MolecularTotalsSeriesTask(AnalysisTask):
 __all__ = [
     "Series",
     "TimeSeriesResult",
+    "SimulationScalarSeriesResult",
+    "TrajectoryCoordinateSeriesResult",
+    "CellDimensionsResult",
+    "ChargeSeriesResult",
+    "ElectricFieldSeriesResult",
+    "EregimeSeriesResult",
+    "PartialEnergySeriesResult",
+    "RestraintSeriesResult",
+    "MolecularFrequencySeriesResult",
+    "MolecularTotalsSeriesResult",
     "SimulationScalarSeriesRequest",
     "SimulationScalarSeriesTask",
     "TrajectoryCoordinateSeriesRequest",

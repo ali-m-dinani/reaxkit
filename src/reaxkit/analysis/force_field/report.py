@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 import re
 from typing import Literal, Optional
 
@@ -221,8 +221,14 @@ def _get_fort99_bulk_modulus(
 class ForceFieldOptimizationReportRequest(BaseRequest):
     """Request for fort.99 report rows."""
 
-    sortby: str = "lineno"
-    ascending: bool = True
+    sortby: str = dc_field(
+        default="lineno",
+        metadata={'label': 'Sortby', 'help': 'Sortby parameter for ForceFieldOptimizationReportRequest.'},
+    )
+    ascending: bool = dc_field(
+        default=True,
+        metadata={'label': 'Ascending', 'help': 'Ascending parameter for ForceFieldOptimizationReportRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass
@@ -236,8 +242,13 @@ class ForceFieldOptimizationReportResult(BaseResult):
 class ForceFieldOptimizationReportEOSRequest(BaseRequest):
     """Request for ENERGY-vs-volume data derived from fort.99 and fort.74."""
 
-    geometry_summary: GeometrySummaryData
-    iden: Optional[str] = None
+    geometry_summary: GeometrySummaryData = dc_field(
+        metadata={'label': 'Geometry Summary', 'help': 'Geometry Summary parameter for ForceFieldOptimizationReportEOSRequest.'},
+    )
+    iden: Optional[str] = dc_field(
+        default=None,
+        metadata={'label': 'Iden', 'help': 'Iden parameter for ForceFieldOptimizationReportEOSRequest.'},
+    )
 
 
 @dataclass
@@ -251,12 +262,28 @@ class ForceFieldOptimizationReportEOSResult(BaseResult):
 class ForceFieldOptimizationReportBulkModulusRequest(BaseRequest):
     """Request for a Vinet bulk-modulus fit derived from fort.99 and fort.74."""
 
-    geometry_summary: GeometrySummaryData
-    iden: str
-    source: Literal["ffield", "qm"] = "ffield"
-    shift_min_to_zero: bool = True
-    flip_sign: bool = False
-    dropna: bool = True
+    geometry_summary: GeometrySummaryData = dc_field(
+        metadata={'label': 'Geometry Summary', 'help': 'Geometry Summary parameter for ForceFieldOptimizationReportBulkModulusRequest.'},
+    )
+    iden: str = dc_field(
+        metadata={'label': 'Iden', 'help': 'Iden parameter for ForceFieldOptimizationReportBulkModulusRequest.'},
+    )
+    source: Literal["ffield", "qm"] = dc_field(
+        default="ffield",
+        metadata={'label': 'Source', 'help': 'Source parameter for ForceFieldOptimizationReportBulkModulusRequest.', 'choices': ['ffield', 'qm']},
+    )
+    shift_min_to_zero: bool = dc_field(
+        default=True,
+        metadata={'label': 'Shift Min To Zero', 'help': 'Shift Min To Zero parameter for ForceFieldOptimizationReportBulkModulusRequest.', 'choices': [True, False]},
+    )
+    flip_sign: bool = dc_field(
+        default=False,
+        metadata={'label': 'Flip Sign', 'help': 'Flip Sign parameter for ForceFieldOptimizationReportBulkModulusRequest.', 'choices': [True, False]},
+    )
+    dropna: bool = dc_field(
+        default=True,
+        metadata={'label': 'Dropna', 'help': 'Dropna parameter for ForceFieldOptimizationReportBulkModulusRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass

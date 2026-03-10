@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
 from typing import Literal, Optional, Sequence
 
 import numpy as np
@@ -69,12 +69,30 @@ def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -
 
 @dataclass
 class ConnectionListRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    min_bo: float = 0.0
-    undirected: bool = True
-    aggregate: Literal["max", "mean"] = "max"
-    include_self: bool = False
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for ConnectionListRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for ConnectionListRequest.', 'min': 1, 'units': 'frames'},
+    )
+    min_bo: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for ConnectionListRequest.', 'min': 0.0},
+    )
+    undirected: bool = dc_field(
+        default=True,
+        metadata={'label': 'Undirected', 'help': 'Undirected parameter for ConnectionListRequest.', 'choices': [True, False]},
+    )
+    aggregate: Literal["max", "mean"] = dc_field(
+        default="max",
+        metadata={'label': 'Aggregate', 'help': 'Aggregate parameter for ConnectionListRequest.', 'choices': ['max', 'mean']},
+    )
+    include_self: bool = dc_field(
+        default=False,
+        metadata={'label': 'Include Self', 'help': 'Include Self parameter for ConnectionListRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass
@@ -144,10 +162,22 @@ class ConnectionListTask(AnalysisTask):
 
 @dataclass
 class ConnectionTableRequest(BaseRequest):
-    frame: int = 0
-    min_bo: float = 0.0
-    undirected: bool = True
-    fill_value: float = 0.0
+    frame: int = dc_field(
+        default=0,
+        metadata={'label': 'Frame', 'help': 'Frame parameter for ConnectionTableRequest.'},
+    )
+    min_bo: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for ConnectionTableRequest.', 'min': 0.0},
+    )
+    undirected: bool = dc_field(
+        default=True,
+        metadata={'label': 'Undirected', 'help': 'Undirected parameter for ConnectionTableRequest.', 'choices': [True, False]},
+    )
+    fill_value: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Fill Value', 'help': 'Fill Value parameter for ConnectionTableRequest.'},
+    )
 
 
 @dataclass
@@ -178,11 +208,26 @@ class ConnectionTableTask(AnalysisTask):
 
 @dataclass
 class ConnectionStatsRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    min_bo: float = 0.0
-    undirected: bool = True
-    how: Literal["mean", "max", "count"] = "mean"
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for ConnectionStatsRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for ConnectionStatsRequest.', 'min': 1, 'units': 'frames'},
+    )
+    min_bo: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for ConnectionStatsRequest.', 'min': 0.0},
+    )
+    undirected: bool = dc_field(
+        default=True,
+        metadata={'label': 'Undirected', 'help': 'Undirected parameter for ConnectionStatsRequest.', 'choices': [True, False]},
+    )
+    how: Literal["mean", "max", "count"] = dc_field(
+        default="mean",
+        metadata={'label': 'How', 'help': 'How parameter for ConnectionStatsRequest.', 'choices': ['mean', 'max', 'count']},
+    )
 
 
 @dataclass
@@ -220,10 +265,22 @@ class ConnectionStatsTask(AnalysisTask):
 
 @dataclass
 class BondTimeseriesRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    undirected: bool = True
-    bo_threshold: float = 0.0
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for BondTimeseriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for BondTimeseriesRequest.', 'min': 1, 'units': 'frames'},
+    )
+    undirected: bool = dc_field(
+        default=True,
+        metadata={'label': 'Undirected', 'help': 'Undirected parameter for BondTimeseriesRequest.', 'choices': [True, False]},
+    )
+    bo_threshold: float = dc_field(
+        default=0.0,
+        metadata={'label': 'Bo Threshold', 'help': 'Bo Threshold parameter for BondTimeseriesRequest.', 'min': 0.0},
+    )
 
 
 @dataclass
@@ -308,18 +365,54 @@ class BondTimeseriesTask(AnalysisTask):
 
 @dataclass
 class BondEventsRequest(BaseRequest):
-    frames: Optional[Sequence[int]] = None
-    every: int = 1
-    src: Optional[int] = None
-    dst: Optional[int] = None
-    threshold: float = 0.35
-    hysteresis: float = 0.05
-    smooth: Optional[Literal["ma", "ema"]] = "ma"
-    window: int = 7
-    ema_alpha: Optional[float] = None
-    min_run: int = 3
-    xaxis: Literal["iter", "frame"] = "iter"
-    undirected: bool = True
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for BondEventsRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for BondEventsRequest.', 'min': 1, 'units': 'frames'},
+    )
+    src: Optional[int] = dc_field(
+        default=None,
+        metadata={'label': 'Src', 'help': 'Src parameter for BondEventsRequest.', 'units': 'index'},
+    )
+    dst: Optional[int] = dc_field(
+        default=None,
+        metadata={'label': 'Dst', 'help': 'Dst parameter for BondEventsRequest.', 'units': 'index'},
+    )
+    threshold: float = dc_field(
+        default=0.35,
+        metadata={'label': 'Threshold', 'help': 'Threshold parameter for BondEventsRequest.', 'min': 0.0},
+    )
+    hysteresis: float = dc_field(
+        default=0.05,
+        metadata={'label': 'Hysteresis', 'help': 'Hysteresis parameter for BondEventsRequest.', 'min': 0.0},
+    )
+    smooth: Optional[Literal["ma", "ema"]] = dc_field(
+        default="ma",
+        metadata={'label': 'Smooth', 'help': 'Smooth parameter for BondEventsRequest.'},
+    )
+    window: int = dc_field(
+        default=7,
+        metadata={'label': 'Window', 'help': 'Window parameter for BondEventsRequest.', 'min': 1},
+    )
+    ema_alpha: Optional[float] = dc_field(
+        default=None,
+        metadata={'label': 'Ema Alpha', 'help': 'Ema Alpha parameter for BondEventsRequest.'},
+    )
+    min_run: int = dc_field(
+        default=3,
+        metadata={'label': 'Min Run', 'help': 'Min Run parameter for BondEventsRequest.', 'min': 1},
+    )
+    xaxis: Literal["iter", "frame"] = dc_field(
+        default="iter",
+        metadata={'label': 'Xaxis', 'help': 'Xaxis parameter for BondEventsRequest.', 'choices': ['iter', 'frame']},
+    )
+    undirected: bool = dc_field(
+        default=True,
+        metadata={'label': 'Undirected', 'help': 'Undirected parameter for BondEventsRequest.', 'choices': [True, False]},
+    )
 
 
 @dataclass
@@ -339,7 +432,6 @@ class BondEventsTask(AnalysisTask):
                 every=request.every,
                 undirected=request.undirected,
                 bo_threshold=0.0,
-                as_wide=False,
             ),
             reporter=reporter,
         ).table

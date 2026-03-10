@@ -18,7 +18,8 @@ def create_dash_app():
     Dash = _dash_imports()
     from reaxkit.webui.backend.api import WebUIApiService
     from reaxkit.webui.callbacks import register_callbacks
-    from reaxkit.webui.layouts import _CSS, build_layout
+    from reaxkit.webui.ui.layout import build_layout
+    from reaxkit.webui.ui.shared.styles import _CSS
 
     app = Dash(
         __name__,
