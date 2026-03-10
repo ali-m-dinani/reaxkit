@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Literal, Optional, Sequence
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -12,6 +12,7 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ForceFieldParametersData
+from reaxkit.presentation.specs import PresentationSpec
 
 _SECTION_TO_ATTR = {
     "general": "general_parameters",
@@ -101,7 +102,7 @@ def _add_symbols_for_columns(
     return out
 
 
-def _interpret_section(data: ForceFieldParametersData, section: str, sep: str) -> pd.DataFrame:
+def _interpret_section(data: ForceFieldParametersData, section: str, sep: str = "-") -> pd.DataFrame:
     idx_to_sym = _atom_index_to_symbol_map(data)
     attr = _SECTION_TO_ATTR[section]
     df = getattr(data, attr).copy()
@@ -115,44 +116,60 @@ def _interpret_section(data: ForceFieldParametersData, section: str, sep: str) -
     return _add_symbols_for_columns(df, idx_to_sym, ["i", "j", "k"], sep=sep)
 
 
-def _section_frame(data: ForceFieldParametersData, section: str, fmt: str, sep: str) -> pd.DataFrame:
+def _section_frame(data: ForceFieldParametersData, section: str, interpret: bool) -> pd.DataFrame:
     attr = _SECTION_TO_ATTR[section]
     raw_df = getattr(data, attr).copy()
-    if fmt == "raw":
+    if not interpret:
         return raw_df
     if section in {"general", "atom"}:
         return raw_df
-    return _interpret_section(data, section, sep)
+    return _interpret_section(data, section, "-")
 
 
 @dataclass
 class ForceFieldDataRequest(BaseRequest):
-    """Request for raw or interpreted force-field sections."""
+    """Request for raw or interpreted force-field section output."""
 
     section: Optional[str] = dc_field(
         default=None,
-        metadata={'label': 'Section', 'help': 'Section parameter for ForceFieldDataRequest.'},
+        metadata={
+            "label": "Section",
+            "help": (
+                "Single force-field section to load. "
+                "Example: 'bond' or 'off_diagonal'."
+            ),
+            "choices": ["general", "atom", "bond", "off_diagonal", "angle", "torsion", "hbond"],
+        },
     )
-    sections: Optional[Sequence[str]] = dc_field(
-        default=None,
-        metadata={'label': 'Sections', 'help': 'Sections parameter for ForceFieldDataRequest.'},
-    )
-    format: Literal["raw", "interpreted"] = dc_field(
-        default="interpreted",
-        metadata={'label': 'Format', 'help': 'Format parameter for ForceFieldDataRequest.', 'choices': ['raw', 'interpreted']},
-    )
-    sep: str = dc_field(
-        default="-",
-        metadata={'label': 'Sep', 'help': 'Sep parameter for ForceFieldDataRequest.'},
+    interpret: bool = dc_field(
+        default=True,
+        metadata={
+            "label": "Interpret",
+            "help": (
+                "If true, include interpreted symbolic terms for multi-body sections "
+                "(for example C-H, C-C-H). If false, keep raw atom-index based rows."
+            ),
+            "choices": [True, False],
+        },
     )
 
 
 @dataclass
 class ForceFieldDataResult(BaseResult):
-    """Raw or interpreted force-field tables."""
+    """Force-field section extraction result.
 
-    tables: dict[str, pd.DataFrame]
-    table: Optional[pd.DataFrame] = None
+    Output structure:
+    - request: ForceFieldDataRequest used to generate this result.
+    - table: pandas.DataFrame with section rows in tabular form.
+      - If one section is requested, rows are returned directly for that section.
+      - If multiple sections are requested, rows are concatenated and include a
+        leading 'section' column indicating the source section.
+      - In interpreted mode for bonded sections, a 'term' column is included
+        (for example 'C-H' or 'C-C-H') alongside numeric parameters.
+    """
+
+    table: pd.DataFrame
+    request: ForceFieldDataRequest
 
 
 @register_task("force_field_data")
@@ -160,6 +177,43 @@ class ForceFieldDataTask(AnalysisTask):
     """Return raw or interpreted force-field section data."""
 
     required_data = ForceFieldParametersData
+
+    @staticmethod
+    def recommended_presentations(_result: ForceFieldDataResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        numeric_cols = [k for k, v in sample.items() if isinstance(v, (int, float)) and k != "section"]
+        if not numeric_cols:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
+        if "term" in sample:
+            x_col = "term"
+        elif "symbol" in sample:
+            x_col = "symbol"
+        elif "i" in sample:
+            x_col = "i"
+        else:
+            x_col = next(iter(sample.keys()), "section")
+
+        y_col = numeric_cols[0]
+        group_col = "section" if "section" in sample else ""
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label=f"{y_col} vs {x_col}",
+                mapping={"x_col": x_col, "y_col": y_col, "group_by_col": group_col},
+                options={
+                    "title": f"Force-Field Data: {y_col} vs {x_col}",
+                    "xlabel": x_col,
+                    "ylabel": y_col,
+                    "legend": bool(group_col),
+                },
+                view_type="plot2d",
+            ),
+        ]
 
     def run(
         self,
@@ -169,23 +223,28 @@ class ForceFieldDataTask(AnalysisTask):
     ) -> ForceFieldDataResult:
         if request.section is not None:
             targets = [_normalize_section_name(request.section)]
-        elif request.sections is not None:
-            targets = [_normalize_section_name(section) for section in request.sections]
         else:
             targets = list(_SECTION_TO_ATTR)
 
         tables: dict[str, pd.DataFrame] = {}
         total = len(targets)
-        fmt = str(request.format)
-        if fmt not in {"raw", "interpreted"}:
-            raise ValueError("ForceFieldDataRequest.format must be 'raw' or 'interpreted'.")
+        interpret = bool(request.interpret)
         for step_i, section in enumerate(targets, start=1):
-            tables[section] = _section_frame(data, section, fmt, str(request.sep))
+            tables[section] = _section_frame(data, section, interpret)
             if reporter:
-                reporter("analyze", step_i, total, f"Loading force-field section: {section} ({fmt})")
+                mode = "interpreted" if interpret else "raw"
+                reporter("analyze", step_i, total, f"Loading force-field section: {section} ({mode})")
 
-        table = tables[targets[0]] if len(targets) == 1 else None
-        return ForceFieldDataResult(tables=tables, table=table)
+        if len(targets) == 1:
+            table = tables[targets[0]].reset_index(drop=True)
+        else:
+            frames: list[pd.DataFrame] = []
+            for section in targets:
+                section_df = tables[section].copy()
+                section_df.insert(0, "section", section)
+                frames.append(section_df)
+            table = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        return ForceFieldDataResult(table=table, request=request)
 
 
 __all__ = [

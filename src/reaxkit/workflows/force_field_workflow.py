@@ -220,13 +220,11 @@ def _load_geometry_summary(args: argparse.Namespace) -> GeometrySummaryData:
 
 
 def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataRequest:
-    sections = args.sections if args.sections else None
     section = args.section if args.section else None
+    fmt = _normalize_force_field_format(args.format)
     return ForceFieldDataRequest(
         section=section,
-        sections=sections,
-        format=_normalize_force_field_format(args.format),
-        sep=args.sep,
+        interpret=(fmt == "interpreted"),
     )
 
 
@@ -239,7 +237,9 @@ def _build_structure_summary_request(args: argparse.Namespace) -> StructureSumma
 
 
 def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -> ParameterOptimizationDiagnosticRequest:
-    return ParameterOptimizationDiagnosticRequest()
+    return ParameterOptimizationDiagnosticRequest(
+        interpret=bool(getattr(args, "interpret", False)),
+    )
 
 
 def _build_force_field_optimization_report_request(args: argparse.Namespace) -> ForceFieldOptimizationReportRequest:
@@ -298,12 +298,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Examples:\n"
             "  reaxkit force_field_data --section bond --term C-H --format interpreted --export CH_bond.csv\n"
             "  reaxkit force_field_data --section angle --term CCH --any-order --format interpreted --export all_CCH_angles.csv\n"
-            "  reaxkit force_field_data --sections atom bond angle --format interpreted --outdir ffield_export"
+            "  reaxkit force_field_data --format interpreted --outdir ffield_export"
         )
         parser.add_argument("--section", default=None, help="Single section: general, atom, bond, off_diagonal, angle, torsion, hbond")
-        parser.add_argument("--sections", nargs="*", default=None, help="Multiple sections to load")
         parser.add_argument("--format", choices=["raw", "indices", "interpreted"], default="interpreted", help="Section view format")
-        parser.add_argument("--sep", default="-", help="Separator used in interpreted term labels")
         parser.add_argument("--term", default=None, help="Filter term, for example C-H, CCH, C-C-H, or 1-2")
         parser.add_argument("--ordered-2body", action="store_true", help="For bond/off_diagonal, keep i-j distinct from j-i")
         parser.add_argument("--any-order", action="store_true", help="For angle/torsion/hbond, match any atom-order permutation")
@@ -337,6 +335,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "  reaxkit parameter_optimization_diagnostic --plot single\n"
             "  reaxkit parameter_optimization_diagnostic --save fort79_diag.png"
         )
+        parser.add_argument("--interpret", action="store_true", help="Interpret identifier triplets using force-field data")
     elif canonical == "parameter_optimization_most_sensitive":
         parser.description = (
             "Identify the parameter with the minimum sensitivity and inspect its epoch-wise ratios.\n\n"
@@ -345,6 +344,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "  reaxkit parameter_optimization_most_sensitive --export most_sensitive.csv --export-all fort79_all.csv\n"
             "  reaxkit parameter_optimization_most_sensitive --save most_sensitive.png"
         )
+        parser.add_argument("--interpret", action="store_true", help="Interpret identifier triplets using force-field data")
         parser.add_argument("--export-all", default=None, help="Optional CSV path for the full diagnostic table")
     elif canonical == "parameter_optimization_tornado":
         parser.description = (
@@ -354,6 +354,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "  reaxkit parameter_optimization_tornado --top 10 --save tornado.png --export tornado.csv\n"
             "  reaxkit parameter_optimization_tornado --vline 1.0"
         )
+        parser.add_argument("--interpret", action="store_true", help="Interpret identifier triplets using force-field data")
         parser.add_argument("--top", type=int, default=0, help="Only keep the top-N widest spans; 0 keeps all")
         parser.add_argument("--vline", type=float, default=1.0, help="Reference line value for the tornado plot")
     elif canonical == "force_field_optimization_report":
@@ -524,18 +525,15 @@ def _run_force_field_data(args: argparse.Namespace) -> int:
     task = ForceFieldDataTask()
 
     if args.term:
-        if request.section is None and not request.sections:
+        if request.section is None:
             raise ValueError("--term requires exactly one selected section via --section.")
-        if request.section is None and request.sections and len(request.sections) != 1:
-            raise ValueError("--term requires exactly one selected section via --section or a single-item --sections.")
-        selected_section = request.section or request.sections[0]
+        selected_section = request.section
 
         raw_result = task.run(
             data,
-            ForceFieldDataRequest(section=selected_section, format="raw", sep=request.sep),
+            ForceFieldDataRequest(section=selected_section, interpret=False),
         )
-        selected_section = next(iter(raw_result.tables))
-        raw_table = raw_result.tables[selected_section]
+        raw_table = raw_result.table
         filtered_raw = _filter_force_field_table_by_term(
             data,
             selected_section,
@@ -544,16 +542,18 @@ def _run_force_field_data(args: argparse.Namespace) -> int:
             unordered_2body=not args.ordered_2body,
             any_order=args.any_order,
         )
-        if request.format == "interpreted":
+        if request.interpret:
             interpreted_result = task.run(
                 data,
-                ForceFieldDataRequest(section=selected_section, format="interpreted", sep=request.sep),
+                ForceFieldDataRequest(section=selected_section, interpret=True),
             )
-            table = interpreted_result.tables[selected_section].loc[filtered_raw.index].copy()
+            table = interpreted_result.table.loc[filtered_raw.index].copy()
         else:
             table = filtered_raw
-        result = task.run(data, ForceFieldDataRequest(section=selected_section, format=request.format, sep=request.sep))
-        result.tables = {selected_section: table}
+        result = task.run(
+            data,
+            ForceFieldDataRequest(section=selected_section, interpret=request.interpret),
+        )
         result.table = table
     else:
         result = task.run(data, request)
@@ -561,7 +561,17 @@ def _run_force_field_data(args: argparse.Namespace) -> int:
     result = _prepare_result("force_field_data", result)
 
     if args.outdir:
-        _export_force_field_tables(result.tables, args.outdir, fmt=request.format)
+        export_tables: dict[str, pd.DataFrame] = {}
+        if isinstance(getattr(result, "table", None), pd.DataFrame) and not result.table.empty:
+            if "section" in result.table.columns:
+                for section_name, group in result.table.groupby("section", dropna=False):
+                    section_key = str(section_name)
+                    export_tables[section_key] = group.drop(columns=["section"]).copy()
+            else:
+                selected = request.section or "force_field"
+                export_tables[str(selected)] = result.table.copy()
+        export_fmt = "interpreted" if request.interpret else "raw"
+        _export_force_field_tables(export_tables, args.outdir, fmt=export_fmt)
         print(f"[Done] Exported section tables to {args.outdir}")
 
     if args.export:

@@ -32,6 +32,26 @@ from reaxkit.engine.reaxff.io.base import BaseHandler
 _FNUM = r"[+-]?\d+\.\d+(?:[DdEe][+-]?\d+|[+-]\d+)?"
 _FVAL_RE = re.compile(_FNUM)
 
+
+def _normalize_identifier(text: str) -> str:
+    """
+    Normalize fort.79 parameter identifier text.
+
+    Some files collapse ``<section> <line> <parameter>`` into two tokens,
+    e.g. ``"5102  2"`` instead of ``"5 102 2"``. This function repairs that
+    case so downstream triplet parsing remains stable.
+    """
+    raw = str(text).strip()
+    parts = raw.split()
+    if len(parts) == 3:
+        return f"{parts[0]} {parts[1]} {parts[2]}"
+    if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+        lead = parts[0]
+        if len(lead) >= 2 and lead[0] in {"1", "2", "3", "4", "5", "6", "7"}:
+            return f"{int(lead[0])} {int(lead[1:])} {int(parts[1])}"
+    return raw
+
+
 def _f(s: str) -> float:
     """
     Convert a numeric token to float.
@@ -86,6 +106,7 @@ class Fort79Handler(BaseHandler):
       tokens are converted to ``NaN`` by design.
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
+    _CACHE_VERSION = "2"
 
     def __init__(self, file_path: str | Path = "fort.79", reporter=None):
         """
@@ -123,7 +144,7 @@ class Fort79Handler(BaseHandler):
                 self._reporter("load", i + 1, n, "Parsing fort.79")
             line = lines[i]
             if line.strip().startswith("Values used for parameter"):
-                ident = line.split("parameter", 1)[1].strip()
+                ident = _normalize_identifier(line.split("parameter", 1)[1].strip())
 
                 # ---- three "Values used..." numbers (may wrap) ----
                 v1 = v2 = v3 = math.nan

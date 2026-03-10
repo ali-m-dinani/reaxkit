@@ -22,6 +22,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationTrainingSetData,
     ForceFieldOptimizationData,
     ForceFieldOptimizationParameterBundleData,
+    ForceFieldOptimizationDiagnosticBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
     GeometryData,
@@ -1287,6 +1288,16 @@ class ReaxFFAdapter(EngineAdapter):
         fort79_path = p / "fort.79" if p.is_dir() else p
         handler = Fort79Handler(fort79_path, reporter=reporter)
         return _parameter_optimization_diagnostic_from_fort79_handler(handler)
+
+    def load_parameter_optimization_diagnostic_bundle(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationDiagnosticBundleData:
+        return ForceFieldOptimizationDiagnosticBundleData(
+            diagnostics=self.load_parameter_optimization_diagnostic(args, reporter=reporter),
+            force_field_parameters=self.load_force_field(args, reporter=reporter),
+        )
 
     def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
         from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler

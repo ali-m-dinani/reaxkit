@@ -1,17 +1,45 @@
-"""Parameter-optimization diagnostic analysis tasks."""
+"""Engine-agnostic parameter-optimization diagnostic analysis tasks."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field as dc_field
+import re
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
+from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
 from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ForceFieldOptimizationDiagnosticData
+from reaxkit.domain.data_models import (
+    ForceFieldOptimizationDiagnosticBundleData,
+    ForceFieldOptimizationDiagnosticData,
+    ForceFieldParametersData,
+)
+from reaxkit.presentation.specs import PresentationSpec
+
+_SECTION_NUM_MAP: dict[int, tuple[str, str]] = {
+    1: ("general", "general"),
+    2: ("atom", "atom"),
+    3: ("bond", "bond"),
+    4: ("off_diagonal", "off_diagonal"),
+    5: ("angle", "angle"),
+    6: ("torsion", "torsion"),
+    7: ("hbond", "hbond"),
+}
+
+_SECTION_INDEX_COLS: dict[str, list[str]] = {
+    "general": [],
+    "atom": ["symbol"],
+    "bond": ["i", "j"],
+    "off_diagonal": ["i", "j"],
+    "angle": ["i", "j", "k"],
+    "torsion": ["i", "j", "k", "l"],
+    "hbond": ["i", "j", "k"],
+}
 
 
 def _diagnostic_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFrame:
@@ -38,45 +66,210 @@ def _diagnostic_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFram
 def _diagnostic_sensitivity_table(
     data: ForceFieldOptimizationDiagnosticData,
 ) -> pd.DataFrame:
-    """Compute relative force-field error sensitivities from diagnostic data."""
+    """Return raw diagnostic data augmented with relative sensitivities."""
     df = _diagnostic_frame(data)
     diff3 = pd.to_numeric(df["diff3"], errors="coerce").replace(0.0, np.nan)
 
-    result = pd.DataFrame({"identifier": df["identifier"].astype(object)})
-    result["sensitivity1/3"] = pd.to_numeric(df["diff1"], errors="coerce") / diff3
-    result["sensitivity2/3"] = pd.to_numeric(df["diff2"], errors="coerce") / diff3
-    result["sensitivity4/3"] = pd.to_numeric(df["diff4"], errors="coerce") / diff3
-    result["min_sensitivity"] = result[["sensitivity1/3", "sensitivity2/3", "sensitivity4/3"]].min(axis=1)
-    result["max_sensitivity"] = result[["sensitivity1/3", "sensitivity2/3", "sensitivity4/3"]].max(axis=1)
-    return result
+    out = df.copy()
+    out["sensitivity1/3"] = pd.to_numeric(out["diff1"], errors="coerce") / diff3
+    out["sensitivity2/3"] = pd.to_numeric(out["diff2"], errors="coerce") / diff3
+    out["sensitivity4/3"] = pd.to_numeric(out["diff4"], errors="coerce") / diff3
+    out["min_sensitivity"] = out[["sensitivity1/3", "sensitivity2/3", "sensitivity4/3"]].min(axis=1)
+    out["max_sensitivity"] = out[["sensitivity1/3", "sensitivity2/3", "sensitivity4/3"]].max(axis=1)
+    return out
+
+
+def _param_columns_for_section(sec_df: pd.DataFrame, section_key: str) -> list[str]:
+    idx_cols = set(_SECTION_INDEX_COLS.get(section_key, []))
+    return [c for c in sec_df.columns if c not in idx_cols]
+
+
+def _parse_identifier_triplet(identifier: Any) -> tuple[int, int, int] | None:
+    text = str(identifier).strip()
+    nums = [int(x) for x in re.findall(r"-?\d+", text)]
+    if len(nums) < 3:
+        return None
+    return nums[0], nums[1], nums[2]
+
+
+def _interpret_identifier_details(
+    identifier: Any,
+    *,
+    force_field: ForceFieldParametersData,
+    cache: dict[str, pd.DataFrame],
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "ff_section": pd.NA,
+        "ff_section_line": pd.NA,
+        "ff_parameter": pd.NA,
+        "component": pd.NA,
+        "ffield_section_name": pd.NA,
+        "ffield_value": pd.NA,
+        "term": pd.NA,
+    }
+    parsed = _parse_identifier_triplet(identifier)
+    if parsed is None:
+        return out
+    sec_num, line_1b, par_1b = parsed
+    out["ff_section"] = int(sec_num)
+    out["ff_section_line"] = int(line_1b)
+    out["ff_parameter"] = int(par_1b)
+    if sec_num not in _SECTION_NUM_MAP:
+        return out
+    section_key, section_name = _SECTION_NUM_MAP[sec_num]
+    out["ffield_section_name"] = section_name
+
+    if section_key not in cache:
+        cache[section_key] = ForceFieldDataTask().run(
+            force_field,
+            ForceFieldDataRequest(
+                section=section_name,
+                interpret=section_key not in {"general", "atom"},
+            ),
+        ).table
+
+    sec_df = cache[section_key]
+    row_idx = int(line_1b) - 1
+    if row_idx < 0 or row_idx >= len(sec_df):
+        return out
+
+    param_cols = _param_columns_for_section(sec_df, section_key)
+    param_cols = [c for c in param_cols if not (str(c).endswith("_symbol") or c == "term")]
+    par_idx = int(par_1b) - 1
+    if par_idx < 0 or par_idx >= len(param_cols):
+        return out
+
+    param_name = str(param_cols[par_idx])
+    sec_row = sec_df.iloc[row_idx]
+    out["component"] = param_name
+    out["ffield_value"] = sec_row.get(param_name, pd.NA)
+    out["term"] = sec_row.get("term", pd.NA)
+    return out
+
+
+def _with_interpreted_identifiers(
+    table: pd.DataFrame,
+    *,
+    force_field: ForceFieldParametersData,
+) -> pd.DataFrame:
+    out = table.copy()
+    sec_cache: dict[str, pd.DataFrame] = {}
+    details = out["identifier"].map(
+        lambda raw: _interpret_identifier_details(raw, force_field=force_field, cache=sec_cache)
+    )
+    details_df = pd.DataFrame(details.tolist())
+    id_loc = out.columns.get_loc("identifier")
+    for offset, col in enumerate(
+        [
+            "ff_section",
+            "ff_section_line",
+            "ff_parameter",
+            "component",
+            "ffield_section_name",
+            "ffield_value",
+            "term",
+        ]
+    ):
+        out.insert(id_loc + 1 + offset, col, details_df[col])
+    out = out.drop(columns=["identifier"])
+    return out
 
 
 @dataclass
 class ParameterOptimizationDiagnosticRequest(BaseRequest):
-    """Request for fort.79 parameter-optimization diagnostics."""
+    """Request for parameter-optimization diagnostics.
+
+    This task has no request-time filters currently; it returns the full
+    diagnostic sensitivity table derived from the loaded diagnostic data model.
+    """
+
+    interpret: bool = dc_field(
+        default=False,
+        metadata={
+            "label": "Interpret",
+            "help": (
+                "If true, interpret identifier triplets (section, line, parameter) "
+                "into descriptive force-field parameter names using loaded force-field data."
+            ),
+            "choices": [True, False],
+        },
+    )
 
 
 @dataclass
 class ParameterOptimizationDiagnosticResult(BaseResult):
-    """Result for fort.79 parameter-optimization diagnostics."""
+    """Parameter-optimization diagnostic result.
+
+    Output structure:
+    - request: ParameterOptimizationDiagnosticRequest used to generate this result
+    - table: pandas.DataFrame with raw diagnostic columns plus derived columns:
+      raw columns:
+      ['identifier', 'value1', 'value2', 'value3', 'diff1', 'diff2', 'diff3',
+       'a', 'b', 'c', 'parabol_min', 'parabol_min_diff', 'value4', 'diff4']
+      derived columns:
+      ['sensitivity1/3', 'sensitivity2/3', 'sensitivity4/3',
+       'min_sensitivity', 'max_sensitivity']
+      - identifier: parameter/entry label from diagnostic data
+        (or interpreted label when request.interpret=True)
+      - sensitivity1/3, sensitivity2/3, sensitivity4/3:
+        relative sensitivities computed as diff1/diff3, diff2/diff3, diff4/diff3
+      - min_sensitivity: row-wise minimum across the three sensitivity ratios
+      - max_sensitivity: row-wise maximum across the three sensitivity ratios
+
+    Example:
+    If one row has sensitivities [0.8, 1.2, 0.5], then
+    min_sensitivity = 0.5 and max_sensitivity = 1.2.
+    """
 
     table: pd.DataFrame
+    request: ParameterOptimizationDiagnosticRequest
 
 
 @register_task("parameter_optimization_diagnostic")
 class ParameterOptimizationDiagnosticTask(AnalysisTask):
-    """Return sensitivity diagnostics derived from fort.79 parameter updates."""
+    """Return sensitivity diagnostics derived from parameter-update diagnostics."""
 
-    required_data = ForceFieldOptimizationDiagnosticData
+    required_data = ForceFieldOptimizationDiagnosticBundleData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: ParameterOptimizationDiagnosticResult, payload: dict[str, Any]
+    ) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        if "identifier" not in sample or "min_sensitivity" not in sample:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="Min Sensitivity vs Identifier",
+                mapping={"x_col": "identifier", "y_col": "min_sensitivity", "group_by_col": ""},
+                options={
+                    "title": "Min Sensitivity vs Identifier",
+                    "xlabel": "identifier",
+                    "ylabel": "min_sensitivity",
+                    "legend": False,
+                },
+                view_type="plot2d",
+            ),
+        ]
 
     def run(
         self,
-        data: ForceFieldOptimizationDiagnosticData,
+        data: ForceFieldOptimizationDiagnosticBundleData,
         request: ParameterOptimizationDiagnosticRequest,
         reporter=None,
     ) -> ParameterOptimizationDiagnosticResult:
-        table = _diagnostic_sensitivity_table(data)
-        return ParameterOptimizationDiagnosticResult(table=table)
+        diagnostic_data = data.diagnostics
+        if diagnostic_data is None:
+            raise ValueError("ForceFieldOptimizationDiagnosticBundleData.diagnostics is required.")
+        table = _diagnostic_sensitivity_table(diagnostic_data)
+        if bool(request.interpret):
+            table = _with_interpreted_identifiers(table, force_field=data.force_field_parameters)
+        return ParameterOptimizationDiagnosticResult(table=table, request=request)
 
 
 __all__ = [

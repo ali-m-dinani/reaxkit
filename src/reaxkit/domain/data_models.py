@@ -701,6 +701,19 @@ class ForceFieldOptimizationParameterBundleData:
     force_field_parameters: Optional[ForceFieldParametersData] = None
     metadata: Optional[dict[str, Any]] = None
 
+
+@dataclass
+class ForceFieldOptimizationDiagnosticBundleData:
+    """Composite data for diagnostic optimization tasks.
+
+    - diagnostics: parsed diagnostic data (required)
+    - force_field_parameters: parsed force-field parameter tables (required for identifier interpretation)
+    """
+
+    diagnostics: ForceFieldOptimizationDiagnosticData
+    force_field_parameters: ForceFieldParametersData
+    metadata: Optional[dict[str, Any]] = None
+
 @dataclass
 class ElectrostaticsData:
     """Composite electrostatics model for engine-agnostic analyses."""

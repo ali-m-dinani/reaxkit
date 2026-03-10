@@ -94,10 +94,12 @@ def _interpret_params(
 
         section_key, section_name = _SECTION_NUM_MAP[sec_num]
         if section_key not in sec_cache:
-            fmt = "interpreted" if section_key not in {"general", "atom"} else "raw"
             sec_cache[section_key] = ForceFieldDataTask().run(
                 force_field,
-                ForceFieldDataRequest(section=section_name, format=fmt, sep="-"),
+                ForceFieldDataRequest(
+                    section=section_name,
+                    interpret=section_key not in {"general", "atom"},
+                ),
             ).table
 
         sec_df = sec_cache[section_key]

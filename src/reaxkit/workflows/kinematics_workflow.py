@@ -125,13 +125,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     return parser
 
 
-def _metadata_to_table(result) -> None:
-    if result.table is not None or not result.metadata:
-        return
-    rows = [{"key": key, "value": value} for key, value in result.metadata.items()]
-    result.table = pd.DataFrame(rows)
-
-
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
@@ -241,6 +234,5 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
-    _metadata_to_table(result)
     present_result(canonical, result, args, plot_payload_builder=_plot_payload)
     return 0
