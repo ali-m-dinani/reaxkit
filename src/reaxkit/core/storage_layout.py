@@ -158,9 +158,8 @@ class ReaxkitStorageLayout:
     def logs_root(self) -> Path:
         return self.project_root / "logs"
 
-    def ensure_base_layout(self) -> None:
-        for root in (
-            self.inputs_root,
+    def ensure_base_layout(self, *, include_inputs: bool = False) -> None:
+        roots = [
             self.raw_root,
             self.parsed_root,
             self.run_index_root,
@@ -169,7 +168,10 @@ class ReaxkitStorageLayout:
             self.reports_root,
             self.cache_root,
             self.logs_root,
-        ):
+        ]
+        if include_inputs:
+            roots.insert(0, self.inputs_root)
+        for root in roots:
             root.mkdir(parents=True, exist_ok=True)
 
     def input_run_dir(self, run_id: str) -> Path:
@@ -184,10 +186,17 @@ class ReaxkitStorageLayout:
     def parsed_dir(self, parsed_id: str) -> Path:
         return self.parsed_root / str(parsed_id)
 
-    def ensure_run_layout(self, run_id: str) -> None:
-        self.ensure_base_layout()
-        self.input_run_dir(run_id).mkdir(parents=True, exist_ok=True)
+    def ensure_run_layout(self, run_id: str, *, include_inputs: bool = False) -> None:
+        self.ensure_base_layout(include_inputs=include_inputs)
+        if include_inputs:
+            self.input_run_dir(run_id).mkdir(parents=True, exist_ok=True)
         self.raw_run_dir(run_id).mkdir(parents=True, exist_ok=True)
+
+    def ensure_analysis_run_layout(self, run_id: str) -> None:
+        self.ensure_run_layout(run_id, include_inputs=False)
+
+    def ensure_input_run_layout(self, run_id: str) -> None:
+        self.ensure_run_layout(run_id, include_inputs=True)
 
     def register_parsed_dataset(
         self,
@@ -197,7 +206,7 @@ class ReaxkitStorageLayout:
         engine: str,
     ) -> str:
         run_id = _safe_run_id(run_id)
-        self.ensure_run_layout(run_id)
+        self.ensure_analysis_run_layout(run_id)
         raw_dir = self.raw_run_dir(run_id)
         raw_hash = directory_fingerprint(raw_dir)
         parsed_id = parsed_id_from_raw_and_handler(raw_hash=raw_hash, handler_version=handler_version)
@@ -368,7 +377,7 @@ def snapshot_storage_inputs(args: dict, *, names: Sequence[str] | None = None) -
     project_root = Path(args.get("project_root") or default_project_root())
     args["project_root"] = str(project_root)
     layout = ReaxkitStorageLayout(project_root=project_root)
-    layout.ensure_run_layout(str(run_id))
+    layout.ensure_analysis_run_layout(str(run_id))
     raw_dir = layout.raw_run_dir(str(run_id))
     source = _detect_snapshot_source(args)
     args["_snapshot_source_dir"] = str(source)
@@ -390,7 +399,7 @@ def normalize_storage_args(
     project_root = Path(out.get("project_root") or default_project_root())
     out["project_root"] = str(project_root)
     layout = ReaxkitStorageLayout(project_root=project_root)
-    layout.ensure_run_layout(str(run_id))
+    layout.ensure_analysis_run_layout(str(run_id))
     out["_snapshot_source_dir"] = str(_detect_snapshot_source(out))
     raw_dir = layout.raw_run_dir(str(run_id))
     if snapshot:
