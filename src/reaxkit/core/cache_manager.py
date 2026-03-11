@@ -160,7 +160,7 @@ class CacheManager:
     def _utc_now_iso() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    def _update_index(self, analysis_id: str, *, cache_path: Path) -> None:
+    def _update_index(self, analysis_id: str, *, cache_path: Path, task_name: str | None = None) -> None:
         path = self._index_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, Any] = {}
@@ -171,10 +171,13 @@ class CacheManager:
                 payload = {}
         payload.setdefault("namespace", self.cfg.namespace)
         payload.setdefault("entries", {})
-        payload["entries"][str(analysis_id)] = {
+        entry: dict[str, Any] = {
             "path": str(cache_path),
             "updated_at": self._utc_now_iso(),
         }
+        if task_name:
+            entry["task_name"] = str(task_name)
+        payload["entries"][str(analysis_id)] = entry
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     def exists(self, analysis_id: str) -> bool:
@@ -197,7 +200,7 @@ class CacheManager:
         self._memory_put(analysis_id, value)
         return value
 
-    def store(self, analysis_id: str, value: Any) -> None:
+    def store(self, analysis_id: str, value: Any, *, task_name: str | None = None) -> None:
         self._memory_put(analysis_id, value)
         if h5py is None:
             return
@@ -209,7 +212,7 @@ class CacheManager:
             h5.attrs["cache_format"] = "reaxkit-analysis-hdf5-v1"
             h5.create_dataset("payload", data=np.frombuffer(payload, dtype=np.uint8))
         tmp.replace(path)
-        self._update_index(analysis_id, cache_path=path)
+        self._update_index(analysis_id, cache_path=path, task_name=task_name)
 
 
 __all__ = ["CacheConfig", "CacheManager"]

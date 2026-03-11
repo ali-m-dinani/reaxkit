@@ -205,7 +205,7 @@ class AnalysisExecutor:
                         t_run = perf_counter() - t_run0
                         self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
                         if use_cache:
-                            cache.store(analysis_id, result)
+                            cache.store(analysis_id, result, task_name=task.__class__.__name__)
                             logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
                         return result
 
@@ -325,6 +325,6 @@ class AnalysisExecutor:
             ) from exc
         t_run = perf_counter() - t_run0
         self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
-        cache.store(analysis_id, result)
+        cache.store(analysis_id, result, task_name=task.__class__.__name__)
         logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
         return result
