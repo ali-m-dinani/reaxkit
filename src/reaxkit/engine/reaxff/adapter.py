@@ -464,6 +464,7 @@ def _connectivity_trajectory_from_handlers(
     xmolout_handler: XmoloutHandler,
     *,
     summary_simulation: SimulationData | None = None,
+    force_field_parameters: ForceFieldParametersData | None = None,
     reporter=None,
 ) -> ConnectivityTrajectoryData:
     trajectory = _trajectory_from_xmolout_handler(xmolout_handler)
@@ -500,6 +501,7 @@ def _connectivity_trajectory_from_handlers(
     return ConnectivityTrajectoryData(
         connectivity=connectivity,
         trajectory=trajectory,
+        force_field_parameters=force_field_parameters,
     )
 
 
@@ -1203,10 +1205,27 @@ class ReaxFFAdapter(EngineAdapter):
         fort7_handler = Fort7Handler(fort7_path, reporter=reporter)
         xmol_handler = XmoloutHandler(xmol_path, reporter=reporter)
         summary_simulation = self._load_simulation_from_summary(args, reporter=reporter)
+        force_field_parameters: ForceFieldParametersData | None = None
+        try:
+            ff_args = dict(args)
+            if not ff_args.get("ffield"):
+                ff_args["ffield"] = str(
+                    self._resolve_reaxff_path(
+                        args,
+                        "ffield",
+                        "force_field",
+                        "atom_reference",
+                        default="ffield",
+                    )
+                )
+            force_field_parameters = self.load_force_field(ff_args, reporter=reporter)
+        except Exception:
+            force_field_parameters = None
         return _connectivity_trajectory_from_handlers(
             fort7_handler,
             xmol_handler,
             summary_simulation=summary_simulation,
+            force_field_parameters=force_field_parameters,
             reporter=reporter,
         )
 

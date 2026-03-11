@@ -26,7 +26,7 @@ from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
-from reaxkit.domain.data_models import ConnectivityTrajectoryData, CoordinationStatusBundleData
+from reaxkit.domain.data_models import ConnectivityTrajectoryData
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 
@@ -192,15 +192,17 @@ def _build_hybridization_request(args: argparse.Namespace) -> HybridizationStatu
 
 def _build_coordination_relabel_request(
     args: argparse.Namespace,
-    coordination_table: pd.DataFrame,
 ) -> TrajectoryRelabelByCoordinationRequest:
+    valences = _parse_kv_map(args.valences, value_cast=float) if args.valences else None
     return TrajectoryRelabelByCoordinationRequest(
-        coordination_table=coordination_table,
         labels=_parse_status_labels(args.labels),
         mode=args.mode,
         keep_coord_original=args.keep_coord_original,
         frames=_parse_frames(args.frames),
         every=args.every,
+        valences=valences,
+        threshold=args.threshold,
+        require_all_valences=not args.allow_missing_valences,
     )
 
 
@@ -434,17 +436,11 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         )
         composite = adapter.load(ConnectivityTrajectoryData, normalized)
 
-        coordination_task_cls = TASK_REGISTRY["coordination"]
-        coordination_request = _build_coordination_request(args)
-        coordination_bundle = adapter.load(CoordinationStatusBundleData, normalized)
-        coordination_result = coordination_task_cls().run(coordination_bundle, coordination_request)
-
-        if args.export:
-            export_result_csv(coordination_result, args.export)
-
         relabel_task_cls = TASK_REGISTRY["trajectory_relabel_by_coordination"]
-        relabel_request = _build_coordination_relabel_request(args, coordination_result.table)
+        relabel_request = _build_coordination_relabel_request(args)
         relabel_result = relabel_task_cls().run(composite, relabel_request)
+        if args.export:
+            export_result_csv(relabel_result, args.export)
 
         out_path = adapter.write(relabel_result.trajectory, args.output, vars(args))
         print(f"Wrote relabeled trajectory to {out_path}")

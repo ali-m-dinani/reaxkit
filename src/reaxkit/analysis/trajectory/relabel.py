@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
+from reaxkit.analysis.connectivity.coordination import CoordinationStatusRequest, CoordinationStatusTask
 from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityTrajectoryData, SimulationData, TrajectoryData
+from reaxkit.domain.data_models import (
+    ConnectivityTrajectoryData,
+    CoordinationStatusBundleData,
+    ForceFieldParametersData,
+    SimulationData,
+    TrajectoryData,
+)
+from reaxkit.presentation.specs import PresentationSpec
 
 
 def _subset_optional_array(values, frame_idx: np.ndarray):
@@ -48,39 +56,127 @@ def _subset_simulation(simulation: SimulationData | None, frame_idx: np.ndarray,
 
 @dataclass
 class TrajectoryRelabelByCoordinationRequest(BaseRequest):
-    """Request to relabel a trajectory from coordination-status output."""
+    """Request to relabel trajectory atom labels from coordination status.
 
-    coordination_table: pd.DataFrame = dc_field(
-        metadata={'label': 'Coordination Table', 'help': 'Coordination Table parameter for TrajectoryRelabelByCoordinationRequest.'},
-    )
+    Parameters
+    ----------
+    labels
+        Optional mapping from status code to tag string.
+        Defaults are ``{-1: "U", 0: "C", 1: "O"}``.
+        Example: ``{-1: "UN", 0: "OK", 1: "OV"}``.
+    mode
+        Relabeling style:
+        - ``global``: replace labels with status tags only
+        - ``by_type``: append status tag to original atom type
+        Example: ``mode="by_type"``.
+    keep_coord_original
+        Used only with ``mode="by_type"``. If ``True``, atoms with status ``0``
+        keep original labels instead of adding the coordinated tag.
+    frames
+        Optional frame indices to relabel. If omitted, all frames are used.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after selection. Example: ``every=5``.
+    valences
+        Optional element-to-valence map passed to coordination classification.
+        Example: ``{"C": 4.0, "O": 2.0, "H": 1.0}``.
+    threshold
+        Absolute tolerance around valence used for coordination classification.
+        Example: ``0.9``.
+    require_all_valences
+        If ``True``, fail when selected atom types have no valence mapping.
+    """
+
     labels: Optional[Mapping[int, str]] = dc_field(
         default=None,
-        metadata={'label': 'Labels', 'help': 'Labels parameter for TrajectoryRelabelByCoordinationRequest.'},
+        metadata={
+            'label': 'Labels',
+            'help': "Optional status->tag mapping. Example: {-1:'UN', 0:'OK', 1:'OV'}.",
+        },
     )
     mode: str = dc_field(
         default="global",
-        metadata={'label': 'Mode', 'help': 'Mode parameter for TrajectoryRelabelByCoordinationRequest.'},
+        metadata={
+            'label': 'Mode',
+            'help': "Relabeling mode. 'global' uses only status tags, 'by_type' appends tags to original atom types.",
+            'choices': ['global', 'by_type'],
+        },
     )
     keep_coord_original: bool = dc_field(
         default=False,
-        metadata={'label': 'Keep Coord Original', 'help': 'Keep Coord Original parameter for TrajectoryRelabelByCoordinationRequest.', 'choices': [True, False]},
+        metadata={
+            'label': 'Keep Coord Original',
+            'help': "In by_type mode, keep original label for coordinated atoms (status=0).",
+            'choices': [True, False],
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for TrajectoryRelabelByCoordinationRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to relabel. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for TrajectoryRelabelByCoordinationRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
+    )
+    valences: Optional[Mapping[str, float]] = dc_field(
+        default=None,
+        metadata={
+            'label': 'Valences',
+            'help': "Optional element->valence map for coordination classification. Example: {'C': 4, 'O': 2, 'H': 1}.",
+        },
+    )
+    threshold: float = dc_field(
+        default=0.9,
+        metadata={
+            'label': 'Threshold',
+            'help': "Absolute tolerance used to classify under/coord/over status. Example: 0.9.",
+            'min': 0.0,
+        },
+    )
+    require_all_valences: bool = dc_field(
+        default=True,
+        metadata={
+            'label': 'Require All Valences',
+            'help': "If true, fail when any selected atom type has no valence mapping.",
+            'choices': [True, False],
+        },
     )
 
 
 @dataclass
 class TrajectoryRelabelByCoordinationResult(BaseResult):
-    """Relabeled trajectory plus the label table used to build it."""
+    """Relabeled trajectory generated from computed coordination status.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`TrajectoryRelabelByCoordinationRequest` used.
+    - ``trajectory``: trajectory subset with relabeled ``atom_labels`` per frame.
+    - ``table``: coordination-status table used for relabeling.
+
+    Table columns
+    -------------
+    Typical columns include:
+    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
+    ``valence``, ``delta``, ``status``, ``status_label``.
+
+    Example
+    -------
+    With ``mode='by_type'`` and default labels, an oxygen atom with status ``1``
+    is relabeled from ``O`` to ``OO`` in that frame.
+    """
 
     trajectory: TrajectoryData
     table: pd.DataFrame
+    request: TrajectoryRelabelByCoordinationRequest
 
 
 def _status_labels(mapping: Optional[Mapping[int, str]]) -> dict[int, str]:
@@ -95,12 +191,23 @@ def _selected_frames(data: TrajectoryData, request: TrajectoryRelabelByCoordinat
     n_frames = int(np.asarray(data.positions).shape[0])
     if request.frames is not None:
         idx = [int(i) for i in request.frames if 0 <= int(i) < n_frames]
-    elif not request.coordination_table.empty and "frame_index" in request.coordination_table.columns:
-        idx = sorted({int(i) for i in request.coordination_table["frame_index"].dropna().tolist() if 0 <= int(i) < n_frames})
     else:
         idx = list(range(n_frames))
     stride = max(1, int(request.every))
     return np.asarray(idx[::stride], dtype=int)
+
+
+def _empty_force_field_parameters() -> ForceFieldParametersData:
+    empty = pd.DataFrame()
+    return ForceFieldParametersData(
+        general_parameters=empty.copy(),
+        atom_parameters=empty.copy(),
+        bond_parameters=empty.copy(),
+        off_diagonal_parameters=empty.copy(),
+        angle_parameters=empty.copy(),
+        torsion_parameters=empty.copy(),
+        hydrogen_bond_parameters=empty.copy(),
+    )
 
 
 @register_task("trajectory_relabel_by_coordination")
@@ -108,6 +215,13 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
     """Build a relabeled trajectory from coordination-status output."""
 
     required_data = ConnectivityTrajectoryData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: TrajectoryRelabelByCoordinationResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
     def run(
         self,
@@ -129,11 +243,33 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
         if len(base_elements) != n_atoms:
             raise ValueError("TrajectoryData.elements length must match positions atom count.")
 
+        force_field = data.force_field_parameters
+        if force_field is None and request.valences is None:
+            raise ValueError(
+                "Relabel-by-coordination requires force-field valences (via ConnectivityTrajectoryData.force_field_parameters) "
+                "or explicit request.valences."
+            )
+        if force_field is None:
+            force_field = _empty_force_field_parameters()
+
+        coordination_result = CoordinationStatusTask().run(
+            CoordinationStatusBundleData(
+                connectivity=data.connectivity,
+                force_field_parameters=force_field,
+            ),
+            CoordinationStatusRequest(
+                valences=request.valences,
+                threshold=float(request.threshold),
+                frames=request.frames,
+                every=int(request.every),
+                require_all_valences=bool(request.require_all_valences),
+            ),
+        )
+        table = coordination_result.table.copy()
         frame_idx = _selected_frames(trajectory, request)
         labels_by_frame = np.tile(np.asarray(base_elements, dtype=object), (len(frame_idx), 1))
         label_map = _status_labels(request.labels)
         atom_to_index = {atom_id: i for i, atom_id in enumerate(atom_ids)}
-        table = request.coordination_table.copy()
 
         if not table.empty:
             required = {"frame_index", "atom_id", "status"}
@@ -174,7 +310,11 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
             iterations=_subset_optional_array(trajectory.iterations, frame_idx),
             atom_labels=labels_by_frame,
         )
-        return TrajectoryRelabelByCoordinationResult(trajectory=relabeled, table=table.reset_index(drop=True))
+        return TrajectoryRelabelByCoordinationResult(
+            trajectory=relabeled,
+            table=table.reset_index(drop=True),
+            request=request,
+        )
 
 
 __all__ = [

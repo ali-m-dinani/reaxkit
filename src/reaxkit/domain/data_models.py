@@ -757,5 +757,6 @@ class ConnectivityTrajectoryData:
 
     connectivity: ConnectivityData
     trajectory: TrajectoryData
+    force_field_parameters: Optional[ForceFieldParametersData] = None
 
 
