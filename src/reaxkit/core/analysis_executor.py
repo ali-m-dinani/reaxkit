@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 from pathlib import Path
 from time import perf_counter
 from datetime import datetime, timezone
@@ -173,6 +174,9 @@ class AnalysisExecutor:
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
+        handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
+        handler_cache_dir.mkdir(parents=True, exist_ok=True)
+        os.environ["REAXKIT_HANDLER_CACHE_DIR"] = str(handler_cache_dir.resolve())
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
         args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task.__class__.__name__)
