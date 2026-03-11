@@ -152,6 +152,63 @@ class AnalysisExecutor:
         use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
         analysis_id = None
         if parsed_id is not None:
+            data_name = getattr(task.required_data, "__name__", "parsed_data")
+            artifact_name = str(data_name).lower()
+            if layout is not None:
+                cached_parsed = layout.load_parsed_artifact(
+                    parsed_id=parsed_id,
+                    artifact_name=artifact_name,
+                )
+                if cached_parsed is not None:
+                    expected_type = task.required_data
+                    if isinstance(cached_parsed, expected_type):
+                        logger.debug("Parsed cache hit for data_type=%s parsed_id=%s", data_name, parsed_id[:12])
+                        t_load = 0.0
+                        self._record_timing(args, phase="load", task_name=task.__class__.__name__, seconds=t_load)
+                        data = cached_parsed
+                        analysis_id = cache.analysis_id_for(
+                            task=task,
+                            data=None,
+                            request=request,
+                            parsed_id=parsed_id,
+                            task_version=task_version,
+                        )
+                        args["_analysis_id"] = analysis_id
+                        try:
+                            layout.record_run_analysis(
+                                run_id=str(run_id),
+                                parsed_id=parsed_id,
+                                analysis_id=analysis_id,
+                                task_name=task.__class__.__name__,
+                                task_version=task_version,
+                            )
+                        except Exception as exc:  # pragma: no cover - best-effort index update
+                            logger.debug("Run analysis index update skipped: %s", exc)
+
+                        if use_cache and cache.exists(analysis_id):
+                            logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                            return cache.load(analysis_id)
+
+                        if not use_cache:
+                            logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
+                        else:
+                            logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                        t_run0 = perf_counter()
+                        try:
+                            result = self._run_task(task, data, request, reporter)
+                        except AnalysisError:
+                            raise
+                        except Exception as exc:
+                            raise AnalysisError(
+                                f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
+                            ) from exc
+                        t_run = perf_counter() - t_run0
+                        self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
+                        if use_cache:
+                            cache.store(analysis_id, result)
+                            logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
+                        return result
+
             analysis_id = cache.analysis_id_for(
                 task=task,
                 data=None,

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
-from reaxkit.core.parsed_store import update_parsed_meta, write_parsed_hdf5
+from reaxkit.core.parsed_store import load_parsed_hdf5, update_parsed_meta, write_parsed_hdf5
 
 _DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
     "xmolout",
@@ -250,6 +250,30 @@ class ReaxkitStorageLayout:
         out_path = write_parsed_hdf5(parsed_dir / file_name, data)
         update_parsed_meta(parsed_dir, parsed_id=str(parsed_id), artifact_name=safe_name, file_name=file_name)
         return out_path
+
+    def load_parsed_artifact(
+        self,
+        *,
+        parsed_id: str,
+        artifact_name: str,
+    ) -> Any | None:
+        parsed_dir = self.parsed_dir(parsed_id)
+        meta_path = parsed_dir / "meta.json"
+        safe_name = "".join(ch if (ch.isalnum() or ch in {"_", "-"}) else "_" for ch in str(artifact_name)).strip("_")
+        if not safe_name:
+            safe_name = "parsed_data"
+        default_file = f"{safe_name}.h5"
+        target = parsed_dir / default_file
+        if meta_path.exists():
+            payload = _read_json(meta_path, default={})
+            file_name = str(((payload.get("artifacts") or {}).get(safe_name) or {}).get("file") or default_file)
+            target = parsed_dir / file_name
+        if not target.exists():
+            return None
+        try:
+            return load_parsed_hdf5(target)
+        except Exception:
+            return None
 
     def record_run_analysis(
         self,

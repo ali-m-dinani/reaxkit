@@ -127,12 +127,30 @@ def write_parsed_hdf5(path: Path, data: Any) -> Path:
     if tmp.exists():
         tmp.unlink()
     with h5py.File(tmp, "w") as h5:
-        h5.attrs["reaxkit_format"] = "parsed-hdf5-v1"
+        h5.attrs["reaxkit_format"] = "parsed-hdf5-v2"
         h5.attrs["created_at_utc"] = _utc_now_iso()
         h5.attrs["root_class"] = f"{data.__class__.__module__}.{data.__class__.__qualname__}"
-        _write_any(h5, "payload", data)
+        # Store a canonical payload for fast and lossless re-hydration.
+        payload = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
+        h5.create_dataset("__pickle_payload__", data=np.frombuffer(payload, dtype=np.uint8))
+        try:
+            _write_any(h5, "payload", data)
+        except Exception as exc:
+            # Structured tree is best-effort; payload remains authoritative.
+            h5.attrs["payload_layout_error"] = repr(exc)
     tmp.replace(path)
     return path
+
+
+def load_parsed_hdf5(path: Path) -> Any:
+    """Load parsed domain data from HDF5 when pickle payload is available."""
+    if h5py is None:  # pragma: no cover
+        raise RuntimeError("h5py is required to load parsed HDF5 artifacts.")
+    with h5py.File(path, "r") as h5:
+        if "__pickle_payload__" not in h5:
+            raise ValueError("Parsed artifact does not contain a pickle payload.")
+        payload = bytes(bytearray(h5["__pickle_payload__"][...].tolist()))
+    return pickle.loads(payload)
 
 
 def update_parsed_meta(parsed_dir: Path, *, parsed_id: str, artifact_name: str, file_name: str) -> Path:
