@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -1138,12 +1139,67 @@ class ReaxFFAdapter(EngineAdapter):
         }
         return mapping.get(data_type)
 
+    @staticmethod
+    def _emit_load_timing(
+        args: dict,
+        *,
+        handler: str,
+        source_path: Path | str | None,
+        seconds: float,
+    ) -> None:
+        cb = args.get("_load_timing_callback")
+        if not callable(cb):
+            return
+        source = None
+        source_full = None
+        if source_path is not None:
+            p = Path(source_path)
+            source = p.name
+            source_full = str(p)
+        cb(handler=str(handler), source=source, source_path=source_full, seconds=float(seconds))
+
+    @classmethod
+    def _build_handler(
+        cls,
+        args: dict,
+        *,
+        handler_name: str,
+        source_path: Path | str | None,
+        factory,
+    ):
+        _ = (args, handler_name, source_path)
+        return factory()
+
+    @classmethod
+    def _time_source(
+        cls,
+        args: dict,
+        *,
+        handler_name: str,
+        source_path: Path | str | None,
+        loader,
+    ):
+        t0 = perf_counter()
+        out = loader()
+        cls._emit_load_timing(args, handler=handler_name, source_path=source_path, seconds=perf_counter() - t0)
+        return out
+
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
         xmol_path = self._resolve_reaxff_path(args, "xmolout", default="xmolout")
-        handler = XmoloutHandler(xmol_path, reporter=reporter)
-        trj = _trajectory_from_xmolout_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="XmoloutHandler",
+            source_path=xmol_path,
+            factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        )
+        trj = self._time_source(
+            args,
+            handler_name="XmoloutHandler",
+            source_path=xmol_path,
+            loader=lambda: _trajectory_from_xmolout_handler(handler),
+        )
         trj.simulation = _merge_simulation_data(
             trj.simulation,
             self._load_simulation_from_summary(args, reporter=reporter),
@@ -1156,8 +1212,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
         p = Path(raw)
         geo_path = p / "geo" if p.is_dir() else p
-        handler = GeoHandler(geo_path, reporter=reporter)
-        return _geometry_from_geo_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="GeoHandler",
+            source_path=geo_path,
+            factory=lambda: GeoHandler(geo_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="GeoHandler",
+            source_path=geo_path,
+            loader=lambda: _geometry_from_geo_handler(handler),
+        )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
         sim = self._load_simulation_from_xmolout(args, reporter=reporter)
@@ -1166,19 +1232,29 @@ class ReaxFFAdapter(EngineAdapter):
             raise FileNotFoundError("SimulationData for reaxff currently requires xmolout or summary.txt.")
         return sim
 
-    @staticmethod
-    def _load_simulation_from_xmolout(args: dict, reporter=None) -> SimulationData | None:
+    @classmethod
+    def _load_simulation_from_xmolout(cls, args: dict, reporter=None) -> SimulationData | None:
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
-        xmol_path = ReaxFFAdapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        xmol_path = cls._resolve_reaxff_path(args, "xmolout", default="xmolout")
         if not xmol_path.exists():
             return None
-        handler = XmoloutHandler(xmol_path, reporter=reporter)
-        trj = _trajectory_from_xmolout_handler(handler)
+        handler = cls._build_handler(
+            args,
+            handler_name="XmoloutHandler",
+            source_path=xmol_path,
+            factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        )
+        trj = cls._time_source(
+            args,
+            handler_name="XmoloutHandler",
+            source_path=xmol_path,
+            loader=lambda: _trajectory_from_xmolout_handler(handler),
+        )
         return trj.simulation
 
-    @staticmethod
-    def _load_simulation_from_summary(args: dict, reporter=None) -> SimulationData | None:
+    @classmethod
+    def _load_simulation_from_summary(cls, args: dict, reporter=None) -> SimulationData | None:
         from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
 
         candidates = [args.get("summary"), args.get("xmolout"), args.get("run_dir"), args.get("input")]
@@ -1198,8 +1274,18 @@ class ReaxFFAdapter(EngineAdapter):
                 break
         if summary_path is None:
             return None
-        handler = SummaryHandler(summary_path, reporter=reporter)
-        return _simulation_from_summary_handler(handler)
+        handler = cls._build_handler(
+            args,
+            handler_name="SummaryHandler",
+            source_path=summary_path,
+            factory=lambda: SummaryHandler(summary_path, reporter=reporter),
+        )
+        return cls._time_source(
+            args,
+            handler_name="SummaryHandler",
+            source_path=summary_path,
+            loader=lambda: _simulation_from_summary_handler(handler),
+        )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
@@ -1207,8 +1293,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort7") or args.get("connectivity") or args.get("input") or "fort.7"
         p = Path(raw)
         fort7_path = p / "fort.7" if p.is_dir() else p
-        handler = Fort7Handler(fort7_path, reporter=reporter)
-        conn = _connectivity_from_fort7_handler(handler, reporter=reporter)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort7Handler",
+            source_path=fort7_path,
+            factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        )
+        conn = self._time_source(
+            args,
+            handler_name="Fort7Handler",
+            source_path=fort7_path,
+            loader=lambda: _connectivity_from_fort7_handler(handler, reporter=reporter),
+        )
         sim = _merge_simulation_data(
             self._load_simulation_from_xmolout(args, reporter=reporter),
             self._load_simulation_from_summary(args, reporter=reporter),
@@ -1234,8 +1330,18 @@ class ReaxFFAdapter(EngineAdapter):
         fort7_path = fort7_path / "fort.7" if fort7_path.is_dir() else fort7_path
 
         xmol_path = self._resolve_reaxff_path(args, "xmolout", default="xmolout")
-        fort7_handler = Fort7Handler(fort7_path, reporter=reporter)
-        xmol_handler = XmoloutHandler(xmol_path, reporter=reporter)
+        fort7_handler = self._build_handler(
+            args,
+            handler_name="Fort7Handler",
+            source_path=fort7_path,
+            factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        )
+        xmol_handler = self._build_handler(
+            args,
+            handler_name="XmoloutHandler",
+            source_path=xmol_path,
+            factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        )
         summary_simulation = self._load_simulation_from_summary(args, reporter=reporter)
         force_field_parameters: ForceFieldParametersData | None = None
         try:
@@ -1267,9 +1373,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
         ffield_path = p / "ffield" if p.is_dir() else p
-        handler = FFieldHandler(ffield_path, reporter=reporter)
-        out = _force_field_from_ffield_handler(handler)
-        return out
+        handler = self._build_handler(
+            args,
+            handler_name="FFieldHandler",
+            source_path=ffield_path,
+            factory=lambda: FFieldHandler(ffield_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="FFieldHandler",
+            source_path=ffield_path,
+            loader=lambda: _force_field_from_ffield_handler(handler),
+        )
 
     def load_force_field_optimization(self, args: dict, reporter=None) -> ForceFieldOptimizationProgressData:
         from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
@@ -1277,8 +1392,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort13") or args.get("force_field_optimization") or args.get("input") or "fort.13"
         p = Path(raw)
         fort13_path = p / "fort.13" if p.is_dir() else p
-        handler = Fort13Handler(fort13_path, reporter=reporter)
-        return _force_field_optimization_from_fort13_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort13Handler",
+            source_path=fort13_path,
+            factory=lambda: Fort13Handler(fort13_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort13Handler",
+            source_path=fort13_path,
+            loader=lambda: _force_field_optimization_from_fort13_handler(handler),
+        )
 
     def load_force_field_optimization_report(self, args: dict, reporter=None) -> ForceFieldOptimizationReportData:
         from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
@@ -1286,8 +1411,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort99") or args.get("force_field_optimization_report") or args.get("input") or "fort.99"
         p = Path(raw)
         fort99_path = p / "fort.99" if p.is_dir() else p
-        handler = Fort99Handler(fort99_path, reporter=reporter)
-        return _force_field_optimization_report_from_fort99_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort99Handler",
+            source_path=fort99_path,
+            factory=lambda: Fort99Handler(fort99_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort99Handler",
+            source_path=fort99_path,
+            loader=lambda: _force_field_optimization_report_from_fort99_handler(handler),
+        )
 
     def load_force_field_optimization_training_set(
         self,
@@ -1299,8 +1434,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("trainset") or args.get("force_field_optimization_training_set") or args.get("input") or "trainset.in"
         p = Path(raw)
         trainset_path = p / "trainset.in" if p.is_dir() else p
-        handler = TrainsetHandler(trainset_path, reporter=reporter)
-        return _force_field_optimization_training_set_from_trainset_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="TrainsetHandler",
+            source_path=trainset_path,
+            factory=lambda: TrainsetHandler(trainset_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="TrainsetHandler",
+            source_path=trainset_path,
+            loader=lambda: _force_field_optimization_training_set_from_trainset_handler(handler),
+        )
 
     def load_force_field_optimization_parameters(
         self,
@@ -1312,8 +1457,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("params") or args.get("force_field_optimization_parameters") or args.get("input") or "params"
         p = Path(raw)
         params_path = p / "params" if p.is_dir() else p
-        handler = ParamsHandler(params_path, reporter=reporter)
-        return _force_field_optimization_parameters_from_params_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="ParamsHandler",
+            source_path=params_path,
+            factory=lambda: ParamsHandler(params_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="ParamsHandler",
+            source_path=params_path,
+            loader=lambda: _force_field_optimization_parameters_from_params_handler(handler),
+        )
 
     def load_force_field_optimization_data(
         self,
@@ -1345,8 +1500,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort79") or args.get("parameter_optimization_diagnostic") or args.get("input") or "fort.79"
         p = Path(raw)
         fort79_path = p / "fort.79" if p.is_dir() else p
-        handler = Fort79Handler(fort79_path, reporter=reporter)
-        return _parameter_optimization_diagnostic_from_fort79_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort79Handler",
+            source_path=fort79_path,
+            factory=lambda: Fort79Handler(fort79_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort79Handler",
+            source_path=fort79_path,
+            loader=lambda: _parameter_optimization_diagnostic_from_fort79_handler(handler),
+        )
 
     def load_parameter_optimization_diagnostic_bundle(
         self,
@@ -1374,8 +1539,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
         p = Path(raw)
         fort74_path = p / "fort.74" if p.is_dir() else p
-        handler = Fort74Handler(fort74_path, reporter=reporter)
-        return _structure_summary_from_fort74_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort74Handler",
+            source_path=fort74_path,
+            factory=lambda: Fort74Handler(fort74_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort74Handler",
+            source_path=fort74_path,
+            loader=lambda: _structure_summary_from_fort74_handler(handler),
+        )
 
     def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
         from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
@@ -1387,8 +1562,18 @@ class ReaxFFAdapter(EngineAdapter):
             partial_energy_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
         else:
             partial_energy_path = p
-        handler = Fort73Handler(partial_energy_path, reporter=reporter)
-        return _partial_energy_from_energy_log_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort73Handler",
+            source_path=partial_energy_path,
+            factory=lambda: Fort73Handler(partial_energy_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort73Handler",
+            source_path=partial_energy_path,
+            loader=lambda: _partial_energy_from_energy_log_handler(handler),
+        )
 
     def load_restraints(self, args: dict, reporter=None) -> RestraintData:
         from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
@@ -1396,8 +1581,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
         p = Path(raw)
         fort76_path = p / "fort.76" if p.is_dir() else p
-        handler = Fort76Handler(fort76_path, reporter=reporter)
-        return _restraint_from_fort76_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort76Handler",
+            source_path=fort76_path,
+            factory=lambda: Fort76Handler(fort76_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort76Handler",
+            source_path=fort76_path,
+            loader=lambda: _restraint_from_fort76_handler(handler),
+        )
 
     def load_geometry_optimization(self, args: dict, reporter=None) -> GeometryOptimizationProgressData:
         from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
@@ -1405,8 +1600,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
         p = Path(raw)
         fort57_path = p / "fort.57" if p.is_dir() else p
-        handler = Fort57Handler(fort57_path, reporter=reporter)
-        return _geometry_optimization_from_fort57_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort57Handler",
+            source_path=fort57_path,
+            factory=lambda: Fort57Handler(fort57_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort57Handler",
+            source_path=fort57_path,
+            loader=lambda: _geometry_optimization_from_fort57_handler(handler),
+        )
 
     def load_control_parameters(self, args: dict, reporter=None) -> ControlParametersData:
         from reaxkit.engine.reaxff.io.control_handler import ControlHandler
@@ -1414,8 +1619,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
         p = Path(raw)
         control_path = p / "control" if p.is_dir() else p
-        handler = ControlHandler(control_path, reporter=reporter)
-        return _control_parameters_from_control_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="ControlHandler",
+            source_path=control_path,
+            factory=lambda: ControlHandler(control_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="ControlHandler",
+            source_path=control_path,
+            loader=lambda: _control_parameters_from_control_handler(handler),
+        )
 
     def load_eregime(self, args: dict, reporter=None) -> EregimeData:
         from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
@@ -1423,8 +1638,18 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
         p = Path(raw)
         eregime_path = p / "eregime.in" if p.is_dir() else p
-        handler = EregimeHandler(eregime_path, reporter=reporter)
-        return _eregime_from_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="EregimeHandler",
+            source_path=eregime_path,
+            factory=lambda: EregimeHandler(eregime_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="EregimeHandler",
+            source_path=eregime_path,
+            loader=lambda: _eregime_from_handler(handler),
+        )
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
@@ -1432,12 +1657,22 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
         p = Path(raw)
         fort7_path = p / "fort.7" if p.is_dir() else p
-        handler = Fort7Handler(fort7_path, reporter=reporter)
+        handler = self._build_handler(
+            args,
+            handler_name="Fort7Handler",
+            source_path=fort7_path,
+            factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        )
         sim = _merge_simulation_data(
             self._load_simulation_from_xmolout(args, reporter=reporter),
             self._load_simulation_from_summary(args, reporter=reporter),
         )
-        return _charges_from_fort7_handler(handler, simulation=sim, reporter=reporter)
+        return self._time_source(
+            args,
+            handler_name="Fort7Handler",
+            source_path=fort7_path,
+            loader=lambda: _charges_from_fort7_handler(handler, simulation=sim, reporter=reporter),
+        )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:
         from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
@@ -1455,8 +1690,18 @@ class ReaxFFAdapter(EngineAdapter):
                 vels_path = p / "vels"
         else:
             vels_path = p
-        handler = VelsHandler(vels_path, reporter=reporter)
-        return _atomic_kinematics_from_vels_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="VelsHandler",
+            source_path=vels_path,
+            factory=lambda: VelsHandler(vels_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="VelsHandler",
+            source_path=vels_path,
+            loader=lambda: _atomic_kinematics_from_vels_handler(handler),
+        )
 
     def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
         from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
@@ -1466,9 +1711,18 @@ class ReaxFFAdapter(EngineAdapter):
         fort78_path = p / "fort.78" if p.is_dir() else p
         # ReaxFF writes fort.78 on the iout1 schedule, which may differ from xmolout/fort.7/summary
         # outputs that are typically written on the iout2 schedule.
-        handler = Fort78Handler(fort78_path, reporter=reporter)
-        out = _electric_field_from_fort78_handler(handler)
-        return out
+        handler = self._build_handler(
+            args,
+            handler_name="Fort78Handler",
+            source_path=fort78_path,
+            factory=lambda: Fort78Handler(fort78_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="Fort78Handler",
+            source_path=fort78_path,
+            loader=lambda: _electric_field_from_fort78_handler(handler),
+        )
 
     def load_molecular_analysis(self, args: dict, reporter=None) -> MolecularAnalysisData:
         from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
@@ -1484,8 +1738,18 @@ class ReaxFFAdapter(EngineAdapter):
                 molfra_path = p / "molfra.out"
         else:
             molfra_path = p
-        handler = MolFraHandler(molfra_path, reporter=reporter)
-        return _molecular_analysis_from_molfra_handler(handler)
+        handler = self._build_handler(
+            args,
+            handler_name="MolFraHandler",
+            source_path=molfra_path,
+            factory=lambda: MolFraHandler(molfra_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="MolFraHandler",
+            source_path=molfra_path,
+            loader=lambda: _molecular_analysis_from_molfra_handler(handler),
+        )
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
         from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames

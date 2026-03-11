@@ -52,18 +52,61 @@ class AnalysisExecutor:
     @staticmethod
     def _timing_log_path(args: dict) -> Path:
         project_root = Path(args.get("project_root") or ".")
-        return project_root / "logs" / "timing.log"
+        return project_root / "logs" / "timing" / "machine_readable_timing.log"
 
     @staticmethod
     def _timing_human_global_log_path(args: dict) -> Path:
         project_root = Path(args.get("project_root") or ".")
-        return project_root / "logs" / "timing_human.log"
+        return project_root / "logs" / "timing" / "human_readable_timing.log"
 
     @staticmethod
     def _timing_human_run_log_path(args: dict) -> Path:
         project_root = Path(args.get("project_root") or ".")
         session_id = str(args.get("_log_session_id") or datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
-        return project_root / "logs" / f"run_{session_id}.timing.log"
+        return project_root / "logs" / "timing" / f"human_readable_timing_{session_id}.log"
+
+    @staticmethod
+    def _general_global_log_path(args: dict) -> Path:
+        project_root = Path(args.get("project_root") or ".")
+        return project_root / "logs" / "general" / "reaxkit_general.log"
+
+    @staticmethod
+    def _general_run_log_path(args: dict) -> Path:
+        project_root = Path(args.get("project_root") or ".")
+        session_id = str(args.get("_log_session_id") or datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
+        return project_root / "logs" / "general" / f"run_{session_id}.general.log"
+
+    @staticmethod
+    def _analysis_output_dir(args: dict) -> Path:
+        project_root = Path(args.get("project_root") or ".")
+        command = str(args.get("command") or "analysis")
+        analysis_id = str(args.get("analysis_id") or args.get("run_id") or args.get("_analysis_id") or "analysis")
+        return project_root / "analysis" / command / analysis_id
+
+    @staticmethod
+    def _fmt_kv(extra: dict | None) -> str:
+        if not extra:
+            return ""
+        parts: list[str] = []
+        for key in sorted(extra.keys()):
+            value = extra.get(key)
+            if value is None:
+                continue
+            parts.append(f"{key}={value}")
+        return (" " + " ".join(parts)) if parts else ""
+
+    @classmethod
+    def _record_general(cls, args: dict, *, event: str, task_name: str, extra: dict | None = None) -> None:
+        stamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
+        line = (
+            f"{stamp} ReaxKit event={event} task={task_name} "
+            f"run_id={args.get('run_id', '')}"
+            f"{cls._fmt_kv(extra)}"
+        )
+        for path in (cls._general_global_log_path(args), cls._general_run_log_path(args)):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(line + "\n")
 
     @classmethod
     def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float, extra: dict | None = None) -> None:
@@ -73,6 +116,7 @@ class AnalysisExecutor:
             "task": str(task_name),
             "seconds": float(seconds),
             "run_id": args.get("run_id"),
+            "session_id": args.get("_log_session_id"),
         }
         if extra:
             payload.update(extra)
@@ -86,14 +130,29 @@ class AnalysisExecutor:
             f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')} "
             f"ReaxKit task={task_name} phase={phase} "
             f"time={float(seconds):.3f}s run_id={args.get('run_id', '')}"
+            f"{cls._fmt_kv(extra)}"
         )
         for human_path in (cls._timing_human_global_log_path(args), cls._timing_human_run_log_path(args)):
             human_path.parent.mkdir(parents=True, exist_ok=True)
             with open(human_path, "a", encoding="utf-8") as fh:
                 fh.write(human_line + "\n")
 
-        if cls._timing_console_enabled(args):
-            logger.info("Timing phase=%s task=%s seconds=%.3f", phase, task_name, float(seconds))
+    @classmethod
+    def _load_timing_callback(cls, args: dict, *, task_name: str):
+        def _emit(*, handler: str, source: str | None, source_path: str | None, seconds: float) -> None:
+            cls._record_timing(
+                args,
+                phase="load_handler",
+                task_name=task_name,
+                seconds=float(seconds),
+                extra={
+                    "handler": handler,
+                    "source": source,
+                    "source_path": source_path,
+                },
+            )
+
+        return _emit
 
     @staticmethod
     def _run_task(task, data, request, reporter):
@@ -116,11 +175,21 @@ class AnalysisExecutor:
         args.update(normalized)
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
+        args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task.__class__.__name__)
         log_level = args.get("log")
         if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")
         elif log_level == "quiet" or args.get("quiet"):
             get_logger(__name__, level="WARNING")
+        self._record_general(
+            args,
+            event="session_start",
+            task_name=task.__class__.__name__,
+            extra={
+                "command": args.get("command"),
+                "project_root": args.get("project_root"),
+            },
+        )
 
         input_path = str(args.get("_snapshot_source_dir") or self._detection_path(args))
         forced_engine = args.get("engine")
@@ -129,6 +198,21 @@ class AnalysisExecutor:
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
         snapshot_names = adapter.required_input_files(task.required_data, args)
         snapshot_storage_inputs(args, names=snapshot_names)
+        if run_id := args.get("run_id"):
+            project_root = Path(args.get("project_root") or ".")
+            raw_dir = ReaxkitStorageLayout(project_root=project_root).raw_run_dir(str(run_id))
+            copied = sorted([p.name for p in raw_dir.iterdir() if p.is_file()]) if raw_dir.exists() else []
+            self._record_general(
+                args,
+                event="snapshot_raw_ready",
+                task_name=task.__class__.__name__,
+                extra={
+                    "raw_dir": str(raw_dir),
+                    "files": ",".join(copied),
+                    "required_inputs": ",".join(snapshot_names or ()),
+                    "engine_adapter": adapter.__class__.__name__,
+                },
+            )
         reporter = resolve_reporter(args)
         run_id = args.get("run_id")
         task_version = str(getattr(task, "VERSION", "1"))
@@ -144,6 +228,16 @@ class AnalysisExecutor:
                     engine=engine_name,
                 )
                 parsed_id = str(args["_parsed_id"])
+                self._record_general(
+                    args,
+                    event="parsed_dataset_registered",
+                    task_name=task.__class__.__name__,
+                    extra={
+                        "parsed_id": parsed_id,
+                        "parsed_dir": str(layout.parsed_dir(parsed_id)),
+                        "run_index": str(layout.run_index_path(str(run_id))),
+                    },
+                )
             except Exception as exc:  # pragma: no cover - best-effort metadata persistence
                 logger.debug("Storage index update skipped: %s", exc)
 
@@ -164,7 +258,7 @@ class AnalysisExecutor:
                     if isinstance(cached_parsed, expected_type):
                         logger.debug("Parsed cache hit for data_type=%s parsed_id=%s", data_name, parsed_id[:12])
                         t_load = 0.0
-                        self._record_timing(args, phase="load", task_name=task.__class__.__name__, seconds=t_load)
+                        self._record_timing(args, phase="load_total", task_name=task.__class__.__name__, seconds=t_load)
                         data = cached_parsed
                         analysis_id = cache.analysis_id_for(
                             task=task,
@@ -187,12 +281,24 @@ class AnalysisExecutor:
 
                         if use_cache and cache.exists(analysis_id):
                             logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                            self._record_general(
+                                args,
+                                event="analysis_cache_hit",
+                                task_name=task.__class__.__name__,
+                                extra={"analysis_id": analysis_id},
+                            )
                             return cache.load(analysis_id)
 
                         if not use_cache:
                             logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
                         else:
                             logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                            self._record_general(
+                                args,
+                                event="analysis_cache_miss",
+                                task_name=task.__class__.__name__,
+                                extra={"analysis_id": analysis_id},
+                            )
                         t_run0 = perf_counter()
                         try:
                             result = self._run_task(task, data, request, reporter)
@@ -207,6 +313,16 @@ class AnalysisExecutor:
                         if use_cache:
                             cache.store(analysis_id, result, task_name=task.__class__.__name__)
                             logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
+                        self._record_general(
+                            args,
+                            event="analysis_done",
+                            task_name=task.__class__.__name__,
+                            extra={
+                                "analysis_id": analysis_id,
+                                "analysis_dir": str(self._analysis_output_dir(args)),
+                                "status": "success",
+                            },
+                        )
                         return result
 
             analysis_id = cache.analysis_id_for(
@@ -230,6 +346,12 @@ class AnalysisExecutor:
 
             if use_cache and cache.exists(analysis_id):
                 logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                self._record_general(
+                    args,
+                    event="analysis_cache_hit",
+                    task_name=task.__class__.__name__,
+                    extra={"analysis_id": analysis_id},
+                )
                 return cache.load(analysis_id)
 
         t_load0 = perf_counter()
@@ -252,6 +374,16 @@ class AnalysisExecutor:
                     engine=engine_name,
                 )
                 parsed_id = str(args["_parsed_id"])
+                self._record_general(
+                    args,
+                    event="parsed_dataset_registered",
+                    task_name=task.__class__.__name__,
+                    extra={
+                        "parsed_id": parsed_id,
+                        "parsed_dir": str(layout.parsed_dir(parsed_id)),
+                        "run_index": str(layout.run_index_path(str(run_id))),
+                    },
+                )
             except Exception as exc:  # pragma: no cover - best-effort metadata persistence
                 logger.debug("Storage index update skipped: %s", exc)
 
@@ -259,10 +391,20 @@ class AnalysisExecutor:
             try:
                 data_name = getattr(task.required_data, "__name__", "parsed_data")
                 artifact_name = data_name.lower()
-                layout.persist_parsed_artifact(
+                parsed_artifact_path = layout.persist_parsed_artifact(
                     parsed_id=parsed_id,
                     artifact_name=artifact_name,
                     data=data,
+                )
+                self._record_general(
+                    args,
+                    event="parsed_artifact_saved",
+                    task_name=task.__class__.__name__,
+                    extra={
+                        "parsed_id": parsed_id,
+                        "artifact": artifact_name,
+                        "path": str(parsed_artifact_path),
+                    },
                 )
             except Exception as exc:  # pragma: no cover - best-effort artifact persistence
                 logger.debug("Parsed artifact write skipped: %s", exc)
@@ -272,7 +414,7 @@ class AnalysisExecutor:
             getattr(task.required_data, "__name__", str(task.required_data)),
             task.__class__.__name__,
         )
-        self._record_timing(args, phase="load", task_name=task.__class__.__name__, seconds=t_load)
+        self._record_timing(args, phase="load_total", task_name=task.__class__.__name__, seconds=t_load)
 
         analysis_id = analysis_id or cache.analysis_id_for(
             task=task,
@@ -307,13 +449,35 @@ class AnalysisExecutor:
                 ) from exc
             t_run = perf_counter() - t_run0
             self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
+            self._record_general(
+                args,
+                event="analysis_done",
+                task_name=task.__class__.__name__,
+                extra={
+                    "analysis_id": analysis_id,
+                    "analysis_dir": str(self._analysis_output_dir(args)),
+                    "status": "success",
+                },
+            )
             return result
 
         if cache.exists(analysis_id):
             logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+            self._record_general(
+                args,
+                event="analysis_cache_hit",
+                task_name=task.__class__.__name__,
+                extra={"analysis_id": analysis_id},
+            )
             return cache.load(analysis_id)
 
         logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+        self._record_general(
+            args,
+            event="analysis_cache_miss",
+            task_name=task.__class__.__name__,
+            extra={"analysis_id": analysis_id},
+        )
         t_run0 = perf_counter()
         try:
             result = self._run_task(task, data, request, reporter)
@@ -327,4 +491,14 @@ class AnalysisExecutor:
         self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
         cache.store(analysis_id, result, task_name=task.__class__.__name__)
         logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
+        self._record_general(
+            args,
+            event="analysis_done",
+            task_name=task.__class__.__name__,
+            extra={
+                "analysis_id": analysis_id,
+                "analysis_dir": str(self._analysis_output_dir(args)),
+                "status": "success",
+            },
+        )
         return result

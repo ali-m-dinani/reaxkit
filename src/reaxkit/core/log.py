@@ -36,12 +36,12 @@ def configure_file_logging(project_root: str | Path, *, session_id: str | None =
     Configure default file logging for all ReaxKit loggers.
 
     Creates:
-      - logs/reaxkit.log             (global append-all)
-      - logs/run_<session_id>.log    (per-run)
+      - logs/general/reaxkit_general.log
+      - logs/general/run_<session_id>.general.log
     """
     global _GLOBAL_FILE_HANDLER, _RUN_FILE_HANDLER, _CURRENT_SESSION_ID, _CURRENT_LOGS_ROOT
     root = Path(project_root)
-    logs_root = root / "logs"
+    logs_root = root / "logs" / "general"
     logs_root.mkdir(parents=True, exist_ok=True)
     sid = session_id or datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
 
@@ -52,7 +52,7 @@ def configure_file_logging(project_root: str | Path, *, session_id: str | None =
                     _GLOBAL_FILE_HANDLER.close()
                 except Exception:
                     pass
-            global_path = logs_root / "reaxkit.log"
+            global_path = logs_root / "reaxkit_general.log"
             gh = logging.FileHandler(global_path, encoding="utf-8")
             gh.setFormatter(_formatter())
             _GLOBAL_FILE_HANDLER = gh
@@ -70,7 +70,7 @@ def configure_file_logging(project_root: str | Path, *, session_id: str | None =
             _RUN_FILE_HANDLER = None
 
         if _RUN_FILE_HANDLER is None:
-            run_path = logs_root / f"run_{sid}.log"
+            run_path = logs_root / f"run_{sid}.general.log"
             rh = logging.FileHandler(run_path, encoding="utf-8")
             rh.setFormatter(_formatter())
             _RUN_FILE_HANDLER = rh
@@ -92,9 +92,7 @@ def get_logger(name: str, *, level: str | int | None = None) -> logging.Logger:
     logger = logging.getLogger(name)
     with _LOGGER_LOCK:
         if not logger.handlers:
-            handler = logging.StreamHandler()
-            handler.setFormatter(_formatter())
-            logger.addHandler(handler)
+            logger.addHandler(logging.NullHandler())
             logger.propagate = False
             logger.setLevel(logging.INFO)
 
