@@ -52,7 +52,7 @@ docs/file_templates/fort.79
 docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
-src/reaxkit/webui/reaxkit_workkspace
+src/reaxkit/webui/reaxkit_workspace
 
 # Generated outputs and temporary folders
 examples_to_test/

@@ -237,7 +237,7 @@ class BaseHandler(ABC):
         env_root = os.environ.get(self._CACHE_ENV_VAR, "").strip()
         if env_root:
             return Path(env_root)
-        project_workspace = Path("reaxkit_workkspace")
+        project_workspace = Path("reaxkit_workspace")
         if project_workspace.exists() and project_workspace.is_dir():
             return project_workspace / "cache" / "handlers"
         return Path(".reaxkit_cache") / "handlers"

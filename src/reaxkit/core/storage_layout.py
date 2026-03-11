@@ -69,7 +69,7 @@ def _safe_run_id(run_id: str) -> str:
 
 
 def default_project_root() -> Path:
-    return Path("reaxkit_workkspace")
+    return Path("reaxkit_workspace")
 
 
 def generate_run_id() -> str:

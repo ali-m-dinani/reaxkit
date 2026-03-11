@@ -20,11 +20,11 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
             candidates.append((Path(__file__).resolve().parents[2] / path).resolve())
     candidates.extend(
         [
-            Path("reaxkit_workkspace"),
             Path("reaxkit_workspace"),
-            Path.cwd() / "reaxkit_workkspace",
+            Path("reaxkit_workspace"),
             Path.cwd() / "reaxkit_workspace",
-            Path(__file__).resolve().parents[2] / "reaxkit_workkspace",
+            Path.cwd() / "reaxkit_workspace",
+            Path(__file__).resolve().parents[2] / "reaxkit_workspace",
             Path(__file__).resolve().parents[2] / "reaxkit_workspace",
         ]
     )
@@ -40,7 +40,7 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
         logs = root / "logs"
         if logs.exists() and logs.is_dir():
             return logs
-    return (deduped[0] / "logs") if deduped else (Path.cwd() / "reaxkit_workkspace" / "logs")
+    return (deduped[0] / "logs") if deduped else (Path.cwd() / "reaxkit_workspace" / "logs")
 
 
 def _pick_latest(paths: list[Path]) -> Path | None:
