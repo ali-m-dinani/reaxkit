@@ -1,0 +1,313 @@
+"""Workspace cleanup and archiving commands."""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import tarfile
+from pathlib import Path
+
+from reaxkit.core.storage_layout import default_project_root
+
+MANAGE_WORKSPACE_COMMAND = "manage-workspace"
+FREE_UP_COMMAND = "free-up"
+DEFAULT_ALT_WORKSPACE = Path("reaxkit_workspace")
+
+
+def _positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Value must be an integer.") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("Value must be >= 0.")
+    return parsed
+
+
+def _is_archive(path: Path) -> bool:
+    name = path.name.lower()
+    return name.endswith(".tar.gz") or name.endswith(".tar.zst") or name.endswith(".gz") or name.endswith(".zst")
+
+
+def _human_size(num_bytes: int) -> str:
+    value = float(max(0, int(num_bytes)))
+    units = ["B", "KB", "MB", "GB", "TB"]
+    idx = 0
+    while value >= 1024.0 and idx < len(units) - 1:
+        value /= 1024.0
+        idx += 1
+    return f"{value:.1f}{units[idx]}"
+
+
+def _entry_size(path: Path) -> int:
+    if path.is_file():
+        return int(path.stat().st_size)
+    total = 0
+    for child in path.rglob("*"):
+        if child.is_file():
+            total += int(child.stat().st_size)
+    return total
+
+
+def _resolve_workspace_root(workspace_root: str | None) -> Path:
+    if workspace_root:
+        root = Path(workspace_root)
+        return root
+
+    candidates = [
+        default_project_root(),
+        DEFAULT_ALT_WORKSPACE,
+        Path.cwd() / default_project_root(),
+        Path.cwd() / DEFAULT_ALT_WORKSPACE,
+    ]
+    for path in candidates:
+        if path.exists() and path.is_dir():
+            return path
+    return default_project_root()
+
+
+def _resolve_target_folder(*, workspace_root: Path, folder: str) -> Path:
+    raw = Path(str(folder).strip())
+    if raw.is_absolute():
+        return raw
+    return workspace_root / raw
+
+
+def _collect_entries(target: Path, *, include_archives: bool = False) -> list[Path]:
+    if not target.exists() or not target.is_dir():
+        return []
+    entries: list[Path] = []
+    for item in target.iterdir():
+        if item.name.startswith("."):
+            continue
+        if not include_archives and _is_archive(item):
+            continue
+        if item.is_dir() or item.is_file():
+            entries.append(item)
+    entries.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return entries
+
+
+def _delete_entry(path: Path, *, dry_run: bool) -> None:
+    if dry_run:
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+    elif path.exists():
+        path.unlink()
+
+
+def _archive_path(path: Path, compression: str) -> Path:
+    suffix = ".tar.gz" if compression == "gz" else ".tar.zst"
+    return path.with_name(f"{path.name}{suffix}")
+
+
+def _compress_to_archive(source: Path, archive: Path, *, compression: str) -> None:
+    if compression == "gz":
+        with tarfile.open(archive, mode="w:gz") as tar:
+            tar.add(source, arcname=source.name)
+        return
+
+    try:
+        import zstandard as zstd
+    except ImportError as exc:
+        raise RuntimeError(
+            "zst compression requested but optional dependency `zstandard` is not installed. "
+            "Install it or use --format gz."
+        ) from exc
+
+    with archive.open("wb") as out_f:
+        compressor = zstd.ZstdCompressor(level=3)
+        with compressor.stream_writer(out_f) as zstd_stream:
+            with tarfile.open(fileobj=zstd_stream, mode="w|") as tar:
+                tar.add(source, arcname=source.name)
+
+
+def _print_list(target: Path) -> int:
+    entries = _collect_entries(target, include_archives=True)
+    if not entries:
+        print(f"[Info] No entries found under {target}")
+        return 0
+    total = 0
+    print(f"[Info] Entries under {target}:")
+    for item in entries:
+        size = _entry_size(item)
+        total += size
+        stamp = item.stat().st_mtime
+        print(f"  - {item.name}  size={_human_size(size)}  mtime={stamp:.0f}")
+    print(f"[Info] Total entries: {len(entries)} | total size: {_human_size(total)}")
+    return 0
+
+
+def _delete_policy(entries: list[Path], keep_last: int) -> list[Path]:
+    if keep_last <= 0:
+        return list(entries)
+    return entries[keep_last:]
+
+
+def _run_manage_workspace(args: argparse.Namespace) -> int:
+    workspace_root = _resolve_workspace_root(args.workspace_root)
+    target = _resolve_target_folder(workspace_root=workspace_root, folder=args.folder)
+    if not target.exists():
+        print(f"[Info] Target folder not found: {target}")
+        return 0
+
+    action = str(args.action or "delete").strip().lower()
+    dry_run = bool(args.dry_run)
+    keep_n = int(args.number or 0)
+
+    if action == "list":
+        return _print_list(target)
+
+    entries = _collect_entries(target, include_archives=False)
+    if not entries:
+        print(f"[Info] No entries found under {target}")
+        return 0
+
+    if action in {"delete", "keep"}:
+        victims = _delete_policy(entries, keep_last=(keep_n if action == "keep" else keep_n))
+        freed = sum(_entry_size(v) for v in victims)
+        for victim in victims:
+            _delete_entry(victim, dry_run=dry_run)
+        verb = "Would delete" if dry_run else "Deleted"
+        print(f"{verb} {len(victims)} item(s) from {target}.")
+        print(f"Estimated reclaimed size: {_human_size(freed)}")
+        for victim in victims:
+            print(f"  - {victim}")
+        return 0
+
+    if action == "archive":
+        victims = _delete_policy(entries, keep_last=keep_n)
+        archives: list[Path] = []
+        skipped: list[Path] = []
+        reclaimed = 0
+        for victim in victims:
+            archive = _archive_path(victim, args.format)
+            if archive.exists():
+                skipped.append(victim)
+                continue
+            if not dry_run:
+                _compress_to_archive(victim, archive, compression=args.format)
+            archives.append(archive)
+            reclaimed += _entry_size(victim)
+            _delete_entry(victim, dry_run=dry_run)
+        verb = "Would archive+delete" if dry_run else "Archived+deleted"
+        print(f"{verb} {len(archives)} item(s) from {target}.")
+        print(f"Estimated reclaimed size: {_human_size(reclaimed)}")
+        for archive in archives:
+            print(f"  - {archive}")
+        if skipped:
+            print(f"[Info] Skipped {len(skipped)} item(s); archive already exists:")
+            for victim in skipped:
+                print(f"  - {victim}")
+        return 0
+
+    raise ValueError(f"Unsupported action: {action}")
+
+
+def _run_free_up_legacy(args: argparse.Namespace) -> int:
+    workspace_root = _resolve_workspace_root(args.workspace_root)
+    if args.raw_root:
+        target = Path(args.raw_root)
+    else:
+        target = workspace_root / "data" / "raw"
+    if not target.exists():
+        print(f"[Info] Raw directory not found: {target}")
+        return 0
+
+    if args.last is not None:
+        entries = _collect_entries(target, include_archives=False)
+        victims = _delete_policy(entries, keep_last=int(args.last))
+        freed = sum(_entry_size(v) for v in victims)
+        for victim in victims:
+            _delete_entry(victim, dry_run=bool(args.dry_run))
+        verb = "Would delete" if args.dry_run else "Deleted"
+        print(f"{verb} {len(victims)} raw run(s) from {target} (kept latest {args.last}).")
+        print(f"Estimated reclaimed size: {_human_size(freed)}")
+        for victim in victims:
+            print(f"  - {victim}")
+        return 0
+
+    entries = _collect_entries(target, include_archives=False)
+    victims = _delete_policy(entries, keep_last=int(args.compress))
+    archives: list[Path] = []
+    skipped: list[Path] = []
+    reclaimed = 0
+    for victim in victims:
+        archive = _archive_path(victim, args.format)
+        if archive.exists():
+            skipped.append(victim)
+            continue
+        if not args.dry_run:
+            _compress_to_archive(victim, archive, compression=args.format)
+        archives.append(archive)
+        reclaimed += _entry_size(victim)
+        _delete_entry(victim, dry_run=bool(args.dry_run))
+    verb = "Would archive+delete" if args.dry_run else "Archived+deleted"
+    print(f"{verb} {len(archives)} raw run(s) in {target} (kept latest {args.compress}).")
+    print(f"Estimated reclaimed size: {_human_size(reclaimed)}")
+    for archive in archives:
+        print(f"  - {archive}")
+    if skipped:
+        print(f"[Info] Skipped {len(skipped)} run(s) because archive already exists:")
+        for victim in skipped:
+            print(f"  - {victim}")
+    return 0
+
+
+def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    parser.formatter_class = argparse.RawTextHelpFormatter
+
+    if command == MANAGE_WORKSPACE_COMMAND:
+        parser.description = (
+            "Manage ReaxKit workspace storage.\n\n"
+            "Examples:\n"
+            "  reaxkit manage-workspace --folder data/raw\n"
+            "  reaxkit manage-workspace --folder data/raw --action keep --number 5\n"
+            "  reaxkit manage-workspace --folder data/raw --action archive --number 5 --format zst\n"
+            "  reaxkit manage-workspace --folder cache --action list"
+        )
+        parser.add_argument("--folder", required=True, help="Target folder inside workspace, e.g. data/raw, cache.")
+        parser.add_argument(
+            "--action",
+            choices=("list", "delete", "keep", "archive"),
+            default="delete",
+            help="Action to perform. 'archive' always deletes originals after successful archive.",
+        )
+        parser.add_argument(
+            "--number",
+            type=_positive_int,
+            default=0,
+            help="Retention count N. Used by keep/archive; for delete, keeps latest N and deletes the rest.",
+        )
+        parser.add_argument("--format", choices=("gz", "zst"), default="gz", help="Archive format for --action archive.")
+        parser.add_argument("--workspace-root", default=None, help="Workspace root path (auto-detected by default).")
+        parser.add_argument("--dry-run", action="store_true", help="Preview only; do not write/delete files.")
+        return parser
+
+    if command == FREE_UP_COMMAND:
+        parser.description = (
+            "Legacy raw-data cleanup command.\n\n"
+            "Examples:\n"
+            "  reaxkit free-up --last 5\n"
+            "  reaxkit free-up --compress 5 --format zst\n"
+            "  reaxkit free-up --last 3 --dry-run"
+        )
+        mode_group = parser.add_mutually_exclusive_group(required=True)
+        mode_group.add_argument("--last", type=_positive_int, metavar="N", help="Keep only the latest N raw runs.")
+        mode_group.add_argument("--compress", type=_positive_int, metavar="N", help="Archive+delete all but latest N runs.")
+        parser.add_argument("--raw-root", default=None, help="Raw root path (default: <workspace>/data/raw).")
+        parser.add_argument("--workspace-root", default=None, help="Workspace root path (auto-detected by default).")
+        parser.add_argument("--format", choices=("gz", "zst"), default="gz", help="Archive format for --compress.")
+        parser.add_argument("--dry-run", action="store_true", help="Preview only; do not write/delete files.")
+        return parser
+
+    raise KeyError(f"Unsupported workspace command: {command!r}.")
+
+
+def run_main(command: str, args: argparse.Namespace) -> int:
+    if command == MANAGE_WORKSPACE_COMMAND:
+        return _run_manage_workspace(args)
+    if command == FREE_UP_COMMAND:
+        return _run_free_up_legacy(args)
+    raise KeyError(f"Unsupported workspace command: {command!r}.")

@@ -45,4 +45,5 @@ register_generator("make-trainset-settings", module_path="reaxkit.workflows.file
 register_generator("make-trainset", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_generator("make-tregime", module_path="reaxkit.workflows.file_tools.tregime_workflow")
 register_generator("make-vregime", module_path="reaxkit.workflows.file_tools.vregime_workflow")
-register_generator("free-up", module_path="reaxkit.cli.path")
+register_generator("free-up", module_path="reaxkit.workflows.meta.workspace_management_workflow")
+register_generator("manage-workspace", module_path="reaxkit.workflows.meta.workspace_management_workflow")
