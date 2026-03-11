@@ -184,14 +184,10 @@ class ReaxkitStorageLayout:
     def parsed_dir(self, parsed_id: str) -> Path:
         return self.parsed_root / str(parsed_id)
 
-    def parsed_run_dir(self, run_id: str) -> Path:
-        return self.parsed_root / _safe_run_id(run_id)
-
     def ensure_run_layout(self, run_id: str) -> None:
         self.ensure_base_layout()
         self.input_run_dir(run_id).mkdir(parents=True, exist_ok=True)
         self.raw_run_dir(run_id).mkdir(parents=True, exist_ok=True)
-        self.parsed_run_dir(run_id).mkdir(parents=True, exist_ok=True)
 
     def register_parsed_dataset(
         self,
