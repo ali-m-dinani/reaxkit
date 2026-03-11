@@ -1106,6 +1106,38 @@ class ReaxFFAdapter(EngineAdapter):
         has_xmol = (p / "xmolout").exists() or (p.is_file() and "xmolout" in p.name.lower())
         return 0.95 if has_xmol else 0.0
 
+    def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
+        _ = args
+        mapping: dict[object, tuple[str, ...]] = {
+            TrajectoryData: ("xmolout", "summary.txt"),
+            GeometryData: ("geo",),
+            SimulationData: ("xmolout", "summary.txt"),
+            ConnectivityData: ("fort.7", "xmolout", "summary.txt"),
+            ConnectivityTrajectoryData: ("fort.7", "xmolout", "summary.txt", "ffield"),
+            CoordinationStatusBundleData: ("fort.7", "xmolout", "summary.txt", "ffield"),
+            ChargeData: ("fort.7", "xmolout", "summary.txt"),
+            AtomicKinematicsData: ("vels",),
+            ElectricFieldData: ("fort.78",),
+            EregimeData: ("eregime.in",),
+            ForceFieldParametersData: ("ffield",),
+            ForceFieldOptimizationProgressData: ("fort.13",),
+            ForceFieldOptimizationTrainingSetData: ("trainset.in",),
+            ForceFieldOptimizationData: ("ffield", "params"),
+            ForceFieldOptimizationParameterBundleData: ("params", "ffield"),
+            ForceFieldOptimizationDiagnosticBundleData: ("fort.79", "ffield"),
+            ForceFieldOptimizationReportEOSBundleData: ("fort.99", "fort.74"),
+            ForceFieldOptimizationParameterData: ("params",),
+            ForceFieldOptimizationReportData: ("fort.99",),
+            ForceFieldOptimizationDiagnosticData: ("fort.79",),
+            GeometrySummaryData: ("fort.74",),
+            PartialEnergyData: ("fort.73", "energylog", "fort.58"),
+            RestraintData: ("fort.76",),
+            GeometryOptimizationProgressData: ("fort.57",),
+            ControlParametersData: ("control",),
+            MolecularAnalysisData: ("molfra.out", "molfra_ig.out"),
+        }
+        return mapping.get(data_type)
+
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 

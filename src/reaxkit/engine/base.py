@@ -45,6 +45,14 @@ class EngineAdapter(ABC):
     def detect(self, path: str | Path) -> float:
         """Return confidence score [0, 1]."""
 
+    def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
+        """Return minimal source filenames needed to load ``data_type``.
+
+        Returning ``None`` means "use the storage layer's default broad snapshot list".
+        """
+        _ = (data_type, args)
+        return None
+
     def load(self, data_type, args: dict, reporter=None):
         """Load requested domain data type from engine-specific sources."""
         if data_type is TrajectoryData:

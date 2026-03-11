@@ -13,7 +13,7 @@ from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.exceptions import ParseError, AnalysisError
 from reaxkit.core.log import get_logger, configure_file_logging
 from reaxkit.core.progress import resolve_reporter
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
+from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 
 logger = get_logger(__name__)
@@ -111,7 +111,7 @@ class AnalysisExecutor:
         return "."
 
     def run(self, task, request, args: dict):
-        normalized = normalize_storage_args(args)
+        normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
@@ -122,11 +122,13 @@ class AnalysisExecutor:
         elif log_level == "quiet" or args.get("quiet"):
             get_logger(__name__, level="WARNING")
 
-        input_path = self._detection_path(args)
+        input_path = str(args.get("_snapshot_source_dir") or self._detection_path(args))
         forced_engine = args.get("engine")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
         adapter = resolve_engine(input_path, engine=forced_engine)
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
+        snapshot_names = adapter.required_input_files(task.required_data, args)
+        snapshot_storage_inputs(args, names=snapshot_names)
         reporter = resolve_reporter(args)
         t_load0 = perf_counter()
         try:

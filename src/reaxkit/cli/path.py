@@ -48,7 +48,8 @@ def resolve_output_path(
             "run_id": run_id,
             "project_root": str(project_root),
             "analysis_id": analysis_id,
-        }
+        },
+        snapshot=False,
     )
     layout = ReaxkitStorageLayout(project_root=Path(norm["project_root"]))
     layout.ensure_base_layout()

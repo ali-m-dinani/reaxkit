@@ -23,7 +23,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory (fallback for detection)")
     parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Trajectory file path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Logging level")
     add_storage_cli_arguments(parser)
 
 
@@ -94,6 +94,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     """Build the parser for a direct trajectory command."""
     canonical = resolve_command_name(command, task_names=TRAJECTORY_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)

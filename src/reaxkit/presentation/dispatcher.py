@@ -14,6 +14,28 @@ from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_plot_pa
 
 PlotPayloadBuilder = Callable[[str, object, object], dict[str, object] | None]
 
+_RAW_PLOT_DATA_KEYS = frozenset(
+    {
+        "x",
+        "y",
+        "z",
+        "series",
+        "subplots",
+        "values",
+        "bins",
+        "vectors",
+        "u",
+        "v",
+    }
+)
+
+
+def _looks_like_raw_plot_payload(payload: object) -> bool:
+    """Return True when payload already targets a concrete plot renderer."""
+    if not isinstance(payload, dict):
+        return False
+    return any(key in payload for key in _RAW_PLOT_DATA_KEYS)
+
 
 def export_result_csv(result, path: str) -> None:
     """Export a result table to CSV."""
@@ -35,7 +57,7 @@ def present_result(
     plot_payload_builder: PlotPayloadBuilder | None = None,
 ) -> None:
     """Dispatch result presentation from CLI-style arguments."""
-    normalized = normalize_storage_args(vars(args))
+    normalized = normalize_storage_args(vars(args), snapshot=False)
     for key, value in normalized.items():
         setattr(args, key, value)
     persist_analysis_result(command, result, args)
@@ -64,19 +86,20 @@ def present_result(
             if payload is None:
                 print("No data available for plotting.")
             else:
-                # Typed presentation specs are adapted to renderer payloads here.
-                spec = ensure_presentation_spec(payload)
-                if spec is None and isinstance(payload, list):
-                    for item in payload:
-                        cand = ensure_presentation_spec(item)
-                        if cand is not None and cand.renderer != "table":
-                            spec = cand
-                            break
-                if spec is not None:
-                    payload = spec_to_plot_payload(spec, result)
-                    if payload is None:
-                        print("No plot-compatible presentation available for this result.")
-                        return
+                if not _looks_like_raw_plot_payload(payload):
+                    # Typed presentation specs are adapted to renderer payloads here.
+                    spec = ensure_presentation_spec(payload)
+                    if spec is None and isinstance(payload, list):
+                        for item in payload:
+                            cand = ensure_presentation_spec(item)
+                            if cand is not None and cand.renderer != "table":
+                                spec = cand
+                                break
+                    if spec is not None:
+                        payload = spec_to_plot_payload(spec, result)
+                        if payload is None:
+                            print("No plot-compatible presentation available for this result.")
+                            return
                 if save:
                     save_path = resolve_output_path(
                         save,

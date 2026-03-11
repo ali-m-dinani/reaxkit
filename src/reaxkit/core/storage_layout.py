@@ -18,9 +18,33 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from reaxkit.core.parsed_store import update_parsed_meta, write_parsed_hdf5
+
+_DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
+    "xmolout",
+    "summary.txt",
+    "fort.7",
+    "fort.13",
+    "fort.57",
+    "fort.73",
+    "fort.74",
+    "fort.76",
+    "fort.78",
+    "fort.79",
+    "fort.99",
+    "trainset.in",
+    "params",
+    "control",
+    "eregime.in",
+    "vels",
+    "molfra.out",
+    "ffield",
+    "dump.lammpstrj",
+    "lammpstrj",
+    "log.lammps",
+)
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -285,49 +309,58 @@ def _copy_if_exists(src: Path, dst: Path) -> None:
         shutil.copy2(src, dst)
 
 
-def _snapshot_raw_from_source(out: dict, raw_dir: Path) -> None:
+def _detect_snapshot_source(out: dict) -> Path:
     detection_keys = ("input", "run_dir", "xmolout", "fort7", "summary")
-    source = None
+    source = out.get("_snapshot_source_dir")
+    if source:
+        p = Path(str(source))
+        if p.exists():
+            return p if p.is_dir() else p.parent
+    chosen = None
     for key in detection_keys:
         value = out.get(key)
         if not value:
             continue
         path = Path(str(value))
         if path.exists():
-            source = path if path.is_dir() else path.parent
+            chosen = path if path.is_dir() else path.parent
             break
-    if source is None:
-        source = Path(".")
+    if chosen is None:
+        chosen = Path(".")
+    return chosen
+
+
+def _snapshot_raw_from_source(source: Path, raw_dir: Path, *, names: Sequence[str] | None = None) -> None:
     if source.resolve() == raw_dir.resolve():
         return
 
-    for name in (
-        "xmolout",
-        "summary.txt",
-        "fort.7",
-        "fort.13",
-        "fort.57",
-        "fort.73",
-        "fort.74",
-        "fort.76",
-        "fort.78",
-        "fort.79",
-        "fort.99",
-        "trainset.in",
-        "params",
-        "control",
-        "eregime.in",
-        "vels",
-        "molfra.out",
-        "ffield",
-        "dump.lammpstrj",
-        "lammpstrj",
-        "log.lammps",
-    ):
+    snapshot_names = tuple(names) if names is not None else _DEFAULT_SNAPSHOT_FILES
+    for name in snapshot_names:
         _copy_if_exists(source / name, raw_dir / name)
 
 
-def normalize_storage_args(args: dict) -> dict:
+def snapshot_storage_inputs(args: dict, *, names: Sequence[str] | None = None) -> None:
+    """Copy source raw inputs into run-scoped ``data/raw/<run_id>``."""
+    run_id = args.get("run_id")
+    if not run_id:
+        run_id = generate_run_id()
+        args["run_id"] = run_id
+    project_root = Path(args.get("project_root") or default_project_root())
+    args["project_root"] = str(project_root)
+    layout = ReaxkitStorageLayout(project_root=project_root)
+    layout.ensure_run_layout(str(run_id))
+    raw_dir = layout.raw_run_dir(str(run_id))
+    source = _detect_snapshot_source(args)
+    args["_snapshot_source_dir"] = str(source)
+    _snapshot_raw_from_source(source, raw_dir, names=names)
+
+
+def normalize_storage_args(
+    args: dict,
+    *,
+    snapshot: bool = True,
+    snapshot_inputs: Sequence[str] | None = None,
+) -> dict:
     out = dict(args)
     run_id = out.get("run_id")
     if not run_id:
@@ -338,8 +371,10 @@ def normalize_storage_args(args: dict) -> dict:
     out["project_root"] = str(project_root)
     layout = ReaxkitStorageLayout(project_root=project_root)
     layout.ensure_run_layout(str(run_id))
+    out["_snapshot_source_dir"] = str(_detect_snapshot_source(out))
     raw_dir = layout.raw_run_dir(str(run_id))
-    _snapshot_raw_from_source(out, raw_dir)
+    if snapshot:
+        snapshot_storage_inputs(out, names=snapshot_inputs)
 
     if not out.get("input") or str(out.get("input")) == ".":
         out["input"] = str(raw_dir)
