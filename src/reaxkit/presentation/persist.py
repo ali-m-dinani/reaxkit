@@ -45,12 +45,12 @@ def _write_csvs(out_dir: Path, result: Any) -> list[str]:
 
 
 def persist_analysis_result(command: str, result: Any, args: Any) -> Path:
-    """Persist analysis result to CSV + JSON under analysis/<command>/<analysis_id>/."""
+    """Persist analysis result to CSV + JSON under analysis/<command>/<run_id>/ by default."""
     project_root = Path(getattr(args, "project_root", "."))
     analysis_id = (
         getattr(args, "analysis_id", None)
-        or getattr(args, "_analysis_id", None)
         or getattr(args, "run_id", None)
+        or getattr(args, "_analysis_id", None)
         or "analysis"
     )
     layout = ReaxkitStorageLayout(project_root=project_root)
