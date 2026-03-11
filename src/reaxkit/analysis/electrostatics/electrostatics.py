@@ -20,142 +20,330 @@ from reaxkit.engine.reaxff.adapter import (
     _trajectory_from_xmolout_handler,
 )
 from reaxkit.core.constants import const
+from reaxkit.presentation.specs import PresentationSpec
 from reaxkit.utils.numerical.numerical_calcs import find_zero_crossings
 
 Scope = Literal["total", "local"]
 Mode = Literal["dipole", "polarization"]
 VolumeMethod = Literal["hull", "bbox", "cell"]
 AggregateKind = Optional[Literal["mean", "max", "min", "last"]]
+FieldDirection = Literal["x", "y", "z"]
+DipoleOrPolarizationDirection = Literal["mu_x", "mu_y", "mu_z", "p_x", "p_y", "p_z"]
 
 
 @dataclass
 class DipoleRequest(BaseRequest):
-    """Request for dipole analysis."""
+    """Request for dipole analysis.
+
+    Parameters
+    ----------
+    scope
+        ``"total"`` computes one dipole vector per frame for the whole system.
+        ``"local"`` computes one dipole vector per selected core atom and frame.
+        Example: ``scope="local"``.
+    atom_ids
+        Optional core atom-id filter used in local mode.
+        Example: ``[1, 5, 9]``.
+    atom_types
+        Optional core atom-type filter used in local mode when ``atom_ids`` is
+        not provided. Example: ``["O", "H"]``.
+    frames
+        Optional frame indices to include. If omitted, all frames are included.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after selection. Example: ``every=5`` keeps every fifth
+        selected frame.
+    """
 
     scope: Scope = dc_field(
         default="total",
-        metadata={'label': 'Scope', 'help': 'Scope parameter for DipoleRequest.'},
+        metadata={
+            'label': 'Scope',
+            'help': "Dipole evaluation mode: 'total' (whole-system) or 'local' (per core atom). Example: 'local'.",
+            'choices': ['total', 'local'],
+        },
     )
     atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for DipoleRequest.', 'units': 'index'},
+        metadata={
+            'label': 'Atom Ids',
+            'help': "Optional core atom-id filter used in local mode. Example: [1, 5, 9].",
+            'units': 'index',
+        },
     )
     atom_types: Optional[Sequence[str]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for DipoleRequest.'},
+        metadata={
+            'label': 'Atom Types',
+            'help': "Optional core atom-type filter in local mode (used when atom_ids is not set). Example: ['O', 'H'].",
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for DipoleRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to include. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for DipoleRequest.', 'min': 1, 'units': 'frames'},
-    )
-    min_bo: float = dc_field(
-        default=0.0,
-        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for DipoleRequest.', 'min': 0.0},
-    )
-    scale_neighbor_charges: bool = dc_field(
-        default=True,
-        metadata={'label': 'Scale Neighbor Charges', 'help': 'Scale Neighbor Charges parameter for DipoleRequest.', 'choices': [True, False]},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
 
 
 @dataclass
 class DipoleResult(BaseResult):
-    """Result of dipole analysis."""
+    """Dipole analysis result.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`DipoleRequest` used to compute this result.
+    - ``table``: pandas.DataFrame with dipole components per selected frame
+      (total mode) or per selected core atom and frame (local mode).
+
+    Common columns
+    --------------
+    - ``frame_index``: source frame index.
+    - ``iter``: simulation iteration mapped to the frame.
+    - ``mu_x (debye)``, ``mu_y (debye)``, ``mu_z (debye)``: dipole components.
+
+    Local-mode extra columns
+    ------------------------
+    - ``core_atom_id``: selected core atom id.
+    - ``core_atom_type``: selected core atom type.
+
+    Example
+    -------
+    A row like ``frame_index=12, iter=1200, mu_z (debye)=1.45`` means the
+    z-component dipole at that frame is 1.45 Debye.
+    """
 
     table: pd.DataFrame
+    request: DipoleRequest
 
 
 @dataclass
 class PolarizationRequest(BaseRequest):
-    """Request for polarization analysis."""
+    """Request for polarization analysis.
+
+    Parameters
+    ----------
+    scope
+        ``"total"`` computes one polarization vector per frame for the whole
+        system. ``"local"`` computes local polarization around selected core
+        atoms. Example: ``scope="local"``.
+    atom_ids
+        Optional core atom-id filter used in local mode.
+        Example: ``[1, 5, 9]``.
+    atom_types
+        Optional core atom-type filter used in local mode when ``atom_ids`` is
+        not provided. Example: ``["O", "H"]``.
+    frames
+        Optional frame indices to include. If omitted, all frames are included.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after selection. Example: ``every=5``.
+    volume_method
+        Volume estimator for polarization normalization.
+        ``"hull"``: convex hull, ``"bbox"``: axis-aligned bounding box,
+        ``"cell"``: simulation cell volume (total mode).
+        Example: ``volume_method="hull"``.
+    """
 
     scope: Scope = dc_field(
         default="total",
-        metadata={'label': 'Scope', 'help': 'Scope parameter for PolarizationRequest.'},
+        metadata={
+            'label': 'Scope',
+            'help': "Polarization evaluation mode: 'total' (whole-system) or 'local' (per core atom). Example: 'local'.",
+            'choices': ['total', 'local'],
+        },
     )
     atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for PolarizationRequest.', 'units': 'index'},
+        metadata={
+            'label': 'Atom Ids',
+            'help': "Optional core atom-id filter used in local mode. Example: [1, 5, 9].",
+            'units': 'index',
+        },
     )
     atom_types: Optional[Sequence[str]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for PolarizationRequest.'},
+        metadata={
+            'label': 'Atom Types',
+            'help': "Optional core atom-type filter in local mode (used when atom_ids is not set). Example: ['O', 'H'].",
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for PolarizationRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to include. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for PolarizationRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
     volume_method: Optional[VolumeMethod] = dc_field(
         default=None,
-        metadata={'label': 'Volume Method', 'help': 'Volume Method parameter for PolarizationRequest.'},
-    )
-    min_bo: float = dc_field(
-        default=0.0,
-        metadata={'label': 'Min Bo', 'help': 'Min Bo parameter for PolarizationRequest.', 'min': 0.0},
-    )
-    scale_neighbor_charges: bool = dc_field(
-        default=True,
-        metadata={'label': 'Scale Neighbor Charges', 'help': 'Scale Neighbor Charges parameter for PolarizationRequest.', 'choices': [True, False]},
+        metadata={
+            'label': 'Volume Method',
+            'help': "Volume estimator for polarization normalization. Examples: 'hull', 'bbox', 'cell'.",
+            'choices': ['hull', 'bbox', 'cell'],
+        },
     )
 
 
 @dataclass
 class PolarizationResult(BaseResult):
-    """Result of polarization analysis."""
+    """Polarization analysis result.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`PolarizationRequest` used for computation.
+    - ``table``: pandas.DataFrame with polarization components and volume terms
+      per selected frame (total mode) or per selected core atom and frame
+      (local mode).
+
+    Common columns
+    --------------
+    - ``frame_index``: source frame index.
+    - ``iter``: simulation iteration mapped to the frame.
+    - ``P_x (uC/cm^2)``, ``P_y (uC/cm^2)``, ``P_z (uC/cm^2)``: polarization
+      components.
+    - ``volume (angstrom^3)``: normalization volume used for each row.
+
+    Local-mode extra columns
+    ------------------------
+    - ``core_atom_id``: selected core atom id.
+    - ``core_atom_type``: selected core atom type.
+
+    Example
+    -------
+    A row like ``frame_index=12, iter=1200, P_z (uC/cm^2)=18.7`` means the
+    z-component polarization at that frame is 18.7 uC/cm^2.
+    """
 
     table: pd.DataFrame
+    request: PolarizationRequest
 
 
 @dataclass
 class PolarizationFieldRequest(BaseRequest):
-    """Request for polarization-electric field hysteresis analysis."""
+    """Request for polarization/dipole versus electric-field hysteresis analysis.
+
+    Parameters
+    ----------
+    frames
+        Optional frame indices to include. If omitted, all available frames are used.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after selection. Example: ``every=5``.
+    aggregate
+        Optional aggregation applied after pairing field and response values.
+        Choices:
+        - ``mean``: average all rows sharing the same field value
+        - ``max``: maximum over grouped rows
+        - ``min``: minimum over grouped rows
+        - ``last``: keep the last row by iteration per field value
+        - ``None``: no aggregation
+    field_direction
+        Electric-field axis used for hysteresis x-axis, mapped to
+        ``field_x`` / ``field_y`` / ``field_z``. Example: ``"z"``.
+    dipole_or_polaization_direction
+        Response axis used for hysteresis y-axis.
+        - ``mu_x``/``mu_y``/``mu_z`` map to dipole components
+        - ``p_x``/``p_y``/``p_z`` map to polarization components
+        Example: ``"p_z"``.
+    """
 
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for PolarizationFieldRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to include. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for PolarizationFieldRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
     aggregate: AggregateKind = dc_field(
         default=None,
-        metadata={'label': 'Aggregate', 'help': 'Aggregate parameter for PolarizationFieldRequest.'},
+        metadata={
+            'label': 'Aggregate',
+            'help': "Optional aggregation over rows sharing the same field value. Example: 'mean'.",
+            'choices': ['mean', 'max', 'min', 'last'],
+        },
     )
-    field_component: str = dc_field(
-        default="field_z",
-        metadata={'label': 'Field Component', 'help': 'Field Component parameter for PolarizationFieldRequest.'},
+    field_direction: FieldDirection = dc_field(
+        default="z",
+        metadata={
+            'label': 'Field Direction',
+            'help': "Field axis used as hysteresis x-axis. 'z' maps to field_z. Example: 'z'.",
+            'choices': ['x', 'y', 'z'],
+        },
     )
-    x_variable: str = dc_field(
-        default="field_z",
-        metadata={'label': 'X Variable', 'help': 'X Variable parameter for PolarizationFieldRequest.'},
-    )
-    y_variable: str = dc_field(
-        default="P_z (uC/cm^2)",
-        metadata={'label': 'Y Variable', 'help': 'Y Variable parameter for PolarizationFieldRequest.'},
-    )
-    field_scale: float = dc_field(
-        default=const("electric_field_VA_to_MVcm"),
-        metadata={'label': 'Field Scale', 'help': 'Field Scale parameter for PolarizationFieldRequest.'},
+    dipole_or_polaization_direction: DipoleOrPolarizationDirection = dc_field(
+        default="p_z",
+        metadata={
+            'label': 'Dipole Or Polaization Direction',
+            'help': "Response axis for hysteresis. Example: 'mu_z' for dipole-z or 'p_z' for polarization-z.",
+            'choices': ['mu_x', 'mu_y', 'mu_z', 'p_x', 'p_y', 'p_z'],
+        },
     )
 
 
 @dataclass
 class PolarizationFieldResult(BaseResult):
-    """Result of hysteresis analysis."""
+    """Hysteresis analysis result for field-response curves.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`PolarizationFieldRequest` used to build the result.
+    - ``full_table``: per-frame joined table with field and response values.
+    - ``aggregated_table``: grouped table after optional aggregation.
+    - ``polarization_zero_crossings``: x-values where y crosses zero.
+    - ``field_zero_crossings``: y-values where x crosses zero.
+
+    Table semantics
+    ---------------
+    ``full_table`` always contains:
+    - ``iter`` and ``frame_index`` from polarization series
+    - dipole columns ``mu_x/y/z (debye)``
+    - polarization columns ``P_x/y/z (uC/cm^2)``
+    - one field column chosen by ``request.field_direction``:
+      ``field_x`` or ``field_y`` or ``field_z`` (scaled to MV/cm)
+
+    Example
+    -------
+    With ``field_direction='z'`` and ``dipole_or_polaization_direction='p_z'``,
+    hysteresis is computed from ``x=field_z`` and ``y=P_z (uC/cm^2)``.
+    """
 
     full_table: pd.DataFrame
     aggregated_table: pd.DataFrame
     polarization_zero_crossings: list[float]
     field_zero_crossings: list[float]
+    request: PolarizationFieldRequest
 
 
 def _minimum_image_delta(delta: np.ndarray, box_lengths: np.ndarray) -> np.ndarray:
@@ -245,7 +433,6 @@ def _neighbors_from_connectivity(
     frame_index: int,
     *,
     n_atoms: int,
-    min_bo: float,
 ) -> list[np.ndarray]:
     if connectivity.connectivity is not None:
         conn = connectivity.connectivity
@@ -273,8 +460,7 @@ def _neighbors_from_connectivity(
     mat = _bo_frame_from_connectivity(connectivity, frame_index)
     if mat.shape != (n_atoms, n_atoms):
         raise ValueError("bond-order frame must be square and match atom count.")
-    thr = float(min_bo)
-    return [np.where(mat[i] > thr)[0] for i in range(n_atoms)]
+    return [np.where(mat[i] > 0)[0] for i in range(n_atoms)]
 
 
 def _series_total(
@@ -339,8 +525,6 @@ def _series_local(
     volume_method: Optional[VolumeMethod],
     selected_atom_ids: Optional[Sequence[int]],
     selected_atom_types: Optional[Sequence[str]],
-    min_bo: float,
-    scale_neighbor_charges: bool,
     reporter=None,
 ) -> pd.DataFrame:
     mask = _atom_selector(
@@ -362,7 +546,6 @@ def _series_local(
             connectivity,
             int(fi),
             n_atoms=coords.shape[0],
-            min_bo=float(min_bo),
         )
 
         box_lengths = None
@@ -388,7 +571,7 @@ def _series_local(
                 rel = _minimum_image_delta(rel, box_lengths)
 
             cluster_q = q[cluster].copy()
-            if scale_neighbor_charges and neigh.size > 0:
+            if neigh.size > 0:
                 cluster_q[1:] = cluster_q[1:] / float(neigh.size)
 
             mu_ea = (rel * cluster_q[:, None]).sum(axis=0)
@@ -508,8 +691,6 @@ def _run_electrostatics(
     frames: Optional[Sequence[int]],
     every: int,
     volume_method: Optional[VolumeMethod],
-    min_bo: float,
-    scale_neighbor_charges: bool,
     reporter=None,
 ) -> pd.DataFrame:
     positions = np.asarray(data.trajectory.positions, dtype=float)
@@ -569,8 +750,6 @@ def _run_electrostatics(
         volume_method=volume_method,
         selected_atom_ids=atom_ids,
         selected_atom_types=atom_types,
-        min_bo=min_bo,
-        scale_neighbor_charges=scale_neighbor_charges,
         reporter=reporter,
     )
     if table.empty:
@@ -584,6 +763,34 @@ class DipoleTask(AnalysisTask):
 
     required_data = ElectrostaticsData
 
+    @staticmethod
+    def recommended_presentations(
+        _result: DipoleResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        if "iter" not in sample or "mu_z (debye)" not in sample:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        group_by = "core_atom_id" if "core_atom_id" in sample else ""
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="mu_z (debye) vs iter",
+                mapping={"x_col": "iter", "y_col": "mu_z (debye)", "group_by_col": group_by},
+                options={
+                    "title": "Dipole",
+                    "xlabel": "iter",
+                    "ylabel": "mu_z (debye)",
+                    "legend": True,
+                },
+                view_type="plot2d",
+            ),
+        ]
+
     def run(self, data: ElectrostaticsData, request: DipoleRequest, reporter=None) -> DipoleResult:
         out = _run_electrostatics(
             data,
@@ -594,11 +801,9 @@ class DipoleTask(AnalysisTask):
             frames=request.frames,
             every=request.every,
             volume_method=None,
-            min_bo=request.min_bo,
-            scale_neighbor_charges=request.scale_neighbor_charges,
             reporter=reporter,
         )
-        return DipoleResult(table=out)
+        return DipoleResult(table=out, request=request)
 
 
 @register_task("polarization")
@@ -606,6 +811,34 @@ class PolarizationTask(AnalysisTask):
     """Compute polarization series as total or local."""
 
     required_data = ElectrostaticsData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: PolarizationResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        if "iter" not in sample or "P_z (uC/cm^2)" not in sample:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        group_by = "core_atom_id" if "core_atom_id" in sample else ""
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="P_z (uC/cm^2) vs iter",
+                mapping={"x_col": "iter", "y_col": "P_z (uC/cm^2)", "group_by_col": group_by},
+                options={
+                    "title": "Polarization",
+                    "xlabel": "iter",
+                    "ylabel": "P_z (uC/cm^2)",
+                    "legend": True,
+                },
+                view_type="plot2d",
+            ),
+        ]
 
     def run(self, data: ElectrostaticsData, request: PolarizationRequest, reporter=None) -> PolarizationResult:
         out = _run_electrostatics(
@@ -617,11 +850,9 @@ class PolarizationTask(AnalysisTask):
             frames=request.frames,
             every=request.every,
             volume_method=request.volume_method,
-            min_bo=request.min_bo,
-            scale_neighbor_charges=request.scale_neighbor_charges,
             reporter=reporter,
         )
-        return PolarizationResult(table=out)
+        return PolarizationResult(table=out, request=request)
 
 
 @register_task("polarization_field")
@@ -629,6 +860,64 @@ class PolarizationFieldTask(AnalysisTask):
     """Compute polarization-field data and hysteresis roots."""
 
     required_data = ElectrostaticsData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: PolarizationFieldResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        views: list[PresentationSpec] = [
+            PresentationSpec(
+                renderer="table",
+                label="Full Table",
+                options={"source_key": "full_table"},
+                view_type="table",
+            ),
+            PresentationSpec(
+                renderer="table",
+                label="Aggregated Table",
+                options={"source_key": "aggregated_table"},
+                view_type="table",
+            ),
+        ]
+
+        agg_rows = payload.get("aggregated_table")
+        req_payload = payload.get("request") if isinstance(payload.get("request"), dict) else {}
+        if not isinstance(agg_rows, list) or not agg_rows:
+            return views
+
+        sample = agg_rows[0] if isinstance(agg_rows[0], dict) else {}
+        field_dir = str(req_payload.get("field_direction", "z")).strip().lower()
+        y_key = str(req_payload.get("dipole_or_polaization_direction", "p_z")).strip().lower()
+        x_col = f"field_{field_dir}" if field_dir in {"x", "y", "z"} else "field_z"
+        y_map = {
+            "mu_x": "mu_x (debye)",
+            "mu_y": "mu_y (debye)",
+            "mu_z": "mu_z (debye)",
+            "p_x": "P_x (uC/cm^2)",
+            "p_y": "P_y (uC/cm^2)",
+            "p_z": "P_z (uC/cm^2)",
+        }
+        y_col = y_map.get(y_key, "P_z (uC/cm^2)")
+        if x_col not in sample or y_col not in sample:
+            return views
+
+        views.append(
+            PresentationSpec(
+                renderer="single_plot",
+                label=f"{y_col} vs {x_col}",
+                mapping={"x_col": x_col, "y_col": y_col, "group_by_col": ""},
+                options={
+                    "title": "Hysteresis",
+                    "xlabel": x_col,
+                    "ylabel": y_col,
+                    "legend": False,
+                    "source_key": "aggregated_table",
+                },
+                view_type="plot2d",
+            )
+        )
+        return views
 
     def run(self, data: ElectrostaticsData, request: PolarizationFieldRequest) -> PolarizationFieldResult:
         if data.electric_field is None:
@@ -648,22 +937,23 @@ class PolarizationFieldTask(AnalysisTask):
 
         pol = pol.sort_values("iter").reset_index(drop=True)
         iters = pol["iter"].to_numpy(dtype=int)
+        field_col = f"field_{str(request.field_direction).strip().lower()}"
         field = _field_component_series(
             data.electric_field,
-            component=str(request.field_component),
+            component=field_col,
             target_iters=iters,
         )
-        field = np.asarray(field, dtype=float) * float(request.field_scale)
+        field = np.asarray(field, dtype=float) * float(const("electric_field_VA_to_MVcm"))
 
         full = pol.copy()
-        full[str(request.field_component)] = field
+        full[field_col] = field
 
         if request.aggregate is None:
             agg = full.copy()
         else:
             if request.aggregate not in {"mean", "max", "min", "last"}:
                 raise ValueError("aggregate must be one of: mean|max|min|last (or None).")
-            group_col = str(request.field_component)
+            group_col = field_col
             if request.aggregate == "mean":
                 agg = full.groupby(group_col, as_index=False).mean(numeric_only=True)
             elif request.aggregate == "max":
@@ -672,14 +962,29 @@ class PolarizationFieldTask(AnalysisTask):
                 agg = full.groupby(group_col, as_index=False).min(numeric_only=True)
             else:
                 agg = full.sort_values("iter").groupby(group_col, as_index=False).tail(1).reset_index(drop=True)
+            # Keep aggregated table column order aligned with full table.
+            preferred_cols = [c for c in full.columns if c in agg.columns]
+            trailing_cols = [c for c in agg.columns if c not in preferred_cols]
+            agg = agg.loc[:, preferred_cols + trailing_cols]
 
-        if request.x_variable not in agg.columns or request.y_variable not in agg.columns:
+        y_map = {
+            "mu_x": "mu_x (debye)",
+            "mu_y": "mu_y (debye)",
+            "mu_z": "mu_z (debye)",
+            "p_x": "P_x (uC/cm^2)",
+            "p_y": "P_y (uC/cm^2)",
+            "p_z": "P_z (uC/cm^2)",
+        }
+        y_col = y_map.get(str(request.dipole_or_polaization_direction).strip().lower())
+        if y_col is None:
             raise KeyError(
-                f"Missing required columns '{request.x_variable}' or '{request.y_variable}' in aggregated data."
+                f"Unsupported dipole_or_polaization_direction='{request.dipole_or_polaization_direction}'."
             )
+        if field_col not in agg.columns or y_col not in agg.columns:
+            raise KeyError(f"Missing required columns '{field_col}' or '{y_col}' in aggregated data.")
 
-        x = agg[request.x_variable].to_numpy(float)
-        y = agg[request.y_variable].to_numpy(float)
+        x = agg[field_col].to_numpy(float)
+        y = agg[y_col].to_numpy(float)
         y_zeros = find_zero_crossings(x, y)
         x_zeros = find_zero_crossings(y, x)
 
@@ -688,6 +993,7 @@ class PolarizationFieldTask(AnalysisTask):
             aggregated_table=agg.reset_index(drop=True),
             polarization_zero_crossings=y_zeros,
             field_zero_crossings=x_zeros,
+            request=request,
         )
 
 

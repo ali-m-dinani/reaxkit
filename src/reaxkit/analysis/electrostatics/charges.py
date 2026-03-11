@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ChargeData
+from reaxkit.presentation.specs import PresentationSpec
 
 
 def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -> list[int]:
@@ -22,27 +23,84 @@ def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -
 
 @dataclass
 class ChargeTableRequest(BaseRequest):
+    """Request for per-atom charge extraction across frames.
+
+    Parameters
+    ----------
+    atom_ids
+        Optional atom-id filter. If provided, only these atoms are included.
+        Example: ``[1, 5, 9]``.
+    atom_types
+        Optional element/type filter. Used only when ``atom_ids`` is not set.
+        Example: ``["O", "H"]``.
+    frames
+        Optional frame indices to include. If omitted, all frames are included.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after selection. Example: ``every=5`` keeps every fifth
+        selected frame.
+    """
+
     atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for ChargeTableRequest.', 'units': 'index'},
+        metadata={
+            'label': 'Atom Ids',
+            'help': "Optional atom-id filter. Example: [1, 5, 9].",
+            'units': 'index',
+        },
     )
     atom_types: Optional[Sequence[str]] = dc_field(
         default=None,
-        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for ChargeTableRequest.'},
+        metadata={
+            'label': 'Atom Types',
+            'help': "Optional atom-type filter used when atom_ids is not provided. Example: ['O', 'H'].",
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for ChargeTableRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to include. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for ChargeTableRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
 
 
 @dataclass
 class ChargeTableResult(BaseResult):
+    """Charge-table extraction result.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`ChargeTableRequest` used to generate this result.
+    - ``table``: pandas.DataFrame with columns:
+      ``['frame_index', 'iter', 'atom_id', 'atom_type', 'charge']``.
+
+    Column meanings
+    ---------------
+    - ``frame_index``: source frame index in the charge trajectory.
+    - ``iter``: simulation iteration mapped to the frame.
+    - ``atom_id``: atom identifier.
+    - ``atom_type``: atom element/type label when available.
+    - ``charge``: per-atom charge value at that frame.
+
+    Example
+    -------
+    A row ``frame_index=12, iter=1200, atom_id=7, atom_type='O', charge=-0.52``
+    means atom 7 had charge -0.52 at frame 12.
+    """
+
     table: pd.DataFrame
+    request: ChargeTableRequest
 
 
 @register_task("charge_table")
@@ -50,6 +108,33 @@ class ChargeTableTask(AnalysisTask):
     """Return per-atom charges across selected frames as a tidy table."""
 
     required_data = ChargeData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: ChargeTableResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        if "iter" not in sample or "charge" not in sample:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label="charge vs iter",
+                mapping={"x_col": "iter", "y_col": "charge", "group_by_col": "atom_id"},
+                options={
+                    "title": "Charge Table",
+                    "xlabel": "iter",
+                    "ylabel": "charge",
+                    "legend": True,
+                },
+                view_type="plot2d",
+            ),
+        ]
 
     def run(self, data: ChargeData, request: ChargeTableRequest, reporter=None) -> ChargeTableResult:
         charges = np.asarray(data.charges, dtype=float)
@@ -60,7 +145,8 @@ class ChargeTableTask(AnalysisTask):
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
         if not frame_idx:
             return ChargeTableResult(
-                table=pd.DataFrame(columns=["frame_index", "iter", "atom_id", "atom_type", "charge"])
+                table=pd.DataFrame(columns=["frame_index", "iter", "atom_id", "atom_type", "charge"]),
+                request=request,
             )
 
         iterations = (
@@ -114,7 +200,7 @@ class ChargeTableTask(AnalysisTask):
             table = pd.DataFrame(columns=["frame_index", "iter", "atom_id", "atom_type", "charge"])
         else:
             table = table.sort_values(["frame_index", "atom_id"], kind="stable").reset_index(drop=True)
-        return ChargeTableResult(table=table)
+        return ChargeTableResult(table=table, request=request)
 
 
 __all__ = [

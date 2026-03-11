@@ -244,10 +244,9 @@ def _build_polarization_request(args: argparse.Namespace) -> PolarizationRequest
 
 def _build_hyst_request(args: argparse.Namespace) -> PolarizationFieldRequest:
     return PolarizationFieldRequest(
-        field_component="field_z",
+        field_direction="z",
         aggregate=args.aggregate,
-        x_variable="field_z",
-        y_variable="P_z (uC/cm^2)",
+        dipole_or_polaization_direction="p_z",
     )
 
 
@@ -317,14 +316,27 @@ def _summary_text(result) -> str:
             return "None found"
         return ", ".join(f"{value:.6g}" for value in values)
 
+    field_dir = getattr(getattr(result, "request", None), "field_direction", "z")
+    resp_dir = getattr(getattr(result, "request", None), "dipole_or_polaization_direction", "p_z")
+    field_col = f"field_{field_dir}"
+    y_map = {
+        "mu_x": "mu_x (debye)",
+        "mu_y": "mu_y (debye)",
+        "mu_z": "mu_z (debye)",
+        "p_x": "P_x (uC/cm^2)",
+        "p_y": "P_y (uC/cm^2)",
+        "p_z": "P_z (uC/cm^2)",
+    }
+    resp_col = y_map.get(str(resp_dir), "P_z (uC/cm^2)")
+
     return (
         "Hysteresis Analysis Summary\n"
         "===========================\n\n"
-        "Coercive fields (where polarization crosses zero vs field_z)\n"
+        f"Coercive fields (where {resp_col} crosses zero vs {field_col})\n"
         "Units: MV/cm\n"
         f"Values: {_fmt(result.polarization_zero_crossings)}\n\n"
-        "Remnant polarizations (where field_z crosses zero vs P_z)\n"
-        "Units: uC/cm^2\n"
+        f"Remnant responses (where {field_col} crosses zero vs {resp_col})\n"
+        "Units: response-axis units\n"
         f"Values: {_fmt(result.field_zero_crossings)}\n"
     )
 
