@@ -130,20 +130,11 @@ class AnalysisExecutor:
         snapshot_names = adapter.required_input_files(task.required_data, args)
         snapshot_storage_inputs(args, names=snapshot_names)
         reporter = resolve_reporter(args)
-        t_load0 = perf_counter()
-        try:
-            data = adapter.load(task.required_data, args, reporter=reporter)
-        except ParseError:
-            raise
-        except Exception as exc:
-            raise ParseError(
-                f"Failed to load required data '{getattr(task.required_data, '__name__', str(task.required_data))}' "
-                f"for task '{task.__class__.__name__}': {exc}"
-            ) from exc
         run_id = args.get("run_id")
-        if run_id:
-            layout = ReaxkitStorageLayout(project_root=Path(args.get("project_root") or "."))
-            parsed_id = None
+        task_version = str(getattr(task, "VERSION", "1"))
+        layout = ReaxkitStorageLayout(project_root=Path(args.get("project_root") or ".")) if run_id else None
+        parsed_id = None
+        if layout is not None:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
                 engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()
@@ -156,17 +147,68 @@ class AnalysisExecutor:
             except Exception as exc:  # pragma: no cover - best-effort metadata persistence
                 logger.debug("Storage index update skipped: %s", exc)
 
-            if parsed_id is not None:
-                try:
-                    data_name = getattr(task.required_data, "__name__", "parsed_data")
-                    artifact_name = data_name.lower()
-                    layout.persist_parsed_artifact(
-                        parsed_id=parsed_id,
-                        artifact_name=artifact_name,
-                        data=data,
-                    )
-                except Exception as exc:  # pragma: no cover - best-effort artifact persistence
-                    logger.debug("Parsed artifact write skipped: %s", exc)
+        cache_root = Path(args.get("cache_dir") or (Path(input_path) / ".reaxkit_cache"))
+        cache = CacheManager(CacheConfig(root=cache_root, namespace="analysis"))
+        use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
+        analysis_id = None
+        if parsed_id is not None:
+            analysis_id = cache.analysis_id_for(
+                task=task,
+                data=None,
+                request=request,
+                parsed_id=parsed_id,
+                task_version=task_version,
+            )
+            args["_analysis_id"] = analysis_id
+            try:
+                layout.record_run_analysis(
+                    run_id=str(run_id),
+                    parsed_id=parsed_id,
+                    analysis_id=analysis_id,
+                    task_name=task.__class__.__name__,
+                    task_version=task_version,
+                )
+            except Exception as exc:  # pragma: no cover - best-effort index update
+                logger.debug("Run analysis index update skipped: %s", exc)
+
+            if use_cache and cache.exists(analysis_id):
+                logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                return cache.load(analysis_id)
+
+        t_load0 = perf_counter()
+        try:
+            data = adapter.load(task.required_data, args, reporter=reporter)
+        except ParseError:
+            raise
+        except Exception as exc:
+            raise ParseError(
+                f"Failed to load required data '{getattr(task.required_data, '__name__', str(task.required_data))}' "
+                f"for task '{task.__class__.__name__}': {exc}"
+            ) from exc
+        if run_id and layout is not None and parsed_id is None:
+            try:
+                handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
+                engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()
+                args["_parsed_id"] = layout.register_parsed_dataset(
+                    run_id=str(run_id),
+                    handler_version=handler_version,
+                    engine=engine_name,
+                )
+                parsed_id = str(args["_parsed_id"])
+            except Exception as exc:  # pragma: no cover - best-effort metadata persistence
+                logger.debug("Storage index update skipped: %s", exc)
+
+        if parsed_id is not None and layout is not None:
+            try:
+                data_name = getattr(task.required_data, "__name__", "parsed_data")
+                artifact_name = data_name.lower()
+                layout.persist_parsed_artifact(
+                    parsed_id=parsed_id,
+                    artifact_name=artifact_name,
+                    data=data,
+                )
+            except Exception as exc:  # pragma: no cover - best-effort artifact persistence
+                logger.debug("Parsed artifact write skipped: %s", exc)
         t_load = perf_counter() - t_load0
         logger.debug(
             "Loaded data_type=%s for task=%s",
@@ -175,30 +217,26 @@ class AnalysisExecutor:
         )
         self._record_timing(args, phase="load", task_name=task.__class__.__name__, seconds=t_load)
 
-        cache_root = Path(args.get("cache_dir") or (Path(input_path) / ".reaxkit_cache"))
-        cache = CacheManager(CacheConfig(root=cache_root, namespace="analysis"))
-        analysis_id = cache.analysis_id_for(
+        analysis_id = analysis_id or cache.analysis_id_for(
             task=task,
             data=data,
             request=request,
-            parsed_id=args.get("_parsed_id"),
-            task_version=str(getattr(task, "VERSION", "1")),
+            parsed_id=parsed_id,
+            task_version=task_version,
         )
         args["_analysis_id"] = analysis_id
         if run_id:
             try:
-                layout = ReaxkitStorageLayout(project_root=Path(args.get("project_root") or "."))
                 layout.record_run_analysis(
                     run_id=str(run_id),
-                    parsed_id=args.get("_parsed_id"),
+                    parsed_id=parsed_id,
                     analysis_id=analysis_id,
                     task_name=task.__class__.__name__,
-                    task_version=str(getattr(task, "VERSION", "1")),
+                    task_version=task_version,
                 )
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)
 
-        use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
         if not use_cache:
             logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
             t_run0 = perf_counter()

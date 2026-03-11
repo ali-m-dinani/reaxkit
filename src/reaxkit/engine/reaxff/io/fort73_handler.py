@@ -51,7 +51,7 @@ class Fort73Handler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
-    def __init__(self, file_path: str | Path = "fort.73"):
+    def __init__(self, file_path: str | Path = "fort.73", reporter=None):
         """
         Initialize the instance.
 
@@ -62,6 +62,7 @@ class Fort73Handler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
     @staticmethod
     def _is_int_token(tok: str) -> bool:
@@ -115,8 +116,12 @@ class Fort73Handler(BaseHandler):
             rows.append(current[: len(cols)])
             current = []
 
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
         with open(self.path, "r") as fh:
-            for line in fh:
+            for line_i, line in enumerate(fh, start=1):
+                if self._reporter and (line_i % 500 == 0 or line_i == total_lines):
+                    self._reporter("load", line_i, total_lines, f"Parsing {self.path.name}")
                 s = line.strip()
 
                 # skip blanks/separators
@@ -172,6 +177,8 @@ class Fort73Handler(BaseHandler):
             # optional debugging hints:
             "source_file": str(self.path),
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, f"Finished parsing {self.path.name}")
 
         self._frames = []  # Not used in this handler
         return df, meta

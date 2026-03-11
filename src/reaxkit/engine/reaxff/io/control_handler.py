@@ -64,7 +64,7 @@ class ControlHandler(BaseHandler):
     - Content before the first recognized section header is ignored.
     """
 
-    def __init__(self, file_path: str | Path = "control"):
+    def __init__(self, file_path: str | Path = "control", reporter=None):
         """
         Initialize the instance.
 
@@ -75,6 +75,7 @@ class ControlHandler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
         # Backward-compatible per-section dicts
         self.general_parameters: Dict[str, Any] = {}
@@ -126,8 +127,12 @@ class ControlHandler(BaseHandler):
             return None
 
         try:
+            with open(self.path, "r") as fh_count:
+                total_lines = sum(1 for _ in fh_count)
             with open(self.path, "r") as f:
-                for raw in f:
+                for line_i, raw in enumerate(f, start=1):
+                    if self._reporter and (line_i % 200 == 0 or line_i == total_lines):
+                        self._reporter("load", line_i, total_lines, "Parsing control")
                     line = raw.strip()
                     if not line:
                         continue  # skip blank lines
@@ -214,5 +219,7 @@ class ControlHandler(BaseHandler):
             "n_ff": counts.get("ff", 0),
             "n_outdated": counts.get("outdated", 0),
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing control")
 
         return df, meta

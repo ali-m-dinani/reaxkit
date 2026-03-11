@@ -1198,7 +1198,7 @@ class ReaxFFAdapter(EngineAdapter):
                 break
         if summary_path is None:
             return None
-        handler = SummaryHandler(summary_path)
+        handler = SummaryHandler(summary_path, reporter=reporter)
         return _simulation_from_summary_handler(handler)
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
@@ -1267,7 +1267,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
         ffield_path = p / "ffield" if p.is_dir() else p
-        handler = FFieldHandler(ffield_path)
+        handler = FFieldHandler(ffield_path, reporter=reporter)
         out = _force_field_from_ffield_handler(handler)
         return out
 
@@ -1277,7 +1277,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort13") or args.get("force_field_optimization") or args.get("input") or "fort.13"
         p = Path(raw)
         fort13_path = p / "fort.13" if p.is_dir() else p
-        handler = Fort13Handler(fort13_path)
+        handler = Fort13Handler(fort13_path, reporter=reporter)
         return _force_field_optimization_from_fort13_handler(handler)
 
     def load_force_field_optimization_report(self, args: dict, reporter=None) -> ForceFieldOptimizationReportData:
@@ -1286,7 +1286,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort99") or args.get("force_field_optimization_report") or args.get("input") or "fort.99"
         p = Path(raw)
         fort99_path = p / "fort.99" if p.is_dir() else p
-        handler = Fort99Handler(fort99_path)
+        handler = Fort99Handler(fort99_path, reporter=reporter)
         return _force_field_optimization_report_from_fort99_handler(handler)
 
     def load_force_field_optimization_training_set(
@@ -1374,7 +1374,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
         p = Path(raw)
         fort74_path = p / "fort.74" if p.is_dir() else p
-        handler = Fort74Handler(fort74_path)
+        handler = Fort74Handler(fort74_path, reporter=reporter)
         return _structure_summary_from_fort74_handler(handler)
 
     def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
@@ -1387,7 +1387,7 @@ class ReaxFFAdapter(EngineAdapter):
             partial_energy_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
         else:
             partial_energy_path = p
-        handler = Fort73Handler(partial_energy_path)
+        handler = Fort73Handler(partial_energy_path, reporter=reporter)
         return _partial_energy_from_energy_log_handler(handler)
 
     def load_restraints(self, args: dict, reporter=None) -> RestraintData:
@@ -1396,7 +1396,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
         p = Path(raw)
         fort76_path = p / "fort.76" if p.is_dir() else p
-        handler = Fort76Handler(fort76_path)
+        handler = Fort76Handler(fort76_path, reporter=reporter)
         return _restraint_from_fort76_handler(handler)
 
     def load_geometry_optimization(self, args: dict, reporter=None) -> GeometryOptimizationProgressData:
@@ -1405,7 +1405,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
         p = Path(raw)
         fort57_path = p / "fort.57" if p.is_dir() else p
-        handler = Fort57Handler(fort57_path)
+        handler = Fort57Handler(fort57_path, reporter=reporter)
         return _geometry_optimization_from_fort57_handler(handler)
 
     def load_control_parameters(self, args: dict, reporter=None) -> ControlParametersData:
@@ -1414,7 +1414,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
         p = Path(raw)
         control_path = p / "control" if p.is_dir() else p
-        handler = ControlHandler(control_path)
+        handler = ControlHandler(control_path, reporter=reporter)
         return _control_parameters_from_control_handler(handler)
 
     def load_eregime(self, args: dict, reporter=None) -> EregimeData:
@@ -1423,7 +1423,7 @@ class ReaxFFAdapter(EngineAdapter):
         raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
         p = Path(raw)
         eregime_path = p / "eregime.in" if p.is_dir() else p
-        handler = EregimeHandler(eregime_path)
+        handler = EregimeHandler(eregime_path, reporter=reporter)
         return _eregime_from_handler(handler)
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
@@ -1466,7 +1466,7 @@ class ReaxFFAdapter(EngineAdapter):
         fort78_path = p / "fort.78" if p.is_dir() else p
         # ReaxFF writes fort.78 on the iout1 schedule, which may differ from xmolout/fort.7/summary
         # outputs that are typically written on the iout2 schedule.
-        handler = Fort78Handler(fort78_path)
+        handler = Fort78Handler(fort78_path, reporter=reporter)
         out = _electric_field_from_fort78_handler(handler)
         return out
 

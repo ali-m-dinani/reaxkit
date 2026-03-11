@@ -46,7 +46,7 @@ class Fort13Handler(BaseHandler):
     - This handler represents a single-scalar-per-iteration data source.
     """
 
-    def __init__(self, file_path: str | Path = "fort.13"):
+    def __init__(self, file_path: str | Path = "fort.13", reporter=None):
         """
         Initialize the instance.
 
@@ -57,6 +57,7 @@ class Fort13Handler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
         self._n_records: Optional[int] = None
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -70,8 +71,12 @@ class Fort13Handler(BaseHandler):
 
         """
         sim_rows: List[list] = []
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
         with open(self.path, "r") as fh:
             for idx, line in enumerate(fh, start=1):
+                if self._reporter and (idx % 500 == 0 or idx == total_lines):
+                    self._reporter("load", idx, total_lines, "Parsing fort.13")
                 line = line.strip()
                 if not line:
                     continue
@@ -91,6 +96,8 @@ class Fort13Handler(BaseHandler):
         }
 
         self._n_records = meta["n_records"]
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.13")
         return df, meta
 
     # ---- Accessors ----

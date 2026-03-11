@@ -55,7 +55,7 @@ class Fort99Handler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
-    def __init__(self, file_path: str | Path = "fort.99"):
+    def __init__(self, file_path: str | Path = "fort.99", reporter=None):
         """
         Initialize the instance.
 
@@ -66,6 +66,7 @@ class Fort99Handler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
@@ -82,8 +83,12 @@ class Fort99Handler(BaseHandler):
         # float like -17.8000, 1.54, 1.0e-03, etc.
         float_re = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[eE][+-]?\d+)?")
 
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
         with open(self.path, "r") as fh:
             for lineno, raw in enumerate(fh, start=1):
+                if self._reporter and (lineno % 500 == 0 or lineno == total_lines):
+                    self._reporter("load", lineno, total_lines, "Parsing fort.99")
                 line = raw.rstrip("\n")
                 if not line.strip():
                     continue
@@ -143,4 +148,6 @@ class Fort99Handler(BaseHandler):
             "n_records": len(df),
             "n_frames": 0,
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.99")
         return df, meta

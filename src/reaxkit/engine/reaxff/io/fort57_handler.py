@@ -52,7 +52,7 @@ class Fort57Handler(BaseHandler):
 
     _COLS = ["iter", "E_pot", "T", "T_set", "RMSG", "nfc"]
 
-    def __init__(self, file_path: str | Path = "fort.57"):
+    def __init__(self, file_path: str | Path = "fort.57", reporter=None):
         """
         Initialize the instance.
 
@@ -63,6 +63,7 @@ class Fort57Handler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
         self._geo_descriptor: str = ""
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -77,6 +78,7 @@ class Fort57Handler(BaseHandler):
         """
         with open(self.path, "r") as fh:
             lines = fh.readlines()
+        total_lines = len(lines)
 
         if not lines:
             df = pd.DataFrame(columns=self._COLS)
@@ -88,7 +90,9 @@ class Fort57Handler(BaseHandler):
 
         # 2) parse numeric rows
         rows: List[List[Any]] = []
-        for raw in lines[1:]:
+        for line_i, raw in enumerate(lines[1:], start=2):
+            if self._reporter and (line_i % 500 == 0 or line_i == total_lines):
+                self._reporter("load", line_i, total_lines, "Parsing fort.57")
             s = raw.strip()
             if not s:
                 continue
@@ -126,6 +130,8 @@ class Fort57Handler(BaseHandler):
             "n_records": int(len(df)),
             "n_frames": int(len(df)),  # for consistency with other handlers
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.57")
         return df, meta
 
     # ---- convenience accessors ----

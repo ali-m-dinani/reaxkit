@@ -53,7 +53,7 @@ class EregimeHandler(BaseHandler):
     - Field directions are stored as strings; field magnitudes are numeric.
     """
 
-    def __init__(self, file_path: str | Path = "eregime.in"):
+    def __init__(self, file_path: str | Path = "eregime.in", reporter=None):
         """
         Initialize the instance.
 
@@ -64,6 +64,7 @@ class EregimeHandler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
 
     def _parse(self) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
@@ -78,8 +79,12 @@ class EregimeHandler(BaseHandler):
         rows: List[Dict[str, Any]] = []
         max_pairs = 0
 
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
         with open(self.path, "r") as fh:
-            for raw in fh:
+            for line_i, raw in enumerate(fh, start=1):
+                if self._reporter and (line_i % 200 == 0 or line_i == total_lines):
+                    self._reporter("load", line_i, total_lines, "Parsing eregime.in")
                 s = raw.strip()
                 if not s or s.startswith("#"):
                     continue
@@ -137,4 +142,6 @@ class EregimeHandler(BaseHandler):
             "max_field_zones": int(max_pairs),
             "n_records": int(len(df)),
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing eregime.in")
         return df, meta

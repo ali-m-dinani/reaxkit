@@ -59,7 +59,7 @@ class Fort76Handler(BaseHandler):
     - This handler represents one row per iteration (frame-like semantics).
     """
 
-    def __init__(self, file_path: str | Path = "fort.76"):
+    def __init__(self, file_path: str | Path = "fort.76", reporter=None):
         """
         Initialize the instance.
 
@@ -70,6 +70,7 @@ class Fort76Handler(BaseHandler):
 
         """
         super().__init__(file_path)
+        self._reporter = reporter
         self._frames: List[pd.DataFrame] = []  # optional, kept for template consistency
         self._n_records: Optional[int] = None
 
@@ -108,8 +109,12 @@ class Fort76Handler(BaseHandler):
         rows: List[List[float]] = []
         n_restraints_max = 0
 
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
         with open(self.path, "r") as fh:
-            for line in fh:
+            for line_i, line in enumerate(fh, start=1):
+                if self._reporter and (line_i % 500 == 0 or line_i == total_lines):
+                    self._reporter("load", line_i, total_lines, "Parsing fort.76")
                 s = line.strip()
                 if not s:
                     continue
@@ -188,6 +193,8 @@ class Fort76Handler(BaseHandler):
             "n_restraints": int(n_restraints_max),
             "restraint_cols": [c for c in df.columns if c.startswith("r")],
         }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.76")
         return df, meta
 
     # ---- File-specific accessors
