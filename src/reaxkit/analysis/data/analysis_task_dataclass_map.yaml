@@ -11,9 +11,6 @@ tasks:
   bond_events:
     consumes_dataclass: ConnectivityData
     module: reaxkit.analysis.connectivity.connectivity
-  bond_timeseries:
-    consumes_dataclass: ConnectivityData
-    module: reaxkit.analysis.connectivity.connectivity
   cell_dimensions:
     consumes_dataclass: SimulationData
     module: reaxkit.analysis.timeseries.timeseries
@@ -132,7 +129,7 @@ tasks:
 dataclass_usage:
   AtomicKinematicsData: [atomic_kinematics]
   ChargeData: [charge_series, charge_table]
-  ConnectivityData: [bond_events, bond_timeseries, connection_list, connection_stats, connection_table, coordination, hybridization]
+  ConnectivityData: [bond_events, connection_list, connection_stats, connection_table, coordination, hybridization]
   ConnectivityTrajectoryData: [trajectory_relabel_by_coordination]
   ControlParametersData: [control_value]
   EregimeData: [eregime_series]

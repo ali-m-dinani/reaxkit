@@ -18,7 +18,7 @@ from reaxkit.analysis.force_field.report import (
     ForceFieldOptimizationReportRequest,
 )
 from reaxkit.analysis.force_field.structure_summary import StructureSummaryRequest
-from reaxkit.analysis.force_field.trainset import TrainsetGroupCommentsRequest
+from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
 from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
@@ -38,6 +38,7 @@ FORCE_FIELD_COMMANDS = (
     "force_field_optimization_report",
     "force_field_optimization_report_eos",
     "force_field_optimization_report_bulk_modulus",
+    "trainset_data",
     "trainset_group_comments",
 )
 
@@ -233,7 +234,7 @@ def _build_force_field_optimization_request(args: argparse.Namespace) -> ForceFi
 
 
 def _build_structure_summary_request(args: argparse.Namespace) -> StructureSummaryRequest:
-    return StructureSummaryRequest(sort=args.sort, ascending=not args.descending)
+    return StructureSummaryRequest()
 
 
 def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -> ParameterOptimizationDiagnosticRequest:
@@ -264,7 +265,11 @@ def _build_force_field_optimization_report_bulk_modulus_request(
 
 
 def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:
-    return TrainsetGroupCommentsRequest(sort=args.sort)
+    return TrainsetGroupCommentsRequest()
+
+
+def _build_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
+    return GetTrainsetDataRequest(section=str(getattr(args, "section", "all")))
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
@@ -277,6 +282,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "force_field_optimization_report": _build_force_field_optimization_report_request,
     "force_field_optimization_report_eos": _build_force_field_optimization_report_eos_request,
     "force_field_optimization_report_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
+    "trainset_data": _build_trainset_data_request,
     "trainset_group_comments": _build_trainset_group_comments_request,
 }
 
@@ -316,13 +322,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Load structure-summary data from fort.74.\n\n"
             "Examples:\n"
-            "  reaxkit structure_summary_data --sort V --export fort74.csv\n"
-            "  reaxkit structure_summary_data --col Density --export fort74_density.csv\n"
-            "  reaxkit structure_summary_data --sort Hf --descending\n"
+            "  reaxkit structure_summary_data --export fort74.csv\n"
+            "  reaxkit structure_summary_data --col density --export fort74_density.csv\n"
             "  reaxkit structure_summary_data --plot single --xaxis identifier"
         )
-        parser.add_argument("--sort", default=None, help="Optional sort column")
-        parser.add_argument("--descending", action="store_true", help="Sort in descending order")
         parser.add_argument("--col", default="all", help="Single column to keep, preserving identifier")
     elif canonical == "parameter_optimization_diagnostic":
         parser.description = (
@@ -388,10 +391,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Return unique trainset group comments by section.\n\n"
             "Examples:\n"
             "  reaxkit trainset_group_comments --export group_comments.csv\n"
-            "  reaxkit trainset_group_comments --sort\n"
             "  reaxkit trainset_group_comments"
         )
-        parser.add_argument("--sort", action="store_true", help="Sort the resulting comments")
+    elif canonical == "trainset_data":
+        parser.description = (
+            "Return trainset rows for one section or all sections.\n\n"
+            "Examples:\n"
+            "  reaxkit trainset_data --section all --export trainset_all.csv\n"
+            "  reaxkit trainset_data --section energy --export trainset_energy.csv"
+        )
+        parser.add_argument(
+            "--section",
+            default="all",
+            help="Section: all, charge, heatfo, geometry, cell_parameters, energy",
+        )
     else:
         raise KeyError(f"Unsupported force-field command '{canonical}'.")
 

@@ -205,7 +205,7 @@ def _validate_task_specific(task: Any, data: Any, request: Any) -> None:
         _validate_str_list(task_name, "quantities", getattr(request, "quantities", None), allow_empty=False)
         return
 
-    if task_name == "ControlValueTask":
+    if task_name == "ControlParametersTask":
         if not str(getattr(request, "key", "")).strip():
             _raise(task_name, "key cannot be empty.")
         return

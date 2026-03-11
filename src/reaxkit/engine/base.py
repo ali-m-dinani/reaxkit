@@ -10,6 +10,7 @@ from reaxkit.domain.data_models import (
     AtomicKinematicsData,
     ChargeData,
     ConnectivityTrajectoryData,
+    CoordinationStatusBundleData,
     ConnectivityData,
     ControlParametersData,
     EregimeData,
@@ -56,6 +57,8 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_connectivity", args, reporter=reporter)
         if data_type is ConnectivityTrajectoryData:
             return self._invoke_loader("load_connectivity_trajectory", args, reporter=reporter)
+        if data_type is CoordinationStatusBundleData:
+            return self._invoke_loader("load_coordination_status_bundle", args, reporter=reporter)
         if data_type is ChargeData:
             return self._invoke_loader("load_charges", args, reporter=reporter)
         if data_type is AtomicKinematicsData:

@@ -51,7 +51,17 @@ def _split_inline_comment(line: str) -> tuple[str, str]:
     return line.strip(), ""
 
 
-def _parse_charge(lines: List[str], section_name: str) -> pd.DataFrame:
+def _unpack_line_item(item: str | tuple[int, str]) -> tuple[int, str]:
+    """Return (line_number, raw_line_text) for parser input items."""
+    if isinstance(item, tuple) and len(item) == 2:
+        try:
+            return int(item[0]), str(item[1])
+        except Exception:
+            return -1, str(item[1])
+    return -1, str(item)
+
+
+def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     CHARGE block:
 
@@ -75,7 +85,8 @@ def _parse_charge(lines: List[str], section_name: str) -> pd.DataFrame:
     group_comment = ""
     last_was_comment = False  # track previous processed line
 
-    for raw in lines:
+    for item in lines:
+        line_number, raw = _unpack_line_item(item)
         line = raw.strip()
         if not line:
             continue
@@ -116,6 +127,7 @@ def _parse_charge(lines: List[str], section_name: str) -> pd.DataFrame:
         rows.append(
             {
                 "section": section_name,
+                "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
                 "iden": iden,
                 "weight": weight,
@@ -128,7 +140,7 @@ def _parse_charge(lines: List[str], section_name: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _parse_heatfo(lines: List[str], section_name: str) -> pd.DataFrame:
+def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     HEATFO block:
 
@@ -151,7 +163,8 @@ def _parse_heatfo(lines: List[str], section_name: str) -> pd.DataFrame:
     group_comment = ""
     last_was_comment = False  # track whether previous processed line was a comment
 
-    for raw in lines:
+    for item in lines:
+        line_number, raw = _unpack_line_item(item)
         line = raw.strip()
         if not line:
             continue
@@ -190,6 +203,7 @@ def _parse_heatfo(lines: List[str], section_name: str) -> pd.DataFrame:
         rows.append(
             {
                 "section": section_name,
+                "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
                 "iden": iden,
                 "weight": weight,
@@ -201,7 +215,7 @@ def _parse_heatfo(lines: List[str], section_name: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _parse_geometry(lines: List[str], section_name: str) -> pd.DataFrame:
+def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     GEOMETRY block:
 
@@ -228,7 +242,8 @@ def _parse_geometry(lines: List[str], section_name: str) -> pd.DataFrame:
     group_comment = ""
     last_was_comment = False  # track whether previous processed line was a comment
 
-    for raw in lines:
+    for item in lines:
+        line_number, raw = _unpack_line_item(item)
         line = raw.strip()
         if not line:
             continue
@@ -270,6 +285,7 @@ def _parse_geometry(lines: List[str], section_name: str) -> pd.DataFrame:
 
         row = {
             "section": section_name,
+            "line_number": line_number if line_number >= 0 else pd.NA,
             "iden": iden,
             "weight": weight,
             "lit": lit,
@@ -299,7 +315,7 @@ def _parse_geometry(lines: List[str], section_name: str) -> pd.DataFrame:
     return df
 
 
-def _parse_cell_parameters(lines: List[str], section_name: str) -> pd.DataFrame:
+def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     CELL PARAMETERS block:
 
@@ -316,7 +332,8 @@ def _parse_cell_parameters(lines: List[str], section_name: str) -> pd.DataFrame:
     group_comment = ""
     last_was_comment = False  # track whether previous processed line was a comment
 
-    for raw in lines:
+    for item in lines:
+        line_number, raw = _unpack_line_item(item)
         line = raw.strip()
         if not line:
             continue
@@ -357,6 +374,7 @@ def _parse_cell_parameters(lines: List[str], section_name: str) -> pd.DataFrame:
         rows.append(
             {
                 "section": section_name,
+                "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
                 "iden": iden,
                 "weight": weight,
@@ -369,7 +387,7 @@ def _parse_cell_parameters(lines: List[str], section_name: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
+def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
      parse energy.
 
@@ -390,7 +408,8 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
     group_comment = ""
     last_was_comment = False  # track if previous processed line was a comment
 
-    for raw in lines:
+    for item in lines:
+        line_number, raw = _unpack_line_item(item)
         line = raw.strip()
         if not line:
             continue
@@ -459,6 +478,7 @@ def _parse_energy(lines: List[str], section_name: str) -> pd.DataFrame:
 
         row: Dict[str, Any] = {
             "section": section_name,
+            "line_number": line_number if line_number >= 0 else pd.NA,
             "group_comment": group_comment,
             "weight": weight,
         }
@@ -573,6 +593,7 @@ class TrainsetHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
+    _CACHE_VERSION = "3"
     filetype = "trainset"
 
     def __init__(self, file_path: str = "trainset.in", reporter=None):
@@ -592,7 +613,7 @@ class TrainsetHandler(BaseHandler):
         tables: Dict[str, pd.DataFrame] = {}
         current_raw_label: Optional[str] = None
         current_canonical: Optional[str] = None
-        buffer: List[str] = []
+        buffer: List[tuple[int, str]] = []
 
         def flush_section():
             nonlocal buffer, current_canonical, tables
@@ -652,7 +673,7 @@ class TrainsetHandler(BaseHandler):
                     buffer = []
                     continue
 
-                buffer.append(raw)
+                buffer.append((line_i, raw))
 
         # Final flush
         flush_section()

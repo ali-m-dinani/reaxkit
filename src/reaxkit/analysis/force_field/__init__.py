@@ -32,6 +32,9 @@ from reaxkit.analysis.force_field.report import (
     ForceFieldOptimizationReportTask,
 )
 from reaxkit.analysis.force_field.trainset import (
+    GetTrainsetDataRequest,
+    GetTrainsetDataResult,
+    GetTrainsetDataTask,
     TrainsetGroupCommentsRequest,
     TrainsetGroupCommentsResult,
     TrainsetGroupCommentsTask,
@@ -56,6 +59,9 @@ __all__ = [
     "ForceFieldOptimizationReportBulkModulusRequest",
     "ForceFieldOptimizationReportBulkModulusResult",
     "ForceFieldOptimizationReportBulkModulusTask",
+    "GetTrainsetDataRequest",
+    "GetTrainsetDataResult",
+    "GetTrainsetDataTask",
     "TrainsetGroupCommentsRequest",
     "TrainsetGroupCommentsResult",
     "TrainsetGroupCommentsTask",

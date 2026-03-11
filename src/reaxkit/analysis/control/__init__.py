@@ -1,13 +1,13 @@
 """Control analysis tasks."""
 
 from reaxkit.analysis.control.control import (
-    ControlValueRequest,
-    ControlValueResult,
-    ControlValueTask,
+    ControlParametersTaskRequest,
+    ControlParametersTaskResult,
+    ControlParametersTask,
 )
 
 __all__ = [
-    "ControlValueRequest",
-    "ControlValueResult",
-    "ControlValueTask",
+    "ControlParametersTaskRequest",
+    "ControlParametersTaskResult",
+    "ControlParametersTask",
 ]

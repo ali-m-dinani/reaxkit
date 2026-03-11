@@ -17,14 +17,9 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "group_candidates": ("atom_id",),
     },
     "bond_events": {
-        "x_candidates": ("x_axis", "iter", "frame_index", "frame_idx"),
-        "y_candidates": ("bo_at_event",),
-        "group_candidates": ("event", "src", "dst"),
-    },
-    "bond_timeseries": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
-        "y_candidates": ("bo",),
-        "group_candidates": ("src", "dst"),
+        "y_candidates": ("bo_at_event",),
+        "group_candidates": ("event", "source", "destination"),
     },
     "charge_table": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
@@ -119,6 +114,7 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "y_candidates": ("value", "peak_height", "area"),
     },
     "structure_summary_data": {"disable_plot": True},
+    "trainset_data": {"disable_plot": True},
     "trainset_group_comments": {"disable_plot": True},
 }
 

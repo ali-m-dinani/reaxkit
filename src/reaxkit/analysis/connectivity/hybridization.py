@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -13,51 +13,137 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ConnectivityData
+from reaxkit.presentation.specs import PresentationSpec
 
 
 @dataclass
 class HybridizationStatusRequest(BaseRequest):
-    """Request for per-atom hybridization status classification."""
+    """Request for per-atom hybridization-status classification.
+
+    Parameters
+    ----------
+    hybridizations
+        Global hybridization targets used when an element-specific mapping is not
+        provided. Keys are state labels and values are target BO sums.
+        Example: ``{"sp": 1.0, "sp2": 2.0, "sp3": 3.0}``.
+    element_hybridizations
+        Per-element mapping that overrides ``hybridizations`` for specific atom
+        types. Example:
+        ``{"C": {"sp": 1.0, "sp2": 2.0, "sp3": 3.0}, "N": {"sp2": 2.0, "sp3": 3.0}}``.
+    target_elements
+        Optional element filter. If provided, only these atom types are classified.
+        Example: ``["C", "O"]``.
+    target_atom_ids
+        Optional atom-id filter (1-based ids). Example: ``[1, 2, 5]``.
+    threshold
+        Absolute tolerance for deciding whether an atom matches the closest
+        hybridization target. Example: ``0.2``.
+    frames
+        Optional frame indices to evaluate. If omitted, all frames are considered.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after frame selection. Example: ``every=5`` keeps every fifth
+        selected frame.
+    require_defined_hybridization
+        If ``True``, missing element mappings raise an error. If ``False``, rows are
+        emitted with ``status_label='undefined'``.
+    """
 
     hybridizations: Optional[Mapping[str, float]] = dc_field(
         default=None,
-        metadata={'label': 'Hybridizations', 'help': 'Hybridizations parameter for HybridizationStatusRequest.'},
+        metadata={
+            'label': 'Hybridizations',
+            'help': (
+                "Global hybridization mapping as state->target sum_BOs. "
+                "Example: {'sp': 1, 'sp2': 2, 'sp3': 3}."
+            ),
+        },
     )
     element_hybridizations: Optional[Mapping[str, Mapping[str, float]]] = dc_field(
         default=None,
-        metadata={'label': 'Element Hybridizations', 'help': 'Element Hybridizations parameter for HybridizationStatusRequest.'},
+        metadata={
+            'label': 'Element Hybridizations',
+            'help': (
+                "Per-element hybridization map overriding global values. "
+                "Example: {'C': {'sp': 1, 'sp2': 2, 'sp3': 3}}."
+            ),
+        },
     )
     target_elements: Optional[Sequence[str]] = dc_field(
         default=None,
-        metadata={'label': 'Target Elements', 'help': 'Target Elements parameter for HybridizationStatusRequest.'},
+        metadata={
+            'label': 'Target Elements',
+            'help': "Optional element filter. Example: ['C', 'O'].",
+        },
     )
     target_atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Target Atom Ids', 'help': 'Target Atom Ids parameter for HybridizationStatusRequest.'},
+        metadata={
+            'label': 'Target Atom Ids',
+            'help': "Optional atom-id filter (1-based). Example: [1, 2, 5].",
+        },
     )
     threshold: float = dc_field(
         default=0.3,
-        metadata={'label': 'Threshold', 'help': 'Threshold parameter for HybridizationStatusRequest.', 'min': 0.0},
+        metadata={
+            'label': 'Threshold',
+            'help': "Absolute tolerance for match classification. Example: 0.2.",
+            'min': 0.0,
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for HybridizationStatusRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to evaluate. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for HybridizationStatusRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
     require_defined_hybridization: bool = dc_field(
         default=True,
-        metadata={'label': 'Require Defined Hybridization', 'help': 'Require Defined Hybridization parameter for HybridizationStatusRequest.', 'choices': [True, False]},
+        metadata={
+            'label': 'Require Defined Hybridization',
+            'help': (
+                "If true, fail when an element has no mapping. If false, emit "
+                "undefined rows instead."
+            ),
+            'choices': [True, False],
+        },
     )
 
 
 @dataclass
 class HybridizationStatusResult(BaseResult):
-    """Result of hybridization status classification."""
+    """Hybridization-status analysis result.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`HybridizationStatusRequest` used for this run.
+    - ``table``: pandas.DataFrame containing one row per selected atom per frame.
+
+    Typical columns
+    ---------------
+    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
+    ``hybridization``, ``expected_sum_BOs``, ``delta``, ``within_threshold``,
+    ``status_label``.
+
+    Example
+    -------
+    A matched row may look like:
+    ``frame_index=10, atom_id=4, atom_type='C', sum_BOs=2.03, hybridization='sp2', status_label='matched'``.
+    """
 
     table: pd.DataFrame
+    request: HybridizationStatusRequest
 
 
 def _sum_bond_orders_matrix(data: ConnectivityData) -> np.ndarray:
@@ -123,10 +209,17 @@ class HybridizationStatusTask(AnalysisTask):
 
     required_data = ConnectivityData
 
+    @staticmethod
+    def recommended_presentations(
+        _result: HybridizationStatusResult,
+        _payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
     def run(self, data: ConnectivityData, request: HybridizationStatusRequest) -> HybridizationStatusResult:
         sum_bos_m = _sum_bond_orders_matrix(data)
         if sum_bos_m.size == 0:
-            return HybridizationStatusResult(table=pd.DataFrame())
+            return HybridizationStatusResult(table=pd.DataFrame(), request=request)
 
         n_frames, n_atoms = sum_bos_m.shape
         elements = data.elements if data.elements is not None else ["X"] * n_atoms
@@ -147,12 +240,12 @@ class HybridizationStatusTask(AnalysisTask):
             target_elements=request.target_elements,
         )
         if not sel_idx:
-            return HybridizationStatusResult(table=pd.DataFrame())
+            return HybridizationStatusResult(table=pd.DataFrame(), request=request)
 
         frame_idx = list(range(n_frames)) if request.frames is None else [int(i) for i in request.frames]
         frame_idx = [i for i in frame_idx if 0 <= i < n_frames][:: max(1, int(request.every))]
         if not frame_idx:
-            return HybridizationStatusResult(table=pd.DataFrame())
+            return HybridizationStatusResult(table=pd.DataFrame(), request=request)
 
         rows: list[dict] = []
         for fi in frame_idx:
@@ -209,7 +302,7 @@ class HybridizationStatusTask(AnalysisTask):
                 )
 
         out = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
-        return HybridizationStatusResult(table=out)
+        return HybridizationStatusResult(table=out, request=request)
 
 
 __all__ = [

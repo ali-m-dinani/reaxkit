@@ -14,7 +14,6 @@ from reaxkit.analysis import connectivity as _connectivity_tasks  # noqa: F401
 from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401
 from reaxkit.analysis.connectivity.connectivity import (
     BondEventsRequest,
-    BondTimeseriesRequest,
     ConnectionListRequest,
     ConnectionStatsRequest,
     ConnectionTableRequest,
@@ -27,7 +26,7 @@ from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
-from reaxkit.domain.data_models import ConnectivityTrajectoryData, ForceFieldParametersData
+from reaxkit.domain.data_models import ConnectivityTrajectoryData, CoordinationStatusBundleData
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 
@@ -35,7 +34,6 @@ CONNECTIVITY_COMMANDS = (
     "connection_list",
     "connection_table",
     "connection_stats",
-    "bond_timeseries",
     "bond_events",
     "coordination",
     "coordination_relabel",
@@ -121,24 +119,12 @@ def _add_frame_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
 
 
-def _maybe_load_force_field(args: argparse.Namespace) -> ForceFieldParametersData | None:
-    raw = getattr(args, "ffield", None)
-    if not raw:
-        return None
-    path = Path(raw)
-    if not path.exists():
-        return None
-    adapter = resolve_engine(str(path), engine=getattr(args, "engine", None))
-    return adapter.load(ForceFieldParametersData, vars(args))
-
-
 def _build_connection_list_request(args: argparse.Namespace) -> ConnectionListRequest:
     return ConnectionListRequest(
         frames=_parse_frames(args.frames),
         every=args.every,
         min_bo=args.min_bo,
         undirected=args.undirected,
-        aggregate=args.aggregate,
         include_self=args.include_self,
     )
 
@@ -162,16 +148,6 @@ def _build_connection_stats_request(args: argparse.Namespace) -> ConnectionStats
     )
 
 
-def _build_bond_timeseries_request(args: argparse.Namespace) -> BondTimeseriesRequest:
-    return BondTimeseriesRequest(
-        frames=_parse_frames(args.frames),
-        every=args.every,
-        undirected=args.undirected,
-        bo_threshold=args.bo_threshold,
-        as_wide=args.as_wide,
-    )
-
-
 def _build_bond_events_request(args: argparse.Namespace) -> BondEventsRequest:
     return BondEventsRequest(
         frames=_parse_frames(args.frames),
@@ -184,18 +160,14 @@ def _build_bond_events_request(args: argparse.Namespace) -> BondEventsRequest:
         window=args.window,
         ema_alpha=args.ema_alpha,
         min_run=args.min_run,
-        xaxis=args.xaxis,
         undirected=args.undirected,
     )
 
 
 def _build_coordination_request(args: argparse.Namespace) -> CoordinationStatusRequest:
     valences = _parse_kv_map(args.valences, value_cast=float) if args.valences else None
-    force_field = None if valences else _maybe_load_force_field(args)
     return CoordinationStatusRequest(
         valences=valences,
-        force_field=force_field,
-        valence_key=args.valence_key,
         threshold=args.threshold,
         frames=_parse_frames(args.frames),
         every=args.every,
@@ -236,7 +208,6 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "connection_list": _build_connection_list_request,
     "connection_table": _build_connection_table_request,
     "connection_stats": _build_connection_stats_request,
-    "bond_timeseries": _build_bond_timeseries_request,
     "bond_events": _build_bond_events_request,
     "coordination": _build_coordination_request,
     "hybridization": _build_hybridization_request,
@@ -257,12 +228,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Examples:\n"
             "  reaxkit connection_list --fort7 fort.7 --frames 0 1 2 --export connections.csv\n"
             "  reaxkit connection_list --fort7 fort.7 --min-bo 0.3 --undirected\n"
-            "  reaxkit connection_list --fort7 fort.7 --include-self --aggregate mean"
+            "  reaxkit connection_list --fort7 fort.7 --include-self"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
-        parser.add_argument("--aggregate", choices=["max", "mean"], default="max", help="How to aggregate undirected pairs")
         parser.add_argument("--include-self", action="store_true", help="Include self connections")
     elif canonical == "connection_table":
         parser.description = (
@@ -288,18 +258,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
         parser.add_argument("--how", choices=["mean", "max", "count"], default="mean", help="Statistic to compute")
-    elif canonical == "bond_timeseries":
-        parser.description = (
-            "Build bond-order time series for all observed bonds.\n\n"
-            "Examples:\n"
-            "  reaxkit bond_timeseries --fort7 fort.7 --plot single\n"
-            "  reaxkit bond_timeseries --fort7 fort.7 --bo-threshold 0.3 --export bond_ts.csv\n"
-            "  reaxkit bond_timeseries --fort7 fort.7 --as-wide --export bond_ts_wide.csv"
-        )
-        _add_frame_arguments(parser)
-        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
-        parser.add_argument("--bo-threshold", type=float, default=0.0, help="Zero-out values below this threshold")
-        parser.add_argument("--as-wide", action="store_true", help="Return wide one-column-per-bond output")
     elif canonical == "bond_events":
         parser.description = (
             "Detect bond formation and breakage events.\n\n"
@@ -329,7 +287,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         _add_frame_arguments(parser)
         parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2")
         parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences")
-        parser.add_argument("--valence-key", default="valency", help="Force-field atom parameter column for valence")
         parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence")
         parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences")
     elif canonical == "coordination_relabel":
@@ -343,7 +300,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         _add_frame_arguments(parser)
         parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2")
         parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences")
-        parser.add_argument("--valence-key", default="valency", help="Force-field atom parameter column for valence")
         parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence")
         parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences")
         parser.add_argument("--output", required=True, help="Output trajectory path")
@@ -374,7 +330,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _prepare_result_table(command: str, result, args: argparse.Namespace) -> None:
-    if command in {"connection_table", "bond_timeseries"} and isinstance(result.table, pd.DataFrame):
+    if command in {"connection_table"} and isinstance(result.table, pd.DataFrame):
         if not isinstance(result.table.index, pd.RangeIndex):
             result.table = result.table.reset_index()
 
@@ -392,15 +348,15 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         if counts.empty:
             return None
 
-        if args.xaxis == "iter" and "iter" in table.columns:
-            iter_map = table.drop_duplicates(count_col)[[count_col, "iter"]]
+        if args.xaxis == "iter" and "iteration" in table.columns:
+            iter_map = table.drop_duplicates(count_col)[[count_col, "iteration"]]
             counts = counts.merge(iter_map, on=count_col, how="left")
-            xvals = counts["iter"].tolist()
+            xvals = counts["iteration"].tolist()
             xlabel = "Iteration"
-        elif args.xaxis == "time" and "iter" in table.columns:
-            iter_map = table.drop_duplicates(count_col)[[count_col, "iter"]]
+        elif args.xaxis == "time" and "iteration" in table.columns:
+            iter_map = table.drop_duplicates(count_col)[[count_col, "iteration"]]
             counts = counts.merge(iter_map, on=count_col, how="left")
-            converted, xlabel = convert_xaxis(counts["iter"].to_numpy(dtype=int), "time", control_file=args.control)
+            converted, xlabel = convert_xaxis(counts["iteration"].to_numpy(dtype=int), "time", control_file=args.control)
             xvals = np.asarray(converted).tolist()
         else:
             xvals = counts[count_col].tolist()
@@ -413,66 +369,6 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "xlabel": xlabel,
             "ylabel": "Edge Count",
             "title": "Connection Count Per Frame",
-        }
-
-    if command == "bond_timeseries":
-        if args.as_wide:
-            base_x_col = "iter" if "iter" in table.columns else "frame_idx"
-            series = []
-            for col in table.columns:
-                if col in {"frame_idx", "iter"}:
-                    continue
-                xvals = table[base_x_col].to_numpy(dtype=int if base_x_col == "iter" else float)
-                xlabel = "Iteration" if base_x_col == "iter" else "Frame Index"
-                if args.xaxis == "time" and "iter" in table.columns:
-                    converted, xlabel = convert_xaxis(table["iter"].to_numpy(dtype=int), "time", control_file=args.control)
-                    xvals = np.asarray(converted)
-                elif args.xaxis == "frame" and "frame_idx" in table.columns:
-                    xvals = table["frame_idx"].to_numpy(dtype=float)
-                    xlabel = "Frame Index"
-                elif args.xaxis == "iter" and "iter" in table.columns:
-                    xvals = table["iter"].to_numpy(dtype=int)
-                    xlabel = "Iteration"
-                series.append({"x": xvals.tolist(), "y": pd.to_numeric(table[col], errors="coerce").tolist(), "label": str(col)})
-        else:
-            series = []
-            for (src, dst), group in table.groupby(["src", "dst"], sort=True):
-                group = group.sort_values("frame_idx")
-                if args.xaxis == "time" and "iter" in group.columns:
-                    converted, xlabel = convert_xaxis(group["iter"].to_numpy(dtype=int), "time", control_file=args.control)
-                    xvals = np.asarray(converted).tolist()
-                elif args.xaxis == "frame":
-                    xvals = group["frame_idx"].tolist()
-                    xlabel = "Frame Index"
-                else:
-                    xvals = group["iter"].tolist() if "iter" in group.columns else group["frame_idx"].tolist()
-                    xlabel = "Iteration" if "iter" in group.columns else "Frame Index"
-                series.append(
-                    {
-                        "x": xvals,
-                        "y": pd.to_numeric(group["bo"], errors="coerce").tolist(),
-                        "label": f"{src}-{dst}",
-                    }
-                )
-        if not series:
-            return None
-        if getattr(args, "plot", None) == "subplot":
-            return {
-                "plot_type": "multi_subplots",
-                "subplots": [[s] for s in series],
-                "xlabel": xlabel,
-                "ylabel": "Bond Order",
-                "title": "Bond Timeseries",
-                "legend": False,
-                "grid": getattr(args, "grid", None),
-            }
-        return {
-            "plot_type": "single_plot",
-            "series": series,
-            "xlabel": xlabel,
-            "ylabel": "Bond Order",
-            "title": "Bond Timeseries",
-            "legend": True,
         }
 
     if command == "bond_events":
@@ -540,7 +436,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
         coordination_task_cls = TASK_REGISTRY["coordination"]
         coordination_request = _build_coordination_request(args)
-        coordination_result = coordination_task_cls().run(composite.connectivity, coordination_request)
+        coordination_bundle = adapter.load(CoordinationStatusBundleData, normalized)
+        coordination_result = coordination_task_cls().run(coordination_bundle, coordination_request)
 
         if args.export:
             export_result_csv(coordination_result, args.export)

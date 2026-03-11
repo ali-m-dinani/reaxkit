@@ -6,7 +6,7 @@ import argparse
 from typing import Callable
 
 from reaxkit.analysis import control as _control_tasks  # noqa: F401
-from reaxkit.analysis.control.control import ControlValueRequest
+from reaxkit.analysis.control.control import ControlParametersTaskRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
@@ -44,11 +44,10 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     add_storage_cli_arguments(parser)
 
 
-def _build_get_request(args: argparse.Namespace) -> ControlValueRequest:
-    return ControlValueRequest(
+def _build_get_request(args: argparse.Namespace) -> ControlParametersTaskRequest:
+    return ControlParametersTaskRequest(
         key=args.key,
         section=args.section,
-        default=args.default,
     )
 
 
@@ -102,12 +101,16 @@ def _run_get(args: argparse.Namespace) -> int:
     task_cls = TASK_REGISTRY["control_value"]
     request = REQUEST_BUILDERS["get-control"](args)
     result = executor.run(task_cls(), request, vars(args))
+    row = result.table.iloc[0] if getattr(result, "table", None) is not None and not result.table.empty else None
+    found = bool(row["found"]) if row is not None and "found" in row else False
+    key = str(row["key"]) if row is not None and "key" in row else str(args.key)
+    value = row["value"] if row is not None and "value" in row else args.default
 
-    if not result.found and args.default is None:
+    if not found and args.default is None:
         print(f"Key '{args.key}' not found in control file '{args.control}'.")
         return 1
 
-    print(f"{result.key} = {_format_value(result.value)}")
+    print(f"{key} = {_format_value(value)}")
     return 0
 
 

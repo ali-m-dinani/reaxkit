@@ -727,6 +727,20 @@ class ForceFieldOptimizationReportEOSBundleData:
     geometry_summary: GeometrySummaryData
     metadata: Optional[dict[str, Any]] = None
 
+
+@dataclass
+class CoordinationStatusBundleData:
+    """Composite data for coordination-status analysis tasks.
+
+    - connectivity: bond-order/neighbor information per frame (required)
+    - force_field_parameters: force-field atom parameters with ``valency`` column (required)
+    """
+
+    connectivity: ConnectivityData
+    force_field_parameters: ForceFieldParametersData
+    metadata: Optional[dict[str, Any]] = None
+
+
 @dataclass
 class ElectrostaticsData:
     """Composite electrostatics model for engine-agnostic analyses."""

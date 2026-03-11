@@ -13,6 +13,7 @@ from reaxkit.domain.data_models import (
     AtomicKinematicsData,
     ChargeData,
     ConnectivityTrajectoryData,
+    CoordinationStatusBundleData,
     ConnectivityData,
     ControlParametersData,
     EregimeData,
@@ -1183,6 +1184,12 @@ class ReaxFFAdapter(EngineAdapter):
             conn.elements = conn.simulation.elements
             conn.atom_ids = conn.simulation.atom_ids
         return conn
+
+    def load_coordination_status_bundle(self, args: dict, reporter=None) -> CoordinationStatusBundleData:
+        return CoordinationStatusBundleData(
+            connectivity=self.load_connectivity(args, reporter=reporter),
+            force_field_parameters=self.load_force_field(args, reporter=reporter),
+        )
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler

@@ -161,9 +161,6 @@ commands:
   connection_stats:
     kind: analysis
     help: Connectivity statistics
-  bond_timeseries:
-    kind: analysis
-    help: Bond time series
   bond_events:
     kind: analysis
     help: Bond formation and breakage events

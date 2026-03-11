@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -12,48 +12,102 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ForceFieldParametersData
+from reaxkit.domain.data_models import CoordinationStatusBundleData, ForceFieldParametersData
+from reaxkit.presentation.specs import PresentationSpec
 
 
 @dataclass
 class CoordinationStatusRequest(BaseRequest):
-    """Request for per-atom coordination status classification."""
+    """Request for per-atom coordination-status classification.
+
+    Parameters
+    ----------
+    valences
+        Optional element-to-valence map used for classification.
+        Example: ``{"C": 4.0, "O": 2.0, "H": 1.0}``.
+    threshold
+        Absolute tolerance around the target valence for assigning ``coord``.
+        Example: ``0.9``.
+    frames
+        Optional frame indices to analyze. If omitted, all frames are used.
+        Example: ``[0, 10, 20]``.
+    every
+        Frame stride after frame selection. Example: ``every=5``.
+    require_all_valences
+        If ``True``, fail when a selected atom type has no valence mapping.
+        If ``False``, those rows are kept with NaN-derived status.
+    """
 
     valences: Optional[Mapping[str, float]] = dc_field(
         default=None,
-        metadata={'label': 'Valences', 'help': 'Valences parameter for CoordinationStatusRequest.'},
-    )
-    force_field: Optional[ForceFieldParametersData] = dc_field(
-        default=None,
-        metadata={'label': 'Force Field', 'help': 'Force Field parameter for CoordinationStatusRequest.'},
-    )
-    valence_key: str = dc_field(
-        default="valency",
-        metadata={'label': 'Valence Key', 'help': 'Valence Key parameter for CoordinationStatusRequest.'},
+        metadata={
+            'label': 'Valences',
+            'help': (
+                "Optional element->valence map. "
+                "Example: {'C': 4, 'O': 2, 'H': 1}."
+            ),
+        },
     )
     threshold: float = dc_field(
         default=0.9,
-        metadata={'label': 'Threshold', 'help': 'Threshold parameter for CoordinationStatusRequest.', 'min': 0.0},
+        metadata={
+            'label': 'Threshold',
+            'help': "Absolute tolerance for assigning coordinated status. Example: 0.9.",
+            'min': 0.0,
+        },
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
-        metadata={'label': 'Frames', 'help': 'Frames parameter for CoordinationStatusRequest.', 'units': 'frame_index'},
+        metadata={
+            'label': 'Frames',
+            'help': "Optional frame indices to analyze. Example: [0, 10, 20].",
+            'units': 'frame_index',
+        },
     )
     every: int = dc_field(
         default=1,
-        metadata={'label': 'Every', 'help': 'Every parameter for CoordinationStatusRequest.', 'min': 1, 'units': 'frames'},
+        metadata={
+            'label': 'Every',
+            'help': "Stride for selected frames. Example: every=5.",
+            'min': 1,
+            'units': 'frames',
+        },
     )
     require_all_valences: bool = dc_field(
         default=True,
-        metadata={'label': 'Require All Valences', 'help': 'Require All Valences parameter for CoordinationStatusRequest.', 'choices': [True, False]},
+        metadata={
+            'label': 'Require All Valences',
+            'help': (
+                "If true, raise when any atom type has no valence mapping. "
+                "If false, keep rows with undefined status."
+            ),
+            'choices': [True, False],
+        },
     )
 
 
 @dataclass
 class CoordinationStatusResult(BaseResult):
-    """Result of coordination status classification."""
+    """Coordination-status analysis result.
+
+    Output structure
+    ----------------
+    - ``request``: the :class:`CoordinationStatusRequest` used for this run.
+    - ``table``: pandas.DataFrame with one row per atom per analyzed frame.
+
+    Typical columns
+    ---------------
+    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
+    ``valence``, ``delta``, ``status``, ``status_label``.
+
+    Example
+    -------
+    A representative row:
+    ``frame_index=12, atom_id=7, atom_type='C', sum_BOs=3.95, valence=4.0, status_label='coord'``.
+    """
 
     table: pd.DataFrame
+    request: CoordinationStatusRequest
 
 
 def _classify_coordination_for_frame(
@@ -118,24 +172,20 @@ def _status_label(series: Sequence[int | float]) -> list[Optional[str]]:
     return labels
 
 
-def _valence_map_from_request(req: CoordinationStatusRequest) -> dict[str, float]:
+def _valence_map_from_request(
+    req: CoordinationStatusRequest,
+    *,
+    force_field_data: ForceFieldParametersData,
+) -> dict[str, float]:
     if req.valences:
         return {str(k): float(v) for k, v in req.valences.items()}
-    if req.force_field is None:
-        raise ValueError("Provide either request.valences or request.force_field with atom valence data.")
-
-    atom_df = req.force_field.atom_parameters
+    atom_df = force_field_data.atom_parameters
     if atom_df is None or atom_df.empty:
         raise ValueError("force_field.atom_parameters is empty; cannot infer valences.")
 
-    key = str(req.valence_key)
-    candidate_keys = [key]
-    if key == "valence":
-        candidate_keys.append("valency")
-
-    value_col = next((k for k in candidate_keys if k in atom_df.columns), None)
-    if value_col is None:
-        raise ValueError(f"No valence column found in force_field.atom_parameters for keys={candidate_keys}.")
+    value_col = "valency"
+    if value_col not in atom_df.columns:
+        raise ValueError("force_field.atom_parameters must include 'valency' column.")
     if "symbol" not in atom_df.columns:
         raise ValueError("force_field.atom_parameters must include 'symbol' column.")
 
@@ -186,10 +236,47 @@ def _sum_bond_orders_matrix(data: ConnectivityData) -> np.ndarray:
 class CoordinationStatusTask(AnalysisTask):
     """Per-atom coordination status over selected frames."""
 
-    required_data = ConnectivityData
+    required_data = CoordinationStatusBundleData
 
-    def run(self, data: ConnectivityData, request: CoordinationStatusRequest) -> CoordinationStatusResult:
-        sum_bos_m = _sum_bond_orders_matrix(data)
+    @staticmethod
+    def recommended_presentations(
+        _result: CoordinationStatusResult,
+        payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        rows = payload.get("table")
+        if not isinstance(rows, list) or not rows:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
+        sample = rows[0] if isinstance(rows[0], dict) else {}
+        if not isinstance(sample, dict):
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
+        x_col = "frame_index" if "frame_index" in sample else ("iter" if "iter" in sample else "")
+        y_col = "delta" if "delta" in sample else ("sum_BOs" if "sum_BOs" in sample else "")
+        group_col = "atom_id" if "atom_id" in sample else ""
+        if not x_col or not y_col:
+            return [PresentationSpec(renderer="table", label="Table", view_type="table")]
+
+        return [
+            PresentationSpec(renderer="table", label="Table", view_type="table"),
+            PresentationSpec(
+                renderer="single_plot",
+                label=f"{y_col} vs {x_col}",
+                mapping={"x_col": x_col, "y_col": y_col, "group_by_col": group_col},
+                options={
+                    "title": f"Coordination Status: {y_col} vs {x_col}",
+                    "xlabel": x_col,
+                    "ylabel": y_col,
+                    "legend": bool(group_col),
+                },
+                view_type="plot2d",
+            ),
+        ]
+
+    def run(self, data: CoordinationStatusBundleData, request: CoordinationStatusRequest) -> CoordinationStatusResult:
+        connectivity = data.connectivity
+        force_field = data.force_field_parameters
+        sum_bos_m = _sum_bond_orders_matrix(connectivity)
         if sum_bos_m.size == 0:
             return CoordinationStatusResult(
                 table=pd.DataFrame(
@@ -204,16 +291,17 @@ class CoordinationStatusTask(AnalysisTask):
                         "status",
                         "status_label",
                     ]
-                )
+                ),
+                request=request,
             )
 
         n_frames, n_atoms = sum_bos_m.shape
-        elements = data.elements if data.elements is not None else ["X"] * n_atoms
+        elements = connectivity.elements if connectivity.elements is not None else ["X"] * n_atoms
         if len(elements) != n_atoms:
             raise ValueError(f"elements length ({len(elements)}) must match n_atoms ({n_atoms}).")
 
-        if data.atom_ids is not None:
-            atom_ids = np.asarray(data.atom_ids, dtype=int).reshape(-1)
+        if connectivity.atom_ids is not None:
+            atom_ids = np.asarray(connectivity.atom_ids, dtype=int).reshape(-1)
             if atom_ids.shape[0] != n_atoms:
                 raise ValueError(f"atom_ids length ({atom_ids.shape[0]}) must match n_atoms ({n_atoms}).")
         else:
@@ -222,9 +310,9 @@ class CoordinationStatusTask(AnalysisTask):
         frame_idx = list(range(n_frames)) if request.frames is None else [int(i) for i in request.frames]
         frame_idx = [i for i in frame_idx if 0 <= i < n_frames][:: max(1, int(request.every))]
         if not frame_idx:
-            return CoordinationStatusResult(table=pd.DataFrame())
+            return CoordinationStatusResult(table=pd.DataFrame(), request=request)
 
-        val_map = _valence_map_from_request(request)
+        val_map = _valence_map_from_request(request, force_field_data=force_field)
         rows: list[pd.DataFrame] = []
         for fi in frame_idx:
             per_atom = _classify_coordination_for_frame(
@@ -235,7 +323,7 @@ class CoordinationStatusTask(AnalysisTask):
                 require_all_valences=bool(request.require_all_valences),
             )
             per_atom["atom_id"] = atom_ids
-            iter_val = int(data.iterations[fi]) if data.iterations is not None else int(fi)
+            iter_val = int(connectivity.iterations[fi]) if connectivity.iterations is not None else int(fi)
             per_atom.insert(0, "iter", iter_val)
             per_atom.insert(0, "frame_index", int(fi))
             per_atom["status_label"] = _status_label(per_atom["status"])
@@ -243,7 +331,7 @@ class CoordinationStatusTask(AnalysisTask):
 
         out = pd.concat(rows, ignore_index=True)
         out = out.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
-        return CoordinationStatusResult(table=out)
+        return CoordinationStatusResult(table=out, request=request)
 
 
 __all__ = [

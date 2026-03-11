@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Optional
+from typing import Any, Optional
+
+import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ControlParametersData
+from reaxkit.presentation.specs import PresentationSpec
 
 _SECTION_NAMES = ("general", "md", "mm", "ff", "outdated")
 
@@ -69,45 +72,102 @@ def _get_control_data(
     return default
 
 
+def _resolve_key_section(data: ControlParametersData, key: str, section: Optional[str]) -> Optional[str]:
+    """Resolve which section contains a key when section is not explicitly requested."""
+    if section is not None:
+        return str(section).lower()
+    key_norm = str(key).lower()
+    section_map = _section_map(data)
+    for section_name in _SECTION_NAMES:
+        if key_norm in section_map[section_name]:
+            return section_name
+    return None
+
+
 @dataclass
-class ControlValueRequest(BaseRequest):
-    """Request for a single control-parameter lookup."""
+class ControlParametersTaskRequest(BaseRequest):
+    """Request for extracting a control parameter as a table row.
+
+    Parameters
+    ----------
+    key
+        Control key to query (case-insensitive).
+        Examples: ``"nmdit"``, ``"iout2"``, ``"imetho"``.
+    section
+        Optional section to search in. If omitted, sections are searched in order:
+        ``general -> md -> mm -> ff -> outdated``.
+        Example: ``section="md"``.
+    """
 
     key: str = dc_field(
-        metadata={'label': 'Key', 'help': 'Key parameter for ControlValueRequest.'},
+        metadata={
+            "label": "Key",
+            "help": (
+                "Control key to retrieve (case-insensitive). "
+                "Examples: 'nmdit', 'iout2', 'imetho'."
+            ),
+        },
     )
     section: Optional[str] = dc_field(
         default=None,
-        metadata={'label': 'Section', 'help': 'Section parameter for ControlValueRequest.'},
-    )
-    default: object = dc_field(
-        default=None,
-        metadata={'label': 'Default', 'help': 'Default parameter for ControlValueRequest.'},
+        metadata={
+            "label": "Section",
+            "help": (
+                "Optional control section to search. "
+                "If omitted, all sections are searched in default order. "
+                "Example: 'md'."
+            ),
+            "choices": ["general", "md", "mm", "ff", "outdated"],
+        },
     )
 
 
 @dataclass
-class ControlValueResult(BaseResult):
-    """Single control-parameter lookup result."""
+class ControlParametersTaskResult(BaseResult):
+    """Result for a control-parameter table extraction.
 
-    key: str
-    value: object
-    section: Optional[str] = None
-    found: bool = False
+    Output structure
+    ----------------
+    - ``request``: the :class:`ControlParametersTaskRequest` used for lookup.
+    - ``table``: pandas.DataFrame with one row and columns:
+      ``['key', 'value', 'section', 'found']``.
+
+    Column meanings
+    ---------------
+    - ``key``: normalized control key string that was requested.
+    - ``value``: resolved control value, or ``None`` when not found.
+    - ``section``: section where the key was resolved (or requested section).
+    - ``found``: ``True`` when the key exists in the control data, else ``False``.
+
+    Example
+    -------
+    A successful lookup may return:
+    ``key='iout2', value=20, section='md', found=True``.
+    """
+
+    table: pd.DataFrame
+    request: ControlParametersTaskRequest
 
 
 @register_task("control_value")
-class ControlValueTask(AnalysisTask):
-    """Return the value of a control parameter of interest."""
+class ControlParametersTask(AnalysisTask):
+    """Return one control parameter as a one-row table."""
 
     required_data = ControlParametersData
+
+    @staticmethod
+    def recommended_presentations(
+        _result: ControlParametersTaskResult,
+        _payload: dict[str, Any],
+    ) -> list[PresentationSpec]:
+        return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
     def run(
         self,
         data: ControlParametersData,
-        request: ControlValueRequest,
+        request: ControlParametersTaskRequest,
         reporter=None,
-    ) -> ControlValueResult:
+    ) -> ControlParametersTaskResult:
         missing = object()
         value = _get_control_data(
             data,
@@ -115,16 +175,28 @@ class ControlValueTask(AnalysisTask):
             section=request.section,
             default=missing,
         )
-        return ControlValueResult(
-            key=str(request.key),
-            value=request.default if value is missing else value,
-            section=request.section,
-            found=value is not missing,
+        found = value is not missing
+        resolved_value = None if not found else value
+        resolved_section = _resolve_key_section(data, key=request.key, section=request.section)
+
+        table = pd.DataFrame(
+            [
+                {
+                    "key": str(request.key).lower(),
+                    "value": resolved_value,
+                    "section": resolved_section,
+                    "found": bool(found),
+                }
+            ]
+        )
+        return ControlParametersTaskResult(
+            table=table,
+            request=request,
         )
 
 
 __all__ = [
-    "ControlValueRequest",
-    "ControlValueResult",
-    "ControlValueTask",
+    "ControlParametersTaskRequest",
+    "ControlParametersTaskResult",
+    "ControlParametersTask",
 ]
