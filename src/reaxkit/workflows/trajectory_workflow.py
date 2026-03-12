@@ -12,6 +12,7 @@ from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
@@ -37,7 +38,12 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--frames", type=int, nargs="*", default=None, help="Selected frame indices")
+    parser.add_argument(
+        "--frames",
+        nargs="*",
+        default=None,
+        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+    )
     parser.add_argument("--every", type=int, default=1, help="Frame stride")
 
 
@@ -47,7 +53,7 @@ def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
         atom_types=args.atom_types,
         dims=tuple(args.dims),
         origin=args.origin,
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
     )
 
@@ -58,7 +64,7 @@ def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
         atom_ids_b=args.atom_ids_b,
         atom_types_a=args.atom_types_a,
         atom_types_b=args.atom_types_b,
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
         bins=args.bins,
         r_max=args.r_max,
@@ -73,7 +79,7 @@ def _build_rdf_property_request(args: argparse.Namespace) -> RDFPropertyRequest:
         atom_ids_b=args.atom_ids_b,
         atom_types_a=args.atom_types_a,
         atom_types_b=args.atom_types_b,
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
         bins=args.bins,
         r_max=args.r_max,

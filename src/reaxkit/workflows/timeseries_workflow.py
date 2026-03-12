@@ -24,7 +24,7 @@ from reaxkit.analysis.timeseries.timeseries import (
     TrajectoryCoordinateSeriesRequest,
 )
 from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.frame_utils import parse_frames
+from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.convert import convert_xaxis
@@ -78,18 +78,8 @@ _DIRECT_EFIELD_COMPONENT_RE = re.compile(r"^(?:field_[xyz]|E_field(?:_[xyz])?)$"
 _GEO_OPT_ALL_COLUMNS = ("iter", "E_pot", "T", "T_set", "RMSG", "nfc")
 
 
-def _parse_frame_selector(spec: str | None) -> list[int] | None:
-    if not spec:
-        return None
-    sel = parse_frames(spec)
-    if sel is None:
-        return None
-    if isinstance(sel, slice):
-        start = 0 if sel.start is None else int(sel.start)
-        stop = int(sel.stop) if sel.stop is not None else start
-        step = 1 if sel.step is None else int(sel.step)
-        return list(range(start, stop, step))
-    return [int(v) for v in sel]
+def _parse_frame_selector(spec) -> list[int] | None:
+    return parse_frame_indices(spec)
 
 
 def _split_csv_tokens(spec: str) -> list[str]:
@@ -129,7 +119,12 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--frames", default=None, help='Frame selector: "0,10,20" or "0:100:5"')
+    parser.add_argument(
+        "--frames",
+        nargs="*",
+        default=None,
+        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+    )
     parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
     parser.add_argument("--format", choices=["long", "wide"], default="long", help="Trajectory output table format")
     parser.add_argument("--atoms", default=None, help='Legacy trajectory atom selector, for example "1,5,12"')

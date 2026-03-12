@@ -678,7 +678,7 @@ class PipelineRuntime:
     @staticmethod
     def _semantic_defaults(field_name: str) -> dict[str, Any]:
         defaults: dict[str, dict[str, Any]] = {
-            "frames": {"help": "Frame indices to include. Empty means all frames.", "units": "frame_index"},
+            "frames": {"help": "Frame selector: 0,10,20 or 0 10 20 or 0:20 or 0-20 or 0:20:2.", "units": "frame_index"},
             "every": {"help": "Stride over selected frames.", "min": 1, "units": "frames"},
             "atom_ids": {"help": "Atom IDs to include. Empty means all atoms.", "units": "index"},
             "atom_ids_a": {"help": "Atom IDs for group A. Empty means all atoms.", "units": "index"},

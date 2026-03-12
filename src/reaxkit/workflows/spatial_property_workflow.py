@@ -13,6 +13,7 @@ import reaxkit.engine  # noqa: F401
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ChargeData, ConnectivityData, TrajectoryData
 from reaxkit.presentation.dispatcher import export_result_csv
@@ -48,7 +49,12 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--property", default=None, help="Property to map: charge, q, partial_charge, sum_BOs, connectivity")
-    parser.add_argument("--frames", type=int, nargs="*", default=None, help="Selected frame indices")
+    parser.add_argument(
+        "--frames",
+        nargs="*",
+        default=None,
+        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+    )
     parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
     parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="Restrict to selected 1-based atom ids")
     parser.add_argument("--atom-types", nargs="*", default=None, help="Restrict to selected atom types/elements")
@@ -323,7 +329,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         charges,
         connectivity,
         property_name=property_name,
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
         atom_ids=args.atom_ids,
         atom_types=args.atom_types,

@@ -18,6 +18,7 @@ from reaxkit.analysis.molecular_analysis.molecular_analysis import (
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 
@@ -48,13 +49,18 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--frames", type=int, nargs="*", default=None, help="Selected frame indices")
+    parser.add_argument(
+        "--frames",
+        nargs="*",
+        default=None,
+        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+    )
     parser.add_argument("--every", type=int, default=1, help="Frame stride")
 
 
 def _build_dominant_species_request(args: argparse.Namespace) -> DominantSpeciesRequest:
     return DominantSpeciesRequest(
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
         top_n=args.top_n,
         min_freq=args.min_freq,
@@ -63,14 +69,14 @@ def _build_dominant_species_request(args: argparse.Namespace) -> DominantSpecies
 
 def _build_largest_molecule_by_mass_request(args: argparse.Namespace) -> LargestMoleculeByMassRequest:
     return LargestMoleculeByMassRequest(
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
     )
 
 
 def _build_largest_molecule_composition_request(args: argparse.Namespace) -> LargestMoleculeCompositionRequest:
     return LargestMoleculeCompositionRequest(
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
     )
 
@@ -78,7 +84,7 @@ def _build_largest_molecule_composition_request(args: argparse.Namespace) -> Lar
 def _build_molecule_lifetime_request(args: argparse.Namespace) -> MoleculeLifetimeRequest:
     return MoleculeLifetimeRequest(
         molecules=args.molecules,
-        frames=args.frames,
+        frames=parse_frame_indices(args.frames),
         every=args.every,
         min_freq=args.min_freq,
     )

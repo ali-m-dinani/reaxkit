@@ -7,6 +7,7 @@ from typing import Any, Callable
 from dash import ALL, Input, Output, State, dcc, html, no_update
 
 from reaxkit.webui.backend.api import WebUIApiService
+from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.webui.ui.analysis.tasks.form_utils import label_with_help
 from reaxkit.webui.ui.analysis.tasks.ui_hints import field_ui_hint
 
@@ -208,6 +209,7 @@ def _parse_csv_strs(raw: Any) -> list[str] | None:
 
 
 def _coerce_value(raw_value: Any, field: dict[str, Any]) -> Any:
+    name = str(field.get("name") or "").strip()
     kind = field.get("kind")
     semantic = field.get("semantic", {}) if isinstance(field.get("semantic"), dict) else {}
     default = field.get("default")
@@ -242,7 +244,13 @@ def _coerce_value(raw_value: Any, field: dict[str, Any]) -> Any:
             return default
 
     if _is_list_int(kind):
-        val = _parse_csv_ints(raw_value)
+        if name == "frames":
+            try:
+                val = parse_frame_indices(raw_value)
+            except Exception:
+                val = None
+        else:
+            val = _parse_csv_ints(raw_value)
         return val if val is not None else default
 
     if _is_list_float(kind):

@@ -24,7 +24,7 @@ from reaxkit.analysis.electrostatics.electrostatics import (
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.alias import _resolve_alias, normalize_choice, resolve_alias_from_columns
 from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.frame_utils import parse_frames
+from reaxkit.core.frame_utils import parse_frame_indices, parse_frames
 from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import (
@@ -58,7 +58,12 @@ def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
         help="Render local dipole or polarization results as a plot",
     )
     parser.add_argument("--component", default=None, help="Component to color by for local plots")
-    parser.add_argument("--frames", default=None, help='Frames for local plots: "0,10,20" or "0:100:5"')
+    parser.add_argument(
+        "--frames",
+        nargs="*",
+        default=None,
+        help='Frames for local plots: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+    )
     parser.add_argument("--save", default=None, help="Directory used when saving local plots")
     parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum for local plots")
     parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum for local plots")
@@ -94,7 +99,7 @@ def _parse_bins(spec: str) -> Union[int, tuple[int, int]]:
     return int(spec)
 
 
-def _parse_frame_indices(n_frames: int, spec: str | None) -> list[int]:
+def _parse_frame_indices(n_frames: int, spec) -> list[int]:
     if not spec:
         return list(range(n_frames))
 
@@ -109,18 +114,8 @@ def _parse_frame_indices(n_frames: int, spec: str | None) -> list[int]:
     return [int(idx) for idx in selector if 0 <= int(idx) < n_frames]
 
 
-def _parse_frame_selector(spec: str | None) -> list[int] | None:
-    if not spec:
-        return None
-    selector = parse_frames(spec)
-    if selector is None:
-        return None
-    if isinstance(selector, slice):
-        start = 0 if selector.start is None else int(selector.start)
-        stop = int(selector.stop) if selector.stop is not None else start
-        step = 1 if selector.step is None else int(selector.step)
-        return list(range(start, stop, step))
-    return [int(idx) for idx in selector]
+def _parse_frame_selector(spec) -> list[int] | None:
+    return parse_frame_indices(spec)
 
 
 def _normalized_args(args: argparse.Namespace) -> dict:
@@ -563,7 +558,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids to include")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
-        parser.add_argument("--frames", default=None, help='Frames: "0,10,20" or "0:100:5"')
+        parser.add_argument(
+            "--frames",
+            nargs="*",
+            default=None,
+            help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        )
         parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
         parser.add_argument("--control", default="control", help="Control file for time-axis conversion")
         _add_table_presentation_arguments(parser)
