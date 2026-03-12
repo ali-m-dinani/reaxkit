@@ -216,7 +216,12 @@ class HybridizationStatusTask(AnalysisTask):
     ) -> list[PresentationSpec]:
         return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
-    def run(self, data: ConnectivityData, request: HybridizationStatusRequest) -> HybridizationStatusResult:
+    def run(
+        self,
+        data: ConnectivityData,
+        request: HybridizationStatusRequest,
+        reporter=None,
+    ) -> HybridizationStatusResult:
         sum_bos_m = _sum_bond_orders_matrix(data)
         if sum_bos_m.size == 0:
             return HybridizationStatusResult(table=pd.DataFrame(), request=request)
@@ -248,7 +253,10 @@ class HybridizationStatusTask(AnalysisTask):
             return HybridizationStatusResult(table=pd.DataFrame(), request=request)
 
         rows: list[dict] = []
-        for fi in frame_idx:
+        total = max(1, len(frame_idx))
+        if reporter:
+            reporter("analyze", 0, total, "Preparing hybridization status")
+        for step_i, fi in enumerate(frame_idx, start=1):
             iter_val = int(data.iterations[fi]) if data.iterations is not None else int(fi)
             for ai in sel_idx:
                 elem = str(elements[ai])
@@ -300,8 +308,12 @@ class HybridizationStatusTask(AnalysisTask):
                         "status_label": "matched" if within else "unmatched",
                     }
                 )
+            if reporter:
+                reporter("analyze", step_i, total, "Computing hybridization status")
 
         out = pd.DataFrame(rows).sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
+        if reporter:
+            reporter("analyze", total, total, "Finished hybridization status")
         return HybridizationStatusResult(table=out, request=request)
 
 

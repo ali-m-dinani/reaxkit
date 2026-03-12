@@ -273,7 +273,12 @@ class CoordinationStatusTask(AnalysisTask):
             ),
         ]
 
-    def run(self, data: CoordinationStatusBundleData, request: CoordinationStatusRequest) -> CoordinationStatusResult:
+    def run(
+        self,
+        data: CoordinationStatusBundleData,
+        request: CoordinationStatusRequest,
+        reporter=None,
+    ) -> CoordinationStatusResult:
         connectivity = data.connectivity
         force_field = data.force_field_parameters
         sum_bos_m = _sum_bond_orders_matrix(connectivity)
@@ -314,7 +319,10 @@ class CoordinationStatusTask(AnalysisTask):
 
         val_map = _valence_map_from_request(request, force_field_data=force_field)
         rows: list[pd.DataFrame] = []
-        for fi in frame_idx:
+        total = max(1, len(frame_idx))
+        if reporter:
+            reporter("analyze", 0, total, "Preparing coordination status")
+        for step_i, fi in enumerate(frame_idx, start=1):
             per_atom = _classify_coordination_for_frame(
                 sum_bos=sum_bos_m[fi, :],
                 atom_types=elements,
@@ -328,9 +336,13 @@ class CoordinationStatusTask(AnalysisTask):
             per_atom.insert(0, "frame_index", int(fi))
             per_atom["status_label"] = _status_label(per_atom["status"])
             rows.append(per_atom)
+            if reporter:
+                reporter("analyze", step_i, total, "Computing coordination status")
 
         out = pd.concat(rows, ignore_index=True)
         out = out.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
+        if reporter:
+            reporter("analyze", total, total, "Finished coordination status")
         return CoordinationStatusResult(table=out, request=request)
 
 

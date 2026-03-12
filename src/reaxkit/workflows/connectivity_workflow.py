@@ -217,9 +217,18 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 }
 
 
+def _selected_connection_table_frames(args: argparse.Namespace) -> list[int]:
+    raw_frames = _parse_frames(getattr(args, "frames", None))
+    if raw_frames is None or len(raw_frames) == 0:
+        return [int(args.frame)]
+    every = max(1, int(getattr(args, "every", 1)))
+    return [int(v) for v in raw_frames][::every]
+
+
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = resolve_command_name(command, task_names=CONNECTIVITY_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
@@ -239,12 +248,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--include-self", action="store_true", help="Include self connections")
     elif canonical == "connection_table":
         parser.description = (
-            "Build a single-frame connectivity matrix.\n\n"
+            "Build one or more frame-wise connectivity matrices.\n\n"
             "Examples:\n"
             "  reaxkit connection_table --fort7 fort.7 --frame 0 --export connection_table.csv\n"
+            "  reaxkit connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n"
             "  reaxkit connection_table --fort7 fort.7 --frame 10 --min-bo 0.3\n"
             "  reaxkit connection_table --fort7 fort.7 --frame 5 --fill-value -1"
         )
+        _add_frame_arguments(parser)
         parser.add_argument("--frame", type=int, default=0, help="Frame index to extract")
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
@@ -454,6 +465,44 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         out_path = adapter.write(relabel_result.trajectory, args.output, vars(args))
         print(f"Wrote relabeled trajectory to {out_path}")
         return 0
+
+    if canonical == "connection_table":
+        frames = _selected_connection_table_frames(args)
+        if len(frames) > 1:
+            if getattr(args, "plot", None) or getattr(args, "save", None) or getattr(args, "show", False):
+                raise ValueError("Plotting for connection_table with multiple frames is not supported. Export CSVs instead.")
+            if not getattr(args, "export", None):
+                raise ValueError("Multiple frames require --export so one CSV per frame can be written.")
+
+            task_cls = TASK_REGISTRY[canonical]
+            executor = AnalysisExecutor()
+            base_out = resolve_output_path(
+                args.export,
+                canonical,
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
+            stem = base_out.stem if base_out.suffix else base_out.name
+            suffix = base_out.suffix if base_out.suffix else ".csv"
+            written: list[Path] = []
+
+            for frame in frames:
+                req = ConnectionTableRequest(
+                    frame=int(frame),
+                    min_bo=float(args.min_bo),
+                    undirected=bool(args.undirected),
+                    fill_value=float(args.fill_value),
+                )
+                result = executor.run(task_cls(), req, vars(args))
+                _prepare_result_table(canonical, result, args)
+                out_path = base_out.parent / f"{stem}_frame_{int(frame)}{suffix}"
+                export_result_csv(result, str(out_path))
+                written.append(out_path)
+
+            print("Results saved in:")
+            print(f"  {base_out.parent.resolve()}")
+            return 0
 
     task_cls = TASK_REGISTRY[canonical]
     request = REQUEST_BUILDERS[canonical](args)

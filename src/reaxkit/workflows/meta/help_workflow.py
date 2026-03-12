@@ -13,6 +13,17 @@ import argparse
 
 def build_parser(p: argparse.ArgumentParser) -> None:
     """Define CLI arguments for `reaxkit help`."""
+    p.formatter_class = argparse.RawTextHelpFormatter
+    p.description = (
+        "Interactive help and discovery for ReaxKit commands and file semantics.\n\n"
+        "Examples:\n"
+        "  reaxkit help \"get trajectory\"\n"
+        "  reaxkit help \"bond order\" --top 12\n"
+        "  reaxkit help \"electric field\" --engine reaxff\n"
+        "  reaxkit help \"fort.7\" --why --tags\n"
+        "  reaxkit help \"xmolout\" --all-info"
+    )
+
     p.add_argument(
         "query",
         nargs="?",

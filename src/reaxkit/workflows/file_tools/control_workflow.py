@@ -66,6 +66,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     if command == MAKE_CONTROL_COMMAND:
         parser.set_defaults(command=MAKE_CONTROL_COMMAND)
+        parser.set_defaults(progress=True)
         parser.formatter_class = argparse.RawTextHelpFormatter
         parser.description = (
             "Generate a default control file template.\n\n"
