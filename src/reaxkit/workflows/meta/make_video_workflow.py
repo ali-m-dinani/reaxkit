@@ -55,20 +55,15 @@ def _make_task(args: argparse.Namespace) -> int:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Register coordination-related CLI subcommands.
-
-    This function defines the task-level interface for the
-    `reaxkit file` workflow and attaches its tasks (i.e., subcommands).
-
-    Each task may share common input arguments and defines task-specific options as needed.
+    Register `video` workflow task subcommands.
     """
     p = subparsers.add_parser(
         "make",
         help="Create a video from a sequence of image files",
         description=(
             "Examples:\n"
-            "  reaxkit video make --folder reaxkit_outputs/elect/local_mu_3d "
-            "--output reaxkit_outputs/video/local_mu_3D.mp4 --fps 5\n"
+            "  reaxkit video make --folder reaxkit_workspace/analysis/msd/run_xxx/figures "
+            "--output reaxkit_workspace/analysis/msd/run_xxx/figures/msd.mp4 --fps 8\n"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )

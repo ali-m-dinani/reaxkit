@@ -581,6 +581,7 @@ def _format_hits(
     show_optional_vars: bool = False,
     show_derived_vars: bool = False,
     show_notes: bool = False,
+    engine: Optional[str] = None,
 ) -> str:
     """
     Format help search results for CLI display.
@@ -598,6 +599,7 @@ def _format_hits(
         Human-readable formatted output.
     """
     in_hits, out_hits = _group_hits(hits)
+    engine_map = _resolve_engine_loader_map(engine) if engine else {}
 
     def _fmt_one(h: HelpHit) -> str:
         e = h.entry
@@ -620,6 +622,12 @@ def _format_hits(
             tags = e.get("tags") or []
             if tags:
                 lines.append(f"  tags: {tags}")
+        if engine:
+            rows = _engine_targets_for_file(engine_map, h.file)
+            if rows:
+                lines.append(f"  dataclasses ({engine}):")
+                for row in rows:
+                    lines.append(f"    - {row['dataclass']} via {row['loader']} ({row['role']})")
 
         if show_core_vars:
             xs = e.get("core_vars") or []
@@ -654,7 +662,10 @@ def _format_hits(
     if in_hits and out_hits:
         parts.append("-------------")
     if out_hits:
-        parts.append("OUTPUT FILES")
+        if engine:
+            parts.append(f"OUTPUT FILES (engine: {engine})")
+        else:
+            parts.append("OUTPUT FILES")
         parts.extend(_fmt_one(h) for h in out_hits)
 
     if not parts:
@@ -671,20 +682,20 @@ def _format_hits(
 
 
 # ----------------------------
-# Capability / intent search
+# Command / capability search
 # ----------------------------
 
 @dataclass(frozen=True)
-class IntentHit:
-    """Ranked intent/capability match for `reaxkit help` queries."""
+class CommandHit:
+    """Ranked command/capability match for `reaxkit help` queries."""
 
-    intent: str
+    command: str
+    kind: str
     score: float
-    description: str
-    dataclasses: Tuple[str, ...]
-    workflows: Tuple[str, ...]
-    generators: Tuple[str, ...]
+    help_text: str
     aliases: Tuple[str, ...]
+    module_path: str
+    related_commands: Tuple[str, ...]
 
 
 def _read_yaml_from_package(package: str, filename: str) -> Dict[str, Any]:
@@ -704,21 +715,15 @@ def _read_yaml_from_package(package: str, filename: str) -> Dict[str, Any]:
 
 
 @lru_cache(maxsize=1)
-def load_help_intents() -> Dict[str, Any]:
-    """Load canonical help intents used for capability discovery."""
-    return _read_yaml_from_package("reaxkit.help.data", "help_intents.yaml")
+def load_command_metadata() -> Dict[str, Any]:
+    """Load command metadata used for capability discovery."""
+    return _read_yaml_from_package("reaxkit", "data/command_metadata.yaml")
 
 
 @lru_cache(maxsize=1)
 def load_engine_data_maps() -> Dict[str, Any]:
     """Load mapping of engine name -> loader/dataclass map source."""
     return _read_yaml_from_package("reaxkit.help.data", "engine_data_maps.yaml")
-
-
-@lru_cache(maxsize=1)
-def load_analysis_task_dataclass_map() -> Dict[str, Any]:
-    """Load analysis task -> dataclass metadata."""
-    return _read_yaml_from_package("reaxkit.analysis.data", "analysis_task_dataclass_map.yaml")
 
 
 def _resolve_engine_loader_map(engine: str) -> Dict[str, Any]:
@@ -736,43 +741,74 @@ def _resolve_engine_loader_map(engine: str) -> Dict[str, Any]:
     return {}
 
 
-def _analysis_commands_for_dataclasses(dataclasses: Iterable[str]) -> List[str]:
-    """Return analysis task names whose required_data matches any dataclass in the list."""
-    wanted = {str(d).strip() for d in dataclasses if str(d).strip()}
-    if not wanted:
-        return []
-    doc = load_analysis_task_dataclass_map()
-    tasks = doc.get("tasks") or {}
-    out: List[str] = []
-    for task_name, meta in tasks.items():
-        consumes = str((meta or {}).get("consumes_dataclass") or "").strip()
-        if consumes in wanted:
-            out.append(str(task_name))
-    return sorted(set(out))
+def _resolve_module_path(command: str, kind: str) -> str:
+    """Resolve module path for a command via routing registries."""
+    try:
+        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+    except Exception:
+        return ""
+
+    if kind == "analysis":
+        spec = get_registered_analysis_commands().get(command)
+        return str(spec.module_path) if spec is not None else ""
+    if kind == "generator":
+        spec = get_registered_generators().get(command)
+        return str(spec.module_path) if spec is not None else ""
+    if kind == "workflow":
+        spec = get_registered_workflows().get(command)
+        return str(spec.module_path) if spec is not None else ""
+    return ""
 
 
-def search_help_intents(
+def _related_commands_for_module(module_path: str, kind: str) -> Tuple[str, ...]:
+    """List peer commands that share the same module path."""
+    if not module_path:
+        return tuple()
+    try:
+        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+    except Exception:
+        return tuple()
+
+    related: List[str] = []
+    if kind == "analysis":
+        for name, spec in get_registered_analysis_commands().items():
+            if str(spec.module_path) == module_path:
+                related.append(str(name))
+    elif kind == "generator":
+        for name, spec in get_registered_generators().items():
+            if str(spec.module_path) == module_path:
+                related.append(str(name))
+    elif kind == "workflow":
+        for name, spec in get_registered_workflows().items():
+            if str(spec.module_path) == module_path:
+                related.append(str(name))
+    return tuple(sorted(set(related)))
+
+
+def search_help_commands(
     query: str,
     *,
     top_k: int = 5,
     min_score: float = 35.0,
-) -> List[IntentHit]:
-    """Search canonical help intents from natural-language queries."""
+) -> List[CommandHit]:
+    """Search command metadata from natural-language queries."""
     q = _norm(query)
     q_toks = set(_tokens(query))
-    raw = load_help_intents().get("intents") or {}
-    hits: List[IntentHit] = []
+    raw = load_command_metadata().get("commands") or {}
+    hits: List[CommandHit] = []
 
-    for intent, meta in raw.items():
+    for command_name, meta in raw.items():
         aliases = [str(a) for a in _as_list((meta or {}).get("aliases"))]
-        description = str((meta or {}).get("description") or "")
-        dataclasses = tuple(str(d) for d in _as_list((meta or {}).get("dataclasses")))
-        workflows = tuple(str(w) for w in _as_list((meta or {}).get("workflows")))
-        generators = tuple(str(g) for g in _as_list((meta or {}).get("generators")))
+        help_text = str((meta or {}).get("help") or "")
+        kind = str((meta or {}).get("kind") or "analysis").strip().lower()
 
-        names_blob = " ".join([str(intent)] + aliases)
+        names_blob = " ".join([str(command_name)] + aliases)
         names_tokens = set(_tokens(names_blob))
-        desc_tokens = set(_tokens(description))
+        desc_tokens = set(_tokens(help_text))
 
         score = 0.0
         overlap_names = q_toks & names_tokens
@@ -783,21 +819,24 @@ def search_help_intents(
             score += 12.0 + 3.0 * len(overlap_desc)
 
         score += 0.40 * _fuzzy_ratio(q, names_blob)
-        score += 0.15 * _fuzzy_ratio(q, description)
+        score += 0.15 * _fuzzy_ratio(q, help_text)
 
-        if q and q in _norm(names_blob):
+        if q and q in _norm(str(command_name)):
+            score += 45.0
+        elif q and q in _norm(names_blob):
             score += 20.0
 
         if score >= min_score:
+            module_path = _resolve_module_path(str(command_name), kind)
             hits.append(
-                IntentHit(
-                    intent=str(intent),
+                CommandHit(
+                    command=str(command_name),
+                    kind=kind,
                     score=score,
-                    description=description,
-                    dataclasses=dataclasses,
-                    workflows=workflows,
-                    generators=generators,
+                    help_text=help_text,
                     aliases=tuple(aliases),
+                    module_path=module_path,
+                    related_commands=_related_commands_for_module(module_path, kind),
                 )
             )
 
@@ -823,19 +862,13 @@ def _engine_sources_for_dataclass(engine_loader_map: Dict[str, Any], dataclass_n
     return out
 
 
-def _format_intent_hits(hits: List[IntentHit], *, engine: Optional[str] = None) -> str:
-    """Format intent/capability matches for CLI output."""
+def _format_command_hits_legacy(hits: List[CommandHit]) -> str:
+    """Format command/capability matches for CLI output."""
     if not hits:
         return ""
+    return _format_command_hits(hits)
 
-    try:
-        from reaxkit.core.command_catalog import get_registered_commands
-        registered = set(get_registered_commands(include_analysis_tasks=True).keys())
-    except Exception:
-        registered = set()
-
-    engine_map = _resolve_engine_loader_map(engine) if engine else {}
-    parts: List[str] = ["CAPABILITY MATCHES"]
+    parts: List[str] = ["COMMAND MATCHES"]
 
     for hit in hits:
         parts.append(f"• {hit.intent} (score={hit.score:.1f})")
@@ -876,4 +909,48 @@ def _format_intent_hits(hits: List[IntentHit], *, engine: Optional[str] = None) 
             if not any_row:
                 parts.append("    - no engine loader mapping found for this intent/dataclass set")
 
+    return "\n".join(parts)
+
+
+def _engine_targets_for_file(engine_loader_map: Dict[str, Any], file_name: str) -> List[Dict[str, str]]:
+    """Find loader entries that consume the given file."""
+    file_key = _norm(file_name)
+    if not file_key:
+        return []
+    loaders = (engine_loader_map or {}).get("loaders") or {}
+    out: List[Dict[str, str]] = []
+    for loader_name, meta in loaders.items():
+        dataclass_name = str((meta or {}).get("dataclass") or "").strip()
+        if not dataclass_name:
+            continue
+        for role in ("primary_files", "supplemental_files", "fallback_files"):
+            files = [str(x) for x in _as_list((meta or {}).get(role))]
+            if any(_norm(x) == file_key for x in files):
+                out.append(
+                    {
+                        "loader": str(loader_name),
+                        "dataclass": dataclass_name,
+                        "role": role.replace("_files", ""),
+                    }
+                )
+                break
+    return out
+
+
+def _format_command_hits(hits: List[CommandHit]) -> str:
+    """Format command/capability matches for CLI output."""
+    if not hits:
+        return ""
+
+    parts: List[str] = ["COMMAND MATCHES"]
+    for hit in hits:
+        parts.append(f"- {hit.command} --{hit.kind} (score={hit.score:.1f})")
+        if hit.help_text:
+            parts.append(f"  {hit.help_text}")
+        if hit.aliases:
+            parts.append(f"  aliases: {list(hit.aliases)}")
+        if hit.module_path:
+            parts.append(f"  workflow module: {hit.module_path}")
+        if hit.related_commands:
+            parts.append(f"  related commands: {list(hit.related_commands)}")
     return "\n".join(parts)

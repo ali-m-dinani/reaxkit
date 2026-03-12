@@ -207,6 +207,15 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     --------
     >>>
     """
+    p.formatter_class = argparse.RawTextHelpFormatter
+    p.description = (
+        "Inspect ReaxKit modules and folders.\n\n"
+        "Examples:\n"
+        "  reaxkit intspec --folder workflows\n"
+        "  reaxkit intspec --folder reaxkit.workflows.meta\n"
+        "  reaxkit intspec --file reaxkit.workflows.meta.help_workflow\n"
+        "  reaxkit intspec --file reaxkit/workflows/meta/help_workflow.py"
+    )
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
     g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
@@ -312,36 +321,5 @@ def run_main(file: str | None, folder: str | None) -> int:
 
 
 def register_tasks(subparsers) -> None:
-    """
-    Register workflow tasks under the given argparse subparser collection.
-
-    Works on
-    --------
-    CLI workflow task arguments and helper utilities
-
-    Parameters
-    ----------
-    subparsers : Any
-        Parameter description.
-
-    Examples
-    --------
-    >>>
-    """
-    p = subparsers.add_parser(
-        "run",
-        help="Introspect a module (--file) or folder (--folder).",
-        description=(
-            "Introspect a module (--file) or folder (--folder).\n"
-            "Examples:\n"
-            "  reaxkit intspec --folder workflow\n"
-            "  reaxkit intspec run --folder workflow\n"
-            "  reaxkit intspec --file fort7_analyzer\n"
-            "  reaxkit intspec run --file fort7_analyzer\n"
-        ),
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
-    g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
-    p.set_defaults(_run=lambda args: run_main(getattr(args, "file", None), getattr(args, "folder", None)))
+    """`intspec` is a kind-level command and intentionally has no task subcommands."""
+    return

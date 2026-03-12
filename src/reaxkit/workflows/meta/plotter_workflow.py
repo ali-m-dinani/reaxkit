@@ -613,22 +613,19 @@ def _add_common_io_args(p: argparse.ArgumentParser) -> None:
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     """
-    Register coordination-related CLI subcommands.
-
-    This function defines the task-level interface for the
-    `reaxkit file` workflow and attaches its tasks (i.e., subcommands).
-
-    Each task may share common input arguments and defines task-specific options as needed.
+    Register `plotter` workflow task subcommands.
     """
 
     # ---- single ----
     p_single = subparsers.add_parser(
         "single",
-        help="Plot one or multiple y columns vs x columns (line or scatter). || "
-             "reaxkit plotter single --file summary.txt --xaxis c1 --yaxis c2 --plot || "
-             "reaxkit plotter single --file summary.txt --xaxis c1 --yaxis c2 --scatter --plot || "
-             "reaxkit plotter single --file summary.txt --xaxis c1,c3 --yaxis c2,c4 --plot || "
-             "reaxkit plotter single --file summary.txt --xaxis c1 --yaxis c2,c3,c4 --scatter --plot",
+        help="Plot one or more y columns vs x columns (line/scatter).",
+        description=(
+            "Examples:\n"
+            "  reaxkit plotter single --file reaxkit_workspace/analysis/msd/run_xxx/msd.csv --xaxis c1 --yaxis c2 --plot\n"
+            "  reaxkit plotter single --file table.csv --xaxis c1 --yaxis c2,c3 --scatter --save single.png"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_single)
     p_single.add_argument("--xaxis", required=True,
@@ -645,8 +642,12 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- directed ----
     p_directed = subparsers.add_parser(
         "directed",
-        help="Line plot with arrows showing direction along the path. || "
-             "reaxkit plotter directed --file summary.txt --xaxis c1 --yaxis c2 --save directed.png",
+        help="Line plot with arrows showing direction along the path.",
+        description=(
+            "Example:\n"
+            "  reaxkit plotter directed --file table.csv --xaxis c1 --yaxis c2 --save directed.png"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_directed)
     p_directed.add_argument("--xaxis", required=True, help="Single x column (e.g., 'c1').")
@@ -658,8 +659,12 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- dual ----
     p_dual = subparsers.add_parser(
         "dual",
-        help="Dual y-axis plot: one x column, two y columns. || "
-             "reaxkit plotter dual --file summary.txt --xaxis c1 --y1 c2 --y2 c3 --save dual_plot.png",
+        help="Dual y-axis plot: one x column, two y columns.",
+        description=(
+            "Example:\n"
+            "  reaxkit plotter dual --file table.csv --xaxis c1 --y1 c2 --y2 c3 --save dual_plot.png"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_dual)
     p_dual.add_argument("--xaxis", required=True, help="Single x column (e.g., 'c1').")
@@ -673,9 +678,13 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- tornado ----
     p_tornado = subparsers.add_parser(
         "tornado",
-        help="Tornado plot: label + min/max (and optional median). || "
-             "reaxkit plotter tornado --file summary.txt --label c1 --min c2 --max c3 --median c4 --top 10 --save tornado.png || "
-             "reaxkit plotter tornado --file summary.txt --label c1 --min c2 --max c3",
+        help="Tornado plot: label + min/max (+ optional median).",
+        description=(
+            "Examples:\n"
+            "  reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --median c4 --top 10 --save tornado.png\n"
+            "  reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --plot"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_tornado)
     p_tornado.add_argument("--label", required=True, help="Column for labels (e.g., 'c1').")
@@ -691,8 +700,12 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- scatter3d ----
     p_scatter3d = subparsers.add_parser(
         "scatter3d",
-        help="3D scatter of (x,y,z) points colored by a value. || "
-             "reaxkit plotter scatter3d --file summary.txt --x c1 --y c2 --z c3 --value c4 --save 3dscatter.png",
+        help="3D scatter of (x,y,z) points colored by a value.",
+        description=(
+            "Example:\n"
+            "  reaxkit plotter scatter3d --file table.csv --x c1 --y c2 --z c3 --value c4 --save scatter3d.png"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_scatter3d)
     p_scatter3d.add_argument("--x", required=True, help="x coordinate column (e.g., 'c1').")
@@ -704,9 +717,12 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
     # ---- heatmap2d ----
     p_heatmap2d = subparsers.add_parser(
         "heatmap2d",
-        help="2D heatmap from 3D coords + values (projection plane selectable). || "
-             "reaxkit plotter heatmap2d --file summary.txt --x c1 --y c2 --z c3 --value c4 --plane xz "
-             "--bins 100,80 --save heat_xz.png",
+        help="2D heatmap from 3D coords + values (projection plane selectable).",
+        description=(
+            "Example:\n"
+            "  reaxkit plotter heatmap2d --file table.csv --x c1 --y c2 --z c3 --value c4 --plane xz --bins 100,80 --save heat_xz.png"
+        ),
+        formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_heatmap2d)
     p_heatmap2d.add_argument("--x", required=True, help="x coordinate column (e.g., 'c1').")

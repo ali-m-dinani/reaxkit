@@ -17,9 +17,9 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     p.description = (
         "Interactive help and discovery for ReaxKit commands and file semantics.\n\n"
         "Examples:\n"
-        "  reaxkit help \"get trajectory\"\n"
+        "  reaxkit help \"msd\"\n"
         "  reaxkit help \"bond order\" --top 12\n"
-        "  reaxkit help \"electric field\" --engine reaxff\n"
+        "  reaxkit help \"restraint\" --engine reaxff\n"
         "  reaxkit help \"fort.7\" --why --tags\n"
         "  reaxkit help \"xmolout\" --all-info"
     )
@@ -72,19 +72,19 @@ def run_main(args: argparse.Namespace) -> None:
     """Run the `reaxkit help` command."""
     if getattr(args, "query", None) is None:
         print("ReaxKit help\n")
-        print('Usage:\n  reaxkit help "get trajectory"\n  reaxkit help "bond order"\n  reaxkit help "electric field"')
-        print('  reaxkit help "get trajectory" --engine reaxff\n')
+        print('Usage:\n  reaxkit help "msd"\n  reaxkit help "bond order"\n  reaxkit help "restraint"')
+        print('  reaxkit help "restraint" --engine reaxff\n')
         print("Tip: put multi-word queries in quotes.")
         return
 
     from reaxkit.help.help_index_loader import (
+        _format_command_hits,
         _format_hits,
-        _format_intent_hits,
         search_help_indices,
-        search_help_intents,
+        search_help_commands,
     )
 
-    intent_hits = search_help_intents(
+    command_hits = search_help_commands(
         args.query,
         top_k=getattr(args, "top", 8),
         min_score=getattr(args, "min_score", 35.0),
@@ -95,7 +95,7 @@ def run_main(args: argparse.Namespace) -> None:
         min_score=getattr(args, "min_score", 35.0),
     )
 
-    if not intent_hits and not file_hits:
+    if not command_hits and not file_hits:
         print(f"No matches for: {args.query!r}")
         return
 
@@ -108,8 +108,10 @@ def run_main(args: argparse.Namespace) -> None:
     show_derived_vars = all_info or getattr(args, "derived_vars", False)
     show_notes = all_info or getattr(args, "notes", False)
 
-    if intent_hits:
-        print(_format_intent_hits(intent_hits, engine=getattr(args, "engine", None)))
+    engine = getattr(args, "engine", None) or "reaxff"
+
+    if command_hits:
+        print(_format_command_hits(command_hits))
         if file_hits:
             print("\n-------------")
 
@@ -124,6 +126,7 @@ def run_main(args: argparse.Namespace) -> None:
                 show_optional_vars=show_optional_vars,
                 show_derived_vars=show_derived_vars,
                 show_notes=show_notes,
+                engine=engine,
             )
         )
 
