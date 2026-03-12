@@ -6,6 +6,13 @@ import argparse
 from pathlib import Path
 from typing import Callable
 
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.common.geo_io import read_structure, write_structure
 from reaxkit.engine.common.geo_transforms import (
     build_surface,
@@ -194,7 +201,7 @@ def _run_place_geo(args: argparse.Namespace) -> int:
         print(f"[Done] Placed {args.ncopy} copies into box to {out_path}")
         return 0
 
-    tmp_xyz = Path("place2_output.xyz")
+    tmp_xyz = out_path.parent / "place2_output.xyz"
     write_structure(atoms, tmp_xyz)
     xtob(
         xyz_file=tmp_xyz,
@@ -319,8 +326,32 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     else:
         raise KeyError(f"Unsupported GEO file-tool command {command!r}.")
 
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    return RUNNERS[command](args)
+    output_value = getattr(args, "output", None)
+    if command == "add-geo-restraint" and not output_value:
+        output_value = f"{Path(args.file).name}_with_restraints"
+    if not output_value:
+        output_value = command
+    out_path, layout = prepare_generator_output(args, command=command, output_value=str(output_value))
+    args.output = str(out_path)
+    code = RUNNERS[command](args)
+    if code != 0:
+        return code
+    persist_generator_metadata(
+        args,
+        command=command,
+        output_path=out_path,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(out_path, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out_path.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
+    return 0

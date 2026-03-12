@@ -630,6 +630,17 @@ def _run_scalar_command(command: str, args: argparse.Namespace) -> int:
     task = DipoleTask() if command == "dipole" else PolarizationTask()
     result = task.run(data, request)
 
+    if args.save:
+        out_save = resolve_output_path(
+            args.save,
+            command,
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
+        args = argparse.Namespace(**vars(args))
+        args.save = str(out_save)
+
     if args.export:
         out = resolve_output_path(
             args.export,

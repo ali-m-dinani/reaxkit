@@ -10,6 +10,7 @@ import pandas as pd
 
 from reaxkit.analysis import kinematics as _kinematics_tasks  # noqa: F401
 from reaxkit.analysis.kinematics.kinematics import AtomicKinematicsRequest
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
@@ -83,6 +84,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = resolve_command_name(command, task_names=KINEMATICS_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
@@ -98,27 +100,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--key", choices=KINEMATICS_KEYS, required=True, help="Requested kinematics dataset")
         parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids")
-    elif canonical == "kinematics_plot3d":
-        _add_spatial_plot_arguments(parser)
-        parser.description = (
-            "Plot atomic velocity or acceleration values on 3D atomic coordinates.\n\n"
-            "Examples:\n"
-            "  reaxkit kinematics_plot3d --value vz --save vz_3d.png\n"
-            "  reaxkit kinematics_plot3d --vels moldyn.vel --value ax --atoms 1 3 7 --show\n"
-            "  reaxkit kinematics_plot3d --vels molsav.0001 --value paz --export paz_coords.csv"
-        )
-    elif canonical == "kinematics_heatmap2d":
-        _add_spatial_plot_arguments(parser)
-        parser.description = (
-            "Project atomic velocity or acceleration values into a 2D heatmap.\n\n"
-            "Examples:\n"
-            "  reaxkit kinematics_heatmap2d --value vz --plane xz --bins 60 --save vz_xz.png\n"
-            "  reaxkit kinematics_heatmap2d --vels moldyn.vel --value ax --plane xy --agg max --show\n"
-            "  reaxkit kinematics_heatmap2d --value paz --plane yz --export paz_yz.csv"
-        )
-        parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane")
-        parser.add_argument("--bins", default="50", help='Grid bins: "N" or "Nx,Ny"')
-        parser.add_argument("--agg", default="mean", help="Aggregation: mean|max|min|sum|count")
     else:
         raise KeyError(f"Unsupported kinematics command '{canonical}'.")
 
@@ -185,7 +166,15 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
         raise ValueError("No matching atom rows between coordinates and selected values.")
 
     if args.export:
-        merged.to_csv(args.export, index=False)
+        out_csv = resolve_output_path(
+            args.export,
+            command,
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
+        merged.to_csv(out_csv, index=False)
+        args.export = str(out_csv)
 
     coords = merged[["x", "y", "z"]].to_numpy(float)
     values = merged[col].to_numpy(float)
@@ -196,6 +185,17 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
         raise ValueError("All selected values are NaN/invalid; nothing to plot.")
 
     if command == "kinematics_plot3d":
+        save_path = None
+        if args.save:
+            out_save = resolve_output_path(
+                args.save,
+                command,
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
+            save_path = str(out_save)
+            args.save = save_path
         scatter3d_points(
             coords,
             values,
@@ -203,11 +203,22 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
             cmap=args.cmap,
             vmin=args.vmin,
             vmax=args.vmax,
-            save=args.save,
+            save=save_path,
             show_message=bool(args.show),
         )
         return 0
 
+    save_path = None
+    if args.save:
+        out_save = resolve_output_path(
+            args.save,
+            command,
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
+        save_path = str(out_save)
+        args.save = save_path
     heatmap2d_from_3d(
         coords,
         values,
@@ -218,7 +229,7 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
         vmax=args.vmax,
         cmap=args.cmap,
         title=f"{args.value}_{args.plane}_heatmap2d",
-        save=args.save,
+        save=save_path,
         show_message=bool(args.show),
     )
     return 0

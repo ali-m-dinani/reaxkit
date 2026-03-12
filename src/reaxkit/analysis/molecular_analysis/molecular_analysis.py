@@ -280,6 +280,8 @@ class DominantSpeciesTask(AnalysisTask):
     def run(self, data: MolecularAnalysisData, request: DominantSpeciesRequest, reporter=None) -> DominantSpeciesResult:
         df = data.molecular_species.copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 1, 1, "Finished dominant species analysis")
             return DominantSpeciesResult(
                 table=pd.DataFrame(columns=["frame_index", "iter", "rank", "molecular_formula", "freq", "molecular_mass"]),
                 request=request,
@@ -289,6 +291,8 @@ class DominantSpeciesTask(AnalysisTask):
         selected_iters = iterations[frame_idx]
         df = df[df["iter"].isin(set(int(it) for it in selected_iters))].copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 1, 1, "Finished dominant species analysis")
             return DominantSpeciesResult(
                 table=pd.DataFrame(columns=["frame_index", "iter", "rank", "molecular_formula", "freq", "molecular_mass"]),
                 request=request,
@@ -298,6 +302,8 @@ class DominantSpeciesTask(AnalysisTask):
         df["molecular_mass"] = pd.to_numeric(df["molecular_mass"], errors="coerce")
         df = df[df["freq"] >= float(request.min_freq)].copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 1, 1, "Finished dominant species analysis")
             return DominantSpeciesResult(
                 table=pd.DataFrame(columns=["frame_index", "iter", "rank", "molecular_formula", "freq", "molecular_mass"]),
                 request=request,
@@ -306,7 +312,11 @@ class DominantSpeciesTask(AnalysisTask):
         rows = []
         frame_lookup = {int(iterations[i]): int(i) for i in frame_idx.tolist()}
         top_n = max(1, int(request.top_n))
-        for iter_val, sub in df.groupby("iter", sort=True):
+        grouped = list(df.groupby("iter", sort=True))
+        total_groups = max(1, len(grouped))
+        if reporter:
+            reporter("analyze", 0, total_groups, "Preparing dominant species analysis")
+        for step_i, (iter_val, sub) in enumerate(grouped, start=1):
             ranked = sub.sort_values(["freq", "molecular_mass", "molecular_formula"], ascending=[False, False, True]).head(top_n)
             for rank, (_, row) in enumerate(ranked.iterrows(), start=1):
                 rows.append(
@@ -319,12 +329,16 @@ class DominantSpeciesTask(AnalysisTask):
                         "molecular_mass": float(row["molecular_mass"]) if pd.notna(row["molecular_mass"]) else np.nan,
                     }
                 )
+            if reporter:
+                reporter("analyze", step_i, total_groups, "Computing dominant species")
 
         out = pd.DataFrame(rows)
         if out.empty:
             out = pd.DataFrame(columns=["frame_index", "iter", "rank", "molecular_formula", "freq", "molecular_mass"])
         else:
             out = out.sort_values(["frame_index", "rank"], kind="stable").reset_index(drop=True)
+        if reporter:
+            reporter("analyze", total_groups, total_groups, "Finished dominant species analysis")
         return DominantSpeciesResult(table=out, request=request)
 
 
@@ -368,31 +382,47 @@ class LargestMoleculeByMassTask(AnalysisTask):
         request: LargestMoleculeByMassRequest,
         reporter=None,
     ) -> LargestMoleculeByMassResult:
+        if reporter:
+            reporter("analyze", 0, 3, "Preparing largest molecule-by-mass analysis")
         columns = ["frame_index", "iter", "molecular_formula", "freq", "molecular_mass"]
         df = data.molecular_species.copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 3, 3, "Finished largest molecule-by-mass analysis")
             return LargestMoleculeByMassResult(table=pd.DataFrame(columns=columns), request=request)
 
         iterations, frame_idx = _selected_iterations(data, request.frames, request.every)
         selected_iters = iterations[frame_idx]
         if selected_iters.size == 0:
+            if reporter:
+                reporter("analyze", 3, 3, "Finished largest molecule-by-mass analysis")
             return LargestMoleculeByMassResult(table=pd.DataFrame(columns=columns), request=request)
 
         df = df[df["iter"].isin(set(int(it) for it in selected_iters))].copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 3, 3, "Finished largest molecule-by-mass analysis")
             return LargestMoleculeByMassResult(table=pd.DataFrame(columns=columns), request=request)
+        if reporter:
+            reporter("analyze", 1, 3, "Filtering selected iterations")
 
         df["molecular_mass"] = pd.to_numeric(df["molecular_mass"], errors="coerce")
         df["freq"] = pd.to_numeric(df["freq"], errors="coerce").fillna(0.0)
         df = df[df["molecular_mass"].notna()].copy()
         if df.empty:
+            if reporter:
+                reporter("analyze", 3, 3, "Finished largest molecule-by-mass analysis")
             return LargestMoleculeByMassResult(table=pd.DataFrame(columns=columns), request=request)
+        if reporter:
+            reporter("analyze", 2, 3, "Selecting heaviest species per iteration")
 
         idx = df.groupby("iter")["molecular_mass"].idxmax()
         out = df.loc[idx, ["iter", "molecular_formula", "freq", "molecular_mass"]].copy()
         frame_lookup = {int(iterations[i]): int(i) for i in frame_idx.tolist()}
         out.insert(0, "frame_index", out["iter"].map(lambda it: frame_lookup.get(int(it), -1)).astype(int))
         out = out.sort_values(["frame_index", "iter"], kind="stable").reset_index(drop=True)
+        if reporter:
+            reporter("analyze", 3, 3, "Finished largest molecule-by-mass analysis")
         return LargestMoleculeByMassResult(table=out[columns], request=request)
 
 
@@ -436,19 +466,24 @@ class LargestMoleculeCompositionTask(AnalysisTask):
         request: LargestMoleculeCompositionRequest,
         reporter=None,
     ) -> LargestMoleculeCompositionResult:
+        if reporter:
+            reporter("analyze", 0, 1, "Preparing largest molecule composition analysis")
         largest = LargestMoleculeByMassTask().run(
             data,
             LargestMoleculeByMassRequest(frames=request.frames, every=request.every),
             reporter=reporter,
         ).table
         if largest.empty:
+            if reporter:
+                reporter("analyze", 1, 1, "Finished largest molecule composition analysis")
             return LargestMoleculeCompositionResult(
                 table=pd.DataFrame(columns=["frame_index", "iter", "element", "count"]),
                 request=request,
             )
 
         rows = []
-        for _, row in largest.iterrows():
+        total = max(1, len(largest))
+        for step_i, (_, row) in enumerate(largest.iterrows(), start=1):
             pairs = re.findall(r"([A-Z][a-z]*)(\d+)", str(row["molecular_formula"]))
             for element, count in pairs:
                 rows.append(
@@ -459,12 +494,16 @@ class LargestMoleculeCompositionTask(AnalysisTask):
                         "count": int(count),
                     }
                 )
+            if reporter:
+                reporter("analyze", step_i, total, "Expanding molecular composition")
 
         long = pd.DataFrame(rows)
         if long.empty:
             long = pd.DataFrame(columns=["frame_index", "iter", "element", "count"])
         else:
             long = long.sort_values(["frame_index", "element"], kind="stable").reset_index(drop=True)
+        if reporter:
+            reporter("analyze", total, total, "Finished largest molecule composition analysis")
         return LargestMoleculeCompositionResult(table=long, request=request)
 
 
@@ -519,6 +558,8 @@ class MoleculeLifetimeTask(AnalysisTask):
             "mean_freq",
         ]
         if selected_iters.size == 0:
+            if reporter:
+                reporter("analyze", 1, 1, "Finished molecule lifetime analysis")
             return MoleculeLifetimeResult(table=pd.DataFrame(columns=lifetime_cols), request=request)
 
         if request.molecules is not None:
@@ -528,7 +569,10 @@ class MoleculeLifetimeTask(AnalysisTask):
             formulas = [str(m) for m in request.molecules]
 
         lifetimes_rows = []
-        for formula in formulas:
+        total_formulas = max(1, len(formulas))
+        if reporter:
+            reporter("analyze", 0, total_formulas, "Preparing molecule lifetime analysis")
+        for step_i, formula in enumerate(formulas, start=1):
             sub = df[df["molecular_formula"] == str(formula)][["iter", "freq"]].copy()
             sub["iter"] = pd.to_numeric(sub["iter"], errors="coerce").astype(int)
             sub["freq"] = pd.to_numeric(sub["freq"], errors="coerce").fillna(0.0)
@@ -555,6 +599,8 @@ class MoleculeLifetimeTask(AnalysisTask):
                         "mean_freq": float(np.mean(run_freq)),
                     }
                 )
+            if reporter:
+                reporter("analyze", step_i, total_formulas, "Computing molecule lifetimes")
 
         table = pd.DataFrame(lifetimes_rows)
         if table.empty:
@@ -562,6 +608,8 @@ class MoleculeLifetimeTask(AnalysisTask):
         else:
             table = table.sort_values(["molecular_formula", "start_iter"], kind="stable").reset_index(drop=True)
 
+        if reporter:
+            reporter("analyze", total_formulas, total_formulas, "Finished molecule lifetime analysis")
         return MoleculeLifetimeResult(table=table, request=request)
 
 

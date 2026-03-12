@@ -12,6 +12,7 @@ import reaxkit.engine  # noqa: F401
 
 from reaxkit.analysis import connectivity as _connectivity_tasks  # noqa: F401
 from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.analysis.connectivity.connectivity import (
     BondEventsRequest,
     ConnectionListRequest,
@@ -440,7 +441,15 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         relabel_request = _build_coordination_relabel_request(args)
         relabel_result = relabel_task_cls().run(composite, relabel_request)
         if args.export:
-            export_result_csv(relabel_result, args.export)
+            out = resolve_output_path(
+                args.export,
+                canonical,
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
+            export_result_csv(relabel_result, str(out))
+            print(f"[Done] Exported data to {out}")
 
         out_path = adapter.write(relabel_result.trajectory, args.output, vars(args))
         print(f"Wrote relabeled trajectory to {out_path}")

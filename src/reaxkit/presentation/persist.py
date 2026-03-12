@@ -44,8 +44,8 @@ def _write_csvs(out_dir: Path, result: Any) -> list[str]:
     return written
 
 
-def persist_analysis_result(command: str, result: Any, args: Any) -> Path:
-    """Persist analysis result to CSV + JSON under analysis/<command>/<run_id>/ by default."""
+def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: bool = True) -> Path:
+    """Persist analysis result metadata (and optional CSV) under analysis/<command>/<run_id>/."""
     project_root = Path(getattr(args, "project_root", "."))
     analysis_id = (
         getattr(args, "analysis_id", None)
@@ -57,7 +57,7 @@ def persist_analysis_result(command: str, result: Any, args: Any) -> Path:
     out_dir = layout.analysis_root / str(command) / str(analysis_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_files = _write_csvs(out_dir, result)
+    csv_files = _write_csvs(out_dir, result) if write_csv else []
 
     settings = {
         "command": str(command),

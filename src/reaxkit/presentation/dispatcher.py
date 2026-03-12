@@ -26,6 +26,10 @@ _RAW_PLOT_DATA_KEYS = frozenset(
         "vectors",
         "u",
         "v",
+        "labels",
+        "min_vals",
+        "max_vals",
+        "median_vals",
     }
 )
 
@@ -77,10 +81,10 @@ def present_result(
     for key, value in normalized.items():
         setattr(args, key, value)
     result_dirs: list[Path] = []
-    analysis_dir = persist_analysis_result(command, result, args)
+    export_csv = getattr(args, "export", None)
+    analysis_dir = persist_analysis_result(command, result, args, write_csv=not bool(export_csv))
     result_dirs.append(analysis_dir)
 
-    export_csv = getattr(args, "export", None)
     save = getattr(args, "save", None)
     plot_mode = getattr(args, "plot", None)
     show = bool(getattr(args, "show", False))

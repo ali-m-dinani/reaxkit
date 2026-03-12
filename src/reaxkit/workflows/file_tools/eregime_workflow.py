@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 from typing import Any, Callable
 
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.eregime_generator import (
     write_eregime_from_function,
     write_eregime_sinusoidal,
@@ -43,6 +49,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     parser.add_argument("--type", choices=["sin", "pulse", "func"], required=True, help="Generator profile type")
     parser.add_argument("--output", default="eregime.in", help="Output file path")
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     parser.add_argument("--direction", default="z", help="Field direction: x|y|z")
     parser.add_argument("--V", type=int, default=1, help="Voltage index")
     parser.add_argument("--start-iter", type=int, default=0, help="Starting iteration")
@@ -65,12 +72,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument("--dt", type=float, default=None, help="Time step for func profile")
 
     parser.add_argument("--iteration-step", type=int, required=True, help="Iterations per sample")
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    _ = command
-    out_path = Path(args.output)
+    out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
 
     if args.type == "sin":
         if args.max_magnitude is None or args.step_angle is None or args.num_cycles is None:
@@ -126,5 +133,16 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             start_iter=args.start_iter,
         )
 
-    print(f"Wrote eregime file to {out_path.resolve()}")
+    persist_generator_metadata(
+        args,
+        command=command,
+        output_path=out_path,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(out_path, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out_path.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0

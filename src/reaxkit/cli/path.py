@@ -9,21 +9,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
+from reaxkit.core.storage_layout import ReaxkitStorageLayout, default_project_root, normalize_storage_args
 
 def resolve_output_path(
     user_value: str,
     workflow: str,
     *,
     run_id: str | None = None,
-    project_root: str | Path = ".",
+    project_root: str | Path = str(default_project_root()),
     analysis_id: str | None = None,
 ) -> Path:
     """
     Resolve the output path for a workflow result.
 
     If the user provides only a bare filename, the file is written under
-    ``reaxkit_outputs/<workflow>/``. If the user provides an absolute path
+    ``<project_root>/analysis/<workflow>/<analysis_id_or_run_id>/``.
+    If the user provides an absolute path
     or a path containing directories, that path is used directly.
     """
     p = Path(user_value)
@@ -34,10 +35,14 @@ def resolve_output_path(
         p.parent.mkdir(parents=True, exist_ok=True)
         return p
 
+    normalized_root = str(project_root).strip()
+    if not normalized_root or normalized_root == ".":
+        normalized_root = str(default_project_root())
+
     norm = normalize_storage_args(
         {
             "run_id": run_id,
-            "project_root": str(project_root),
+            "project_root": normalized_root,
             "analysis_id": analysis_id,
         },
         snapshot=False,

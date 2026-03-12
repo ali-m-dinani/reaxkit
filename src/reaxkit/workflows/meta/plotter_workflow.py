@@ -26,6 +26,7 @@ from typing import List, Dict, Any, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.presentation.plot import (
     single_plot,
     directed_plot,
@@ -37,6 +38,12 @@ from reaxkit.presentation.plot import (
 
 
 # ---------- Helpers ----------
+
+def _normalize_save_path(args: argparse.Namespace) -> None:
+    if not getattr(args, "save", None):
+        return
+    out = resolve_output_path(str(args.save), workflow="plotter")
+    args.save = str(out)
 
 def _load_table(path: str | Path) -> pd.DataFrame:
     """
@@ -177,6 +184,7 @@ def _plotter_single_task(args: argparse.Namespace) -> int:
     - If len(xaxis) == len(yaxis): pair-wise (x_i, y_i) series.
     - If len(xaxis) == 1 and len(yaxis) >= 1: use the same x for all y columns.
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
     x_indices = _parse_col_list(args.xaxis)
     y_indices = _parse_col_list(args.yaxis)
@@ -271,6 +279,7 @@ def _plotter_directed_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.xaxis)
     y_idx = _parse_col_token(args.yaxis)
@@ -326,6 +335,7 @@ def _plotter_dual_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.xaxis)
     y1_idx = _parse_col_token(args.y1)
@@ -371,6 +381,7 @@ def _plotter_tornado_task(args: argparse.Namespace) -> int:
     reaxkit plotter tornado --file summary.txt --label c1 --min c2 --max c3 [--median c4]
                              [--top 10] [--vline 0.0] [--save out.png]
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
 
     label_idx = _parse_col_token(args.label)
@@ -460,6 +471,7 @@ def _plotter_scatter3d_task(args: argparse.Namespace) -> int:
     --------
     >>>
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.x)
     y_idx = _parse_col_token(args.y)
@@ -506,6 +518,7 @@ def _plotter_heatmap2d_task(args: argparse.Namespace) -> int:
 
     Uses heatmap2d_from_3d under the hood.
     """
+    _normalize_save_path(args)
     df_raw = _load_table(args.file)
     x_idx = _parse_col_token(args.x)
     y_idx = _parse_col_token(args.y)

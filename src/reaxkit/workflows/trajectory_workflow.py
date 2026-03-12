@@ -62,8 +62,6 @@ def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
         every=args.every,
         bins=args.bins,
         r_max=args.r_max,
-        average=False,
-        return_stack=True,
         backend=args.backend,
     )
 

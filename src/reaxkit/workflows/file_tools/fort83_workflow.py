@@ -5,6 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
+from reaxkit.core.storage_layout import add_storage_cli_arguments
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
@@ -17,11 +25,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     )
     parser.add_argument("--fort83", default="fort.83", help="Path to fort.83")
     parser.add_argument("--output", default="ffield_optimized", help="Output path for the extracted force field")
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    _ = command
+    out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
     fort83_path = Path(args.fort83)
     lines = fort83_path.read_text(encoding="utf-8").splitlines(keepends=True)
 
@@ -34,8 +44,17 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print("[Warning] 'Error force field' not found in fort.83.")
         return 1
 
-    out_path = Path(args.output)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("".join(lines[start_index + 1 :]), encoding="utf-8")
-    print(f"[Done] Extracted content written to {out_path}")
+    persist_generator_metadata(
+        args,
+        command=command,
+        output_path=out_path,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(out_path, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out_path.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0

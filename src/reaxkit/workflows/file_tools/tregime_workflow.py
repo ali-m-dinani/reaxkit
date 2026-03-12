@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import argparse
 
-from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.tregime_generator import write_sample_tregime
 
 
@@ -18,13 +24,25 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit make-tregime --rows 5 --output tregime.in"
     )
     parser.add_argument("--output", default="tregime.in", help="Output tregime path")
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     parser.add_argument("--rows", type=int, default=3, help="Number of sample rows")
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    _ = command
-    out = resolve_output_path(args.output, workflow="tregime")
+    out, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
     write_sample_tregime(out, n_rows=args.rows)
-    print(f"[Done] Sample tregime generated in {out}")
+    persist_generator_metadata(
+        args,
+        command=command,
+        output_path=out,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(out, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0

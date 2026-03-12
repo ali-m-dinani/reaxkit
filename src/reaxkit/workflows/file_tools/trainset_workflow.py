@@ -6,7 +6,13 @@ import argparse
 import os
 from pathlib import Path
 
-from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.engine.reaxff.generators.trainset_mp import generate_trainset_settings_yaml_from_mp_simple
@@ -42,6 +48,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--trainset", "--file", dest="trainset", default="trainset.in", help="Path to trainset.in")
         parser.add_argument("--section", default="all", help="Section: all, charge, heatfo, geometry, cell_parameters, energy")
         parser.add_argument("--output", default="trainset_export", help="Output directory for exported CSV files")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     elif command == "make-trainset-settings":
         parser.description = (
             "Write a sample trainset settings YAML.\n\n"
@@ -50,6 +57,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "  reaxkit make-trainset-settings --output trainset_settings.yaml"
         )
         parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     elif command == "make-trainset":
         parser.description = (
             "Generate an elastic-energy trainset from YAML or Materials Project metadata.\n\n"
@@ -66,16 +74,18 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--structure-dir", default=None, help="Directory for MP-downloaded structures")
         parser.add_argument("--verbose", action="store_true", help="Verbose MP fetching/logging")
         parser.add_argument("--output", default="trainset_generated", help="Directory for trainset outputs")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     else:
         raise KeyError(f"Unsupported trainset file-tool command {command!r}.")
 
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def _run_export_trainset(args: argparse.Namespace) -> int:
+    outdir, layout = prepare_generator_output(args, command="export-trainset", output_value=str(args.output))
     tables = _load_trainset_tables(args.trainset)
     section = str(args.section).strip().lower()
-    outdir = Path(args.output)
     outdir.mkdir(parents=True, exist_ok=True)
 
     if section == "all":
@@ -94,17 +104,41 @@ def _run_export_trainset(args: argparse.Namespace) -> int:
         outpath = outdir / f"{stem}_{sec_name.lower()}.csv"
         df.to_csv(outpath, index=False)
         print(f"[Done] Exported section {sec_name} to {outpath}")
+    persist_generator_metadata(
+        args,
+        command="export-trainset",
+        output_path=outdir,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(outdir, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [outdir]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0
 
 
 def _run_make_trainset_settings(args: argparse.Namespace) -> int:
-    out = resolve_output_path(args.output, workflow="trainset")
+    out, layout = prepare_generator_output(args, command="make-trainset-settings", output_value=str(args.output))
     write_trainset_settings_yaml(out_path=str(out))
-    print(f"[Done] Wrote sample settings YAML to: {out}")
+    persist_generator_metadata(
+        args,
+        command="make-trainset-settings",
+        output_path=out,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(out, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0
 
 
 def _run_make_trainset(args: argparse.Namespace) -> int:
+    out_dir, layout = prepare_generator_output(args, command="make-trainset", output_value=str(args.output))
     yaml_path = args.yaml
     if not yaml_path:
         if not args.mp_id:
@@ -113,8 +147,8 @@ def _run_make_trainset(args: argparse.Namespace) -> int:
         if not api_key:
             raise ValueError("Missing Materials Project API key. Provide --api-key or set MP_API_KEY.")
 
-        out_yaml = resolve_output_path(args.out_yaml, workflow="trainset")
-        structure_dir = args.structure_dir or str(Path(out_yaml).parent / "downloaded_structures")
+        out_yaml = out_dir.parent / Path(str(args.out_yaml)).name
+        structure_dir = args.structure_dir or str(out_dir.parent / "downloaded_structures")
         Path(structure_dir).mkdir(parents=True, exist_ok=True)
         res = generate_trainset_settings_yaml_from_mp_simple(
             mp_id=args.mp_id,
@@ -127,7 +161,6 @@ def _run_make_trainset(args: argparse.Namespace) -> int:
         yaml_path = res["yaml"]
         print(f"[Done] Generated settings from Materials Project: {yaml_path}")
 
-    out_dir = resolve_output_path(args.output, workflow="trainset")
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     generate_trainset_from_yaml(yaml_path=yaml_path, out_dir=str(out_dir))
     print(f"[Done] Elastic-energy trainset + tables written to: {out_dir}")
@@ -144,6 +177,19 @@ def _run_make_trainset(args: argparse.Namespace) -> int:
                         fout.write(fin.read())
                     fout.write(f"\n# ===== END {bgf.name} =====\n\n")
             print(f"[Done] Concatenated strained geometries to: {all_geo_file}")
+    persist_generator_metadata(
+        args,
+        command="make-trainset",
+        output_path=out_dir,
+        layout=layout,
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+        extra={"yaml_path": str(yaml_path)},
+    )
+    copied = maybe_copy_output_to_dot(out_dir, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [out_dir]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0
 
 

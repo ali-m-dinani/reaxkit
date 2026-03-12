@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import reaxkit.engine  # noqa: F401
 
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
@@ -329,8 +330,25 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
 
     if args.export:
-        export_result_csv(SimpleNamespace(table=table), args.export)
-        print(f"[Done] Exported data to {args.export}")
+        out_csv = resolve_output_path(
+            args.export,
+            canonical,
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
+        export_result_csv(SimpleNamespace(table=table), str(out_csv))
+        print(f"[Done] Exported data to {out_csv}")
+
+    if args.save:
+        out_save = resolve_output_path(
+            args.save,
+            canonical,
+            run_id=getattr(args, "run_id", None),
+            project_root=getattr(args, "project_root", "."),
+            analysis_id=getattr(args, "analysis_id", None),
+        )
+        args.save = str(out_save)
 
     if not table.empty:
         _render_frame_payloads(table, args, mode="plot3d" if canonical == "atom_property_plot3d" else "heatmap2d")

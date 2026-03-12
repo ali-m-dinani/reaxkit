@@ -19,6 +19,7 @@ from reaxkit.analysis.force_field.report import (
 )
 from reaxkit.analysis.force_field.structure_summary import StructureSummaryRequest
 from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
+from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.engine_registry import resolve_engine
@@ -171,12 +172,22 @@ def _filter_force_field_table_by_term(
     return df.loc[key == wanted].copy()
 
 
-def _load_force_field_data(args: argparse.Namespace) -> ForceFieldParametersData:
-    normalized = normalize_storage_args(vars(args))
-    adapter = resolve_engine(
-        normalized.get("ffield") or normalized.get("input") or ".",
+def _resolve_engine_from_args(normalized: dict, args: argparse.Namespace):
+    detection_path = (
+        normalized.get("_snapshot_source_dir")
+        or normalized.get("input")
+        or normalized.get("run_dir")
+        or "."
+    )
+    return resolve_engine(
+        str(detection_path),
         engine=getattr(args, "engine", None),
     )
+
+
+def _load_force_field_data(args: argparse.Namespace) -> ForceFieldParametersData:
+    normalized = normalize_storage_args(vars(args))
+    adapter = _resolve_engine_from_args(normalized, args)
     return adapter.load(ForceFieldParametersData, normalized)
 
 
@@ -213,10 +224,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 def _load_geometry_summary(args: argparse.Namespace) -> GeometrySummaryData:
     normalized = normalize_storage_args(vars(args))
-    adapter = resolve_engine(
-        normalized.get("fort74") or normalized.get("input") or ".",
-        engine=getattr(args, "engine", None),
-    )
+    adapter = _resolve_engine_from_args(normalized, args)
     return adapter.load(GeometrySummaryData, normalized)
 
 
@@ -290,6 +298,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = resolve_command_name(command, task_names=FORCE_FIELD_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
@@ -578,15 +587,11 @@ def _run_force_field_data(args: argparse.Namespace) -> int:
         _export_force_field_tables(export_tables, args.outdir, fmt=export_fmt)
         print(f"[Done] Exported section tables to {args.outdir}")
 
-    if args.export:
-        export_result_csv(result, args.export)
-        print(f"[Done] Exported data to {args.export}")
-
     wants_plot = bool(getattr(args, "plot", None) or getattr(args, "save", None) or getattr(args, "show", False))
-    if wants_plot or not (args.export or args.outdir):
-        present_args = argparse.Namespace(**vars(args))
-        present_args.export = None
-        present_result("force_field_data", result, present_args, plot_payload_builder=_plot_payload)
+    if args.outdir and not args.export and not wants_plot:
+        return 0
+
+    present_result("force_field_data", result, args, plot_payload_builder=_plot_payload)
     return 0
 
 
@@ -781,8 +786,15 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         )
         result = _build_most_sensitive_result(base_result)
         if getattr(args, "export_all", None):
-            export_result_csv(argparse.Namespace(table=result.metadata["full_table"]), args.export_all)
-            print(f"[Done] Exported full diagnostic table to {args.export_all}")
+            out_all = resolve_output_path(
+                args.export_all,
+                canonical,
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
+            export_result_csv(argparse.Namespace(table=result.metadata["full_table"]), str(out_all))
+            print(f"[Done] Exported full diagnostic table to {out_all}")
         present_result(canonical, result, args, plot_payload_builder=_plot_payload)
         return 0
 

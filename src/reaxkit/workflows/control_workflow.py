@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Callable
 
 from reaxkit.analysis import control as _control_tasks  # noqa: F401
@@ -10,6 +11,12 @@ from reaxkit.analysis.control.control import ControlParametersTaskRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
+from reaxkit.core.generator_runtime import (
+    maybe_copy_output_to_dot,
+    persist_generator_metadata,
+    prepare_generator_output,
+    print_saved_dirs,
+)
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.control_generator import write_control
 
@@ -65,12 +72,31 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Examples:\n"
             "  reaxkit make-control\n"
             "  reaxkit make-control --output control\n"
-            "  reaxkit make-control --output inputs/control"
+            "  reaxkit make-control --parameter nmdit --value 100000\n"
+            "  reaxkit make-control --output control --copy-to-dot"
         )
+        add_storage_cli_arguments(parser)
         parser.add_argument(
             "--output",
-            default="reaxkit_generated_inputs/control",
-            help="Output path for the generated control file",
+            default="control",
+            help="Output filename to write under <project_root>/input/",
+        )
+        parser.add_argument(
+            "--copy-to-dot",
+            action="store_true",
+            help="Also copy the generated control file to the current directory.",
+        )
+        parser.add_argument(
+            "--parameter",
+            action="append",
+            default=[],
+            help="Control parameter key to override (repeatable, must pair with --value).",
+        )
+        parser.add_argument(
+            "--value",
+            action="append",
+            default=[],
+            help="Override value for the corresponding --parameter entry.",
         )
         return parser
 
@@ -115,8 +141,31 @@ def _run_get(args: argparse.Namespace) -> int:
 
 
 def _run_make(args: argparse.Namespace) -> int:
-    output = write_control(args.output)
-    print(f"control file written to {output}")
+    output, layout = prepare_generator_output(
+        args,
+        command=MAKE_CONTROL_COMMAND,
+        output_value=str(getattr(args, "output", "control")),
+    )
+    parameters = list(getattr(args, "parameter", []) or [])
+    values = list(getattr(args, "value", []) or [])
+    if len(parameters) != len(values):
+        raise ValueError("--parameter and --value must be provided the same number of times.")
+    overrides = {str(k).strip(): str(v) for k, v in zip(parameters, values)}
+
+    write_control(output, overrides=overrides or None)
+    persist_generator_metadata(
+        args,
+        command=MAKE_CONTROL_COMMAND,
+        output_path=output,
+        layout=layout,
+        extra={"overrides": overrides},
+        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+    )
+    copied = maybe_copy_output_to_dot(output, enabled=bool(getattr(args, "copy_to_dot", False)))
+    dirs = [output.parent]
+    if copied is not None:
+        dirs.append(copied.parent)
+    print_saved_dirs(dirs)
     return 0
 
 

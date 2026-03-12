@@ -319,6 +319,36 @@ class ReaxkitStorageLayout:
         _write_json(path, payload)
         return path
 
+    def record_run_generator(
+        self,
+        *,
+        run_id: str,
+        command: str,
+        output_path: str | Path,
+        settings_path: str | Path | None = None,
+    ) -> Path:
+        run_id = _safe_run_id(run_id)
+        path = self.run_index_path(run_id)
+        payload = _read_json(path, default={})
+        if not payload:
+            payload = {"run_id": run_id}
+
+        entries = list(payload.get("generators") or [])
+        entry_id = f"gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(2)}"
+        entries.append(
+            {
+                "generator_id": entry_id,
+                "command": str(command),
+                "output_path": str(output_path),
+                "settings_path": str(settings_path) if settings_path is not None else None,
+                "updated_at": _utc_now_iso(),
+            }
+        )
+        payload["generators"] = entries
+        payload["updated_at"] = _utc_now_iso()
+        _write_json(path, payload)
+        return path
+
 
 def add_storage_cli_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-id", default=None, help="Run identifier for run-scoped layout (e.g., run_91ac0e).")

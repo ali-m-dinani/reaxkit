@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+import re
 
 
 CONTROL_TEMPLATE = """# General parameters
@@ -125,9 +126,47 @@ def generate_control_template(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC)
     return spec.template_text
 
 
+def _apply_control_overrides(text: str, overrides: dict[str, Any] | None = None) -> str:
+    if not overrides:
+        return text
+
+    normalized = {str(k).strip().lower(): str(v) for k, v in (overrides or {}).items() if str(k).strip()}
+    if not normalized:
+        return text
+
+    out_lines: list[str] = []
+    seen: set[str] = set()
+    pattern = re.compile(r"^(\s*)(\S+)(\s+)([A-Za-z_]\w*)(.*)$")
+    for line in text.splitlines(keepends=True):
+        match = pattern.match(line)
+        if not match:
+            out_lines.append(line)
+            continue
+        lead, old_value, gap, key, tail = match.groups()
+        lookup = key.lower()
+        if lookup not in normalized:
+            out_lines.append(line)
+            continue
+
+        new_value = normalized[lookup]
+        width = len(old_value)
+        if len(new_value) > width:
+            raise ValueError(
+                f"Value {new_value!r} for key {key!r} exceeds template width {width} and would break alignment."
+            )
+        seen.add(lookup)
+        out_lines.append(f"{lead}{new_value.rjust(width)}{gap}{key}{tail}")
+
+    missing = sorted(k for k in normalized if k not in seen)
+    if missing:
+        raise KeyError(f"Unknown control key(s): {', '.join(missing)}")
+    return "".join(out_lines)
+
+
 def write_control(
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+    overrides: dict[str, Any] | None = None,
 ) -> Path:
     """
     Write a generated ReaxFF ``control`` file to disk.
@@ -146,7 +185,8 @@ def write_control(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_control_template(spec), encoding="utf-8")
+    rendered = _apply_control_overrides(generate_control_template(spec), overrides=overrides)
+    out_path.write_text(rendered, encoding="utf-8")
     return out_path
 
 

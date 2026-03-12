@@ -151,6 +151,8 @@ commands:
     aliases:
       - rdf-property
       - rdfproperty
+      - rdfprop
+      - rdf-prop
     help: RDF property analysis
   connection_list:
     kind: analysis
