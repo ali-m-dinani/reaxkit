@@ -32,6 +32,12 @@ commands:
   make-control:
     kind: generator
     help: Generate a control file
+  write-control:
+    kind: generator
+    help: Rewrite a control file with canonical alignment
+  study:
+    kind: generator
+    help: Generate study YAML templates and sweep folder layouts
   add-alias:
     kind: generator
     help: Add a user-defined command alias
