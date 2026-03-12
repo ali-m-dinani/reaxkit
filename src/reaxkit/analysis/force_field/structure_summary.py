@@ -83,7 +83,7 @@ class StructureSummaryResult(BaseResult):
     request: StructureSummaryRequest
 
 
-@register_task("structure_summary_data")
+@register_task("structure_summary_data", label="Structure Summary Data")
 class StructureSummaryTask(AnalysisTask):
     """Return structure-summary data."""
 

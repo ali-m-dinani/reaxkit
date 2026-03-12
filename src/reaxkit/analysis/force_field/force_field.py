@@ -172,7 +172,7 @@ class ForceFieldDataResult(BaseResult):
     request: ForceFieldDataRequest
 
 
-@register_task("force_field_data")
+@register_task("force_field_data", label="Force Field Data")
 class ForceFieldDataTask(AnalysisTask):
     """Return raw or interpreted force-field section data."""
 

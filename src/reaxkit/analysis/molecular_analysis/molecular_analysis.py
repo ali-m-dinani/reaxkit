@@ -243,7 +243,7 @@ class LargestMoleculeCompositionResult(BaseResult):
     request: LargestMoleculeCompositionRequest
 
 
-@register_task("dominant_species")
+@register_task("dominant_species", label="Dominant Species")
 class DominantSpeciesTask(AnalysisTask):
     """Return the dominant molecular species per selected iteration."""
 
@@ -342,7 +342,7 @@ class DominantSpeciesTask(AnalysisTask):
         return DominantSpeciesResult(table=out, request=request)
 
 
-@register_task("largest_molecule_by_mass")
+@register_task("largest_molecule_by_mass", label="Largest Molecule by Mass")
 class LargestMoleculeByMassTask(AnalysisTask):
     """Return the heaviest individual molecular species per selected iteration."""
 
@@ -426,7 +426,7 @@ class LargestMoleculeByMassTask(AnalysisTask):
         return LargestMoleculeByMassResult(table=out[columns], request=request)
 
 
-@register_task("largest_molecule_composition")
+@register_task("largest_molecule_composition", label="Largest Molecule Composition")
 class LargestMoleculeCompositionTask(AnalysisTask):
     """Return per-element composition of the heaviest molecule per selected iteration."""
 
@@ -507,7 +507,7 @@ class LargestMoleculeCompositionTask(AnalysisTask):
         return LargestMoleculeCompositionResult(table=long, request=request)
 
 
-@register_task("molecule_lifetime")
+@register_task("molecule_lifetime", label="Molecule Lifetime")
 class MoleculeLifetimeTask(AnalysisTask):
     """Compute active lifetimes and birth/death events for molecular species."""
 

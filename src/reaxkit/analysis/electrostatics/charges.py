@@ -103,7 +103,7 @@ class ChargeTableResult(BaseResult):
     request: ChargeTableRequest
 
 
-@register_task("charge_table")
+@register_task("charge_table", label="Charge Table")
 class ChargeTableTask(AnalysisTask):
     """Return per-atom charges across selected frames as a tidy table."""
 

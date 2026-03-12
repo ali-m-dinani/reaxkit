@@ -442,7 +442,7 @@ class ForceFieldOptimizationReportBulkModulusResult(BaseResult):
     request: ForceFieldOptimizationReportBulkModulusRequest
 
 
-@register_task("force_field_optimization_report")
+@register_task("force_field_optimization_report", label="Force Field Optimization Report")
 class ForceFieldOptimizationReportTask(AnalysisTask):
     """Return the parsed optimization-report table with QM-FF differences."""
 
@@ -484,7 +484,7 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
         return ForceFieldOptimizationReportResult(table=table, request=request)
 
 
-@register_task("force_field_optimization_report_eos")
+@register_task("force_field_optimization_report_eos", label="Force Field Optimization Report EOS")
 class ForceFieldOptimizationReportEOSTask(AnalysisTask):
     """Return ENERGY-vs-volume data derived from report + geometry summary."""
 
@@ -533,7 +533,7 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
         return ForceFieldOptimizationReportEOSResult(table=table, request=request)
 
 
-@register_task("force_field_optimization_report_bulk_modulus")
+@register_task("force_field_optimization_report_bulk_modulus", label="Force Field Optimization Report Bulk Modulus")
 class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
     """Return a Vinet bulk-modulus fit derived from report + geometry summary."""
 

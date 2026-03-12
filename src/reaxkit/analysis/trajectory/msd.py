@@ -66,7 +66,7 @@ class MSDResult(BaseResult):
     request: MSDRequest
 
 
-@register_task("msd")
+@register_task("msd", label="MSD")
 class MSDTask(AnalysisTask):
     """Per-atom mean-squared displacement over selected frames/dimensions."""
 

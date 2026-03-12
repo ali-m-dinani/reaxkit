@@ -149,7 +149,7 @@ class ControlParametersTaskResult(BaseResult):
     request: ControlParametersTaskRequest
 
 
-@register_task("control_value")
+@register_task("control_value", label="Control Value")
 class ControlParametersTask(AnalysisTask):
     """Return one control parameter as a one-row table."""
 

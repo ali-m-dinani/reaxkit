@@ -16,7 +16,7 @@ from pathlib import Path
 import tempfile
 
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY, task_display_label
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_dash_request
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.backend.tabular_payload import extract_tabular_rows, infer_columns, infer_numeric_columns
@@ -326,7 +326,10 @@ def _engine_display_name(value: str | None) -> str:
     return str(value or "")
 
 
-def _analysis_dropdown_options(task_names: list[str] | None) -> tuple[list[dict[str, Any]], str]:
+def _analysis_dropdown_options(
+    task_names: list[str] | None,
+    task_labels: dict[str, str] | None = None,
+) -> tuple[list[dict[str, Any]], str]:
     """Build grouped analysis dropdown options."""
     tasks = sorted({str(task) for task in (task_names or []) if str(task).strip()})
     if not tasks:
@@ -368,6 +371,7 @@ def _analysis_dropdown_options(task_names: list[str] | None) -> tuple[list[dict[
 
     options: list[dict[str, Any]] = []
     first_value = ""
+    labels = {str(k): str(v) for k, v in (task_labels or {}).items()}
     for group_name in sorted(grouped.keys()):
         options.append(
             {
@@ -377,9 +381,15 @@ def _analysis_dropdown_options(task_names: list[str] | None) -> tuple[list[dict[
             }
         )
         for task_name in sorted(grouped[group_name]):
+            task_label = labels.get(task_name)
+            if not task_label:
+                task_cls = TASK_REGISTRY.get(task_name)
+                task_label = str(getattr(task_cls, "_reaxkit_task_label", "")).strip() if task_cls else ""
+            if not task_label:
+                task_label = str(TASK_LABELS.get(task_name) or task_display_label(task_name))
             options.append(
                 {
-                    "label": html.Span(task_name, style={"paddingLeft": "18px", "display": "inline-block"}),
+                    "label": html.Span(task_label, style={"paddingLeft": "18px", "display": "inline-block"}),
                     "value": task_name,
                 }
             )
@@ -512,8 +522,9 @@ def _analysis_display_label(snapshot: dict[str, Any] | None, analysis_node_id: s
     node = nodes.get(str(analysis_node_id))
     if not isinstance(node, dict):
         return "analysis"
-    raw_name = str(node.get("metadata", {}).get("task_name") or node.get("name") or "analysis")
-    key = raw_name.strip().lower()
+    task_key = str(node.get("metadata", {}).get("task_name") or node.get("name") or "analysis").strip().lower()
+    raw_name = str(TASK_LABELS.get(task_key) or task_display_label(task_key))
+    key = task_key
     analyses = [
         n for n in nodes.values()
         if isinstance(n, dict) and str(n.get("kind")) == "analysis"
@@ -1943,7 +1954,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         if selected_id == "virtual:analysis":
             catalog = _catalog_payload(service)
             task_names = [str(name) for name in (catalog.get("analysis_tasks", []) if isinstance(catalog, dict) else [])]
-            analysis_options, analysis_default = _analysis_dropdown_options(task_names)
+            task_labels = {
+                str(name): str(label)
+                for name, label in (
+                    (catalog.get("analysis_task_labels", {}) if isinstance(catalog, dict) else {}).items()
+                )
+            }
+            analysis_options, analysis_default = _analysis_dropdown_options(task_names, task_labels)
             return html.Div(
                 [
                     html.Label("Analysis type"),

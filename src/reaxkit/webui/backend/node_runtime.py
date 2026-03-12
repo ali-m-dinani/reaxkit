@@ -566,7 +566,7 @@ class PipelineRuntime:
 
     def get_catalog(self) -> dict[str, Any]:
         try:
-            from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+            from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY
             try:
                 import reaxkit.analysis  # noqa: F401  (best-effort registration)
             except Exception:
@@ -585,6 +585,7 @@ class PipelineRuntime:
                 except Exception:
                     pass
             task_names = sorted(str(name) for name in TASK_REGISTRY.keys())
+            task_labels = {str(name): str(label) for name, label in TASK_LABELS.items()}
             schemas = self._analysis_schemas({str(k): v for k, v in TASK_REGISTRY.items()})
         except Exception:
             try:
@@ -593,11 +594,13 @@ class PipelineRuntime:
                 task_names = sorted(str(name) for name in get_registered_analysis_commands().keys())
             except Exception:
                 task_names = []
+            task_labels = {}
             schemas = {}
 
         utility_specs = utility_specs_payload()
         return {
             "analysis_tasks": task_names,
+            "analysis_task_labels": task_labels,
             "analysis_schemas": schemas,
             "utility_nodes": [str(spec.get("name")) for spec in utility_specs],
             "utility_specs": utility_specs,

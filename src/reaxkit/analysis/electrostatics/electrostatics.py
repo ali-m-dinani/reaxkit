@@ -757,7 +757,7 @@ def _run_electrostatics(
     return table.sort_values(["frame_index", "core_atom_id"], kind="stable").reset_index(drop=True)
 
 
-@register_task("dipole")
+@register_task("dipole", label="Dipole")
 class DipoleTask(AnalysisTask):
     """Compute dipole series as total or local."""
 
@@ -806,7 +806,7 @@ class DipoleTask(AnalysisTask):
         return DipoleResult(table=out, request=request)
 
 
-@register_task("polarization")
+@register_task("polarization", label="Polarization")
 class PolarizationTask(AnalysisTask):
     """Compute polarization series as total or local."""
 
@@ -855,7 +855,7 @@ class PolarizationTask(AnalysisTask):
         return PolarizationResult(table=out, request=request)
 
 
-@register_task("polarization_field")
+@register_task("polarization_field", label="Polarization Field")
 class PolarizationFieldTask(AnalysisTask):
     """Compute polarization-field data and hysteresis roots."""
 

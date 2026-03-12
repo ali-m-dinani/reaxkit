@@ -68,7 +68,7 @@ class ForceFieldOptimizationResult(BaseResult):
     request: ForceFieldOptimizationRequest
 
 
-@register_task("force_field_optimization")
+@register_task("force_field_optimization", label="Force Field Optimization")
 class ForceFieldOptimizationTask(AnalysisTask):
     """Return total force-field error versus optimization epoch."""
 

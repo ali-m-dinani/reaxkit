@@ -175,7 +175,7 @@ class GetTrainsetDataResult(BaseResult):
     request: GetTrainsetDataRequest
 
 
-@register_task("trainset_data")
+@register_task("trainset_data", label="Trainset Data")
 class GetTrainsetDataTask(AnalysisTask):
     """Return trainset rows for one section or all sections."""
 
@@ -255,7 +255,7 @@ class TrainsetGroupCommentsResult(BaseResult):
     request: TrainsetGroupCommentsRequest
 
 
-@register_task("trainset_group_comments")
+@register_task("trainset_group_comments", label="Trainset Group Comments")
 class TrainsetGroupCommentsTask(AnalysisTask):
     """Return unique trainset group-comment annotations by section."""
 

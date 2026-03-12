@@ -170,7 +170,7 @@ class ConnectionListResult(BaseResult):
     request: ConnectionListRequest
 
 
-@register_task("connection_list")
+@register_task("connection_list", label="Connection List")
 class ConnectionListTask(AnalysisTask):
     required_data = ConnectivityData
 
@@ -365,7 +365,7 @@ class ConnectionTableResult(BaseResult):
     request: ConnectionTableRequest
 
 
-@register_task("connection_table")
+@register_task("connection_table", label="Connection Table")
 class ConnectionTableTask(AnalysisTask):
     required_data = ConnectivityData
 
@@ -527,7 +527,7 @@ class ConnectionStatsResult(BaseResult):
     request: ConnectionStatsRequest
 
 
-@register_task("connection_stats")
+@register_task("connection_stats", label="Connection Stats")
 class ConnectionStatsTask(AnalysisTask):
     required_data = ConnectivityData
 
@@ -753,7 +753,7 @@ class BondEventsResult(BaseResult):
     request: BondEventsRequest
 
 
-@register_task("bond_events")
+@register_task("bond_events", label="Bond Events")
 class BondEventsTask(AnalysisTask):
     required_data = ConnectivityData
 

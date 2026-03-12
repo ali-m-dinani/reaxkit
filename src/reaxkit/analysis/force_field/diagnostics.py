@@ -225,7 +225,7 @@ class ParameterOptimizationDiagnosticResult(BaseResult):
     request: ParameterOptimizationDiagnosticRequest
 
 
-@register_task("parameter_optimization_diagnostic")
+@register_task("parameter_optimization_diagnostic", label="Parameter Optimization Diagnostic")
 class ParameterOptimizationDiagnosticTask(AnalysisTask):
     """Return sensitivity diagnostics derived from parameter-update diagnostics."""
 

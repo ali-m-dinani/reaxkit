@@ -630,7 +630,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
     return np.asarray(arr), label
 
 
-@register_task("simulation_series")
+@register_task("simulation_series", label="Simulation Series")
 class SimulationScalarSeriesTask(AnalysisTask):
     """Build a scalar time series from ``SimulationData``."""
 
@@ -683,7 +683,7 @@ class SimulationScalarSeriesTask(AnalysisTask):
         )
 
 
-@register_task("trajectory_coordinate_series")
+@register_task("trajectory_coordinate_series", label="Trajectory Coordinate Series")
 class TrajectoryCoordinateSeriesTask(AnalysisTask):
     """Build coordinate time series for one or more atoms."""
 
@@ -778,7 +778,7 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         return TrajectoryCoordinateSeriesResult(table=table, request=request)
 
 
-@register_task("cell_dimensions")
+@register_task("cell_dimensions", label="Cell Dimensions")
 class CellDimensionsTask(AnalysisTask):
     """Build cell-dimension time series from ``SimulationData``."""
 
@@ -845,7 +845,7 @@ class CellDimensionsTask(AnalysisTask):
         )
 
 
-@register_task("charge_series")
+@register_task("charge_series", label="Charge Series")
 class ChargeSeriesTask(AnalysisTask):
     """Build charge time series for one or more atoms."""
 
@@ -1106,7 +1106,7 @@ def _resolve_restraint_fields(df: pd.DataFrame, request: RestraintSeriesRequest)
     return resolved
 
 
-@register_task("electric_field_series")
+@register_task("electric_field_series", label="Electric Field Series")
 class ElectricFieldSeriesTask(AnalysisTask):
     """Build time series for applied-field or field-energy components."""
 
@@ -1197,7 +1197,7 @@ class ElectricFieldSeriesTask(AnalysisTask):
         )
 
 
-@register_task("eregime_series")
+@register_task("eregime_series", label="Eregime Series")
 class EregimeSeriesTask(AnalysisTask):
     """Build iteration-based series for one eregime field column."""
 
@@ -1255,7 +1255,7 @@ class EregimeSeriesTask(AnalysisTask):
         )
 
 
-@register_task("partial_energy_series")
+@register_task("partial_energy_series", label="Partial Energy Series")
 class PartialEnergySeriesTask(AnalysisTask):
     """Build iteration-based series for one or more fort.73 energy components."""
 
@@ -1315,7 +1315,7 @@ class PartialEnergySeriesTask(AnalysisTask):
         )
 
 
-@register_task("restraint_series")
+@register_task("restraint_series", label="Restraint Series")
 class RestraintSeriesTask(AnalysisTask):
     """Build iteration-based series for fort.76 restraint data."""
 
@@ -1393,7 +1393,7 @@ class RestraintSeriesTask(AnalysisTask):
         )
 
 
-@register_task("molecular_frequency_series")
+@register_task("molecular_frequency_series", label="Molecular Frequency Series")
 class MolecularFrequencySeriesTask(AnalysisTask):
     """Build molecular-frequency time series for one or more molecular formulas."""
 
@@ -1463,7 +1463,7 @@ class MolecularFrequencySeriesTask(AnalysisTask):
         )
 
 
-@register_task("molecular_totals_series")
+@register_task("molecular_totals_series", label="Molecular Totals Series")
 class MolecularTotalsSeriesTask(AnalysisTask):
     """Build total molecule/atom/mass time series from MolecularAnalysisData.totals."""
 

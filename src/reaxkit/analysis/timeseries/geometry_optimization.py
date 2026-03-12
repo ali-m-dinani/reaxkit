@@ -139,7 +139,7 @@ class GeometryOptimizationResult(BaseResult):
     request: GeometryOptimizationRequest
 
 
-@register_task("geometry_optimization_data")
+@register_task("geometry_optimization_data", label="Geometry Optimization Data")
 class GeometryOptimizationTask(AnalysisTask):
     """Return selected geometry-optimization summary data from fort.57."""
 

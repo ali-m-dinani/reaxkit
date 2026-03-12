@@ -193,7 +193,7 @@ class ForceFieldOptimizationParameterResult(BaseResult):
     request: ForceFieldOptimizationParameterRequest
 
 
-@register_task("force_field_optimization_parameters")
+@register_task("force_field_optimization_parameters", label="Force Field Optimization Parameters")
 class ForceFieldOptimizationParameterTask(AnalysisTask):
     """Return raw or interpreted optimization-parameter definitions from params."""
 

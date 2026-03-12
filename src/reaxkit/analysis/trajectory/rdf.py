@@ -477,7 +477,7 @@ def _compute_rdfs(
     return r_ref, stack, frame_idx
 
 
-@register_task("rdf")
+@register_task("rdf", label="RDF")
 class RDFTask(AnalysisTask):
     """RDF curve task (total/partial)."""
 
@@ -537,7 +537,7 @@ class RDFTask(AnalysisTask):
         return RDFResult(table=table, request=request)
 
 
-@register_task("rdf_property")
+@register_task("rdf_property", label="RDF Property")
 class RDFPropertyTask(AnalysisTask):
     """RDF-derived property task."""
 

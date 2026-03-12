@@ -210,7 +210,7 @@ def _empty_force_field_parameters() -> ForceFieldParametersData:
     )
 
 
-@register_task("trajectory_relabel_by_coordination")
+@register_task("trajectory_relabel_by_coordination", label="Trajectory Relabel by Coordination")
 class TrajectoryRelabelByCoordinationTask(AnalysisTask):
     """Build a relabeled trajectory from coordination-status output."""
 
