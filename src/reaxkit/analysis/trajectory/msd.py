@@ -58,6 +58,8 @@ class MSDResult(BaseResult):
       - atom_id: atom identifier
       - atom_type: element/type label for the atom
       - dim: dimension selection label used for MSD (for example 'x,y,z')
+        Note: when multiple dimensions are selected (for example x,y,z),
+        MSD is the summed squared displacement across those dimensions.
       - msd: mean-squared displacement value
     - request: MSDRequest used to produce this result
     """
@@ -68,7 +70,12 @@ class MSDResult(BaseResult):
 
 @register_task("msd", label="MSD")
 class MSDTask(AnalysisTask):
-    """Per-atom mean-squared displacement over selected frames/dimensions."""
+    """Per-atom mean-squared displacement over selected frames/dimensions.
+
+    When ``dims`` contains multiple axes (for example ``("x", "y", "z")``),
+    the returned ``msd`` is the sum across those axes, and ``dim`` is stored
+    as the joined label (for example ``"x,y,z"``).
+    """
 
     required_data = TrajectoryData
 

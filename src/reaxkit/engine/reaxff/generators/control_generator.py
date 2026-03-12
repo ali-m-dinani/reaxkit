@@ -12,6 +12,10 @@ from pathlib import Path
 from typing import Any
 import re
 
+from reaxkit.domain.data_models import ControlParametersData
+
+CONTROL_VALUE_WIDTH = 7
+CONTROL_KEY_WIDTH = 10
 
 CONTROL_TEMPLATE = """# General parameters
       1 iexx
@@ -86,8 +90,10 @@ __all__ = [
     "DEFAULT_CONTROL_SPEC",
     "CONTROL_GENERATOR_REGISTRY",
     "generate_control_template",
+    "write_control_from_data",
     "write_control",
     "write_control_template",
+    "write_control_template_with_overrides",
 ]
 
 
@@ -126,50 +132,88 @@ def generate_control_template(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC)
     return spec.template_text
 
 
+def _format_control_value(value: Any) -> str:
+    text = str(value).strip()
+    if len(text) > CONTROL_VALUE_WIDTH:
+        raise ValueError(
+            f"Value {text!r} exceeds canonical control width {CONTROL_VALUE_WIDTH}."
+        )
+    return text.rjust(CONTROL_VALUE_WIDTH)
+
+
+def _format_control_line(value: Any, key: str, comment_tail: str) -> str:
+    key_text = str(key).strip()
+    if len(key_text) > CONTROL_KEY_WIDTH:
+        raise ValueError(
+            f"Control key {key_text!r} exceeds canonical width {CONTROL_KEY_WIDTH}."
+        )
+    key_col = key_text.ljust(CONTROL_KEY_WIDTH)
+    comment = str(comment_tail).strip()
+    if comment:
+        return f"{_format_control_value(value)} {key_col} {comment}\n"
+    return f"{_format_control_value(value)} {key_col}\n"
+
+
 def _apply_control_overrides(text: str, overrides: dict[str, Any] | None = None) -> str:
-    if not overrides:
-        return text
-
-    normalized = {str(k).strip().lower(): str(v) for k, v in (overrides or {}).items() if str(k).strip()}
-    if not normalized:
-        return text
-
+    normalized = {str(k).strip().lower(): v for k, v in (overrides or {}).items() if str(k).strip()}
     out_lines: list[str] = []
     seen: set[str] = set()
-    pattern = re.compile(r"^(\s*)(\S+)(\s+)([A-Za-z_]\w*)(.*)$")
+    pattern = re.compile(r"^\s*([\d\-.Ee+]+)\s+([A-Za-z_]\w*)\s*(.*)$")
     for line in text.splitlines(keepends=True):
         match = pattern.match(line)
         if not match:
             out_lines.append(line)
             continue
-        lead, old_value, gap, key, tail = match.groups()
+        old_value, key, tail = match.groups()
         lookup = key.lower()
-        if lookup not in normalized:
-            out_lines.append(line)
-            continue
+        value = normalized.get(lookup, old_value)
+        if lookup in normalized:
+            seen.add(lookup)
+        out_lines.append(_format_control_line(value=value, key=key, comment_tail=tail))
 
-        new_value = normalized[lookup]
-        width = len(old_value)
-        if len(new_value) > width:
-            raise ValueError(
-                f"Value {new_value!r} for key {key!r} exceeds template width {width} and would break alignment."
-            )
-        seen.add(lookup)
-        out_lines.append(f"{lead}{new_value.rjust(width)}{gap}{key}{tail}")
-
-    missing = sorted(k for k in normalized if k not in seen)
+    missing = sorted(k for k in normalized.keys() if k not in seen)
     if missing:
         raise KeyError(f"Unknown control key(s): {', '.join(missing)}")
     return "".join(out_lines)
 
 
-def write_control(
+def _normalize_overrides(overrides: dict[str, Any] | None = None) -> dict[str, str]:
+    return {str(k).strip().lower(): str(v) for k, v in (overrides or {}).items() if str(k).strip()}
+
+
+def _control_overrides_from_data(data: ControlParametersData) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for section_name in ("general", "md", "mm", "ff", "outdated"):
+        section = getattr(data, section_name, {}) or {}
+        if not isinstance(section, dict):
+            raise TypeError(f"ControlParametersData.{section_name} must be a dict.")
+        for key, value in section.items():
+            key_norm = str(key).strip().lower()
+            if key_norm:
+                overrides[key_norm] = value
+    return overrides
+
+
+def write_control_template(
+    out_path: str | Path = "control",
+    spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+) -> Path:
+    """
+    Write the default template ``control`` file with no modifications.
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(generate_control_template(spec), encoding="utf-8")
+    return out_path
+
+
+def write_control_template_with_overrides(
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
     overrides: dict[str, Any] | None = None,
 ) -> Path:
     """
-    Write a generated ReaxFF ``control`` file to disk.
+    Write the template ``control`` file with key/value overrides.
 
     Parameters
     ----------
@@ -185,16 +229,42 @@ def write_control(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rendered = _apply_control_overrides(generate_control_template(spec), overrides=overrides)
+    rendered = _apply_control_overrides(generate_control_template(spec), overrides=_normalize_overrides(overrides))
     out_path.write_text(rendered, encoding="utf-8")
     return out_path
 
 
-def write_control_template(out_path: str | Path = "control") -> Path:
+def write_control_from_data(
+    data: ControlParametersData,
+    out_path: str | Path = "control",
+    spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+    overrides: dict[str, Any] | None = None,
+) -> Path:
     """
-    Backward-compatible wrapper for writing the default ``control`` file.
+    Write a ``control`` file from ``ControlParametersData`` and optional overrides.
     """
-    return write_control(out_path=out_path, spec=DEFAULT_CONTROL_SPEC)
+    merged = _normalize_overrides(_control_overrides_from_data(data))
+    merged.update(_normalize_overrides(overrides))
+    return write_control_template_with_overrides(
+        out_path=out_path,
+        spec=spec,
+        overrides=merged,
+    )
+
+
+def write_control(
+    out_path: str | Path = "control",
+    spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+    overrides: dict[str, Any] | None = None,
+) -> Path:
+    """
+    Backward-compatible wrapper for writing template control files with overrides.
+    """
+    return write_control_template_with_overrides(
+        out_path=out_path,
+        spec=spec,
+        overrides=overrides,
+    )
 
 
 CONTROL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -203,6 +273,6 @@ CONTROL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "default_filename": "control",
         "spec_type": ControlGeneratorSpec,
         "generate": generate_control_template,
-        "write": write_control,
+        "write": write_control_template_with_overrides,
     }
 }

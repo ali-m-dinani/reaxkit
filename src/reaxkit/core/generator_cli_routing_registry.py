@@ -28,8 +28,9 @@ def get_registered_generators() -> dict[str, GeneratorSpec]:
     return dict(GENERATOR_REGISTRY)
 
 
-register_generator("get-control", module_path="reaxkit.workflows.control_workflow")
-register_generator("make-control", module_path="reaxkit.workflows.control_workflow")
+register_generator("get-control", module_path="reaxkit.workflows.file_tools.control_workflow")
+register_generator("make-control", module_path="reaxkit.workflows.file_tools.control_workflow")
+register_generator("write-control", module_path="reaxkit.workflows.file_tools.control_workflow")
 register_generator("add-alias", module_path="reaxkit.workflows.meta.command_alias_workflow")
 register_generator("make-eregime", module_path="reaxkit.workflows.file_tools.eregime_workflow")
 register_generator("trim-xmolout", module_path="reaxkit.workflows.file_tools.xmolout_workflow")

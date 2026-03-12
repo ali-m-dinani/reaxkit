@@ -1751,6 +1751,25 @@ class ReaxFFAdapter(EngineAdapter):
             loader=lambda: _molecular_analysis_from_molfra_handler(handler),
         )
 
+    def write_control(
+        self,
+        data: ControlParametersData,
+        out_path: str | Path,
+        args: dict | None = None,
+    ):
+        from reaxkit.engine.reaxff.generators.control_generator import write_control_from_data
+
+        args = args or {}
+        if not isinstance(data, ControlParametersData):
+            raise TypeError("write_control expects ControlParametersData.")
+
+        overrides = args.get("overrides") or args.get("control_overrides")
+        return write_control_from_data(
+            data,
+            out_path=out_path,
+            overrides=overrides,
+        )
+
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
         from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames
 

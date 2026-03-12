@@ -113,6 +113,8 @@ class EngineAdapter(ABC):
         """Write a domain data object using an engine-appropriate writer."""
         if isinstance(data, TrajectoryData):
             return self._invoke_writer("write_trajectory", data, out_path, args or {})
+        if isinstance(data, ControlParametersData):
+            return self._invoke_writer("write_control", data, out_path, args or {})
         raise ValueError(f"{self.name} cannot write data object of type: {type(data).__name__}")
 
     def _invoke_loader(self, method_name: str, args: dict, reporter=None):
