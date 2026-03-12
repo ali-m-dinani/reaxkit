@@ -49,6 +49,22 @@ def print_result_table(result) -> None:
     print(result.table.to_string(index=False))
 
 
+def _print_output_dirs(paths: list[Path]) -> None:
+    seen: set[str] = set()
+    ordered_dirs: list[str] = []
+    for path in paths:
+        directory = str(path.resolve())
+        if directory in seen:
+            continue
+        seen.add(directory)
+        ordered_dirs.append(directory)
+    if not ordered_dirs:
+        return
+    print("Results saved in:")
+    for directory in ordered_dirs:
+        print(f"  {directory}")
+
+
 def present_result(
     command: str,
     result,
@@ -60,7 +76,9 @@ def present_result(
     normalized = normalize_storage_args(vars(args), snapshot=False)
     for key, value in normalized.items():
         setattr(args, key, value)
-    persist_analysis_result(command, result, args)
+    result_dirs: list[Path] = []
+    analysis_dir = persist_analysis_result(command, result, args)
+    result_dirs.append(analysis_dir)
 
     export_csv = getattr(args, "export", None)
     save = getattr(args, "save", None)
@@ -77,6 +95,7 @@ def present_result(
             analysis_id=getattr(args, "analysis_id", None),
         )
         export_result_csv(result, str(export_path))
+        result_dirs.append(export_path.parent)
 
     if wants_plot:
         if plot_payload_builder is None:
@@ -109,8 +128,10 @@ def present_result(
                         analysis_id=getattr(args, "analysis_id", None),
                     )
                     render_plot({**payload, "save": str(save_path)})
+                    result_dirs.append(save_path.parent)
                 if show or (plot_mode and not save):
                     render_plot(payload)
 
     if not (wants_plot or export_csv):
         print_result_table(result)
+    _print_output_dirs(result_dirs)
