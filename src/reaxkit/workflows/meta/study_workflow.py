@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import csv
 import itertools
 import json
@@ -1130,6 +1131,86 @@ def _execute_stage_run(
     }
 
 
+def _run_single_replicate_pipeline(
+    *,
+    case: dict[str, Any],
+    rep: dict[str, Any],
+    manifest: dict[str, Any],
+    stage_filter: str | None,
+    artifact_transfer: str,
+    run_geometry_generator: bool,
+    strict_actions: bool,
+) -> dict[str, int]:
+    counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
+    rep_id = str(rep.get("replicate_id") or "")
+    rep_path = Path(str(rep.get("path") or ""))
+    rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+    produced_map = _build_declared_produced_map(rep_manifest)
+
+    stage_entries = rep_manifest.get("stages") or []
+    status_by_stage: dict[str, str] = {}
+    for entry in stage_entries:
+        if not isinstance(entry, dict):
+            continue
+        stage_name = str(entry.get("stage") or "").strip()
+        if not stage_name:
+            continue
+        stage_dir = Path(str(entry.get("path") or ""))
+        status_by_stage[stage_name] = str(_load_stage_status(stage_dir).get("status") or "pending")
+
+    for entry in stage_entries:
+        if not isinstance(entry, dict):
+            continue
+        stage_name = str(entry.get("stage") or "").strip()
+        if not stage_name:
+            continue
+        if stage_filter and stage_name != stage_filter:
+            continue
+
+        stage_dir = Path(str(entry.get("path") or ""))
+        stage_manifest = _read_json(stage_dir / "stage_manifest.json")
+        stage_manifest["study_source_dir"] = str(Path(str(manifest.get("source_yaml") or "")).parent)
+
+        status = _load_stage_status(stage_dir)
+        current_status = str(status.get("status") or "pending")
+        if current_status == "completed":
+            counts["skipped"] += 1
+            print(f"[skip] {case.get('case_id')} {rep_id} {stage_name}: already completed")
+            continue
+
+        ready, reason = _is_stage_ready(
+            stage_manifest,
+            status_by_stage=status_by_stage,
+            produced_artifacts=produced_map,
+        )
+        if not ready:
+            counts["not_ready"] += 1
+            print(f"[wait] {case.get('case_id')} {rep_id} {stage_name}: {reason}")
+            continue
+
+        print(f"[run] {case.get('case_id')} {rep_id} {stage_name}")
+        result = _execute_stage_run(
+            stage_dir=stage_dir,
+            stage_manifest=stage_manifest,
+            produced_artifacts=produced_map,
+            artifact_transfer=artifact_transfer,
+            run_geometry_generator=run_geometry_generator,
+            strict_actions=strict_actions,
+        )
+        final_status = str(result.get("status") or "failed")
+        status_by_stage[stage_name] = final_status
+        if final_status == "completed":
+            counts["completed"] += 1
+            print(f"[done] {case.get('case_id')} {rep_id} {stage_name}")
+        else:
+            counts["failed"] += 1
+            print(f"[fail] {case.get('case_id')} {rep_id} {stage_name}")
+            if strict_actions:
+                return counts
+
+    return counts
+
+
 def _run_study(
     *,
     study_root: Path,
@@ -1139,6 +1220,7 @@ def _run_study(
     artifact_transfer: str,
     run_geometry_generator: bool,
     strict_actions: bool,
+    parallel_workers: int,
 ) -> dict[str, int]:
     manifest = _read_json(study_root / "study_manifest.json")
     case_entries = manifest.get("cases") or []
@@ -1146,6 +1228,7 @@ def _run_study(
         raise ValueError("Invalid study_manifest.json: cases must be a list.")
 
     counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
+    tasks: list[tuple[dict[str, Any], dict[str, Any]]] = []
 
     for case in case_entries:
         if not isinstance(case, dict):
@@ -1161,70 +1244,48 @@ def _run_study(
             rep_id = str(rep.get("replicate_id") or "")
             if replicate_filter and rep_id != replicate_filter:
                 continue
-            rep_path = Path(str(rep.get("path") or ""))
-            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
-            produced_map = _build_declared_produced_map(rep_manifest)
+            tasks.append((case, rep))
 
-            stage_entries = rep_manifest.get("stages") or []
-            status_by_stage: dict[str, str] = {}
-            for entry in stage_entries:
-                if not isinstance(entry, dict):
-                    continue
-                stage_name = str(entry.get("stage") or "").strip()
-                if not stage_name:
-                    continue
-                stage_dir = Path(str(entry.get("path") or ""))
-                status_by_stage[stage_name] = str(_load_stage_status(stage_dir).get("status") or "pending")
+    workers = max(1, int(parallel_workers))
+    if strict_actions and workers > 1:
+        print("[warn] --strict-actions with --parallel-workers>1 is downgraded to sequential execution.")
+        workers = 1
 
-            for entry in stage_entries:
-                if not isinstance(entry, dict):
-                    continue
-                stage_name = str(entry.get("stage") or "").strip()
-                if not stage_name:
-                    continue
-                if stage_filter and stage_name != stage_filter:
-                    continue
+    if workers == 1:
+        for case, rep in tasks:
+            rec = _run_single_replicate_pipeline(
+                case=case,
+                rep=rep,
+                manifest=manifest,
+                stage_filter=stage_filter,
+                artifact_transfer=artifact_transfer,
+                run_geometry_generator=run_geometry_generator,
+                strict_actions=strict_actions,
+            )
+            for key in counts:
+                counts[key] += int(rec.get(key, 0))
+            if strict_actions and rec.get("failed", 0) > 0:
+                return counts
+        return counts
 
-                stage_dir = Path(str(entry.get("path") or ""))
-                stage_manifest = _read_json(stage_dir / "stage_manifest.json")
-                stage_manifest["study_source_dir"] = str(Path(str(manifest.get("source_yaml") or "")).parent)
-
-                status = _load_stage_status(stage_dir)
-                current_status = str(status.get("status") or "pending")
-                if current_status == "completed":
-                    counts["skipped"] += 1
-                    print(f"[skip] {case.get('case_id')} {rep_id} {stage_name}: already completed")
-                    continue
-
-                ready, reason = _is_stage_ready(
-                    stage_manifest,
-                    status_by_stage=status_by_stage,
-                    produced_artifacts=produced_map,
-                )
-                if not ready:
-                    counts["not_ready"] += 1
-                    print(f"[wait] {case.get('case_id')} {rep_id} {stage_name}: {reason}")
-                    continue
-
-                print(f"[run] {case.get('case_id')} {rep_id} {stage_name}")
-                result = _execute_stage_run(
-                    stage_dir=stage_dir,
-                    stage_manifest=stage_manifest,
-                    produced_artifacts=produced_map,
-                    artifact_transfer=artifact_transfer,
-                    run_geometry_generator=run_geometry_generator,
-                    strict_actions=strict_actions,
-                )
-                final_status = str(result.get("status") or "failed")
-                status_by_stage[stage_name] = final_status
-                if final_status == "completed":
-                    counts["completed"] += 1
-                    print(f"[done] {case.get('case_id')} {rep_id} {stage_name}")
-                else:
-                    counts["failed"] += 1
-                    print(f"[fail] {case.get('case_id')} {rep_id} {stage_name}")
-                    if strict_actions:
-                        return counts
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(
+                _run_single_replicate_pipeline,
+                case=case,
+                rep=rep,
+                manifest=manifest,
+                stage_filter=stage_filter,
+                artifact_transfer=artifact_transfer,
+                run_geometry_generator=run_geometry_generator,
+                strict_actions=False,
+            )
+            for case, rep in tasks
+        ]
+        for future in as_completed(futures):
+            rec = future.result()
+            for key in counts:
+                counts[key] += int(rec.get(key, 0))
     return counts
 
 
@@ -1697,6 +1758,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Optional replicate selector (e.g. replicate_01).",
     )
     parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        default=1,
+        help="Number of replicate pipelines to run in parallel for --run (default: 1).",
+    )
+    parser.add_argument(
         "--analysis",
         default=None,
         help="Variable name for study aggregate (e.g. polarization, field).",
@@ -1755,6 +1822,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             artifact_transfer=str(getattr(args, "artifact_transfer", DEFAULT_ARTIFACT_TRANSFER)),
             run_geometry_generator=bool(getattr(args, "run_geometry_generator", True)),
             strict_actions=bool(getattr(args, "strict_actions", False)),
+            parallel_workers=int(getattr(args, "parallel_workers", 1)),
         )
         print(
             "Run summary: "
