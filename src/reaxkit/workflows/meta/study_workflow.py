@@ -8,6 +8,7 @@ import csv
 import itertools
 import json
 import math
+import re
 import shutil
 import statistics
 import subprocess
@@ -1180,6 +1181,139 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"Expected JSON object in {path}.")
     return payload
+
+
+def _looks_like_abs_path(text: str) -> bool:
+    s = str(text).strip()
+    if not s:
+        return False
+    if s.startswith("/"):
+        return True
+    if re.match(r"^[A-Za-z]:[\\/]", s):
+        return True
+    return False
+
+
+def _replace_path_prefix(value: str, old_prefix: str | None, new_prefix: str | None) -> str:
+    if not old_prefix or new_prefix is None:
+        return value
+    if value == old_prefix:
+        return new_prefix
+    if value.startswith(old_prefix.rstrip("/\\") + "/") or value.startswith(old_prefix.rstrip("/\\") + "\\"):
+        suffix = value[len(old_prefix.rstrip("/\\")) :]
+        return new_prefix.rstrip("/\\") + suffix
+    return value
+
+
+def _rewrite_json_paths(
+    obj: Any,
+    *,
+    old_source_yaml: str | None,
+    new_source_yaml: str | None,
+    old_study_root: str | None,
+    new_study_root: str | None,
+    old_template_dir: str | None,
+    new_template_dir: str | None,
+) -> Any:
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            key = str(k)
+            if key == "source_yaml":
+                out[key] = new_source_yaml
+                continue
+            if key == "study_root":
+                out[key] = new_study_root
+                continue
+            if key == "template_dir":
+                out[key] = new_template_dir
+                continue
+            out[key] = _rewrite_json_paths(
+                v,
+                old_source_yaml=old_source_yaml,
+                new_source_yaml=new_source_yaml,
+                old_study_root=old_study_root,
+                new_study_root=new_study_root,
+                old_template_dir=old_template_dir,
+                new_template_dir=new_template_dir,
+            )
+        return out
+    if isinstance(obj, list):
+        return [
+            _rewrite_json_paths(
+                v,
+                old_source_yaml=old_source_yaml,
+                new_source_yaml=new_source_yaml,
+                old_study_root=old_study_root,
+                new_study_root=new_study_root,
+                old_template_dir=old_template_dir,
+                new_template_dir=new_template_dir,
+            )
+            for v in obj
+        ]
+    if isinstance(obj, str):
+        text = obj
+        if _looks_like_abs_path(text):
+            text = _replace_path_prefix(text, old_study_root, new_study_root)
+            text = _replace_path_prefix(text, old_source_yaml, new_source_yaml)
+            text = _replace_path_prefix(text, old_template_dir, new_template_dir)
+        return text
+    return obj
+
+
+def _prompt_with_default(label: str, default: str | None) -> str | None:
+    base = (default or "").strip()
+    msg = f"{label} [{base}]: " if base else f"{label}: "
+    entered = input(msg).strip()
+    if entered:
+        return entered
+    return base or None
+
+
+def _update_study_directory_paths(*, study_root: Path) -> dict[str, Any]:
+    manifest_path = study_root / "study_manifest.json"
+    manifest = _read_json(manifest_path)
+    old_source_yaml = str(manifest.get("source_yaml") or "").strip() or None
+    old_study_root = str(manifest.get("study_root") or "").strip() or str(study_root.resolve())
+    old_template_dir = str(manifest.get("template_dir") or "").strip() or None
+
+    print("Update study path references (press Enter to keep current value).")
+    new_source_yaml = _prompt_with_default("source_yaml", old_source_yaml)
+    new_study_root_in = _prompt_with_default("study_root", str(study_root.resolve()))
+    if not new_study_root_in:
+        raise ValueError("study_root cannot be empty.")
+    new_study_root = str(Path(new_study_root_in).resolve())
+    new_template_dir = _prompt_with_default("template_dir", old_template_dir)
+
+    json_files = sorted(study_root.rglob("*.json"))
+    updated = 0
+    for path in json_files:
+        try:
+            payload = _read_json(path)
+        except Exception:
+            continue
+        rewritten = _rewrite_json_paths(
+            payload,
+            old_source_yaml=old_source_yaml,
+            new_source_yaml=new_source_yaml,
+            old_study_root=old_study_root,
+            new_study_root=new_study_root,
+            old_template_dir=old_template_dir,
+            new_template_dir=new_template_dir,
+        )
+        if rewritten != payload:
+            if not isinstance(rewritten, dict):
+                continue
+            _write_json(path, rewritten)
+            updated += 1
+
+    return {
+        "study_root": new_study_root,
+        "source_yaml": new_source_yaml,
+        "template_dir": new_template_dir,
+        "json_files_scanned": len(json_files),
+        "json_files_updated": updated,
+    }
 
 
 def _stage_status_path(stage_dir: Path) -> Path:
@@ -3843,6 +3977,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "Create and initialize parameter-sweep study layouts.\n\n"
         "Examples:\n"
         "  reaxkit study --make-yaml study.yaml\n"
+        "  reaxkit study --update-dir\n"
         "  reaxkit study --gen-yaml\n"
         "  reaxkit study --init study.yaml --root .\n"
         "  reaxkit study --init study.yaml --root studies --force\n"
@@ -3882,6 +4017,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         const="study.yaml",
         metavar="PATH",
         help="Alias for --make-yaml.",
+    )
+    mode.add_argument(
+        "--update-dir",
+        nargs="?",
+        const=".",
+        metavar="STUDY_ROOT",
+        help="Interactively update path references in study JSON files after moving a study directory.",
     )
     mode.add_argument(
         "--run",
@@ -3990,6 +4132,19 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     if yaml_out is not None:
         out_path = _write_study_template(Path(str(yaml_out)), force=bool(getattr(args, "force", False)))
         print(f"Created study template: {out_path.resolve()}")
+        return 0
+
+    update_dir = getattr(args, "update_dir", None)
+    if update_dir is not None:
+        target = Path(str(update_dir)).resolve()
+        result = _update_study_directory_paths(study_root=target)
+        print(
+            "Updated study paths: "
+            f"json_scanned={result['json_files_scanned']} json_updated={result['json_files_updated']}"
+        )
+        print(f"study_root: {result['study_root']}")
+        print(f"source_yaml: {result['source_yaml']}")
+        print(f"template_dir: {result['template_dir']}")
         return 0
 
     aggregate_values = getattr(args, "aggregate", None)
