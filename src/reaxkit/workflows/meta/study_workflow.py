@@ -34,7 +34,6 @@ SUPPORTED_ARTIFACT_TRANSFER = {"copy", "symlink", "hardlink"}
 STAGE_STATUS_FILE = ".stage_status.json"
 ANALYSIS_STATUS_FILE = ".analysis_status.json"
 ANALYSIS_MANIFEST_FILE = "analysis_manifest.json"
-AGGREGATE_ACTION = "aggregate"
 RR_CLEANUP_PATTERNS = [
     "job.*",
     "fort.*",
@@ -112,6 +111,15 @@ analysis:
         directory: "reaxkit_workspace/analysis/msd"
         file: "results.csv"
         column: "msd"
+
+aggregate:
+  - title: msd_atom1_aggregation
+    analysis_title: msd_atom1
+    x: iter
+    y: [msd]
+    reducer: identity
+    stats: [mean, std, min, max, sem, n]
+    on_missing: skip
 """
 
 
@@ -127,6 +135,17 @@ class AnalysisDef:
     title: str
     run_stage: str
     payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class AggregateDef:
+    title: str
+    analysis_title: str
+    x: str
+    y: list[str]
+    reducer: str
+    stats: list[str]
+    on_missing: str
 
 
 @dataclass(frozen=True)
@@ -279,6 +298,75 @@ def _load_study_yaml(path: Path) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("Study YAML must be a mapping at top level.")
     return raw
+
+
+def _load_source_study_doc(study_manifest: dict[str, Any]) -> dict[str, Any]:
+    source_yaml = Path(str(study_manifest.get("source_yaml") or "")).resolve()
+    if not source_yaml.exists():
+        raise FileNotFoundError(f"Study source YAML not found: {source_yaml}")
+    return _load_study_yaml(source_yaml)
+
+
+def _analysis_defs_from_doc(doc: dict[str, Any]) -> dict[str, AnalysisDef]:
+    _, _, _, _, analyses, _ = _validate_study(doc)
+    out: dict[str, AnalysisDef] = {}
+    for a in analyses:
+        out[a.title] = a
+    return out
+
+
+def _aggregate_defs_from_doc(doc: dict[str, Any]) -> dict[str, AggregateDef]:
+    raw = doc.get("aggregate") or []
+    if not isinstance(raw, list):
+        raise ValueError("aggregate must be a list when provided.")
+    out: dict[str, AggregateDef] = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("Each aggregate entry must be a mapping.")
+        title = str(item.get("title") or "").strip()
+        analysis_title = str(item.get("analysis_title") or "").strip()
+        x = str(item.get("x") or "").strip()
+        y_raw = item.get("y")
+        reducer = str(item.get("reducer") or "identity").strip().lower()
+        stats_raw = item.get("stats") or ["mean", "std", "min", "max", "sem", "n"]
+        on_missing = str(item.get("on_missing") or "skip").strip().lower()
+
+        if not title:
+            raise ValueError("Each aggregate entry requires non-empty 'title'.")
+        if title in out:
+            raise ValueError(f"Duplicate aggregate title: {title}")
+        if not analysis_title:
+            raise ValueError(f"aggregate.{title}: analysis_title is required.")
+        if not x:
+            raise ValueError(f"aggregate.{title}: x is required.")
+
+        if isinstance(y_raw, str):
+            y = [y_raw.strip()] if y_raw.strip() else []
+        elif isinstance(y_raw, list):
+            y = [str(v).strip() for v in y_raw if str(v).strip()]
+        else:
+            y = []
+        if not y:
+            raise ValueError(f"aggregate.{title}: y must be a non-empty string or list.")
+
+        if not isinstance(stats_raw, list) or not stats_raw:
+            raise ValueError(f"aggregate.{title}: stats must be a non-empty list.")
+        stats = [str(v).strip().lower() for v in stats_raw if str(v).strip()]
+        if not stats:
+            raise ValueError(f"aggregate.{title}: stats must contain at least one entry.")
+        if on_missing not in {"skip", "fail"}:
+            raise ValueError(f"aggregate.{title}: on_missing must be 'skip' or 'fail'.")
+
+        out[title] = AggregateDef(
+            title=title,
+            analysis_title=analysis_title,
+            x=x,
+            y=y,
+            reducer=reducer,
+            stats=stats,
+            on_missing=on_missing,
+        )
+    return out
 
 
 def _validate_study(
@@ -2071,6 +2159,105 @@ def _extract_scalar_from_csv(
     return float(sum(vals) / len(vals)), target_col
 
 
+def _load_column_values(csv_path: Path, column: str) -> list[Any]:
+    rows = _load_csv_rows(csv_path)
+    if not rows:
+        return []
+    if column not in rows[0]:
+        raise KeyError(f"Column '{column}' not found in {csv_path}.")
+    return [row.get(column) for row in rows]
+
+
+def _resolve_variable_file_for_run(
+    *,
+    stage_dir: Path,
+    spec: dict[str, str],
+    result_dirs: list[str] | None,
+) -> Path | None:
+    file_value = str(spec.get("file") or "").strip()
+    if not file_value:
+        return None
+    if result_dirs:
+        for result_dir in result_dirs:
+            candidate = Path(str(result_dir)) / file_value
+            if candidate.exists():
+                return candidate
+    return _resolve_variable_csv_path(stage_dir=stage_dir, spec=spec)
+
+
+def _apply_reducer_to_series(
+    *,
+    pairs: list[tuple[Any, Any]],
+    reducer: str,
+) -> list[tuple[Any, float]]:
+    vals: list[tuple[Any, float]] = []
+    for x, y in pairs:
+        fy = _safe_float(y)
+        if fy is None:
+            continue
+        vals.append((x, fy))
+    if not vals:
+        return []
+    r = str(reducer or "identity").strip().lower()
+    if r == "identity":
+        return vals
+    ys = [v for _, v in vals]
+    xs_num = [_safe_float(x) for x, _ in vals]
+    if r == "mean":
+        return [("__reduced__", float(statistics.fmean(ys)))]
+    if r == "median":
+        return [("__reduced__", float(statistics.median(ys)))]
+    if r == "first":
+        return [("__reduced__", float(ys[0]))]
+    if r == "last":
+        return [("__reduced__", float(ys[-1]))]
+    if r == "max":
+        return [("__reduced__", float(max(ys)))]
+    if r == "min":
+        return [("__reduced__", float(min(ys)))]
+    if r == "trapz":
+        import numpy as np
+
+        if any(v is None for v in xs_num):
+            return []
+        area = float(np.trapz(ys, [float(v) for v in xs_num]))
+        return [("__reduced__", area)]
+    if r == "slope":
+        import numpy as np
+
+        if any(v is None for v in xs_num):
+            return []
+        xarr = np.array([float(v) for v in xs_num], dtype=float)
+        yarr = np.array(ys, dtype=float)
+        if len(xarr) < 2:
+            return []
+        a, _b = np.polyfit(xarr, yarr, 1)
+        return [("__reduced__", float(a))]
+    raise ValueError(f"Unsupported reducer: {reducer}")
+
+
+def _compute_stats(values: list[float], wanted: list[str]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    n = len(values)
+    if "n" in wanted:
+        out["n"] = float(n)
+    if n == 0:
+        return out
+    mean_v = float(statistics.fmean(values))
+    if "mean" in wanted:
+        out["mean"] = mean_v
+    if "min" in wanted:
+        out["min"] = float(min(values))
+    if "max" in wanted:
+        out["max"] = float(max(values))
+    std_v = float(statistics.stdev(values)) if n > 1 else 0.0
+    if "std" in wanted:
+        out["std"] = std_v
+    if "sem" in wanted:
+        out["sem"] = float(std_v / math.sqrt(n)) if n > 0 else 0.0
+    return out
+
+
 def _normalize_stage_variables(rendered_stage: dict[str, Any]) -> dict[str, dict[str, str]]:
     variables: dict[str, dict[str, str]] = {}
     raw = rendered_stage.get("variables")
@@ -2202,6 +2389,290 @@ def _make_aggregate_plot(
     plt.savefig(out_path, dpi=150)
     plt.close()
     return True, "ok"
+
+
+def _aggregate_from_definition(
+    *,
+    study_root: Path,
+    study_manifest: dict[str, Any],
+    aggregate_def: AggregateDef,
+    analysis_def: AnalysisDef,
+    stage_filter: str | None,
+) -> dict[str, Any]:
+    if stage_filter and analysis_def.run_stage != stage_filter:
+        raise ValueError(
+            f"Aggregate '{aggregate_def.title}' targets run_stage '{analysis_def.run_stage}', "
+            f"but --stage '{stage_filter}' was requested."
+        )
+
+    param_names = list((study_manifest.get("parameters") or {}).keys())
+    variables = _normalize_analysis_variables(analysis_def.payload)
+    x_name = aggregate_def.x
+    y_names = list(aggregate_def.y)
+    if x_name not in variables:
+        raise KeyError(f"Aggregate '{aggregate_def.title}': x variable '{x_name}' not found in analysis '{analysis_def.title}'.")
+    for y in y_names:
+        if y not in variables:
+            raise KeyError(f"Aggregate '{aggregate_def.title}': y variable '{y}' not found in analysis '{analysis_def.title}'.")
+
+    raw_rows: list[dict[str, Any]] = []
+    missing_rows: list[dict[str, Any]] = []
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        case_id = str(case.get("case_id") or "")
+        case_path = Path(str(case.get("path") or ""))
+        case_params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
+        case_manifest = _read_json(case_path / "case_manifest.json")
+        for rep in case_manifest.get("replicates") or []:
+            if not isinstance(rep, dict):
+                continue
+            rep_id = str(rep.get("replicate_id") or "")
+            rep_path = Path(str(rep.get("path") or ""))
+            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+            stage_entries = rep_manifest.get("stages") or []
+            stage_entry = next(
+                (
+                    entry
+                    for entry in stage_entries
+                    if isinstance(entry, dict) and str(entry.get("stage") or "").strip() == analysis_def.run_stage
+                ),
+                None,
+            )
+            if stage_entry is None:
+                missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": "run_stage_not_found"})
+                continue
+
+            stage_dir = Path(str(stage_entry.get("path") or ""))
+            stage_status = _load_stage_status(stage_dir)
+            if str(stage_status.get("status") or "") != "completed":
+                missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": "run_stage_not_completed"})
+                continue
+
+            analysis_manifest = _load_analysis_manifest(stage_dir)
+            selected_run: dict[str, Any] | None = None
+            for run in reversed(analysis_manifest.get("runs") or []):
+                if not isinstance(run, dict):
+                    continue
+                if str(run.get("analysis_id") or "") != analysis_def.analysis_id:
+                    continue
+                if str(run.get("status") or "") != "completed":
+                    continue
+                selected_run = run
+                break
+            if selected_run is None:
+                missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": "analysis_not_completed"})
+                continue
+            result_dirs = [str(d) for d in (selected_run.get("result_dirs") or []) if str(d).strip()]
+
+            x_spec = variables[x_name]
+            x_col = str(x_spec.get("column") or x_name).strip()
+            x_file = _resolve_variable_file_for_run(stage_dir=stage_dir, spec=x_spec, result_dirs=result_dirs)
+            if x_file is None or not x_file.exists():
+                missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": f"missing_x_file:{x_name}"})
+                continue
+            try:
+                x_vals = _load_column_values(x_file, x_col)
+            except Exception as exc:
+                missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": f"x_column_error:{exc}"})
+                continue
+
+            for y_name in y_names:
+                y_spec = variables[y_name]
+                y_col = str(y_spec.get("column") or y_name).strip()
+                y_file = _resolve_variable_file_for_run(stage_dir=stage_dir, spec=y_spec, result_dirs=result_dirs)
+                if y_file is None or not y_file.exists():
+                    missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": f"missing_y_file:{y_name}"})
+                    continue
+                try:
+                    y_vals = _load_column_values(y_file, y_col)
+                except Exception as exc:
+                    missing_rows.append({"case_id": case_id, "replicate_id": rep_id, "reason": f"y_column_error:{exc}"})
+                    continue
+
+                n = min(len(x_vals), len(y_vals))
+                pairs = [(x_vals[i], y_vals[i]) for i in range(n)]
+                reduced = _apply_reducer_to_series(pairs=pairs, reducer=aggregate_def.reducer)
+                for x_value, y_value in reduced:
+                    row = {
+                        "case_id": case_id,
+                        "replicate_id": rep_id,
+                        "run_stage": analysis_def.run_stage,
+                        "analysis_title": analysis_def.title,
+                        "analysis_id": analysis_def.analysis_id,
+                        "x_name": x_name,
+                        "x_value": x_value,
+                        "y_name": y_name,
+                        "y_value": float(y_value),
+                    }
+                    for p in param_names:
+                        row[p] = case_params.get(p)
+                    raw_rows.append(row)
+
+    if aggregate_def.on_missing == "fail" and missing_rows:
+        first = missing_rows[0]
+        raise RuntimeError(
+            f"Aggregate '{aggregate_def.title}' missing input for case={first.get('case_id')} "
+            f"replicate={first.get('replicate_id')}: {first.get('reason')}"
+        )
+
+    # Case-level outputs
+    case_output_index: list[dict[str, Any]] = []
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        case_id = str(case.get("case_id") or "")
+        case_path = Path(str(case.get("path") or ""))
+        case_rows = [r for r in raw_rows if str(r.get("case_id") or "") == case_id]
+        case_out_dir = case_path / "aggregate" / aggregate_def.title
+        case_out_dir.mkdir(parents=True, exist_ok=True)
+
+        raw_csv = case_out_dir / "raw_replicates.csv"
+        raw_fields = [*param_names, "case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"]
+        with raw_csv.open("w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=raw_fields)
+            w.writeheader()
+            for row in case_rows:
+                w.writerow({k: row.get(k) for k in raw_fields})
+
+        per_x_rows: list[dict[str, Any]] = []
+        buckets: dict[tuple[str, Any], list[float]] = {}
+        for row in case_rows:
+            key = (str(row.get("y_name") or ""), row.get("x_value"))
+            buckets.setdefault(key, []).append(float(row.get("y_value")))
+        for (y_name, x_value), values in buckets.items():
+            s = _compute_stats(values, aggregate_def.stats)
+            out_row = {"case_id": case_id, "y_name": y_name, "x_name": x_name, "x_value": x_value}
+            out_row.update(s)
+            per_x_rows.append(out_row)
+        per_x_rows.sort(key=lambda r: (str(r.get("y_name")), _to_plot_value(r.get("x_value"))))
+        per_x_csv = case_out_dir / "per_x_stats.csv"
+        per_x_fields = ["case_id", "y_name", "x_name", "x_value", *aggregate_def.stats]
+        with per_x_csv.open("w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=per_x_fields)
+            w.writeheader()
+            for row in per_x_rows:
+                write_row = dict(row)
+                if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
+                    write_row["n"] = int(write_row["n"])
+                w.writerow({k: write_row.get(k) for k in per_x_fields})
+
+        global_rows: list[dict[str, Any]] = []
+        gb: dict[str, list[float]] = {}
+        for row in case_rows:
+            y_name = str(row.get("y_name") or "")
+            gb.setdefault(y_name, []).append(float(row.get("y_value")))
+        for y_name, values in gb.items():
+            s = _compute_stats(values, aggregate_def.stats)
+            out_row = {"case_id": case_id, "y_name": y_name}
+            out_row.update(s)
+            global_rows.append(out_row)
+        global_csv = case_out_dir / "global_stats.csv"
+        global_fields = ["case_id", "y_name", *aggregate_def.stats]
+        with global_csv.open("w", encoding="utf-8", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=global_fields)
+            w.writeheader()
+            for row in global_rows:
+                write_row = dict(row)
+                if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
+                    write_row["n"] = int(write_row["n"])
+                w.writerow({k: write_row.get(k) for k in global_fields})
+        case_output_index.append(
+            {"case_id": case_id, "raw_csv": str(raw_csv), "per_x_stats_csv": str(per_x_csv), "global_stats_csv": str(global_csv)}
+        )
+
+    # Across-cases outputs
+    across_dir = study_root / "cases" / "aggregate" / aggregate_def.title
+    across_dir.mkdir(parents=True, exist_ok=True)
+    across_raw_csv = across_dir / "raw_all_cases.csv"
+    across_raw_fields = [*param_names, "case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"]
+    with across_raw_csv.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=across_raw_fields)
+        w.writeheader()
+        for row in raw_rows:
+            w.writerow({k: row.get(k) for k in across_raw_fields})
+
+    per_x_buckets: dict[tuple[Any, ...], list[float]] = {}
+    for row in raw_rows:
+        key = tuple([row.get(p) for p in param_names] + [row.get("y_name"), row.get("x_value")])
+        per_x_buckets.setdefault(key, []).append(float(row.get("y_value")))
+    across_per_x_rows: list[dict[str, Any]] = []
+    for key, values in per_x_buckets.items():
+        out_row = {p: key[i] for i, p in enumerate(param_names)}
+        y_name = key[len(param_names)]
+        x_value = key[len(param_names) + 1]
+        out_row.update({"y_name": y_name, "x_name": x_name, "x_value": x_value})
+        out_row.update(_compute_stats(values, aggregate_def.stats))
+        across_per_x_rows.append(out_row)
+    across_per_x_rows.sort(
+        key=lambda r: tuple([_to_plot_value(r.get(p)) for p in param_names] + [str(r.get("y_name")), _to_plot_value(r.get("x_value"))])
+    )
+    across_per_x_csv = across_dir / "across_cases_per_x_stats.csv"
+    across_per_x_fields = [*param_names, "y_name", "x_name", "x_value", *aggregate_def.stats]
+    with across_per_x_csv.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=across_per_x_fields)
+        w.writeheader()
+        for row in across_per_x_rows:
+            write_row = dict(row)
+            if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
+                write_row["n"] = int(write_row["n"])
+            w.writerow({k: write_row.get(k) for k in across_per_x_fields})
+
+    global_buckets: dict[tuple[Any, ...], list[float]] = {}
+    for row in raw_rows:
+        key = tuple([row.get(p) for p in param_names] + [row.get("y_name")])
+        global_buckets.setdefault(key, []).append(float(row.get("y_value")))
+    across_global_rows: list[dict[str, Any]] = []
+    for key, values in global_buckets.items():
+        out_row = {p: key[i] for i, p in enumerate(param_names)}
+        out_row["y_name"] = key[len(param_names)]
+        out_row.update(_compute_stats(values, aggregate_def.stats))
+        across_global_rows.append(out_row)
+    across_global_rows.sort(
+        key=lambda r: tuple([_to_plot_value(r.get(p)) for p in param_names] + [str(r.get("y_name"))])
+    )
+    across_global_csv = across_dir / "across_cases_global_stats.csv"
+    across_global_fields = [*param_names, "y_name", *aggregate_def.stats]
+    with across_global_csv.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=across_global_fields)
+        w.writeheader()
+        for row in across_global_rows:
+            write_row = dict(row)
+            if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
+                write_row["n"] = int(write_row["n"])
+            w.writerow({k: write_row.get(k) for k in across_global_fields})
+
+    manifest = {
+        "title": aggregate_def.title,
+        "analysis_title": aggregate_def.analysis_title,
+        "analysis_id": analysis_def.analysis_id,
+        "run_stage": analysis_def.run_stage,
+        "x": aggregate_def.x,
+        "y": aggregate_def.y,
+        "reducer": aggregate_def.reducer,
+        "stats": aggregate_def.stats,
+        "on_missing": aggregate_def.on_missing,
+        "raw_count": len(raw_rows),
+        "missing_count": len(missing_rows),
+        "case_outputs": case_output_index,
+        "across_cases": {
+            "raw_csv": str(across_raw_csv),
+            "per_x_stats_csv": str(across_per_x_csv),
+            "global_stats_csv": str(across_global_csv),
+        },
+        "missing": missing_rows,
+        "generated_at_utc": _utc_now(),
+    }
+    manifest_path = across_dir / "aggregate_manifest.json"
+    _write_json(manifest_path, manifest)
+    return {
+        "manifest": manifest_path,
+        "raw_csv": across_raw_csv,
+        "grouped_csv": across_per_x_csv,
+        "plot": None,
+        "raw_count": len(raw_rows),
+        "group_count": len(across_per_x_rows),
+    }
 
 
 def _iter_replicate_variable_records(
@@ -2368,6 +2839,30 @@ def _aggregate_study_analysis(
     stage_filter: str | None,
 ) -> dict[str, Any]:
     study_manifest = _read_json(study_root / "study_manifest.json")
+    try:
+        study_doc = _load_source_study_doc(study_manifest)
+        aggregate_defs = _aggregate_defs_from_doc(study_doc)
+        analysis_defs_by_title = _analysis_defs_from_doc(study_doc)
+    except Exception:
+        aggregate_defs = {}
+        analysis_defs_by_title = {}
+
+    # New aggregation model: aggregate definitions by title.
+    if analysis_name in aggregate_defs:
+        agg_def = aggregate_defs[analysis_name]
+        if agg_def.analysis_title not in analysis_defs_by_title:
+            raise KeyError(
+                f"Aggregate '{agg_def.title}' references unknown analysis_title '{agg_def.analysis_title}'."
+            )
+        return _aggregate_from_definition(
+            study_root=study_root,
+            study_manifest=study_manifest,
+            aggregate_def=agg_def,
+            analysis_def=analysis_defs_by_title[agg_def.analysis_title],
+            stage_filter=stage_filter,
+        )
+
+    # Backward-compatible legacy mode.
     param_names = list((study_manifest.get("parameters") or {}).keys())
     raw_rows, chosen_column = _iter_replicate_variable_records(
         study_manifest=study_manifest,
@@ -2465,17 +2960,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _ = command
     parser.set_defaults(command=STUDY_COMMAND)
     parser.formatter_class = argparse.RawTextHelpFormatter
-    parser.add_argument(
-        "study_action",
-        nargs="?",
-        choices=[AGGREGATE_ACTION],
-        help="Study sub-action. Use 'aggregate' to summarize analysis outputs.",
-    )
-    parser.add_argument(
-        "study_action_target",
-        nargs="?",
-        help="Target path for study sub-action (e.g. study root for aggregate).",
-    )
     parser.description = (
         "Create and initialize parameter-sweep study layouts.\n\n"
         "Examples:\n"
@@ -2490,8 +2974,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study --analyze study_MgTemp/\n"
         "  reaxkit study --analyze study_MgTemp/ --analysis msd\n"
-        "  reaxkit study aggregate study_MgTemp/ --analysis polarization\n"
-        "  reaxkit study aggregate study_MgTemp/ --analysis polarization --stage NVT"
+        "  reaxkit study --aggregate study_MgTemp/ --analysis polarization\n"
+        "  reaxkit study --aggregate study_MgTemp/ --analysis polarization --stage NVT"
     )
 
     mode = parser.add_mutually_exclusive_group(required=False)
@@ -2523,6 +3007,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "--analyze",
         metavar="STUDY_ROOT",
         help="Execute analysis pipelines declared in top-level study 'analysis'.",
+    )
+    mode.add_argument(
+        "--aggregate",
+        metavar="STUDY_ROOT",
+        help="Run study aggregation (new aggregate definitions or legacy variable aggregation).",
     )
     parser.add_argument(
         "--root",
@@ -2606,14 +3095,14 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Created study template: {out_path.resolve()}")
         return 0
 
-    action = _clean_opt(getattr(args, "study_action", None))
-    if action == AGGREGATE_ACTION:
-        target = _clean_opt(getattr(args, "study_action_target", None))
+    aggregate_root = getattr(args, "aggregate", None)
+    if aggregate_root is not None:
+        target = _clean_opt(aggregate_root)
         if target is None:
-            raise ValueError("study aggregate requires a study root path: reaxkit study aggregate <study_root> --analysis ...")
+            raise ValueError("--aggregate requires a study root path.")
         variable_name = _clean_opt(getattr(args, "analysis", None))
         if variable_name is None:
-            raise ValueError("--analysis is required for study aggregate.")
+            raise ValueError("--analysis is required with --aggregate.")
         result = _aggregate_study_analysis(
             study_root=Path(target).resolve(),
             analysis_name=variable_name,
@@ -2667,7 +3156,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     init_path = getattr(args, "init", None)
     if init_path is None:
-        raise ValueError("Missing required mode. Use --init, --run, --analyze, study aggregate, or --make-yaml.")
+        raise ValueError("Missing required mode. Use --init, --run, --analyze, --aggregate, or --make-yaml.")
 
     study_root = _init_study(
         Path(str(init_path)),
