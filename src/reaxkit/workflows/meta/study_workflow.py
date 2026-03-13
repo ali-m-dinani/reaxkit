@@ -104,6 +104,59 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _local_now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _log_stage_event(case_id: str, replicate_id: str, stage_name: str, tag: str, detail: str | None = None) -> None:
+    label = str(tag).upper()[:5].ljust(5)
+    print(f"{case_id} {replicate_id} {stage_name}")
+    line = f"[{label}] {_local_now()}"
+    if detail:
+        line = f"{line}  {detail}"
+    print(line)
+
+
+def _write_study_run_status(
+    *,
+    study_root: Path,
+    rows: list[dict[str, Any]],
+    summary: dict[str, Any],
+) -> tuple[Path, Path]:
+    status_dir = study_root
+    status_dir.mkdir(parents=True, exist_ok=True)
+
+    json_path = status_dir / "study_run_status.json"
+    csv_path = status_dir / "study_run_status.csv"
+
+    payload = {
+        "generated_at_utc": _utc_now(),
+        "summary": summary,
+        "rows": rows,
+    }
+    _write_json(json_path, payload)
+
+    fieldnames = [
+        "case_id",
+        "replicate_id",
+        "status",
+        "run",
+        "done",
+        "skip",
+        "wait",
+        "fail",
+        "started_at",
+        "finished_at",
+    ]
+    with csv_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k) for k in fieldnames})
+
+    return json_path, csv_path
+
+
 def _slug(value: Any) -> str:
     text = str(value).strip()
     out = []
@@ -1140,9 +1193,11 @@ def _run_single_replicate_pipeline(
     artifact_transfer: str,
     run_geometry_generator: bool,
     strict_actions: bool,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
+    started_at = _local_now()
     rep_id = str(rep.get("replicate_id") or "")
+    case_id = str(case.get("case_id") or "")
     rep_path = Path(str(rep.get("path") or ""))
     rep_manifest = _read_json(rep_path / "replicate_manifest.json")
     produced_map = _build_declared_produced_map(rep_manifest)
@@ -1175,7 +1230,7 @@ def _run_single_replicate_pipeline(
         current_status = str(status.get("status") or "pending")
         if current_status == "completed":
             counts["skipped"] += 1
-            print(f"[skip] {case.get('case_id')} {rep_id} {stage_name}: already completed")
+            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "SKIP", "already completed")
             continue
 
         ready, reason = _is_stage_ready(
@@ -1185,10 +1240,10 @@ def _run_single_replicate_pipeline(
         )
         if not ready:
             counts["not_ready"] += 1
-            print(f"[wait] {case.get('case_id')} {rep_id} {stage_name}: {reason}")
+            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "WAIT", reason)
             continue
 
-        print(f"[run] {case.get('case_id')} {rep_id} {stage_name}")
+        _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "RUN")
         result = _execute_stage_run(
             stage_dir=stage_dir,
             stage_manifest=stage_manifest,
@@ -1201,14 +1256,51 @@ def _run_single_replicate_pipeline(
         status_by_stage[stage_name] = final_status
         if final_status == "completed":
             counts["completed"] += 1
-            print(f"[done] {case.get('case_id')} {rep_id} {stage_name}")
+            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "DONE")
         else:
             counts["failed"] += 1
-            print(f"[fail] {case.get('case_id')} {rep_id} {stage_name}")
+            _log_stage_event(case_id, rep_id, stage_name, "FAIL")
             if strict_actions:
-                return counts
+                finished_at = _local_now()
+                return {
+                    **counts,
+                    "case_id": case_id,
+                    "replicate_id": rep_id,
+                    "run": counts["completed"] + counts["failed"],
+                    "done": counts["completed"],
+                    "skip": counts["skipped"],
+                    "wait": counts["not_ready"],
+                    "fail": counts["failed"],
+                    "status": "failed",
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                }
 
-    return counts
+    finished_at = _local_now()
+    if counts["failed"] > 0:
+        final_status = "failed"
+    elif counts["not_ready"] > 0:
+        final_status = "waiting"
+    elif counts["completed"] > 0:
+        final_status = "done"
+    elif counts["skipped"] > 0:
+        final_status = "skipped"
+    else:
+        final_status = "idle"
+
+    return {
+        **counts,
+        "case_id": case_id,
+        "replicate_id": rep_id,
+        "run": counts["completed"] + counts["failed"],
+        "done": counts["completed"],
+        "skip": counts["skipped"],
+        "wait": counts["not_ready"],
+        "fail": counts["failed"],
+        "status": final_status,
+        "started_at": started_at,
+        "finished_at": finished_at,
+    }
 
 
 def _run_study(
@@ -1229,6 +1321,7 @@ def _run_study(
 
     counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
     tasks: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    row_map: dict[tuple[str, str], dict[str, Any]] = {}
 
     for case in case_entries:
         if not isinstance(case, dict):
@@ -1245,6 +1338,32 @@ def _run_study(
             if replicate_filter and rep_id != replicate_filter:
                 continue
             tasks.append((case, rep))
+            case_id = str(case.get("case_id") or "")
+            row_map[(case_id, rep_id)] = {
+                "case_id": case_id,
+                "replicate_id": rep_id,
+                "status": "pending",
+                "run": 0,
+                "done": 0,
+                "skip": 0,
+                "wait": 0,
+                "fail": 0,
+                "started_at": None,
+                "finished_at": None,
+            }
+
+    def persist_status() -> None:
+        rows = sorted(row_map.values(), key=lambda r: (str(r.get("case_id") or ""), str(r.get("replicate_id") or "")))
+        summary = {
+            "completed": counts["completed"],
+            "skipped": counts["skipped"],
+            "not_ready": counts["not_ready"],
+            "failed": counts["failed"],
+            "total_replicates": len(rows),
+        }
+        _write_study_run_status(study_root=study_root, rows=rows, summary=summary)
+
+    persist_status()
 
     workers = max(1, int(parallel_workers))
     if strict_actions and workers > 1:
@@ -1264,6 +1383,19 @@ def _run_study(
             )
             for key in counts:
                 counts[key] += int(rec.get(key, 0))
+            row_map[(str(rec.get("case_id") or ""), str(rec.get("replicate_id") or ""))] = {
+                "case_id": str(rec.get("case_id") or ""),
+                "replicate_id": str(rec.get("replicate_id") or ""),
+                "status": str(rec.get("status") or "unknown"),
+                "run": int(rec.get("run", 0)),
+                "done": int(rec.get("done", 0)),
+                "skip": int(rec.get("skip", 0)),
+                "wait": int(rec.get("wait", 0)),
+                "fail": int(rec.get("fail", 0)),
+                "started_at": rec.get("started_at"),
+                "finished_at": rec.get("finished_at"),
+            }
+            persist_status()
             if strict_actions and rec.get("failed", 0) > 0:
                 return counts
         return counts
@@ -1286,6 +1418,19 @@ def _run_study(
             rec = future.result()
             for key in counts:
                 counts[key] += int(rec.get(key, 0))
+            row_map[(str(rec.get("case_id") or ""), str(rec.get("replicate_id") or ""))] = {
+                "case_id": str(rec.get("case_id") or ""),
+                "replicate_id": str(rec.get("replicate_id") or ""),
+                "status": str(rec.get("status") or "unknown"),
+                "run": int(rec.get("run", 0)),
+                "done": int(rec.get("done", 0)),
+                "skip": int(rec.get("skip", 0)),
+                "wait": int(rec.get("wait", 0)),
+                "fail": int(rec.get("fail", 0)),
+                "started_at": rec.get("started_at"),
+                "finished_at": rec.get("finished_at"),
+            }
+            persist_status()
     return counts
 
 
@@ -1683,6 +1828,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --init study.yaml --root .\n"
         "  reaxkit study --init study.yaml --root studies --force\n"
         "  reaxkit study --run study_MgTemp/\n"
+        "  reaxkit study --run study_MgTemp/ --parallel-workers 4\n"
         "  reaxkit study --run study_MgTemp/ --stage MM\n"
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study aggregate study_MgTemp/ --analysis polarization\n"
