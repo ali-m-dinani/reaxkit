@@ -42,6 +42,10 @@ RUN_STATUS_CSV_FILE = "run_status.csv"
 RUN_STATUS_JSON_FILE = "run_status.json"
 ANALYSIS_STATUS_CSV_FILE = "analysis_status.csv"
 ANALYSIS_STATUS_JSON_FILE = "analysis_status.json"
+AGGREGATE_STATUS_CSV_FILE = "aggregate_status.csv"
+AGGREGATE_STATUS_JSON_FILE = "aggregate_status.json"
+PLOT_STATUS_CSV_FILE = "plot_status.csv"
+PLOT_STATUS_JSON_FILE = "plot_status.json"
 LEGACY_STAGE_MANIFEST_FILE = "stage_manifest.json"
 LEGACY_REPLICATE_MANIFEST_FILE = "replicate_manifest.json"
 LEGACY_CASE_MANIFEST_FILE = "case_manifest.json"
@@ -216,6 +220,14 @@ def _log_stage_event(
     print(line)
 
 
+def _log_task_event(tag: str, info: str, detail: str | None = None) -> None:
+    tag_block = f"[{str(tag).upper()}]".ljust(8)
+    line = f"{tag_block}{str(info)}  {_local_now()}"
+    if detail:
+        line = f"{line}  {detail}"
+    print(line)
+
+
 def _write_study_run_status(
     *,
     study_root: Path,
@@ -255,6 +267,38 @@ def _write_study_run_status(
             writer.writerow({k: row.get(k) for k in fieldnames})
 
     return json_path, csv_path
+
+
+def _write_named_status(
+    *,
+    study_root: Path,
+    rows: list[dict[str, Any]],
+    summary: dict[str, Any],
+    csv_name: str,
+    json_name: str,
+) -> tuple[Path, Path]:
+    json_path = study_root / json_name
+    csv_path = study_root / csv_name
+    payload = {
+        "generated_at_utc": _utc_now(),
+        "summary": summary,
+        "rows": rows,
+    }
+    _write_json(json_path, payload)
+
+    if rows:
+        fieldnames = list(rows[0].keys())
+    else:
+        fieldnames = []
+    with csv_path.open("w", encoding="utf-8", newline="") as fh:
+        if fieldnames:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: row.get(k) for k in fieldnames})
+        else:
+            fh.write("")
+    return csv_path, json_path
 
 
 def _resolve_existing_file(primary: Path, *fallbacks: str) -> Path:
@@ -3092,16 +3136,53 @@ def _aggregate_study_all(
         else:
             targets = list(aggregate_defs.keys())
         results: list[dict[str, Any]] = []
+        status_rows: list[dict[str, Any]] = []
         for title in targets:
+            started_at = _local_now()
+            started_utc = _utc_now()
             res = _aggregate_study_analysis(
                 study_root=study_root,
                 analysis_name=title,
                 value_column=value_column,
                 stage_filter=stage_filter,
             )
+            status = "done"
+            reason = ""
+            finished_at = _local_now()
+            duration_min = _duration_minutes(started_at, finished_at)
             out = dict(res)
             out["title"] = title
             results.append(out)
+            _log_task_event("DONE", f"aggregate {title}")
+            status_rows.append(
+                {
+                    "title": title,
+                    "status": status,
+                    "reason": reason,
+                    "raw_csv": str(out.get("raw_csv") or ""),
+                    "grouped_csv": str(out.get("grouped_csv") or ""),
+                    "manifest": str(out.get("manifest") or ""),
+                    "raw_count": int(out.get("raw_count", 0) or 0),
+                    "group_count": int(out.get("group_count", 0) or 0),
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "duration_min": duration_min,
+                    "started_at_utc": started_utc,
+                    "finished_at_utc": _utc_now(),
+                }
+            )
+        summary = {
+            "total": len(status_rows),
+            "done": sum(1 for r in status_rows if r.get("status") == "done"),
+            "failed": sum(1 for r in status_rows if r.get("status") == "failed"),
+        }
+        _write_named_status(
+            study_root=study_root,
+            rows=status_rows,
+            summary=summary,
+            csv_name=AGGREGATE_STATUS_CSV_FILE,
+            json_name=AGGREGATE_STATUS_JSON_FILE,
+        )
         return results
 
     # Legacy fallback when no aggregate definitions exist.
@@ -3118,6 +3199,30 @@ def _aggregate_study_all(
     )
     out = dict(res)
     out["title"] = legacy_analysis_name
+    _log_task_event("DONE", f"aggregate {legacy_analysis_name}")
+    _write_named_status(
+        study_root=study_root,
+        rows=[
+            {
+                "title": legacy_analysis_name,
+                "status": "done",
+                "reason": "",
+                "raw_csv": str(out.get("raw_csv") or ""),
+                "grouped_csv": str(out.get("grouped_csv") or ""),
+                "manifest": str(out.get("manifest") or ""),
+                "raw_count": int(out.get("raw_count", 0) or 0),
+                "group_count": int(out.get("group_count", 0) or 0),
+                "started_at": None,
+                "finished_at": _local_now(),
+                "duration_min": None,
+                "started_at_utc": None,
+                "finished_at_utc": _utc_now(),
+            }
+        ],
+        summary={"total": 1, "done": 1, "failed": 0},
+        csv_name=AGGREGATE_STATUS_CSV_FILE,
+        json_name=AGGREGATE_STATUS_JSON_FILE,
+    )
     return [out]
 
 
@@ -3224,6 +3329,230 @@ def _make_boxplots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: st
     return outputs
 
 
+def _row_key_from_params(row: dict[str, str], param_cols: list[str]) -> str:
+    parts = [f"{p}={row.get(p)}" for p in param_cols]
+    return ", ".join(parts)
+
+
+def _find_param_columns(rows: list[dict[str, str]]) -> list[str]:
+    if not rows:
+        return []
+    known = {"case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"}
+    out: list[str] = []
+    for key in rows[0].keys():
+        if key in known:
+            continue
+        if key.startswith("y_"):
+            continue
+        out.append(key)
+    return out
+
+
+def _make_all_cases_errorbar_plots(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    src = across_dir / "across_cases_per_x_stats.csv"
+    if not src.exists():
+        return []
+    rows = _load_csv_rows(src)
+    if not rows:
+        return []
+    param_cols = _find_param_columns(rows)
+    grouped_by_y: dict[str, dict[str, list[dict[str, str]]]] = {}
+    for row in rows:
+        y_name = str(row.get("y_name") or "").strip()
+        if not y_name:
+            continue
+        curve_key = _row_key_from_params(row, param_cols)
+        grouped_by_y.setdefault(y_name, {}).setdefault(curve_key, []).append(row)
+
+    outputs: list[Path] = []
+    for y_name, curve_map in grouped_by_y.items():
+        series = []
+        for curve_key, items in curve_map.items():
+            items_sorted = sorted(items, key=lambda r: _to_plot_value(r.get("x_value")))
+            xs: list[Any] = []
+            ys: list[float] = []
+            yerrs: list[float] = []
+            for r in items_sorted:
+                xv_raw = r.get("x_value")
+                xv_num = _safe_float(xv_raw)
+                x_val: Any = xv_num if xv_num is not None else str(xv_raw)
+                ym = _safe_float(r.get("y_mean"))
+                ys_err = _safe_float(r.get("y_sem"))
+                ystd = _safe_float(r.get("y_std"))
+                if ym is None:
+                    continue
+                xs.append(x_val)
+                ys.append(ym)
+                yerrs.append(ys_err if ys_err is not None else (ystd if ystd is not None else 0.0))
+            if ys:
+                series.append({"x": xs, "y": ys, "yerr": yerrs, "label": curve_key})
+        if not series:
+            continue
+        out_path = across_dir / f"errorbar_all_cases_{_slug_underscore(y_name)}.png"
+        render_plot(
+            {
+                "plot_type": "errorbar_plot",
+                "series": series,
+                "xlabel": "x",
+                "ylabel": y_name,
+                "title": f"{aggregate_title} - {y_name} (all cases errorbar)",
+                "legend": True,
+                "save": str(out_path),
+            }
+        )
+        outputs.append(out_path)
+    return outputs
+
+
+def _make_heatmap_from_rows(
+    *,
+    rows: list[dict[str, str]],
+    x_param: str,
+    y_param: str,
+    value_col: str,
+    out_path: Path,
+    title: str,
+) -> Path | None:
+    coords: list[list[float]] = []
+    values: list[float] = []
+    for row in rows:
+        xv = _safe_float(row.get(x_param))
+        yv = _safe_float(row.get(y_param))
+        zv = _safe_float(row.get(value_col))
+        if xv is None or yv is None or zv is None:
+            continue
+        coords.append([xv, yv, 0.0])
+        values.append(zv)
+    if not values:
+        return None
+    render_plot(
+        {
+            "plot_type": "heatmap2d_from_3d",
+            "coords": coords,
+            "values": values,
+            "xlabel": x_param,
+            "ylabel": y_param,
+            "title": title,
+            "save": str(out_path),
+        }
+    )
+    return out_path
+
+
+def _make_all_cases_heatmaps(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    outputs: list[Path] = []
+    per_x_csv = across_dir / "across_cases_per_x_stats.csv"
+    global_csv = across_dir / "across_cases_global_stats.csv"
+
+    # Heatmaps at final x for mean/std/sem from per-x stats.
+    if per_x_csv.exists():
+        rows = _load_csv_rows(per_x_csv)
+        if rows:
+            param_cols = _find_param_columns(rows)
+            if len(param_cols) >= 2:
+                x_param, y_param = param_cols[0], param_cols[1]
+                # Group by y_name and pick final x_value slice.
+                by_y: dict[str, list[dict[str, str]]] = {}
+                for row in rows:
+                    y_name = str(row.get("y_name") or "").strip()
+                    if y_name:
+                        by_y.setdefault(y_name, []).append(row)
+                for y_name, y_rows in by_y.items():
+                    x_vals = [_safe_float(r.get("x_value")) for r in y_rows]
+                    x_vals = [v for v in x_vals if v is not None]
+                    if not x_vals:
+                        continue
+                    final_x = max(x_vals)
+                    final_rows = [r for r in y_rows if _safe_float(r.get("x_value")) == final_x]
+                    for metric in ("y_mean", "y_std", "y_sem"):
+                        out_path = across_dir / f"heatmap_final_x_{_slug_underscore(y_name)}_{metric}.png"
+                        made = _make_heatmap_from_rows(
+                            rows=final_rows,
+                            x_param=x_param,
+                            y_param=y_param,
+                            value_col=metric,
+                            out_path=out_path,
+                            title=f"{aggregate_title} - {y_name} final x {metric}",
+                        )
+                        if made is not None:
+                            outputs.append(made)
+
+    # Global heatmaps from across_cases_global_stats.csv
+    if global_csv.exists():
+        rows = _load_csv_rows(global_csv)
+        if rows:
+            param_cols = _find_param_columns(rows)
+            if len(param_cols) >= 2:
+                x_param, y_param = param_cols[0], param_cols[1]
+                by_y: dict[str, list[dict[str, str]]] = {}
+                for row in rows:
+                    y_name = str(row.get("y_name") or "").strip()
+                    if y_name:
+                        by_y.setdefault(y_name, []).append(row)
+                for y_name, y_rows in by_y.items():
+                    for metric in ("y_mean", "y_std", "y_sem"):
+                        out_path = across_dir / f"heatmap_global_{_slug_underscore(y_name)}_{metric}.png"
+                        made = _make_heatmap_from_rows(
+                            rows=y_rows,
+                            x_param=x_param,
+                            y_param=y_param,
+                            value_col=metric,
+                            out_path=out_path,
+                            title=f"{aggregate_title} - {y_name} global {metric}",
+                        )
+                        if made is not None:
+                            outputs.append(made)
+    return outputs
+
+
+def _make_all_cases_per_iter_boxplots(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    src = across_dir / "raw_all_cases.csv"
+    if not src.exists():
+        return []
+    rows = _load_csv_rows(src)
+    if not rows:
+        return []
+    param_cols = _find_param_columns(rows)
+    if not param_cols:
+        return []
+    by_y: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        y_name = str(row.get("y_name") or "").strip()
+        if y_name:
+            by_y.setdefault(y_name, []).append(row)
+
+    outputs: list[Path] = []
+    for y_name, y_rows in by_y.items():
+        x_values = _sort_plot_x(list({row.get("x_value") for row in y_rows}))
+        for xv in x_values:
+            subset = [r for r in y_rows if str(r.get("x_value")) == str(xv)]
+            dist: dict[str, list[float]] = {}
+            for r in subset:
+                case_key = _row_key_from_params(r, param_cols)
+                yv = _safe_float(r.get("y_value"))
+                if yv is None:
+                    continue
+                dist.setdefault(case_key, []).append(yv)
+            labels = [k for k, v in dist.items() if v]
+            data = [v for v in dist.values() if v]
+            if not data:
+                continue
+            out_path = across_dir / f"boxplot_all_cases_{_slug_underscore(y_name)}_x_{_slug_underscore(xv)}.png"
+            render_plot(
+                {
+                    "plot_type": "box_whisker_plot",
+                    "data": data,
+                    "labels": labels,
+                    "xlabel": "case",
+                    "ylabel": y_name,
+                    "title": f"{aggregate_title} - {y_name} boxplot at x={xv}",
+                    "save": str(out_path),
+                }
+            )
+            outputs.append(out_path)
+    return outputs
+
+
 def _plot_study_aggregates(
     *,
     study_root: Path,
@@ -3245,6 +3574,8 @@ def _plot_study_aggregates(
 
     generated: list[Path] = []
     missing: list[str] = []
+    target_set = set(target_titles)
+    status_rows: list[dict[str, Any]] = []
     for case in study_manifest.get("cases") or []:
         if not isinstance(case, dict):
             continue
@@ -3259,17 +3590,65 @@ def _plot_study_aggregates(
             generated.extend(_make_errorbar_plots_for_case_aggregate(case_agg_dir, aggregate_title=agg_title))
             generated.extend(_make_boxplots_for_case_aggregate(case_agg_dir, aggregate_title=agg_title))
 
-    out_manifest = {
-        "study_root": str(study_root),
-        "aggregate_titles": target_titles,
+    # All-cases level plots from aggregate outputs under cases/aggregate/<title>.
+    for agg_title in target_titles:
+        started_at = _local_now()
+        before_count = len(generated)
+        across_dir = study_root / "cases" / "aggregate" / agg_title
+        if not across_dir.exists():
+            if agg_title in target_set:
+                missing.append(str(across_dir))
+            finished_at = _local_now()
+            status_rows.append(
+                {
+                    "title": agg_title,
+                    "status": "skip",
+                    "reason": "missing_aggregate_dir",
+                    "generated_count": 0,
+                    "missing_count": 1,
+                    "started_at": started_at,
+                    "finished_at": finished_at,
+                    "duration_min": _duration_minutes(started_at, finished_at),
+                }
+            )
+            _log_task_event("SKIP", f"plot {agg_title}", "missing aggregate directory")
+            continue
+        generated.extend(_make_all_cases_errorbar_plots(across_dir, aggregate_title=agg_title))
+        generated.extend(_make_all_cases_heatmaps(across_dir, aggregate_title=agg_title))
+        generated.extend(_make_all_cases_per_iter_boxplots(across_dir, aggregate_title=agg_title))
+        created_n = len(generated) - before_count
+        finished_at = _local_now()
+        status_rows.append(
+            {
+                "title": agg_title,
+                "status": "done",
+                "reason": "",
+                "generated_count": created_n,
+                "missing_count": 0,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_min": _duration_minutes(started_at, finished_at),
+            }
+        )
+        _log_task_event("DONE", f"plot {agg_title}", f"generated={created_n}")
+
+    generated_files = [str(p) for p in generated]
+    summary = {
+        "total": len(status_rows),
+        "done": sum(1 for r in status_rows if r.get("status") == "done"),
+        "skip": sum(1 for r in status_rows if r.get("status") == "skip"),
         "generated_count": len(generated),
-        "generated_files": [str(p) for p in generated],
+        "generated_files": generated_files,
         "missing_dirs": missing,
-        "generated_at_utc": _utc_now(),
     }
-    manifest_path = study_root / "plot_status.json"
-    _write_json(manifest_path, out_manifest)
-    return {"generated": generated, "missing": missing, "manifest": manifest_path}
+    csv_path, json_path = _write_named_status(
+        study_root=study_root,
+        rows=status_rows,
+        summary=summary,
+        csv_name=PLOT_STATUS_CSV_FILE,
+        json_name=PLOT_STATUS_JSON_FILE,
+    )
+    return {"generated": generated, "missing": missing, "manifest": json_path, "csv": csv_path}
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
@@ -3445,6 +3824,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             if result["plot"] is not None:
                 print(f"Plot: {result['plot']}")
             print(f"Manifest: {result['manifest']}")
+        print(f"Status CSV: {Path(target).resolve() / AGGREGATE_STATUS_CSV_FILE}")
+        print(f"Status JSON: {Path(target).resolve() / AGGREGATE_STATUS_JSON_FILE}")
         return 0
 
     plot_values = getattr(args, "plot", None)
@@ -3462,6 +3843,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             aggregate_title_filter=aggregate_title_filter,
             case_filter=_clean_opt(getattr(args, "case", None)),
         )
+        print(f"Status CSV: {Path(target).resolve() / PLOT_STATUS_CSV_FILE}")
+        print(f"Status JSON: {Path(target).resolve() / PLOT_STATUS_JSON_FILE}")
         print(f"Plot manifest: {result['manifest']}")
         print(f"Generated plots: {len(result['generated'])}")
         return 0
