@@ -108,10 +108,25 @@ def _local_now() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _log_stage_event(case_id: str, replicate_id: str, stage_name: str, tag: str, detail: str | None = None) -> None:
-    label = str(tag).upper()[:5].ljust(5)
-    print(f"{case_id} {replicate_id} {stage_name}")
-    line = f"[{label}] {_local_now()}"
+def _stage_label_width(max_stage_chars: int) -> int:
+    # Requested format width: 23 + max_stage_len + 2
+    return 23 + int(max_stage_chars) + 2
+
+
+def _log_stage_event(
+    case_id: str,
+    replicate_id: str,
+    stage_name: str,
+    tag: str,
+    detail: str | None = None,
+    *,
+    stage_block_width: int | None = None,
+) -> None:
+    tag_block = f"[{str(tag).upper()}]".ljust(8)
+    stage_block = f"{case_id} {replicate_id} {stage_name}"
+    if stage_block_width is not None:
+        stage_block = stage_block.ljust(stage_block_width)
+    line = f"{tag_block}{stage_block}{_local_now()}"
     if detail:
         line = f"{line}  {detail}"
     print(line)
@@ -1015,6 +1030,10 @@ def _run_single_step_command(
     command: str,
     workdir: str | None = None,
 ) -> dict[str, Any]:
+    command_tokens = str(command).strip().split()
+    if command_tokens and command_tokens[0].lower() == "sbatch" and "--wait" not in command_tokens:
+        command = "sbatch --wait " + " ".join(command_tokens[1:])
+
     wd = stage_dir / str(workdir or ".")
     wd.mkdir(parents=True, exist_ok=True)
     job_id = f"local-{uuid.uuid4().hex[:12]}"
@@ -1203,6 +1222,15 @@ def _run_single_replicate_pipeline(
     produced_map = _build_declared_produced_map(rep_manifest)
 
     stage_entries = rep_manifest.get("stages") or []
+    max_stage_chars = 0
+    for _entry in stage_entries:
+        if not isinstance(_entry, dict):
+            continue
+        sname = str(_entry.get("stage") or "").strip()
+        if len(sname) > max_stage_chars:
+            max_stage_chars = len(sname)
+    stage_block_width = _stage_label_width(max_stage_chars=max_stage_chars)
+
     status_by_stage: dict[str, str] = {}
     for entry in stage_entries:
         if not isinstance(entry, dict):
@@ -1230,7 +1258,14 @@ def _run_single_replicate_pipeline(
         current_status = str(status.get("status") or "pending")
         if current_status == "completed":
             counts["skipped"] += 1
-            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "SKIP", "already completed")
+            _log_stage_event(
+                case_id,
+                rep_id,
+                stage_name,
+                "SKIP",
+                "already completed",
+                stage_block_width=stage_block_width,
+            )
             continue
 
         ready, reason = _is_stage_ready(
@@ -1240,10 +1275,17 @@ def _run_single_replicate_pipeline(
         )
         if not ready:
             counts["not_ready"] += 1
-            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "WAIT", reason)
+            _log_stage_event(
+                case_id,
+                rep_id,
+                stage_name,
+                "WAIT",
+                reason,
+                stage_block_width=stage_block_width,
+            )
             continue
 
-        _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "RUN")
+        _log_stage_event(case_id, rep_id, stage_name, "RUN", stage_block_width=stage_block_width)
         result = _execute_stage_run(
             stage_dir=stage_dir,
             stage_manifest=stage_manifest,
@@ -1256,10 +1298,10 @@ def _run_single_replicate_pipeline(
         status_by_stage[stage_name] = final_status
         if final_status == "completed":
             counts["completed"] += 1
-            _log_stage_event(str(case.get("case_id") or ""), rep_id, stage_name, "DONE")
+            _log_stage_event(case_id, rep_id, stage_name, "DONE", stage_block_width=stage_block_width)
         else:
             counts["failed"] += 1
-            _log_stage_event(case_id, rep_id, stage_name, "FAIL")
+            _log_stage_event(case_id, rep_id, stage_name, "FAIL", stage_block_width=stage_block_width)
             if strict_actions:
                 finished_at = _local_now()
                 return {
