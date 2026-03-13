@@ -34,6 +34,18 @@ SUPPORTED_ARTIFACT_TRANSFER = {"copy", "symlink", "hardlink"}
 STAGE_STATUS_FILE = ".stage_status.json"
 ANALYSIS_STATUS_FILE = ".analysis_status.json"
 ANALYSIS_MANIFEST_FILE = "analysis_manifest.json"
+RUN_STAGE_MANIFEST_FILE = "run_stage_manifest.json"
+RUN_REPLICATE_MANIFEST_FILE = "run_replicate_manifest.json"
+RUN_CASE_MANIFEST_FILE = "run_case_manifest.json"
+RUN_STATUS_CSV_FILE = "run_status.csv"
+RUN_STATUS_JSON_FILE = "run_status.json"
+ANALYSIS_STATUS_CSV_FILE = "analysis_status.csv"
+ANALYSIS_STATUS_JSON_FILE = "analysis_status.json"
+LEGACY_STAGE_MANIFEST_FILE = "stage_manifest.json"
+LEGACY_REPLICATE_MANIFEST_FILE = "replicate_manifest.json"
+LEGACY_CASE_MANIFEST_FILE = "case_manifest.json"
+LEGACY_RUN_STATUS_CSV_FILE = "study_run_status.csv"
+LEGACY_RUN_STATUS_JSON_FILE = "study_run_status.json"
 RR_CLEANUP_PATTERNS = [
     "job.*",
     "fort.*",
@@ -179,6 +191,11 @@ def _stage_label_width(max_stage_chars: int) -> int:
     return 23 + int(max_stage_chars) + 2
 
 
+def _analysis_label_width(max_analysis_chars: int) -> int:
+    # Requested format width: 24 + max_analysis_len + 2
+    return 24 + int(max_analysis_chars) + 2
+
+
 def _log_stage_event(
     case_id: str,
     replicate_id: str,
@@ -207,8 +224,8 @@ def _write_study_run_status(
     status_dir = study_root
     status_dir.mkdir(parents=True, exist_ok=True)
 
-    json_path = status_dir / "study_run_status.json"
-    csv_path = status_dir / "study_run_status.csv"
+    json_path = status_dir / RUN_STATUS_JSON_FILE
+    csv_path = status_dir / RUN_STATUS_CSV_FILE
 
     payload = {
         "generated_at_utc": _utc_now(),
@@ -239,8 +256,34 @@ def _write_study_run_status(
     return json_path, csv_path
 
 
+def _resolve_existing_file(primary: Path, *fallbacks: str) -> Path:
+    if primary.exists():
+        return primary
+    for name in fallbacks:
+        candidate = primary.parent / name
+        if candidate.exists():
+            return candidate
+    return primary
+
+
+def _run_stage_manifest_path(stage_dir: Path) -> Path:
+    return _resolve_existing_file(stage_dir / RUN_STAGE_MANIFEST_FILE, LEGACY_STAGE_MANIFEST_FILE)
+
+
+def _run_replicate_manifest_path(rep_dir: Path) -> Path:
+    return _resolve_existing_file(rep_dir / RUN_REPLICATE_MANIFEST_FILE, LEGACY_REPLICATE_MANIFEST_FILE)
+
+
+def _run_case_manifest_path(case_dir: Path) -> Path:
+    return _resolve_existing_file(case_dir / RUN_CASE_MANIFEST_FILE, LEGACY_CASE_MANIFEST_FILE)
+
+
+def _run_status_csv_path(study_root: Path) -> Path:
+    return _resolve_existing_file(study_root / RUN_STATUS_CSV_FILE, LEGACY_RUN_STATUS_CSV_FILE)
+
+
 def _load_study_run_status_rows(study_root: Path) -> list[dict[str, str]]:
-    csv_path = study_root / "study_run_status.csv"
+    csv_path = _run_status_csv_path(study_root)
     if not csv_path.exists():
         raise FileNotFoundError(
             f"Cannot use rerun mode because status file does not exist: {csv_path}. "
@@ -262,7 +305,7 @@ def _cleanup_stage_artifacts(stage_dir: Path) -> int:
     removed = 0
     for pattern in RR_CLEANUP_PATTERNS:
         for target in stage_dir.glob(pattern):
-            if target.name in {STAGE_STATUS_FILE, "stage_manifest.json"}:
+            if target.name in {STAGE_STATUS_FILE, RUN_STAGE_MANIFEST_FILE, LEGACY_STAGE_MANIFEST_FILE}:
                 continue
             try:
                 if target.is_dir() and not target.is_symlink():
@@ -977,7 +1020,7 @@ def _init_study(
                     "actions": stage_actions,
                     "generated_at_utc": _utc_now(),
                 }
-                _write_json(stage_dir / "stage_manifest.json", stage_manifest)
+                _write_json(stage_dir / RUN_STAGE_MANIFEST_FILE, stage_manifest)
                 stage_entries.append(
                     {
                         "stage": stage.name,
@@ -1001,7 +1044,7 @@ def _init_study(
                 "stages": stage_entries,
                 "generated_at_utc": _utc_now(),
             }
-            _write_json(rep_dir / "replicate_manifest.json", rep_manifest)
+            _write_json(rep_dir / RUN_REPLICATE_MANIFEST_FILE, rep_manifest)
             replicate_entries.append(
                 {
                     "replicate_id": rep_id,
@@ -1017,7 +1060,7 @@ def _init_study(
             "replicates": replicate_entries,
             "generated_at_utc": _utc_now(),
         }
-        _write_json(case_dir / "case_manifest.json", case_manifest)
+        _write_json(case_dir / RUN_CASE_MANIFEST_FILE, case_manifest)
         case_entries.append(
             {
                 "case_id": case_id,
@@ -1501,7 +1544,7 @@ def _execute_stage_run(
         "actions": actions,
         "updated_at_utc": _utc_now(),
     }
-    _write_json(stage_dir / "stage_manifest.json", stage_manifest)
+    _write_json(stage_dir / RUN_STAGE_MANIFEST_FILE, stage_manifest)
 
     return {
         "status": stage_status["status"],
@@ -1526,7 +1569,7 @@ def _run_single_replicate_pipeline(
     rep_id = str(rep.get("replicate_id") or "")
     case_id = str(case.get("case_id") or "")
     rep_path = Path(str(rep.get("path") or ""))
-    rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+    rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
     produced_map = _build_declared_produced_map(rep_manifest)
 
     stage_entries = rep_manifest.get("stages") or []
@@ -1559,7 +1602,7 @@ def _run_single_replicate_pipeline(
             continue
 
         stage_dir = Path(str(entry.get("path") or ""))
-        stage_manifest = _read_json(stage_dir / "stage_manifest.json")
+        stage_manifest = _read_json(_run_stage_manifest_path(stage_dir))
         stage_manifest["study_source_dir"] = str(Path(str(manifest.get("source_yaml") or "")).parent)
 
         status = _load_stage_status(stage_dir)
@@ -1707,7 +1750,7 @@ def _run_study(
             continue
         case_id = str(case.get("case_id") or "")
         case_path = Path(str(case.get("path") or ""))
-        case_manifest = _read_json(case_path / "case_manifest.json")
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
         reps = case_manifest.get("replicates") or []
         for rep in reps:
             if not isinstance(rep, dict):
@@ -1744,7 +1787,7 @@ def _run_study(
         _write_study_run_status(study_root=study_root, rows=rows, summary=summary)
 
     if rerun_failed and not tasks:
-        print("[info] No failed/waiting replicates found in study_run_status.csv.")
+        print("[info] No failed/waiting replicates found in run_status.csv.")
         persist_status()
         return counts
 
@@ -1918,10 +1961,26 @@ def _analyze_study(
 
     if not analysis_defs:
         raise ValueError("No analysis entries found to run. Check study 'analysis' and --analysis filter.")
+    max_analysis_chars = 0
+    for entry in analysis_defs:
+        t = str(entry.get("title") or "").strip()
+        if len(t) > max_analysis_chars:
+            max_analysis_chars = len(t)
+    analysis_block_width = _analysis_label_width(max_analysis_chars=max_analysis_chars)
 
     records: list[dict[str, Any]] = []
     counts = {"completed": 0, "failed": 0, "skipped": 0}
     study_dir = source_yaml.parent
+
+    def _analysis_counters(*, status: str, reason: str | None = None) -> dict[str, int]:
+        s = str(status or "").strip().lower()
+        r = str(reason or "").strip().lower()
+        run = 1 if s in {"completed", "failed"} else 0
+        done = 1 if s == "completed" else 0
+        fail = 1 if s == "failed" else 0
+        wait = 1 if (s == "skipped" and r.startswith("run_stage_not_completed")) else 0
+        skip = 1 if (s == "skipped" and wait == 0) else 0
+        return {"run": run, "done": done, "skip": skip, "wait": wait, "fail": fail}
 
     for case in manifest.get("cases") or []:
         if not isinstance(case, dict):
@@ -1930,7 +1989,7 @@ def _analyze_study(
             continue
         case_id = str(case.get("case_id") or "")
         case_path = Path(str(case.get("path") or ""))
-        case_manifest = _read_json(case_path / "case_manifest.json")
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
         for rep in case_manifest.get("replicates") or []:
             if not isinstance(rep, dict):
                 continue
@@ -1938,7 +1997,7 @@ def _analyze_study(
             if replicate_filter and rep_id != replicate_filter:
                 continue
             rep_path = Path(str(rep.get("path") or ""))
-            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+            rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
             stage_entries = rep_manifest.get("stages") or []
             stage_entry_by_name = {
                 str(entry.get("stage") or "").strip(): entry for entry in stage_entries if isinstance(entry, dict)
@@ -1956,6 +2015,17 @@ def _analyze_study(
                 stage_entry = stage_entry_by_name.get(run_stage)
                 if stage_entry is None:
                     counts["skipped"] += 1
+                    status_value = "skipped"
+                    reason = "run_stage_not_found"
+                    ctr = _analysis_counters(status=status_value, reason=reason)
+                    _log_stage_event(
+                        case_id,
+                        rep_id,
+                        title,
+                        "SKIP",
+                        reason,
+                        stage_block_width=analysis_block_width,
+                    )
                     records.append(
                         {
                             "case_id": case_id,
@@ -1963,8 +2033,12 @@ def _analyze_study(
                             "analysis_id": analysis_id,
                             "title": title,
                             "run_stage": run_stage,
-                            "status": "skipped",
-                            "reason": "run_stage_not_found",
+                            "status": status_value,
+                            "reason": reason,
+                            **ctr,
+                            "started_at": None,
+                            "finished_at": None,
+                            "duration_min": None,
                         }
                     )
                     continue
@@ -1973,6 +2047,17 @@ def _analyze_study(
                 stage_status = _load_stage_status(stage_dir)
                 if str(stage_status.get("status") or "") != "completed":
                     counts["skipped"] += 1
+                    status_value = "skipped"
+                    reason = f"run_stage_not_completed:{stage_status.get('status')}"
+                    ctr = _analysis_counters(status=status_value, reason=reason)
+                    _log_stage_event(
+                        case_id,
+                        rep_id,
+                        title,
+                        "WAIT",
+                        reason,
+                        stage_block_width=analysis_block_width,
+                    )
                     records.append(
                         {
                             "case_id": case_id,
@@ -1981,8 +2066,12 @@ def _analyze_study(
                             "title": title,
                             "run_stage": run_stage,
                             "stage_path": str(stage_dir),
-                            "status": "skipped",
-                            "reason": f"run_stage_not_completed:{stage_status.get('status')}",
+                            "status": status_value,
+                            "reason": reason,
+                            **ctr,
+                            "started_at": None,
+                            "finished_at": None,
+                            "duration_min": None,
                         }
                     )
                     continue
@@ -1991,6 +2080,8 @@ def _analyze_study(
                 context["stage"] = run_stage
                 rendered_analysis = _render_value((analysis_def.get("payload") or analysis_def), context)
                 started = _utc_now()
+                started_local = _local_now()
+                _log_stage_event(case_id, rep_id, title, "RUN", stage_block_width=analysis_block_width)
                 try:
                     step_records = _run_analysis_steps(
                         stage_dir=stage_dir,
@@ -2006,6 +2097,8 @@ def _analyze_study(
                     reason = str(exc)
 
                 finished = _utc_now()
+                finished_local = _local_now()
+                duration_min = _duration_minutes(started_local, finished_local)
                 result_dirs = _collect_result_dirs_from_step_records(step_records)
                 analysis_status = _load_analysis_status(stage_dir)
                 analysis_status.setdefault("analyses", {})
@@ -2029,11 +2122,15 @@ def _analyze_study(
                         "reason": reason,
                         "started_at_utc": started,
                         "finished_at_utc": finished,
+                        "started_at": started_local,
+                        "finished_at": finished_local,
+                        "duration_min": duration_min,
                         "result_dirs": result_dirs,
                         "step_records": step_records,
                     }
                 )
                 _write_analysis_manifest(stage_dir, analysis_manifest)
+                ctr = _analysis_counters(status=status_value, reason=reason)
 
                 rec = {
                     "case_id": case_id,
@@ -2046,12 +2143,18 @@ def _analyze_study(
                     "reason": reason,
                     "n_steps": len(step_records),
                     "result_dirs": result_dirs,
+                    **ctr,
+                    "started_at": started_local,
+                    "finished_at": finished_local,
+                    "duration_min": duration_min,
                 }
                 records.append(rec)
                 if status_value == "completed":
                     counts["completed"] += 1
+                    _log_stage_event(case_id, rep_id, title, "DONE", stage_block_width=analysis_block_width)
                 else:
                     counts["failed"] += 1
+                    _log_stage_event(case_id, rep_id, title, "FAIL", stage_block_width=analysis_block_width)
                     if strict_actions:
                         break
             if strict_actions and counts["failed"] > 0:
@@ -2059,7 +2162,7 @@ def _analyze_study(
         if strict_actions and counts["failed"] > 0:
             break
 
-    out_dir = study_root / "analysis"
+    out_dir = study_root
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "study_root": str(study_root),
@@ -2068,10 +2171,10 @@ def _analyze_study(
         "records": records,
         "analysis_filter": analysis_filter,
     }
-    manifest_path = out_dir / "study_analyze_manifest.json"
+    manifest_path = out_dir / ANALYSIS_STATUS_JSON_FILE
     _write_json(manifest_path, payload)
 
-    csv_path = out_dir / "study_analyze_results.csv"
+    csv_path = out_dir / ANALYSIS_STATUS_CSV_FILE
     fieldnames = [
         "case_id",
         "replicate_id",
@@ -2080,6 +2183,14 @@ def _analyze_study(
         "run_stage",
         "stage_path",
         "status",
+        "run",
+        "done",
+        "skip",
+        "wait",
+        "fail",
+        "started_at",
+        "finished_at",
+        "duration_min",
         "reason",
         "n_steps",
         "result_dirs",
@@ -2423,13 +2534,13 @@ def _aggregate_from_definition(
         case_id = str(case.get("case_id") or "")
         case_path = Path(str(case.get("path") or ""))
         case_params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
-        case_manifest = _read_json(case_path / "case_manifest.json")
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
         for rep in case_manifest.get("replicates") or []:
             if not isinstance(rep, dict):
                 continue
             rep_id = str(rep.get("replicate_id") or "")
             rep_path = Path(str(rep.get("path") or ""))
-            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+            rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
             stage_entries = rep_manifest.get("stages") or []
             stage_entry = next(
                 (
@@ -2543,18 +2654,18 @@ def _aggregate_from_definition(
         for (y_name, x_value), values in buckets.items():
             s = _compute_stats(values, aggregate_def.stats)
             out_row = {"case_id": case_id, "y_name": y_name, "x_name": x_name, "x_value": x_value}
-            out_row.update(s)
+            out_row.update({f"y_{k}": v for k, v in s.items()})
             per_x_rows.append(out_row)
         per_x_rows.sort(key=lambda r: (str(r.get("y_name")), _to_plot_value(r.get("x_value"))))
         per_x_csv = case_out_dir / "per_x_stats.csv"
-        per_x_fields = ["case_id", "y_name", "x_name", "x_value", *aggregate_def.stats]
+        per_x_fields = ["case_id", "y_name", "x_name", "x_value", *[f"y_{k}" for k in aggregate_def.stats]]
         with per_x_csv.open("w", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=per_x_fields)
             w.writeheader()
             for row in per_x_rows:
                 write_row = dict(row)
-                if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
-                    write_row["n"] = int(write_row["n"])
+                if "y_n" in write_row and isinstance(write_row["y_n"], float) and write_row["y_n"].is_integer():
+                    write_row["y_n"] = int(write_row["y_n"])
                 w.writerow({k: write_row.get(k) for k in per_x_fields})
 
         global_rows: list[dict[str, Any]] = []
@@ -2565,17 +2676,17 @@ def _aggregate_from_definition(
         for y_name, values in gb.items():
             s = _compute_stats(values, aggregate_def.stats)
             out_row = {"case_id": case_id, "y_name": y_name}
-            out_row.update(s)
+            out_row.update({f"y_{k}": v for k, v in s.items()})
             global_rows.append(out_row)
         global_csv = case_out_dir / "global_stats.csv"
-        global_fields = ["case_id", "y_name", *aggregate_def.stats]
+        global_fields = ["case_id", "y_name", *[f"y_{k}" for k in aggregate_def.stats]]
         with global_csv.open("w", encoding="utf-8", newline="") as fh:
             w = csv.DictWriter(fh, fieldnames=global_fields)
             w.writeheader()
             for row in global_rows:
                 write_row = dict(row)
-                if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
-                    write_row["n"] = int(write_row["n"])
+                if "y_n" in write_row and isinstance(write_row["y_n"], float) and write_row["y_n"].is_integer():
+                    write_row["y_n"] = int(write_row["y_n"])
                 w.writerow({k: write_row.get(k) for k in global_fields})
         case_output_index.append(
             {"case_id": case_id, "raw_csv": str(raw_csv), "per_x_stats_csv": str(per_x_csv), "global_stats_csv": str(global_csv)}
@@ -2750,14 +2861,14 @@ def _iter_replicate_variable_records(
         case_id = str(case.get("case_id") or "")
         case_params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
         case_path = Path(str(case.get("path") or ""))
-        case_manifest = _read_json(case_path / "case_manifest.json")
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
         reps = case_manifest.get("replicates") or []
         for rep in reps:
             if not isinstance(rep, dict):
                 continue
             rep_id = str(rep.get("replicate_id") or "")
             rep_path = Path(str(rep.get("path") or ""))
-            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+            rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
             stage_entries = rep_manifest.get("stages") or []
             stage_entry_by_name = {
                 str(entry.get("stage") or "").strip(): entry for entry in stage_entries if isinstance(entry, dict)
@@ -2956,6 +3067,59 @@ def _aggregate_study_analysis(
     }
 
 
+def _aggregate_study_all(
+    *,
+    study_root: Path,
+    aggregate_title_filter: str | None,
+    stage_filter: str | None,
+    value_column: str | None,
+    legacy_analysis_name: str | None,
+) -> list[dict[str, Any]]:
+    study_manifest = _read_json(study_root / "study_manifest.json")
+    aggregate_defs: dict[str, AggregateDef] = {}
+    try:
+        study_doc = _load_source_study_doc(study_manifest)
+        aggregate_defs = _aggregate_defs_from_doc(study_doc)
+    except Exception:
+        aggregate_defs = {}
+
+    if aggregate_defs:
+        if aggregate_title_filter:
+            if aggregate_title_filter not in aggregate_defs:
+                raise KeyError(f"Unknown aggregate title: {aggregate_title_filter}")
+            targets = [aggregate_title_filter]
+        else:
+            targets = list(aggregate_defs.keys())
+        results: list[dict[str, Any]] = []
+        for title in targets:
+            res = _aggregate_study_analysis(
+                study_root=study_root,
+                analysis_name=title,
+                value_column=value_column,
+                stage_filter=stage_filter,
+            )
+            out = dict(res)
+            out["title"] = title
+            results.append(out)
+        return results
+
+    # Legacy fallback when no aggregate definitions exist.
+    if legacy_analysis_name is None:
+        raise ValueError(
+            "No top-level aggregate definitions found in study.yaml. "
+            "Provide --analysis <name> to use legacy variable aggregation."
+        )
+    res = _aggregate_study_analysis(
+        study_root=study_root,
+        analysis_name=legacy_analysis_name,
+        value_column=value_column,
+        stage_filter=stage_filter,
+    )
+    out = dict(res)
+    out["title"] = legacy_analysis_name
+    return [out]
+
+
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
     parser.set_defaults(command=STUDY_COMMAND)
@@ -2974,8 +3138,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study --analyze study_MgTemp/\n"
         "  reaxkit study --analyze study_MgTemp/ --analysis msd\n"
-        "  reaxkit study --aggregate study_MgTemp/ --analysis polarization\n"
-        "  reaxkit study --aggregate study_MgTemp/ --analysis polarization --stage NVT"
+        "  reaxkit study --aggregate study_MgTemp/\n"
+        "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation\n"
+        "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT"
     )
 
     mode = parser.add_mutually_exclusive_group(required=False)
@@ -3010,8 +3175,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     )
     mode.add_argument(
         "--aggregate",
-        metavar="STUDY_ROOT",
-        help="Run study aggregation (new aggregate definitions or legacy variable aggregation).",
+        action="append",
+        metavar="VALUE",
+        help="Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
     )
     parser.add_argument(
         "--root",
@@ -3065,12 +3231,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--rerun-failed",
         action="store_true",
-        help="For --run, rerun only replicates with fail>0 or wait>0 in study_run_status.csv; cleans stage artifacts before rerun.",
+        help="For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun.",
     )
     parser.add_argument(
         "--analysis",
         default=None,
-        help="Analysis title filter for --analyze, or variable/title name for aggregate.",
+        help="Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name.",
     )
     parser.add_argument(
         "--value-column",
@@ -3095,31 +3261,37 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Created study template: {out_path.resolve()}")
         return 0
 
-    aggregate_root = getattr(args, "aggregate", None)
-    if aggregate_root is not None:
-        target = _clean_opt(aggregate_root)
+    aggregate_values = getattr(args, "aggregate", None)
+    if aggregate_values is not None:
+        if not isinstance(aggregate_values, list) or len(aggregate_values) == 0:
+            raise ValueError("--aggregate requires at least one value: study root.")
+        if len(aggregate_values) > 2:
+            raise ValueError("--aggregate accepts at most two values: study root and optional aggregate title.")
+        target = _clean_opt(aggregate_values[0])
         if target is None:
             raise ValueError("--aggregate requires a study root path.")
-        variable_name = _clean_opt(getattr(args, "analysis", None))
-        if variable_name is None:
-            raise ValueError("--analysis is required with --aggregate.")
-        result = _aggregate_study_analysis(
+        aggregate_title_filter = _clean_opt(aggregate_values[1]) if len(aggregate_values) == 2 else None
+        results = _aggregate_study_all(
             study_root=Path(target).resolve(),
-            analysis_name=variable_name,
-            value_column=_clean_opt(getattr(args, "value_column", None)),
+            aggregate_title_filter=aggregate_title_filter,
             stage_filter=_clean_opt(getattr(args, "stage", None)),
+            value_column=_clean_opt(getattr(args, "value_column", None)),
+            legacy_analysis_name=_clean_opt(getattr(args, "analysis", None)),
         )
-        print(f"Raw CSV: {result['raw_csv']}")
-        print(f"Grouped CSV: {result['grouped_csv']}")
-        if result["plot"] is not None:
-            print(f"Plot: {result['plot']}")
-        print(f"Manifest: {result['manifest']}")
+        for result in results:
+            print(f"Aggregate: {result.get('title')}")
+            print(f"Raw CSV: {result['raw_csv']}")
+            print(f"Grouped CSV: {result['grouped_csv']}")
+            if result["plot"] is not None:
+                print(f"Plot: {result['plot']}")
+            print(f"Manifest: {result['manifest']}")
         return 0
 
     run_root = getattr(args, "run", None)
     if run_root is not None:
+        run_root_path = Path(str(run_root)).resolve()
         counts = _run_study(
-            study_root=Path(str(run_root)).resolve(),
+            study_root=run_root_path,
             stage_filter=_clean_opt(getattr(args, "stage", None)),
             case_filter=_clean_opt(getattr(args, "case", None)),
             replicate_filter=_clean_opt(getattr(args, "replicate", None)),
@@ -3134,6 +3306,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             f"completed={counts['completed']} skipped={counts['skipped']} "
             f"not_ready={counts['not_ready']} failed={counts['failed']}"
         )
+        print(f"Status CSV: {run_root_path / RUN_STATUS_CSV_FILE}")
+        print(f"Status JSON: {run_root_path / RUN_STATUS_JSON_FILE}")
         return 1 if counts["failed"] > 0 else 0
 
     analyze_root = getattr(args, "analyze", None)
@@ -3150,8 +3324,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             "Analyze summary: "
             f"completed={counts['completed']} skipped={counts['skipped']} failed={counts['failed']}"
         )
-        print(f"Manifest: {result['manifest']}")
-        print(f"CSV: {result['csv']}")
+        print(f"Status CSV: {result['csv']}")
+        print(f"Status JSON: {result['manifest']}")
         return 1 if counts["failed"] > 0 else 0
 
     init_path = getattr(args, "init", None)
