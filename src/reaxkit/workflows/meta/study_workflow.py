@@ -51,6 +51,8 @@ LEGACY_REPLICATE_MANIFEST_FILE = "replicate_manifest.json"
 LEGACY_CASE_MANIFEST_FILE = "case_manifest.json"
 LEGACY_RUN_STATUS_CSV_FILE = "study_run_status.csv"
 LEGACY_RUN_STATUS_JSON_FILE = "study_run_status.json"
+LEGACY_ANALYSIS_STATUS_CSV_FILE = "study_analyze_results.csv"
+LEGACY_ANALYSIS_STATUS_JSON_FILE = "study_analyze_manifest.json"
 RR_CLEANUP_PATTERNS = [
     "job.*",
     "fort.*",
@@ -327,12 +329,32 @@ def _run_status_csv_path(study_root: Path) -> Path:
     return _resolve_existing_file(study_root / RUN_STATUS_CSV_FILE, LEGACY_RUN_STATUS_CSV_FILE)
 
 
+def _analysis_status_csv_path(study_root: Path) -> Path:
+    return _resolve_existing_file(study_root / ANALYSIS_STATUS_CSV_FILE, LEGACY_ANALYSIS_STATUS_CSV_FILE)
+
+
+def _analysis_status_json_path(study_root: Path) -> Path:
+    return _resolve_existing_file(study_root / ANALYSIS_STATUS_JSON_FILE, LEGACY_ANALYSIS_STATUS_JSON_FILE)
+
+
 def _load_study_run_status_rows(study_root: Path) -> list[dict[str, str]]:
     csv_path = _run_status_csv_path(study_root)
     if not csv_path.exists():
         raise FileNotFoundError(
             f"Cannot use rerun mode because status file does not exist: {csv_path}. "
             "Run 'reaxkit study --run <study_root>' once first."
+        )
+    with csv_path.open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        return [dict(row) for row in reader]
+
+
+def _load_analysis_status_rows(study_root: Path) -> list[dict[str, str]]:
+    csv_path = _analysis_status_csv_path(study_root)
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Cannot use analyze rerun mode because status file does not exist: {csv_path}. "
+            "Run 'reaxkit study --analyze <study_root>' once first."
         )
     with csv_path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
@@ -1984,6 +2006,7 @@ def _analyze_study(
     case_filter: str | None,
     replicate_filter: str | None,
     strict_actions: bool,
+    rerun_failed: bool,
 ) -> dict[str, Any]:
     manifest = _read_json(study_root / "study_manifest.json")
     source_yaml = Path(str(manifest.get("source_yaml") or "")).resolve()
@@ -2016,6 +2039,22 @@ def _analyze_study(
     records: list[dict[str, Any]] = []
     counts = {"completed": 0, "failed": 0, "skipped": 0}
     study_dir = source_yaml.parent
+    rerun_targets: set[tuple[str, str, str]] | None = None
+    if rerun_failed:
+        rerun_targets = set()
+        for row in _load_analysis_status_rows(study_root):
+            case_id = str(row.get("case_id") or "").strip()
+            rep_id = str(row.get("replicate_id") or "").strip()
+            analysis_id = str(row.get("analysis_id") or "").strip()
+            fail_n = _to_int(row.get("fail"))
+            wait_n = _to_int(row.get("wait"))
+            status_v = str(row.get("status") or "").strip().lower()
+            if not case_id or not rep_id or not analysis_id:
+                continue
+            if fail_n > 0 or wait_n > 0 or status_v in {"failed", "waiting"}:
+                rerun_targets.add((case_id, rep_id, analysis_id))
+        if not rerun_targets:
+            print("[info] No failed/waiting analysis entries found in analysis_status.csv.")
 
     def _analysis_counters(*, status: str, reason: str | None = None) -> dict[str, int]:
         s = str(status or "").strip().lower()
@@ -2057,6 +2096,8 @@ def _analyze_study(
                 analysis_id = str(analysis_def.get("analysis_id") or "").strip()
                 title = str(analysis_def.get("title") or "").strip()
                 run_stage = str(analysis_def.get("run_stage") or "").strip()
+                if rerun_targets is not None and (case_id, rep_id, analysis_id) not in rerun_targets:
+                    continue
                 stage_entry = stage_entry_by_name.get(run_stage)
                 if stage_entry is None:
                     counts["skipped"] += 1
@@ -3651,6 +3692,149 @@ def _plot_study_aggregates(
     return {"generated": generated, "missing": missing, "manifest": json_path, "csv": csv_path}
 
 
+def _remove_analysis_outputs(
+    *,
+    study_root: Path,
+    remove_target: str,
+) -> dict[str, Any]:
+    study_manifest = _read_json(study_root / "study_manifest.json")
+    doc = _load_source_study_doc(study_manifest)
+    analysis_defs = _analysis_defs_from_doc(doc)
+    target = str(remove_target or "").strip()
+    if not target:
+        raise ValueError("--remove requires a value: all or <analysis_title>.")
+
+    if target.lower() == "all":
+        target_ids = {a.analysis_id for a in analysis_defs.values()}
+    else:
+        if target not in analysis_defs:
+            raise KeyError(f"Unknown analysis title: {target}")
+        target_ids = {analysis_defs[target].analysis_id}
+
+    removed_dirs: list[str] = []
+    updated_stage_manifests = 0
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        case_path = Path(str(case.get("path") or ""))
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
+        for rep in case_manifest.get("replicates") or []:
+            if not isinstance(rep, dict):
+                continue
+            rep_path = Path(str(rep.get("path") or ""))
+            rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
+            for stage_entry in rep_manifest.get("stages") or []:
+                if not isinstance(stage_entry, dict):
+                    continue
+                stage_dir = Path(str(stage_entry.get("path") or ""))
+                analysis_manifest = _load_analysis_manifest(stage_dir)
+                runs = analysis_manifest.get("runs") or []
+                kept_runs: list[dict[str, Any]] = []
+                for run in runs:
+                    if not isinstance(run, dict):
+                        continue
+                    analysis_id = str(run.get("analysis_id") or "")
+                    if analysis_id in target_ids:
+                        for d in run.get("result_dirs") or []:
+                            p = Path(str(d))
+                            if p.exists():
+                                try:
+                                    if p.is_dir():
+                                        shutil.rmtree(p)
+                                    else:
+                                        p.unlink()
+                                    removed_dirs.append(str(p))
+                                except Exception:
+                                    pass
+                    else:
+                        kept_runs.append(run)
+                if len(kept_runs) != len(runs):
+                    analysis_manifest["runs"] = kept_runs
+                    _write_analysis_manifest(stage_dir, analysis_manifest)
+                    updated_stage_manifests += 1
+
+                    analysis_status = _load_analysis_status(stage_dir)
+                    analyses_obj = analysis_status.get("analyses") if isinstance(analysis_status.get("analyses"), dict) else {}
+                    for aid in list(analyses_obj.keys()):
+                        if aid in target_ids:
+                            analyses_obj.pop(aid, None)
+                    analysis_status["analyses"] = analyses_obj
+                    _write_analysis_status(stage_dir, analysis_status)
+
+    # Remove top-level analyze status files; they represent prior runs.
+    for p in [
+        study_root / ANALYSIS_STATUS_CSV_FILE,
+        study_root / ANALYSIS_STATUS_JSON_FILE,
+        study_root / LEGACY_ANALYSIS_STATUS_CSV_FILE,
+        study_root / LEGACY_ANALYSIS_STATUS_JSON_FILE,
+    ]:
+        if p.exists():
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+    return {
+        "target": target,
+        "removed_dirs": removed_dirs,
+        "updated_stage_manifests": updated_stage_manifests,
+    }
+
+
+def _remove_aggregate_outputs(
+    *,
+    study_root: Path,
+    remove_target: str,
+) -> dict[str, Any]:
+    study_manifest = _read_json(study_root / "study_manifest.json")
+    doc = _load_source_study_doc(study_manifest)
+    aggregate_defs = _aggregate_defs_from_doc(doc)
+    target = str(remove_target or "").strip()
+    if not target:
+        raise ValueError("--remove requires a value: all or <aggregate_title>.")
+
+    if target.lower() == "all":
+        titles = set(aggregate_defs.keys())
+        # include existing dirs even if not in current YAML
+        extra = study_root / "cases" / "aggregate"
+        if extra.exists():
+            for d in extra.iterdir():
+                if d.is_dir():
+                    titles.add(d.name)
+    else:
+        if target not in aggregate_defs:
+            raise KeyError(f"Unknown aggregate title: {target}")
+        titles = {target}
+
+    removed_dirs: list[str] = []
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        case_path = Path(str(case.get("path") or ""))
+        for title in titles:
+            d = case_path / "aggregate" / title
+            if d.exists():
+                shutil.rmtree(d)
+                removed_dirs.append(str(d))
+    for title in titles:
+        d = study_root / "cases" / "aggregate" / title
+        if d.exists():
+            shutil.rmtree(d)
+            removed_dirs.append(str(d))
+
+    for p in [
+        study_root / AGGREGATE_STATUS_CSV_FILE,
+        study_root / AGGREGATE_STATUS_JSON_FILE,
+    ]:
+        if p.exists():
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+    return {"target": target, "removed_dirs": removed_dirs}
+
+
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
     parser.set_defaults(command=STUDY_COMMAND)
@@ -3668,9 +3852,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --run study_MgTemp/ --stage MM\n"
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study --analyze study_MgTemp/\n"
+        "  reaxkit study --analyze study_MgTemp/ --rerun-failed\n"
+        "  reaxkit study --analyze study_MgTemp/ --remove all\n"
         "  reaxkit study --analyze study_MgTemp/ --analysis msd\n"
         "  reaxkit study --aggregate study_MgTemp/\n"
         "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation\n"
+        "  reaxkit study --aggregate study_MgTemp/ --remove msd_atom1_aggregation\n"
         "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT\n"
         "  reaxkit study --plot study_MgTemp/\n"
         "  reaxkit study --plot study_MgTemp/ --plot msd_atom1_aggregation"
@@ -3778,6 +3965,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name.",
     )
     parser.add_argument(
+        "--remove",
+        default=None,
+        help="For --analyze/--aggregate: remove outputs by title or 'all'.",
+    )
+    parser.add_argument(
         "--value-column",
         default=None,
         help="For aggregate: explicit numeric column to extract from per-run analysis CSV exports.",
@@ -3810,6 +4002,16 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         if target is None:
             raise ValueError("--aggregate requires a study root path.")
         aggregate_title_filter = _clean_opt(aggregate_values[1]) if len(aggregate_values) == 2 else None
+        remove_target = _clean_opt(getattr(args, "remove", None))
+        if remove_target is not None:
+            if aggregate_title_filter is not None:
+                raise ValueError("When using --remove with --aggregate, do not pass aggregate title as second --aggregate value.")
+            removed = _remove_aggregate_outputs(
+                study_root=Path(target).resolve(),
+                remove_target=remove_target,
+            )
+            _log_task_event("DONE", "aggregate remove", f"target={removed['target']} removed={len(removed['removed_dirs'])}")
+            return 0
         results = _aggregate_study_all(
             study_root=Path(target).resolve(),
             aggregate_title_filter=aggregate_title_filter,
@@ -3874,12 +4076,25 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     analyze_root = getattr(args, "analyze", None)
     if analyze_root is not None:
+        remove_target = _clean_opt(getattr(args, "remove", None))
+        if remove_target is not None:
+            removed = _remove_analysis_outputs(
+                study_root=Path(str(analyze_root)).resolve(),
+                remove_target=remove_target,
+            )
+            _log_task_event(
+                "DONE",
+                "analyze remove",
+                f"target={removed['target']} removed_dirs={len(removed['removed_dirs'])}",
+            )
+            return 0
         result = _analyze_study(
             study_root=Path(str(analyze_root)).resolve(),
             analysis_filter=_clean_opt(getattr(args, "analysis", None)),
             case_filter=_clean_opt(getattr(args, "case", None)),
             replicate_filter=_clean_opt(getattr(args, "replicate", None)),
             strict_actions=bool(getattr(args, "strict_actions", False)),
+            rerun_failed=bool(getattr(args, "rerun_failed", False)),
         )
         counts = result["counts"]
         print(
