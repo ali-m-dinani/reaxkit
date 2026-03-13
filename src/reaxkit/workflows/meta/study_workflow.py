@@ -2434,6 +2434,13 @@ def _safe_float(value: Any) -> float | None:
     return fv
 
 
+def _stat_value(row: dict[str, Any], key: str) -> Any:
+    prefixed = f"y_{key}"
+    if prefixed in row:
+        return row.get(prefixed)
+    return row.get(key)
+
+
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
@@ -2933,20 +2940,20 @@ def _aggregate_from_definition(
         y_name = key[len(param_names)]
         x_value = key[len(param_names) + 1]
         out_row.update({"y_name": y_name, "x_name": x_name, "x_value": x_value})
-        out_row.update(_compute_stats(values, aggregate_def.stats))
+        out_row.update({f"y_{k}": v for k, v in _compute_stats(values, aggregate_def.stats).items()})
         across_per_x_rows.append(out_row)
     across_per_x_rows.sort(
         key=lambda r: tuple([_to_plot_value(r.get(p)) for p in param_names] + [str(r.get("y_name")), _to_plot_value(r.get("x_value"))])
     )
     across_per_x_csv = across_dir / "across_cases_per_x_stats.csv"
-    across_per_x_fields = [*param_names, "y_name", "x_name", "x_value", *aggregate_def.stats]
+    across_per_x_fields = [*param_names, "y_name", "x_name", "x_value", *[f"y_{k}" for k in aggregate_def.stats]]
     with across_per_x_csv.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=across_per_x_fields)
         w.writeheader()
         for row in across_per_x_rows:
             write_row = dict(row)
-            if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
-                write_row["n"] = int(write_row["n"])
+            if "y_n" in write_row and isinstance(write_row["y_n"], float) and write_row["y_n"].is_integer():
+                write_row["y_n"] = int(write_row["y_n"])
             w.writerow({k: write_row.get(k) for k in across_per_x_fields})
 
     global_buckets: dict[tuple[Any, ...], list[float]] = {}
@@ -2957,20 +2964,20 @@ def _aggregate_from_definition(
     for key, values in global_buckets.items():
         out_row = {p: key[i] for i, p in enumerate(param_names)}
         out_row["y_name"] = key[len(param_names)]
-        out_row.update(_compute_stats(values, aggregate_def.stats))
+        out_row.update({f"y_{k}": v for k, v in _compute_stats(values, aggregate_def.stats).items()})
         across_global_rows.append(out_row)
     across_global_rows.sort(
         key=lambda r: tuple([_to_plot_value(r.get(p)) for p in param_names] + [str(r.get("y_name"))])
     )
     across_global_csv = across_dir / "across_cases_global_stats.csv"
-    across_global_fields = [*param_names, "y_name", *aggregate_def.stats]
+    across_global_fields = [*param_names, "y_name", *[f"y_{k}" for k in aggregate_def.stats]]
     with across_global_csv.open("w", encoding="utf-8", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=across_global_fields)
         w.writeheader()
         for row in across_global_rows:
             write_row = dict(row)
-            if "n" in write_row and isinstance(write_row["n"], float) and write_row["n"].is_integer():
-                write_row["n"] = int(write_row["n"])
+            if "y_n" in write_row and isinstance(write_row["y_n"], float) and write_row["y_n"].is_integer():
+                write_row["y_n"] = int(write_row["y_n"])
             w.writerow({k: write_row.get(k) for k in across_global_fields})
 
     manifest = {
@@ -3551,9 +3558,9 @@ def _make_all_cases_errorbar_plots(across_dir: Path, *, aggregate_title: str) ->
                 xv_raw = r.get("x_value")
                 xv_num = _safe_float(xv_raw)
                 x_val: Any = xv_num if xv_num is not None else str(xv_raw)
-                ym = _safe_float(r.get("y_mean"))
-                ys_err = _safe_float(r.get("y_sem"))
-                ystd = _safe_float(r.get("y_std"))
+                ym = _safe_float(_stat_value(r, "mean"))
+                ys_err = _safe_float(_stat_value(r, "sem"))
+                ystd = _safe_float(_stat_value(r, "std"))
                 if ym is None:
                     continue
                 xs.append(x_val)
@@ -3588,12 +3595,16 @@ def _make_heatmap_from_rows(
     out_path: Path,
     title: str,
 ) -> Path | None:
+    stat_key = value_col[2:] if value_col.startswith("y_") else value_col
     coords: list[list[float]] = []
     values: list[float] = []
     for row in rows:
         xv = _safe_float(row.get(x_param))
         yv = _safe_float(row.get(y_param))
-        zv = _safe_float(row.get(value_col))
+        zv_raw = row.get(value_col)
+        if zv_raw is None:
+            zv_raw = _stat_value(row, stat_key)
+        zv = _safe_float(zv_raw)
         if xv is None or yv is None or zv is None:
             continue
         coords.append([xv, yv, 0.0])
