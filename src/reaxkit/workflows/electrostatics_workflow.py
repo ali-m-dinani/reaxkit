@@ -533,6 +533,7 @@ def _iter_local_plot_payloads(command: str, table: pd.DataFrame, args: argparse.
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = resolve_command_name(command, task_names=ELECTROSTATICS_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
     _add_runtime_arguments(parser)
 

@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import argparse
 import csv
-import importlib
 import itertools
-import io
 import json
 import math
 import shutil
 import statistics
 import subprocess
 import uuid
-from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,8 +18,6 @@ from typing import Any
 
 import yaml
 
-from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.engine.reaxff.generators.control_generator import (
     ControlGeneratorSpec,
     write_control,
@@ -39,6 +34,7 @@ STAGE_STATUS_FILE = ".stage_status.json"
 AGGREGATE_ACTION = "aggregate"
 
 STUDY_TEMPLATE_YAML = """study_name: mg_temp_sweep
+template: "./template"
 parameters:
   mg_percent: [5, 10]
   temperature: [300, 600]
@@ -46,61 +42,48 @@ replicates: 2
 
 workflow:
   - stage: MM
-    type: preprocess_and_run
-    geometry_generator:
-      script: make_structure.py
-      cli_template: "python make_structure.py --mg-percent {mg_percent}"
+    steps:
+      - "python make_structure.py --mg-percent {mg_percent}"
+      - "sbatch submit_and_wait.sh"
     produces:
-      final_geometry: "outputs/final_geo.xyz"
-    outputs:
       final_geometry: "outputs/final_geo.xyz"
 
   - stage: NPT
-    type: run
-    depends_on: MM
     consumes:
       initial_geometry:
         from: MM.final_geometry
         to: inputs/initial_geometry.xyz
-    input_geometry_from: MM.final_geometry
-    control:
-      generator: control_generator
-      template: control_npt.template
-      parameters:
-        temperature: "{temperature}"
+    steps:
+      - "reaxkit write-control --parameter mdtemp --value {temperature} --output control"
+      - "sbatch submit_and_wait.sh"
     produces:
       final_geometry: "outputs/final_geo.xyz"
       control_file: "control"
-    outputs:
-      final_geometry: "outputs/final_geo.xyz"
 
   - stage: NVT
-    type: run
-    depends_on: NPT
     consumes:
       initial_geometry:
         from: NPT.final_geometry
         to: inputs/initial_geometry.xyz
-    input_geometry_from: NPT.final_geometry
-    control:
-      generator: control_generator
-      template: control_nvt.template
-      parameters:
-        temperature: "{temperature}"
+    steps:
+      - "reaxkit write-control --parameter mdtemp --value {temperature} --output control"
+      - "sbatch submit_and_wait.sh"
+      - "reaxkit polarization --frame 0"
+    variables:
+      field:
+        directory: "reaxkit_workspace/analysis/polarization"
+        folder_id: "latest"
+        file: "results.csv"
+        column: "field_z"
+      polarization:
+        directory: "reaxkit_workspace/analysis/polarization"
+        folder_id: "latest"
+        file: "results.csv"
+        column: "P_z (uC/cm^2)"
     produces:
       trajectory: "outputs/traj.xyz"
       final_geometry: "outputs/final_geo.xyz"
       control_file: "control"
-    outputs:
-      trajectory: "outputs/traj.xyz"
-      final_geometry: "outputs/final_geo.xyz"
-
-analysis:
-  - name: polarization
-    stage: NVT
-    script: electrostatics.py
-    outputs:
-      scalar: "reaxkit_workspace/analysis/polarization/result.json"
 """
 
 
@@ -132,6 +115,10 @@ def _slug(value: Any) -> str:
     return slug or "value"
 
 
+def _slug_underscore(value: Any) -> str:
+    return _slug(value).replace("-", "_").replace(".", "_")
+
+
 def _load_study_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Study file not found: {path}")
@@ -141,7 +128,7 @@ def _load_study_yaml(path: Path) -> dict[str, Any]:
     return raw
 
 
-def _validate_study(doc: dict[str, Any]) -> tuple[str, dict[str, list[Any]], int, list[StageDef]]:
+def _validate_study(doc: dict[str, Any]) -> tuple[str, dict[str, list[Any]], int, list[StageDef], str | None]:
     study_name = str(doc.get("study_name") or "").strip()
     if not study_name:
         raise ValueError("study_name is required.")
@@ -177,7 +164,12 @@ def _validate_study(doc: dict[str, Any]) -> tuple[str, dict[str, list[Any]], int
             raise ValueError(f"Duplicate workflow stage: {stage_name}")
         seen.add(stage_name)
         stages.append(StageDef(name=stage_name, payload=dict(item)))
-    return study_name, parameters, replicates, stages
+    template_raw = doc.get("template")
+    template_dir: str | None = None
+    if template_raw is not None:
+        template_dir = str(template_raw).strip() or None
+
+    return study_name, parameters, replicates, stages, template_dir
 
 
 def _render_value(value: Any, context: dict[str, Any]) -> Any:
@@ -213,6 +205,64 @@ def _resolve_template_path(template_value: str, *, study_dir: Path) -> Path:
     if candidate.is_absolute():
         return candidate
     return (study_dir / candidate).resolve()
+
+
+def _copy_template_into_replicate(*, template_root: Path, replicate_dir: Path) -> None:
+    if not template_root.exists():
+        raise FileNotFoundError(f"Study template directory not found: {template_root}")
+    if not template_root.is_dir():
+        raise NotADirectoryError(f"Study template path is not a directory: {template_root}")
+
+    for source in template_root.iterdir():
+        destination = replicate_dir / source.name
+        if source.is_dir():
+            shutil.copytree(source, destination, dirs_exist_ok=True)
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+
+
+def _apply_stage_slurm_job_name(*, stage_dir: Path, case_number: int, replicate_number: int, stage_name: str) -> None:
+    submit_script = stage_dir / "submit_and_wait.sh"
+    if not submit_script.exists():
+        return
+
+    job_name = f"C{case_number:02d}_R{replicate_number:02d}_{stage_name}"
+    lines = submit_script.read_text(encoding="utf-8").splitlines()
+    out_lines: list[str] = []
+    replaced = False
+    for line in lines:
+        if line.strip().startswith("#SBATCH --job-name="):
+            out_lines.append(f"#SBATCH --job-name={job_name}")
+            replaced = True
+        else:
+            out_lines.append(line)
+
+    if not replaced:
+        insert_at = 1 if out_lines and out_lines[0].startswith("#!") else 0
+        out_lines.insert(insert_at, f"#SBATCH --job-name={job_name}")
+
+    submit_script.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+
+def _collect_template_stage_relpaths(*, template_root: Path, stage_names: list[str]) -> dict[str, Path]:
+    stage_to_relpath: dict[str, Path] = {}
+    for stage_name in stage_names:
+        matches: list[Path] = []
+        for candidate in template_root.rglob(stage_name):
+            if candidate.is_dir():
+                matches.append(candidate)
+        if not matches:
+            raise ValueError(
+                f"Template validation failed: stage folder '{stage_name}' not found under template '{template_root}'."
+            )
+        if len(matches) > 1:
+            rels = ", ".join(str(p.relative_to(template_root)) for p in matches)
+            raise ValueError(
+                f"Template validation failed: stage folder '{stage_name}' is ambiguous under template '{template_root}': {rels}"
+            )
+        stage_to_relpath[stage_name] = matches[0].relative_to(template_root)
+    return stage_to_relpath
 
 
 def _normalize_control_overrides(overrides: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -494,7 +544,7 @@ def _init_study(
         )
 
     study_doc = _load_study_yaml(study_file)
-    study_name, parameters, replicates, stages = _validate_study(study_doc)
+    study_name, parameters, replicates, stages, template_dir_raw = _validate_study(study_doc)
     combos = _enumerate_cases(parameters)
 
     study_root = (root / study_name).resolve()
@@ -514,10 +564,20 @@ def _init_study(
 
     case_entries: list[dict[str, Any]] = []
     study_yaml_dir = study_file.resolve().parent
+    template_dir = _resolve_template_path(template_dir_raw, study_dir=study_yaml_dir) if template_dir_raw else None
+    if template_dir is not None and not template_dir.exists():
+        raise FileNotFoundError(f"Study template directory not found: {template_dir}")
+    stage_template_relpaths: dict[str, Path] | None = None
+    if template_dir is not None:
+        stage_template_relpaths = _collect_template_stage_relpaths(
+            template_root=template_dir,
+            stage_names=stage_names,
+        )
+
     for case_idx, param_values in enumerate(combos, start=1):
-        combo_slug = "__".join(f"{k}-{_slug(v)}" for k, v in param_values.items())
+        combo_slug = "_".join(f"{_slug_underscore(k)}_{_slug_underscore(v)}" for k, v in param_values.items())
         case_id = f"case_{case_idx:04d}"
-        case_dir = cases_dir / f"{case_id}__{combo_slug}"
+        case_dir = cases_dir / f"{case_id}_{combo_slug}"
         case_dir.mkdir(parents=True, exist_ok=True)
 
         replicate_entries: list[dict[str, Any]] = []
@@ -525,15 +585,27 @@ def _init_study(
             rep_id = f"replicate_{rep_idx:02d}"
             rep_dir = case_dir / rep_id
             rep_dir.mkdir(parents=True, exist_ok=True)
+            if template_dir is not None:
+                _copy_template_into_replicate(template_root=template_dir, replicate_dir=rep_dir)
 
             stage_paths: dict[str, Path] = {}
             produced_artifacts: dict[tuple[str, str], Path] = {}
             stage_entries: list[dict[str, Any]] = []
             for stage in stages:
                 dep = str(stage.payload.get("depends_on") or "").strip()
-                base = stage_paths.get(dep, rep_dir) if dep else rep_dir
-                stage_dir = base / stage.name
+                if stage_template_relpaths is not None:
+                    stage_rel = stage_template_relpaths[stage.name]
+                    stage_dir = rep_dir / stage_rel
+                else:
+                    base = stage_paths.get(dep, rep_dir) if dep else rep_dir
+                    stage_dir = base / stage.name
                 stage_dir.mkdir(parents=True, exist_ok=True)
+                _apply_stage_slurm_job_name(
+                    stage_dir=stage_dir,
+                    case_number=case_idx,
+                    replicate_number=rep_idx,
+                    stage_name=stage.name,
+                )
                 stage_paths[stage.name] = stage_dir
 
                 context = {
@@ -679,13 +751,13 @@ def _init_study(
         "study_name": study_name,
         "study_root": str(study_root),
         "source_yaml": str(study_file.resolve()),
+        "template_dir": str(template_dir) if template_dir is not None else None,
         "parameters": parameters,
         "replicates": replicates,
         "workflow_stages": stage_names,
         "n_cases": len(case_entries),
         "n_total_runs": len(case_entries) * replicates,
         "cases": case_entries,
-        "analysis": study_doc.get("analysis") or [],
         "generated_at_utc": _utc_now(),
     }
     _write_json(study_root / "study_manifest.json", manifest)
@@ -844,16 +916,7 @@ def _submit_stage_job(
     if script:
         script_resolved = _resolve_cli_script_path(str(script), study_dir=study_dir)
         command = command.replace(str(script), script_resolved)
-    else:
-        # Best-effort rewrite for common "python some_script.py ..." patterns.
-        for token in command.split():
-            raw = token.strip().strip("'\"")
-            if not raw.lower().endswith(".py"):
-                continue
-            candidate = (study_dir / raw).resolve()
-            if not candidate.exists():
-                continue
-            command = command.replace(raw, str(candidate))
+    command = _rewrite_python_script_tokens(command, study_dir=study_dir)
     workdir_value = str(submit_cfg.get("workdir") or ".").strip()
     workdir = stage_dir / workdir_value
     workdir.mkdir(parents=True, exist_ok=True)
@@ -877,6 +940,98 @@ def _submit_stage_job(
         "submitted_at_utc": _utc_now(),
         "finished_at_utc": _utc_now(),
     }
+
+
+def _rewrite_python_script_tokens(command: str, *, study_dir: Path) -> str:
+    rewritten = str(command)
+    for token in str(command).split():
+        raw = token.strip().strip("'\"")
+        if not raw.lower().endswith(".py"):
+            continue
+        candidate = (study_dir / raw).resolve()
+        if not candidate.exists():
+            continue
+        rewritten = rewritten.replace(raw, str(candidate))
+    return rewritten
+
+
+def _run_single_step_command(
+    *,
+    stage_dir: Path,
+    command: str,
+    workdir: str | None = None,
+) -> dict[str, Any]:
+    wd = stage_dir / str(workdir or ".")
+    wd.mkdir(parents=True, exist_ok=True)
+    job_id = f"local-{uuid.uuid4().hex[:12]}"
+    proc = subprocess.run(
+        command,
+        shell=True,
+        cwd=str(wd),
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "job_id": job_id,
+        "command": command,
+        "cwd": str(wd),
+        "return_code": int(proc.returncode),
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "status": "completed" if proc.returncode == 0 else "failed",
+        "submitted_at_utc": _utc_now(),
+        "finished_at_utc": _utc_now(),
+    }
+
+
+def _execute_stage_steps_if_any(
+    *,
+    stage_dir: Path,
+    rendered_stage: dict[str, Any],
+    study_dir: Path,
+) -> list[dict[str, Any]] | None:
+    raw_steps = rendered_stage.get("steps")
+    if raw_steps is None:
+        return None
+    if not isinstance(raw_steps, list):
+        raise ValueError("stage.steps must be a list.")
+
+    step_records: list[dict[str, Any]] = []
+    for idx, step in enumerate(raw_steps, start=1):
+        if isinstance(step, str):
+            cmd = str(step).strip()
+            if not cmd:
+                continue
+            cmd = _rewrite_python_script_tokens(cmd, study_dir=study_dir)
+            record = _run_single_step_command(stage_dir=stage_dir, command=cmd)
+            record["step_index"] = idx
+            record["step_type"] = "run"
+            step_records.append(record)
+            continue
+
+        if not isinstance(step, dict):
+            raise ValueError(f"stage.steps[{idx}] must be string or mapping.")
+        cmd = str(step.get("run") or "").strip()
+        if not cmd:
+            raise ValueError(f"stage.steps[{idx}] missing required 'run' command.")
+
+        script = step.get("script")
+        if script:
+            script_resolved = _resolve_cli_script_path(str(script), study_dir=study_dir)
+            cmd = cmd.replace(str(script), script_resolved)
+        cmd = _rewrite_python_script_tokens(cmd, study_dir=study_dir)
+
+        record = _run_single_step_command(
+            stage_dir=stage_dir,
+            command=cmd,
+            workdir=(str(step.get("workdir")) if step.get("workdir") is not None else None),
+        )
+        record["step_index"] = idx
+        record["step_type"] = str(step.get("type") or "run")
+        if "name" in step:
+            record["step_name"] = str(step.get("name"))
+        step_records.append(record)
+    return step_records
 
 
 def _execute_stage_run(
@@ -909,37 +1064,54 @@ def _execute_stage_run(
     for event in consumed_artifacts:
         actions.append({"action": "artifact_consume", **event})
 
-    geometry_action = None
+    study_dir = Path(stage_manifest.get("study_source_dir") or stage_dir)
+    step_jobs: list[dict[str, Any]] | None = None
     try:
-        geometry_action = _run_geometry_generation_if_needed(
+        step_jobs = _execute_stage_steps_if_any(
             stage_dir=stage_dir,
             rendered_stage=rendered_stage,
-            study_dir=Path(stage_manifest.get("study_source_dir") or stage_dir),
-            enabled=run_geometry_generator,
+            study_dir=study_dir,
         )
     except Exception as exc:
         if strict_actions:
             raise
-        geometry_action = {"status": "failed", "reason": str(exc)}
-    if geometry_action is not None:
-        actions.append({"action": "geometry_generator", **geometry_action})
+        actions.append({"action": "steps", "status": "failed", "reason": str(exc)})
+        step_jobs = []
 
-    job_record = _submit_stage_job(
-        stage_dir,
-        rendered_stage,
-        study_dir=Path(stage_manifest.get("study_source_dir") or stage_dir),
-    )
-    if job_record is not None:
-        actions.append({"action": "submit_job", **job_record})
+    if step_jobs is not None:
+        for item in step_jobs:
+            actions.append({"action": "step", **item})
+    else:
+        # Backward-compatibility path for legacy stage schema.
+        geometry_action = None
+        try:
+            geometry_action = _run_geometry_generation_if_needed(
+                stage_dir=stage_dir,
+                rendered_stage=rendered_stage,
+                study_dir=study_dir,
+                enabled=run_geometry_generator,
+            )
+        except Exception as exc:
+            if strict_actions:
+                raise
+            geometry_action = {"status": "failed", "reason": str(exc)}
+        if geometry_action is not None:
+            actions.append({"action": "geometry_generator", **geometry_action})
+
+        job_record = _submit_stage_job(
+            stage_dir,
+            rendered_stage,
+            study_dir=study_dir,
+        )
+        if job_record is not None:
+            actions.append({"action": "submit_job", **job_record})
 
     failed = any(str(a.get("status", "")).lower() == "failed" for a in actions)
-    if job_record is not None and int(job_record.get("return_code", 1)) != 0:
-        failed = True
 
     stage_status = _load_stage_status(stage_dir)
     stage_status.setdefault("jobs", [])
-    if job_record is not None:
-        stage_status["jobs"].append(job_record)
+    job_records = [a for a in actions if "job_id" in a and "command" in a]
+    stage_status["jobs"].extend(job_records)
     stage_status["last_actions"] = actions
     stage_status["status"] = "failed" if failed else "completed"
     _write_stage_status(stage_dir, stage_status)
@@ -954,7 +1126,7 @@ def _execute_stage_run(
     return {
         "status": stage_status["status"],
         "actions": actions,
-        "job_id": job_record.get("job_id") if job_record else None,
+        "job_id": job_records[-1].get("job_id") if job_records else None,
     }
 
 
@@ -1056,289 +1228,6 @@ def _run_study(
     return counts
 
 
-def _first_option_for_dest(parser: argparse.ArgumentParser, dest: str) -> str | None:
-    for action in parser._actions:
-        if action.dest == dest and action.option_strings:
-            return action.option_strings[0]
-    return None
-
-
-def _option_exists(parser: argparse.ArgumentParser, option: str) -> bool:
-    for action in parser._actions:
-        if option in action.option_strings:
-            return True
-    return False
-
-
-def _build_analysis_cli_args(
-    parser: argparse.ArgumentParser,
-    *,
-    stage_dir: Path,
-    analysis_name: str,
-    extra_args: list[str],
-) -> list[str]:
-    args: list[str] = []
-
-    def add_opt(opt: str, value: str) -> None:
-        if _option_exists(parser, opt):
-            args.extend([opt, value])
-
-    add_opt("--run-dir", str(stage_dir))
-    add_opt("--dir", str(stage_dir))
-    add_opt("--input", str(stage_dir))
-    add_opt("--project-root", str(stage_dir / "reaxkit_workspace"))
-    add_opt("--engine", "reaxff")
-
-    # Fill file path options if their default files exist under the stage dir.
-    for opt, default_name in (
-        ("--xmolout", "xmolout"),
-        ("--fort7", "fort.7"),
-        ("--fort78", "fort.78"),
-        ("--control", "control"),
-        ("--summary", "summary.out"),
-    ):
-        if _option_exists(parser, opt):
-            candidate = stage_dir / default_name
-            if candidate.exists():
-                args.extend([opt, str(candidate)])
-
-    export_opt = _first_option_for_dest(parser, "export")
-    if export_opt:
-        out_dir = stage_dir / "reaxkit_workspace" / "analysis" / "study" / analysis_name
-        out_dir.mkdir(parents=True, exist_ok=True)
-        args.extend([export_opt, str(out_dir / "result.csv")])
-
-    summary_opt = _first_option_for_dest(parser, "summary")
-    if summary_opt:
-        out_dir = stage_dir / "reaxkit_workspace" / "analysis" / "study" / analysis_name
-        out_dir.mkdir(parents=True, exist_ok=True)
-        args.extend([summary_opt, str(out_dir / "summary.txt")])
-
-    # Best-effort defaults for required options.
-    supplied_dests = set()
-    for i, token in enumerate(args):
-        if token.startswith("-") and i + 1 < len(args):
-            for action in parser._actions:
-                if token in action.option_strings:
-                    supplied_dests.add(action.dest)
-                    break
-
-    for action in parser._actions:
-        if not getattr(action, "required", False):
-            continue
-        if action.dest in supplied_dests:
-            continue
-        if not action.option_strings:
-            # Skip required positional args in phase-4 generic mode.
-            continue
-        opt = action.option_strings[0]
-        if action.nargs == 0:
-            args.append(opt)
-            supplied_dests.add(action.dest)
-            continue
-        if getattr(action, "choices", None):
-            args.extend([opt, str(next(iter(action.choices)))])
-            supplied_dests.add(action.dest)
-            continue
-        if str(action.dest) == "frame":
-            args.extend([opt, "0"])
-            supplied_dests.add(action.dest)
-            continue
-        if action.type in (int, float):
-            args.extend([opt, "0"])
-            supplied_dests.add(action.dest)
-            continue
-        args.extend([opt, "0"])
-        supplied_dests.add(action.dest)
-
-    args.extend(extra_args)
-    return args
-
-
-def _run_single_analysis(
-    *,
-    analysis_name: str,
-    stage_dir: Path,
-    extra_args: list[str],
-) -> dict[str, Any]:
-    analysis_routes = get_registered_analysis_commands()
-    if analysis_name not in analysis_routes:
-        raise KeyError(f"Unknown analysis command: {analysis_name}")
-    module = importlib.import_module(analysis_routes[analysis_name].module_path)
-
-    parser = argparse.ArgumentParser(prog=f"reaxkit-study-analyze-{analysis_name}")
-    module.build_parser(parser, command=analysis_name)
-    cli_args = _build_analysis_cli_args(
-        parser,
-        stage_dir=stage_dir,
-        analysis_name=analysis_name,
-        extra_args=extra_args,
-    )
-    try:
-        ns = parser.parse_args(cli_args)
-    except SystemExit as exc:
-        return {
-            "status": "failed",
-            "return_code": int(exc.code) if isinstance(exc.code, int) else 2,
-            "args": cli_args,
-            "stdout": "",
-            "stderr": f"Argument parsing failed for analysis '{analysis_name}'.",
-        }
-
-    out_buf = io.StringIO()
-    err_buf = io.StringIO()
-    rc = 1
-    with redirect_stdout(out_buf), redirect_stderr(err_buf):
-        try:
-            rc = int(module.run_main(analysis_name, ns))
-        except Exception as exc:
-            err_buf.write(f"{type(exc).__name__}: {exc}\n")
-            rc = 1
-
-    export_path = None
-    if hasattr(ns, "export") and getattr(ns, "export", None):
-        export_path = str(getattr(ns, "export"))
-
-    return {
-        "status": "completed" if rc == 0 else "failed",
-        "return_code": rc,
-        "args": cli_args,
-        "stdout": out_buf.getvalue(),
-        "stderr": err_buf.getvalue(),
-        "export_path": export_path,
-    }
-
-
-def _analyze_study(
-    *,
-    study_root: Path,
-    analysis_name: str,
-    stage_name: str,
-    case_filter: str | None,
-    replicate_filter: str | None,
-    extra_args: list[str],
-    strict_actions: bool,
-) -> dict[str, Any]:
-    manifest = _read_json(study_root / "study_manifest.json")
-    case_entries = manifest.get("cases") or []
-
-    records: list[dict[str, Any]] = []
-    counts = {"completed": 0, "failed": 0, "skipped": 0}
-
-    for case in case_entries:
-        if not isinstance(case, dict):
-            continue
-        if not _case_matches_selector(case, case_filter):
-            continue
-        case_id = str(case.get("case_id") or "")
-        case_path = Path(str(case.get("path") or ""))
-        case_manifest = _read_json(case_path / "case_manifest.json")
-        reps = case_manifest.get("replicates") or []
-        for rep in reps:
-            if not isinstance(rep, dict):
-                continue
-            rep_id = str(rep.get("replicate_id") or "")
-            if replicate_filter and rep_id != replicate_filter:
-                continue
-            rep_path = Path(str(rep.get("path") or ""))
-            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
-            stage_entries = rep_manifest.get("stages") or []
-            target_entry = next(
-                (
-                    entry
-                    for entry in stage_entries
-                    if isinstance(entry, dict) and str(entry.get("stage") or "").strip() == stage_name
-                ),
-                None,
-            )
-            if target_entry is None:
-                counts["skipped"] += 1
-                records.append(
-                    {
-                        "case_id": case_id,
-                        "replicate_id": rep_id,
-                        "stage": stage_name,
-                        "status": "skipped",
-                        "reason": "stage_not_found",
-                    }
-                )
-                continue
-
-            stage_dir = Path(str(target_entry.get("path") or ""))
-            stage_status = _load_stage_status(stage_dir)
-            if str(stage_status.get("status") or "") != "completed":
-                counts["skipped"] += 1
-                records.append(
-                    {
-                        "case_id": case_id,
-                        "replicate_id": rep_id,
-                        "stage": stage_name,
-                        "stage_path": str(stage_dir),
-                        "status": "skipped",
-                        "reason": f"stage_not_completed:{stage_status.get('status')}",
-                    }
-                )
-                continue
-
-            print(f"[analyze] {case_id} {rep_id} {stage_name} -> {analysis_name}")
-            result = _run_single_analysis(
-                analysis_name=analysis_name,
-                stage_dir=stage_dir,
-                extra_args=extra_args,
-            )
-            rec = {
-                "case_id": case_id,
-                "replicate_id": rep_id,
-                "stage": stage_name,
-                "stage_path": str(stage_dir),
-                **result,
-            }
-            records.append(rec)
-            if rec["status"] == "completed":
-                counts["completed"] += 1
-            else:
-                counts["failed"] += 1
-                if strict_actions:
-                    break
-        if strict_actions and counts["failed"] > 0:
-            break
-
-    out_dir = study_root / "analysis" / analysis_name
-    out_dir.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "study_root": str(study_root),
-        "analysis": analysis_name,
-        "stage": stage_name,
-        "generated_at_utc": _utc_now(),
-        "counts": counts,
-        "records": records,
-    }
-    _write_json(out_dir / "study_analysis_manifest.json", payload)
-
-    csv_path = out_dir / "study_analysis_results.csv"
-    fieldnames = [
-        "case_id",
-        "replicate_id",
-        "stage",
-        "stage_path",
-        "status",
-        "return_code",
-        "reason",
-        "export_path",
-    ]
-    with csv_path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
-        writer.writeheader()
-        for rec in records:
-            writer.writerow({k: rec.get(k) for k in fieldnames})
-
-    return {
-        "counts": counts,
-        "manifest": out_dir / "study_analysis_manifest.json",
-        "csv": csv_path,
-    }
-
-
 def _safe_float(value: Any) -> float | None:
     try:
         fv = float(value)
@@ -1355,13 +1244,12 @@ def _load_csv_rows(path: Path) -> list[dict[str, str]]:
         return [dict(row) for row in reader]
 
 
-def _extract_scalar_from_export(
-    export_path: Path,
+def _extract_scalar_from_csv(
+    csv_path: Path,
     *,
-    analysis_name: str,
     value_column: str | None,
 ) -> tuple[float | None, str | None]:
-    rows = _load_csv_rows(export_path)
+    rows = _load_csv_rows(csv_path)
     if not rows:
         return None, None
 
@@ -1369,11 +1257,10 @@ def _extract_scalar_from_export(
     target_col: str | None = None
     if value_column:
         if value_column not in columns:
-            raise KeyError(f"Requested value column '{value_column}' not found in {export_path}.")
+            raise KeyError(f"Requested value column '{value_column}' not found in {csv_path}.")
         target_col = value_column
     else:
         preferred = [
-            analysis_name,
             "polarization",
             "P_z (uC/cm^2)",
             "p_z",
@@ -1405,6 +1292,69 @@ def _extract_scalar_from_export(
     if not vals:
         return None, target_col
     return float(sum(vals) / len(vals)), target_col
+
+
+def _normalize_stage_variables(rendered_stage: dict[str, Any]) -> dict[str, dict[str, str]]:
+    variables: dict[str, dict[str, str]] = {}
+    raw = rendered_stage.get("variables")
+    if not isinstance(raw, dict):
+        return variables
+    for variable_name, spec in raw.items():
+        name = str(variable_name).strip()
+        if not name or not isinstance(spec, dict):
+            continue
+        payload: dict[str, str] = {}
+        directory_value = str(spec.get("directory") or "").strip()
+        folder_id_value = str(spec.get("folder_id") or "").strip()
+        file_value = str(spec.get("file") or "").strip()
+        column_value = str(spec.get("column") or "").strip()
+        if directory_value:
+            payload["directory"] = directory_value
+        if folder_id_value:
+            payload["folder_id"] = folder_id_value
+        if file_value:
+            payload["file"] = file_value
+        if column_value:
+            payload["column"] = column_value
+        # Backward-compatible legacy spec with just file+column.
+        if "file" not in payload:
+            continue
+        variables[name] = payload
+    return variables
+
+
+def _resolve_variable_csv_path(*, stage_dir: Path, spec: dict[str, str]) -> Path | None:
+    directory_value = str(spec.get("directory") or "").strip()
+    folder_id_value = str(spec.get("folder_id") or "").strip()
+    file_value = str(spec.get("file") or "").strip()
+    if not file_value:
+        return None
+
+    file_path = Path(file_value)
+    if file_path.is_absolute():
+        return file_path
+
+    if not directory_value:
+        return stage_dir / file_value
+
+    directory_path = stage_dir / directory_value
+    if not directory_path.exists() or not directory_path.is_dir():
+        return None
+
+    target_dir = directory_path
+    if folder_id_value:
+        if folder_id_value.lower() == "latest":
+            children = [p for p in directory_path.iterdir() if p.is_dir()]
+            if not children:
+                return None
+            target_dir = max(children, key=lambda p: p.stat().st_mtime)
+        else:
+            explicit = directory_path / folder_id_value
+            if not explicit.exists() or not explicit.is_dir():
+                return None
+            target_dir = explicit
+
+    return target_dir / file_value
 
 
 def _sort_values(values: list[Any]) -> list[Any]:
@@ -1477,69 +1427,108 @@ def _make_aggregate_plot(
     return True, "ok"
 
 
+def _iter_replicate_variable_records(
+    *,
+    study_manifest: dict[str, Any],
+    variable_name: str,
+    stage_filter: str | None,
+    value_column_override: str | None,
+) -> tuple[list[dict[str, Any]], str | None]:
+    param_names = list((study_manifest.get("parameters") or {}).keys())
+    raw_rows: list[dict[str, Any]] = []
+    resolved_column: str | None = None
+    case_entries = study_manifest.get("cases") or []
+
+    for case in case_entries:
+        if not isinstance(case, dict):
+            continue
+        case_id = str(case.get("case_id") or "")
+        case_params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
+        case_path = Path(str(case.get("path") or ""))
+        case_manifest = _read_json(case_path / "case_manifest.json")
+        reps = case_manifest.get("replicates") or []
+        for rep in reps:
+            if not isinstance(rep, dict):
+                continue
+            rep_id = str(rep.get("replicate_id") or "")
+            rep_path = Path(str(rep.get("path") or ""))
+            rep_manifest = _read_json(rep_path / "replicate_manifest.json")
+            stage_entries = rep_manifest.get("stages") or []
+            for stage_entry in stage_entries:
+                if not isinstance(stage_entry, dict):
+                    continue
+                stage_name = str(stage_entry.get("stage") or "").strip()
+                if not stage_name:
+                    continue
+                if stage_filter and stage_name != stage_filter:
+                    continue
+
+                stage_dir = Path(str(stage_entry.get("path") or ""))
+                stage_status = _load_stage_status(stage_dir)
+                if str(stage_status.get("status") or "") != "completed":
+                    continue
+                stage_manifest = _read_json(stage_dir / "stage_manifest.json")
+                rendered_stage = stage_manifest.get("rendered_stage")
+                if not isinstance(rendered_stage, dict):
+                    continue
+                variables = _normalize_stage_variables(rendered_stage)
+                spec = variables.get(variable_name)
+                if not isinstance(spec, dict):
+                    continue
+
+                csv_path = _resolve_variable_csv_path(stage_dir=stage_dir, spec=spec)
+                if csv_path is None:
+                    continue
+                if not csv_path.exists():
+                    continue
+
+                spec_col = str(spec.get("column") or "").strip() or None
+                scalar, used_col = _extract_scalar_from_csv(
+                    csv_path,
+                    value_column=value_column_override or spec_col,
+                )
+                if used_col and resolved_column is None:
+                    resolved_column = used_col
+                if scalar is None:
+                    continue
+
+                row = {
+                    "case_id": case_id,
+                    "replicate": rep_id,
+                    "stage": stage_name,
+                    variable_name: scalar,
+                    "source_file": str(csv_path),
+                    "source_column": used_col,
+                }
+                for param in param_names:
+                    row[param] = case_params.get(param)
+                raw_rows.append(row)
+                break
+
+    return raw_rows, resolved_column
+
+
 def _aggregate_study_analysis(
     *,
     study_root: Path,
     analysis_name: str,
     value_column: str | None,
+    stage_filter: str | None,
 ) -> dict[str, Any]:
     study_manifest = _read_json(study_root / "study_manifest.json")
-    analysis_manifest_path = study_root / "analysis" / analysis_name / "study_analysis_manifest.json"
-    analysis_manifest = _read_json(analysis_manifest_path)
-
-    case_params: dict[str, dict[str, Any]] = {}
-    for case in study_manifest.get("cases") or []:
-        if not isinstance(case, dict):
-            continue
-        case_id = str(case.get("case_id") or "")
-        params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
-        if case_id:
-            case_params[case_id] = dict(params)
-
     param_names = list((study_manifest.get("parameters") or {}).keys())
-    raw_rows: list[dict[str, Any]] = []
-    records = analysis_manifest.get("records") or []
-    chosen_column: str | None = None
-
-    for rec in records:
-        if not isinstance(rec, dict):
-            continue
-        if str(rec.get("status") or "") != "completed":
-            continue
-        export_path = rec.get("export_path")
-        if not export_path:
-            continue
-        p = Path(str(export_path))
-        if not p.exists():
-            continue
-        scalar, used_col = _extract_scalar_from_export(
-            p,
-            analysis_name=analysis_name,
-            value_column=value_column,
-        )
-        if used_col and chosen_column is None:
-            chosen_column = used_col
-        if scalar is None:
-            continue
-
-        case_id = str(rec.get("case_id") or "")
-        rep_id = str(rec.get("replicate_id") or "")
-        row = {
-            "case_id": case_id,
-            "replicate": rep_id,
-            analysis_name: scalar,
-            "export_path": str(p),
-        }
-        params = case_params.get(case_id, {})
-        for name in param_names:
-            row[name] = params.get(name)
-        raw_rows.append(row)
+    raw_rows, chosen_column = _iter_replicate_variable_records(
+        study_manifest=study_manifest,
+        variable_name=analysis_name,
+        stage_filter=stage_filter,
+        value_column_override=value_column,
+    )
 
     out_dir = study_root / "analysis" / analysis_name / "aggregate"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     raw_csv = out_dir / f"{analysis_name}_raw.csv"
-    raw_fields = [*param_names, "replicate", analysis_name, "case_id", "export_path"]
+    raw_fields = [*param_names, "replicate", analysis_name, "case_id", "stage", "source_file", "source_column"]
     with raw_csv.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=raw_fields)
         writer.writeheader()
@@ -1586,7 +1575,8 @@ def _aggregate_study_analysis(
 
     manifest = {
         "study_root": str(study_root),
-        "analysis": analysis_name,
+        "variable": analysis_name,
+        "stage_filter": stage_filter,
         "value_column": value_column,
         "resolved_value_column": chosen_column,
         "raw_count": len(raw_rows),
@@ -1635,7 +1625,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --run study_MgTemp/ --stage MM\n"
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study aggregate study_MgTemp/ --analysis polarization\n"
-        "  reaxkit study --analyze study_MgTemp/ --analysis polarization --stage NVT"
+        "  reaxkit study aggregate study_MgTemp/ --analysis polarization --stage NVT"
     )
 
     mode = parser.add_mutually_exclusive_group(required=False)
@@ -1662,11 +1652,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "--run",
         metavar="STUDY_ROOT",
         help="Execute study stages from an initialized study root folder.",
-    )
-    mode.add_argument(
-        "--analyze",
-        metavar="STUDY_ROOT",
-        help="Run one analysis command across cases/replicates for a target stage.",
     )
     parser.add_argument(
         "--root",
@@ -1714,13 +1699,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--analysis",
         default=None,
-        help="Analysis command name for --analyze (e.g. polarization, msd).",
-    )
-    parser.add_argument(
-        "--analysis-arg",
-        action="append",
-        default=[],
-        help="Extra argument to pass to the underlying analysis command (repeatable).",
+        help="Variable name for study aggregate (e.g. polarization, field).",
     )
     parser.add_argument(
         "--value-column",
@@ -1750,15 +1729,14 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         target = _clean_opt(getattr(args, "study_action_target", None))
         if target is None:
             raise ValueError("study aggregate requires a study root path: reaxkit study aggregate <study_root> --analysis ...")
-        analysis_routes = get_registered_analysis_commands()
-        analysis_raw = _clean_opt(getattr(args, "analysis", None))
-        if analysis_raw is None:
+        variable_name = _clean_opt(getattr(args, "analysis", None))
+        if variable_name is None:
             raise ValueError("--analysis is required for study aggregate.")
-        analysis_name = resolve_command_name(analysis_raw, task_names=analysis_routes.keys())
         result = _aggregate_study_analysis(
             study_root=Path(target).resolve(),
-            analysis_name=analysis_name,
+            analysis_name=variable_name,
             value_column=_clean_opt(getattr(args, "value_column", None)),
+            stage_filter=_clean_opt(getattr(args, "stage", None)),
         )
         print(f"Raw CSV: {result['raw_csv']}")
         print(f"Grouped CSV: {result['grouped_csv']}")
@@ -1785,38 +1763,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         )
         return 1 if counts["failed"] > 0 else 0
 
-    analyze_root = getattr(args, "analyze", None)
-    if analyze_root is not None:
-        analysis_routes = get_registered_analysis_commands()
-        analysis_raw = _clean_opt(getattr(args, "analysis", None))
-        if analysis_raw is None:
-            raise ValueError("--analysis is required with --analyze.")
-        analysis_name = resolve_command_name(analysis_raw, task_names=analysis_routes.keys())
-        stage_name = _clean_opt(getattr(args, "stage", None))
-        if stage_name is None:
-            raise ValueError("--stage is required with --analyze.")
-
-        result = _analyze_study(
-            study_root=Path(str(analyze_root)).resolve(),
-            analysis_name=analysis_name,
-            stage_name=stage_name,
-            case_filter=_clean_opt(getattr(args, "case", None)),
-            replicate_filter=_clean_opt(getattr(args, "replicate", None)),
-            extra_args=list(getattr(args, "analysis_arg", []) or []),
-            strict_actions=bool(getattr(args, "strict_actions", False)),
-        )
-        counts = result["counts"]
-        print(
-            "Analyze summary: "
-            f"completed={counts['completed']} skipped={counts['skipped']} failed={counts['failed']}"
-        )
-        print(f"Manifest: {result['manifest']}")
-        print(f"CSV: {result['csv']}")
-        return 1 if counts["failed"] > 0 else 0
-
     init_path = getattr(args, "init", None)
     if init_path is None:
-        raise ValueError("Missing required mode. Use --init, --run, --analyze, or --make-yaml.")
+        raise ValueError("Missing required mode. Use --init, --run, study aggregate, or --make-yaml.")
 
     study_root = _init_study(
         Path(str(init_path)),
