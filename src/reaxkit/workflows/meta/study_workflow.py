@@ -33,6 +33,34 @@ DEFAULT_ARTIFACT_TRANSFER = "copy"
 SUPPORTED_ARTIFACT_TRANSFER = {"copy", "symlink", "hardlink"}
 STAGE_STATUS_FILE = ".stage_status.json"
 AGGREGATE_ACTION = "aggregate"
+RR_CLEANUP_PATTERNS = [
+    "job.*",
+    "fort.*",
+    "59s",
+    "57s",
+    "58s",
+    "4s",
+    "13s",
+    "13s2",
+    "vels23",
+    "6*",
+    "7*",
+    "8*",
+    "9*",
+    "Kid*",
+    "Unknown*",
+    "*log",
+    "*out",
+    "*.recover",
+    "*thermolog",
+    "energy*",
+    "reax*",
+    "output*",
+    "mol*",
+    "xmolout",
+    "summary.txt",
+    "ffieldss",
+]
 
 STUDY_TEMPLATE_YAML = """study_name: mg_temp_sweep
 template: "./template"
@@ -170,6 +198,42 @@ def _write_study_run_status(
             writer.writerow({k: row.get(k) for k in fieldnames})
 
     return json_path, csv_path
+
+
+def _load_study_run_status_rows(study_root: Path) -> list[dict[str, str]]:
+    csv_path = study_root / "study_run_status.csv"
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"Cannot use rerun mode because status file does not exist: {csv_path}. "
+            "Run 'reaxkit study --run <study_root>' once first."
+        )
+    with csv_path.open("r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        return [dict(row) for row in reader]
+
+
+def _to_int(value: Any) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return 0
+
+
+def _cleanup_stage_artifacts(stage_dir: Path) -> int:
+    removed = 0
+    for pattern in RR_CLEANUP_PATTERNS:
+        for target in stage_dir.glob(pattern):
+            if target.name in {STAGE_STATUS_FILE, "stage_manifest.json"}:
+                continue
+            try:
+                if target.is_dir() and not target.is_symlink():
+                    shutil.rmtree(target)
+                else:
+                    target.unlink()
+                removed += 1
+            except FileNotFoundError:
+                continue
+    return removed
 
 
 def _slug(value: Any) -> str:
@@ -1212,6 +1276,7 @@ def _run_single_replicate_pipeline(
     artifact_transfer: str,
     run_geometry_generator: bool,
     strict_actions: bool,
+    cleanup_before_stage: bool,
 ) -> dict[str, Any]:
     counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
     started_at = _local_now()
@@ -1286,6 +1351,16 @@ def _run_single_replicate_pipeline(
             continue
 
         _log_stage_event(case_id, rep_id, stage_name, "RUN", stage_block_width=stage_block_width)
+        if cleanup_before_stage:
+            removed_n = _cleanup_stage_artifacts(stage_dir)
+            _log_stage_event(
+                case_id,
+                rep_id,
+                stage_name,
+                "CLEAN",
+                f"removed={removed_n}",
+                stage_block_width=stage_block_width,
+            )
         result = _execute_stage_run(
             stage_dir=stage_dir,
             stage_manifest=stage_manifest,
@@ -1355,6 +1430,7 @@ def _run_study(
     run_geometry_generator: bool,
     strict_actions: bool,
     parallel_workers: int,
+    rerun_failed: bool,
 ) -> dict[str, int]:
     manifest = _read_json(study_root / "study_manifest.json")
     case_entries = manifest.get("cases") or []
@@ -1365,11 +1441,26 @@ def _run_study(
     tasks: list[tuple[dict[str, Any], dict[str, Any]]] = []
     row_map: dict[tuple[str, str], dict[str, Any]] = {}
 
+    rerun_targets: set[tuple[str, str]] | None = None
+    if rerun_failed:
+        rerun_targets = set()
+        for row in _load_study_run_status_rows(study_root):
+            case_id = str(row.get("case_id") or "").strip()
+            rep_id = str(row.get("replicate_id") or "").strip()
+            fail_n = _to_int(row.get("fail"))
+            wait_n = _to_int(row.get("wait"))
+            status = str(row.get("status") or "").strip().lower()
+            if not case_id or not rep_id:
+                continue
+            if fail_n > 0 or wait_n > 0 or status in {"failed", "waiting"}:
+                rerun_targets.add((case_id, rep_id))
+
     for case in case_entries:
         if not isinstance(case, dict):
             continue
         if not _case_matches_selector(case, case_filter):
             continue
+        case_id = str(case.get("case_id") or "")
         case_path = Path(str(case.get("path") or ""))
         case_manifest = _read_json(case_path / "case_manifest.json")
         reps = case_manifest.get("replicates") or []
@@ -1379,8 +1470,9 @@ def _run_study(
             rep_id = str(rep.get("replicate_id") or "")
             if replicate_filter and rep_id != replicate_filter:
                 continue
+            if rerun_targets is not None and (case_id, rep_id) not in rerun_targets:
+                continue
             tasks.append((case, rep))
-            case_id = str(case.get("case_id") or "")
             row_map[(case_id, rep_id)] = {
                 "case_id": case_id,
                 "replicate_id": rep_id,
@@ -1405,6 +1497,11 @@ def _run_study(
         }
         _write_study_run_status(study_root=study_root, rows=rows, summary=summary)
 
+    if rerun_failed and not tasks:
+        print("[info] No failed/waiting replicates found in study_run_status.csv.")
+        persist_status()
+        return counts
+
     persist_status()
 
     workers = max(1, int(parallel_workers))
@@ -1422,6 +1519,7 @@ def _run_study(
                 artifact_transfer=artifact_transfer,
                 run_geometry_generator=run_geometry_generator,
                 strict_actions=strict_actions,
+                cleanup_before_stage=rerun_failed,
             )
             for key in counts:
                 counts[key] += int(rec.get(key, 0))
@@ -1453,6 +1551,7 @@ def _run_study(
                 artifact_transfer=artifact_transfer,
                 run_geometry_generator=run_geometry_generator,
                 strict_actions=False,
+                cleanup_before_stage=rerun_failed,
             )
             for case, rep in tasks
         ]
@@ -1871,6 +1970,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --init study.yaml --root studies --force\n"
         "  reaxkit study --run study_MgTemp/\n"
         "  reaxkit study --run study_MgTemp/ --parallel-workers 4\n"
+        "  reaxkit study --run study_MgTemp/ --rerun-failed\n"
         "  reaxkit study --run study_MgTemp/ --stage MM\n"
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study aggregate study_MgTemp/ --analysis polarization\n"
@@ -1952,6 +2052,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Number of replicate pipelines to run in parallel for --run (default: 1).",
     )
     parser.add_argument(
+        "--rerun-failed",
+        action="store_true",
+        help="For --run, rerun only replicates with fail>0 or wait>0 in study_run_status.csv; cleans stage artifacts before rerun.",
+    )
+    parser.add_argument(
         "--analysis",
         default=None,
         help="Variable name for study aggregate (e.g. polarization, field).",
@@ -2011,6 +2116,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             run_geometry_generator=bool(getattr(args, "run_geometry_generator", True)),
             strict_actions=bool(getattr(args, "strict_actions", False)),
             parallel_workers=int(getattr(args, "parallel_workers", 1)),
+            rerun_failed=bool(getattr(args, "rerun_failed", False)),
         )
         print(
             "Run summary: "
