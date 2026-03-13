@@ -24,6 +24,7 @@ from reaxkit.engine.reaxff.generators.control_generator import (
     write_control,
     write_control_template_with_overrides,
 )
+from reaxkit.presentation.plot.registry import plot as render_plot
 
 STUDY_COMMAND = "study"
 CONTROL_PARAMETER_ALIASES = {
@@ -3120,6 +3121,157 @@ def _aggregate_study_all(
     return [out]
 
 
+def _sort_plot_x(values: list[Any]) -> list[Any]:
+    return _sort_values(list(values))
+
+
+def _make_errorbar_plots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: str) -> list[Path]:
+    per_x_csv = case_agg_dir / "per_x_stats.csv"
+    if not per_x_csv.exists():
+        return []
+    rows = _load_csv_rows(per_x_csv)
+    if not rows:
+        return []
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        y_name = str(row.get("y_name") or "").strip()
+        if not y_name:
+            continue
+        grouped.setdefault(y_name, []).append(row)
+
+    outputs: list[Path] = []
+    for y_name, items in grouped.items():
+        items_sorted = sorted(items, key=lambda r: _to_plot_value(r.get("x_value")))
+        x_vals: list[Any] = []
+        y_vals: list[float] = []
+        err_vals: list[float] = []
+        for r in items_sorted:
+            x_raw = r.get("x_value")
+            x_num = _safe_float(x_raw)
+            x_vals.append(x_num if x_num is not None else str(x_raw))
+            y_mean = _safe_float(r.get("y_mean"))
+            y_std = _safe_float(r.get("y_std"))
+            y_sem = _safe_float(r.get("y_sem"))
+            if y_mean is None:
+                continue
+            y_vals.append(y_mean)
+            err_vals.append(y_sem if y_sem is not None else (y_std if y_std is not None else 0.0))
+        if not y_vals:
+            continue
+        out_path = case_agg_dir / f"errorbar_{_slug_underscore(y_name)}.png"
+        render_plot(
+            {
+                "plot_type": "errorbar_plot",
+                "x": x_vals[: len(y_vals)],
+                "y": y_vals,
+                "yerr": err_vals,
+                "xlabel": "x",
+                "ylabel": y_name,
+                "title": f"{aggregate_title} - {y_name} (errorbar)",
+                "legend": False,
+                "save": str(out_path),
+            }
+        )
+        outputs.append(out_path)
+    return outputs
+
+
+def _make_boxplots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: str) -> list[Path]:
+    raw_csv = case_agg_dir / "raw_replicates.csv"
+    if not raw_csv.exists():
+        return []
+    rows = _load_csv_rows(raw_csv)
+    if not rows:
+        return []
+
+    grouped_y: dict[str, dict[Any, list[float]]] = {}
+    for row in rows:
+        y_name = str(row.get("y_name") or "").strip()
+        if not y_name:
+            continue
+        x_val = row.get("x_value")
+        y_val = _safe_float(row.get("y_value"))
+        if y_val is None:
+            continue
+        grouped_y.setdefault(y_name, {}).setdefault(x_val, []).append(y_val)
+
+    outputs: list[Path] = []
+    for y_name, xmap in grouped_y.items():
+        x_keys = _sort_plot_x(list(xmap.keys()))
+        data: list[list[float]] = []
+        labels: list[str] = []
+        for xv in x_keys:
+            vals = xmap.get(xv)
+            if not vals:
+                continue
+            data.append(vals)
+            labels.append(str(xv))
+        if not data:
+            continue
+        out_path = case_agg_dir / f"boxplot_{_slug_underscore(y_name)}.png"
+        render_plot(
+            {
+                "plot_type": "box_whisker_plot",
+                "data": data,
+                "labels": labels,
+                "xlabel": "x",
+                "ylabel": y_name,
+                "title": f"{aggregate_title} - {y_name} (boxplot)",
+                "save": str(out_path),
+            }
+        )
+        outputs.append(out_path)
+    return outputs
+
+
+def _plot_study_aggregates(
+    *,
+    study_root: Path,
+    aggregate_title_filter: str | None,
+    case_filter: str | None,
+) -> dict[str, Any]:
+    study_manifest = _read_json(study_root / "study_manifest.json")
+    study_doc = _load_source_study_doc(study_manifest)
+    aggregate_defs = _aggregate_defs_from_doc(study_doc)
+    if not aggregate_defs:
+        raise ValueError("No top-level aggregate definitions found in study.yaml.")
+
+    if aggregate_title_filter:
+        if aggregate_title_filter not in aggregate_defs:
+            raise KeyError(f"Unknown aggregate title: {aggregate_title_filter}")
+        target_titles = [aggregate_title_filter]
+    else:
+        target_titles = list(aggregate_defs.keys())
+
+    generated: list[Path] = []
+    missing: list[str] = []
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        if not _case_matches_selector(case, case_filter):
+            continue
+        case_path = Path(str(case.get("path") or ""))
+        for agg_title in target_titles:
+            case_agg_dir = case_path / "aggregate" / agg_title
+            if not case_agg_dir.exists():
+                missing.append(str(case_agg_dir))
+                continue
+            generated.extend(_make_errorbar_plots_for_case_aggregate(case_agg_dir, aggregate_title=agg_title))
+            generated.extend(_make_boxplots_for_case_aggregate(case_agg_dir, aggregate_title=agg_title))
+
+    out_manifest = {
+        "study_root": str(study_root),
+        "aggregate_titles": target_titles,
+        "generated_count": len(generated),
+        "generated_files": [str(p) for p in generated],
+        "missing_dirs": missing,
+        "generated_at_utc": _utc_now(),
+    }
+    manifest_path = study_root / "plot_status.json"
+    _write_json(manifest_path, out_manifest)
+    return {"generated": generated, "missing": missing, "manifest": manifest_path}
+
+
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
     parser.set_defaults(command=STUDY_COMMAND)
@@ -3140,7 +3292,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --analyze study_MgTemp/ --analysis msd\n"
         "  reaxkit study --aggregate study_MgTemp/\n"
         "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation\n"
-        "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT"
+        "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT\n"
+        "  reaxkit study --plot study_MgTemp/\n"
+        "  reaxkit study --plot study_MgTemp/ --plot msd_atom1_aggregation"
     )
 
     mode = parser.add_mutually_exclusive_group(required=False)
@@ -3178,6 +3332,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         action="append",
         metavar="VALUE",
         help="Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
+    )
+    mode.add_argument(
+        "--plot",
+        action="append",
+        metavar="VALUE",
+        help="Plot mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
     )
     parser.add_argument(
         "--root",
@@ -3287,6 +3447,25 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             print(f"Manifest: {result['manifest']}")
         return 0
 
+    plot_values = getattr(args, "plot", None)
+    if plot_values is not None:
+        if not isinstance(plot_values, list) or len(plot_values) == 0:
+            raise ValueError("--plot requires at least one value: study root.")
+        if len(plot_values) > 2:
+            raise ValueError("--plot accepts at most two values: study root and optional aggregate title.")
+        target = _clean_opt(plot_values[0])
+        if target is None:
+            raise ValueError("--plot requires a study root path.")
+        aggregate_title_filter = _clean_opt(plot_values[1]) if len(plot_values) == 2 else None
+        result = _plot_study_aggregates(
+            study_root=Path(target).resolve(),
+            aggregate_title_filter=aggregate_title_filter,
+            case_filter=_clean_opt(getattr(args, "case", None)),
+        )
+        print(f"Plot manifest: {result['manifest']}")
+        print(f"Generated plots: {len(result['generated'])}")
+        return 0
+
     run_root = getattr(args, "run", None)
     if run_root is not None:
         run_root_path = Path(str(run_root)).resolve()
@@ -3330,7 +3509,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     init_path = getattr(args, "init", None)
     if init_path is None:
-        raise ValueError("Missing required mode. Use --init, --run, --analyze, --aggregate, or --make-yaml.")
+        raise ValueError("Missing required mode. Use --init, --run, --analyze, --aggregate, --plot, or --make-yaml.")
 
     study_root = _init_study(
         Path(str(init_path)),

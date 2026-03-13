@@ -6,11 +6,13 @@ from typing import Any, Mapping, Optional
 
 from reaxkit.presentation.plot.renderers.directed import DirectedPlotRenderer
 from reaxkit.presentation.plot.renderers.dual_yaxis import DualYaxisPlotRenderer
+from reaxkit.presentation.plot.renderers.errorbar import ErrorbarPlotRenderer
 from reaxkit.presentation.plot.renderers.heatmap2d import Heatmap2DRenderer
 from reaxkit.presentation.plot.renderers.multi_subplots import MultiSubplotsRenderer
 from reaxkit.presentation.plot.renderers.scatter3d import Scatter3DRenderer
 from reaxkit.presentation.plot.renderers.single import SinglePlotRenderer
 from reaxkit.presentation.plot.renderers.tornado import TornadoPlotRenderer
+from reaxkit.presentation.plot.renderers.boxplot import BoxWhiskerPlotRenderer
 
 PLOT_REGISTRY = {
     "single_plot": SinglePlotRenderer(),
@@ -20,12 +22,16 @@ PLOT_REGISTRY = {
     "tornado_plot": TornadoPlotRenderer(),
     "scatter3d_points": Scatter3DRenderer(),
     "heatmap2d_from_3d": Heatmap2DRenderer(),
+    "errorbar_plot": ErrorbarPlotRenderer(),
+    "box_whisker_plot": BoxWhiskerPlotRenderer(),
     # backward-compatible aliases
     "line": SinglePlotRenderer(),
     "multicurve": SinglePlotRenderer(),
     "dual_axis": DualYaxisPlotRenderer(),
     "scatter3d": Scatter3DRenderer(),
     "heatmap2d": Heatmap2DRenderer(),
+    "errorbar": ErrorbarPlotRenderer(),
+    "boxplot": BoxWhiskerPlotRenderer(),
 }
 
 

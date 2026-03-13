@@ -1,8 +1,10 @@
 """Renderer-based plotting API."""
 
 from reaxkit.presentation.plot.renderers.base import PlotRenderer
+from reaxkit.presentation.plot.renderers.boxplot import BoxWhiskerPlotRenderer
 from reaxkit.presentation.plot.renderers.directed import DirectedPlotRenderer
 from reaxkit.presentation.plot.renderers.dual_yaxis import DualYaxisPlotRenderer
+from reaxkit.presentation.plot.renderers.errorbar import ErrorbarPlotRenderer
 from reaxkit.presentation.plot.renderers.heatmap2d import Heatmap2DRenderer
 from reaxkit.presentation.plot.renderers.multi_subplots import MultiSubplotsRenderer
 from reaxkit.presentation.plot.registry import PLOT_REGISTRY, plot
@@ -38,6 +40,15 @@ def scatter3d_points(coords, values, **kwargs):
 def heatmap2d_from_3d(coords, values, **kwargs):
     return plot({"plot_type": "heatmap2d_from_3d", "coords": coords, "values": values, **kwargs})
 
+
+def errorbar_plot(x=None, y=None, yerr=None, **kwargs):
+    return plot({"plot_type": "errorbar_plot", "x": x, "y": y, "yerr": yerr, **kwargs})
+
+
+def box_whisker_plot(data, labels=None, **kwargs):
+    return plot({"plot_type": "box_whisker_plot", "data": data, "labels": labels, **kwargs})
+
+
 __all__ = [
     "PlotRenderer",
     "SinglePlotRenderer",
@@ -47,6 +58,8 @@ __all__ = [
     "TornadoPlotRenderer",
     "Scatter3DRenderer",
     "Heatmap2DRenderer",
+    "ErrorbarPlotRenderer",
+    "BoxWhiskerPlotRenderer",
     "PLOT_REGISTRY",
     "plot",
     "single_plot",
@@ -56,4 +69,6 @@ __all__ = [
     "tornado_plot",
     "scatter3d_points",
     "heatmap2d_from_3d",
+    "errorbar_plot",
+    "box_whisker_plot",
 ]
