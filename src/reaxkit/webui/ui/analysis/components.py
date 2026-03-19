@@ -24,8 +24,21 @@ def visualization_canvas() -> html.Div:
     """Main canvas area driven by active result tab."""
     return html.Div(
         [
-            html.H3("Visualization Canvas"),
+            html.Div(
+                [
+                    html.H3("Visualization Canvas"),
+                    html.Div(
+                        [
+                            html.Button("Save", id="btn-canvas-primary", n_clicks=0, style={"display": "none"}),
+                            html.Button("Save As", id="btn-canvas-secondary", n_clicks=0, style={"display": "none"}),
+                        ],
+                        className="rk-canvas-actions",
+                    ),
+                ],
+                className="rk-canvas-head",
+            ),
             html.Div(id="canvas-content", className="rk-canvas-box"),
+            html.Div(id="canvas-export-status", className="rk-log-name"),
         ]
     )
 

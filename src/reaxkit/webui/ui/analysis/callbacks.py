@@ -19,6 +19,7 @@ import tempfile
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY, task_display_label
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_dash_request
+from reaxkit.utils.export_utils import write_figure, write_table
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.backend.tabular_payload import extract_tabular_rows, infer_columns, infer_numeric_columns
 from reaxkit.webui.backend.utility_registry import canonical_utility_name, default_utility_request
@@ -312,6 +313,101 @@ def _browse_directory() -> str | None:
     except Exception:
         return None
     return None
+
+
+def _browse_save_file(
+    *,
+    title: str,
+    initial_dir: Path,
+    initial_name: str,
+    filetypes: list[tuple[str, str]],
+    default_ext: str,
+) -> Path | None:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        chosen = filedialog.asksaveasfilename(
+            title=title,
+            initialdir=str(initial_dir),
+            initialfile=initial_name,
+            defaultextension=default_ext,
+            filetypes=filetypes,
+        )
+        root.destroy()
+        if chosen and isinstance(chosen, str):
+            return Path(chosen)
+    except Exception:
+        return None
+    return None
+
+
+def _default_export_dir(
+    snapshot: dict[str, Any] | None,
+    session: dict[str, Any] | None,
+    config: dict[str, Any] | None,
+) -> Path:
+    cfg = dict(config or {})
+    project_root = Path(str(cfg.get("workspace_dir") or "reaxkit_workspace")).resolve()
+    dataset = _latest_dataset_node(snapshot)
+    if isinstance(dataset, dict):
+        meta = dataset.get("metadata", {}) if isinstance(dataset.get("metadata"), dict) else {}
+        project_raw = str(meta.get("project_root") or "").strip()
+        if project_raw:
+            project_root = Path(project_raw).resolve()
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    selected_node_id = str((session or {}).get("selected_node_id") or "")
+    analysis_id = _ancestor_analysis_id(nodes, selected_node_id) if isinstance(nodes, dict) and selected_node_id else None
+    workflow = "analysis"
+    if analysis_id and isinstance(nodes, dict):
+        anode = nodes.get(analysis_id)
+        if isinstance(anode, dict):
+            workflow = str(anode.get("metadata", {}).get("task_name") or anode.get("name") or "analysis")
+    export_dir = project_root / "analysis" / workflow
+    if analysis_id:
+        export_dir = export_dir / str(analysis_id)
+    export_dir.mkdir(parents=True, exist_ok=True)
+    return export_dir
+
+
+def _resolve_canvas_source_node(
+    snapshot: dict[str, Any] | None,
+    session: dict[str, Any] | None,
+    tab_node_id: str | None,
+) -> dict[str, Any] | None:
+    if not snapshot or not session:
+        return None
+    nodes = snapshot.get("nodes", {})
+    if not isinstance(nodes, dict):
+        return None
+    node_id = str(session.get("selected_node_id") or "")
+    selected_node = nodes.get(node_id)
+    if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
+        return None
+    if str(node_id).startswith("virtual:visualization:") and not tab_node_id:
+        return None
+    source_node_id = str(tab_node_id or node_id)
+    source_node = nodes.get(source_node_id)
+    if not isinstance(source_node, dict):
+        return None
+    if str(source_node.get("kind")) == "utility":
+        analysis_id = _ancestor_analysis_id(nodes, source_node_id)
+        if analysis_id:
+            viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id)
+            if viz_nodes:
+                selected_viz = None
+                for vnode in viz_nodes:
+                    req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
+                    meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
+                    vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
+                    if vtype == "table":
+                        selected_viz = vnode
+                        break
+                source_node = selected_viz or viz_nodes[0]
+    return source_node if isinstance(source_node, dict) else None
 
 
 def _engine_display_name(value: str | None) -> str:
@@ -1068,12 +1164,36 @@ def _apply_2d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool =
     tick_x = _parse_float(req.get("tick_spacing_x"), None)
     tick_y = _parse_float(req.get("tick_spacing_y"), None)
 
-    fig.update_layout(template=theme, font={"size": font_size})
-    xaxis_cfg: dict[str, Any] = {"showgrid": grid_on}
-    yaxis_cfg: dict[str, Any] = {"showgrid": grid_on}
+    fig.update_layout(
+        template=theme,
+        font={"size": font_size, "color": "black"},
+        title={"font": {"color": "black"}},
+    )
+    xaxis_cfg: dict[str, Any] = {
+        "showgrid": grid_on,
+        "showline": True,
+        "linecolor": "black",
+        "linewidth": 1.5,
+        "mirror": True,
+        "ticks": "outside",
+        "tickcolor": "black",
+    }
+    yaxis_cfg: dict[str, Any] = {
+        "showgrid": grid_on,
+        "showline": True,
+        "linecolor": "black",
+        "linewidth": 1.5,
+        "mirror": True,
+        "ticks": "outside",
+        "tickcolor": "black",
+    }
     if axis_title_size is not None:
         xaxis_cfg["title_font"] = {"size": axis_title_size}
         yaxis_cfg["title_font"] = {"size": axis_title_size}
+    xaxis_cfg["title_font"] = {**(xaxis_cfg.get("title_font") or {}), "color": "black"}
+    yaxis_cfg["title_font"] = {**(yaxis_cfg.get("title_font") or {}), "color": "black"}
+    xaxis_cfg["tickfont"] = {"color": "black"}
+    yaxis_cfg["tickfont"] = {"color": "black"}
     if tick_x is not None:
         xaxis_cfg["dtick"] = tick_x
     if tick_y is not None:
@@ -1181,6 +1301,160 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
                 label = _visualization_display_label(snapshot, str(vnode.get("id")))
                 rendered.append(row(str(vnode.get("id")), label, 5, str(vnode.get("status", "idle"))))
     return rendered
+
+
+def _build_canvas_payload(
+    *,
+    snapshot: dict[str, Any] | None,
+    session: dict[str, Any] | None,
+    result_store: dict[str, Any] | None,
+    tab_node_id: str | None,
+    x_col: str | None,
+    y_col: str | None,
+    group_col: str | None,
+    hist_col: str | None,
+    view3d_x: str | None,
+    view3d_y: str | None,
+    view3d_z: str | None,
+    view3d_color: str | None,
+    focus_atom: str | None,
+) -> tuple[str, list[dict[str, Any]], go.Figure | None]:
+    source_node = _resolve_canvas_source_node(snapshot, session, tab_node_id)
+    if not isinstance(source_node, dict):
+        return "none", [], None
+    nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+    source_node_id = str(source_node.get("id") or "")
+    artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
+    rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
+    if focus_atom:
+        rows = [r for r in rows if str(r.get("atom_id")) == str(focus_atom)]
+    req = source_node.get("request", {}) if isinstance(source_node.get("request"), dict) else {}
+    rows = _apply_row_filters(rows, req.get("row_filters"))
+    if str(source_node.get("kind")) == "utility":
+        return "table", rows, None
+    viz_type = str(req.get("visualization_type") or "plot2d").lower()
+    if viz_type == "table":
+        return "table", rows, None
+
+    presentation_spec = None
+    meta = source_node.get("metadata", {})
+    if isinstance(meta, dict):
+        presentation_spec = meta.get("presentation_spec")
+
+    if viz_type == "plot2d":
+        cols = infer_columns(rows)
+        numeric_cols = infer_numeric_columns(rows)
+        fallback_x = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (cols[0] if cols else ""))
+        fallback_y = next((col for col in numeric_cols if col != fallback_x), numeric_cols[0] if numeric_cols else (cols[1] if len(cols) > 1 else fallback_x))
+        use_x = str(req.get("x_col") or x_col or fallback_x)
+        use_y = str(req.get("y_col") or y_col or fallback_y)
+        use_group = str(req.get("group_col") or group_col or "")
+        use_group_agg = _normalize_group_agg(req.get("group_agg"))
+        use_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+        try:
+            use_width = float(req.get("line_width")) if req.get("line_width") is not None else None
+        except Exception:
+            use_width = None
+        use_marker = _parse_float(req.get("marker_size"), 6.0)
+        show_markers = _flag_on(req.get("show_markers"), default=False)
+        trace_styles = _trace_styles_map(req.get("trace_styles"))
+        plot_rows = _aggregate_plot2d_rows(rows, x_col=use_x, y_col=use_y, group_col=use_group, agg=use_group_agg)
+        fig = render_figure(
+            plot_rows,
+            presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
+            x_col=use_x,
+            y_col=use_y,
+            group_col=use_group,
+            view_type="plot2d",
+        )
+        if fig is None:
+            return "plot", rows, None
+        scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
+        apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
+        for curve_index, tr in enumerate(fig.data):
+            if isinstance(tr, go.Scatter):
+                trace_name = str(tr.name or f"curve_{curve_index}")
+                curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+                curve_color = str(curve_style.get("line_color_rgb") or curve_style.get("line_color") or "").strip()
+                curve_width = _parse_float(curve_style.get("line_width"), None)
+                line_update: dict[str, Any] = {}
+                if curve_color:
+                    line_update["color"] = curve_color
+                elif apply_fixed_line_color:
+                    line_update["color"] = str(use_color)
+                if curve_width is not None:
+                    line_update["width"] = float(curve_width)
+                elif use_width is not None:
+                    line_update["width"] = float(use_width)
+                if line_update:
+                    tr.update(line=line_update)
+        for curve_index, tr in enumerate(fig.data):
+            if not isinstance(tr, go.Scatter):
+                continue
+            trace_name = str(tr.name or f"curve_{curve_index}")
+            curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+            curve_marker_size = _parse_float(curve_style.get("marker_size"), None)
+            has_curve_marker_flag = "show_markers" in curve_style
+            curve_show_markers = _flag_on(curve_style.get("show_markers"), default=False) if has_curve_marker_flag else show_markers
+            mode = str(tr.mode or "lines")
+            marker_size = curve_marker_size if curve_marker_size is not None else use_marker
+            if curve_show_markers and marker_size is not None and marker_size > 0:
+                if "markers" not in mode:
+                    mode = f"{mode}+markers" if mode else "markers"
+                tr.update(mode=mode, marker={"size": float(marker_size)})
+            else:
+                mode_clean = mode.replace("+markers", "").replace("markers+", "")
+                tr.update(mode=(mode_clean if mode_clean else "lines"))
+        _apply_2d_style(fig, req, apply_legend=True)
+        return "plot", rows, fig
+
+    if viz_type == "histogram":
+        cols = infer_columns(rows)
+        numeric_cols = infer_numeric_columns(rows)
+        fallback_hist = numeric_cols[0] if numeric_cols else (cols[0] if cols else "")
+        use_hist = str(req.get("x_col") or req.get("y_col") or hist_col or fallback_hist)
+        fig = render_figure(
+            rows,
+            presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
+            x_col=use_hist,
+            y_col=use_hist,
+            view_type="histogram",
+        )
+        if fig is None:
+            return "plot", rows, None
+        hist_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+        if hist_color:
+            for tr in fig.data:
+                if isinstance(tr, go.Histogram):
+                    tr.update(marker={"color": hist_color})
+        _apply_2d_style(fig, req, apply_legend=True)
+        return "plot", rows, fig
+
+    fig3d = render_figure(
+        rows,
+        presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
+        x_col=str(req.get("x_col") or view3d_x or ""),
+        y_col=str(req.get("y_col") or view3d_y or ""),
+        z_col=str(req.get("z_col") or view3d_z or ""),
+        color_col=str(req.get("color_col") or view3d_color or ""),
+        view_type="scatter3d",
+    )
+    if fig3d is None:
+        return "plot", rows, None
+    marker_size = _parse_float(req.get("marker_size"), 6.0)
+    fixed_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+    color_by = str(req.get("color_col") or "")
+    for tr in fig3d.data:
+        if isinstance(tr, go.Scatter3d):
+            marker_update: dict[str, Any] = {}
+            if marker_size is not None:
+                marker_update["size"] = float(marker_size)
+            if fixed_color and not color_by:
+                marker_update["color"] = fixed_color
+            if marker_update:
+                tr.update(marker=marker_update)
+    _apply_3d_style(fig3d, req, apply_legend=True)
+    return "plot", rows, fig3d
 
 
 def register_analysis_callbacks(app, service: WebUIApiService) -> None:
@@ -4033,6 +4307,185 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             f"Frames: {frames} | "
             f"Engine: {_engine_display_name(dataset.get('engine_override') or dataset.get('engine_detected') or 'unknown')}"
         )
+
+    @app.callback(
+        Output("btn-canvas-primary", "children"),
+        Output("btn-canvas-secondary", "children"),
+        Output("btn-canvas-primary", "style"),
+        Output("btn-canvas-secondary", "style"),
+        Input("session-store", "data"),
+        Input("pipeline-store", "data"),
+        Input("result-tabs", "value"),
+        prevent_initial_call=False,
+    )
+    def render_canvas_action_buttons(
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+        tab_node_id: str | None,
+    ):
+        source_node = _resolve_canvas_source_node(snapshot, session, tab_node_id)
+        if not isinstance(source_node, dict):
+            hidden = {"display": "none"}
+            return "Save", "Save As", hidden, hidden
+        kind = str(source_node.get("kind") or "")
+        req = source_node.get("request", {}) if isinstance(source_node.get("request"), dict) else {}
+        viz_type = str(req.get("visualization_type") or "plot2d").lower()
+        mode = "table" if kind == "utility" or viz_type == "table" else "plot"
+        visible = {"display": "block"}
+        if mode == "table":
+            return "Export", "Export As", visible, visible
+        return "Save", "Save As", visible, visible
+
+    @app.callback(
+        Output("canvas-export-status", "children"),
+        Output("status-banner", "children", allow_duplicate=True),
+        Output("execute-loading-proxy", "children", allow_duplicate=True),
+        Input("btn-canvas-primary", "n_clicks"),
+        Input("btn-canvas-secondary", "n_clicks"),
+        State("result-tabs", "value"),
+        State("session-store", "data"),
+        State("result-store", "data"),
+        State("pipeline-store", "data"),
+        State("config-store", "data"),
+        State({"type": "plot-graph", "slot": ALL}, "figure"),
+        State({"type": "plot-graph", "slot": ALL}, "id"),
+        State("plot-x-col", "value"),
+        State("plot-y-col", "value"),
+        State("plot-group-col", "value"),
+        State("hist-col", "value"),
+        State("view3d-x-col", "value"),
+        State("view3d-y-col", "value"),
+        State("view3d-z-col", "value"),
+        State("view3d-color-col", "value"),
+        State("focus-atom", "value"),
+        prevent_initial_call=True,
+    )
+    def on_canvas_save_export(
+        n_primary: int,
+        n_secondary: int,
+        tab_node_id: str | None,
+        session: dict[str, Any] | None,
+        result_store: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+        config: dict[str, Any] | None,
+        graph_figures: list[dict[str, Any] | None] | None,
+        graph_ids: list[dict[str, Any] | None] | None,
+        x_col: str | None,
+        y_col: str | None,
+        group_col: str | None,
+        hist_col: str | None,
+        view3d_x: str | None,
+        view3d_y: str | None,
+        view3d_z: str | None,
+        view3d_color: str | None,
+        focus_atom: str | None,
+    ):
+        trig = str(ctx.triggered_id or "")
+        if trig not in {"btn-canvas-primary", "btn-canvas-secondary"}:
+            return no_update, no_update, no_update
+        if trig == "btn-canvas-primary" and int(n_primary or 0) <= 0:
+            return no_update, no_update, no_update
+        if trig == "btn-canvas-secondary" and int(n_secondary or 0) <= 0:
+            return no_update, no_update, no_update
+
+        mode, rows, fig = _build_canvas_payload(
+            snapshot=snapshot,
+            session=session,
+            result_store=result_store,
+            tab_node_id=tab_node_id,
+            x_col=x_col,
+            y_col=y_col,
+            group_col=group_col,
+            hist_col=hist_col,
+            view3d_x=view3d_x,
+            view3d_y=view3d_y,
+            view3d_z=view3d_z,
+            view3d_color=view3d_color,
+            focus_atom=focus_atom,
+        )
+        spinner_tick = html.Span(str(int(n_primary or 0) + int(n_secondary or 0)), style={"display": "none"})
+        if mode == "none":
+            return "Nothing to save/export.", "Nothing to save/export.", spinner_tick
+
+        source_node = _resolve_canvas_source_node(snapshot, session, tab_node_id)
+        nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
+        source_id = str(source_node.get("id") or "") if isinstance(source_node, dict) else ""
+        analysis_id = _ancestor_analysis_id(nodes, source_id) if isinstance(nodes, dict) and source_id else None
+        workflow = "analysis"
+        if analysis_id and isinstance(nodes, dict):
+            anode = nodes.get(analysis_id)
+            if isinstance(anode, dict):
+                workflow = str(anode.get("metadata", {}).get("task_name") or anode.get("name") or "analysis")
+        rel_save_dir = f"{workflow}/{analysis_id}" if analysis_id else workflow
+
+        # Prefer the exact figure currently shown on canvas.
+        if mode == "plot" and (not isinstance(fig, go.Figure)):
+            chosen_fig: dict[str, Any] | None = None
+            for gid, gfig in zip(graph_ids or [], graph_figures or []):
+                if isinstance(gid, dict) and str(gid.get("slot") or "") == "canvas" and isinstance(gfig, dict):
+                    chosen_fig = gfig
+                    break
+            if chosen_fig is None:
+                for gfig in (graph_figures or []):
+                    if isinstance(gfig, dict):
+                        chosen_fig = gfig
+                        break
+            if isinstance(chosen_fig, dict):
+                fig = go.Figure(chosen_fig)
+        export_dir = _default_export_dir(snapshot, session, config)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        try:
+            if mode == "table":
+                if trig == "btn-canvas-primary":
+                    path = export_dir / f"table_{stamp}.csv"
+                    write_table(rows, path, "csv")
+                    msg = f"saved to {rel_save_dir}"
+                    return msg, msg, spinner_tick
+                chosen = _browse_save_file(
+                    title="Export table as...",
+                    initial_dir=export_dir,
+                    initial_name=f"table_{stamp}.csv",
+                    filetypes=[("CSV", "*.csv"), ("Excel Workbook", "*.xlsx")],
+                    default_ext=".csv",
+                )
+                if chosen is None:
+                    return "Export canceled.", "Export canceled.", spinner_tick
+                suffix = chosen.suffix.lower()
+                fmt = "xlsx" if suffix == ".xlsx" else "csv"
+                if suffix not in {".csv", ".xlsx"}:
+                    chosen = chosen.with_suffix(".csv")
+                    fmt = "csv"
+                write_table(rows, chosen, fmt)
+                msg = "saved in the requested directory"
+                return msg, msg, spinner_tick
+
+            if fig is None:
+                return "No figure available to save.", "No figure available to save.", spinner_tick
+            if trig == "btn-canvas-primary":
+                path = export_dir / f"plot_{stamp}.png"
+                write_figure(fig, path, "png")
+                msg = f"saved to {rel_save_dir}"
+                return msg, msg, spinner_tick
+            chosen = _browse_save_file(
+                title="Save plot as...",
+                initial_dir=export_dir,
+                initial_name=f"plot_{stamp}.png",
+                filetypes=[("PNG", "*.png"), ("JPEG", "*.jpeg;*.jpg")],
+                default_ext=".png",
+            )
+            if chosen is None:
+                return "Save canceled.", "Save canceled.", spinner_tick
+            suffix = chosen.suffix.lower()
+            fmt = "jpeg" if suffix in {".jpeg", ".jpg"} else "png"
+            if suffix not in {".png", ".jpeg", ".jpg"}:
+                chosen = chosen.with_suffix(".png")
+                fmt = "png"
+            write_figure(fig, chosen, fmt)
+            msg = "saved in the requested directory"
+            return msg, msg, spinner_tick
+        except Exception as exc:
+            msg = f"Save/export failed: {exc}"
+            return msg, msg, spinner_tick
 
     @app.callback(
         Output("result-tab-content", "children"),

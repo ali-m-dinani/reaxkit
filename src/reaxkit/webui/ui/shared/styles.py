@@ -137,6 +137,8 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   cursor: help; background: #f2f7fb;
 }
 .rk-canvas-box, .rk-results-box { border: 1px dashed #bfd0de; border-radius: 8px; min-height: 140px; padding: 10px; }
+.rk-canvas-head { display: flex; align-items: flex-start; justify-content: space-between; }
+.rk-canvas-actions { display: grid; gap: 6px; justify-items: end; }
 .rk-page-full {
   grid-column: 1 / span 2;
   grid-row: 2 / span 3;
