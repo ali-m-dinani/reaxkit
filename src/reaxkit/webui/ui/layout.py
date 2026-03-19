@@ -23,6 +23,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="session-store"),
             dcc.Store(id="pipeline-store"),
             dcc.Store(id="result-store"),
+            dcc.Store(id="selected-curve-store", data={}),
             dcc.Store(id="ui-store", data={"page": "analysis"}),
             dcc.Store(
                 id="config-store",

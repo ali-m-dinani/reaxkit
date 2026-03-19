@@ -6,6 +6,7 @@ import logging
 from typing import Any
 from numbers import Number
 from datetime import date, datetime
+import statistics
 
 from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_update
 import plotly.graph_objects as go
@@ -646,6 +647,7 @@ def _viz_request_with_defaults(existing: dict[str, Any] | None, viz_type: str) -
     req.setdefault("z_title", "")
     req.setdefault("color_col", "")
     req.setdefault("group_col", "")
+    req.setdefault("group_agg", "none")
     req.setdefault("line_color", "blue")
     req.setdefault("line_color_rgb", "")
     req.setdefault("line_width", 2.0)
@@ -663,6 +665,7 @@ def _viz_request_with_defaults(existing: dict[str, Any] | None, viz_type: str) -
     req.setdefault("legend_position", "top-right")
     req.setdefault("show_legend", True)
     req.setdefault("show_markers", False)
+    req.setdefault("trace_styles", {})
     return req
 
 
@@ -676,6 +679,97 @@ def _parse_float(raw: Any, default: float | None = None) -> float | None:
         return float(txt)
     except Exception:
         return default
+
+
+def _trace_styles_map(raw: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for key, style in raw.items():
+        if not isinstance(style, dict):
+            continue
+        skey = str(key).strip()
+        if not skey:
+            continue
+        out[skey] = dict(style)
+    return out
+
+
+def _trace_key_candidates(trace_name: str, curve_index: int) -> list[str]:
+    clean_name = str(trace_name or "").strip()
+    return [clean_name, str(curve_index), f"curve_{curve_index}"]
+
+
+def _trace_style_for_trace(trace_styles: dict[str, dict[str, Any]], trace_name: str, curve_index: int) -> dict[str, Any]:
+    for key in _trace_key_candidates(trace_name, curve_index):
+        if key and key in trace_styles:
+            style = trace_styles.get(key)
+            if isinstance(style, dict):
+                return style
+    return {}
+
+
+def _normalize_group_agg(raw: Any) -> str:
+    val = str(raw or "none").strip().lower()
+    allowed = {"none", "mean", "median", "min", "max", "sum", "count", "std"}
+    return val if val in allowed else "none"
+
+
+def _aggregate_plot2d_rows(
+    rows: list[dict[str, Any]],
+    *,
+    x_col: str,
+    y_col: str,
+    group_col: str,
+    agg: str,
+) -> list[dict[str, Any]]:
+    mode = _normalize_group_agg(agg)
+    if mode == "none" or not rows:
+        return rows
+
+    buckets: dict[tuple[str, Any], dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        xv = row.get(x_col)
+        yv = row.get(y_col)
+        if xv is None or yv is None:
+            continue
+        try:
+            y_num = float(yv)
+        except Exception:
+            continue
+        gkey = str(row.get(group_col, "all")) if group_col else "all"
+        key = (gkey, xv)
+        bucket = buckets.setdefault(key, {"group": gkey, "x": xv, "vals": []})
+        bucket["vals"].append(y_num)
+
+    out: list[dict[str, Any]] = []
+    for bucket in buckets.values():
+        vals = list(bucket["vals"])
+        if not vals:
+            continue
+        if mode == "mean":
+            y_out = float(sum(vals) / len(vals))
+        elif mode == "median":
+            y_out = float(statistics.median(vals))
+        elif mode == "min":
+            y_out = float(min(vals))
+        elif mode == "max":
+            y_out = float(max(vals))
+        elif mode == "sum":
+            y_out = float(sum(vals))
+        elif mode == "count":
+            y_out = float(len(vals))
+        elif mode == "std":
+            y_out = float(statistics.pstdev(vals)) if len(vals) > 1 else 0.0
+        else:
+            y_out = float(sum(vals) / len(vals))
+        row_out: dict[str, Any] = {x_col: bucket["x"], y_col: y_out}
+        if group_col:
+            row_out[group_col] = bucket["group"]
+        out.append(row_out)
+    return out
 
 
 def _theme_options() -> list[dict[str, str]]:
@@ -1244,6 +1338,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         State("viz-z-col", "value"),
         State("viz-color-col", "value"),
         State("viz-group-col", "value"),
+        State("viz-group-agg", "value"),
         prevent_initial_call=True,
     )
     def on_add_visualization_node(
@@ -1256,6 +1351,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         z_col: str | None,
         color_col: str | None,
         group_col: str | None,
+        group_agg: str | None,
     ):
         if not n_clicks or not session or not snapshot:
             return no_update, no_update, no_update
@@ -1299,6 +1395,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     "z_title": "",
                     "color_col": str(color_col or ""),
                     "group_col": str(group_col or ""),
+                    "group_agg": _normalize_group_agg(group_agg),
                     "line_color": "blue",
                     "line_color_rgb": "",
                     "line_width": 2.0,
@@ -1316,6 +1413,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     "show_markers": False,
                     "show_legend": True,
                     "legend_position": "top-right",
+                    "trace_styles": {},
                 },
             },
         )
@@ -1910,16 +2008,19 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Input("session-store", "data"),
         Input("result-store", "data"),
         Input("config-store", "data"),
+        Input("selected-curve-store", "data"),
     )
     def render_properties(
         snapshot: dict[str, Any] | None,
         session: dict[str, Any] | None,
         result_store_in: dict[str, Any] | None,
         config_in: dict[str, Any] | None,
+        selected_curve_in: dict[str, Any] | None,
     ):
         selected_id = str((session or {}).get("selected_node_id") or "")
         result_store = dict(result_store_in or {})
         config = dict(config_in or {})
+        selected_curve = dict(selected_curve_in or {})
 
         if selected_id == "virtual:engine":
             engine_value = str(config.get("engine_name") or "autodetect")
@@ -2039,6 +2140,22 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-y-col", options=opts, value=y_default, clearable=False),
                         html.Label("group content"),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True),
+                        html.Label("group aggregation"),
+                        dcc.Dropdown(
+                            id="viz-group-agg",
+                            options=[
+                                {"label": "none", "value": "none"},
+                                {"label": "mean", "value": "mean"},
+                                {"label": "median", "value": "median"},
+                                {"label": "min", "value": "min"},
+                                {"label": "max", "value": "max"},
+                                {"label": "sum", "value": "sum"},
+                                {"label": "count", "value": "count"},
+                                {"label": "std", "value": "std"},
+                            ],
+                            value="none",
+                            clearable=False,
+                        ),
                         dcc.Dropdown(id="viz-z-col", options=opts, value=x_default, clearable=False, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                     ]
@@ -2055,6 +2172,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         html.Label("color by"),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                     ]
                 )
             elif draft_type == "histogram":
@@ -2066,6 +2184,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                     ]
                 )
             else:
@@ -2076,6 +2195,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                     ]
                 )
             body.extend(
@@ -2460,6 +2580,17 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             hist_default = numeric_cols[0] if numeric_cols else (cols[0] if cols else "")
             opts = [{"label": c, "value": c} for c in cols]
             viz_type = str(req.get("visualization_type") or "plot2d")
+            trace_styles = _trace_styles_map(req.get("trace_styles"))
+            selected_curve_key = ""
+            selected_curve_label = ""
+            if str(viz_type) == "plot2d":
+                if (
+                    isinstance(selected_curve, dict)
+                    and str(selected_curve.get("node_id") or "") == str(node.get("id") or "")
+                ):
+                    selected_curve_key = str(selected_curve.get("trace_key") or "").strip()
+                    selected_curve_label = str(selected_curve.get("trace_label") or selected_curve_key).strip()
+            selected_style = trace_styles.get(selected_curve_key, {}) if selected_curve_key else {}
             color_options = [
                 {"label": "blue", "value": "blue"},
                 {"label": "red", "value": "red"},
@@ -2507,6 +2638,22 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-y-col", options=opts, value=str(req.get("y_col") or y_default), clearable=False),
                         html.Label("group content"),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True),
+                        html.Label("group aggregation"),
+                        dcc.Dropdown(
+                            id="viz-group-agg",
+                            options=[
+                                {"label": "none", "value": "none"},
+                                {"label": "mean", "value": "mean"},
+                                {"label": "median", "value": "median"},
+                                {"label": "min", "value": "min"},
+                                {"label": "max", "value": "max"},
+                                {"label": "sum", "value": "sum"},
+                                {"label": "count", "value": "count"},
+                                {"label": "std", "value": "std"},
+                            ],
+                            value=_normalize_group_agg(req.get("group_agg")),
+                            clearable=False,
+                        ),
                         dcc.Checklist(
                             id="viz-use-plot-title",
                             options=[{"label": "use custom plot title", "value": "on"}],
@@ -2553,6 +2700,54 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         ),
                         html.Label("Theme"),
                         dcc.Dropdown(id="viz-theme", options=theme_options, value=str(req.get("theme") or "plotly_white"), clearable=False),
+                        html.Div("Curve settings", className="rk-subtitle"),
+                        html.Div(
+                            f"Selected curve: {selected_curve_label}" if selected_curve_key else "Click any point on a curve to edit curve-specific style.",
+                            className="rk-help-inline",
+                        ),
+                        dcc.Input(id="viz-selected-trace-key", type="text", value=selected_curve_key, style={"display": "none"}),
+                        html.Label("Curve color"),
+                        dcc.Dropdown(
+                            id="viz-curve-color-name",
+                            options=color_options,
+                            value=str(selected_style.get("line_color") or "blue"),
+                            clearable=False,
+                            disabled=not bool(selected_curve_key),
+                        ),
+                        html.Label("Curve color (RGB, optional)"),
+                        dcc.Input(
+                            id="viz-curve-color-rgb",
+                            type="text",
+                            value=str(selected_style.get("line_color_rgb") or ""),
+                            placeholder="e.g. rgb(255,0,0)",
+                            disabled=not bool(selected_curve_key),
+                        ),
+                        html.Label("Curve line width"),
+                        dcc.Input(
+                            id="viz-curve-line-width",
+                            type="number",
+                            value=float(selected_style.get("line_width") or req.get("line_width") or 2),
+                            min=1,
+                            max=8,
+                            step=1,
+                            disabled=not bool(selected_curve_key),
+                        ),
+                        html.Label("Curve marker size"),
+                        dcc.Input(
+                            id="viz-curve-marker-size",
+                            type="number",
+                            value=float(selected_style.get("marker_size") or req.get("marker_size") or 6),
+                            min=0,
+                            max=20,
+                            step=1,
+                            disabled=not bool(selected_curve_key),
+                        ),
+                        dcc.Checklist(
+                            id="viz-curve-show-markers",
+                            options=[{"label": "show markers for this curve", "value": "on"}],
+                            value=["on"] if _flag_on(selected_style.get("show_markers"), False) else [],
+                            style={} if selected_curve_key else {"display": "none"},
+                        ),
                         html.Details(
                             [
                                 html.Summary("Advanced Settings"),
@@ -2607,6 +2802,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         html.Label("color by"),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-selected-trace-key", type="text", value="", style={"display": "none"}),
+                        dcc.Dropdown(id="viz-curve-color-name", options=color_options, value="blue", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-color-rgb", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-curve-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-marker-size", type="number", value=6, style={"display": "none"}),
+                        dcc.Checklist(id="viz-curve-show-markers", options=[{"label": "on", "value": "on"}], value=[], style={"display": "none"}),
                         dcc.Checklist(
                             id="viz-use-plot-title",
                             options=[{"label": "use custom plot title", "value": "on"}],
@@ -2684,6 +2886,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-selected-trace-key", type="text", value="", style={"display": "none"}),
+                        dcc.Dropdown(id="viz-curve-color-name", options=color_options, value="blue", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-color-rgb", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-curve-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-marker-size", type="number", value=6, style={"display": "none"}),
+                        dcc.Checklist(id="viz-curve-show-markers", options=[{"label": "on", "value": "on"}], value=[], style={"display": "none"}),
                         dcc.Checklist(
                             id="viz-use-plot-title",
                             options=[{"label": "use custom plot title", "value": "on"}],
@@ -2786,6 +2995,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-selected-trace-key", type="text", value="", style={"display": "none"}),
+                        dcc.Dropdown(id="viz-curve-color-name", options=color_options, value="blue", clearable=False, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-color-rgb", type="text", value="", style={"display": "none"}),
+                        dcc.Input(id="viz-curve-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Input(id="viz-curve-marker-size", type="number", value=6, style={"display": "none"}),
+                        dcc.Checklist(id="viz-curve-show-markers", options=[{"label": "on", "value": "on"}], value=[], style={"display": "none"}),
                         html.Div(
                             [
                                 html.Label("Line color"),
@@ -2884,6 +3100,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         State("viz-z-col", "value"),
         State("viz-color-col", "value"),
         State("viz-group-col", "value"),
+        State("viz-group-agg", "value"),
         State("viz-use-plot-title", "value"),
         State("viz-plot-title", "value"),
         State("viz-x-title", "value"),
@@ -2918,6 +3135,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         z_col: str | None,
         color_col: str | None,
         group_col: str | None,
+        group_agg: str | None,
         use_plot_title_values: list[str] | None,
         plot_title: str | None,
         x_title: str | None,
@@ -2947,6 +3165,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         node = _selected_node(snapshot, session)
         if not pipeline_id or not node or node.get("kind") != "visualization":
             return no_update, "WARN: Select a visualization node"
+        req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
         payload = {
             "visualization_type": str(viz_type or "plot2d"),
             "x_col": str(x_col or ""),
@@ -2959,6 +3178,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             "z_title": str(z_title or ""),
             "color_col": str(color_col or ""),
             "group_col": str(group_col or ""),
+            "group_agg": _normalize_group_agg(group_agg),
             "line_color": str(line_color_name or "blue"),
             "line_color_rgb": str(line_color_rgb or ""),
             "line_width": float(line_width if line_width is not None else 2.0),
@@ -2976,6 +3196,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             "table_filter_col": str(table_filter_col or ""),
             "table_filter_value": str(table_filter_value or ""),
             "table_max_rows": int(table_max_rows) if table_max_rows is not None else 200,
+            "trace_styles": _trace_styles_map(req_old.get("trace_styles")),
         }
         service.update_node(pipeline_id, str(node["id"]), {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}})
         next_snapshot = service.get_pipeline(pipeline_id)
@@ -2989,6 +3210,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Input("viz-z-col", "value"),
         Input("viz-color-col", "value"),
         Input("viz-group-col", "value"),
+        Input("viz-group-agg", "value"),
         Input("viz-use-plot-title", "value"),
         Input("viz-plot-title", "value"),
         Input("viz-x-title", "value"),
@@ -3019,6 +3241,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         z_col: str | None,
         color_col: str | None,
         group_col: str | None,
+        group_agg: str | None,
         use_plot_title_values: list[str] | None,
         plot_title: str | None,
         x_title: str | None,
@@ -3065,6 +3288,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 "z_title": str(z_title or payload.get("z_title") or ""),
                 "color_col": str(color_col or payload.get("color_col") or ""),
                 "group_col": str(group_col or payload.get("group_col") or ""),
+                "group_agg": _normalize_group_agg(group_agg if group_agg is not None else payload.get("group_agg")),
                 "line_color": str(line_color_name or payload.get("line_color") or "blue"),
                 "line_color_rgb": str(line_color_rgb or payload.get("line_color_rgb") or ""),
                 "line_width": float(line_width if line_width is not None else float(payload.get("line_width") or 2.0)),
@@ -3102,6 +3326,130 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             pipeline_id,
             str(node["id"]),
             {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}},
+        )
+        return service.get_pipeline(pipeline_id)
+
+    @app.callback(
+        Output("selected-curve-store", "data"),
+        Input("session-store", "data"),
+        Input({"type": "plot-graph", "slot": ALL}, "clickData"),
+        State({"type": "plot-graph", "slot": ALL}, "id"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_curve_click(
+        session: dict[str, Any] | None,
+        click_data_all: list[dict[str, Any] | None] | None,
+        graph_ids: list[dict[str, Any]] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        triggered = ctx.triggered_id
+        if triggered == "session-store":
+            return {}
+        if not session or not isinstance(click_data_all, list):
+            return no_update
+        node = _selected_node(snapshot, session)
+        req = node.get("request", {}) if isinstance(node, dict) and isinstance(node.get("request"), dict) else {}
+        if not isinstance(node, dict) or str(node.get("kind")) != "visualization":
+            return no_update
+        if str(req.get("visualization_type") or "plot2d").lower() != "plot2d":
+            return no_update
+        click_data: dict[str, Any] | None = None
+        if isinstance(triggered, dict):
+            trigger_slot = str(triggered.get("slot") or "")
+            for gid, cdata in zip(graph_ids or [], click_data_all):
+                if not isinstance(gid, dict):
+                    continue
+                if str(gid.get("slot") or "") == trigger_slot and isinstance(cdata, dict):
+                    click_data = cdata
+                    break
+        if click_data is None:
+            click_data = next((c for c in click_data_all if isinstance(c, dict)), None)
+        if not isinstance(click_data, dict):
+            return no_update
+        points = click_data.get("points")
+        if not isinstance(points, list) or not points:
+            return no_update
+        point = points[0] if isinstance(points[0], dict) else {}
+        try:
+            curve_index = int(point.get("curveNumber"))
+        except Exception:
+            return no_update
+        if curve_index < 0:
+            return no_update
+        data_obj = point.get("data") if isinstance(point.get("data"), dict) else {}
+        full_obj = point.get("fullData") if isinstance(point.get("fullData"), dict) else {}
+        trace_name = str(data_obj.get("name") or full_obj.get("name") or "").strip()
+        trace_key = trace_name or f"curve_{curve_index}"
+        trace_label = trace_name or f"curve {curve_index}"
+        return {
+            "node_id": str(session.get("selected_node_id") or ""),
+            "curve_index": curve_index,
+            "trace_key": trace_key,
+            "trace_label": trace_label,
+        }
+
+    @app.callback(
+        Output("pipeline-store", "data", allow_duplicate=True),
+        Input("viz-curve-color-name", "value"),
+        Input("viz-curve-color-rgb", "value"),
+        Input("viz-curve-line-width", "value"),
+        Input("viz-curve-marker-size", "value"),
+        Input("viz-curve-show-markers", "value"),
+        State("viz-selected-trace-key", "value"),
+        State("selected-curve-store", "data"),
+        State("session-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_live_curve_params(
+        curve_color_name: str | None,
+        curve_color_rgb: str | None,
+        curve_line_width: float | None,
+        curve_marker_size: float | None,
+        curve_show_markers_values: list[str] | None,
+        selected_trace_key_value: str | None,
+        selected_curve_state: dict[str, Any] | None,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        if not session or not snapshot:
+            return no_update
+        pipeline_id = str(session.get("pipeline_id", ""))
+        node = _selected_node(snapshot, session)
+        if not pipeline_id or not node or node.get("kind") != "visualization":
+            return no_update
+        req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        if str(req_old.get("visualization_type") or "plot2d").lower() != "plot2d":
+            return no_update
+
+        selected_curve = dict(selected_curve_state or {})
+        trace_key = str(selected_trace_key_value or selected_curve.get("trace_key") or "").strip()
+        if not trace_key:
+            return no_update
+
+        trace_styles = _trace_styles_map(req_old.get("trace_styles"))
+        style_old = trace_styles.get(trace_key, {}) if isinstance(trace_styles.get(trace_key), dict) else {}
+        style_new = dict(style_old)
+        style_new.update(
+            {
+                "line_color": str(curve_color_name or "blue"),
+                "line_color_rgb": str(curve_color_rgb or ""),
+                "line_width": float(curve_line_width if curve_line_width is not None else _parse_float(req_old.get("line_width"), 2.0) or 2.0),
+                "marker_size": float(curve_marker_size if curve_marker_size is not None else _parse_float(req_old.get("marker_size"), 6.0) or 6.0),
+                "show_markers": bool("on" in (curve_show_markers_values or [])),
+            }
+        )
+
+        if style_new == style_old:
+            return no_update
+        trace_styles[trace_key] = style_new
+        payload = dict(req_old)
+        payload["trace_styles"] = trace_styles
+        service.update_node(
+            pipeline_id,
+            str(node["id"]),
+            {"request": payload, "metadata": {"visualization_type": payload.get("visualization_type", "plot2d")}},
         )
         return service.get_pipeline(pipeline_id)
 
@@ -3337,6 +3685,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             use_x = str(req.get("x_col") or x_col or fallback_x)
             use_y = str(req.get("y_col") or y_col or fallback_y)
             use_group = str(req.get("group_col") or group_col or "")
+            use_group_agg = _normalize_group_agg(req.get("group_agg"))
             use_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
             try:
                 use_width = float(req.get("line_width")) if req.get("line_width") is not None else None
@@ -3344,8 +3693,16 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 use_width = None
             use_marker = _parse_float(req.get("marker_size"), 6.0)
             show_markers = _flag_on(req.get("show_markers"), default=False)
-            fig = render_figure(
+            trace_styles = _trace_styles_map(req.get("trace_styles"))
+            plot_rows = _aggregate_plot2d_rows(
                 rows,
+                x_col=use_x,
+                y_col=use_y,
+                group_col=use_group,
+                agg=use_group_agg,
+            )
+            fig = render_figure(
+                plot_rows,
                 presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
                 x_col=use_x,
                 y_col=use_y,
@@ -3355,23 +3712,43 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             if fig is None:
                 content = "No plottable data."
                 return content, content
-            for tr in fig.data:
+            scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
+            apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
+            for curve_index, tr in enumerate(fig.data):
                 if isinstance(tr, go.Scatter):
+                    trace_name = str(tr.name or f"curve_{curve_index}")
+                    curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+                    curve_color = str(curve_style.get("line_color_rgb") or curve_style.get("line_color") or "").strip()
+                    curve_width = _parse_float(curve_style.get("line_width"), None)
                     line_update: dict[str, Any] = {}
-                    if use_color:
+                    if curve_color:
+                        line_update["color"] = curve_color
+                    elif apply_fixed_line_color:
                         line_update["color"] = str(use_color)
-                    if use_width is not None:
+                    if curve_width is not None:
+                        line_update["width"] = float(curve_width)
+                    elif use_width is not None:
                         line_update["width"] = float(use_width)
                     if line_update:
                         tr.update(line=line_update)
-            for tr in fig.data:
+            for curve_index, tr in enumerate(fig.data):
                 if not isinstance(tr, go.Scatter):
                     continue
+                trace_name = str(tr.name or f"curve_{curve_index}")
+                curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+                curve_marker_size = _parse_float(curve_style.get("marker_size"), None)
+                has_curve_marker_flag = "show_markers" in curve_style
+                curve_show_markers = (
+                    _flag_on(curve_style.get("show_markers"), default=False)
+                    if has_curve_marker_flag
+                    else show_markers
+                )
                 mode = str(tr.mode or "lines")
-                if show_markers and use_marker is not None and use_marker > 0:
+                marker_size = curve_marker_size if curve_marker_size is not None else use_marker
+                if curve_show_markers and marker_size is not None and marker_size > 0:
                     if "markers" not in mode:
                         mode = f"{mode}+markers" if mode else "markers"
-                    tr.update(mode=mode, marker={"size": float(use_marker)})
+                    tr.update(mode=mode, marker={"size": float(marker_size)})
                 else:
                     mode_clean = mode.replace("+markers", "").replace("markers+", "")
                     mode_clean = mode_clean if mode_clean else "lines"
@@ -3387,8 +3764,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_xaxes(title_text=x_title)
             if y_title:
                 fig.update_yaxes(title_text=y_title)
-            graph = dcc.Graph(figure=fig, config={"displaylogo": False})
-            return graph, graph
+            graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
+            graph_canvas = dcc.Graph(
+                id={"type": "plot-graph", "slot": "canvas"},
+                figure=go.Figure(fig),
+                config={"displaylogo": False},
+            )
+            return graph_result, graph_canvas
 
         if viz_type == "histogram":
             cols = infer_columns(rows)
@@ -3421,8 +3803,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_xaxes(title_text=x_title)
             if y_title:
                 fig.update_yaxes(title_text=y_title)
-            graph = dcc.Graph(figure=fig, config={"displaylogo": False})
-            return graph, graph
+            graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
+            graph_canvas = dcc.Graph(
+                id={"type": "plot-graph", "slot": "canvas"},
+                figure=go.Figure(fig),
+                config={"displaylogo": False},
+            )
+            return graph_result, graph_canvas
 
         fig3d = render_figure(
             rows,
@@ -3462,5 +3849,10 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 yaxis_title=y_title or None,
                 zaxis_title=z_title or None,
             )
-        graph3d = dcc.Graph(figure=fig3d, config={"displaylogo": False})
-        return graph3d, graph3d
+        graph3d_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig3d, config={"displaylogo": False})
+        graph3d_canvas = dcc.Graph(
+            id={"type": "plot-graph", "slot": "canvas"},
+            figure=go.Figure(fig3d),
+            config={"displaylogo": False},
+        )
+        return graph3d_result, graph3d_canvas

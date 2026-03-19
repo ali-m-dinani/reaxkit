@@ -18,8 +18,11 @@ def create_dash_app():
     Dash = _dash_imports()
     from reaxkit.webui.backend.api import WebUIApiService
     from reaxkit.webui.callbacks import register_callbacks
+    from reaxkit.webui.ui.shared.debounce import enable_input_debounce
     from reaxkit.webui.ui.layout import build_layout
     from reaxkit.webui.ui.shared.styles import _CSS
+
+    enable_input_debounce()
 
     app = Dash(
         __name__,
