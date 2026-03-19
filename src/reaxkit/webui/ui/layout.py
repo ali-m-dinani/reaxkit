@@ -24,7 +24,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="pipeline-store"),
             dcc.Store(id="result-store"),
             dcc.Store(id="selected-curve-store", data={}),
-            dcc.Store(id="ui-store", data={"page": "analysis"}),
+            dcc.Store(id="ui-store", data={"page": "analysis", "help_open": False}),
             dcc.Store(
                 id="config-store",
                 data={

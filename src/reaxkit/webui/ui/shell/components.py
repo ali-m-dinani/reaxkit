@@ -14,7 +14,7 @@ def topbar() -> html.Div:
             html.Button("Log", id="btn-nav-log", n_clicks=0, className="rk-nav-btn"),
             html.Div(
                 [
-                    html.Span("Help", id="help-menu-trigger", className="rk-help-trigger"),
+                    html.Button("Help", id="help-menu-trigger", n_clicks=0, className="rk-help-trigger"),
                     html.Div(
                         [
                             html.A("ReaxKit GitHub", href="https://github.com/ali-m-dinani/reaxkit?tab=readme-ov-file", target="_blank", className="rk-help-item"),
@@ -23,6 +23,7 @@ def topbar() -> html.Div:
                             html.Button("check for updates", id="btn-help-check-updates", n_clicks=0, className="rk-help-item rk-help-btn"),
                             html.Div(id="help-update-status", className="rk-help-status"),
                         ],
+                        id="help-menu-dropdown",
                         className="rk-help-dropdown",
                     ),
                 ],

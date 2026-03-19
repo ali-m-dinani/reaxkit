@@ -48,13 +48,14 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   border-radius: 0;
   padding: 0 4px;
   margin: 0;
-  cursor: default;
+  cursor: pointer;
   display: inline-flex;
   font-size: 15px;
   line-height: 1.2;
   font-weight: 500;
   font-family: "Segoe UI", Tahoma, sans-serif;
 }
+.rk-help-trigger.active { font-weight: 600; }
 .rk-help-dropdown {
   display: none;
   position: absolute;
@@ -69,7 +70,6 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   padding: 8px;
   gap: 4px;
 }
-.rk-help-menu:hover .rk-help-dropdown { display: grid; }
 .rk-help-item {
   display: block;
   text-decoration: none;

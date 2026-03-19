@@ -159,21 +159,26 @@ def register_shell_callbacks(app, service) -> None:
         Output("ui-store", "data"),
         Input("btn-nav-analysis", "n_clicks"),
         Input("btn-nav-log", "n_clicks"),
+        Input("help-menu-trigger", "n_clicks"),
         State("ui-store", "data"),
         prevent_initial_call=True,
     )
     def on_nav_page_change(
         _n_analysis: int,
         _n_log: int,
+        _n_help: int,
         ui_data: dict[str, Any] | None,
     ):
         trig = str(ctx.triggered_id or "")
         current = str((ui_data or {}).get("page") or "analysis")
+        help_open = bool((ui_data or {}).get("help_open", False))
         if trig == "btn-nav-log":
-            return {"page": "log"}
+            return {"page": "log", "help_open": False}
         if trig == "btn-nav-analysis":
-            return {"page": "analysis"}
-        return {"page": current}
+            return {"page": "analysis", "help_open": False}
+        if trig == "help-menu-trigger":
+            return {"page": current, "help_open": not help_open}
+        return {"page": current, "help_open": help_open}
 
     @app.callback(
         Output("panel-left", "style"),
@@ -184,11 +189,14 @@ def register_shell_callbacks(app, service) -> None:
         Output("panel-log-page", "style"),
         Output("btn-nav-analysis", "className"),
         Output("btn-nav-log", "className"),
+        Output("help-menu-dropdown", "style"),
+        Output("help-menu-trigger", "className"),
         Input("ui-store", "data"),
         prevent_initial_call=False,
     )
     def render_active_page(ui_data: dict[str, Any] | None):
         page = str((ui_data or {}).get("page") or "analysis").lower()
+        help_open = bool((ui_data or {}).get("help_open", False))
         show_analysis = page == "analysis"
         show_log = page == "log"
         base = "rk-nav-btn"
@@ -201,6 +209,8 @@ def register_shell_callbacks(app, service) -> None:
             {"display": "block"} if show_log else {"display": "none"},
             f"{base} active" if show_analysis else base,
             f"{base} active" if show_log else base,
+            {"display": "grid"} if help_open else {"display": "none"},
+            "rk-help-trigger active" if help_open else "rk-help-trigger",
         )
 
     @app.callback(
