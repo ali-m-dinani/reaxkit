@@ -541,9 +541,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             f"Compute {canonical} data for a single frame.\n\n"
             "Examples:\n"
-            f"  reaxkit elect {canonical} --frame 10 --scope total --export {canonical}_frame10.csv\n"
-            f"  reaxkit elect {canonical} --frame 10 --scope local --core Al --export local_{canonical}_frame10.csv\n"
-            f"  reaxkit elect {canonical} --frame 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
+            f"  reaxkit {canonical} --frame 10 --scope total --export {canonical}_frame10.csv\n"
+            f"  reaxkit {canonical} --frame 10 --scope local --core Al --export local_{canonical}_frame10.csv\n"
+            f"  reaxkit {canonical} --frame 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
         )
         parser.add_argument("--frame", type=int, required=True, help="0-based frame index in xmolout")
         parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope")
@@ -553,9 +553,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Extract per-atom charges across selected frames.\n\n"
             "Examples:\n"
-            "  reaxkit elect charge_table --frames 0:10:2 --export charges.csv\n"
-            "  reaxkit elect charge_table --atom-ids 1 2 3 --frames 0,5,10 --plot single\n"
-            "  reaxkit elect charge_table --atom-types O H --every 5 --xaxis time --save charge_series.png"
+            "  reaxkit charge_table --frames 0:10:2 --export charges.csv\n"
+            "  reaxkit charge_table --atom-ids 1 2 3 --frames 0,5,10 --plot single\n"
+            "  reaxkit charge_table --atom-types O H --every 5 --xaxis time --save charge_series.png"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids to include")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
@@ -572,9 +572,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Analyze polarization-field hysteresis behavior.\n\n"
             "Examples:\n"
-            "  reaxkit elect hyst --plot --save hysteresis.png\n"
-            "  reaxkit elect hyst --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n"
-            "  reaxkit elect hyst --roots --summary hysteresis_summary.txt"
+            "  reaxkit hyst --plot --save hysteresis.png\n"
+            "  reaxkit hyst --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n"
+            "  reaxkit hyst --roots --summary hysteresis_summary.txt"
         )
         parser.add_argument("--fort78", default="fort.78", help="Path to fort.78 file")
         parser.add_argument("--control", default="control", help="Path to control file")
