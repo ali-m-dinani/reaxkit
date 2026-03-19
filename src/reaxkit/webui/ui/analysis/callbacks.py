@@ -34,6 +34,10 @@ from reaxkit.webui.ui.shell.callbacks import (
 )
 
 logger = logging.getLogger(__name__)
+_ARTIFACT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
+_ARTIFACT_ROWS_CACHE_MAX = 128
+_PLOT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
+_PLOT_ROWS_CACHE_MAX = 96
 
 
 def _trace(message: str) -> None:
@@ -72,6 +76,36 @@ def _selected_node(snapshot: dict[str, Any] | None, session: dict[str, Any] | No
     return node if isinstance(node, dict) else None
 
 
+def _snapshot_with_node_update(
+    snapshot: dict[str, Any] | None,
+    node_id: str,
+    *,
+    request: dict[str, Any] | None = None,
+    metadata: dict[str, Any] | None = None,
+    status: str | None = None,
+) -> dict[str, Any] | None:
+    if not isinstance(snapshot, dict):
+        return snapshot
+    nodes = snapshot.get("nodes", {})
+    if not isinstance(nodes, dict):
+        return snapshot
+    old_node = nodes.get(str(node_id))
+    if not isinstance(old_node, dict):
+        return snapshot
+    next_snapshot = dict(snapshot)
+    next_nodes = dict(nodes)
+    next_node = dict(old_node)
+    if request is not None:
+        next_node["request"] = dict(request)
+    if metadata is not None:
+        next_node["metadata"] = dict(metadata)
+    if status is not None:
+        next_node["status"] = str(status)
+    next_nodes[str(node_id)] = next_node
+    next_snapshot["nodes"] = next_nodes
+    return next_snapshot
+
+
 def _parse_csv_ints(raw: str | None) -> list[int] | None:
     if raw is None or str(raw).strip() == "":
         return None
@@ -97,6 +131,10 @@ def _parse_csv_strs(raw: str | None) -> list[str] | None:
 def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
     if not artifact or not isinstance(artifact, dict):
         return []
+    artifact_id = str(artifact.get("id") or "").strip()
+    if artifact_id and artifact_id in _ARTIFACT_ROWS_CACHE:
+        cached_rows = _ARTIFACT_ROWS_CACHE.get(artifact_id, [])
+        return [dict(row) for row in cached_rows]
     payload = artifact.get("payload", {})
     rows: list[dict[str, Any]] = []
     if not isinstance(payload, dict):
@@ -126,6 +164,11 @@ def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
         logger.info("ui._artifact_rows artifact_id=%s rows=%s cols=%s", artifact.get("id"), len(rows), list(rows[0].keys()))
     else:
         logger.info("ui._artifact_rows artifact_id=%s rows=0 payload_keys=%s", artifact.get("id"), sorted(payload.keys()) if isinstance(payload, dict) else [])
+    if artifact_id:
+        _ARTIFACT_ROWS_CACHE[artifact_id] = [dict(row) for row in rows]
+        while len(_ARTIFACT_ROWS_CACHE) > _ARTIFACT_ROWS_CACHE_MAX:
+            oldest = next(iter(_ARTIFACT_ROWS_CACHE))
+            _ARTIFACT_ROWS_CACHE.pop(oldest, None)
     return rows
 
 
@@ -1071,6 +1114,61 @@ def _aggregate_plot2d_rows(
     return out
 
 
+def _cached_aggregate_plot2d_rows(
+    rows: list[dict[str, Any]],
+    *,
+    artifact_id: str,
+    x_col: str,
+    y_col: str,
+    group_col: str,
+    agg: str,
+    filter_signature: str,
+) -> list[dict[str, Any]]:
+    mode = _normalize_group_agg(agg)
+    if mode == "none" or not rows or not artifact_id:
+        return _aggregate_plot2d_rows(rows, x_col=x_col, y_col=y_col, group_col=group_col, agg=agg)
+    key = "|".join(
+        [
+            str(artifact_id),
+            str(x_col),
+            str(y_col),
+            str(group_col),
+            str(mode),
+            str(filter_signature),
+            str(len(rows)),
+        ]
+    )
+    cached = _PLOT_ROWS_CACHE.get(key)
+    if isinstance(cached, list):
+        return [dict(r) for r in cached]
+    out = _aggregate_plot2d_rows(rows, x_col=x_col, y_col=y_col, group_col=group_col, agg=agg)
+    _PLOT_ROWS_CACHE[key] = [dict(r) for r in out]
+    while len(_PLOT_ROWS_CACHE) > _PLOT_ROWS_CACHE_MAX:
+        oldest = next(iter(_PLOT_ROWS_CACHE))
+        _PLOT_ROWS_CACHE.pop(oldest, None)
+    return out
+
+
+def _optimize_plot2d_for_large_data(fig: go.Figure, *, threshold_points: int = 5000) -> go.Figure:
+    point_count = 0
+    for tr in fig.data:
+        if isinstance(tr, go.Scatter):
+            xs = getattr(tr, "x", None)
+            point_count += len(xs) if xs is not None else 0
+    if point_count <= int(threshold_points):
+        return fig
+    new_fig = go.Figure()
+    new_fig.update_layout(fig.layout)
+    for tr in fig.data:
+        if isinstance(tr, go.Scatter):
+            payload = tr.to_plotly_json()
+            payload.pop("type", None)
+            new_fig.add_trace(go.Scattergl(**payload))
+        else:
+            new_fig.add_trace(tr)
+    return new_fig
+
+
 def _theme_options() -> list[dict[str, str]]:
     cached = getattr(_theme_options, "_cache", None)
     if isinstance(cached, list) and cached:
@@ -1358,7 +1456,15 @@ def _build_canvas_payload(
         use_marker = _parse_float(req.get("marker_size"), 6.0)
         show_markers = _flag_on(req.get("show_markers"), default=False)
         trace_styles = _trace_styles_map(req.get("trace_styles"))
-        plot_rows = _aggregate_plot2d_rows(rows, x_col=use_x, y_col=use_y, group_col=use_group, agg=use_group_agg)
+        plot_rows = _cached_aggregate_plot2d_rows(
+            rows,
+            artifact_id=str((artifact or {}).get("id") if isinstance(artifact, dict) else ""),
+            x_col=use_x,
+            y_col=use_y,
+            group_col=use_group,
+            agg=use_group_agg,
+            filter_signature=json.dumps(_row_filters_from_raw(req.get("row_filters")), sort_keys=True, ensure_ascii=True),
+        )
         fig = render_figure(
             plot_rows,
             presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
@@ -2182,7 +2288,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             str(node["id"]),
             {"request": request_payload, "metadata": metadata},
         )
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(
+            snapshot,
+            str(node["id"]),
+            request=request_payload,
+            metadata=metadata,
+        )
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
@@ -2253,7 +2365,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         if not changed or request_payload == old_req:
             return no_update
         service.update_node(pipeline_id, str(node["id"]), {"request": request_payload})
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(snapshot, str(node["id"]), request=request_payload)
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
@@ -4044,12 +4157,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 payload["log_scale"] = "none"
             if not payload.get("legend_position"):
                 payload["legend_position"] = "top-right"
+        if payload == req_old:
+            return no_update
         service.update_node(
             pipeline_id,
             str(node["id"]),
             {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}},
         )
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(
+            snapshot,
+            str(node["id"]),
+            request=payload,
+            metadata={"visualization_type": payload["visualization_type"]},
+        )
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("selected-curve-store", "data"),
@@ -4173,7 +4294,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             str(node["id"]),
             {"request": payload, "metadata": {"visualization_type": payload.get("visualization_type", "plot2d")}},
         )
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(
+            snapshot,
+            str(node["id"]),
+            request=payload,
+            metadata={"visualization_type": payload.get("visualization_type", "plot2d")},
+        )
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
@@ -4203,12 +4330,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         payload["table_filter_col"] = ""
         payload["table_filter_value"] = ""
         payload["table_max_rows"] = int(table_max_rows) if table_max_rows is not None else int(req_old.get("table_max_rows") or 200)
+        if payload == req_old:
+            return no_update
         service.update_node(
             pipeline_id,
             str(node["id"]),
             {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}},
         )
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(
+            snapshot,
+            str(node["id"]),
+            request=payload,
+            metadata={"visualization_type": payload["visualization_type"]},
+        )
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
@@ -4244,7 +4379,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             str(node["id"]),
             {"request": payload, "metadata": {"visualization_type": payload["visualization_type"]}},
         )
-        return service.get_pipeline(pipeline_id)
+        next_snapshot = _snapshot_with_node_update(
+            snapshot,
+            str(node["id"]),
+            request=payload,
+            metadata={"visualization_type": payload["visualization_type"]},
+        )
+        return next_snapshot if isinstance(next_snapshot, dict) else service.get_pipeline(pipeline_id)
 
     @app.callback(
         Output("input-dataset-path", "value"),
@@ -4596,12 +4737,14 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             use_marker = _parse_float(req.get("marker_size"), 6.0)
             show_markers = _flag_on(req.get("show_markers"), default=False)
             trace_styles = _trace_styles_map(req.get("trace_styles"))
-            plot_rows = _aggregate_plot2d_rows(
+            plot_rows = _cached_aggregate_plot2d_rows(
                 rows,
+                artifact_id=str((artifact or {}).get("id") if isinstance(artifact, dict) else ""),
                 x_col=use_x,
                 y_col=use_y,
                 group_col=use_group,
                 agg=use_group_agg,
+                filter_signature=json.dumps(_row_filters_from_raw(req.get("row_filters")), sort_keys=True, ensure_ascii=True),
             )
             fig = render_figure(
                 plot_rows,
@@ -4666,6 +4809,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_xaxes(title_text=x_title)
             if y_title:
                 fig.update_yaxes(title_text=y_title)
+            fig = _optimize_plot2d_for_large_data(fig, threshold_points=5000)
             graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
