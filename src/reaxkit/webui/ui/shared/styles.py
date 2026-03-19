@@ -21,27 +21,39 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
 .rk-info { grid-area: info; }
 .rk-topbar { display: flex; align-items: center; gap: 16px; }
 .rk-nav-btn {
-  border: 1px solid #c8d7e3;
-  background: #f7fbff;
+  border: none;
+  background: transparent;
   color: #2f4a63;
-  border-radius: 8px;
-  padding: 4px 10px;
+  border-radius: 0;
+  padding: 0 4px;
+  margin: 0;
   cursor: pointer;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 500;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  appearance: none;
+  -webkit-appearance: none;
 }
 .rk-nav-btn.active {
-  background: #d8e7f8;
-  border-color: #b8cfe8;
+  background: transparent;
+  border: none;
   font-weight: 600;
 }
 .rk-help-menu { position: relative; }
 .rk-help-trigger {
-  border: 1px solid #c8d7e3;
-  background: #f7fbff;
+  border: none;
+  background: transparent;
   color: #2f4a63;
-  border-radius: 8px;
-  padding: 4px 10px;
+  border-radius: 0;
+  padding: 0 4px;
+  margin: 0;
   cursor: default;
   display: inline-flex;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 500;
+  font-family: "Segoe UI", Tahoma, sans-serif;
 }
 .rk-help-dropdown {
   display: none;
