@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from dash import Input, Output, State, no_update
+from dash import Input, Output, no_update
 
 
 def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
@@ -43,15 +43,7 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
     return (deduped[0] / "logs") if deduped else (Path.cwd() / "reaxkit_workspace" / "logs")
 
 
-def _pick_latest(paths: list[Path]) -> Path | None:
-    existing = [path for path in paths if path.exists() and path.is_file()]
-    if not existing:
-        return None
-    existing.sort(key=lambda path: path.stat().st_mtime)
-    return existing[-1]
-
-
-def _read_tail(path: Path | None, *, max_lines: int = 400) -> str:
+def _read_tail(path: Path | None, *, max_lines: int = 400, newest_first: bool = True) -> str:
     if path is None or not path.exists():
         return "No log file found."
     try:
@@ -61,23 +53,16 @@ def _read_tail(path: Path | None, *, max_lines: int = 400) -> str:
     lines = text.splitlines()
     if len(lines) > max_lines:
         lines = lines[-max_lines:]
+    if newest_first:
+        lines = list(reversed(lines))
     return "\n".join(lines) if lines else "(empty log)"
 
 
 def _select_log_files(config: dict[str, Any] | None) -> tuple[Path | None, Path | None]:
     logs_root = _resolve_logs_root(config)
-    human_candidates = sorted(logs_root.glob("run_*.timing.log"))
-    human = _pick_latest(human_candidates) or _pick_latest([logs_root / "timing_human.log"])
-
-    low = _pick_latest([logs_root / "timing.log"])
-    if low is not None:
-        return human, low
-    run_low_candidates = [path for path in logs_root.glob("run_*.log") if not path.name.endswith(".timing.log")]
-    run_low_candidates.sort(key=lambda path: path.stat().st_mtime if path.exists() else 0.0)
-    low = _pick_latest(run_low_candidates)
-    if low is None:
-        low = _pick_latest([logs_root / "reaxkit.log"])
-    return human, low
+    general = logs_root / "general" / "reaxkit_general.log"
+    timing = logs_root / "timing" / "human_readable_timing.log"
+    return general, timing
 
 
 def register_log_callbacks(app) -> None:
@@ -90,20 +75,22 @@ def register_log_callbacks(app) -> None:
         Output("log-low-content", "children"),
         Input("ui-store", "data"),
         Input("pipeline-store", "data"),
-        State("config-store", "data"),
+        Input("log-refresh-tick", "n_intervals"),
+        Input("config-store", "data"),
         prevent_initial_call=False,
     )
     def render_log_page(
         ui_data: dict[str, Any] | None,
         _snapshot: dict[str, Any] | None,
-        config_data: dict[str, Any] | None,
+        _tick: int,
+        config_input: dict[str, Any] | None,
     ):
         page = str((ui_data or {}).get("page") or "analysis").lower()
         if page != "log":
             return no_update, no_update, no_update, no_update
-        human, low = _select_log_files(config_data)
-        human_name = human.name if human else "(missing)"
-        low_name = low.name if low else "(missing)"
-        human_content = _read_tail(human)
-        low_content = _read_tail(low)
+        general, timing = _select_log_files(config_input if isinstance(config_input, dict) else None)
+        human_name = str(general) if general else "(missing)"
+        low_name = str(timing) if timing else "(missing)"
+        human_content = _read_tail(general, newest_first=True)
+        low_content = _read_tail(timing, newest_first=True)
         return human_name, human_content, low_name, low_content
