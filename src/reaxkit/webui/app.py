@@ -2,14 +2,107 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
+import signal
+import subprocess
 import tempfile
+import time
 from typing import Any
 from pathlib import Path
 
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.dash_app import create_dash_app
+
+
+def _single_instance_enabled() -> bool:
+    raw = str(os.environ.get("REAXKIT_WEBUI_SINGLE_INSTANCE", "1")).strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _instance_lock_path(port: int) -> Path:
+    return Path(tempfile.gettempdir()) / f"reaxkit_webui_{port}.pid"
+
+
+def _read_pid(path: Path) -> int | None:
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+        if not text:
+            return None
+        pid = int(text)
+        if pid <= 0:
+            return None
+        return pid
+    except Exception:
+        return None
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _terminate_pid(pid: int) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return
+    os.kill(pid, signal.SIGTERM)
+
+
+def _ensure_single_instance(port: int, logger: logging.Logger) -> None:
+    if not _single_instance_enabled():
+        logger.info("Single-instance guard disabled by REAXKIT_WEBUI_SINGLE_INSTANCE")
+        return
+    lock_path = _instance_lock_path(port)
+    existing_pid = _read_pid(lock_path)
+    current_pid = os.getpid()
+    if existing_pid and existing_pid != current_pid and _pid_alive(existing_pid):
+        logger.warning(
+            "WebUI single-instance guard: terminating existing process pid=%s on port=%s",
+            existing_pid,
+            port,
+        )
+        try:
+            _terminate_pid(existing_pid)
+            deadline = time.time() + 4.0
+            while time.time() < deadline:
+                if not _pid_alive(existing_pid):
+                    break
+                time.sleep(0.1)
+            if _pid_alive(existing_pid):
+                logger.warning(
+                    "WebUI single-instance guard: process pid=%s still alive after terminate attempt",
+                    existing_pid,
+                )
+        except Exception as exc:  # pragma: no cover
+            logger.warning(
+                "WebUI single-instance guard: failed terminating pid=%s error=%s",
+                existing_pid,
+                exc,
+            )
+    try:
+        lock_path.write_text(str(current_pid), encoding="utf-8")
+    except Exception as exc:  # pragma: no cover
+        logger.warning("WebUI single-instance guard: failed writing lock %s error=%s", lock_path, exc)
+        return
+
+    def _cleanup_lock() -> None:
+        try:
+            if _read_pid(lock_path) == current_pid:
+                lock_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    atexit.register(_cleanup_lock)
 
 
 def create_service() -> WebUIApiService:
@@ -70,6 +163,7 @@ def main() -> None:
     except Exception:
         port = 8060
     logging.getLogger(__name__).info("WebUI startup pid=%s port=%s", os.getpid(), port)
+    _ensure_single_instance(port, logging.getLogger(__name__))
     trace_env = str(os.environ.get("REAXKIT_UI_TRACE_PATH", "")).strip()
     trace_targets = []
     if trace_env:
