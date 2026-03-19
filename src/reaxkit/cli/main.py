@@ -21,6 +21,39 @@ from reaxkit.core.generator_cli_routing_registry import get_registered_generator
 from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
 
 
+def _print_error_with_hints(title: str, message: str, *, hints: list[str] | None = None) -> None:
+    print(f"[{title}] {message}", file=sys.stderr)
+    for hint in hints or []:
+        print(f"  - {hint}", file=sys.stderr)
+
+
+def _hints_for_filenotfound(exc: FileNotFoundError, args: argparse.Namespace) -> list[str]:
+    msg = str(exc)
+    command = str(getattr(args, "command", "") or "")
+    hints: list[str] = []
+    if "Study file not found:" in msg and command == "study":
+        hints.append("Ensure the YAML path is correct and relative to your current directory.")
+        hints.append(r"Example: reaxkit study --init .\study.yaml --root .")
+        hints.append(r"Create template first if needed: reaxkit study --make-yaml study.yaml")
+    return hints
+
+
+def _hints_for_oserror(exc: OSError, args: argparse.Namespace) -> list[str]:
+    msg = str(exc)
+    lower = msg.lower()
+    if getattr(exc, "winerror", None) == 206 or "filename or extension is too long" in lower:
+        command = str(getattr(args, "command", "") or "")
+        hints = [
+            r"Use a short project root for analysis cache/output paths, e.g. add: --project-root C:\rk",
+            r"Shorten case folder names in a study: reaxkit study --manage <study_root> --action rename-cases --target case-names",
+            "Optionally enable Windows long paths policy and restart.",
+        ]
+        if command and command != "study":
+            hints.insert(0, f"Re-run with a shorter root, e.g.: reaxkit {command} ... --project-root C:\\rk")
+        return hints
+    return []
+
+
 def _command_help_text(name: str, fallback: str) -> str:
     """Return help text for a top-level command."""
     spec = get_registered_commands(include_analysis_tasks=True).get(name)
@@ -139,3 +172,12 @@ def main() -> int:
     except AnalysisError as exc:
         print(f"[Analysis error] {exc}", file=sys.stderr)
         return 3
+    except FileNotFoundError as exc:
+        _print_error_with_hints("File not found", str(exc), hints=_hints_for_filenotfound(exc, args))
+        return 4
+    except OSError as exc:
+        _print_error_with_hints("OS error", str(exc), hints=_hints_for_oserror(exc, args))
+        return 5
+    except Exception as exc:
+        _print_error_with_hints("Error", str(exc))
+        return 1

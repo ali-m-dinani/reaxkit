@@ -86,8 +86,8 @@ RR_CLEANUP_PATTERNS = [
 STUDY_TEMPLATE_YAML = """study_name: mg_temp_sweep
 template: "./template"
 parameters:
-  mg_percent: [40, 60]
-  temperature: [300, 500]
+  mg: [40, 60]     # Mg percent
+  te: [300, 500]   # Temperature (K)
 replicates: 2
 
 run:
@@ -974,7 +974,7 @@ def _init_study(
 
         replicate_entries: list[dict[str, Any]] = []
         for rep_idx in range(1, replicates + 1):
-            rep_id = f"replicate_{rep_idx:02d}"
+            rep_id = f"rep_{rep_idx:02d}"
             rep_dir = case_dir / rep_id
             rep_dir.mkdir(parents=True, exist_ok=True)
             if template_dir is not None:
@@ -1205,6 +1205,28 @@ def _replace_path_prefix(value: str, old_prefix: str | None, new_prefix: str | N
     return value
 
 
+def _remap_study_internal_path(value: str, *, new_study_root: str | None, study_name: str | None) -> str:
+    if new_study_root is None or not study_name:
+        return value
+    if not _looks_like_abs_path(value):
+        return value
+    normalized = value.replace("\\", "/")
+    token = f"/{study_name}/"
+    rel_parts: list[str]
+    idx = normalized.find(token)
+    if idx >= 0:
+        rel = normalized[idx + len(token) :].strip("/")
+        rel_parts = [p for p in rel.split("/") if p]
+    elif normalized.rstrip("/").endswith(f"/{study_name}"):
+        rel_parts = []
+    else:
+        return value
+    target = Path(new_study_root)
+    if rel_parts:
+        target = target.joinpath(*rel_parts)
+    return str(target)
+
+
 def _rewrite_json_paths(
     obj: Any,
     *,
@@ -1214,6 +1236,7 @@ def _rewrite_json_paths(
     new_study_root: str | None,
     old_template_dir: str | None,
     new_template_dir: str | None,
+    study_name: str | None,
 ) -> Any:
     if isinstance(obj, dict):
         out: dict[str, Any] = {}
@@ -1236,6 +1259,7 @@ def _rewrite_json_paths(
                 new_study_root=new_study_root,
                 old_template_dir=old_template_dir,
                 new_template_dir=new_template_dir,
+                study_name=study_name,
             )
         return out
     if isinstance(obj, list):
@@ -1248,6 +1272,7 @@ def _rewrite_json_paths(
                 new_study_root=new_study_root,
                 old_template_dir=old_template_dir,
                 new_template_dir=new_template_dir,
+                study_name=study_name,
             )
             for v in obj
         ]
@@ -1257,8 +1282,96 @@ def _rewrite_json_paths(
             text = _replace_path_prefix(text, old_study_root, new_study_root)
             text = _replace_path_prefix(text, old_source_yaml, new_source_yaml)
             text = _replace_path_prefix(text, old_template_dir, new_template_dir)
+            text = _remap_study_internal_path(text, new_study_root=new_study_root, study_name=study_name)
         return text
     return obj
+
+
+def _rewrite_paths_by_map(obj: Any, path_map: dict[str, str]) -> Any:
+    if isinstance(obj, dict):
+        return {k: _rewrite_paths_by_map(v, path_map) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_rewrite_paths_by_map(v, path_map) for v in obj]
+    if isinstance(obj, str):
+        text = obj
+        for old, new in path_map.items():
+            text = _replace_path_prefix(text, old, new)
+        return text
+    return obj
+
+
+def _rename_case_directories(
+    *,
+    study_root: Path,
+    case_filter: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    manifest_path = study_root / "study_manifest.json"
+    manifest = _read_json(manifest_path)
+    cases = manifest.get("cases") or []
+    if not isinstance(cases, list):
+        raise ValueError("Invalid study_manifest.json: 'cases' must be a list.")
+
+    rename_map: dict[str, str] = {}
+    case_updates: list[dict[str, str]] = []
+    for case in cases:
+        if not isinstance(case, dict):
+            continue
+        if not _case_matches_selector(case, case_filter):
+            continue
+        case_id = str(case.get("case_id") or "").strip()
+        params = case.get("parameters") if isinstance(case.get("parameters"), dict) else {}
+        old_path = str(case.get("path") or "").strip()
+        if not case_id or not old_path:
+            continue
+        new_slug = _case_label_from_params_compact(params)
+        new_dir_name = f"{case_id}_{new_slug}" if new_slug else case_id
+        old_dir = Path(old_path)
+        new_dir = old_dir.parent / new_dir_name
+        if str(old_dir) == str(new_dir):
+            continue
+        if new_dir.exists() and str(new_dir.resolve()) != str(old_dir.resolve()):
+            raise FileExistsError(f"Target case directory already exists: {new_dir}")
+        rename_map[str(old_dir)] = str(new_dir)
+        case_updates.append({"case_id": case_id, "from": str(old_dir), "to": str(new_dir), "combo_slug": new_slug})
+
+    if not case_updates:
+        return {"renamed": [], "json_files_updated": 0, "dry_run": bool(dry_run)}
+
+    # Rename deeper paths first to avoid parent/child rename conflicts.
+    for old, new in sorted(rename_map.items(), key=lambda kv: len(kv[0]), reverse=True):
+        old_p, new_p = Path(old), Path(new)
+        if not old_p.exists():
+            continue
+        if not dry_run:
+            old_p.rename(new_p)
+
+    json_files = sorted(study_root.rglob("*.json"))
+    json_updated = 0
+    for path in json_files:
+        try:
+            payload = _read_json(path)
+        except Exception:
+            continue
+        rewritten = _rewrite_paths_by_map(payload, rename_map)
+        if isinstance(rewritten, dict) and rewritten != payload:
+            if path == manifest_path and isinstance(rewritten.get("cases"), list):
+                for entry in rewritten["cases"]:
+                    if isinstance(entry, dict):
+                        cid = str(entry.get("case_id") or "").strip()
+                        for upd in case_updates:
+                            if upd["case_id"] == cid:
+                                entry["combo_slug"] = upd["combo_slug"]
+                                break
+            if not dry_run:
+                _write_json(path, rewritten)
+            json_updated += 1
+
+    return {
+        "renamed": case_updates,
+        "json_files_updated": json_updated,
+        "dry_run": bool(dry_run),
+    }
 
 
 def _prompt_with_default(label: str, default: str | None) -> str | None:
@@ -1270,9 +1383,30 @@ def _prompt_with_default(label: str, default: str | None) -> str | None:
     return base or None
 
 
-def _update_study_directory_paths(*, study_root: Path) -> dict[str, Any]:
+def _json_path_matches_filters(path: Path, *, case_filter: str | None, replicate_filter: str | None) -> bool:
+    if not case_filter and not replicate_filter:
+        return True
+    text = str(path).replace("\\", "/")
+    case_ok = True
+    if case_filter:
+        case_ok = _canonical_token(case_filter) in _canonical_token(text)
+    rep_ok = True
+    if replicate_filter:
+        variants = _replicate_variants(replicate_filter)
+        rep_ok = any(_canonical_token(v) in _canonical_token(text) for v in variants)
+    return case_ok and rep_ok
+
+
+def _update_study_directory_paths(
+    *,
+    study_root: Path,
+    case_filter: str | None = None,
+    replicate_filter: str | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
     manifest_path = study_root / "study_manifest.json"
     manifest = _read_json(manifest_path)
+    study_name = str(manifest.get("study_name") or "").strip() or study_root.name
     old_source_yaml = str(manifest.get("source_yaml") or "").strip() or None
     old_study_root = str(manifest.get("study_root") or "").strip() or str(study_root.resolve())
     old_template_dir = str(manifest.get("template_dir") or "").strip() or None
@@ -1287,7 +1421,11 @@ def _update_study_directory_paths(*, study_root: Path) -> dict[str, Any]:
 
     json_files = sorted(study_root.rglob("*.json"))
     updated = 0
+    scanned = 0
     for path in json_files:
+        if not _json_path_matches_filters(path, case_filter=case_filter, replicate_filter=replicate_filter):
+            continue
+        scanned += 1
         try:
             payload = _read_json(path)
         except Exception:
@@ -1300,19 +1438,22 @@ def _update_study_directory_paths(*, study_root: Path) -> dict[str, Any]:
             new_study_root=new_study_root,
             old_template_dir=old_template_dir,
             new_template_dir=new_template_dir,
+            study_name=study_name,
         )
         if rewritten != payload:
             if not isinstance(rewritten, dict):
                 continue
-            _write_json(path, rewritten)
+            if not dry_run:
+                _write_json(path, rewritten)
             updated += 1
 
     return {
         "study_root": new_study_root,
         "source_yaml": new_source_yaml,
         "template_dir": new_template_dir,
-        "json_files_scanned": len(json_files),
+        "json_files_scanned": scanned,
         "json_files_updated": updated,
+        "dry_run": bool(dry_run),
     }
 
 
@@ -1438,6 +1579,15 @@ def _short_param_name(name: str) -> str:
     return low
 
 
+def _compact_param_name(name: str) -> str:
+    low = str(name).strip().lower()
+    if not low:
+        return "p"
+    token = low.split("_", 1)[0]
+    token = token[:2] if len(token) >= 2 else token
+    return token or "p"
+
+
 def _format_param_value_for_case(value: Any) -> str:
     try:
         f = float(value)
@@ -1452,6 +1602,11 @@ def _format_param_value_for_case(value: Any) -> str:
 def _case_label_from_params(params: dict[str, Any]) -> str:
     parts = [f"{_short_param_name(k)}_{_format_param_value_for_case(v)}" for k, v in params.items()]
     return "__".join(parts)
+
+
+def _case_label_from_params_compact(params: dict[str, Any]) -> str:
+    parts = [f"{_compact_param_name(k)}_{_format_param_value_for_case(v)}" for k, v in params.items()]
+    return "_".join(parts)
 
 
 def _case_matches_selector(case_entry: dict[str, Any], selector: str | None) -> bool:
@@ -1471,6 +1626,30 @@ def _case_matches_selector(case_entry: dict[str, Any], selector: str | None) -> 
         if needle in _canonical_token(cand):
             return True
     return False
+
+
+def _replicate_variants(value: str | None) -> set[str]:
+    base = str(value or "").strip()
+    if not base:
+        return set()
+    out = {base}
+    if base.startswith("replicate_"):
+        out.add(f"rep_{base[len('replicate_'):]}")
+    elif base.startswith("rep_"):
+        out.add(f"replicate_{base[len('rep_'):]}")
+    return out
+
+
+def _replicate_matches_selector(replicate_id: str, selector: str | None) -> bool:
+    if not selector:
+        return True
+    rep_tokens = {_canonical_token(v) for v in _replicate_variants(replicate_id)}
+    sel_tokens = {_canonical_token(v) for v in _replicate_variants(str(selector))}
+    rep_tokens.discard("")
+    sel_tokens.discard("")
+    if not sel_tokens:
+        return True
+    return bool(rep_tokens.intersection(sel_tokens))
 
 
 def _build_declared_produced_map(replicate_manifest: dict[str, Any]) -> dict[tuple[str, str], Path]:
@@ -1957,7 +2136,7 @@ def _run_study(
             if not isinstance(rep, dict):
                 continue
             rep_id = str(rep.get("replicate_id") or "")
-            if replicate_filter and rep_id != replicate_filter:
+            if not _replicate_matches_selector(rep_id, replicate_filter):
                 continue
             if rerun_targets is not None and (case_id, rep_id) not in rerun_targets:
                 continue
@@ -2212,7 +2391,7 @@ def _analyze_study(
             if not isinstance(rep, dict):
                 continue
             rep_id = str(rep.get("replicate_id") or "")
-            if replicate_filter and rep_id != replicate_filter:
+            if not _replicate_matches_selector(rep_id, replicate_filter):
                 continue
             rep_path = Path(str(rep.get("path") or ""))
             rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
@@ -3840,32 +4019,42 @@ def _plot_study_aggregates(
 def _remove_analysis_outputs(
     *,
     study_root: Path,
-    remove_target: str,
+    analysis_title: str | None,
+    case_filter: str | None = None,
+    replicate_filter: str | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     study_manifest = _read_json(study_root / "study_manifest.json")
     doc = _load_source_study_doc(study_manifest)
     analysis_defs = _analysis_defs_from_doc(doc)
-    target = str(remove_target or "").strip()
-    if not target:
-        raise ValueError("--remove requires a value: all or <analysis_title>.")
-
-    if target.lower() == "all":
-        target_ids = {a.analysis_id for a in analysis_defs.values()}
+    target_title = str(analysis_title or "").strip()
+    if target_title:
+        if target_title not in analysis_defs:
+            raise KeyError(f"Unknown analysis title: {target_title}")
+        target_ids = {analysis_defs[target_title].analysis_id}
     else:
-        if target not in analysis_defs:
-            raise KeyError(f"Unknown analysis title: {target}")
-        target_ids = {analysis_defs[target].analysis_id}
+        target_ids = {a.analysis_id for a in analysis_defs.values()}
 
     removed_dirs: list[str] = []
+    selected_runs = 0
     updated_stage_manifests = 0
+    touched_cases = 0
+    touched_reps = 0
     for case in study_manifest.get("cases") or []:
         if not isinstance(case, dict):
             continue
+        if not _case_matches_selector(case, case_filter):
+            continue
+        touched_cases += 1
         case_path = Path(str(case.get("path") or ""))
         case_manifest = _read_json(_run_case_manifest_path(case_path))
         for rep in case_manifest.get("replicates") or []:
             if not isinstance(rep, dict):
                 continue
+            rep_id = str(rep.get("replicate_id") or "")
+            if not _replicate_matches_selector(rep_id, replicate_filter):
+                continue
+            touched_reps += 1
             rep_path = Path(str(rep.get("path") or ""))
             rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
             for stage_entry in rep_manifest.get("stages") or []:
@@ -3880,65 +4069,73 @@ def _remove_analysis_outputs(
                         continue
                     analysis_id = str(run.get("analysis_id") or "")
                     if analysis_id in target_ids:
+                        selected_runs += 1
                         for d in run.get("result_dirs") or []:
                             p = Path(str(d))
                             if p.exists():
                                 try:
-                                    if p.is_dir():
-                                        shutil.rmtree(p)
-                                    else:
-                                        p.unlink()
+                                    if not dry_run:
+                                        if p.is_dir():
+                                            shutil.rmtree(p)
+                                        else:
+                                            p.unlink()
                                     removed_dirs.append(str(p))
                                 except Exception:
                                     pass
                     else:
                         kept_runs.append(run)
                 if len(kept_runs) != len(runs):
-                    analysis_manifest["runs"] = kept_runs
-                    _write_analysis_manifest(stage_dir, analysis_manifest)
+                    if not dry_run:
+                        analysis_manifest["runs"] = kept_runs
+                        _write_analysis_manifest(stage_dir, analysis_manifest)
                     updated_stage_manifests += 1
 
-                    analysis_status = _load_analysis_status(stage_dir)
-                    analyses_obj = analysis_status.get("analyses") if isinstance(analysis_status.get("analyses"), dict) else {}
-                    for aid in list(analyses_obj.keys()):
-                        if aid in target_ids:
-                            analyses_obj.pop(aid, None)
-                    analysis_status["analyses"] = analyses_obj
-                    _write_analysis_status(stage_dir, analysis_status)
+                    if not dry_run:
+                        analysis_status = _load_analysis_status(stage_dir)
+                        analyses_obj = analysis_status.get("analyses") if isinstance(analysis_status.get("analyses"), dict) else {}
+                        for aid in list(analyses_obj.keys()):
+                            if aid in target_ids:
+                                analyses_obj.pop(aid, None)
+                        analysis_status["analyses"] = analyses_obj
+                        _write_analysis_status(stage_dir, analysis_status)
 
-    # Remove top-level analyze status files; they represent prior runs.
-    for p in [
-        study_root / ANALYSIS_STATUS_CSV_FILE,
-        study_root / ANALYSIS_STATUS_JSON_FILE,
-        study_root / LEGACY_ANALYSIS_STATUS_CSV_FILE,
-        study_root / LEGACY_ANALYSIS_STATUS_JSON_FILE,
-    ]:
-        if p.exists():
-            try:
-                p.unlink()
-            except Exception:
-                pass
+    # Remove top-level analyze status files only for global, unfiltered cleanup.
+    if not dry_run and not case_filter and not replicate_filter:
+        for p in [
+            study_root / ANALYSIS_STATUS_CSV_FILE,
+            study_root / ANALYSIS_STATUS_JSON_FILE,
+            study_root / LEGACY_ANALYSIS_STATUS_CSV_FILE,
+            study_root / LEGACY_ANALYSIS_STATUS_JSON_FILE,
+        ]:
+            if p.exists():
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
 
     return {
-        "target": target,
+        "analysis_title": target_title or "all",
+        "selected_runs": selected_runs,
         "removed_dirs": removed_dirs,
         "updated_stage_manifests": updated_stage_manifests,
+        "cases_scanned": touched_cases,
+        "replicates_scanned": touched_reps,
+        "dry_run": bool(dry_run),
     }
 
 
 def _remove_aggregate_outputs(
     *,
     study_root: Path,
-    remove_target: str,
+    aggregate_title: str | None,
+    case_filter: str | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     study_manifest = _read_json(study_root / "study_manifest.json")
     doc = _load_source_study_doc(study_manifest)
     aggregate_defs = _aggregate_defs_from_doc(doc)
-    target = str(remove_target or "").strip()
+    target = str(aggregate_title or "").strip()
     if not target:
-        raise ValueError("--remove requires a value: all or <aggregate_title>.")
-
-    if target.lower() == "all":
         titles = set(aggregate_defs.keys())
         # include existing dirs even if not in current YAML
         extra = study_root / "cases" / "aggregate"
@@ -3947,7 +4144,7 @@ def _remove_aggregate_outputs(
                 if d.is_dir():
                     titles.add(d.name)
     else:
-        if target not in aggregate_defs:
+        if target not in aggregate_defs and not (study_root / "cases" / "aggregate" / target).exists():
             raise KeyError(f"Unknown aggregate title: {target}")
         titles = {target}
 
@@ -3955,29 +4152,249 @@ def _remove_aggregate_outputs(
     for case in study_manifest.get("cases") or []:
         if not isinstance(case, dict):
             continue
+        if not _case_matches_selector(case, case_filter):
+            continue
         case_path = Path(str(case.get("path") or ""))
         for title in titles:
             d = case_path / "aggregate" / title
             if d.exists():
-                shutil.rmtree(d)
+                if not dry_run:
+                    shutil.rmtree(d)
                 removed_dirs.append(str(d))
-    for title in titles:
-        d = study_root / "cases" / "aggregate" / title
-        if d.exists():
-            shutil.rmtree(d)
-            removed_dirs.append(str(d))
+    if not case_filter:
+        for title in titles:
+            d = study_root / "cases" / "aggregate" / title
+            if d.exists():
+                if not dry_run:
+                    shutil.rmtree(d)
+                removed_dirs.append(str(d))
 
-    for p in [
-        study_root / AGGREGATE_STATUS_CSV_FILE,
-        study_root / AGGREGATE_STATUS_JSON_FILE,
-    ]:
+    if not dry_run and not case_filter:
+        for p in [
+            study_root / AGGREGATE_STATUS_CSV_FILE,
+            study_root / AGGREGATE_STATUS_JSON_FILE,
+        ]:
+            if p.exists():
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+
+    return {"aggregate_title": target or "all", "removed_dirs": removed_dirs, "dry_run": bool(dry_run)}
+
+
+def _remove_cache_outputs(
+    *,
+    study_root: Path,
+    case_filter: str | None = None,
+    replicate_filter: str | None = None,
+    stage_filter: str | None = None,
+    older_than_days: int | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    study_manifest = _read_json(study_root / "study_manifest.json")
+    cutoff_ts: float | None = None
+    if older_than_days is not None and older_than_days >= 0:
+        cutoff_ts = datetime.now().timestamp() - float(older_than_days) * 86400.0
+
+    removed_dirs: list[str] = []
+    skipped_age: list[str] = []
+    stage_dirs_scanned = 0
+    for case in study_manifest.get("cases") or []:
+        if not isinstance(case, dict):
+            continue
+        if not _case_matches_selector(case, case_filter):
+            continue
+        case_path = Path(str(case.get("path") or ""))
+        case_manifest = _read_json(_run_case_manifest_path(case_path))
+        for rep in case_manifest.get("replicates") or []:
+            if not isinstance(rep, dict):
+                continue
+            rep_id = str(rep.get("replicate_id") or "")
+            if not _replicate_matches_selector(rep_id, replicate_filter):
+                continue
+            rep_path = Path(str(rep.get("path") or ""))
+            rep_manifest = _read_json(_run_replicate_manifest_path(rep_path))
+            for stage_entry in rep_manifest.get("stages") or []:
+                if not isinstance(stage_entry, dict):
+                    continue
+                sname = str(stage_entry.get("stage") or "").strip()
+                if stage_filter and sname != stage_filter:
+                    continue
+                stage_dirs_scanned += 1
+                stage_dir = Path(str(stage_entry.get("path") or ""))
+                for cand in (stage_dir / "reaxkit_workspace" / "cache", stage_dir / ".reaxkit_cache"):
+                    if not cand.exists():
+                        continue
+                    if cutoff_ts is not None and cand.stat().st_mtime > cutoff_ts:
+                        skipped_age.append(str(cand))
+                        continue
+                    if not dry_run:
+                        shutil.rmtree(cand, ignore_errors=True)
+                    removed_dirs.append(str(cand))
+    return {
+        "removed_dirs": removed_dirs,
+        "skipped_age": skipped_age,
+        "stage_dirs_scanned": stage_dirs_scanned,
+        "dry_run": bool(dry_run),
+    }
+
+
+def _remove_status_outputs(
+    *,
+    study_root: Path,
+    target: str,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    target_map: dict[str, list[Path]] = {
+        "run-status": [study_root / RUN_STATUS_CSV_FILE, study_root / RUN_STATUS_JSON_FILE],
+        "analysis-status": [study_root / ANALYSIS_STATUS_CSV_FILE, study_root / ANALYSIS_STATUS_JSON_FILE],
+        "aggregate-status": [study_root / AGGREGATE_STATUS_CSV_FILE, study_root / AGGREGATE_STATUS_JSON_FILE],
+        "plot-status": [study_root / PLOT_STATUS_CSV_FILE, study_root / PLOT_STATUS_JSON_FILE],
+    }
+    files = target_map.get(target, [])
+    removed: list[str] = []
+    for p in files:
         if p.exists():
-            try:
-                p.unlink()
-            except Exception:
-                pass
+            if not dry_run:
+                try:
+                    p.unlink()
+                except Exception:
+                    continue
+            removed.append(str(p))
+    return {"target": target, "removed_files": removed, "dry_run": bool(dry_run)}
 
-    return {"target": target, "removed_dirs": removed_dirs}
+
+def _manage_study(
+    *,
+    study_root: Path,
+    action: str,
+    targets: list[str],
+    case_filter: str | None,
+    replicate_filter: str | None,
+    stage_filter: str | None,
+    analysis_title: str | None,
+    aggregate_title: str | None,
+    older_than_days: int | None,
+    dry_run: bool,
+) -> dict[str, Any]:
+    action_norm = str(action or "").strip().lower()
+    if action_norm not in {"update-paths", "rename-cases", "remove"}:
+        raise ValueError("--manage requires --action update-paths|rename-cases|remove.")
+    target_set = [str(t).strip().lower() for t in (targets or []) if str(t).strip()]
+    if not target_set:
+        if action_norm == "update-paths":
+            target_set = ["paths"]
+        elif action_norm == "rename-cases":
+            target_set = ["case-names"]
+        else:
+            target_set = ["analysis", "aggregate", "cache"]
+
+    details: list[dict[str, Any]] = []
+    for target in target_set:
+        started_at = _local_now()
+        status = "done"
+        message = ""
+        data: dict[str, Any] = {}
+        try:
+            if action_norm == "update-paths":
+                if target != "paths":
+                    raise ValueError("Action 'update-paths' supports only target 'paths'.")
+                data = _update_study_directory_paths(
+                    study_root=study_root,
+                    case_filter=case_filter,
+                    replicate_filter=replicate_filter,
+                    dry_run=dry_run,
+                )
+                message = f"json_updated={data.get('json_files_updated')}"
+            elif action_norm == "rename-cases":
+                if target != "case-names":
+                    raise ValueError("Action 'rename-cases' supports only target 'case-names'.")
+                data = _rename_case_directories(
+                    study_root=study_root,
+                    case_filter=case_filter,
+                    dry_run=dry_run,
+                )
+                message = f"renamed={len(data.get('renamed') or [])} json_updated={data.get('json_files_updated')}"
+            else:
+                if target == "analysis":
+                    data = _remove_analysis_outputs(
+                        study_root=study_root,
+                        analysis_title=analysis_title,
+                        case_filter=case_filter,
+                        replicate_filter=replicate_filter,
+                        dry_run=dry_run,
+                    )
+                    message = f"removed_dirs={len(data.get('removed_dirs') or [])}"
+                elif target == "aggregate":
+                    data = _remove_aggregate_outputs(
+                        study_root=study_root,
+                        aggregate_title=aggregate_title,
+                        case_filter=case_filter,
+                        dry_run=dry_run,
+                    )
+                    message = f"removed_dirs={len(data.get('removed_dirs') or [])}"
+                elif target == "cache":
+                    data = _remove_cache_outputs(
+                        study_root=study_root,
+                        case_filter=case_filter,
+                        replicate_filter=replicate_filter,
+                        stage_filter=stage_filter,
+                        older_than_days=older_than_days,
+                        dry_run=dry_run,
+                    )
+                    message = f"removed_dirs={len(data.get('removed_dirs') or [])}"
+                elif target in {"run-status", "analysis-status", "aggregate-status", "plot-status"}:
+                    data = _remove_status_outputs(study_root=study_root, target=target, dry_run=dry_run)
+                    message = f"removed_files={len(data.get('removed_files') or [])}"
+                else:
+                    raise ValueError(f"Unsupported remove target: {target}")
+        except Exception as exc:
+            status = "fail"
+            message = str(exc)
+        finished_at = _local_now()
+        details.append(
+            {
+                "action": action_norm,
+                "target": target,
+                "status": status,
+                "message": message,
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_min": _duration_minutes(started_at, finished_at),
+                "dry_run": bool(dry_run),
+                "data": data,
+            }
+        )
+        _log_task_event(status.upper(), f"manage {action_norm}:{target}", message)
+
+    summary = {
+        "total": len(details),
+        "done": sum(1 for d in details if d.get("status") == "done"),
+        "fail": sum(1 for d in details if d.get("status") == "fail"),
+        "dry_run": bool(dry_run),
+    }
+    rows = [
+        {
+            "action": d["action"],
+            "target": d["target"],
+            "status": d["status"],
+            "message": d["message"],
+            "started_at": d["started_at"],
+            "finished_at": d["finished_at"],
+            "duration_min": d["duration_min"],
+            "dry_run": d["dry_run"],
+        }
+        for d in details
+    ]
+    csv_path, json_path = _write_named_status(
+        study_root=study_root,
+        rows=rows,
+        summary=summary,
+        csv_name="manage_status.csv",
+        json_name="manage_status.json",
+    )
+    return {"summary": summary, "details": details, "csv": csv_path, "json": json_path}
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
@@ -3988,10 +4405,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "Create and initialize parameter-sweep study layouts.\n\n"
         "Examples:\n"
         "  reaxkit study --make-yaml study.yaml\n"
-        "  reaxkit study --update-dir\n"
         "  reaxkit study --gen-yaml\n"
         "  reaxkit study --init study.yaml --root .\n"
         "  reaxkit study --init study.yaml --root studies --force\n"
+        "  reaxkit study --manage study_MgTemp/ --action update-paths --target paths\n"
+        "  reaxkit study --manage study_MgTemp/ --action rename-cases --target case-names\n"
+        "  reaxkit study --manage study_MgTemp/ --action remove --target cache --older-than 14 --dry-run\n"
         "  reaxkit study --run study_MgTemp/\n"
         "  reaxkit study --run study_MgTemp/ --parallel-workers 4\n"
         "  reaxkit study --run study_MgTemp/ --rerun-failed\n"
@@ -3999,14 +4418,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "  reaxkit study --run study_MgTemp/ --case mg_05__temp_300\n"
         "  reaxkit study --analyze study_MgTemp/\n"
         "  reaxkit study --analyze study_MgTemp/ --rerun-failed\n"
-        "  reaxkit study --analyze study_MgTemp/ --remove all\n"
         "  reaxkit study --analyze study_MgTemp/ --analysis msd\n"
         "  reaxkit study --aggregate study_MgTemp/\n"
         "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation\n"
-        "  reaxkit study --aggregate study_MgTemp/ --remove msd_atom1_aggregation\n"
         "  reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT\n"
-        "  reaxkit study --plot study_MgTemp/\n"
-        "  reaxkit study --plot study_MgTemp/ --plot msd_atom1_aggregation"
+        "  reaxkit study --present study_MgTemp/\n"
+        "  reaxkit study --present study_MgTemp/ --present msd_atom1_aggregation"
     )
 
     mode = parser.add_mutually_exclusive_group(required=False)
@@ -4030,11 +4447,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Alias for --make-yaml.",
     )
     mode.add_argument(
-        "--update-dir",
-        nargs="?",
-        const=".",
+        "--manage",
         metavar="STUDY_ROOT",
-        help="Interactively update path references in study JSON files after moving a study directory.",
+        help="Manage study metadata/artifacts (path update and removals).",
     )
     mode.add_argument(
         "--run",
@@ -4053,10 +4468,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
     )
     mode.add_argument(
+        "--present",
+        action="append",
+        metavar="VALUE",
+        help="Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
+    )
+    mode.add_argument(
         "--plot",
         action="append",
         metavar="VALUE",
-        help="Plot mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
+        help="Deprecated alias for --present.",
     )
     parser.add_argument(
         "--root",
@@ -4099,7 +4520,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--replicate",
         default=None,
-        help="Optional replicate selector (e.g. replicate_01).",
+        help="Optional replicate selector (e.g. rep_01).",
     )
     parser.add_argument(
         "--parallel-workers",
@@ -4117,11 +4538,18 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         default=None,
         help="Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name.",
     )
+    parser.add_argument("--action", choices=["update-paths", "rename-cases", "remove"], default=None, help="Manager action for --manage.")
     parser.add_argument(
-        "--remove",
+        "--target",
+        action="append",
+        choices=["paths", "case-names", "analysis", "aggregate", "cache", "run-status", "analysis-status", "aggregate-status", "plot-status"],
         default=None,
-        help="For --analyze/--aggregate: remove outputs by title or 'all'.",
+        help="Manager target(s) for --manage. Can be repeated.",
     )
+    parser.add_argument("--analysis-title", default=None, help="Manager filter: analysis title.")
+    parser.add_argument("--aggregate-title", default=None, help="Manager filter: aggregate title.")
+    parser.add_argument("--dry-run", action="store_true", help="Show what --manage would change without writing/removing.")
+    parser.add_argument("--older-than", type=int, default=None, help="For cache removal: only remove entries older than N days.")
     parser.add_argument(
         "--value-column",
         default=None,
@@ -4145,18 +4573,28 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Created study template: {out_path.resolve()}")
         return 0
 
-    update_dir = getattr(args, "update_dir", None)
-    if update_dir is not None:
-        target = Path(str(update_dir)).resolve()
-        result = _update_study_directory_paths(study_root=target)
-        print(
-            "Updated study paths: "
-            f"json_scanned={result['json_files_scanned']} json_updated={result['json_files_updated']}"
+    manage_root = getattr(args, "manage", None)
+    if manage_root is not None:
+        result = _manage_study(
+            study_root=Path(str(manage_root)).resolve(),
+            action=str(getattr(args, "action", "") or ""),
+            targets=list(getattr(args, "target", None) or []),
+            case_filter=_clean_opt(getattr(args, "case", None)),
+            replicate_filter=_clean_opt(getattr(args, "replicate", None)),
+            stage_filter=_clean_opt(getattr(args, "stage", None)),
+            analysis_title=_clean_opt(getattr(args, "analysis_title", None)),
+            aggregate_title=_clean_opt(getattr(args, "aggregate_title", None)),
+            older_than_days=getattr(args, "older_than", None),
+            dry_run=bool(getattr(args, "dry_run", False)),
         )
-        print(f"study_root: {result['study_root']}")
-        print(f"source_yaml: {result['source_yaml']}")
-        print(f"template_dir: {result['template_dir']}")
-        return 0
+        print(
+            "Manage summary: "
+            f"done={result['summary']['done']} failed={result['summary']['fail']} "
+            f"total={result['summary']['total']} dry_run={result['summary']['dry_run']}"
+        )
+        print(f"Status CSV: {result['csv']}")
+        print(f"Status JSON: {result['json']}")
+        return 1 if result["summary"]["fail"] > 0 else 0
 
     aggregate_values = getattr(args, "aggregate", None)
     if aggregate_values is not None:
@@ -4168,16 +4606,6 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         if target is None:
             raise ValueError("--aggregate requires a study root path.")
         aggregate_title_filter = _clean_opt(aggregate_values[1]) if len(aggregate_values) == 2 else None
-        remove_target = _clean_opt(getattr(args, "remove", None))
-        if remove_target is not None:
-            if aggregate_title_filter is not None:
-                raise ValueError("When using --remove with --aggregate, do not pass aggregate title as second --aggregate value.")
-            removed = _remove_aggregate_outputs(
-                study_root=Path(target).resolve(),
-                remove_target=remove_target,
-            )
-            _log_task_event("DONE", "aggregate remove", f"target={removed['target']} removed={len(removed['removed_dirs'])}")
-            return 0
         results = _aggregate_study_all(
             study_root=Path(target).resolve(),
             aggregate_title_filter=aggregate_title_filter,
@@ -4196,15 +4624,17 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Status JSON: {Path(target).resolve() / AGGREGATE_STATUS_JSON_FILE}")
         return 0
 
-    plot_values = getattr(args, "plot", None)
+    present_values = getattr(args, "present", None)
+    plot_values = present_values if present_values is not None else getattr(args, "plot", None)
     if plot_values is not None:
+        flag_name = "--present" if present_values is not None else "--plot"
         if not isinstance(plot_values, list) or len(plot_values) == 0:
-            raise ValueError("--plot requires at least one value: study root.")
+            raise ValueError(f"{flag_name} requires at least one value: study root.")
         if len(plot_values) > 2:
-            raise ValueError("--plot accepts at most two values: study root and optional aggregate title.")
+            raise ValueError(f"{flag_name} accepts at most two values: study root and optional aggregate title.")
         target = _clean_opt(plot_values[0])
         if target is None:
-            raise ValueError("--plot requires a study root path.")
+            raise ValueError(f"{flag_name} requires a study root path.")
         aggregate_title_filter = _clean_opt(plot_values[1]) if len(plot_values) == 2 else None
         result = _plot_study_aggregates(
             study_root=Path(target).resolve(),
@@ -4242,18 +4672,6 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     analyze_root = getattr(args, "analyze", None)
     if analyze_root is not None:
-        remove_target = _clean_opt(getattr(args, "remove", None))
-        if remove_target is not None:
-            removed = _remove_analysis_outputs(
-                study_root=Path(str(analyze_root)).resolve(),
-                remove_target=remove_target,
-            )
-            _log_task_event(
-                "DONE",
-                "analyze remove",
-                f"target={removed['target']} removed_dirs={len(removed['removed_dirs'])}",
-            )
-            return 0
         result = _analyze_study(
             study_root=Path(str(analyze_root)).resolve(),
             analysis_filter=_clean_opt(getattr(args, "analysis", None)),
@@ -4273,7 +4691,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     init_path = getattr(args, "init", None)
     if init_path is None:
-        raise ValueError("Missing required mode. Use --init, --run, --analyze, --aggregate, --plot, or --make-yaml.")
+        raise ValueError("Missing required mode. Use --init, --manage, --run, --analyze, --aggregate, --present, or --make-yaml.")
 
     study_root = _init_study(
         Path(str(init_path)),
