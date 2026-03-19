@@ -446,6 +446,73 @@ def _utility_specs_map(catalog: dict[str, Any] | None) -> dict[str, dict[str, An
     return out
 
 
+def _utility_field_options(
+    utility_name: str,
+    field_name: str,
+    *,
+    columns: list[str],
+    numeric_columns: list[str],
+) -> list[dict[str, str]]:
+    name = str(field_name or "").strip().lower()
+    util = canonical_utility_name(utility_name)
+    choices: list[str] = []
+    if name in {"column", "source"}:
+        if util in {"denoise_ema", "denoise_sma", "column_transform"}:
+            choices = list(numeric_columns or columns)
+        else:
+            choices = list(columns)
+    elif name in {"group_by", "x_col"}:
+        choices = list(columns)
+    return [{"label": col, "value": col} for col in choices if str(col).strip()]
+
+
+def _coerce_utility_field_value(raw_value: Any, field_type: str) -> Any:
+    normalized = str(field_type or "Any").strip().lower()
+    is_optional = "none" in normalized
+    if raw_value is None:
+        if "list[" in normalized:
+            return []
+        return None if is_optional else ""
+    if isinstance(raw_value, str):
+        text = raw_value.strip()
+        if text == "":
+            if "list[" in normalized:
+                return []
+            return None if is_optional else ""
+    else:
+        text = str(raw_value).strip()
+
+    if "list[int]" in normalized:
+        if isinstance(raw_value, (list, tuple, set)):
+            out: list[int] = []
+            for item in raw_value:
+                try:
+                    out.append(int(item))
+                except Exception:
+                    continue
+            return out
+        return _parse_csv_ints(text) or []
+    if "list[str]" in normalized:
+        if isinstance(raw_value, (list, tuple, set)):
+            return [str(item).strip() for item in raw_value if str(item).strip()]
+        return _parse_csv_strs(text) or []
+    if "bool" in normalized:
+        if isinstance(raw_value, bool):
+            return raw_value
+        return text.lower() in {"1", "true", "yes", "on"}
+    if "int" in normalized and "list[" not in normalized:
+        try:
+            return int(float(text))
+        except Exception:
+            return None if is_optional else 0
+    if "float" in normalized and "list[" not in normalized:
+        try:
+            return float(text)
+        except Exception:
+            return None if is_optional else 0.0
+    return str(raw_value)
+
+
 def _visualization_nodes_for_analysis(snapshot: dict[str, Any] | None, analysis_id: str) -> list[dict[str, Any]]:
     nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
     if not isinstance(nodes, dict):
@@ -648,6 +715,7 @@ def _viz_request_with_defaults(existing: dict[str, Any] | None, viz_type: str) -
     req.setdefault("color_col", "")
     req.setdefault("group_col", "")
     req.setdefault("group_agg", "none")
+    req.setdefault("row_filters", [])
     req.setdefault("line_color", "blue")
     req.setdefault("line_color_rgb", "")
     req.setdefault("line_width", 2.0)
@@ -679,6 +747,141 @@ def _parse_float(raw: Any, default: float | None = None) -> float | None:
         return float(txt)
     except Exception:
         return default
+
+
+_ROW_FILTER_OPERATORS: tuple[str, ...] = (
+    "==",
+    "!=",
+    ">",
+    ">=",
+    "<",
+    "<=",
+    "in",
+    "not in",
+    "contains",
+    "between",
+)
+
+
+def _row_filters_from_raw(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        column = str(item.get("column") or "").strip()
+        op = str(item.get("op") or "==").strip().lower()
+        value = str(item.get("value") or "").strip()
+        if not column:
+            continue
+        if op not in _ROW_FILTER_OPERATORS:
+            op = "=="
+        out.append({"column": column, "op": op, "value": value})
+    return out
+
+
+def _row_filter_table_data(raw: Any) -> list[dict[str, str]]:
+    if not isinstance(raw, list):
+        return [{"column": "", "op": "==", "value": ""}]
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        column = str(item.get("column") or "").strip()
+        op = str(item.get("op") or "==").strip().lower()
+        value = str(item.get("value") or "")
+        if op not in _ROW_FILTER_OPERATORS:
+            op = "=="
+        out.append({"column": column, "op": op, "value": value})
+    return out or [{"column": "", "op": "==", "value": ""}]
+
+
+def _row_filter_dropdown(columns: list[str] | None) -> dict[str, Any]:
+    col_opts = [{"label": str(col), "value": str(col)} for col in (columns or []) if str(col).strip()]
+    return {
+        "column": {"options": col_opts},
+        "op": {"options": [{"label": op, "value": op} for op in _ROW_FILTER_OPERATORS]},
+    }
+
+
+def _as_num(value: Any) -> float | None:
+    return _parse_float(value, None)
+
+
+def _compare_row_filter(row_value: Any, op: str, filter_value: str) -> bool:
+    op_norm = str(op or "==").strip().lower()
+    left_num = _as_num(row_value)
+    left_text = str(row_value or "").strip()
+    raw = str(filter_value or "").strip()
+
+    if op_norm in {"in", "not in"}:
+        tokens = [tok.strip() for tok in raw.split(",") if tok.strip()]
+        hit = left_text in tokens
+        return (not hit) if op_norm == "not in" else hit
+    if op_norm == "contains":
+        return raw.lower() in left_text.lower()
+    if op_norm == "between":
+        parts = [tok.strip() for tok in raw.split(",") if tok.strip()]
+        if len(parts) != 2:
+            return True
+        lo_num = _as_num(parts[0])
+        hi_num = _as_num(parts[1])
+        if left_num is not None and lo_num is not None and hi_num is not None:
+            lo = min(lo_num, hi_num)
+            hi = max(lo_num, hi_num)
+            return lo <= left_num <= hi
+        lo_txt, hi_txt = sorted(parts)
+        return lo_txt <= left_text <= hi_txt
+
+    right_num = _as_num(raw)
+    if left_num is not None and right_num is not None:
+        if op_norm == "==":
+            return left_num == right_num
+        if op_norm == "!=":
+            return left_num != right_num
+        if op_norm == ">":
+            return left_num > right_num
+        if op_norm == ">=":
+            return left_num >= right_num
+        if op_norm == "<":
+            return left_num < right_num
+        if op_norm == "<=":
+            return left_num <= right_num
+        return True
+
+    if op_norm == "==":
+        return left_text == raw
+    if op_norm == "!=":
+        return left_text != raw
+    if op_norm == ">":
+        return left_text > raw
+    if op_norm == ">=":
+        return left_text >= raw
+    if op_norm == "<":
+        return left_text < raw
+    if op_norm == "<=":
+        return left_text <= raw
+    return True
+
+
+def _apply_row_filters(rows: list[dict[str, Any]], raw_filters: Any) -> list[dict[str, Any]]:
+    filters = _row_filters_from_raw(raw_filters)
+    if not filters:
+        return rows
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        keep = True
+        for fil in filters:
+            col = fil["column"]
+            if col not in row:
+                continue
+            if not _compare_row_filter(row.get(col), fil["op"], fil["value"]):
+                keep = False
+                break
+        if keep:
+            out.append(row)
+    return out
 
 
 def _trace_styles_map(raw: Any) -> dict[str, dict[str, Any]]:
@@ -1227,10 +1430,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Output("pipeline-store", "data", allow_duplicate=True),
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-add-join-node", "n_clicks"),
-        Input("btn-add-filter-node", "n_clicks"),
         Input("btn-add-ema-node", "n_clicks"),
         Input("btn-add-sma-node", "n_clicks"),
-        Input("btn-add-frame-range-node", "n_clicks"),
         Input("btn-add-transform-node", "n_clicks"),
         State("session-store", "data"),
         State("pipeline-store", "data"),
@@ -1238,10 +1439,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
     )
     def on_add_utility_node(
         n_join: int,
-        n_filter: int,
         n_ema: int,
         n_sma: int,
-        n_frame_range: int,
         n_transform: int,
         session: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
@@ -1251,10 +1450,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         trig = ctx.triggered_id
         clicks_by_trigger = {
             "btn-add-join-node": int(n_join or 0),
-            "btn-add-filter-node": int(n_filter or 0),
             "btn-add-ema-node": int(n_ema or 0),
             "btn-add-sma-node": int(n_sma or 0),
-            "btn-add-frame-range-node": int(n_frame_range or 0),
             "btn-add-transform-node": int(n_transform or 0),
         }
         if str(trig) not in clicks_by_trigger or clicks_by_trigger[str(trig)] <= 0:
@@ -1295,10 +1492,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
 
         util_by_trigger = {
             "btn-add-join-node": "join_tables",
-            "btn-add-filter-node": "filter_rows",
             "btn-add-ema-node": "denoise_ema",
             "btn-add-sma-node": "denoise_sma",
-            "btn-add-frame-range-node": "frame_range",
             "btn-add-transform-node": "column_transform",
         }
         util_name = canonical_utility_name(util_by_trigger.get(str(trig), ""))
@@ -1396,6 +1591,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     "color_col": str(color_col or ""),
                     "group_col": str(group_col or ""),
                     "group_agg": _normalize_group_agg(group_agg),
+                    "row_filters": [],
                     "line_color": "blue",
                     "line_color_rgb": "",
                     "line_width": 2.0,
@@ -1712,6 +1908,77 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             str(node["id"]),
             {"request": request_payload, "metadata": metadata},
         )
+        return service.get_pipeline(pipeline_id)
+
+    @app.callback(
+        Output("pipeline-store", "data", allow_duplicate=True),
+        Input({"type": "utility-field", "name": ALL}, "value"),
+        State({"type": "utility-field", "name": ALL}, "id"),
+        State("session-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def on_live_utility_params(
+        field_values: list[Any] | None,
+        field_ids: list[dict[str, Any]] | None,
+        session: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        if not session or not snapshot or not isinstance(field_ids, list) or not field_ids:
+            return no_update
+        pipeline_id = str(session.get("pipeline_id", ""))
+        node = _selected_node(snapshot, session)
+        if not pipeline_id or not node or str(node.get("kind")) != "utility":
+            return no_update
+
+        util_name = canonical_utility_name(str(node.get("metadata", {}).get("utility_name") or node.get("name") or ""))
+        if util_name == "join_tables":
+            return no_update
+
+        catalog = _catalog_payload(service)
+        utility_spec = _utility_specs_map(catalog).get(util_name, {})
+        spec_fields = utility_spec.get("fields", []) if isinstance(utility_spec, dict) else []
+        if not isinstance(spec_fields, list) or not spec_fields:
+            return no_update
+        fields_by_name: dict[str, dict[str, Any]] = {}
+        for field in spec_fields:
+            if not isinstance(field, dict):
+                continue
+            fname = str(field.get("name") or "").strip()
+            if fname:
+                fields_by_name[fname] = field
+
+        source_art = _find_source_artifact(snapshot, str(node.get("id")), {})
+        source_rows = _artifact_rows(source_art if isinstance(source_art, dict) else None)
+        default_req = default_utility_request(
+            util_name,
+            columns=infer_columns(source_rows),
+            numeric_columns=infer_numeric_columns(source_rows),
+        )
+        old_req = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+        request_payload = dict(default_req)
+        request_payload.update(old_req)
+        changed = False
+
+        values = field_values if isinstance(field_values, list) else []
+        for field_id, raw_value in zip(field_ids, values):
+            if not isinstance(field_id, dict):
+                continue
+            fname = str(field_id.get("name") or "").strip()
+            if not fname:
+                continue
+            field = fields_by_name.get(fname)
+            if not field:
+                continue
+            ftype = str(field.get("type") or "Any")
+            coerced = _coerce_utility_field_value(raw_value, ftype)
+            if request_payload.get(fname) != coerced:
+                request_payload[fname] = coerced
+                changed = True
+
+        if not changed or request_payload == old_req:
+            return no_update
+        service.update_node(pipeline_id, str(node["id"]), {"request": request_payload})
         return service.get_pipeline(pipeline_id)
 
     @app.callback(
@@ -2081,19 +2348,15 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             catalog = _catalog_payload(service)
             utility_specs = _utility_specs_map(catalog)
             join_label = str(utility_specs.get("join_tables", {}).get("label") or "Join tables")
-            filter_label = str(utility_specs.get("filter_rows", {}).get("label") or "Filter rows")
             ema_label = str(utility_specs.get("denoise_ema", {}).get("label") or "Denoise (EMA)")
             sma_label = str(utility_specs.get("denoise_sma", {}).get("label") or "Denoise (SMA)")
-            frame_label = str(utility_specs.get("frame_range", {}).get("label") or "Frame range")
             transform_label = str(utility_specs.get("column_transform", {}).get("label") or "Column transform")
             return html.Div(
                 [
                     html.Div("Node: Utilities"),
                     html.Button(join_label, id="btn-add-join-node", n_clicks=0),
-                    html.Button(filter_label, id="btn-add-filter-node", n_clicks=0),
                     html.Button(ema_label, id="btn-add-ema-node", n_clicks=0),
                     html.Button(sma_label, id="btn-add-sma-node", n_clicks=0),
-                    html.Button(frame_label, id="btn-add-frame-range-node", n_clicks=0),
                     html.Button(transform_label, id="btn-add-transform-node", n_clicks=0),
                 ],
                 className="rk-stack",
@@ -2156,6 +2419,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                             value="none",
                             clearable=False,
                         ),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=[{"column": "", "op": "==", "value": ""}],
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Dropdown(id="viz-z-col", options=opts, value=x_default, clearable=False, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                     ]
@@ -2171,6 +2448,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value=(cols[2] if len(cols) > 2 else x_default), clearable=False),
                         html.Label("color by"),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=[{"column": "", "op": "==", "value": ""}],
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                     ]
@@ -2180,6 +2471,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     [
                         html.Label("value content"),
                         dcc.Dropdown(id="viz-x-col", options=opts, value=hist_default, clearable=False),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=[{"column": "", "op": "==", "value": ""}],
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Dropdown(id="viz-y-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=None, clearable=True, style={"display": "none"}),
@@ -2190,6 +2495,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             else:
                 body.extend(
                     [
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=[{"column": "", "op": "==", "value": ""}],
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                            style_table={"display": "none"},
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, style={"display": "none"}),
                         dcc.Dropdown(id="viz-x-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-y-col", options=opts, value="", clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-z-col", options=opts, value="", clearable=True, style={"display": "none"}),
@@ -2506,22 +2825,66 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     ]
                 )
                 return html.Div(lines, className="rk-stack")
-            field_lines: list[Any] = []
-            for field in utility_spec.get("fields", []) if isinstance(utility_spec, dict) else []:
+            field_specs = utility_spec.get("fields", []) if isinstance(utility_spec, dict) else []
+            field_controls: list[Any] = []
+            for field in field_specs:
                 if not isinstance(field, dict):
                     continue
                 fname = str(field.get("name") or "").strip()
                 if not fname:
                     continue
                 ftype = str(field.get("type") or "Any")
-                fdefault = field.get("default")
-                field_lines.append(
+                fhelp = str(field.get("help") or "").strip()
+                current_value = merged_req.get(fname, field.get("default"))
+                options = _utility_field_options(
+                    util_name,
+                    fname,
+                    columns=cols,
+                    numeric_columns=numeric_cols,
+                )
+
+                control: Any
+                if "list[str]" in ftype and options:
+                    value = current_value if isinstance(current_value, list) else _parse_csv_strs(str(current_value or "")) or []
+                    control = dcc.Dropdown(
+                        id={"type": "utility-field", "name": fname},
+                        options=options,
+                        value=value,
+                        multi=True,
+                        clearable=True,
+                    )
+                elif options:
+                    value = str(current_value or "").strip()
+                    control = dcc.Dropdown(
+                        id={"type": "utility-field", "name": fname},
+                        options=options,
+                        value=(value if value else None),
+                        clearable=True,
+                    )
+                elif "int" in ftype or "float" in ftype:
+                    control = dcc.Input(
+                        id={"type": "utility-field", "name": fname},
+                        type="number",
+                        value=current_value,
+                        debounce=True,
+                        step=1 if "int" in ftype and "float" not in ftype else "any",
+                    )
+                else:
+                    text_value = current_value if isinstance(current_value, str) else ("" if current_value is None else str(current_value))
+                    control = dcc.Input(
+                        id={"type": "utility-field", "name": fname},
+                        type="text",
+                        value=text_value,
+                        debounce=True,
+                    )
+                field_controls.append(
                     html.Div(
                         [
-                            html.Code(fname),
-                            html.Span(f" : {ftype}"),
-                            html.Span(f"  default={fdefault!r}" if fdefault is not None else "  default=None"),
-                        ]
+                            html.Label(fname),
+                            control,
+                            html.Div(fhelp, className="rk-help-text") if fhelp else html.Div(style={"display": "none"}),
+                        ],
+                        className="rk-stack",
                     )
                 )
             lines.extend(
@@ -2535,6 +2898,23 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     html.Div(f"Utility: {util_name}"),
                 ]
             )
+            if field_controls:
+                lines.extend(field_controls)
+                lines.append(
+                    html.Div("Utility parameters auto-save on field update.", className="rk-subtitle")
+                )
+                lines.append(
+                    html.Div("Execution in progress...")
+                    if is_running
+                    else html.Div(
+                        [
+                            html.Button("Execute", id="btn-apply-node", n_clicks=0, className="rk-btn-exec"),
+                        ],
+                        className="rk-inline-actions",
+                    )
+                )
+                return html.Div(lines, className="rk-stack")
+
             lines.extend(
                 [
                     html.Div("Edit request JSON", className="rk-subtitle"),
@@ -2544,15 +2924,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         style={"width": "100%", "minHeight": "180px", "fontFamily": "Consolas, Courier New, monospace"},
                     ),
                     html.Div("Schema", className="rk-subtitle"),
-                    html.Div(field_lines or [html.Div("No schema metadata found for this utility.")], className="rk-stack"),
+                    html.Div([html.Div("No schema metadata found for this utility.")], className="rk-stack"),
                     *hidden_task_inputs(),
-                    dcc.Dropdown(id="util-filter-column", options=[], value=None, style={"display": "none"}),
-                    dcc.Input(id="util-filter-values", type="text", value="", style={"display": "none"}),
-                    dcc.Dropdown(id="util-denoise-column", options=[], value=None, style={"display": "none"}),
-                    dcc.Input(id="util-denoise-alpha", type="number", value=0.3, style={"display": "none"}),
-                    dcc.Input(id="util-denoise-window", type="number", value=5, style={"display": "none"}),
-                    dcc.Dropdown(id="util-denoise-group", options=[], value=None, style={"display": "none"}),
-                    dcc.Dropdown(id="util-denoise-xcol", options=[], value=None, style={"display": "none"}),
                     (
                         html.Div("Execution in progress...")
                         if is_running
@@ -2654,6 +3027,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                             value=_normalize_group_agg(req.get("group_agg")),
                             clearable=False,
                         ),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=_row_filter_table_data(req.get("row_filters")),
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Checklist(
                             id="viz-use-plot-title",
                             options=[{"label": "use custom plot title", "value": "on"}],
@@ -2801,6 +3188,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or z_default), clearable=False),
                         html.Label("color by"),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=_row_filter_table_data(req.get("row_filters")),
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Dropdown(id="viz-group-col", options=opts, value=str(req.get("group_col") or "") or None, clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-group-agg", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                         dcc.Input(id="viz-selected-trace-key", type="text", value="", style={"display": "none"}),
@@ -2882,6 +3283,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     [
                         html.Label("value content"),
                         dcc.Dropdown(id="viz-x-col", options=opts, value=str(req.get("x_col") or hist_default), clearable=False),
+                        html.Label("Row filters"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=_row_filter_table_data(req.get("row_filters")),
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, className="rk-btn-save"),
                         dcc.Dropdown(id="viz-y-col", options=opts, value=str(req.get("y_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-z-col", options=opts, value=str(req.get("z_col") or ""), clearable=True, style={"display": "none"}),
                         dcc.Dropdown(id="viz-color-col", options=opts, value=str(req.get("color_col") or "") or None, clearable=True, style={"display": "none"}),
@@ -2975,6 +3390,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 body.extend(
                     [
                         html.Div("Table filtering/sorting is available directly in Result Tabs.", className="rk-subtitle"),
+                        dash_table.DataTable(
+                            id="viz-row-filters",
+                            columns=[
+                                {"name": "Column", "id": "column", "presentation": "dropdown"},
+                                {"name": "Operator", "id": "op", "presentation": "dropdown"},
+                                {"name": "Value", "id": "value"},
+                            ],
+                            data=_row_filter_table_data(req.get("row_filters")),
+                            editable=True,
+                            row_deletable=True,
+                            dropdown=_row_filter_dropdown(cols),
+                            style_table={"display": "none"},
+                        ),
+                        html.Button("Add filter", id="btn-viz-add-row-filter", n_clicks=0, style={"display": "none"}),
                         html.Label("Visible rows"),
                         dcc.Input(
                             id="viz-table-max-rows",
@@ -3089,6 +3518,19 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         return {"display": "grid"}
 
     @app.callback(
+        Output("viz-row-filters", "data", allow_duplicate=True),
+        Input("btn-viz-add-row-filter", "n_clicks"),
+        State("viz-row-filters", "data"),
+        prevent_initial_call=True,
+    )
+    def on_add_viz_row_filter(n_clicks: int, rows_data: list[dict[str, Any]] | None):
+        if not n_clicks:
+            return no_update
+        rows = _row_filter_table_data(rows_data)
+        rows.append({"column": "", "op": "==", "value": ""})
+        return rows
+
+    @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-save-viz-params", "n_clicks"),
@@ -3101,6 +3543,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         State("viz-color-col", "value"),
         State("viz-group-col", "value"),
         State("viz-group-agg", "value"),
+        State("viz-row-filters", "data"),
         State("viz-use-plot-title", "value"),
         State("viz-plot-title", "value"),
         State("viz-x-title", "value"),
@@ -3136,6 +3579,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         color_col: str | None,
         group_col: str | None,
         group_agg: str | None,
+        row_filters_data: list[dict[str, Any]] | None,
         use_plot_title_values: list[str] | None,
         plot_title: str | None,
         x_title: str | None,
@@ -3179,6 +3623,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             "color_col": str(color_col or ""),
             "group_col": str(group_col or ""),
             "group_agg": _normalize_group_agg(group_agg),
+            "row_filters": _row_filter_table_data(row_filters_data),
             "line_color": str(line_color_name or "blue"),
             "line_color_rgb": str(line_color_rgb or ""),
             "line_width": float(line_width if line_width is not None else 2.0),
@@ -3211,6 +3656,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Input("viz-color-col", "value"),
         Input("viz-group-col", "value"),
         Input("viz-group-agg", "value"),
+        Input("viz-row-filters", "data"),
         Input("viz-use-plot-title", "value"),
         Input("viz-plot-title", "value"),
         Input("viz-x-title", "value"),
@@ -3242,6 +3688,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         color_col: str | None,
         group_col: str | None,
         group_agg: str | None,
+        row_filters_data: list[dict[str, Any]] | None,
         use_plot_title_values: list[str] | None,
         plot_title: str | None,
         x_title: str | None,
@@ -3289,6 +3736,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 "color_col": str(color_col or payload.get("color_col") or ""),
                 "group_col": str(group_col or payload.get("group_col") or ""),
                 "group_agg": _normalize_group_agg(group_agg if group_agg is not None else payload.get("group_agg")),
+                "row_filters": _row_filter_table_data(row_filters_data),
                 "line_color": str(line_color_name or payload.get("line_color") or "blue"),
                 "line_color_rgb": str(line_color_rgb or payload.get("line_color_rgb") or ""),
                 "line_width": float(line_width if line_width is not None else float(payload.get("line_width") or 2.0)),
@@ -3668,6 +4116,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         if focus_atom:
             rows = [r for r in rows if str(r.get("atom_id")) == str(focus_atom)]
         req = source_node.get("request", {}) if isinstance(source_node.get("request"), dict) else {}
+        rows = _apply_row_filters(rows, req.get("row_filters"))
         viz_type = str(req.get("visualization_type") or "plot2d").lower()
 
         if viz_type == "table":
