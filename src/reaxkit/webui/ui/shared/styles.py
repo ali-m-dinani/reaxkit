@@ -9,7 +9,7 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   grid-template-areas:
     "top top"
     "left canvas"
-    "props results"
+    "props canvas"
     "info info";
 }
 .rk-panel { background: #fff; border: 1px solid #cedae3; border-radius: 10px; padding: 0 0 0 10px; overflow: auto; box-sizing: border-box; }
@@ -196,13 +196,12 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
 @media (max-width: 980px) {
   .rk-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: 56px 280px 250px 260px 220px 42px;
+    grid-template-rows: 56px 280px 250px 360px 42px;
     grid-template-areas:
       "top"
       "left"
       "props"
       "canvas"
-      "results"
       "info";
   }
 }

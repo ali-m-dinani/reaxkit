@@ -41,7 +41,7 @@ def build_layout() -> html.Div:
             html.Div(pipeline_controls(), id="panel-left", className="rk-panel rk-left"),
             html.Div(visualization_canvas(), id="panel-canvas", className="rk-panel rk-canvas"),
             html.Div(properties_panel(), id="panel-props", className="rk-panel rk-props"),
-            html.Div(result_tabs(), id="panel-results", className="rk-panel rk-results"),
+            html.Div(result_tabs(), id="panel-results-hidden", style={"display": "none"}),
             html.Div(dataset_info_panel(), id="panel-info", className="rk-panel rk-info"),
             html.Div(log_page_panel(), id="panel-log-page", className="rk-panel rk-page-full", style={"display": "none"}),
         ],

@@ -37,7 +37,11 @@ def visualization_canvas() -> html.Div:
                 ],
                 className="rk-canvas-head",
             ),
-            html.Div(id="canvas-content", className="rk-canvas-box"),
+            dcc.Loading(
+                id="canvas-content-loading",
+                type="circle",
+                children=html.Div(id="canvas-content", className="rk-canvas-box"),
+            ),
             html.Div(id="canvas-export-status", className="rk-log-name"),
         ]
     )
@@ -109,7 +113,11 @@ def result_tabs() -> html.Div:
                     ),
                 ]
             ),
-            html.Div(id="result-tab-content", className="rk-results-box"),
+            dcc.Loading(
+                id="result-content-loading",
+                type="circle",
+                children=html.Div(id="result-tab-content", className="rk-results-box"),
+            ),
         ]
     )
 

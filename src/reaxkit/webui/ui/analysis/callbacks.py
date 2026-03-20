@@ -2528,19 +2528,19 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         if not isinstance(nodes, dict):
             return [], None
 
+        if selected_id.startswith("virtual:visualization:"):
+            # Keep current tab state unchanged when the virtual Presentation folder is selected.
+            return no_update, no_update
+
         selected_node = nodes.get(selected_id)
         viz_nodes: list[dict[str, Any]] = []
-        if selected_id.startswith("virtual:visualization:"):
-            analysis_id = selected_id.split(":", 2)[2]
-            viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id)
-        else:
-            if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "visualization":
-                viz_nodes = [selected_node]
-            elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
-                analysis_id = _ancestor_analysis_id(nodes, selected_id)
-                viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id) if analysis_id else []
-            elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
-                viz_nodes = []
+        if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "visualization":
+            viz_nodes = [selected_node]
+        elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
+            analysis_id = _ancestor_analysis_id(nodes, selected_id)
+            viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id) if analysis_id else []
+        elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
+            viz_nodes = []
 
         if not viz_nodes:
             return [], None
@@ -4699,23 +4699,20 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         focus_atom: str | None,
     ):
         if not session:
-            empty = "No selected node."
-            return empty, empty
+            return no_update, "No selected node."
         node_id = str(session.get("selected_node_id") or "")
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
         selected_node = nodes.get(node_id) if isinstance(nodes, dict) else None
         if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
-            empty = "No presentation selected. Select a presentation node under this analysis."
-            return empty, empty
-        if str(node_id).startswith("virtual:visualization:") and not tab_node_id:
-            empty = "No presentations yet for this analysis."
-            return empty, empty
+            return no_update, "No presentation selected. Select a presentation node under this analysis."
+        if str(node_id).startswith("virtual:visualization:"):
+            # Selecting the virtual Presentation folder should not change the canvas view.
+            return no_update, no_update
 
         source_node_id = str(tab_node_id or node_id)
         source_node = nodes.get(source_node_id) if isinstance(nodes, dict) else None
         if not isinstance(source_node, dict):
-            empty = "No presentation selected."
-            return empty, empty
+            return no_update, "No presentation selected."
         if str(source_node.get("kind")) == "utility":
             analysis_id = _ancestor_analysis_id(nodes, source_node_id) if isinstance(nodes, dict) else None
             if analysis_id:
@@ -4735,9 +4732,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
             rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
             if not rows:
-                content = "No result rows yet."
-                return content, content
-            return _build_result_table(rows, max_rows=200), _build_result_table(rows, max_rows=200)
+                return no_update, "No result rows yet."
+            return no_update, _build_result_table(rows, max_rows=200)
         presentation_spec = None
         if isinstance(source_node, dict):
             meta = source_node.get("metadata", {})
@@ -4753,10 +4749,9 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
 
         if viz_type == "table":
             if not rows:
-                content = "No result rows yet."
-                return content, content
+                return no_update, "No result rows yet."
             table_max_rows = int(req.get("table_max_rows") or 200)
-            return _build_result_table(rows, max_rows=table_max_rows), _build_result_table(rows, max_rows=table_max_rows)
+            return no_update, _build_result_table(rows, max_rows=table_max_rows)
 
         if viz_type == "plot2d":
             cols = infer_columns(rows)
@@ -4809,13 +4804,12 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             cached_fig_json = _figure_cache_get(fig_cache_key)
             if isinstance(cached_fig_json, dict):
                 cached_fig = go.Figure(cached_fig_json)
-                graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=cached_fig, config={"displaylogo": False})
                 graph_canvas = dcc.Graph(
                     id={"type": "plot-graph", "slot": "canvas"},
-                    figure=go.Figure(cached_fig),
+                    figure=cached_fig,
                     config={"displaylogo": False},
                 )
-                return graph_result, graph_canvas
+                return no_update, graph_canvas
             plot_rows = _cached_aggregate_plot2d_rows(
                 rows,
                 artifact_id=artifact_id,
@@ -4834,8 +4828,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 view_type="plot2d",
             )
             if fig is None:
-                content = "No plottable data."
-                return content, content
+                return no_update, "No plottable data."
             scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
             apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
             for curve_index, tr in enumerate(fig.data):
@@ -4890,13 +4883,12 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_yaxes(title_text=y_title)
             fig = _optimize_plot2d_for_large_data(fig, threshold_points=5000)
             _figure_cache_put(fig_cache_key, fig)
-            graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
-                figure=go.Figure(fig),
+                figure=fig,
                 config={"displaylogo": False},
             )
-            return graph_result, graph_canvas
+            return no_update, graph_canvas
 
         if viz_type == "histogram":
             cols = infer_columns(rows)
@@ -4911,8 +4903,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 view_type="histogram",
             )
             if fig is None:
-                content = "No numeric data for histogram."
-                return content, content
+                return no_update, "No numeric data for histogram."
             hist_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
             if hist_color:
                 for tr in fig.data:
@@ -4929,13 +4920,12 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_xaxes(title_text=x_title)
             if y_title:
                 fig.update_yaxes(title_text=y_title)
-            graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
-                figure=go.Figure(fig),
+                figure=fig,
                 config={"displaylogo": False},
             )
-            return graph_result, graph_canvas
+            return no_update, graph_canvas
 
         fig3d = render_figure(
             rows,
@@ -4947,8 +4937,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             view_type="scatter3d",
         )
         if fig3d is None:
-            content = "No 3D data."
-            return content, content
+            return no_update, "No 3D data."
         marker_size = _parse_float(req.get("marker_size"), 6.0)
         fixed_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
         color_by = str(req.get("color_col") or "")
@@ -4975,10 +4964,9 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 yaxis_title=y_title or None,
                 zaxis_title=z_title or None,
             )
-        graph3d_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig3d, config={"displaylogo": False})
         graph3d_canvas = dcc.Graph(
             id={"type": "plot-graph", "slot": "canvas"},
-            figure=go.Figure(fig3d),
+            figure=fig3d,
             config={"displaylogo": False},
         )
-        return graph3d_result, graph3d_canvas
+        return no_update, graph3d_canvas

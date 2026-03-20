@@ -34,6 +34,11 @@ def topbar() -> html.Div:
                     dcc.Loading(
                         id="execute-loading",
                         type="circle",
+                        target_components={
+                            "execute-loading-proxy": "children",
+                            "canvas-content": "children",
+                            "result-tab-content": "children",
+                        },
                         children=html.Div(id="execute-loading-proxy", className="rk-spinner-anchor"),
                     ),
                     html.Span(id="status-banner", className="rk-badge"),
