@@ -151,10 +151,14 @@ def _log_analysis_dropdown_wiring(dash_app: Any) -> None:
 
 def main() -> None:
     """Run Dash dev server."""
+    # Runtime toggles (fast defaults).
+    console_log_enabled = False  # Set True to print logs in terminal.
+    callback_wiring_log_enabled = False  # Set True to inspect callback-map wiring at startup.
+    ui_trace_startup_enabled = False  # Set True to append startup line to ui_trace.log.
+
     # Verbose terminal logging for Web UI debugging.
     level_name = str(os.environ.get("REAXKIT_WEBUI_LOG_LEVEL", "DEBUG")).upper()
     level = getattr(logging, level_name, logging.DEBUG)
-    console_log_enabled = False  # Set to False to silence terminal logs.
     if console_log_enabled:
         logging.basicConfig(
             level=level,
@@ -168,8 +172,9 @@ def main() -> None:
             handlers=[logging.NullHandler()],
             force=True,
         )
+    effective_level = level if console_log_enabled else (logging.CRITICAL + 1)
     for name in ("reaxkit", "reaxkit.webui", "dash", "flask", "werkzeug"):
-        logging.getLogger(name).setLevel(level)
+        logging.getLogger(name).setLevel(effective_level)
     logging.getLogger(__name__).info("WebUI startup app_module=%s cwd=%s", __file__, os.getcwd())
     port_raw = str(os.environ.get("REAXKIT_WEBUI_PORT", "8060")).strip()
     try:
@@ -178,23 +183,23 @@ def main() -> None:
         port = 8060
     logging.getLogger(__name__).info("WebUI startup pid=%s port=%s", os.getpid(), port)
     _ensure_single_instance(port, logging.getLogger(__name__))
-    # Write trace output under the launch directory workspace.
-    trace_target = Path.cwd() / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
-    try:
-        trace_target.parent.mkdir(parents=True, exist_ok=True)
-        with trace_target.open("a", encoding="utf-8") as fh:
-            fh.write(f"[UI_TRACE] startup app_module={__file__} cwd={os.getcwd()}\n")
-        logging.getLogger(__name__).info("UI trace file target=%s", trace_target)
-    except Exception as exc:  # pragma: no cover
-        logging.getLogger(__name__).warning("UI trace file write failed target=%s error=%s", trace_target, exc)
+    if ui_trace_startup_enabled:
+        trace_target = Path.cwd() / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
+        try:
+            trace_target.parent.mkdir(parents=True, exist_ok=True)
+            with trace_target.open("a", encoding="utf-8") as fh:
+                fh.write(f"[UI_TRACE] startup app_module={__file__} cwd={os.getcwd()}\n")
+            logging.getLogger(__name__).info("UI trace file target=%s", trace_target)
+        except Exception as exc:  # pragma: no cover
+            logging.getLogger(__name__).warning("UI trace file write failed target=%s error=%s", trace_target, exc)
 
     dash_app = create_dash_app()
-    if str(os.environ.get("REAXKIT_WEBUI_LOG_CALLBACKS", "1")).strip().lower() not in {"0", "false", "no"}:
+    if callback_wiring_log_enabled:
         _log_analysis_dropdown_wiring(dash_app)
     dash_app.run(
-        debug=True,
+        debug=False,
         use_reloader=False,
-        dev_tools_silence_routes_logging=False,
+        dev_tools_silence_routes_logging=True,
         port=port,
     )
 

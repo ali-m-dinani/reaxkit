@@ -244,13 +244,12 @@ def _coerce_value(raw_value: Any, field: dict[str, Any]) -> Any:
             return default
 
     if _is_list_int(kind):
-        if name == "frames":
-            try:
-                val = parse_frame_indices(raw_value)
-            except Exception:
-                val = None
-        else:
-            val = _parse_csv_ints(raw_value)
+        try:
+            # Accept flexible selectors for any list[int] field, e.g.
+            # "1,2,3", "1 2 3", "1-40", "1:40", "1:40:1".
+            val = parse_frame_indices(raw_value)
+        except Exception:
+            val = None
         return val if val is not None else default
 
     if _is_list_float(kind):

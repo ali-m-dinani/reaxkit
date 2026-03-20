@@ -7,6 +7,7 @@ from typing import Any
 from numbers import Number
 from datetime import date, datetime
 import statistics
+from hashlib import sha256
 
 from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_update
 import plotly.graph_objects as go
@@ -14,7 +15,6 @@ import plotly.io as pio
 import os
 import json
 from pathlib import Path
-import tempfile
 
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY, task_display_label
@@ -38,9 +38,18 @@ _ARTIFACT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
 _ARTIFACT_ROWS_CACHE_MAX = 128
 _PLOT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
 _PLOT_ROWS_CACHE_MAX = 96
+_FIGURE_CACHE: dict[str, dict[str, Any]] = {}
+_FIGURE_CACHE_MAX = 48
+
+
+def _trace_enabled() -> bool:
+    raw = str(os.environ.get("REAXKIT_UI_TRACE", "0")).strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _trace(message: str) -> None:
+    if not _trace_enabled():
+        return
     text = str(message)
     try:
         print(text, flush=True)
@@ -50,8 +59,8 @@ def _trace(message: str) -> None:
     env_path = str(os.environ.get("REAXKIT_UI_TRACE_PATH", "")).strip()
     if env_path:
         paths.append(Path(env_path))
-    paths.append(Path(os.getcwd()) / "ui_trace.log")
-    paths.append(Path(tempfile.gettempdir()) / "reaxkit_ui_trace.log")
+    else:
+        paths.append(Path.cwd() / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log")
     for trace_path in paths:
         try:
             trace_path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +72,42 @@ def _trace(message: str) -> None:
         logger.info(text)
     except Exception:
         pass
+
+
+def _figure_cache_key(*, artifact_id: str, payload: dict[str, Any]) -> str | None:
+    aid = str(artifact_id or "").strip()
+    if not aid:
+        return None
+    try:
+        text = json.dumps(payload, sort_keys=True, ensure_ascii=True, default=str)
+    except Exception:
+        text = repr(payload)
+    return f"{aid}:{sha256(text.encode('utf-8')).hexdigest()}"
+
+
+def _figure_cache_get(key: str | None) -> dict[str, Any] | None:
+    if not key:
+        return None
+    fig = _FIGURE_CACHE.get(key)
+    if fig is None:
+        return None
+    # LRU touch
+    _FIGURE_CACHE.pop(key, None)
+    _FIGURE_CACHE[key] = fig
+    return dict(fig)
+
+
+def _figure_cache_put(key: str | None, figure: go.Figure | dict[str, Any] | None) -> None:
+    if not key or figure is None:
+        return
+    try:
+        fig_json = figure.to_plotly_json() if isinstance(figure, go.Figure) else dict(figure)
+    except Exception:
+        return
+    _FIGURE_CACHE[key] = fig_json
+    while len(_FIGURE_CACHE) > _FIGURE_CACHE_MAX:
+        oldest = next(iter(_FIGURE_CACHE))
+        _FIGURE_CACHE.pop(oldest, None)
 
 
 def _selected_node(snapshot: dict[str, Any] | None, session: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -4178,25 +4223,17 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Input("session-store", "data"),
         Input({"type": "plot-graph", "slot": ALL}, "clickData"),
         State({"type": "plot-graph", "slot": ALL}, "id"),
-        State("pipeline-store", "data"),
         prevent_initial_call=True,
     )
     def on_curve_click(
         session: dict[str, Any] | None,
         click_data_all: list[dict[str, Any] | None] | None,
         graph_ids: list[dict[str, Any]] | None,
-        snapshot: dict[str, Any] | None,
     ):
         triggered = ctx.triggered_id
         if triggered == "session-store":
             return {}
         if not session or not isinstance(click_data_all, list):
-            return no_update
-        node = _selected_node(snapshot, session)
-        req = node.get("request", {}) if isinstance(node, dict) and isinstance(node.get("request"), dict) else {}
-        if not isinstance(node, dict) or str(node.get("kind")) != "visualization":
-            return no_update
-        if str(req.get("visualization_type") or "plot2d").lower() != "plot2d":
             return no_update
         click_data: dict[str, Any] | None = None
         if isinstance(triggered, dict):
@@ -4738,9 +4775,50 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             use_marker = _parse_float(req.get("marker_size"), 6.0)
             show_markers = _flag_on(req.get("show_markers"), default=False)
             trace_styles = _trace_styles_map(req.get("trace_styles"))
+            artifact_id = str((artifact or {}).get("id") if isinstance(artifact, dict) else "")
+            fig_cache_payload = {
+                "viz_type": "plot2d",
+                "x": use_x,
+                "y": use_y,
+                "group": use_group,
+                "group_agg": use_group_agg,
+                "focus_atom": str(focus_atom or ""),
+                "row_filters": _row_filters_from_raw(req.get("row_filters")),
+                "line_color": use_color,
+                "line_width": use_width,
+                "marker_size": use_marker,
+                "show_markers": show_markers,
+                "trace_styles": trace_styles,
+                "style": {
+                    "theme": str(req.get("theme") or "plotly_white"),
+                    "font_size": _parse_float(req.get("font_size"), 12.0),
+                    "axis_title_size": _parse_float(req.get("axis_title_size"), 13.0),
+                    "grid_on": _flag_on(req.get("grid_on"), default=True),
+                    "log_scale": str(req.get("log_scale") or "none"),
+                    "tick_spacing_x": _parse_float(req.get("tick_spacing_x"), None),
+                    "tick_spacing_y": _parse_float(req.get("tick_spacing_y"), None),
+                    "show_legend": _flag_on(req.get("show_legend"), default=True),
+                    "legend_position": str(req.get("legend_position") or "top-right"),
+                    "use_plot_title": _flag_on(req.get("use_plot_title"), default=False),
+                    "plot_title": str(req.get("plot_title") or "").strip(),
+                    "x_title": str(req.get("x_title") or "").strip(),
+                    "y_title": str(req.get("y_title") or "").strip(),
+                },
+            }
+            fig_cache_key = _figure_cache_key(artifact_id=artifact_id, payload=fig_cache_payload)
+            cached_fig_json = _figure_cache_get(fig_cache_key)
+            if isinstance(cached_fig_json, dict):
+                cached_fig = go.Figure(cached_fig_json)
+                graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=cached_fig, config={"displaylogo": False})
+                graph_canvas = dcc.Graph(
+                    id={"type": "plot-graph", "slot": "canvas"},
+                    figure=go.Figure(cached_fig),
+                    config={"displaylogo": False},
+                )
+                return graph_result, graph_canvas
             plot_rows = _cached_aggregate_plot2d_rows(
                 rows,
-                artifact_id=str((artifact or {}).get("id") if isinstance(artifact, dict) else ""),
+                artifact_id=artifact_id,
                 x_col=use_x,
                 y_col=use_y,
                 group_col=use_group,
@@ -4811,6 +4889,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             if y_title:
                 fig.update_yaxes(title_text=y_title)
             fig = _optimize_plot2d_for_large_data(fig, threshold_points=5000)
+            _figure_cache_put(fig_cache_key, fig)
             graph_result = dcc.Graph(id={"type": "plot-graph", "slot": "result"}, figure=fig, config={"displaylogo": False})
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
