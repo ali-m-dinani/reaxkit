@@ -22,6 +22,7 @@ def build_layout() -> html.Div:
             dcc.Store(id="session-store"),
             dcc.Store(id="pipeline-store"),
             dcc.Store(id="result-store"),
+            dcc.Store(id="viz-row-filters-store", data={"node_id": "", "rows": []}),
             dcc.Store(id="selected-curve-store", data={}),
             dcc.Store(id="ui-store", data={"page": "analysis", "help_open": False}),
             dcc.Store(

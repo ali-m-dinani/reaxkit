@@ -51,6 +51,7 @@ _UI_PLOT2D_MAX_POINTS = int(_UI_PERF["plot2d_max_points"])
 _UI_PLOT2D_MIN_POINTS_PER_TRACE = int(_UI_PERF["plot2d_min_points_per_trace"])
 _UI_PLOT2D_INITIAL_MAX_POINTS = int(_UI_PERF.get("plot2d_initial_max_points", 12000))
 _UI_PLOT2D_ZOOM_MAX_POINTS = int(_UI_PERF.get("plot2d_zoom_max_points", 120000))
+_UI_PLOT2D_MAX_CURVES_DISPLAY = int(_UI_PERF.get("plot2d_max_curves_display", 10))
 if _UI_PLOT2D_ZOOM_MAX_POINTS < _UI_PLOT2D_INITIAL_MAX_POINTS:
     _UI_PLOT2D_ZOOM_MAX_POINTS = _UI_PLOT2D_INITIAL_MAX_POINTS
 
@@ -1079,6 +1080,8 @@ def _viz_request_with_defaults(existing: dict[str, Any] | None, viz_type: str) -
     req.setdefault("theme", "plotly_white")
     req.setdefault("axis_title_size", 13)
     req.setdefault("grid_on", True)
+    req.setdefault("axis_box_on", True)
+    req.setdefault("axis_box_width", 1.5)
     req.setdefault("log_scale", "none")
     req.setdefault("tick_spacing_x", "")
     req.setdefault("tick_spacing_y", "")
@@ -1472,6 +1475,50 @@ def _optimize_plot2d_for_large_data(
     return new_fig
 
 
+def _cap_plot2d_curve_count(fig: go.Figure, *, max_curves: int) -> go.Figure:
+    limit = max(1, int(max_curves or 1))
+    curves_total = 0
+    kept: list[Any] = []
+    curves_kept = 0
+    for tr in fig.data:
+        is_curve = isinstance(tr, (go.Scatter, go.Scattergl))
+        if is_curve:
+            curves_total += 1
+            if curves_kept >= limit:
+                continue
+            curves_kept += 1
+        kept.append(tr)
+    if curves_total <= limit:
+        return fig
+
+    capped = go.Figure()
+    capped.update_layout(fig.layout)
+    for tr in kept:
+        capped.add_trace(tr)
+    message = f"Showing {curves_kept} of {curves_total} atom curves."
+    meta_raw = capped.layout.meta
+    meta: dict[str, Any] = dict(meta_raw) if isinstance(meta_raw, dict) else {}
+    meta.update(
+        {
+            "curve_cap_applied": True,
+            "curve_cap_total": curves_total,
+            "curve_cap_shown": curves_kept,
+            "curve_cap_status": message,
+        }
+    )
+    capped.update_layout(meta=meta)
+    return capped
+
+
+def _curve_cap_status_from_figure(fig: go.Figure | None) -> str:
+    if not isinstance(fig, go.Figure):
+        return ""
+    meta_raw = fig.layout.meta
+    if not isinstance(meta_raw, dict):
+        return ""
+    return str(meta_raw.get("curve_cap_status") or "").strip()
+
+
 def _extract_relayout_x_range(relayout: dict[str, Any] | None) -> tuple[tuple[float, float] | None, bool]:
     if not isinstance(relayout, dict) or not relayout:
         return None, False
@@ -1557,6 +1604,7 @@ def _build_plot2d_figure(
         "group": use_group,
         "group_agg": use_group_agg,
         "row_filters": row_filters,
+        "max_curves_display": int(_UI_PLOT2D_MAX_CURVES_DISPLAY),
         "line_color": use_color,
         "line_width": use_width,
         "marker_size": use_marker,
@@ -1570,6 +1618,8 @@ def _build_plot2d_figure(
             "font_size": _parse_float(req.get("font_size"), 12.0),
             "axis_title_size": _parse_float(req.get("axis_title_size"), 13.0),
             "grid_on": _flag_on(req.get("grid_on"), default=True),
+            "axis_box_on": _flag_on(req.get("axis_box_on"), default=True),
+            "axis_box_width": _parse_float(req.get("axis_box_width"), 1.5),
             "log_scale": str(req.get("log_scale") or "none"),
             "tick_spacing_x": _parse_float(req.get("tick_spacing_x"), None),
             "tick_spacing_y": _parse_float(req.get("tick_spacing_y"), None),
@@ -1610,6 +1660,7 @@ def _build_plot2d_figure(
     )
     if fig is None:
         return None
+    fig = _cap_plot2d_curve_count(fig, max_curves=_UI_PLOT2D_MAX_CURVES_DISPLAY)
 
     scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
     apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
@@ -1843,6 +1894,11 @@ def _apply_2d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool =
     font_size = _parse_float(req.get("font_size"), 12.0) or 12.0
     axis_title_size = _parse_float(req.get("axis_title_size"), font_size + 1.0)
     grid_on = _flag_on(req.get("grid_on"), default=True)
+    axis_box_on = _flag_on(req.get("axis_box_on"), default=True)
+    axis_box_width = _parse_float(req.get("axis_box_width"), 1.5)
+    if axis_box_width is None:
+        axis_box_width = 1.5
+    axis_box_width = max(0.0, min(8.0, float(axis_box_width)))
     log_scale = str(req.get("log_scale") or "none").strip().lower()
     tick_x = _parse_float(req.get("tick_spacing_x"), None)
     tick_y = _parse_float(req.get("tick_spacing_y"), None)
@@ -1855,19 +1911,19 @@ def _apply_2d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool =
     )
     xaxis_cfg: dict[str, Any] = {
         "showgrid": grid_on,
-        "showline": True,
+        "showline": axis_box_on,
         "linecolor": "black",
-        "linewidth": 1.5,
-        "mirror": True,
+        "linewidth": axis_box_width,
+        "mirror": axis_box_on,
         "ticks": "outside",
         "tickcolor": "black",
     }
     yaxis_cfg: dict[str, Any] = {
         "showgrid": grid_on,
-        "showline": True,
+        "showline": axis_box_on,
         "linecolor": "black",
-        "linewidth": 1.5,
-        "mirror": True,
+        "linewidth": axis_box_width,
+        "mirror": axis_box_on,
         "ticks": "outside",
         "tickcolor": "black",
     }
@@ -2581,6 +2637,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                     "theme": "plotly_white",
                     "axis_title_size": 13,
                     "grid_on": True,
+                    "axis_box_on": True,
+                    "axis_box_width": 1.5,
                     "log_scale": "none",
                     "tick_spacing_x": "",
                     "tick_spacing_y": "",
@@ -2990,6 +3048,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         State("session-store", "data"),
         State("pipeline-store", "data"),
         State("result-store", "data"),
+        State("viz-row-filters-store", "data"),
         prevent_initial_call=True,
     )
     def on_apply_node(
@@ -2997,6 +3056,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         session: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
         result_store: dict[str, Any] | None,
+        viz_row_filters_store: dict[str, Any] | None,
     ):
         _trace(f"[UI_TRACE] on_apply_node called n_clicks={n_clicks} has_session={bool(session)} has_snapshot={bool(snapshot)}")
         if not n_clicks or not session or not snapshot:
@@ -3007,6 +3067,22 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             return no_update, no_update, no_update, "WARN: Select a node first"
 
         node_id = str(node.get("id") or "")
+        if str(node.get("kind") or "") == "visualization" and isinstance(viz_row_filters_store, dict):
+            store_node_id = str(viz_row_filters_store.get("node_id") or "")
+            viz_row_filters_data = viz_row_filters_store.get("rows")
+            req_old = node.get("request", {}) if isinstance(node.get("request"), dict) else {}
+            if store_node_id == node_id and isinstance(viz_row_filters_data, list):
+                row_filters_from_ui = _row_filters_from_raw(viz_row_filters_data)
+                row_filters_old = _row_filters_from_raw(req_old.get("row_filters"))
+                if row_filters_from_ui != row_filters_old:
+                    req_new = dict(req_old)
+                    req_new["row_filters"] = row_filters_from_ui
+                    try:
+                        service.update_node(pipeline_id, node_id, {"request": req_new})
+                        node = dict(node)
+                        node["request"] = req_new
+                    except Exception:
+                        pass
         _trace(f"[UI_TRACE] on_apply_node executing pipeline_id={pipeline_id} node_id={node_id}")
         logger.info("ui.on_apply_node click=%s pipeline_id=%s node_id=%s node_kind=%s", n_clicks, pipeline_id, node_id, node.get("kind"))
 
@@ -3431,6 +3507,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         value=["on"],
                         style={"display": "none"},
                     ),
+                    dcc.Checklist(
+                        id="viz-axis-box-on",
+                        options=[{"label": "axis box on", "value": "on"}],
+                        value=["on"],
+                        style={"display": "none"},
+                    ),
+                    dcc.Input(id="viz-axis-box-width", type="number", value=1.5, style={"display": "none"}),
                     dcc.Dropdown(
                         id="viz-log-scale",
                         options=[
@@ -4018,6 +4101,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                                             options=[{"label": "grid on", "value": "on"}],
                                             value=["on"] if _flag_on(req.get("grid_on"), True) else [],
                                         ),
+                                        dcc.Checklist(
+                                            id="viz-axis-box-on",
+                                            options=[{"label": "axis box on", "value": "on"}],
+                                            value=["on"] if _flag_on(req.get("axis_box_on"), True) else [],
+                                        ),
+                                        html.Label("axis box width"),
+                                        dcc.Input(id="viz-axis-box-width", type="number", value=float(req.get("axis_box_width") or 1.5), min=0, max=8, step=0.5),
                                         html.Label("log scale"),
                                         dcc.Dropdown(
                                             id="viz-log-scale",
@@ -4140,6 +4230,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                             ]
                         ),
                         dcc.Input(id="viz-line-width", type="number", value=2, style={"display": "none"}),
+                        dcc.Checklist(id="viz-axis-box-on", options=[{"label": "axis box on", "value": "on"}], value=["on"], style={"display": "none"}),
+                        dcc.Input(id="viz-axis-box-width", type="number", value=1.5, style={"display": "none"}),
                         dcc.Dropdown(id="viz-log-scale", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                         dcc.Input(id="viz-tick-spacing-x", type="number", value=None, style={"display": "none"}),
                         dcc.Input(id="viz-tick-spacing-y", type="number", value=None, style={"display": "none"}),
@@ -4230,6 +4322,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                                             options=[{"label": "grid on", "value": "on"}],
                                             value=["on"] if _flag_on(req.get("grid_on"), True) else [],
                                         ),
+                                        dcc.Checklist(
+                                            id="viz-axis-box-on",
+                                            options=[{"label": "axis box on", "value": "on"}],
+                                            value=["on"] if _flag_on(req.get("axis_box_on"), True) else [],
+                                        ),
+                                        html.Label("axis box width"),
+                                        dcc.Input(id="viz-axis-box-width", type="number", value=float(req.get("axis_box_width") or 1.5), min=0, max=8, step=0.5),
                                         html.Label("log scale"),
                                         dcc.Dropdown(
                                             id="viz-log-scale",
@@ -4320,6 +4419,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Dropdown(id="viz-theme", options=theme_options, value="plotly_white", clearable=False, style={"display": "none"}),
                         dcc.Input(id="viz-axis-title-size", type="number", value=13, style={"display": "none"}),
                         dcc.Checklist(id="viz-grid-on", options=[{"label": "grid on", "value": "on"}], value=["on"], style={"display": "none"}),
+                        dcc.Checklist(id="viz-axis-box-on", options=[{"label": "axis box on", "value": "on"}], value=["on"], style={"display": "none"}),
+                        dcc.Input(id="viz-axis-box-width", type="number", value=1.5, style={"display": "none"}),
                         dcc.Dropdown(id="viz-log-scale", options=[{"label": "none", "value": "none"}], value="none", clearable=False, style={"display": "none"}),
                         dcc.Input(id="viz-tick-spacing-x", type="number", value=None, style={"display": "none"}),
                         dcc.Input(id="viz-tick-spacing-y", type="number", value=None, style={"display": "none"}),
@@ -4402,6 +4503,19 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         return rows
 
     @app.callback(
+        Output("viz-row-filters-store", "data", allow_duplicate=True),
+        Input("viz-row-filters", "data"),
+        State("session-store", "data"),
+        prevent_initial_call=True,
+    )
+    def sync_viz_row_filters_store(
+        rows_data: list[dict[str, Any]] | None,
+        session: dict[str, Any] | None,
+    ):
+        node_id = str((session or {}).get("selected_node_id") or "")
+        return {"node_id": node_id, "rows": _row_filter_table_data(rows_data)}
+
+    @app.callback(
         Output("pipeline-store", "data", allow_duplicate=True),
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-save-viz-params", "n_clicks"),
@@ -4428,6 +4542,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         State("viz-theme", "value"),
         State("viz-axis-title-size", "value"),
         State("viz-grid-on", "value"),
+        State("viz-axis-box-on", "value"),
+        State("viz-axis-box-width", "value"),
         State("viz-log-scale", "value"),
         State("viz-tick-spacing-x", "value"),
         State("viz-tick-spacing-y", "value"),
@@ -4464,6 +4580,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         theme: str | None,
         axis_title_size: float | None,
         grid_on_values: list[str] | None,
+        axis_box_on_values: list[str] | None,
+        axis_box_width: float | None,
         log_scale: str | None,
         tick_spacing_x: float | None,
         tick_spacing_y: float | None,
@@ -4503,6 +4621,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             "theme": _safe_theme(theme or "plotly_white"),
             "axis_title_size": float(axis_title_size if axis_title_size is not None else 13.0),
             "grid_on": bool("on" in (grid_on_values or [])),
+            "axis_box_on": bool("on" in (axis_box_on_values or [])),
+            "axis_box_width": float(axis_box_width if axis_box_width is not None else 1.5),
             "log_scale": str(log_scale or "none"),
             "tick_spacing_x": "" if tick_spacing_x is None else float(tick_spacing_x),
             "tick_spacing_y": "" if tick_spacing_y is None else float(tick_spacing_y),
@@ -4541,6 +4661,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Input("viz-theme", "value"),
         Input("viz-axis-title-size", "value"),
         Input("viz-grid-on", "value"),
+        Input("viz-axis-box-on", "value"),
+        Input("viz-axis-box-width", "value"),
         Input("viz-log-scale", "value"),
         Input("viz-tick-spacing-x", "value"),
         Input("viz-tick-spacing-y", "value"),
@@ -4573,6 +4695,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         theme: str | None,
         axis_title_size: float | None,
         grid_on_values: list[str] | None,
+        axis_box_on_values: list[str] | None,
+        axis_box_width: float | None,
         log_scale: str | None,
         tick_spacing_x: float | None,
         tick_spacing_y: float | None,
@@ -4616,6 +4740,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 "theme": _safe_theme(theme or payload.get("theme") or "plotly_white"),
                 "axis_title_size": float(axis_title_size if axis_title_size is not None else float(payload.get("axis_title_size") or 13.0)),
                 "grid_on": bool("on" in (grid_on_values or [])),
+                "axis_box_on": bool("on" in (axis_box_on_values or [])),
+                "axis_box_width": float(axis_box_width if axis_box_width is not None else float(payload.get("axis_box_width") or 1.5)),
                 "log_scale": str(log_scale or payload.get("log_scale") or "none"),
                 "tick_spacing_x": "" if tick_spacing_x is None else float(tick_spacing_x),
                 "tick_spacing_y": "" if tick_spacing_y is None else float(tick_spacing_y),
@@ -5154,7 +5280,16 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 config={"displaylogo": False, "responsive": True},
                 responsive=True,
             )
-            return graph_canvas
+            cap_status = _curve_cap_status_from_figure(fig)
+            if not cap_status:
+                return graph_canvas
+            return html.Div(
+                [
+                    html.Div(graph_canvas, style={"flex": "1 1 auto", "minHeight": "0"}),
+                    html.Div(cap_status, className="rk-log-name"),
+                ],
+                style={"display": "flex", "flexDirection": "column", "flex": "1 1 auto", "minHeight": "0", "width": "100%"},
+            )
 
         if viz_type == "histogram":
             cols = infer_columns(rows)

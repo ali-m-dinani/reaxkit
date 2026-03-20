@@ -13,6 +13,7 @@ _DEFAULTS: dict[str, int] = {
     "plot2d_min_points_per_trace": 600,
     "plot2d_initial_max_points": 12000,
     "plot2d_zoom_max_points": 120000,
+    "plot2d_max_curves_display": 10,
 }
 
 
@@ -60,5 +61,9 @@ def load_ui_performance_config() -> dict[str, int]:
         "plot2d_zoom_max_points": _safe_int(
             raw.get("plot2d_zoom_max_points"),
             _DEFAULTS["plot2d_zoom_max_points"],
+        ),
+        "plot2d_max_curves_display": _safe_int(
+            raw.get("plot2d_max_curves_display"),
+            _DEFAULTS["plot2d_max_curves_display"],
         ),
     }
