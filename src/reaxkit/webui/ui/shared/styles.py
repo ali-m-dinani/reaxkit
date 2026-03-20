@@ -5,21 +5,21 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
 .rk-grid {
   display: grid; height: 100vh; gap: 8px; padding: 8px;
   grid-template-columns: 320px 1fr;
-  grid-template-rows: 56px 1fr 260px 42px;
+  grid-template-rows: 48px 1fr 260px 42px;
   grid-template-areas:
     "top top"
     "left canvas"
     "props results"
     "info info";
 }
-.rk-panel { background: #fff; border: 1px solid #cedae3; border-radius: 10px; padding: 10px; overflow: auto; }
-.rk-top { grid-area: top; overflow: visible; z-index: 20; }
-.rk-left { grid-area: left; }
+.rk-panel { background: #fff; border: 1px solid #cedae3; border-radius: 10px; padding: 0 0 0 10px; overflow: auto; box-sizing: border-box; }
+.rk-top { grid-area: top; overflow: visible; z-index: 20; padding: 0 0 0 10px; display: flex; align-items: center; }
+.rk-left { grid-area: left; display: flex; flex-direction: column; min-height: 0; }
 .rk-canvas { grid-area: canvas; }
 .rk-props { grid-area: props; }
 .rk-results { grid-area: results; }
 .rk-info { grid-area: info; }
-.rk-topbar { display: flex; align-items: center; gap: 16px; }
+.rk-topbar { display: flex; align-items: center; gap: 16px; width: 100%; padding-right: 10px; box-sizing: border-box; }
 .rk-nav-btn {
   border: none;
   background: transparent;
@@ -88,12 +88,34 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   font-size: 12px;
   white-space: pre-wrap;
 }
-.rk-status-wrap { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 120px; }
-.rk-spinner-anchor { width: 18px; height: 18px; }
-.rk-badge { margin-left: auto; background: #e5f2fb; border: 1px solid #b6d2e8; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
-.rk-badge-error { margin-left: auto; background: #fde8e8; border: 1px solid #f1b5b5; color: #8a1c1c; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
-.rk-badge-warn { margin-left: auto; background: #fff5dc; border: 1px solid #f0d18d; color: #7a4f00; border-radius: 14px; padding: 2px 8px; font-size: 12px; }
+.rk-status-wrap { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 160px; flex-shrink: 0; }
+.rk-spinner-anchor { width: 18px; height: 18px; flex: 0 0 18px; }
+.rk-badge { margin-left: 0; background: #e5f2fb; border: 1px solid #b6d2e8; border-radius: 14px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.rk-badge-error { margin-left: 0; background: #fde8e8; border: 1px solid #f1b5b5; color: #8a1c1c; border-radius: 14px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
+.rk-badge-warn { margin-left: 0; background: #fff5dc; border: 1px solid #f0d18d; color: #7a4f00; border-radius: 14px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
 .rk-stack { display: grid; gap: 8px; margin-bottom: 10px; }
+.rk-props, #properties-content, .rk-props .rk-stack { min-width: 0; }
+#properties-content { padding: 0 10px 0 4px; box-sizing: border-box; }
+.rk-props .rk-stack { padding-right: 4px; box-sizing: border-box; }
+.rk-props { overflow-x: hidden; }
+.rk-props .rk-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.rk-props .rk-inline-actions > * { min-width: 0; max-width: 100%; }
+.rk-props .rk-btn-save { width: auto; min-width: 140px; }
+.rk-props .rk-btn-exec { width: auto; min-width: 90px; }
+.rk-props .dash-dropdown,
+.rk-props .Select-control,
+.rk-props .Select-menu-outer,
+.rk-props input,
+.rk-props textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .rk-subtitle { margin: 8px 0 8px; font-size: 14px; color: #38536a; }
 .rk-inline-actions { display: grid; grid-template-columns: repeat(6, minmax(90px, auto)); gap: 8px; align-items: center; margin: 8px 0; }
 .rk-btn-save {
@@ -109,24 +131,27 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   background: #f9fcff;
   border-radius: 8px;
   padding: 8px;
-  min-height: 190px;
-  max-height: 250px;
+  min-height: 0;
+  max-height: none;
+  flex: 1 1 auto;
+  width: 100%;
   overflow: auto;
   display: grid;
   gap: 2px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
+  box-sizing: border-box;
 }
 .rk-tree-node {
   border: 1px solid transparent; border-radius: 4px; background: transparent;
-  text-align: left; padding: 4px 8px; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  text-align: left; padding: 4px 8px; display: flex; align-items: center; gap: 0; cursor: pointer;
   font-family: "Segoe UI", Tahoma, sans-serif;
 }
 .rk-tree-node:hover { background: #eef5fb; border-color: #d4e3f0; }
 .rk-tree-node.selected { background: #d8e7f8; border-color: #b8cfe8; }
-.rk-tree-prefix { color: #70879c; font-family: Consolas, "Courier New", monospace; white-space: pre; }
-.rk-tree-icon { width: 16px; }
+.rk-tree-prefix { color: #70879c; font-family: Consolas, "Courier New", monospace; white-space: pre; margin-right: 0; }
+.rk-tree-icon { width: 16px; margin-right: 8px; }
 .rk-tree-label { font-weight: 600; color: #2f4a63; }
-.rk-tree-status { margin-left: auto; color: #61778a; font-size: 12px; }
+.rk-tree-status { margin-left: auto; padding-left: 8px; color: #61778a; font-size: 12px; }
 .rk-tree-meta { color: #3f5d74; padding: 2px 8px; display: flex; align-items: center; gap: 8px; font-family: "Segoe UI", Tahoma, sans-serif; }
 .rk-tree-empty { color: #607788; font-size: 13px; }
 .rk-help-inline { display: inline-flex; align-items: center; gap: 6px; }
@@ -137,8 +162,8 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   cursor: help; background: #f2f7fb;
 }
 .rk-canvas-box, .rk-results-box { border: 1px dashed #bfd0de; border-radius: 8px; min-height: 140px; padding: 10px; }
-.rk-canvas-head { display: flex; align-items: flex-start; justify-content: space-between; }
-.rk-canvas-actions { display: grid; gap: 6px; justify-items: end; }
+.rk-canvas-head { display: flex; align-items: center; justify-content: space-between; }
+.rk-canvas-actions { display: grid; gap: 6px; justify-items: end; align-content: center; padding-right: 10px; box-sizing: border-box; }
 .rk-page-full {
   grid-column: 1 / span 2;
   grid-row: 2 / span 3;

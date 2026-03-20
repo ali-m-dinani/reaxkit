@@ -1365,6 +1365,7 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
         selected = str(node_id) == str(selected_node_id)
         prefix = "    " * depth + ("└─ " if depth > 0 else "")
         cls = "rk-tree-node selected" if selected else "rk-tree-node"
+        prefix = ("   " * (depth - 1) + "|_") if depth > 0 else ""
         return html.Button(
             [
                 html.Span(prefix, className="rk-tree-prefix"),
