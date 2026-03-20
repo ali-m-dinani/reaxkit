@@ -23,6 +23,7 @@ from reaxkit.utils.export_utils import write_figure, write_table
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.backend.tabular_payload import extract_tabular_rows, infer_columns, infer_numeric_columns
 from reaxkit.webui.backend.utility_registry import canonical_utility_name, default_utility_request
+from reaxkit.webui.presentation.perf_config import load_ui_performance_config
 from reaxkit.webui.presentation.registry import render_figure
 from reaxkit.webui.ui.analysis.tasks import (
     hidden_task_inputs,
@@ -40,6 +41,18 @@ _PLOT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
 _PLOT_ROWS_CACHE_MAX = 96
 _FIGURE_CACHE: dict[str, dict[str, Any]] = {}
 _FIGURE_CACHE_MAX = 48
+_ARTIFACT_OBJ_CACHE: dict[str, dict[str, Any]] = {}
+_ARTIFACT_OBJ_CACHE_MAX = 96
+_NODE_PIPELINE_CACHE: dict[str, str] = {}
+_SERVICE_HANDLE: WebUIApiService | None = None
+_UI_PERF = load_ui_performance_config()
+_UI_PLOT2D_SCATTERGL_THRESHOLD = int(_UI_PERF["plot2d_scattergl_threshold"])
+_UI_PLOT2D_MAX_POINTS = int(_UI_PERF["plot2d_max_points"])
+_UI_PLOT2D_MIN_POINTS_PER_TRACE = int(_UI_PERF["plot2d_min_points_per_trace"])
+_UI_PLOT2D_INITIAL_MAX_POINTS = int(_UI_PERF.get("plot2d_initial_max_points", 12000))
+_UI_PLOT2D_ZOOM_MAX_POINTS = int(_UI_PERF.get("plot2d_zoom_max_points", 120000))
+if _UI_PLOT2D_ZOOM_MAX_POINTS < _UI_PLOT2D_INITIAL_MAX_POINTS:
+    _UI_PLOT2D_ZOOM_MAX_POINTS = _UI_PLOT2D_INITIAL_MAX_POINTS
 
 
 def _trace_enabled() -> bool:
@@ -110,6 +123,126 @@ def _figure_cache_put(key: str | None, figure: go.Figure | dict[str, Any] | None
         _FIGURE_CACHE.pop(oldest, None)
 
 
+def _artifact_cache_put(artifact: dict[str, Any] | None) -> None:
+    if not isinstance(artifact, dict):
+        return
+    artifact_id = str(artifact.get("id") or "").strip()
+    if not artifact_id:
+        return
+    _ARTIFACT_OBJ_CACHE[artifact_id] = artifact
+    while len(_ARTIFACT_OBJ_CACHE) > _ARTIFACT_OBJ_CACHE_MAX:
+        oldest = next(iter(_ARTIFACT_OBJ_CACHE))
+        _ARTIFACT_OBJ_CACHE.pop(oldest, None)
+
+
+def _artifact_id_from_entry(entry: Any) -> str:
+    if isinstance(entry, str):
+        return str(entry).strip()
+    if isinstance(entry, dict):
+        return str(entry.get("id") or "").strip()
+    return ""
+
+
+def _resolve_pipeline_id_for_node(node_id: str) -> str | None:
+    nid = str(node_id or "").strip()
+    if not nid:
+        return None
+    cached = _NODE_PIPELINE_CACHE.get(nid)
+    if cached:
+        return cached
+    service = _SERVICE_HANDLE
+    if service is None:
+        return None
+    store = getattr(service, "store", None)
+    lock = getattr(store, "_lock", None)
+    pipelines = getattr(store, "_pipelines", None)
+    if not isinstance(pipelines, dict):
+        return None
+    try:
+        cm = lock if lock is not None else None
+        if cm is None:
+            items = list(pipelines.items())
+        else:
+            with cm:
+                items = list(pipelines.items())
+    except Exception:
+        items = list(pipelines.items())
+    for pipeline_id, pipeline_state in items:
+        nodes = getattr(pipeline_state, "nodes", {})
+        if isinstance(nodes, dict) and nid in nodes:
+            _NODE_PIPELINE_CACHE[nid] = str(pipeline_id)
+            return str(pipeline_id)
+    return None
+
+
+def _resolve_artifact_by_id(artifact_id: str, *, node_id: str | None = None, pipeline_id: str | None = None) -> dict[str, Any] | None:
+    aid = str(artifact_id or "").strip()
+    if not aid:
+        return None
+    cached = _ARTIFACT_OBJ_CACHE.get(aid)
+    if isinstance(cached, dict) and isinstance(cached.get("payload"), dict):
+        _ARTIFACT_OBJ_CACHE.pop(aid, None)
+        _ARTIFACT_OBJ_CACHE[aid] = cached
+        return cached
+
+    service = _SERVICE_HANDLE
+    if service is None:
+        return None
+    store = getattr(service, "store", None)
+    if store is None:
+        return None
+
+    pid = str(pipeline_id or "").strip()
+    if not pid and node_id:
+        pid = str(_resolve_pipeline_id_for_node(str(node_id)) or "").strip()
+
+    artifact_obj = None
+    if pid:
+        try:
+            artifact_obj = store.get_artifact(pid, aid)
+        except Exception:
+            artifact_obj = None
+
+    if artifact_obj is None:
+        lock = getattr(store, "_lock", None)
+        pipelines = getattr(store, "_pipelines", None)
+        if isinstance(pipelines, dict):
+            try:
+                cm = lock if lock is not None else None
+                if cm is None:
+                    items = list(pipelines.items())
+                else:
+                    with cm:
+                        items = list(pipelines.items())
+            except Exception:
+                items = list(pipelines.items())
+            for maybe_pid, pipeline_state in items:
+                artifacts = getattr(pipeline_state, "artifacts", {})
+                if isinstance(artifacts, dict) and aid in artifacts:
+                    artifact_obj = artifacts.get(aid)
+                    pid = str(maybe_pid)
+                    break
+        if artifact_obj is None:
+            return None
+
+    payload = getattr(artifact_obj, "payload", {})
+    metadata = getattr(artifact_obj, "metadata", {})
+    views = getattr(artifact_obj, "recommended_views", [])
+    artifact_dict: dict[str, Any] = {
+        "id": str(getattr(artifact_obj, "id", aid) or aid),
+        "node_id": str(getattr(artifact_obj, "node_id", node_id or "") or ""),
+        "payload": payload if isinstance(payload, dict) else {},
+        "metadata": metadata if isinstance(metadata, dict) else {},
+        "recommended_views": views if isinstance(views, list) else [],
+        "created_at": str(getattr(artifact_obj, "created_at", "") or ""),
+    }
+    _artifact_cache_put(artifact_dict)
+    node_key = str(artifact_dict.get("node_id") or "").strip()
+    if pid and node_key:
+        _NODE_PIPELINE_CACHE[node_key] = pid
+    return artifact_dict
+
+
 def _selected_node(snapshot: dict[str, Any] | None, session: dict[str, Any] | None) -> dict[str, Any] | None:
     if not snapshot or not session:
         return None
@@ -178,8 +311,7 @@ def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
         return []
     artifact_id = str(artifact.get("id") or "").strip()
     if artifact_id and artifact_id in _ARTIFACT_ROWS_CACHE:
-        cached_rows = _ARTIFACT_ROWS_CACHE.get(artifact_id, [])
-        return [dict(row) for row in cached_rows]
+        return _ARTIFACT_ROWS_CACHE.get(artifact_id, [])
     payload = artifact.get("payload", {})
     rows: list[dict[str, Any]] = []
     if not isinstance(payload, dict):
@@ -210,7 +342,7 @@ def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
     else:
         logger.info("ui._artifact_rows artifact_id=%s rows=0 payload_keys=%s", artifact.get("id"), sorted(payload.keys()) if isinstance(payload, dict) else [])
     if artifact_id:
-        _ARTIFACT_ROWS_CACHE[artifact_id] = [dict(row) for row in rows]
+        _ARTIFACT_ROWS_CACHE[artifact_id] = rows
         while len(_ARTIFACT_ROWS_CACHE) > _ARTIFACT_ROWS_CACHE_MAX:
             oldest = next(iter(_ARTIFACT_ROWS_CACHE))
             _ARTIFACT_ROWS_CACHE.pop(oldest, None)
@@ -280,16 +412,35 @@ def _build_result_table(rows: list[dict[str, Any]], *, max_rows: int = 200) -> d
 def _result_cache_from_snapshot(snapshot: dict[str, Any] | None) -> dict[str, Any]:
     if not snapshot or not isinstance(snapshot, dict):
         return {}
+    out: dict[str, Any] = {}
+    nodes = snapshot.get("nodes", {})
+    if isinstance(nodes, dict):
+        for node in nodes.values():
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id") or "").strip()
+            if not node_id:
+                continue
+            aid = str(node.get("result_ref") or "").strip()
+            meta = node.get("metadata", {}) if isinstance(node.get("metadata"), dict) else {}
+            if not aid:
+                aid = str(meta.get("last_artifact_id") or "").strip()
+            if aid:
+                out[node_id] = aid
+    if out:
+        return out
+
+    # Backward compatibility with snapshots that still include artifact maps.
     artifacts = snapshot.get("artifacts", {})
     if not isinstance(artifacts, dict):
-        return {}
-    out: dict[str, Any] = {}
+        return out
     for artifact in artifacts.values():
         if not isinstance(artifact, dict):
             continue
-        node_id = artifact.get("node_id")
-        if node_id:
-            out[str(node_id)] = artifact
+        node_id = str(artifact.get("node_id") or "").strip()
+        aid = str(artifact.get("id") or "").strip()
+        if node_id and aid:
+            out[node_id] = aid
     return out
 
 
@@ -329,21 +480,50 @@ def _find_source_artifact(
     if not snapshot or not selected_node_id:
         return None
     nodes = snapshot.get("nodes", {})
-    artifacts = snapshot.get("artifacts", {})
     if not isinstance(nodes, dict):
         return None
     cache = result_store or {}
     current_node = nodes.get(str(selected_node_id)) if isinstance(nodes, dict) else None
 
+    def _resolve_for_node(node_id: str, expected_artifact_id: str | None = None) -> dict[str, Any] | None:
+        entry = cache.get(node_id)
+        if isinstance(entry, dict) and isinstance(entry.get("payload"), dict):
+            if expected_artifact_id:
+                if str(entry.get("id") or "").strip() == str(expected_artifact_id).strip():
+                    _artifact_cache_put(entry)
+                    return entry
+            else:
+                _artifact_cache_put(entry)
+                return entry
+
+        expected = str(expected_artifact_id or "").strip()
+        entry_id = _artifact_id_from_entry(entry)
+        if expected and entry_id and entry_id != expected:
+            entry_id = expected
+        if not entry_id:
+            entry_id = expected
+        if entry_id:
+            resolved = _resolve_artifact_by_id(entry_id, node_id=node_id)
+            if isinstance(resolved, dict):
+                return resolved
+
+        # Optional fallback for snapshots carrying inline artifacts.
+        artifacts = snapshot.get("artifacts", {}) if isinstance(snapshot, dict) else {}
+        if isinstance(artifacts, dict):
+            if expected and isinstance(artifacts.get(expected), dict):
+                candidate = artifacts.get(expected)
+                if isinstance(candidate, dict) and isinstance(candidate.get("payload"), dict):
+                    _artifact_cache_put(candidate)
+                    return candidate
+        return None
+
     # 1) direct cache
-    direct = cache.get(selected_node_id)
-    if isinstance(direct, dict) and isinstance(current_node, dict):
-        direct_id = str(direct.get("id") or "")
+    if isinstance(current_node, dict):
         result_ref = str(current_node.get("result_ref") or "")
         meta = current_node.get("metadata", {})
         last_id = str(meta.get("last_artifact_id") or "") if isinstance(meta, dict) else ""
-        # Avoid stale node->artifact cache entries after upstream transformations.
-        if (result_ref and direct_id == result_ref) or (last_id and direct_id == last_id):
+        direct = _resolve_for_node(str(selected_node_id), result_ref or last_id or None)
+        if isinstance(direct, dict):
             return direct
 
     # 2) walk to nearest ancestor with artifact reference
@@ -356,28 +536,16 @@ def _find_source_artifact(
         seen.add(cid)
         result_ref = current.get("result_ref")
         if result_ref:
-            art = cache.get(cid)
-            if isinstance(art, dict):
-                art_id = str(art.get("id") or "")
-                if art_id == str(result_ref):
-                    return art
-            if isinstance(artifacts, dict):
-                snap_art = artifacts.get(str(result_ref))
-                if isinstance(snap_art, dict):
-                    return snap_art
+            resolved = _resolve_for_node(cid, str(result_ref))
+            if isinstance(resolved, dict):
+                return resolved
         meta = current.get("metadata", {})
         if isinstance(meta, dict):
             last_id = meta.get("last_artifact_id")
             if last_id:
-                art = cache.get(cid)
-                if isinstance(art, dict):
-                    art_id = str(art.get("id") or "")
-                    if art_id == str(last_id):
-                        return art
-                if isinstance(artifacts, dict):
-                    snap_art = artifacts.get(str(last_id))
-                    if isinstance(snap_art, dict):
-                        return snap_art
+                resolved = _resolve_for_node(cid, str(last_id))
+                if isinstance(resolved, dict):
+                    return resolved
         parent_id = current.get("parent_id")
         if not parent_id:
             break
@@ -1185,33 +1353,405 @@ def _cached_aggregate_plot2d_rows(
     )
     cached = _PLOT_ROWS_CACHE.get(key)
     if isinstance(cached, list):
-        return [dict(r) for r in cached]
+        return cached
     out = _aggregate_plot2d_rows(rows, x_col=x_col, y_col=y_col, group_col=group_col, agg=agg)
-    _PLOT_ROWS_CACHE[key] = [dict(r) for r in out]
+    _PLOT_ROWS_CACHE[key] = out
     while len(_PLOT_ROWS_CACHE) > _PLOT_ROWS_CACHE_MAX:
         oldest = next(iter(_PLOT_ROWS_CACHE))
         _PLOT_ROWS_CACHE.pop(oldest, None)
     return out
 
 
-def _optimize_plot2d_for_large_data(fig: go.Figure, *, threshold_points: int = 5000) -> go.Figure:
+def _series_len(values: Any) -> int:
+    try:
+        return len(values) if values is not None else 0
+    except Exception:
+        return 0
+
+
+def _downsample_indices(total: int, max_points: int) -> list[int]:
+    if total <= 0 or max_points <= 0 or total <= max_points:
+        return list(range(total))
+    step = max(1, (total + max_points - 1) // max_points)
+    idx = list(range(0, total, step))
+    if not idx or idx[-1] != total - 1:
+        idx.append(total - 1)
+    if len(idx) > max_points:
+        stride = max(1, (len(idx) + max_points - 1) // max_points)
+        idx = idx[::stride]
+        if idx[-1] != total - 1:
+            idx.append(total - 1)
+    return idx
+
+
+def _take_by_index(values: Any, indices: list[int]) -> list[Any]:
+    out: list[Any] = []
+    if values is None:
+        return out
+    for i in indices:
+        try:
+            out.append(values[i])
+        except Exception:
+            break
+    return out
+
+
+def _downsample_scatter_payload(payload: dict[str, Any], *, max_points: int) -> dict[str, Any]:
+    x_vals = payload.get("x")
+    y_vals = payload.get("y")
+    total = min(_series_len(x_vals), _series_len(y_vals))
+    if total <= 0 or total <= int(max_points):
+        return payload
+    idx = _downsample_indices(total, int(max_points))
+    if not idx:
+        return payload
+    payload["x"] = _take_by_index(x_vals, idx)
+    payload["y"] = _take_by_index(y_vals, idx)
+
+    for key in ("text", "hovertext", "ids", "customdata"):
+        raw = payload.get(key)
+        if _series_len(raw) == total:
+            payload[key] = _take_by_index(raw, idx)
+    marker = payload.get("marker")
+    if isinstance(marker, dict):
+        for mkey in ("color", "size", "opacity"):
+            raw = marker.get(mkey)
+            if _series_len(raw) == total:
+                marker[mkey] = _take_by_index(raw, idx)
+    return payload
+
+
+def _optimize_plot2d_for_large_data(
+    fig: go.Figure,
+    *,
+    threshold_points: int | None = None,
+    max_points_total: int | None = None,
+) -> go.Figure:
+    scatter_traces: list[tuple[go.Scatter, int]] = []
     point_count = 0
     for tr in fig.data:
         if isinstance(tr, go.Scatter):
-            xs = getattr(tr, "x", None)
-            point_count += len(xs) if xs is not None else 0
-    if point_count <= int(threshold_points):
+            n = _series_len(getattr(tr, "x", None))
+            scatter_traces.append((tr, n))
+            point_count += n
+    if not scatter_traces:
         return fig
+
+    threshold = int(threshold_points or _UI_PLOT2D_SCATTERGL_THRESHOLD)
+    max_total = int(max_points_total or _UI_PLOT2D_MAX_POINTS)
+    min_per_trace = int(_UI_PLOT2D_MIN_POINTS_PER_TRACE)
+    needs_scattergl = point_count > threshold
+    needs_downsample = point_count > max_total and max_total > 0
+    if not needs_scattergl and not needs_downsample:
+        return fig
+
+    # Compute per-trace target counts when total points are too high.
+    per_trace_limit: dict[int, int] = {}
+    if needs_downsample and point_count > 0:
+        ratio = float(max_total) / float(point_count)
+        for idx, (_, npts) in enumerate(scatter_traces):
+            keep = int(npts * ratio)
+            keep = max(min_per_trace, keep)
+            keep = min(npts, keep)
+            per_trace_limit[idx] = keep
+
     new_fig = go.Figure()
     new_fig.update_layout(fig.layout)
+    scatter_idx = -1
     for tr in fig.data:
-        if isinstance(tr, go.Scatter):
-            payload = tr.to_plotly_json()
-            payload.pop("type", None)
-            new_fig.add_trace(go.Scattergl(**payload))
-        else:
+        if not isinstance(tr, go.Scatter):
             new_fig.add_trace(tr)
+            continue
+        scatter_idx += 1
+        payload = tr.to_plotly_json()
+        payload.pop("type", None)
+        if needs_downsample:
+            limit = per_trace_limit.get(scatter_idx, _series_len(payload.get("x")))
+            payload = _downsample_scatter_payload(payload, max_points=limit)
+        new_fig.add_trace(go.Scattergl(**payload) if needs_scattergl else go.Scatter(**payload))
     return new_fig
+
+
+def _extract_relayout_x_range(relayout: dict[str, Any] | None) -> tuple[tuple[float, float] | None, bool]:
+    if not isinstance(relayout, dict) or not relayout:
+        return None, False
+    if bool(relayout.get("xaxis.autorange")):
+        return None, True
+    low_raw = relayout.get("xaxis.range[0]")
+    high_raw = relayout.get("xaxis.range[1]")
+    if low_raw is None or high_raw is None:
+        xr = relayout.get("xaxis.range")
+        if isinstance(xr, (list, tuple)) and len(xr) >= 2:
+            low_raw, high_raw = xr[0], xr[1]
+    low = _parse_float(low_raw, None)
+    high = _parse_float(high_raw, None)
+    if low is None or high is None:
+        return None, False
+    lo, hi = (float(low), float(high))
+    if lo > hi:
+        lo, hi = hi, lo
+    return (lo, hi), True
+
+
+def _rows_in_numeric_x_range(
+    rows: list[dict[str, Any]],
+    *,
+    x_col: str,
+    x_range: tuple[float, float] | None,
+) -> list[dict[str, Any]]:
+    if not rows or not x_col or x_range is None:
+        return rows
+    lo, hi = x_range
+    out: list[dict[str, Any]] = []
+    parsed_numeric = 0
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        xv = _parse_float(row.get(x_col), None)
+        if xv is None:
+            continue
+        parsed_numeric += 1
+        if lo <= float(xv) <= hi:
+            out.append(row)
+    if parsed_numeric == 0:
+        # Non-numeric x-axis; fall back to unfiltered rows.
+        return rows
+    return out
+
+
+def _build_plot2d_figure(
+    *,
+    rows: list[dict[str, Any]],
+    artifact_id: str,
+    presentation_spec: dict[str, Any] | None,
+    req: dict[str, Any],
+    x_col: str | None,
+    y_col: str | None,
+    group_col: str | None,
+    x_range: tuple[float, float] | None = None,
+    max_points_total: int | None = None,
+    cache_scope: str = "default",
+) -> go.Figure | None:
+    cols = infer_columns(rows)
+    numeric_cols = infer_numeric_columns(rows)
+    fallback_x = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (cols[0] if cols else ""))
+    fallback_y = next((col for col in numeric_cols if col != fallback_x), numeric_cols[0] if numeric_cols else (cols[1] if len(cols) > 1 else fallback_x))
+    use_x = str(req.get("x_col") or x_col or fallback_x)
+    use_y = str(req.get("y_col") or y_col or fallback_y)
+    use_group = str(req.get("group_col") or group_col or "")
+    use_group_agg = _normalize_group_agg(req.get("group_agg"))
+    use_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
+    try:
+        use_width = float(req.get("line_width")) if req.get("line_width") is not None else None
+    except Exception:
+        use_width = None
+    use_marker = _parse_float(req.get("marker_size"), 6.0)
+    show_markers = _flag_on(req.get("show_markers"), default=False)
+    trace_styles = _trace_styles_map(req.get("trace_styles"))
+    x_range_sig = [round(x_range[0], 9), round(x_range[1], 9)] if x_range is not None else None
+    fig_cache_payload = {
+        "viz_type": "plot2d",
+        "x": use_x,
+        "y": use_y,
+        "group": use_group,
+        "group_agg": use_group_agg,
+        "line_color": use_color,
+        "line_width": use_width,
+        "marker_size": use_marker,
+        "show_markers": show_markers,
+        "trace_styles": trace_styles,
+        "x_range": x_range_sig,
+        "max_points_total": int(max_points_total or _UI_PLOT2D_MAX_POINTS),
+        "cache_scope": str(cache_scope),
+        "style": {
+            "theme": str(req.get("theme") or "plotly_white"),
+            "font_size": _parse_float(req.get("font_size"), 12.0),
+            "axis_title_size": _parse_float(req.get("axis_title_size"), 13.0),
+            "grid_on": _flag_on(req.get("grid_on"), default=True),
+            "log_scale": str(req.get("log_scale") or "none"),
+            "tick_spacing_x": _parse_float(req.get("tick_spacing_x"), None),
+            "tick_spacing_y": _parse_float(req.get("tick_spacing_y"), None),
+            "show_legend": _flag_on(req.get("show_legend"), default=True),
+            "legend_position": str(req.get("legend_position") or "top-right"),
+            "use_plot_title": _flag_on(req.get("use_plot_title"), default=False),
+            "plot_title": str(req.get("plot_title") or "").strip(),
+            "x_title": str(req.get("x_title") or "").strip(),
+            "y_title": str(req.get("y_title") or "").strip(),
+        },
+    }
+    fig_cache_key = _figure_cache_key(artifact_id=artifact_id, payload=fig_cache_payload)
+    cached_fig_json = _figure_cache_get(fig_cache_key)
+    if isinstance(cached_fig_json, dict):
+        return go.Figure(cached_fig_json)
+
+    rows_for_view = _rows_in_numeric_x_range(rows, x_col=use_x, x_range=x_range)
+    if not rows_for_view:
+        return None
+
+    row_filter_signature = json.dumps(
+        {"row_filters": _row_filters_from_raw(req.get("row_filters")), "x_range": x_range_sig},
+        sort_keys=True,
+        ensure_ascii=True,
+    )
+    plot_rows = _cached_aggregate_plot2d_rows(
+        rows_for_view,
+        artifact_id=artifact_id,
+        x_col=use_x,
+        y_col=use_y,
+        group_col=use_group,
+        agg=use_group_agg,
+        filter_signature=row_filter_signature,
+    )
+    fig = render_figure(
+        plot_rows,
+        presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
+        x_col=use_x,
+        y_col=use_y,
+        group_col=use_group,
+        view_type="plot2d",
+    )
+    if fig is None:
+        return None
+
+    scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
+    apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
+    for curve_index, tr in enumerate(fig.data):
+        if not isinstance(tr, go.Scatter):
+            continue
+        trace_name = str(tr.name or f"curve_{curve_index}")
+        curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+        curve_color = str(curve_style.get("line_color_rgb") or curve_style.get("line_color") or "").strip()
+        curve_width = _parse_float(curve_style.get("line_width"), None)
+        line_update: dict[str, Any] = {}
+        if curve_color:
+            line_update["color"] = curve_color
+        elif apply_fixed_line_color:
+            line_update["color"] = str(use_color)
+        if curve_width is not None:
+            line_update["width"] = float(curve_width)
+        elif use_width is not None:
+            line_update["width"] = float(use_width)
+        if line_update:
+            tr.update(line=line_update)
+
+    for curve_index, tr in enumerate(fig.data):
+        if not isinstance(tr, go.Scatter):
+            continue
+        trace_name = str(tr.name or f"curve_{curve_index}")
+        curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
+        curve_marker_size = _parse_float(curve_style.get("marker_size"), None)
+        has_curve_marker_flag = "show_markers" in curve_style
+        curve_show_markers = _flag_on(curve_style.get("show_markers"), default=False) if has_curve_marker_flag else show_markers
+        mode = str(tr.mode or "lines")
+        marker_size = curve_marker_size if curve_marker_size is not None else use_marker
+        if curve_show_markers and marker_size is not None and marker_size > 0:
+            if "markers" not in mode:
+                mode = f"{mode}+markers" if mode else "markers"
+            tr.update(mode=mode, marker={"size": float(marker_size)})
+        else:
+            mode_clean = mode.replace("+markers", "").replace("markers+", "")
+            tr.update(mode=(mode_clean if mode_clean else "lines"))
+
+    _apply_2d_style(fig, req, apply_legend=True)
+    use_custom_title = _flag_on(req.get("use_plot_title"), default=False)
+    plot_title = str(req.get("plot_title") or "").strip()
+    x_title = str(req.get("x_title") or "").strip()
+    y_title = str(req.get("y_title") or "").strip()
+    if use_custom_title and plot_title:
+        fig.update_layout(title=plot_title)
+    if x_title:
+        fig.update_xaxes(title_text=x_title)
+    if y_title:
+        fig.update_yaxes(title_text=y_title)
+
+    fig = _optimize_plot2d_for_large_data(fig, max_points_total=max_points_total)
+    fig.update_layout(
+        uirevision=f"rk-plot2d:{artifact_id}:{use_x}:{use_y}:{use_group}",
+    )
+    if x_range is not None:
+        fig.update_xaxes(range=[x_range[0], x_range[1]], autorange=False)
+
+    _figure_cache_put(fig_cache_key, fig)
+    return fig
+
+
+def _prime_rows_cache_from_artifact(artifact: dict[str, Any] | None) -> int:
+    if not isinstance(artifact, dict):
+        return 0
+    _artifact_cache_put(artifact)
+    artifact_id = str(artifact.get("id") or "").strip()
+    payload = artifact.get("payload", {})
+    table = payload.get("table") if isinstance(payload, dict) else None
+    if not artifact_id or not isinstance(table, list):
+        return 0
+    rows = [dict(row) for row in table if isinstance(row, dict)]
+    if not rows:
+        return 0
+    _ARTIFACT_ROWS_CACHE[artifact_id] = rows
+    while len(_ARTIFACT_ROWS_CACHE) > _ARTIFACT_ROWS_CACHE_MAX:
+        oldest = next(iter(_ARTIFACT_ROWS_CACHE))
+        _ARTIFACT_ROWS_CACHE.pop(oldest, None)
+    return len(rows)
+
+
+def _precompute_plot2d_cache_for_analysis(
+    *,
+    snapshot: dict[str, Any] | None,
+    analysis_id: str | None,
+    result_store: dict[str, Any] | None,
+    max_plot_nodes: int = 6,
+) -> int:
+    aid = str(analysis_id or "").strip()
+    if not snapshot or not aid:
+        return 0
+    viz_nodes = _visualization_nodes_for_analysis(snapshot, aid)
+    if not viz_nodes:
+        return 0
+
+    primed = 0
+    for vnode in viz_nodes:
+        if primed >= int(max_plot_nodes):
+            break
+        if not isinstance(vnode, dict):
+            continue
+        req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
+        meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
+        vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
+        if vtype != "plot2d":
+            continue
+
+        source_node_id = str(vnode.get("id") or "").strip()
+        if not source_node_id:
+            continue
+        artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
+        if not isinstance(artifact, dict):
+            continue
+        _prime_rows_cache_from_artifact(artifact)
+        rows = _artifact_rows(artifact)
+        if not rows:
+            continue
+        rows = _apply_row_filters(rows, req.get("row_filters"))
+        if not rows:
+            continue
+
+        artifact_id = str(artifact.get("id") or "").strip()
+        presentation_spec = meta.get("presentation_spec") if isinstance(meta, dict) else None
+        fig = _build_plot2d_figure(
+            rows=rows,
+            artifact_id=artifact_id,
+            presentation_spec=presentation_spec if isinstance(presentation_spec, dict) else None,
+            req=req,
+            x_col=None,
+            y_col=None,
+            group_col=None,
+            x_range=None,
+            max_points_total=_UI_PLOT2D_INITIAL_MAX_POINTS,
+            cache_scope="initial",
+        )
+        if fig is None:
+            continue
+        primed += 1
+    return primed
 
 
 def _theme_options() -> list[dict[str, str]]:
@@ -1611,6 +2151,8 @@ def _build_canvas_payload(
 
 def register_analysis_callbacks(app, service: WebUIApiService) -> None:
     """Register analysis-focused Dash callbacks."""
+    global _SERVICE_HANDLE
+    _SERVICE_HANDLE = service
 
     register_task_callbacks(
         app,
@@ -1659,6 +2201,10 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             snapshot = service.load_pipeline_snapshot({"path": path})
         except Exception as exc:
             return no_update, no_update, no_update, f"ERROR: Load failed: {exc}"
+        _ARTIFACT_OBJ_CACHE.clear()
+        _ARTIFACT_ROWS_CACHE.clear()
+        _PLOT_ROWS_CACHE.clear()
+        _NODE_PIPELINE_CACHE.clear()
         selected = "virtual:dataset"
         session = {"pipeline_id": snapshot.get("id"), "selected_node_id": selected}
         result_cache = _result_cache_from_snapshot(snapshot)
@@ -2071,9 +2617,24 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
         analysis_id = _ancestor_analysis_id(nodes, node_id) if isinstance(nodes, dict) else None
         try:
-            service.delete_node(pipeline_id, node_id)
+            deleted = service.delete_node(pipeline_id, node_id)
         except Exception as exc:
             return no_update, no_update, no_update, f"ERROR: Delete failed: {exc}"
+        deleted_node_ids = deleted.get("deleted_node_ids", []) if isinstance(deleted, dict) else []
+        if isinstance(deleted_node_ids, list):
+            for nid in deleted_node_ids:
+                _NODE_PIPELINE_CACHE.pop(str(nid or "").strip(), None)
+        deleted_artifact_ids = deleted.get("deleted_artifact_ids", []) if isinstance(deleted, dict) else []
+        if isinstance(deleted_artifact_ids, list):
+            for aid in deleted_artifact_ids:
+                aid_txt = str(aid or "").strip()
+                if not aid_txt:
+                    continue
+                _ARTIFACT_OBJ_CACHE.pop(aid_txt, None)
+                _ARTIFACT_ROWS_CACHE.pop(aid_txt, None)
+                purge_keys = [k for k in _PLOT_ROWS_CACHE.keys() if str(k).startswith(f"{aid_txt}|")]
+                for key in purge_keys:
+                    _PLOT_ROWS_CACHE.pop(key, None)
 
         next_snapshot = service.get_pipeline(pipeline_id)
         next_store = _result_cache_from_snapshot(next_snapshot)
@@ -2453,7 +3014,11 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         artifact = run_result.get("artifact") if isinstance(run_result, dict) else None
         next_store = dict(result_store or {})
         if isinstance(artifact, dict) and "id" in artifact:
-            next_store[node_id] = artifact
+            _prime_rows_cache_from_artifact(artifact)
+            _artifact_cache_put(artifact)
+            artifact_id = str(artifact.get("id") or "").strip()
+            if artifact_id:
+                next_store[node_id] = artifact_id
             payload = artifact.get("payload", {})
             rows = extract_tabular_rows(payload if isinstance(payload, dict) else None)
             _trace(
@@ -2470,8 +3035,8 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
                 if isinstance(nodes, dict):
                     analysis_id = _ancestor_analysis_id(nodes, node_id)
-                    if analysis_id:
-                        next_store[str(analysis_id)] = artifact
+                    if analysis_id and artifact_id:
+                        next_store[str(analysis_id)] = artifact_id
         next_snapshot = service.get_pipeline(pipeline_id)
         if str(node.get("kind")) == "analysis" and isinstance(artifact, dict):
             # Create recommended visualization nodes under this analysis (once).
@@ -2507,170 +3072,37 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                             },
                         )
                 next_snapshot = service.get_pipeline(pipeline_id)
-        return next_snapshot, next_store, html.Span(str(n_clicks), style={"display": "none"}), "Node executed"
-
-    @app.callback(
-        Output("result-tabs", "children"),
-        Output("result-tabs", "value"),
-        Input("session-store", "data"),
-        Input("pipeline-store", "data"),
-        State("result-tabs", "value"),
-    )
-    def sync_result_tabs(
-        session: dict[str, Any] | None,
-        snapshot: dict[str, Any] | None,
-        current_value: str | None,
-    ):
-        if not session or not snapshot:
-            return [], None
-        selected_id = str(session.get("selected_node_id") or "")
-        nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
-        if not isinstance(nodes, dict):
-            return [], None
-
-        if selected_id.startswith("virtual:visualization:"):
-            # Keep current tab state unchanged when the virtual Presentation folder is selected.
-            return no_update, no_update
-
-        selected_node = nodes.get(selected_id)
-        viz_nodes: list[dict[str, Any]] = []
-        if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "visualization":
-            viz_nodes = [selected_node]
-        elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
-            analysis_id = _ancestor_analysis_id(nodes, selected_id)
-            viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id) if analysis_id else []
-        elif isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
-            viz_nodes = []
-
-        if not viz_nodes:
-            return [], None
-        tabs = [
-            dcc.Tab(
-                label=_visualization_display_label(snapshot, str(v.get("id"))),
-                value=str(v.get("id")),
+        try:
+            if isinstance(artifact, dict):
+                kind = str(node.get("kind") or "")
+                prime_analysis_id = ""
+                if kind == "analysis":
+                    prime_analysis_id = str(node_id)
+                elif kind == "utility":
+                    nodes_latest = next_snapshot.get("nodes", {}) if isinstance(next_snapshot, dict) else {}
+                    if isinstance(nodes_latest, dict):
+                        prime_analysis_id = str(_ancestor_analysis_id(nodes_latest, node_id) or "")
+                if prime_analysis_id:
+                    primed = _precompute_plot2d_cache_for_analysis(
+                        snapshot=next_snapshot,
+                        analysis_id=prime_analysis_id,
+                        result_store=next_store,
+                    )
+                    if primed > 0:
+                        logger.info(
+                            "ui.precompute_plot2d_cache pipeline_id=%s analysis_id=%s primed=%s",
+                            pipeline_id,
+                            prime_analysis_id,
+                            primed,
+                        )
+        except Exception as exc:
+            logger.debug(
+                "ui.precompute_plot2d_cache skipped pipeline_id=%s node_id=%s error=%s",
+                pipeline_id,
+                node_id,
+                exc,
             )
-            for v in viz_nodes
-        ]
-        valid = {str(v.get("id")) for v in viz_nodes}
-        if selected_id in valid:
-            return tabs, selected_id
-        if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "utility":
-            table_tab_id = ""
-            for vnode in viz_nodes:
-                req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
-                meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
-                vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
-                if vtype == "table":
-                    table_tab_id = str(vnode.get("id"))
-                    break
-            if table_tab_id:
-                return tabs, table_tab_id
-        if current_value and str(current_value) in valid:
-            return tabs, str(current_value)
-        return tabs, str(viz_nodes[0].get("id"))
-
-    @app.callback(
-        Output("table-controls", "style"),
-        Output("plot-controls", "style"),
-        Output("hist-controls", "style"),
-        Output("view3d-controls", "style"),
-        Output("sync-controls", "style"),
-        Input("result-tabs", "value"),
-        Input("pipeline-store", "data"),
-    )
-    def toggle_result_controls(tab_value: str | None, snapshot: dict[str, Any] | None):
-        nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
-        node = nodes.get(tab_value) if isinstance(nodes, dict) and tab_value else None
-        if not isinstance(node, dict):
-            return {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"}, {"display": "none"}
-        req = node.get("request", {}) if isinstance(node, dict) and isinstance(node.get("request"), dict) else {}
-        viz_type = str(req.get("visualization_type") or "plot2d").lower()
-        table_style = {"display": "none"}
-        plot_style = {"display": "none"}
-        hist_style = {"display": "none"}
-        view3d_style = {"display": "none"}
-        sync_style = {"display": "none"}
-        return table_style, plot_style, hist_style, view3d_style, sync_style
-
-    @app.callback(
-        Output("table-filter-col", "options"),
-        Output("table-filter-col", "value"),
-        Output("plot-x-col", "options"),
-        Output("plot-x-col", "value"),
-        Output("plot-y-col", "options"),
-        Output("plot-y-col", "value"),
-        Output("plot-group-col", "options"),
-        Output("plot-group-col", "value"),
-        Output("hist-col", "options"),
-        Output("hist-col", "value"),
-        Output("view3d-x-col", "options"),
-        Output("view3d-x-col", "value"),
-        Output("view3d-y-col", "options"),
-        Output("view3d-y-col", "value"),
-        Output("view3d-z-col", "options"),
-        Output("view3d-z-col", "value"),
-        Output("view3d-color-col", "options"),
-        Output("view3d-color-col", "value"),
-        Output("focus-atom", "options"),
-        Output("focus-atom", "value"),
-        Input("session-store", "data"),
-        Input("result-tabs", "value"),
-        Input("pipeline-store", "data"),
-        Input("result-store", "data"),
-    )
-    def populate_plot_controls(
-        session: dict[str, Any] | None,
-        tab_node_id: str | None,
-        snapshot: dict[str, Any] | None,
-        result_store: dict[str, Any] | None,
-    ):
-        if not session:
-            return [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None
-        node_id = str(tab_node_id or session.get("selected_node_id") or "")
-        artifact = _find_source_artifact(snapshot, node_id, result_store or {})
-        rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
-        if not rows:
-            return [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None, [], None
-        cols = list(rows[0].keys())
-        numeric_cols = []
-        for col in cols:
-            v = rows[0].get(col)
-            if isinstance(v, (int, float)):
-                numeric_cols.append(col)
-        x_default = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (numeric_cols[0] if numeric_cols else None))
-        y_default = "msd" if "msd" in cols else (numeric_cols[1] if len(numeric_cols) > 1 else (numeric_cols[0] if numeric_cols else None))
-        group_default = "atom_id" if "atom_id" in cols else None
-        options_all = [{"label": c, "value": c} for c in cols]
-        options_numeric = [{"label": c, "value": c} for c in numeric_cols]
-        hist_default = "msd" if "msd" in numeric_cols else (numeric_cols[0] if numeric_cols else None)
-        x3d_default = "x" if "x" in cols else x_default
-        y3d_default = "y" if "y" in cols else ("atom_id" if "atom_id" in cols else y_default)
-        z3d_default = "z" if "z" in cols else ("msd" if "msd" in cols else y_default)
-        color3d_default = "msd" if "msd" in numeric_cols else None
-        atom_ids = sorted({str(r.get("atom_id")) for r in rows if r.get("atom_id") is not None})
-        focus_options = [{"label": aid, "value": aid} for aid in atom_ids]
-        return (
-            options_all,
-            cols[0] if cols else None,
-            options_all,
-            x_default,
-            options_numeric,
-            y_default,
-            options_all,
-            group_default,
-            options_numeric,
-            hist_default,
-            options_all,
-            x3d_default,
-            options_all,
-            y3d_default,
-            options_all,
-            z3d_default,
-            options_numeric,
-            color3d_default,
-            focus_options,
-            None,
-        )
+        return next_snapshot, next_store, html.Span(str(n_clicks), style={"display": "none"}), "Node executed"
 
     @app.callback(
         Output("parameters-title", "children"),
@@ -3822,7 +4254,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             else:
                 body.extend(
                     [
-                        html.Div("Table filtering/sorting is available directly in Result Tabs.", className="rk-subtitle"),
+                        html.Div("Table filtering/sorting is available directly in the Visualization Canvas.", className="rk-subtitle"),
                         dash_table.DataTable(
                             id="viz-row-filters",
                             columns=[
@@ -4494,15 +4926,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Output("btn-canvas-secondary", "style"),
         Input("session-store", "data"),
         Input("pipeline-store", "data"),
-        Input("result-tabs", "value"),
         prevent_initial_call=False,
     )
     def render_canvas_action_buttons(
         session: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
-        tab_node_id: str | None,
     ):
-        source_node = _resolve_canvas_source_node(snapshot, session, tab_node_id)
+        source_node = _resolve_canvas_source_node(snapshot, session, None)
         if not isinstance(source_node, dict):
             hidden = {"display": "none"}
             return "Save", "Save As", hidden, hidden
@@ -4521,43 +4951,23 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         Output("execute-loading-proxy", "children", allow_duplicate=True),
         Input("btn-canvas-primary", "n_clicks"),
         Input("btn-canvas-secondary", "n_clicks"),
-        State("result-tabs", "value"),
         State("session-store", "data"),
         State("result-store", "data"),
         State("pipeline-store", "data"),
         State("config-store", "data"),
         State({"type": "plot-graph", "slot": ALL}, "figure"),
         State({"type": "plot-graph", "slot": ALL}, "id"),
-        State("plot-x-col", "value"),
-        State("plot-y-col", "value"),
-        State("plot-group-col", "value"),
-        State("hist-col", "value"),
-        State("view3d-x-col", "value"),
-        State("view3d-y-col", "value"),
-        State("view3d-z-col", "value"),
-        State("view3d-color-col", "value"),
-        State("focus-atom", "value"),
         prevent_initial_call=True,
     )
     def on_canvas_save_export(
         n_primary: int,
         n_secondary: int,
-        tab_node_id: str | None,
         session: dict[str, Any] | None,
         result_store: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
         config: dict[str, Any] | None,
         graph_figures: list[dict[str, Any] | None] | None,
         graph_ids: list[dict[str, Any] | None] | None,
-        x_col: str | None,
-        y_col: str | None,
-        group_col: str | None,
-        hist_col: str | None,
-        view3d_x: str | None,
-        view3d_y: str | None,
-        view3d_z: str | None,
-        view3d_color: str | None,
-        focus_atom: str | None,
     ):
         trig = str(ctx.triggered_id or "")
         if trig not in {"btn-canvas-primary", "btn-canvas-secondary"}:
@@ -4571,22 +4981,22 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             snapshot=snapshot,
             session=session,
             result_store=result_store,
-            tab_node_id=tab_node_id,
-            x_col=x_col,
-            y_col=y_col,
-            group_col=group_col,
-            hist_col=hist_col,
-            view3d_x=view3d_x,
-            view3d_y=view3d_y,
-            view3d_z=view3d_z,
-            view3d_color=view3d_color,
-            focus_atom=focus_atom,
+            tab_node_id=None,
+            x_col=None,
+            y_col=None,
+            group_col=None,
+            hist_col=None,
+            view3d_x=None,
+            view3d_y=None,
+            view3d_z=None,
+            view3d_color=None,
+            focus_atom=None,
         )
         spinner_tick = html.Span(str(int(n_primary or 0) + int(n_secondary or 0)), style={"display": "none"})
         if mode == "none":
             return "Nothing to save/export.", "Nothing to save/export.", spinner_tick
 
-        source_node = _resolve_canvas_source_node(snapshot, session, tab_node_id)
+        source_node = _resolve_canvas_source_node(snapshot, session, None)
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
         source_id = str(source_node.get("id") or "") if isinstance(source_node, dict) else ""
         analysis_id = _ancestor_analysis_id(nodes, source_id) if isinstance(nodes, dict) and source_id else None
@@ -4667,73 +5077,37 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             return msg, msg, spinner_tick
 
     @app.callback(
-        Output("result-tab-content", "children"),
         Output("canvas-content", "children"),
-        Input("result-tabs", "value"),
         Input("session-store", "data"),
         Input("result-store", "data"),
         Input("pipeline-store", "data"),
-        Input("plot-x-col", "value"),
-        Input("plot-y-col", "value"),
-        Input("plot-group-col", "value"),
-        Input("hist-col", "value"),
-        Input("view3d-x-col", "value"),
-        Input("view3d-y-col", "value"),
-        Input("view3d-z-col", "value"),
-        Input("view3d-color-col", "value"),
-        Input("focus-atom", "value"),
     )
     def render_result_views(
-        tab_node_id: str | None,
         session: dict[str, Any] | None,
         result_store: dict[str, Any] | None,
         snapshot: dict[str, Any] | None,
-        x_col: str | None,
-        y_col: str | None,
-        group_col: str | None,
-        hist_col: str | None,
-        view3d_x: str | None,
-        view3d_y: str | None,
-        view3d_z: str | None,
-        view3d_color: str | None,
-        focus_atom: str | None,
     ):
         if not session:
-            return no_update, "No selected node."
+            return "No selected node."
         node_id = str(session.get("selected_node_id") or "")
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
         selected_node = nodes.get(node_id) if isinstance(nodes, dict) else None
         if isinstance(selected_node, dict) and str(selected_node.get("kind")) == "analysis":
-            return no_update, "No presentation selected. Select a presentation node under this analysis."
+            return "No presentation selected. Select a presentation node under this analysis."
         if str(node_id).startswith("virtual:visualization:"):
             # Selecting the virtual Presentation folder should not change the canvas view.
-            return no_update, no_update
+            return no_update
 
-        source_node_id = str(tab_node_id or node_id)
-        source_node = nodes.get(source_node_id) if isinstance(nodes, dict) else None
+        source_node = _resolve_canvas_source_node(snapshot, session, None)
         if not isinstance(source_node, dict):
-            return no_update, "No presentation selected."
-        if str(source_node.get("kind")) == "utility":
-            analysis_id = _ancestor_analysis_id(nodes, source_node_id) if isinstance(nodes, dict) else None
-            if analysis_id:
-                viz_nodes = _visualization_nodes_for_analysis(snapshot, analysis_id)
-                if viz_nodes:
-                    selected_viz = None
-                    for vnode in viz_nodes:
-                        req = vnode.get("request", {}) if isinstance(vnode.get("request"), dict) else {}
-                        meta = vnode.get("metadata", {}) if isinstance(vnode.get("metadata"), dict) else {}
-                        vtype = _canonical_viz_type(req.get("visualization_type") or meta.get("visualization_type") or vnode.get("name"))
-                        if vtype == "table":
-                            selected_viz = vnode
-                            break
-                    source_node = selected_viz or viz_nodes[0]
-                    source_node_id = str(source_node.get("id"))
+            return "No presentation selected."
+        source_node_id = str(source_node.get("id") or "")
         if str(source_node.get("kind")) == "utility":
             artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
             rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
             if not rows:
-                return no_update, "No result rows yet."
-            return no_update, _build_result_table(rows, max_rows=200)
+                return "No result rows yet."
+            return _build_result_table(rows, max_rows=200)
         presentation_spec = None
         if isinstance(source_node, dict):
             meta = source_node.get("metadata", {})
@@ -4741,160 +5115,45 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 presentation_spec = meta.get("presentation_spec")
         artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
         rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
-        if focus_atom:
-            rows = [r for r in rows if str(r.get("atom_id")) == str(focus_atom)]
         req = source_node.get("request", {}) if isinstance(source_node.get("request"), dict) else {}
         rows = _apply_row_filters(rows, req.get("row_filters"))
         viz_type = str(req.get("visualization_type") or "plot2d").lower()
 
         if viz_type == "table":
             if not rows:
-                return no_update, "No result rows yet."
+                return "No result rows yet."
             table_max_rows = int(req.get("table_max_rows") or 200)
-            return no_update, _build_result_table(rows, max_rows=table_max_rows)
+            return _build_result_table(rows, max_rows=table_max_rows)
 
         if viz_type == "plot2d":
-            cols = infer_columns(rows)
-            numeric_cols = infer_numeric_columns(rows)
-            fallback_x = "iter" if "iter" in cols else ("frame_index" if "frame_index" in cols else (cols[0] if cols else ""))
-            fallback_y = next((col for col in numeric_cols if col != fallback_x), numeric_cols[0] if numeric_cols else (cols[1] if len(cols) > 1 else fallback_x))
-            use_x = str(req.get("x_col") or x_col or fallback_x)
-            use_y = str(req.get("y_col") or y_col or fallback_y)
-            use_group = str(req.get("group_col") or group_col or "")
-            use_group_agg = _normalize_group_agg(req.get("group_agg"))
-            use_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
-            try:
-                use_width = float(req.get("line_width")) if req.get("line_width") is not None else None
-            except Exception:
-                use_width = None
-            use_marker = _parse_float(req.get("marker_size"), 6.0)
-            show_markers = _flag_on(req.get("show_markers"), default=False)
-            trace_styles = _trace_styles_map(req.get("trace_styles"))
             artifact_id = str((artifact or {}).get("id") if isinstance(artifact, dict) else "")
-            fig_cache_payload = {
-                "viz_type": "plot2d",
-                "x": use_x,
-                "y": use_y,
-                "group": use_group,
-                "group_agg": use_group_agg,
-                "focus_atom": str(focus_atom or ""),
-                "row_filters": _row_filters_from_raw(req.get("row_filters")),
-                "line_color": use_color,
-                "line_width": use_width,
-                "marker_size": use_marker,
-                "show_markers": show_markers,
-                "trace_styles": trace_styles,
-                "style": {
-                    "theme": str(req.get("theme") or "plotly_white"),
-                    "font_size": _parse_float(req.get("font_size"), 12.0),
-                    "axis_title_size": _parse_float(req.get("axis_title_size"), 13.0),
-                    "grid_on": _flag_on(req.get("grid_on"), default=True),
-                    "log_scale": str(req.get("log_scale") or "none"),
-                    "tick_spacing_x": _parse_float(req.get("tick_spacing_x"), None),
-                    "tick_spacing_y": _parse_float(req.get("tick_spacing_y"), None),
-                    "show_legend": _flag_on(req.get("show_legend"), default=True),
-                    "legend_position": str(req.get("legend_position") or "top-right"),
-                    "use_plot_title": _flag_on(req.get("use_plot_title"), default=False),
-                    "plot_title": str(req.get("plot_title") or "").strip(),
-                    "x_title": str(req.get("x_title") or "").strip(),
-                    "y_title": str(req.get("y_title") or "").strip(),
-                },
-            }
-            fig_cache_key = _figure_cache_key(artifact_id=artifact_id, payload=fig_cache_payload)
-            cached_fig_json = _figure_cache_get(fig_cache_key)
-            if isinstance(cached_fig_json, dict):
-                cached_fig = go.Figure(cached_fig_json)
-                graph_canvas = dcc.Graph(
-                    id={"type": "plot-graph", "slot": "canvas"},
-                    figure=cached_fig,
-                    config={"displaylogo": False},
-                )
-                return no_update, graph_canvas
-            plot_rows = _cached_aggregate_plot2d_rows(
-                rows,
+            fig = _build_plot2d_figure(
+                rows=rows,
                 artifact_id=artifact_id,
-                x_col=use_x,
-                y_col=use_y,
-                group_col=use_group,
-                agg=use_group_agg,
-                filter_signature=json.dumps(_row_filters_from_raw(req.get("row_filters")), sort_keys=True, ensure_ascii=True),
-            )
-            fig = render_figure(
-                plot_rows,
-                presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
-                x_col=use_x,
-                y_col=use_y,
-                group_col=use_group,
-                view_type="plot2d",
+                presentation_spec=presentation_spec if isinstance(presentation_spec, dict) else None,
+                req=req,
+                x_col=None,
+                y_col=None,
+                group_col=None,
+                x_range=None,
+                max_points_total=_UI_PLOT2D_INITIAL_MAX_POINTS,
+                cache_scope="initial",
             )
             if fig is None:
-                return no_update, "No plottable data."
-            scatter_count = sum(1 for tr in fig.data if isinstance(tr, go.Scatter))
-            apply_fixed_line_color = bool(use_color) and scatter_count <= 1 and not bool(trace_styles)
-            for curve_index, tr in enumerate(fig.data):
-                if isinstance(tr, go.Scatter):
-                    trace_name = str(tr.name or f"curve_{curve_index}")
-                    curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
-                    curve_color = str(curve_style.get("line_color_rgb") or curve_style.get("line_color") or "").strip()
-                    curve_width = _parse_float(curve_style.get("line_width"), None)
-                    line_update: dict[str, Any] = {}
-                    if curve_color:
-                        line_update["color"] = curve_color
-                    elif apply_fixed_line_color:
-                        line_update["color"] = str(use_color)
-                    if curve_width is not None:
-                        line_update["width"] = float(curve_width)
-                    elif use_width is not None:
-                        line_update["width"] = float(use_width)
-                    if line_update:
-                        tr.update(line=line_update)
-            for curve_index, tr in enumerate(fig.data):
-                if not isinstance(tr, go.Scatter):
-                    continue
-                trace_name = str(tr.name or f"curve_{curve_index}")
-                curve_style = _trace_style_for_trace(trace_styles, trace_name, curve_index)
-                curve_marker_size = _parse_float(curve_style.get("marker_size"), None)
-                has_curve_marker_flag = "show_markers" in curve_style
-                curve_show_markers = (
-                    _flag_on(curve_style.get("show_markers"), default=False)
-                    if has_curve_marker_flag
-                    else show_markers
-                )
-                mode = str(tr.mode or "lines")
-                marker_size = curve_marker_size if curve_marker_size is not None else use_marker
-                if curve_show_markers and marker_size is not None and marker_size > 0:
-                    if "markers" not in mode:
-                        mode = f"{mode}+markers" if mode else "markers"
-                    tr.update(mode=mode, marker={"size": float(marker_size)})
-                else:
-                    mode_clean = mode.replace("+markers", "").replace("markers+", "")
-                    mode_clean = mode_clean if mode_clean else "lines"
-                    tr.update(mode=mode_clean)
-            _apply_2d_style(fig, req, apply_legend=True)
-            use_custom_title = _flag_on(req.get("use_plot_title"), default=False)
-            plot_title = str(req.get("plot_title") or "").strip()
-            x_title = str(req.get("x_title") or "").strip()
-            y_title = str(req.get("y_title") or "").strip()
-            if use_custom_title and plot_title:
-                fig.update_layout(title=plot_title)
-            if x_title:
-                fig.update_xaxes(title_text=x_title)
-            if y_title:
-                fig.update_yaxes(title_text=y_title)
-            fig = _optimize_plot2d_for_large_data(fig, threshold_points=5000)
-            _figure_cache_put(fig_cache_key, fig)
+                return "No plottable data."
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
                 figure=fig,
+                style={"height": "100%", "width": "100%"},
                 config={"displaylogo": False},
             )
-            return no_update, graph_canvas
+            return graph_canvas
 
         if viz_type == "histogram":
             cols = infer_columns(rows)
             numeric_cols = infer_numeric_columns(rows)
             fallback_hist = numeric_cols[0] if numeric_cols else (cols[0] if cols else "")
-            use_hist = str(req.get("x_col") or req.get("y_col") or hist_col or fallback_hist)
+            use_hist = str(req.get("x_col") or req.get("y_col") or fallback_hist)
             fig = render_figure(
                 rows,
                 presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
@@ -4903,7 +5162,7 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 view_type="histogram",
             )
             if fig is None:
-                return no_update, "No numeric data for histogram."
+                return "No numeric data for histogram."
             hist_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
             if hist_color:
                 for tr in fig.data:
@@ -4923,21 +5182,22 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
                 figure=fig,
+                style={"height": "100%", "width": "100%"},
                 config={"displaylogo": False},
             )
-            return no_update, graph_canvas
+            return graph_canvas
 
         fig3d = render_figure(
             rows,
             presentation=presentation_spec if isinstance(presentation_spec, dict) else None,
-            x_col=str(req.get("x_col") or view3d_x or ""),
-            y_col=str(req.get("y_col") or view3d_y or ""),
-            z_col=str(req.get("z_col") or view3d_z or ""),
-            color_col=str(req.get("color_col") or view3d_color or ""),
+            x_col=str(req.get("x_col") or ""),
+            y_col=str(req.get("y_col") or ""),
+            z_col=str(req.get("z_col") or ""),
+            color_col=str(req.get("color_col") or ""),
             view_type="scatter3d",
         )
         if fig3d is None:
-            return no_update, "No 3D data."
+            return "No 3D data."
         marker_size = _parse_float(req.get("marker_size"), 6.0)
         fixed_color = str(req.get("line_color_rgb") or req.get("line_color") or "")
         color_by = str(req.get("color_col") or "")
@@ -4967,6 +5227,69 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
         graph3d_canvas = dcc.Graph(
             id={"type": "plot-graph", "slot": "canvas"},
             figure=fig3d,
+            style={"height": "100%", "width": "100%"},
             config={"displaylogo": False},
         )
-        return no_update, graph3d_canvas
+        return graph3d_canvas
+
+    @app.callback(
+        Output({"type": "plot-graph", "slot": "canvas"}, "figure"),
+        Input({"type": "plot-graph", "slot": "canvas"}, "relayoutData"),
+        State("session-store", "data"),
+        State("result-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
+    def refine_plot2d_on_relayout(
+        relayout_data: dict[str, Any] | None,
+        session: dict[str, Any] | None,
+        result_store: dict[str, Any] | None,
+        snapshot: dict[str, Any] | None,
+    ):
+        x_range, has_x_change = _extract_relayout_x_range(relayout_data)
+        if not has_x_change:
+            return no_update
+
+        source_node = _resolve_canvas_source_node(snapshot, session, None)
+        if not isinstance(source_node, dict):
+            return no_update
+        if str(source_node.get("kind")) == "utility":
+            return no_update
+
+        req = source_node.get("request", {}) if isinstance(source_node.get("request"), dict) else {}
+        viz_type = str(req.get("visualization_type") or "plot2d").lower()
+        if viz_type != "plot2d":
+            return no_update
+
+        source_node_id = str(source_node.get("id") or "")
+        artifact = _find_source_artifact(snapshot, source_node_id, result_store or {})
+        rows = _artifact_rows(artifact if isinstance(artifact, dict) else None)
+        if not rows:
+            return no_update
+        rows = _apply_row_filters(rows, req.get("row_filters"))
+        if not rows:
+            return no_update
+
+        presentation_spec = None
+        meta = source_node.get("metadata", {})
+        if isinstance(meta, dict):
+            presentation_spec = meta.get("presentation_spec")
+
+        artifact_id = str((artifact or {}).get("id") if isinstance(artifact, dict) else "")
+        max_points = _UI_PLOT2D_ZOOM_MAX_POINTS if x_range is not None else _UI_PLOT2D_INITIAL_MAX_POINTS
+        cache_scope = "zoom-range" if x_range is not None else "zoom-reset"
+        fig = _build_plot2d_figure(
+            rows=rows,
+            artifact_id=artifact_id,
+            presentation_spec=presentation_spec if isinstance(presentation_spec, dict) else None,
+            req=req,
+            x_col=None,
+            y_col=None,
+            group_col=None,
+            x_range=x_range,
+            max_points_total=max_points,
+            cache_scope=cache_scope,
+        )
+        if fig is None:
+            return no_update
+        return fig

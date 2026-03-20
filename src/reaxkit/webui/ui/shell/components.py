@@ -37,7 +37,6 @@ def topbar() -> html.Div:
                         target_components={
                             "execute-loading-proxy": "children",
                             "canvas-content": "children",
-                            "result-tab-content": "children",
                         },
                         children=html.Div(id="execute-loading-proxy", className="rk-spinner-anchor"),
                     ),

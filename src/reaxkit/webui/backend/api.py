@@ -18,6 +18,33 @@ def _payload_keys(payload: dict[str, Any] | None) -> list[str]:
     return sorted(str(k) for k in payload.keys())
 
 
+def _artifact_shallow(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Return lightweight artifact payload for UI transport (without heavy data table)."""
+    out: dict[str, Any] = {
+        "id": str(artifact.get("id") or ""),
+        "node_id": str(artifact.get("node_id") or ""),
+        "metadata": dict(artifact.get("metadata") or {}),
+        "recommended_views": list(artifact.get("recommended_views") or []),
+        "created_at": str(artifact.get("created_at") or ""),
+    }
+    return out
+
+
+def _snapshot_shallow(snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    """Trim heavy artifact payloads before returning snapshot to Dash stores."""
+    if not isinstance(snapshot, dict):
+        return {}
+    out = dict(snapshot)
+    artifacts = snapshot.get("artifacts", {})
+    if isinstance(artifacts, dict):
+        out["artifacts"] = {
+            str(artifact_id): _artifact_shallow(artifact)
+            for artifact_id, artifact in artifacts.items()
+            if isinstance(artifact, dict)
+        }
+    return out
+
+
 class WebUIApiService:
     """Framework-neutral backend service used by the Web UI."""
 
@@ -34,7 +61,7 @@ class WebUIApiService:
 
     def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
         logger.debug("get_pipeline pipeline_id=%s", pipeline_id)
-        out = self.runtime.get_pipeline(pipeline_id)
+        out = _snapshot_shallow(self.runtime.get_pipeline(pipeline_id))
         logger.debug("get_pipeline -> keys=%s", _payload_keys(out))
         return out
 
@@ -161,7 +188,7 @@ class WebUIApiService:
         snapshot = load_snapshot(path)
         pipeline = self.store.load_snapshot(snapshot)
         logger.debug("load_pipeline_snapshot -> nodes=%s", len(pipeline.nodes))
-        return pipeline.to_dict()
+        return _snapshot_shallow(pipeline.to_dict())
 
     def export_pipeline_bundle(self, pipeline_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         payload = payload or {}

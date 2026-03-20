@@ -184,7 +184,6 @@ def register_shell_callbacks(app, service) -> None:
         Output("panel-left", "style"),
         Output("panel-canvas", "style"),
         Output("panel-props", "style"),
-        Output("panel-results", "style"),
         Output("panel-info", "style"),
         Output("panel-log-page", "style"),
         Output("btn-nav-analysis", "className"),
@@ -201,7 +200,6 @@ def register_shell_callbacks(app, service) -> None:
         show_log = page == "log"
         base = "rk-nav-btn"
         return (
-            {} if show_analysis else {"display": "none"},
             {} if show_analysis else {"display": "none"},
             {} if show_analysis else {"display": "none"},
             {} if show_analysis else {"display": "none"},
