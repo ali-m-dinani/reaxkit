@@ -178,9 +178,8 @@ def main() -> None:
         port = 8060
     logging.getLogger(__name__).info("WebUI startup pid=%s port=%s", os.getpid(), port)
     _ensure_single_instance(port, logging.getLogger(__name__))
-    # Always write trace output to a single workspace path, independent of launch cwd.
-    project_root = Path(__file__).resolve().parents[3]
-    trace_target = project_root / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
+    # Write trace output under the launch directory workspace.
+    trace_target = Path.cwd() / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
     try:
         trace_target.parent.mkdir(parents=True, exist_ok=True)
         with trace_target.open("a", encoding="utf-8") as fh:
