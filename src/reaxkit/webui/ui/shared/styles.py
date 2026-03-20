@@ -161,13 +161,25 @@ body { margin: 0; font-family: Segoe UI, Tahoma, sans-serif; background: #edf3f7
   border: 1px solid #9cb2c3; color: #3d5568; font-size: 11px; font-weight: 700;
   cursor: help; background: #f2f7fb;
 }
-.rk-canvas-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.rk-canvas-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; height: 100%; width: 100%; align-items: stretch; }
 .rk-canvas > .rk-canvas-wrap { flex: 1 1 auto; min-height: 0; }
-.rk-canvas-loading { display: flex; flex: 1 1 auto; min-height: 0; }
-.rk-canvas-loading > div { display: flex; flex: 1 1 auto; min-height: 0; }
-.rk-canvas-box, .rk-results-box { border: 1px dashed #bfd0de; border-radius: 8px; padding: 10px; display: flex; flex: 1 1 auto; min-height: 0; }
-#canvas-content { display: flex; flex: 1 1 auto; min-height: 0; }
-#canvas-content .dash-graph { flex: 1 1 auto; min-height: 0; }
+.rk-canvas-loading { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; }
+.rk-canvas-box, .rk-results-box {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px 8px 8px;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  align-self: stretch;
+}
+#canvas-content { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; align-self: stretch; }
+#canvas-content { padding-right: 10px; box-sizing: border-box; }
+#canvas-content > * { flex: 1 1 auto; min-height: 0; max-width: 100%; }
+#canvas-content .dash-graph { flex: 1 1 auto; min-height: 0; width: 100% !important; max-width: none !important; }
+#canvas-content .dash-table-container { width: 100%; box-sizing: border-box; max-width: 100%; }
+#canvas-content .js-plotly-plot, #canvas-content .plot-container, #canvas-content .svg-container { height: 100% !important; width: 100% !important; max-width: none !important; }
 #canvas-content .js-plotly-plot { height: 100% !important; }
 .rk-canvas-head { display: flex; align-items: center; justify-content: space-between; }
 .rk-canvas-actions { display: grid; gap: 6px; justify-items: end; align-content: center; padding-right: 10px; box-sizing: border-box; }

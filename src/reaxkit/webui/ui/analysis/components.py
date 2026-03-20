@@ -41,7 +41,12 @@ def visualization_canvas() -> html.Div:
                 id="canvas-content-loading",
                 type="circle",
                 className="rk-canvas-loading",
-                children=html.Div(id="canvas-content", className="rk-canvas-box"),
+                style={"display": "flex", "flex": "1 1 auto", "minHeight": "0", "width": "100%"},
+                children=html.Div(
+                    id="canvas-content",
+                    className="rk-canvas-box",
+                    style={"display": "flex", "flex": "1 1 auto", "minHeight": "0", "height": "100%"},
+                ),
             ),
             html.Div(id="canvas-export-status", className="rk-log-name"),
         ],

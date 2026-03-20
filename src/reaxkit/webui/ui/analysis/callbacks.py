@@ -1548,6 +1548,7 @@ def _build_plot2d_figure(
     use_marker = _parse_float(req.get("marker_size"), 6.0)
     show_markers = _flag_on(req.get("show_markers"), default=False)
     trace_styles = _trace_styles_map(req.get("trace_styles"))
+    row_filters = _row_filters_from_raw(req.get("row_filters"))
     x_range_sig = [round(x_range[0], 9), round(x_range[1], 9)] if x_range is not None else None
     fig_cache_payload = {
         "viz_type": "plot2d",
@@ -1555,6 +1556,7 @@ def _build_plot2d_figure(
         "y": use_y,
         "group": use_group,
         "group_agg": use_group_agg,
+        "row_filters": row_filters,
         "line_color": use_color,
         "line_width": use_width,
         "marker_size": use_marker,
@@ -1588,11 +1590,7 @@ def _build_plot2d_figure(
     if not rows_for_view:
         return None
 
-    row_filter_signature = json.dumps(
-        {"row_filters": _row_filters_from_raw(req.get("row_filters")), "x_range": x_range_sig},
-        sort_keys=True,
-        ensure_ascii=True,
-    )
+    row_filter_signature = json.dumps({"row_filters": row_filters, "x_range": x_range_sig}, sort_keys=True, ensure_ascii=True)
     plot_rows = _cached_aggregate_plot2d_rows(
         rows_for_view,
         artifact_id=artifact_id,
@@ -1666,6 +1664,8 @@ def _build_plot2d_figure(
 
     fig = _optimize_plot2d_for_large_data(fig, max_points_total=max_points_total)
     fig.update_layout(
+        autosize=True,
+        height=None,
         uirevision=f"rk-plot2d:{artifact_id}:{use_x}:{use_y}:{use_group}",
     )
     if x_range is not None:
@@ -1851,6 +1851,7 @@ def _apply_2d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool =
         template=theme,
         font={"size": font_size, "color": "black"},
         title={"font": {"color": "black"}},
+        margin={"l": 56, "r": 20, "t": 44, "b": 52},
     )
     xaxis_cfg: dict[str, Any] = {
         "showgrid": grid_on,
@@ -1910,7 +1911,12 @@ def _apply_3d_style(fig: go.Figure, req: dict[str, Any], *, apply_legend: bool =
         scene_cfg["xaxis"]["title"] = {"font": {"size": axis_title_size}}
         scene_cfg["yaxis"]["title"] = {"font": {"size": axis_title_size}}
         scene_cfg["zaxis"]["title"] = {"font": {"size": axis_title_size}}
-    fig.update_layout(template=theme, font={"size": font_size}, scene=scene_cfg)
+    fig.update_layout(
+        template=theme,
+        font={"size": font_size},
+        scene=scene_cfg,
+        margin={"l": 24, "r": 18, "t": 44, "b": 24},
+    )
     if apply_legend:
         if _flag_on(req.get("show_legend"), default=True):
             fig.update_layout(**_legend_layout(str(req.get("legend_position") or "top-right")))
@@ -5144,8 +5150,9 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
                 figure=fig,
-                style={"height": "100%", "width": "100%"},
-                config={"displaylogo": False},
+                style={"height": "100%", "width": "100%", "minWidth": "0"},
+                config={"displaylogo": False, "responsive": True},
+                responsive=True,
             )
             return graph_canvas
 
@@ -5179,11 +5186,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 fig.update_xaxes(title_text=x_title)
             if y_title:
                 fig.update_yaxes(title_text=y_title)
+            fig.update_layout(autosize=True, height=None)
             graph_canvas = dcc.Graph(
                 id={"type": "plot-graph", "slot": "canvas"},
                 figure=fig,
-                style={"height": "100%", "width": "100%"},
-                config={"displaylogo": False},
+                style={"height": "100%", "width": "100%", "minWidth": "0"},
+                config={"displaylogo": False, "responsive": True},
+                responsive=True,
             )
             return graph_canvas
 
@@ -5224,11 +5233,13 @@ def register_analysis_callbacks(app, service: WebUIApiService) -> None:
                 yaxis_title=y_title or None,
                 zaxis_title=z_title or None,
             )
+        fig3d.update_layout(autosize=True, height=None)
         graph3d_canvas = dcc.Graph(
             id={"type": "plot-graph", "slot": "canvas"},
             figure=fig3d,
-            style={"height": "100%", "width": "100%"},
-            config={"displaylogo": False},
+            style={"height": "100%", "width": "100%", "minWidth": "0"},
+            config={"displaylogo": False, "responsive": True},
+            responsive=True,
         )
         return graph3d_canvas
 
