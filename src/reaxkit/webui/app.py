@@ -16,6 +16,11 @@ from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.dash_app import create_dash_app
 
 
+def _console_logging_enabled() -> bool:
+    raw = str(os.environ.get("REAXKIT_WEBUI_LOG_CONSOLE", "1")).strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
 def _single_instance_enabled() -> bool:
     raw = str(os.environ.get("REAXKIT_WEBUI_SINGLE_INSTANCE", "1")).strip().lower()
     return raw not in {"0", "false", "no", "off"}
@@ -149,11 +154,20 @@ def main() -> None:
     # Verbose terminal logging for Web UI debugging.
     level_name = str(os.environ.get("REAXKIT_WEBUI_LOG_LEVEL", "DEBUG")).upper()
     level = getattr(logging, level_name, logging.DEBUG)
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        force=True,
-    )
+    console_log_enabled = False  # Set to False to silence terminal logs.
+    if console_log_enabled:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            force=True,
+        )
+    else:
+        # Keep logging calls safe but silence console output.
+        logging.basicConfig(
+            level=logging.CRITICAL + 1,
+            handlers=[logging.NullHandler()],
+            force=True,
+        )
     for name in ("reaxkit", "reaxkit.webui", "dash", "flask", "werkzeug"):
         logging.getLogger(name).setLevel(level)
     logging.getLogger(__name__).info("WebUI startup app_module=%s cwd=%s", __file__, os.getcwd())
@@ -164,20 +178,16 @@ def main() -> None:
         port = 8060
     logging.getLogger(__name__).info("WebUI startup pid=%s port=%s", os.getpid(), port)
     _ensure_single_instance(port, logging.getLogger(__name__))
-    trace_env = str(os.environ.get("REAXKIT_UI_TRACE_PATH", "")).strip()
-    trace_targets = []
-    if trace_env:
-        trace_targets.append(Path(trace_env))
-    trace_targets.append(Path(os.getcwd()) / "ui_trace.log")
-    trace_targets.append(Path(tempfile.gettempdir()) / "reaxkit_ui_trace.log")
-    for target in trace_targets:
-        try:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with target.open("a", encoding="utf-8") as fh:
-                fh.write(f"[UI_TRACE] startup app_module={__file__} cwd={os.getcwd()}\n")
-            logging.getLogger(__name__).info("UI trace file target=%s", target)
-        except Exception as exc:  # pragma: no cover
-            logging.getLogger(__name__).warning("UI trace file write failed target=%s error=%s", target, exc)
+    # Always write trace output to a single workspace path, independent of launch cwd.
+    project_root = Path(__file__).resolve().parents[3]
+    trace_target = project_root / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
+    try:
+        trace_target.parent.mkdir(parents=True, exist_ok=True)
+        with trace_target.open("a", encoding="utf-8") as fh:
+            fh.write(f"[UI_TRACE] startup app_module={__file__} cwd={os.getcwd()}\n")
+        logging.getLogger(__name__).info("UI trace file target=%s", trace_target)
+    except Exception as exc:  # pragma: no cover
+        logging.getLogger(__name__).warning("UI trace file write failed target=%s error=%s", trace_target, exc)
 
     dash_app = create_dash_app()
     if str(os.environ.get("REAXKIT_WEBUI_LOG_CALLBACKS", "1")).strip().lower() not in {"0", "false", "no"}:
