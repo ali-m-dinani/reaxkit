@@ -14,6 +14,7 @@ from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.exceptions import ParseError, AnalysisError
 from reaxkit.core.log import get_logger, configure_file_logging
 from reaxkit.core.progress import resolve_reporter
+from reaxkit.core.result_time_enrichment import enrich_result_with_time
 from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 
@@ -291,7 +292,12 @@ class AnalysisExecutor:
                                 task_name=task.__class__.__name__,
                                 extra={"analysis_id": analysis_id},
                             )
-                            return cache.load(analysis_id)
+                            cached = cache.load(analysis_id)
+                            return enrich_result_with_time(
+                                cached,
+                                data,
+                                control_file=str(args.get("control") or "control"),
+                            )
 
                         if not use_cache:
                             logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
@@ -312,6 +318,11 @@ class AnalysisExecutor:
                             raise AnalysisError(
                                 f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
                             ) from exc
+                        result = enrich_result_with_time(
+                            result,
+                            data,
+                            control_file=str(args.get("control") or "control"),
+                        )
                         t_run = perf_counter() - t_run0
                         self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
                         if use_cache:
@@ -356,7 +367,12 @@ class AnalysisExecutor:
                     task_name=task.__class__.__name__,
                     extra={"analysis_id": analysis_id},
                 )
-                return cache.load(analysis_id)
+                cached = cache.load(analysis_id)
+                return enrich_result_with_time(
+                    cached,
+                    None,
+                    control_file=str(args.get("control") or "control"),
+                )
 
         t_load0 = perf_counter()
         try:
@@ -451,6 +467,11 @@ class AnalysisExecutor:
                 raise AnalysisError(
                     f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
                 ) from exc
+            result = enrich_result_with_time(
+                result,
+                data,
+                control_file=str(args.get("control") or "control"),
+            )
             t_run = perf_counter() - t_run0
             self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
             self._record_general(
@@ -473,7 +494,12 @@ class AnalysisExecutor:
                 task_name=task.__class__.__name__,
                 extra={"analysis_id": analysis_id},
             )
-            return cache.load(analysis_id)
+            cached = cache.load(analysis_id)
+            return enrich_result_with_time(
+                cached,
+                data,
+                control_file=str(args.get("control") or "control"),
+            )
 
         logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
         self._record_general(
@@ -491,6 +517,11 @@ class AnalysisExecutor:
             raise AnalysisError(
                 f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
             ) from exc
+        result = enrich_result_with_time(
+            result,
+            data,
+            control_file=str(args.get("control") or "control"),
+        )
         t_run = perf_counter() - t_run0
         self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
         cache.store(analysis_id, result, task_name=task.__class__.__name__)
