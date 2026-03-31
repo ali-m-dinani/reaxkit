@@ -13,6 +13,8 @@ from reaxkit.presentation.plot.renderers.scatter3d import Scatter3DRenderer
 from reaxkit.presentation.plot.renderers.single import SinglePlotRenderer
 from reaxkit.presentation.plot.renderers.tornado import TornadoPlotRenderer
 from reaxkit.presentation.plot.renderers.boxplot import BoxWhiskerPlotRenderer
+from reaxkit.presentation.plot.renderers.wireframe3d import Wireframe3DRenderer
+from reaxkit.presentation.plot.renderers.wireframe3d_subplots import Wireframe3DSubplotsRenderer
 
 PLOT_REGISTRY = {
     "single_plot": SinglePlotRenderer(),
@@ -21,6 +23,8 @@ PLOT_REGISTRY = {
     "multi_subplots": MultiSubplotsRenderer(),
     "tornado_plot": TornadoPlotRenderer(),
     "scatter3d_points": Scatter3DRenderer(),
+    "wireframe3d_plot": Wireframe3DRenderer(),
+    "wireframe3d_subplots": Wireframe3DSubplotsRenderer(),
     "heatmap2d_from_3d": Heatmap2DRenderer(),
     "errorbar_plot": ErrorbarPlotRenderer(),
     "box_whisker_plot": BoxWhiskerPlotRenderer(),
@@ -29,6 +33,7 @@ PLOT_REGISTRY = {
     "multicurve": SinglePlotRenderer(),
     "dual_axis": DualYaxisPlotRenderer(),
     "scatter3d": Scatter3DRenderer(),
+    "wireframe3d": Wireframe3DRenderer(),
     "heatmap2d": Heatmap2DRenderer(),
     "errorbar": ErrorbarPlotRenderer(),
     "boxplot": BoxWhiskerPlotRenderer(),

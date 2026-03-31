@@ -11,6 +11,8 @@ from reaxkit.presentation.plot.registry import PLOT_REGISTRY, plot
 from reaxkit.presentation.plot.renderers.scatter3d import Scatter3DRenderer
 from reaxkit.presentation.plot.renderers.single import SinglePlotRenderer
 from reaxkit.presentation.plot.renderers.tornado import TornadoPlotRenderer
+from reaxkit.presentation.plot.renderers.wireframe3d import Wireframe3DRenderer
+from reaxkit.presentation.plot.renderers.wireframe3d_subplots import Wireframe3DSubplotsRenderer
 
 
 def single_plot(x=None, y=None, **kwargs):
@@ -57,6 +59,8 @@ __all__ = [
     "MultiSubplotsRenderer",
     "TornadoPlotRenderer",
     "Scatter3DRenderer",
+    "Wireframe3DRenderer",
+    "Wireframe3DSubplotsRenderer",
     "Heatmap2DRenderer",
     "ErrorbarPlotRenderer",
     "BoxWhiskerPlotRenderer",

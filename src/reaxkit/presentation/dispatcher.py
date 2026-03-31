@@ -24,6 +24,8 @@ _RAW_PLOT_DATA_KEYS = frozenset(
         "values",
         "bins",
         "vectors",
+        "segments",
+        "points",
         "u",
         "v",
         "labels",
