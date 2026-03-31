@@ -12,33 +12,29 @@ import pandas as pd
 import reaxkit.engine  # noqa: F401
 
 from reaxkit.analysis import electrostatics as _electrostatics_tasks  # noqa: F401
-from reaxkit.analysis.electrostatics.charges import ChargeTableRequest, ChargeTableTask
+from reaxkit.analysis.electrostatics.charges import ChargeTableRequest
 from reaxkit.analysis.electrostatics.electrostatics import (
     DipoleRequest,
-    DipoleTask,
     PolarizationFieldRequest,
-    PolarizationFieldTask,
     PolarizationRequest,
-    PolarizationTask,
 )
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.analysis_executor import AnalysisExecutor
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.alias import _resolve_alias, normalize_choice, resolve_alias_from_columns
 from reaxkit.core.engine_registry import resolve_engine
 from reaxkit.core.frame_utils import parse_frame_indices, parse_frames
 from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
+from reaxkit.core.progress import resolve_reporter
+from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.domain.data_models import (
-    ChargeData,
-    ConnectivityData,
-    ElectricFieldData,
-    ElectrostaticsData,
     TrajectoryData,
 )
 from reaxkit.presentation.convert import convert_xaxis
-from reaxkit.presentation.dispatcher import export_result_csv, present_result, print_result_table
+from reaxkit.presentation.dispatcher import export_result_csv, present_result
 from reaxkit.presentation.plot import plot as render_plot
 
-ELECTROSTATICS_COMMANDS = ("charge_table", "dipole", "polarization", "hyst")
+ELECTROSTATICS_COMMANDS = ("charge_table", "dipole", "polarization", "polarization_field")
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -59,10 +55,10 @@ def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--component", default=None, help="Component to color by for local plots")
     parser.add_argument(
-        "--frames",
+        "--plot-frames",
         nargs="*",
         default=None,
-        help='Frames for local plots: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frames for local plots: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2" (defaults to --frames selection)',
     )
     parser.add_argument("--save", default=None, help="Directory used when saving local plots")
     parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum for local plots")
@@ -118,14 +114,12 @@ def _parse_frame_selector(spec) -> list[int] | None:
     return parse_frame_indices(spec)
 
 
-def _normalized_args(args: argparse.Namespace) -> dict:
-    normalized = normalize_storage_args(vars(args))
-    for key, value in normalized.items():
-        setattr(args, key, value)
-    return normalized
-
-
 def _detection_path(args_map: dict) -> str:
+    source_dir = args_map.get("_snapshot_source_dir")
+    if source_dir:
+        p = Path(str(source_dir))
+        if p.exists():
+            return str(p)
     for key in ("xmolout", "fort7", "fort78", "control", "run_dir"):
         value = args_map.get(key)
         if value:
@@ -134,82 +128,8 @@ def _detection_path(args_map: dict) -> str:
 
 
 def _resolve_adapter(args: argparse.Namespace):
-    args_map = _normalized_args(args)
+    args_map = vars(args)
     return resolve_engine(_detection_path(args_map), engine=getattr(args, "engine", None))
-
-
-def _load_electrostatics_data(args: argparse.Namespace) -> ElectrostaticsData:
-    adapter = _resolve_adapter(args)
-    load_args = _normalized_args(args)
-    trajectory = adapter.load(TrajectoryData, load_args)
-    charges = adapter.load(ChargeData, load_args)
-    connectivity = adapter.load(ConnectivityData, load_args)
-    return ElectrostaticsData(
-        trajectory=trajectory,
-        charges=charges,
-        connectivity=connectivity,
-    )
-
-
-def _extract_field_component(field_data: ElectricFieldData, component: str) -> np.ndarray:
-    names = [str(name) for name in field_data.applied_field_components]
-    values = np.asarray(field_data.applied_field_values, dtype=float)
-    if component not in names:
-        raise KeyError(f"Electric field component '{component}' not found in {names}.")
-    if values.ndim == 1:
-        if len(names) != 1:
-            raise ValueError("1D electric field values require exactly one component label.")
-        return values
-    col = names.index(component)
-    return values[:, col]
-
-
-def _align_field_to_iterations(
-    field_data: ElectricFieldData,
-    *,
-    target_iters: np.ndarray,
-    component: str,
-) -> ElectricFieldData:
-    raw_values = _extract_field_component(field_data, component)
-    if field_data.sampled_field_iterations is None:
-        if len(raw_values) < len(target_iters):
-            raise ValueError("Electric field series shorter than selected polarization frames.")
-        aligned = np.asarray(raw_values[: len(target_iters)], dtype=float)
-    else:
-        field_iters = np.asarray(field_data.sampled_field_iterations, dtype=int).reshape(-1)
-        if field_iters.shape[0] != raw_values.shape[0]:
-            raise ValueError("Electric field sample count does not match sampled_field_iterations.")
-        order = np.argsort(field_iters)
-        sorted_iters = field_iters[order]
-        sorted_values = np.asarray(raw_values, dtype=float)[order]
-        aligned = np.empty((len(target_iters),), dtype=float)
-        for idx, iter_value in enumerate(np.asarray(target_iters, dtype=int)):
-            valid = np.where(sorted_iters <= int(iter_value))[0]
-            if valid.size == 0:
-                aligned[idx] = 0.0 if int(iter_value) == 0 else np.nan
-            else:
-                aligned[idx] = float(sorted_values[valid[-1]])
-
-    return ElectricFieldData(
-        applied_field_values=aligned,
-        applied_field_components=(component,),
-        sampled_field_iterations=np.asarray(target_iters, dtype=int),
-    )
-
-
-def _load_hysteresis_data(args: argparse.Namespace) -> ElectrostaticsData:
-    adapter = _resolve_adapter(args)
-    load_args = _normalized_args(args)
-    data = _load_electrostatics_data(args)
-    raw_field = adapter.load(ElectricFieldData, load_args)
-    target_iters = np.asarray(
-        data.trajectory.iterations
-        if data.trajectory.iterations is not None
-        else np.arange(data.trajectory.positions.shape[0]),
-        dtype=int,
-    )
-    data.electric_field = _align_field_to_iterations(raw_field, target_iters=target_iters, component="field_z")
-    return data
 
 
 def _build_dipole_request(args: argparse.Namespace) -> DipoleRequest:
@@ -217,10 +137,11 @@ def _build_dipole_request(args: argparse.Namespace) -> DipoleRequest:
     core_types = _parse_core_types(args.core) if scope == "local" else ()
     if scope == "local" and not core_types:
         raise ValueError("When --scope local is used, --core must be provided (for example --core Al,Mg).")
+    frames = _parse_frame_selector(getattr(args, "frames", None))
     return DipoleRequest(
         scope=scope,
         atom_types=core_types if scope == "local" else None,
-        frames=[int(args.frame)],
+        frames=frames,
     )
 
 
@@ -229,15 +150,16 @@ def _build_polarization_request(args: argparse.Namespace) -> PolarizationRequest
     core_types = _parse_core_types(args.core) if scope == "local" else ()
     if scope == "local" and not core_types:
         raise ValueError("When --scope local is used, --core must be provided (for example --core Al,Mg).")
+    frames = _parse_frame_selector(getattr(args, "frames", None))
     return PolarizationRequest(
         scope=scope,
         atom_types=core_types if scope == "local" else None,
-        frames=[int(args.frame)],
+        frames=frames,
         volume_method="bbox" if scope == "local" else "hull",
     )
 
 
-def _build_hyst_request(args: argparse.Namespace) -> PolarizationFieldRequest:
+def _build_polarization_field_request(args: argparse.Namespace) -> PolarizationFieldRequest:
     return PolarizationFieldRequest(
         field_direction="z",
         aggregate=args.aggregate,
@@ -260,49 +182,8 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "charge_table": _build_charge_table_request,
     "dipole": _build_dipole_request,
     "polarization": _build_polarization_request,
-    "hyst": _build_hyst_request,
+    "polarization_field": _build_polarization_field_request,
 }
-
-
-def _attach_time_column(data: ElectrostaticsData, table: pd.DataFrame) -> pd.DataFrame:
-    simulation = data.trajectory.simulation
-    if simulation is None or simulation.time is None:
-        return table
-
-    iterations = np.asarray(
-        data.trajectory.iterations if data.trajectory.iterations is not None else simulation.iterations,
-        dtype=int,
-    )
-    if iterations.size == 0:
-        return table
-
-    time_values = np.asarray(simulation.time, dtype=float)
-    if time_values.shape[0] != iterations.shape[0]:
-        return table
-
-    aux = pd.DataFrame({"iter": iterations, "time": time_values})
-    return table.merge(aux, on="iter", how="left")
-
-
-def _attach_charge_time_column(data: ChargeData, table: pd.DataFrame, *, control_file: str = "control") -> pd.DataFrame:
-    simulation = data.simulation
-    if simulation is not None and simulation.time is not None:
-        iterations = (
-            np.asarray(data.iterations, dtype=int).reshape(-1)
-            if data.iterations is not None
-            else np.arange(len(np.asarray(simulation.time, dtype=float)), dtype=int)
-        )
-        time_values = np.asarray(simulation.time, dtype=float)
-        if iterations.shape[0] == time_values.shape[0]:
-            aux = pd.DataFrame({"iter": iterations, "time": time_values})
-            return table.merge(aux, on="iter", how="left")
-
-    if "iter" in table.columns:
-        converted, _ = convert_xaxis(table["iter"].to_numpy(dtype=int), "time", control_file=control_file)
-        out = table.copy()
-        out["time"] = np.asarray(converted, dtype=float)
-        return out
-    return table
 
 
 def _summary_text(result) -> str:
@@ -398,7 +279,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": len(series) > 1,
         }
 
-    if command != "hyst":
+    if command != "polarization_field":
         return None
 
     canonical_x = normalize_choice(args.xaxis or "field_z", domain="xaxis")
@@ -539,13 +420,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical in {"dipole", "polarization"}:
         parser.description = (
-            f"Compute {canonical} data for a single frame.\n\n"
+            f"Compute {canonical} data for one or more frames.\n\n"
             "Examples:\n"
-            f"  reaxkit {canonical} --frame 10 --scope total --export {canonical}_frame10.csv\n"
-            f"  reaxkit {canonical} --frame 10 --scope local --core Al --export local_{canonical}_frame10.csv\n"
-            f"  reaxkit {canonical} --frame 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
+            f"  reaxkit {canonical} --frames 10 --scope total --export {canonical}_frame10.csv\n"
+            f"  reaxkit {canonical} --frames 0:20:2 --scope total --export {canonical}_series.csv\n"
+            f"  reaxkit {canonical} --frames 10 --scope local --core Al --export local_{canonical}_frame10.csv\n"
+            f"  reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
         )
-        parser.add_argument("--frame", type=int, required=True, help="0-based frame index in xmolout")
+        parser.add_argument(
+            "--frames",
+            nargs="*",
+            default=None,
+            help='Frames to analyze: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        )
         parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope")
         parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope")
         _add_scalar_presentation_arguments(parser)
@@ -568,13 +455,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
         parser.add_argument("--control", default="control", help="Control file for time-axis conversion")
         _add_table_presentation_arguments(parser)
-    elif canonical == "hyst":
+    elif canonical == "polarization_field":
         parser.description = (
             "Analyze polarization-field hysteresis behavior.\n\n"
             "Examples:\n"
-            "  reaxkit hyst --plot --save hysteresis.png\n"
-            "  reaxkit hyst --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n"
-            "  reaxkit hyst --roots --summary hysteresis_summary.txt"
+            "  reaxkit polarization_field --plot --save hysteresis.png\n"
+            "  reaxkit polarization_field --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n"
+            "  reaxkit polarization_field --roots --summary hysteresis_summary.txt"
         )
         parser.add_argument("--fort78", default="fort.78", help="Path to fort.78 file")
         parser.add_argument("--control", default="control", help="Path to control file")
@@ -601,153 +488,80 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     return parser
 
 
-def _run_charge_table(args: argparse.Namespace) -> int:
-    adapter = _resolve_adapter(args)
-    data = adapter.load(ChargeData, vars(args))
-    request = REQUEST_BUILDERS["charge_table"](args)
-    result = ChargeTableTask().run(data, request)
-    result.table = _attach_charge_time_column(data, result.table, control_file=getattr(args, "control", "control"))
+def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run a direct electrostatics command."""
+    canonical = resolve_command_name(command, task_names=ELECTROSTATICS_COMMANDS)
+    if canonical in {"dipole", "polarization"} and not getattr(args, "frames", None):
+        raise ValueError("Provide --frames selector (for example --frames 0:20:2).")
 
-    if args.export:
-        out = resolve_output_path(
-            args.export,
-            "elect",
-            run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
-            analysis_id=getattr(args, "analysis_id", None),
-        )
-        args = argparse.Namespace(**vars(args))
-        args.export = str(out)
+    task_cls = TASK_REGISTRY[canonical]
+    request = REQUEST_BUILDERS[canonical](args)
 
-    present_result("charge_table", result, args, plot_payload_builder=_plot_payload)
-    if getattr(args, "export", None):
-        print(f"[Done] Exported data to {args.export}")
-    return 0
+    executor = AnalysisExecutor()
+    result = executor.run(task_cls(), request, vars(args))
 
+    if canonical == "charge_table" and isinstance(getattr(result, "table", None), pd.DataFrame):
+        if "time" not in result.table.columns and "iter" in result.table.columns:
+            converted, _ = convert_xaxis(
+                result.table["iter"].to_numpy(dtype=int),
+                "time",
+                control_file=getattr(args, "control", "control"),
+            )
+            result.table = result.table.copy()
+            result.table["time"] = np.asarray(converted, dtype=float)
 
-def _run_scalar_command(command: str, args: argparse.Namespace) -> int:
-    data = _load_electrostatics_data(args)
-    request = REQUEST_BUILDERS[command](args)
-    task = DipoleTask() if command == "dipole" else PolarizationTask()
-    result = task.run(data, request)
+    if canonical == "polarization_field":
+        result.table = result.aggregated_table
+        if "time" not in result.full_table.columns and "iter" in result.full_table.columns:
+            converted, _ = convert_xaxis(
+                result.full_table["iter"].to_numpy(dtype=int),
+                "time",
+                control_file=getattr(args, "control", "control"),
+            )
+            result.full_table = result.full_table.copy()
+            result.full_table["time"] = np.asarray(converted, dtype=float)
 
-    if args.save:
-        out_save = resolve_output_path(
-            args.save,
-            command,
-            run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
-            analysis_id=getattr(args, "analysis_id", None),
-        )
-        args = argparse.Namespace(**vars(args))
-        args.save = str(out_save)
+    local_plot_requested = canonical in {"dipole", "polarization"} and getattr(args, "plot", None) in {"plot3d", "heatmap2d"}
+    args_for_present = args
+    if local_plot_requested:
+        args_for_present = argparse.Namespace(**vars(args))
+        args_for_present.plot = None
+        args_for_present.save = None
 
-    if args.export:
-        out = resolve_output_path(
-            args.export,
-            "elect",
-            run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
-            analysis_id=getattr(args, "analysis_id", None),
-        )
-        export_result_csv(result, str(out))
-        print(f"[Done] Exported data to {out}")
+    present_result(canonical, result, args_for_present, plot_payload_builder=_plot_payload)
 
-    if not args.plot:
-        if not args.export:
-            print_result_table(result)
-        return 0
+    if local_plot_requested:
+        if request.scope != "local":
+            raise ValueError(f"--plot {args.plot} requires --scope local.")
+        reporter = resolve_reporter(vars(args))
+        adapter = _resolve_adapter(args)
+        trajectory = adapter.load(TrajectoryData, vars(args), reporter=reporter)
+        plot_frames_spec = args.plot_frames if getattr(args, "plot_frames", None) else args.frames
+        local_table = _local_result_with_coords(trajectory, result.table, plot_frames_spec)
+        payloads = _iter_local_plot_payloads(canonical, local_table, args)
+        for payload in payloads:
+            render_plot(payload)
 
-    if request.scope != "local":
-        raise ValueError(f"--plot {args.plot} requires --scope local.")
-
-    local_table = _local_result_with_coords(data.trajectory, result.table, args.frames)
-    payloads = _iter_local_plot_payloads(command, local_table, args)
-    for payload in payloads:
-        render_plot(payload)
-
-    if args.save:
-        if args.plot == "plot3d":
-            print(f"[Done] All 3D local {command} plots saved in {args.save}")
-        else:
-            print(f"[Done] All 2D local {command} heatmaps saved in {args.save}")
-    return 0
-
-
-def _run_hyst(args: argparse.Namespace) -> int:
-    data = _load_hysteresis_data(args)
-    request = REQUEST_BUILDERS["hyst"](args)
-    result = PolarizationFieldTask().run(data, request)
-    result.full_table = _attach_time_column(data, result.full_table)
-
-    if args.export:
-        out_csv = resolve_output_path(
-            args.export,
-            "elect",
-            run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
-            analysis_id=getattr(args, "analysis_id", None),
-        )
-        export_result_csv(SimpleNamespace(table=result.aggregated_table), str(out_csv))
-        print(f"[Done] Exported aggregated joint hysteresis data to {out_csv}")
-
-        full_save_path = out_csv.parent / "hysteresis_full_data.csv"
-        export_result_csv(SimpleNamespace(table=result.full_table), str(full_save_path))
-        print(f"[Done] Exported full hysteresis dataset to {full_save_path}")
-
-    if args.summary:
-        summary_path = Path(args.summary)
-        summary_path.parent.mkdir(parents=True, exist_ok=True)
-        summary_path.write_text(_summary_text(result), encoding="utf-8")
-        print(f"[Done] Wrote hysteresis summary to {summary_path}")
-
-    if args.roots:
-        coercive = ", ".join(f"{value:.6g}" for value in result.polarization_zero_crossings) or "None found"
-        remnant = ", ".join(f"{value:.6g}" for value in result.field_zero_crossings) or "None found"
-        print("\n[Hysteresis roots]")
-        print("  Coercive fields (MV/cm):", coercive)
-        print("  Remnant polarizations (uC/cm^2):", remnant)
-
-    payload = _plot_payload("hyst", result, args)
-    if payload is not None:
-        if args.save:
-            out_plot = resolve_output_path(
-                args.save,
-                "elect",
+    if canonical == "polarization_field":
+        if getattr(args, "export", None):
+            out_csv = resolve_output_path(
+                args.export,
+                canonical,
                 run_id=getattr(args, "run_id", None),
                 project_root=getattr(args, "project_root", "."),
                 analysis_id=getattr(args, "analysis_id", None),
             )
-            render_plot({**payload, "save": out_plot})
-        if args.plot or not args.save:
-            render_plot(payload)
-
-    if not args.export and not args.save and not args.plot:
-        print(result.aggregated_table.to_string(index=False))
+            full_save_path = out_csv.parent / "hysteresis_full_data.csv"
+            export_result_csv(SimpleNamespace(table=result.full_table), str(full_save_path))
+        if getattr(args, "summary", None):
+            summary_path = Path(args.summary)
+            summary_path.parent.mkdir(parents=True, exist_ok=True)
+            summary_path.write_text(_summary_text(result), encoding="utf-8")
+        if getattr(args, "roots", False):
+            coercive = ", ".join(f"{value:.6g}" for value in result.polarization_zero_crossings) or "None found"
+            remnant = ", ".join(f"{value:.6g}" for value in result.field_zero_crossings) or "None found"
+            print("\n[Hysteresis roots]")
+            print("  Coercive fields (MV/cm):", coercive)
+            print("  Remnant polarizations (uC/cm^2):", remnant)
 
     return 0
-
-
-def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=ELECTROSTATICS_COMMANDS)
-    if canonical == "charge_table":
-        return _run_charge_table(args)
-    if canonical in {"dipole", "polarization"}:
-        return _run_scalar_command(canonical, args)
-    if canonical == "hyst":
-        return _run_hyst(args)
-    raise KeyError(f"Unsupported electrostatics command '{canonical}'.")
-
-
-def _legacy_command_runner(command: str):
-    def _runner(args: argparse.Namespace) -> int:
-        return run_main(command, args)
-
-    return _runner
-
-
-def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    for command in ELECTROSTATICS_COMMANDS:
-        parser = subparsers.add_parser(command, formatter_class=argparse.RawTextHelpFormatter)
-        build_parser(parser, command=command)
-        parser.set_defaults(_run=_legacy_command_runner(command))

@@ -13,6 +13,7 @@ from reaxkit.domain.data_models import (
     CoordinationStatusBundleData,
     ConnectivityData,
     ControlParametersData,
+    ElectrostaticsData,
     EregimeData,
     ElectricFieldData,
     ForceFieldParametersData,
@@ -105,6 +106,8 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_geometry_optimization", args, reporter=reporter)
         if data_type is ControlParametersData:
             return self._invoke_loader("load_control_parameters", args, reporter=reporter)
+        if data_type is ElectrostaticsData:
+            return self._invoke_loader("load_electrostatics", args, reporter=reporter)
         if data_type is MolecularAnalysisData:
             return self._invoke_loader("load_molecular_analysis", args, reporter=reporter)
         raise ValueError(f"{self.name} cannot load data type: {data_type}")

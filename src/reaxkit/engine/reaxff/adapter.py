@@ -17,6 +17,7 @@ from reaxkit.domain.data_models import (
     CoordinationStatusBundleData,
     ConnectivityData,
     ControlParametersData,
+    ElectrostaticsData,
     EregimeData,
     ElectricFieldData,
     ForceFieldParametersData,
@@ -1108,7 +1109,6 @@ class ReaxFFAdapter(EngineAdapter):
         return 0.95 if has_xmol else 0.0
 
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
-        _ = args
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("xmolout", "summary.txt"),
             GeometryData: ("geo",),
@@ -1117,6 +1117,7 @@ class ReaxFFAdapter(EngineAdapter):
             ConnectivityTrajectoryData: ("fort.7", "xmolout", "summary.txt", "ffield"),
             CoordinationStatusBundleData: ("fort.7", "xmolout", "summary.txt", "ffield"),
             ChargeData: ("fort.7", "xmolout", "summary.txt"),
+            ElectrostaticsData: ("xmolout", "fort.7", "summary.txt"),
             AtomicKinematicsData: ("vels",),
             ElectricFieldData: ("fort.78",),
             EregimeData: ("eregime.in",),
@@ -1137,6 +1138,8 @@ class ReaxFFAdapter(EngineAdapter):
             ControlParametersData: ("control",),
             MolecularAnalysisData: ("molfra.out", "molfra_ig.out"),
         }
+        if data_type is ElectrostaticsData and str(args.get("command") or "").strip().lower() == "hyst":
+            return ("xmolout", "fort.7", "fort.78", "summary.txt")
         return mapping.get(data_type)
 
     @staticmethod
@@ -1672,6 +1675,26 @@ class ReaxFFAdapter(EngineAdapter):
             handler_name="Fort7Handler",
             source_path=fort7_path,
             loader=lambda: _charges_from_fort7_handler(handler, simulation=sim, reporter=reporter),
+        )
+
+    def load_electrostatics(self, args: dict, reporter=None) -> ElectrostaticsData:
+        trajectory = self.load_trajectory(args, reporter=reporter)
+        charges = self.load_charges(args, reporter=reporter)
+        connectivity = self.load_connectivity(args, reporter=reporter)
+        electric_field = None
+        command = str(args.get("command") or "").strip().lower()
+        fort78_path = self._resolve_reaxff_path(args, "fort78", default="fort.78")
+        if command == "hyst" or fort78_path.exists():
+            try:
+                electric_field = self.load_electric_field(args, reporter=reporter)
+            except FileNotFoundError:
+                if command == "hyst":
+                    raise
+        return ElectrostaticsData(
+            trajectory=trajectory,
+            charges=charges,
+            connectivity=connectivity,
+            electric_field=electric_field,
         )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:

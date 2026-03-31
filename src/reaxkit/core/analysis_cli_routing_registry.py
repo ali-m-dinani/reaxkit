@@ -31,7 +31,7 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
 register_analysis_command("dipole", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("polarization", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("charge-table", module_path="reaxkit.workflows.electrostatics_workflow")
-register_analysis_command("hyst", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command("polarization_field", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_heatmap2d", module_path="reaxkit.workflows.kinematics_workflow")
