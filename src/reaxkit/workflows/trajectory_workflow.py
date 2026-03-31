@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import numpy as np
-from typing import Callable
+import pandas as pd
+from typing import Callable, Sequence
 
 from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401
 from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFRequest
+from reaxkit.analysis.trajectory.voronoi import VoronoiRequest
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.command_alias_resolver import resolve_command_name
@@ -17,7 +20,7 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
-TRAJECTORY_COMMANDS = ("msd", "rdf", "rdf_property")
+TRAJECTORY_COMMANDS = ("msd", "rdf", "rdf_property", "voronoi")
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -87,10 +90,21 @@ def _build_rdf_property_request(args: argparse.Namespace) -> RDFPropertyRequest:
     )
 
 
+def _build_voronoi_request(args: argparse.Namespace) -> VoronoiRequest:
+    return VoronoiRequest(
+        atom_ids=args.atom_ids,
+        atom_types=args.atom_types,
+        frames=parse_frame_indices(args.frames),
+        every=args.every,
+        backend=args.backend,
+    )
+
+
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "msd": _build_msd_request,
     "rdf": _build_rdf_request,
     "rdf_property": _build_rdf_property_request,
+    "voronoi": _build_voronoi_request,
 }
 
 
@@ -149,10 +163,217 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins")
         parser.add_argument("--r-max", type=float, default=None, help="Maximum radius")
         parser.add_argument("--backend", choices=["freud", "ovito"], default="freud")
+    elif canonical == "voronoi":
+        parser.description = (
+            "Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.\n\n"
+            "Examples:\n"
+            "  reaxkit voronoi --frames 0 10 20 --export voronoi.csv\n"
+            "  reaxkit voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n"
+            "  reaxkit voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n"
+            "  reaxkit voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
+        )
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
+        parser.add_argument("--backend", choices=["scipy", "pyvoro"], default="scipy", help="Voronoi backend")
+        parser.add_argument("--plot-target", choices=["metrics", "diagram"], default="metrics", help="Plot Voronoi metrics or cell diagrams")
+        parser.add_argument("--diagram-dim", choices=["2d", "3d"], default="2d", help="Diagram dimensionality")
+        parser.add_argument("--projection", choices=["xy", "xz", "yz"], default="xy", help="Projection plane for 2D diagram mode")
     else:
         raise KeyError(f"Unsupported trajectory command '{canonical}'.")
 
     return parser
+
+
+def _safe_obj(value):
+    if isinstance(value, (list, tuple, dict)):
+        return value
+    if isinstance(value, str):
+        txt = value.strip()
+        if txt.startswith("[") or txt.startswith("{") or txt.startswith("("):
+            try:
+                return ast.literal_eval(txt)
+            except Exception:
+                return value
+    return value
+
+
+def _project_xyz(point: Sequence[float], plane: str) -> tuple[float, float]:
+    x, y, z = float(point[0]), float(point[1]), float(point[2])
+    if plane == "xz":
+        return x, z
+    if plane == "yz":
+        return y, z
+    return x, y
+
+
+def _collect_cell_edges(vertices, faces) -> list[tuple[int, int]]:
+    verts = _safe_obj(vertices)
+    face_rows = _safe_obj(faces)
+    if not isinstance(verts, list) or not isinstance(face_rows, list):
+        return []
+    n_vertices = len(verts)
+    edges: set[tuple[int, int]] = set()
+    for face in face_rows:
+        if isinstance(face, dict):
+            idxs = face.get("vertex_indices", [])
+        else:
+            idxs = []
+        idxs = _safe_obj(idxs)
+        if not isinstance(idxs, list):
+            continue
+        clean = [int(v) for v in idxs if isinstance(v, (int, np.integer)) or (isinstance(v, str) and v.isdigit())]
+        if len(clean) < 2:
+            continue
+        for i in range(len(clean)):
+            a = int(clean[i])
+            b = int(clean[(i + 1) % len(clean)])
+            if a < 0 or b < 0 or a >= n_vertices or b >= n_vertices or a == b:
+                continue
+            edge = (a, b) if a < b else (b, a)
+            edges.add(edge)
+    return sorted(edges)
+
+
+def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
+    frame_groups = list(table.groupby("frame_index", sort=True))
+    if not frame_groups:
+        return None
+    plane = str(getattr(args, "projection", "xy")).strip().lower()
+
+    def frame_series(dfi: pd.DataFrame) -> list[dict[str, object]]:
+        series: list[dict[str, object]] = []
+        for _, row in dfi.iterrows():
+            vertices = _safe_obj(row.get("vertices"))
+            faces = _safe_obj(row.get("faces"))
+            if not isinstance(vertices, list) or not isinstance(faces, list):
+                continue
+            edges = _collect_cell_edges(vertices, faces)
+            if not edges:
+                continue
+            xs: list[float | None] = []
+            ys: list[float | None] = []
+            for a, b in edges:
+                va = _safe_obj(vertices[a])
+                vb = _safe_obj(vertices[b])
+                if not isinstance(va, (list, tuple)) or not isinstance(vb, (list, tuple)) or len(va) < 3 or len(vb) < 3:
+                    continue
+                x1, y1 = _project_xyz(va, plane)
+                x2, y2 = _project_xyz(vb, plane)
+                xs.extend([x1, x2, None])
+                ys.extend([y1, y2, None])
+            if xs:
+                series.append(
+                    {
+                        "x": xs,
+                        "y": ys,
+                        "label": f"atom {int(row['atom_id'])}",
+                        "linewidth": 0.8,
+                        "alpha": 0.75,
+                    }
+                )
+        return series
+
+    if getattr(args, "plot", None) == "subplot":
+        subplots: list[list[dict[str, object]]] = []
+        titles: list[str] = []
+        for frame_index, dfi in frame_groups:
+            ser = frame_series(dfi)
+            if not ser:
+                continue
+            iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
+            iter_txt = f", iter {int(iter_vals[0])}" if iter_vals else ""
+            titles.append(f"frame {int(frame_index)}{iter_txt}")
+            subplots.append(ser)
+        if not subplots:
+            return None
+        return {
+            "plot_type": "multi_subplots",
+            "subplots": subplots,
+            "title": titles,
+            "xlabel": f"{plane[0]} (A)",
+            "ylabel": f"{plane[1]} (A)",
+            "legend": False,
+            "grid": getattr(args, "grid", None),
+        }
+
+    frame_index, dfi = frame_groups[0]
+    ser = frame_series(dfi)
+    if not ser:
+        return None
+    iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
+    iter_txt = f", iter {int(iter_vals[0])}" if iter_vals else ""
+    return {
+        "plot_type": "single_plot",
+        "series": ser,
+        "title": f"Voronoi Diagram 2D ({plane}), frame {int(frame_index)}{iter_txt}",
+        "xlabel": f"{plane[0]} (A)",
+        "ylabel": f"{plane[1]} (A)",
+        "legend": len(ser) <= 20,
+    }
+
+
+def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
+    frame_groups = list(table.groupby("frame_index", sort=True))
+    if not frame_groups:
+        return None
+
+    def frame_payload(frame_index: int, dfi: pd.DataFrame) -> dict[str, object] | None:
+        segments: list[list[list[float]]] = []
+        points: list[list[float]] = []
+        values: list[float] = []
+        for _, row in dfi.iterrows():
+            vertices = _safe_obj(row.get("vertices"))
+            faces = _safe_obj(row.get("faces"))
+            if isinstance(vertices, list) and isinstance(faces, list):
+                edges = _collect_cell_edges(vertices, faces)
+                for a, b in edges:
+                    va = _safe_obj(vertices[a])
+                    vb = _safe_obj(vertices[b])
+                    if not isinstance(va, (list, tuple)) or not isinstance(vb, (list, tuple)) or len(va) < 3 or len(vb) < 3:
+                        continue
+                    segments.append([[float(va[0]), float(va[1]), float(va[2])], [float(vb[0]), float(vb[1]), float(vb[2])]])
+
+            site = _safe_obj(row.get("site_position"))
+            if isinstance(site, (list, tuple)) and len(site) >= 3:
+                points.append([float(site[0]), float(site[1]), float(site[2])])
+                values.append(float(pd.to_numeric(row.get("voronoi_volume"), errors="coerce")))
+        if not segments and not points:
+            return None
+        iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
+        iter_txt = f", iter {int(iter_vals[0])}" if iter_vals else ""
+        return {
+            "segments": segments,
+            "points": points,
+            "values": values,
+            "title": f"frame {int(frame_index)}{iter_txt}",
+        }
+
+    payloads: list[dict[str, object]] = []
+    for frame_index, dfi in frame_groups:
+        p = frame_payload(int(frame_index), dfi)
+        if p is not None:
+            payloads.append(p)
+    if not payloads:
+        return None
+
+    if getattr(args, "plot", None) == "subplot":
+        return {
+            "plot_type": "wireframe3d_subplots",
+            "subplots": payloads,
+            "title": "Voronoi Diagram 3D",
+            "grid": getattr(args, "grid", None),
+            "show_colorbar": False,
+        }
+    one = payloads[0]
+    return {
+        "plot_type": "wireframe3d_plot",
+        "segments": one["segments"],
+        "points": one["points"],
+        "values": one["values"],
+        "title": f"Voronoi Diagram 3D ({one['title']})",
+        "show_colorbar": True,
+        "colorbar_label": "Voronoi volume",
+    }
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
@@ -269,6 +490,73 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": title,
         }
 
+    if command == "voronoi":
+        if getattr(args, "plot_target", "metrics") == "diagram":
+            if "vertices" not in table.columns or "faces" not in table.columns:
+                return None
+            if getattr(args, "diagram_dim", "2d") == "3d":
+                return _voronoi_diagram_payload_3d(table, args)
+            return _voronoi_diagram_payload_2d(table, args)
+
+        if "voronoi_volume" not in table.columns:
+            return None
+        work = table[table["is_bounded"] == True].copy() if "is_bounded" in table.columns else table.copy()
+        if work.empty:
+            return None
+
+        if getattr(args, "xaxis", "frame") == "iter" and "iter" in work.columns:
+            x_col = "iter"
+            xlabel = "Iteration"
+        elif getattr(args, "xaxis", "frame") == "time" and "iter" in work.columns:
+            converted, xlabel = convert_xaxis(work["iter"].to_numpy(dtype=int), "time")
+            work["x_axis"] = np.asarray(converted, dtype=float)
+            x_col = "x_axis"
+        else:
+            x_col = "frame_index"
+            xlabel = "Frame Index"
+
+        series = []
+        subplots = []
+        if "atom_id" in work.columns:
+            for atom_id, dfi in work.groupby("atom_id", sort=True):
+                dfi = dfi.sort_values("frame_index")
+                payload = {
+                    "x": dfi[x_col].tolist(),
+                    "y": pd.to_numeric(dfi["voronoi_volume"], errors="coerce").tolist(),
+                    "label": f"atom {atom_id}",
+                }
+                series.append(payload)
+                subplots.append([payload])
+        else:
+            dfi = work.sort_values("frame_index")
+            series.append(
+                {
+                    "x": dfi[x_col].tolist(),
+                    "y": pd.to_numeric(dfi["voronoi_volume"], errors="coerce").tolist(),
+                    "label": "voronoi_volume",
+                }
+            )
+            subplots.append(series)
+
+        if getattr(args, "plot", None) == "subplot":
+            return {
+                "plot_type": "multi_subplots",
+                "subplots": subplots,
+                "xlabel": xlabel,
+                "ylabel": "Voronoi Volume",
+                "title": "Voronoi Volume",
+                "legend": False,
+                "grid": getattr(args, "grid", None),
+            }
+        return {
+            "plot_type": "single_plot",
+            "series": series,
+            "xlabel": xlabel,
+            "ylabel": "Voronoi Volume",
+            "title": "Voronoi Volume",
+            "legend": len(series) > 1,
+        }
+
     value_columns = [c for c in table.columns if c not in {"frame_index", "iter"}]
     if not value_columns:
         return None
@@ -289,7 +577,18 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct trajectory command."""
     canonical = resolve_command_name(command, task_names=TRAJECTORY_COMMANDS)
-    task_cls = TASK_REGISTRY[canonical]
+    task_key = canonical
+    if canonical == "voronoi":
+        backend = str(getattr(args, "backend", "scipy")).strip().lower()
+        plot_target = str(getattr(args, "plot_target", "metrics")).strip().lower()
+        if plot_target == "diagram":
+            backend_to_task = {"scipy": "voronoi_geometry_scipy", "pyvoro": "voronoi_geometry_pyvoro"}
+        else:
+            backend_to_task = {"scipy": "voronoi_scipy", "pyvoro": "voronoi_pyvoro"}
+        if backend not in backend_to_task:
+            raise ValueError("voronoi backend must be 'scipy' or 'pyvoro'")
+        task_key = backend_to_task[backend]
+    task_cls = TASK_REGISTRY[task_key]
     request = REQUEST_BUILDERS[canonical](args)
 
     executor = AnalysisExecutor()

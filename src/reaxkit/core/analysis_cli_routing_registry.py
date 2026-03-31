@@ -66,6 +66,7 @@ register_analysis_command("get-params", module_path="reaxkit.workflows.params_wo
 register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("rdf", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("connection_table", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("connection_stats", module_path="reaxkit.workflows.connectivity_workflow")

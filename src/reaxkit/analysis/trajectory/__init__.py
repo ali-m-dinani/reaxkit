@@ -14,6 +14,15 @@ from reaxkit.analysis.trajectory.rdf import (
     RDFResult,
     RDFTask,
 )
+from reaxkit.analysis.trajectory.voronoi import (
+    VoronoiGeometryPyvoroTask,
+    VoronoiGeometryResult,
+    VoronoiGeometryScipyTask,
+    VoronoiPyvoroTask,
+    VoronoiRequest,
+    VoronoiResult,
+    VoronoiScipyTask,
+)
 
 __all__ = [
     "MSDRequest",
@@ -28,4 +37,11 @@ __all__ = [
     "RDFPropertyRequest",
     "RDFPropertyResult",
     "RDFPropertyTask",
+    "VoronoiRequest",
+    "VoronoiResult",
+    "VoronoiGeometryResult",
+    "VoronoiScipyTask",
+    "VoronoiPyvoroTask",
+    "VoronoiGeometryScipyTask",
+    "VoronoiGeometryPyvoroTask",
 ]
