@@ -502,13 +502,17 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     if canonical == "charge_table" and isinstance(getattr(result, "table", None), pd.DataFrame):
         if "time" not in result.table.columns and "iter" in result.table.columns:
-            converted, _ = convert_xaxis(
-                result.table["iter"].to_numpy(dtype=int),
-                "time",
-                control_file=getattr(args, "control", "control"),
-            )
-            result.table = result.table.copy()
-            result.table["time"] = np.asarray(converted, dtype=float)
+            try:
+                converted, _ = convert_xaxis(
+                    result.table["iter"].to_numpy(dtype=int),
+                    "time",
+                    control_file=getattr(args, "control", "control"),
+                )
+            except Exception:
+                converted = None
+            if converted is not None:
+                result.table = result.table.copy()
+                result.table["time"] = np.asarray(converted, dtype=float)
 
     if canonical == "polarization_field":
         result.table = result.aggregated_table

@@ -137,8 +137,9 @@ def _build_connection_list_request(args: argparse.Namespace) -> ConnectionListRe
 
 
 def _build_connection_table_request(args: argparse.Namespace) -> ConnectionTableRequest:
+    selected = _selected_connection_table_frames(args)
     return ConnectionTableRequest(
-        frame=args.frame,
+        frame=int(selected[0]),
         min_bo=args.min_bo,
         undirected=args.undirected,
         fill_value=args.fill_value,
@@ -226,7 +227,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 def _selected_connection_table_frames(args: argparse.Namespace) -> list[int]:
     raw_frames = _parse_frames(getattr(args, "frames", None))
     if raw_frames is None or len(raw_frames) == 0:
-        return [int(args.frame)]
+        return [0]
     every = max(1, int(getattr(args, "every", 1)))
     return [int(v) for v in raw_frames][::every]
 
@@ -256,13 +257,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Build one or more frame-wise connectivity matrices.\n\n"
             "Examples:\n"
-            "  reaxkit connection_table --fort7 fort.7 --frame 0 --export connection_table.csv\n"
+            "  reaxkit connection_table --fort7 fort.7 --frames 0 --export connection_table.csv\n"
             "  reaxkit connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n"
-            "  reaxkit connection_table --fort7 fort.7 --frame 10 --min-bo 0.3\n"
-            "  reaxkit connection_table --fort7 fort.7 --frame 5 --fill-value -1"
+            "  reaxkit connection_table --fort7 fort.7 --frames 10 --min-bo 0.3\n"
+            "  reaxkit connection_table --fort7 fort.7 --frames 5 --fill-value -1"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--frame", type=int, default=0, help="Frame index to extract")
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
         parser.add_argument("--fill-value", type=float, default=0.0, help="Fill value for missing entries")
