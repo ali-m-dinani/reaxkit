@@ -53,7 +53,10 @@ class AMSAdapter(EngineAdapter):
     def detect(self, path: str | Path) -> float:
         p = Path(path)
         if p.is_file() and p.suffix.lower() in {".rkf", ".kf"}:
-            return 0.95
+            # score is 0.90 not 0.95 to be able to handle AMS Standalone
+            # runs where both xmolout, fort.7, etc. files are generated
+            # along with .kf files
+            return 0.90
         if p.is_dir() and (any(p.glob("*.rkf")) or any(p.glob("*.kf"))):
             return 0.9
         return 0.0

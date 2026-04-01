@@ -1105,8 +1105,15 @@ class ReaxFFAdapter(EngineAdapter):
 
     def detect(self, path: str | Path) -> float:
         p = Path(path)
-        has_xmol = (p / "xmolout").exists() or (p.is_file() and "xmolout" in p.name.lower())
-        return 0.95 if has_xmol else 0.0
+        if p.is_dir():
+            if (p / "xmolout").exists() or (p / "fort.7").exists():
+                return 0.95
+            return 0.0
+        if p.is_file():
+            lower_name = p.name.lower()
+            if "xmolout" in lower_name or p.name == "fort.7":
+                return 0.95
+        return 0.0
 
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
         mapping: dict[object, tuple[str, ...]] = {
