@@ -459,6 +459,29 @@ class PartialEnergyData:
 
 
 @dataclass
+class StressData:
+    """Canonical per-atom stress tensor time-series model."""
+
+    iterations: np.ndarray
+    components: tuple[str, ...] = ("xx", "yy", "zz", "yx", "zx", "zy")
+    values: np.ndarray = field(default_factory=lambda: np.empty((0, 0, 0), dtype=float))
+    metadata: Optional[dict[str, Any]] = None
+
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self) -> None:
+        it = _as_1d("StressData.iterations", self.iterations, dtype=int)
+        vals = np.asarray(self.values, dtype=float)
+        if vals.ndim != 3:
+            raise ValueError(f"StressData.values must be 3D; got shape={vals.shape}.")
+        if vals.shape[0] != it.shape[0]:
+            raise ValueError("StressData.values frame count must match iterations length.")
+        if self.components and vals.shape[2] != len(self.components):
+            raise ValueError("StressData.values component count must match components length.")
+
+
+@dataclass
 class RestraintData:
     """Canonical restraint-monitor model parsed from ``fort.76``."""
 
