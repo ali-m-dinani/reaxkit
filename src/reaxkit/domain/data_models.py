@@ -521,6 +521,42 @@ class StressData:
 
 
 @dataclass
+class AtomTemperatureData:
+    """Canonical per-atom temperature time-series model."""
+
+    iterations: np.ndarray
+    temperatures: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
+    metadata: Optional[dict[str, Any]] = None
+
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self) -> None:
+        it = _as_1d("AtomTemperatureData.iterations", self.iterations, dtype=int)
+        temps = _as_2d("AtomTemperatureData.temperatures", self.temperatures, dtype=float)
+        if temps.shape[0] != it.shape[0]:
+            raise ValueError("AtomTemperatureData.temperatures row count must match iterations length.")
+
+
+@dataclass
+class AtomStrainEnergyData:
+    """Canonical per-atom strain-energy time-series model."""
+
+    iterations: np.ndarray
+    strain_energy: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
+    metadata: Optional[dict[str, Any]] = None
+
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self) -> None:
+        it = _as_1d("AtomStrainEnergyData.iterations", self.iterations, dtype=int)
+        vals = _as_2d("AtomStrainEnergyData.strain_energy", self.strain_energy, dtype=float)
+        if vals.shape[0] != it.shape[0]:
+            raise ValueError("AtomStrainEnergyData.strain_energy row count must match iterations length.")
+
+
+@dataclass
 class RestraintData:
     """Canonical restraint-monitor model parsed from ``fort.76``."""
 

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from reaxkit.domain.data_models import (
     AtomicKinematicsData,
+    AtomStrainEnergyData,
+    AtomTemperatureData,
     ChargeData,
     ConnectivityTrajectoryData,
     CoordinationStatusBundleData,
@@ -72,6 +74,10 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_charges", args, reporter=reporter)
         if data_type is AtomicKinematicsData:
             return self._invoke_loader("load_atomic_kinematics", args, reporter=reporter)
+        if data_type is AtomTemperatureData:
+            return self._invoke_loader("load_atom_temperature", args, reporter=reporter)
+        if data_type is AtomStrainEnergyData:
+            return self._invoke_loader("load_atom_strain_energy", args, reporter=reporter)
         if data_type is ElectricFieldData:
             return self._invoke_loader("load_electric_field", args, reporter=reporter)
         if data_type is EregimeData:

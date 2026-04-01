@@ -135,6 +135,9 @@ def test_ams_adapter_loaders_export_artifacts():
     kinematics = adapter.load_atomic_kinematics(args)
     _save_dataclass_artifacts(kinematics, out_dir, "atomic_kinematics")
 
+    atom_strain_energy = adapter.load_atom_strain_energy(args)
+    _save_dataclass_artifacts(atom_strain_energy, out_dir, "atom_strain_energy")
+
     molecular_analysis = adapter.load_molecular_analysis(args)
     _save_dataclass_artifacts(molecular_analysis, out_dir, "molecular_analysis")
 
@@ -151,6 +154,7 @@ def test_ams_adapter_loaders_export_artifacts():
         "partial_energy",
         "charges",
         "atomic_kinematics",
+        "atom_strain_energy",
         "molecular_analysis",
         "stress",
     ]

@@ -12,6 +12,8 @@ import pandas as pd
 from reaxkit.core.engine_registry import register_engine
 from reaxkit.domain.data_models import (
     AtomicKinematicsData,
+    AtomStrainEnergyData,
+    AtomTemperatureData,
     ChargeData,
     ConnectivityData,
     ConnectivityTrajectoryData,
@@ -132,6 +134,8 @@ class AMSAdapter(EngineAdapter):
         _ = args
         if data_type in {
             AtomicKinematicsData,
+            AtomStrainEnergyData,
+            AtomTemperatureData,
             TrajectoryData,
             ConnectivityData,
             ConnectivityTrajectoryData,
@@ -735,6 +739,54 @@ class AMSAdapter(EngineAdapter):
                 "source_velocities": "History%Velocities (last entry)",
                 "source_accelerations": "History%Acceleration (last entry)",
             },
+        )
+
+    def load_atom_temperature(self, args: dict, reporter=None) -> AtomTemperatureData:
+        kf = self.load_kf(args)
+        history_data = kf.read_section("History")
+        atom_temp_entries = self._history_entries(history_data, "Atom temperature", dtype=float)
+        if not atom_temp_entries:
+            raise RuntimeError("No 'Atom temperature*' entries were found in AMS History section.")
+
+        n_frames = len(atom_temp_entries)
+        n_atoms = max(np.asarray(arr, dtype=float).size for arr in atom_temp_entries)
+        temperatures = self._stack_1d_per_frame(
+            atom_temp_entries,
+            n_frames=n_frames,
+            n_atoms=n_atoms,
+            fill_value=np.nan,
+        )
+        iterations = self._iterations_from_general(kf, n_frames)
+        if callable(reporter):
+            reporter("load", n_frames, n_frames, "Reading AMS atom temperatures from History")
+        return AtomTemperatureData(
+            iterations=iterations,
+            temperatures=temperatures,
+            metadata={"source": "History%Atom temperature"},
+        )
+
+    def load_atom_strain_energy(self, args: dict, reporter=None) -> AtomStrainEnergyData:
+        kf = self.load_kf(args)
+        history_data = kf.read_section("History")
+        strain_entries = self._history_entries(history_data, "Strain energy", dtype=float)
+        if not strain_entries:
+            raise RuntimeError("No 'Strain energy*' entries were found in AMS History section.")
+
+        n_frames = len(strain_entries)
+        n_atoms = max(np.asarray(arr, dtype=float).size for arr in strain_entries)
+        strain_energy = self._stack_1d_per_frame(
+            strain_entries,
+            n_frames=n_frames,
+            n_atoms=n_atoms,
+            fill_value=np.nan,
+        )
+        iterations = self._iterations_from_general(kf, n_frames)
+        if callable(reporter):
+            reporter("load", n_frames, n_frames, "Reading AMS atom strain energy from History")
+        return AtomStrainEnergyData(
+            iterations=iterations,
+            strain_energy=strain_energy,
+            metadata={"source": "History%Strain energy"},
         )
 
     def load_molecular_analysis(self, args: dict, reporter=None) -> MolecularAnalysisData:

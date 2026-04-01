@@ -180,6 +180,30 @@ loaders:
         source: placeholder
         value: "Empty DataFrame with columns [atom_id, ax, ay, az]."
 
+  load_atom_temperature:
+    dataclass: AtomTemperatureData
+    primary_files: [reaxout.kf, reaxout.rkf]
+    field_map:
+      iterations:
+        section: General
+        variable: Step numbers
+      temperatures:
+        section: History
+        variable: "Atom temperature *"
+        transform: "Stacked to (n_frames, n_atoms) with NaN padding."
+
+  load_atom_strain_energy:
+    dataclass: AtomStrainEnergyData
+    primary_files: [reaxout.kf, reaxout.rkf]
+    field_map:
+      iterations:
+        section: General
+        variable: Step numbers
+      strain_energy:
+        section: History
+        variable: "Strain energy *"
+        transform: "Stacked to (n_frames, n_atoms) with NaN padding."
+
   load_molecular_analysis:
     dataclass: MolecularAnalysisData
     primary_files: [reaxout.kf, reaxout.rkf]
