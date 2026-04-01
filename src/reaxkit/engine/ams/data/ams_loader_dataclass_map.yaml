@@ -225,6 +225,26 @@ loaders:
         section: History
         variable: "Atomic stress *"
         transform: "Each frame reshaped to (-1, 6); stacked to (n_frames, n_atoms, 6) with NaN padding."
+      average_values:
+        section: History
+        variable: "Average atomic stress *"
+        transform: "Each frame reshaped to (-1, 6); stacked to (n_frames, n_atoms, 6) with NaN padding."
+      iso_values:
+        section: History
+        variable: "Iso atomic stress *"
+        transform: "Stacked to (n_frames, n_atoms) with NaN padding."
+      avg_iso_values:
+        section: History
+        variable: "Avg iso atomic stress *"
+        transform: "Stacked to (n_frames, n_atoms) with NaN padding."
+      loavg_values:
+        section: History
+        variable: "LoAvg atomic stress *"
+        transform: "Each frame reshaped to (-1, 6); stacked to (n_frames, n_atoms, 6) with NaN padding."
+      loavg_iso_values:
+        section: History
+        variable: "LoAvg iso atom stress *"
+        transform: "Stacked to (n_frames, n_atoms) with NaN padding."
       components:
         source: fixed
         value: [xx, yy, zz, yx, zx, zy]

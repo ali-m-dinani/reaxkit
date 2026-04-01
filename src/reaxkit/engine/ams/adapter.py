@@ -348,6 +348,25 @@ class AMSAdapter(EngineAdapter):
         return out
 
     @staticmethod
+    def _stack_6c_per_frame(
+        entries: list[np.ndarray],
+        *,
+        n_frames: int,
+        n_atoms: int,
+    ) -> np.ndarray:
+        out = np.full((n_frames, n_atoms, 6), np.nan, dtype=float)
+        for fi in range(min(n_frames, len(entries))):
+            flat = np.asarray(entries[fi], dtype=float).ravel()
+            usable = (flat.size // 6) * 6
+            if usable <= 0:
+                continue
+            frame = flat[:usable].reshape(-1, 6)
+            n = min(n_atoms, frame.shape[0])
+            if n > 0:
+                out[fi, :n, :] = frame[:n, :]
+        return out
+
+    @staticmethod
     def _reshape_conntab_entries(
         entries: list[np.ndarray],
         *,
@@ -734,6 +753,8 @@ class AMSAdapter(EngineAdapter):
 
         for sec_i, mol_data in enumerate(mol_sections, start=1):
             names_by_id: dict[int, str] = {}
+            section_counts_by_iter: dict[int, float] = {}
+            section_atoms_by_mol_iter: dict[tuple[int, int], list[int]] = {}
             for key, value in mol_data.items():
                 m = re.match(r"^Molecule name\s+(\d+)$", str(key))
                 if not m:
@@ -749,29 +770,37 @@ class AMSAdapter(EngineAdapter):
                 if m_num:
                     iter_idx = int(m_num.group(1))
                     seen_iter_indices.add(iter_idx)
-                    iter_value = iter_lookup.get(iter_idx, iter_idx)
                     counts = self._to_1d_array(value, dtype=float)
                     freq = float(counts[0]) if counts.size > 0 else 0.0
                     if np.isnan(freq):
                         freq = 0.0
+                    section_counts_by_iter[iter_idx] = freq
                     total_molecules_by_iter[iter_idx] += freq
-                    for mol_id, mol_name in names_by_id.items():
-                        rows_species.append(
-                            {
-                                "iter": int(iter_value),
-                                "molecular_formula": str(mol_name),
-                                "freq": freq,
-                                "molecular_mass": np.nan,
-                            }
-                        )
                     continue
 
                 m_atoms = re.match(r"^Atoms\s+(\d+)\s+(\d+)$", str(key))
                 if m_atoms:
+                    mol_id = int(m_atoms.group(1))
                     iter_idx = int(m_atoms.group(2))
                     seen_iter_indices.add(iter_idx)
                     atom_ids = self._to_1d_array(value, dtype=int)
+                    section_atoms_by_mol_iter[(mol_id, iter_idx)] = [int(v) for v in atom_ids.tolist()]
                     total_atoms_by_iter[iter_idx] += float(atom_ids.size)
+
+            section_iter_indices: set[int] = set(section_counts_by_iter.keys())
+            section_iter_indices.update(iter_idx for _, iter_idx in section_atoms_by_mol_iter.keys())
+            for iter_idx in sorted(section_iter_indices):
+                iter_value = iter_lookup.get(iter_idx, iter_idx)
+                freq = float(section_counts_by_iter.get(iter_idx, 0.0))
+                for mol_id, mol_name in names_by_id.items():
+                    rows_species.append(
+                        {
+                            "iter": int(iter_value),
+                            "molecular_formula": str(mol_name),
+                            "freq": freq,
+                            "molecular_mass": np.nan,
+                        }
+                    )
 
         sorted_iter_indices = sorted(seen_iter_indices)
         if not sorted_iter_indices:
@@ -791,7 +820,10 @@ class AMSAdapter(EngineAdapter):
             if callable(reporter):
                 reporter("load", pos, len(sorted_iter_indices), "Reading AMS molecular analysis")
 
-        species_df = pd.DataFrame(rows_species, columns=["iter", "molecular_formula", "freq", "molecular_mass"])
+        species_df = pd.DataFrame(
+            rows_species,
+            columns=["iter", "molecular_formula", "freq", "molecular_mass"],
+        )
         totals_df = pd.DataFrame(rows_totals, columns=["iter", "total_molecules", "total_atoms", "total_molecular_mass"])
         if not species_df.empty:
             species_df = species_df.sort_values(["iter", "molecular_formula"], kind="stable").reset_index(drop=True)
@@ -807,32 +839,69 @@ class AMSAdapter(EngineAdapter):
     def load_stress(self, args: dict, reporter=None) -> StressData:
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
-        stress_entries = self._history_entries(history_data, "Atomic stress", dtype=float)
-        if not stress_entries:
+        atomic_entries = self._history_entries(history_data, "Atomic stress", dtype=float)
+        avg_entries = self._history_entries(history_data, "Average atomic stress", dtype=float)
+        avg_iso_entries = self._history_entries(history_data, "Avg iso atomic stress", dtype=float)
+        iso_entries = self._history_entries(history_data, "Iso atomic stress", dtype=float)
+        loavg_entries = self._history_entries(history_data, "LoAvg atomic stress", dtype=float)
+        loavg_iso_entries = self._history_entries(history_data, "LoAvg iso atom stress", dtype=float)
+
+        n_frames = max(
+            len(atomic_entries),
+            len(avg_entries),
+            len(avg_iso_entries),
+            len(iso_entries),
+            len(loavg_entries),
+            len(loavg_iso_entries),
+        )
+        if n_frames == 0:
             raise RuntimeError("No 'Atomic stress*' entries were found in AMS History section.")
 
-        n_frames = len(stress_entries)
         n_atoms = 0
-        for arr in stress_entries:
+        for arr in atomic_entries + avg_entries + loavg_entries:
             n_atoms = max(n_atoms, int(np.asarray(arr, dtype=float).size // 6))
-        values = np.full((n_frames, n_atoms, 6), np.nan, dtype=float)
-        for fi, arr in enumerate(stress_entries):
-            flat = np.asarray(arr, dtype=float).ravel()
-            usable = (flat.size // 6) * 6
-            if usable <= 0:
-                continue
-            frame = flat[:usable].reshape(-1, 6)
-            n = min(n_atoms, frame.shape[0])
-            values[fi, :n, :] = frame[:n, :]
+        for arr in iso_entries + avg_iso_entries + loavg_iso_entries:
+            n_atoms = max(n_atoms, int(np.asarray(arr, dtype=float).size))
+
+        values = self._stack_6c_per_frame(atomic_entries, n_frames=n_frames, n_atoms=n_atoms)
+        average_values = self._stack_6c_per_frame(avg_entries, n_frames=n_frames, n_atoms=n_atoms) if avg_entries else None
+        loavg_values = self._stack_6c_per_frame(loavg_entries, n_frames=n_frames, n_atoms=n_atoms) if loavg_entries else None
+        iso_values = self._stack_1d_per_frame(iso_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan) if iso_entries else None
+        avg_iso_values = (
+            self._stack_1d_per_frame(avg_iso_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan)
+            if avg_iso_entries
+            else None
+        )
+        loavg_iso_values = (
+            self._stack_1d_per_frame(loavg_iso_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan)
+            if loavg_iso_entries
+            else None
+        )
+        for fi in range(n_frames):
             if callable(reporter):
-                reporter("load", fi + 1, n_frames, "Reading AMS atomic stress from History")
+                reporter("load", fi + 1, n_frames, "Reading AMS stress series from History")
 
         iterations = self._iterations_from_general(kf, n_frames)
         return StressData(
             iterations=iterations,
             components=("xx", "yy", "zz", "yx", "zx", "zy"),
             values=values,
-            metadata={"source": "History%Atomic stress"},
+            average_values=average_values,
+            iso_values=iso_values,
+            avg_iso_values=avg_iso_values,
+            loavg_values=loavg_values,
+            loavg_iso_values=loavg_iso_values,
+            metadata={
+                "source": "History",
+                "series": [
+                    "Atomic stress",
+                    "Average atomic stress",
+                    "Avg iso atomic stress",
+                    "Iso atomic stress",
+                    "LoAvg atomic stress",
+                    "LoAvg iso atom stress",
+                ],
+            },
         )
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:

@@ -465,6 +465,11 @@ class StressData:
     iterations: np.ndarray
     components: tuple[str, ...] = ("xx", "yy", "zz", "yx", "zx", "zy")
     values: np.ndarray = field(default_factory=lambda: np.empty((0, 0, 0), dtype=float))
+    average_values: Optional[np.ndarray] = None
+    iso_values: Optional[np.ndarray] = None
+    avg_iso_values: Optional[np.ndarray] = None
+    loavg_values: Optional[np.ndarray] = None
+    loavg_iso_values: Optional[np.ndarray] = None
     metadata: Optional[dict[str, Any]] = None
 
     def __post_init__(self):
@@ -472,13 +477,47 @@ class StressData:
 
     def validate(self) -> None:
         it = _as_1d("StressData.iterations", self.iterations, dtype=int)
-        vals = np.asarray(self.values, dtype=float)
-        if vals.ndim != 3:
-            raise ValueError(f"StressData.values must be 3D; got shape={vals.shape}.")
-        if vals.shape[0] != it.shape[0]:
-            raise ValueError("StressData.values frame count must match iterations length.")
-        if self.components and vals.shape[2] != len(self.components):
-            raise ValueError("StressData.values component count must match components length.")
+        n_frames = it.shape[0]
+        n_atoms: int | None = None
+
+        def _validate_tensor(name: str, vals: Any, required: bool) -> None:
+            nonlocal n_atoms
+            if vals is None:
+                if required:
+                    raise ValueError(f"StressData.{name} is required.")
+                return
+            arr = np.asarray(vals, dtype=float)
+            if arr.ndim != 3:
+                raise ValueError(f"StressData.{name} must be 3D; got shape={arr.shape}.")
+            if arr.shape[0] != n_frames:
+                raise ValueError(f"StressData.{name} frame count must match iterations length.")
+            if self.components and arr.shape[2] != len(self.components):
+                raise ValueError(f"StressData.{name} component count must match components length.")
+            if n_atoms is None:
+                n_atoms = int(arr.shape[1])
+            elif int(arr.shape[1]) != n_atoms:
+                raise ValueError(f"StressData.{name} atom count must match other stress arrays.")
+
+        def _validate_scalar(name: str, vals: Any) -> None:
+            nonlocal n_atoms
+            if vals is None:
+                return
+            arr = np.asarray(vals, dtype=float)
+            if arr.ndim != 2:
+                raise ValueError(f"StressData.{name} must be 2D; got shape={arr.shape}.")
+            if arr.shape[0] != n_frames:
+                raise ValueError(f"StressData.{name} frame count must match iterations length.")
+            if n_atoms is None:
+                n_atoms = int(arr.shape[1])
+            elif int(arr.shape[1]) != n_atoms:
+                raise ValueError(f"StressData.{name} atom count must match other stress arrays.")
+
+        _validate_tensor("values", self.values, required=True)
+        _validate_tensor("average_values", self.average_values, required=False)
+        _validate_tensor("loavg_values", self.loavg_values, required=False)
+        _validate_scalar("iso_values", self.iso_values)
+        _validate_scalar("avg_iso_values", self.avg_iso_values)
+        _validate_scalar("loavg_iso_values", self.loavg_iso_values)
 
 
 @dataclass
