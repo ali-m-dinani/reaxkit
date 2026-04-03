@@ -50,6 +50,9 @@ commands:
   make-charges:
     kind: generator
     help: Generate a charges template file
+  make-kopple2:
+    kind: generator
+    help: Generate a kopple2 template file
   trim-xmolout:
     kind: generator
     help: Trim an xmolout trajectory

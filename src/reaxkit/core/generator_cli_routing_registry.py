@@ -36,6 +36,7 @@ register_generator("add-alias", module_path="reaxkit.workflows.meta.command_alia
 register_generator("make-eregime", module_path="reaxkit.workflows.file_tools.eregime_workflow")
 register_generator("make-addmol", module_path="reaxkit.workflows.file_tools.addmol_workflow")
 register_generator("make-charges", module_path="reaxkit.workflows.file_tools.charges_workflow")
+register_generator("make-kopple2", module_path="reaxkit.workflows.file_tools.kopple2_workflow")
 register_generator("trim-xmolout", module_path="reaxkit.workflows.file_tools.xmolout_workflow")
 register_generator("xtob", module_path="reaxkit.workflows.file_tools.geo_workflow")
 register_generator("make-geo", module_path="reaxkit.workflows.file_tools.geo_workflow")
