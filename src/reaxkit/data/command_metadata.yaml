@@ -44,6 +44,9 @@ commands:
   make-eregime:
     kind: generator
     help: Generate an eregime file
+  make-addmol:
+    kind: generator
+    help: Generate addmol.bgf and addmol.vel files
   trim-xmolout:
     kind: generator
     help: Trim an xmolout trajectory
