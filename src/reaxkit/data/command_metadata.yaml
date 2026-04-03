@@ -47,6 +47,9 @@ commands:
   make-addmol:
     kind: generator
     help: Generate addmol.bgf and addmol.vel files
+  make-charges:
+    kind: generator
+    help: Generate a charges template file
   trim-xmolout:
     kind: generator
     help: Trim an xmolout trajectory
