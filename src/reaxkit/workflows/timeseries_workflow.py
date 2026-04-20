@@ -168,7 +168,6 @@ def _resolve_legacy_xmolout_request(args: argparse.Namespace):
                 atom_ids=atom_ids,
                 atom_types=atom_types,
                 dims=dims,
-                format=args.format,
                 frames=frames,
                 every=int(args.every),
             ),
@@ -197,7 +196,6 @@ def _resolve_task_and_request(args: argparse.Namespace):
             TrajectoryCoordinateSeriesRequest(
                 atom_ids=_parse_int_tokens(match.group("ids")),
                 dims=(match.group("axis").lower(),),
-                format=args.format,
                 frames=frames,
                 every=int(args.every),
             ),
@@ -404,6 +402,7 @@ def _resolve_task_and_request(args: argparse.Namespace):
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
+    p.set_defaults(progress=True)
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
         "Dispatcher for time-series and related sequential analyses.\n\n"
@@ -537,6 +536,57 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "ylabel": "geometry_optimization",
             "title": "Geometry Optimization Data",
             "legend": len(series) > 1,
+        }
+
+    if command == "trajectory_coordinate_series":
+        table = getattr(result, "table", None)
+        if table is None or not isinstance(table, pd.DataFrame) or table.empty:
+            return None
+        if "coord" not in table.columns:
+            return None
+        if "iter" in table.columns:
+            x_col = "iter"
+            xlabel = "iter"
+        elif "frame_index" in table.columns:
+            x_col = "frame_index"
+            xlabel = "frame_index"
+        else:
+            return None
+
+        series_key_cols = [col for col in ("atom_id", "atom_type", "dim") if col in table.columns]
+        if not series_key_cols:
+            series_key_cols = [x_col]
+
+        series_payload: list[dict[str, object]] = []
+        grouped = table.sort_values(series_key_cols + [x_col], kind="stable").groupby(series_key_cols, dropna=False)
+        for keys, group in grouped:
+            if not isinstance(keys, tuple):
+                keys = (keys,)
+            label_parts = [f"{col}={val}" for col, val in zip(series_key_cols, keys)]
+            label = ", ".join(label_parts) if label_parts else "coord"
+            x = pd.to_numeric(group[x_col], errors="coerce").to_numpy(dtype=float)
+            y = pd.to_numeric(group["coord"], errors="coerce").to_numpy(dtype=float)
+            series_payload.append({"x": x.tolist(), "y": y.tolist(), "label": label})
+
+        if not series_payload:
+            return None
+        if getattr(args, "plot", None) == "subplot":
+            return {
+                "plot_type": "multi_subplots",
+                "subplots": [[s] for s in series_payload],
+                "xlabel": xlabel,
+                "ylabel": "coord",
+                "title": "Trajectory Coordinate Series",
+                "legend": False,
+                "grid": getattr(args, "grid", None),
+            }
+        return {
+            "plot_type": "single_plot",
+            "series": series_payload,
+            "xlabel": xlabel,
+            "ylabel": "coord",
+            "title": "Trajectory Coordinate Series",
+            "legend": len(series_payload) > 1,
         }
 
     return None

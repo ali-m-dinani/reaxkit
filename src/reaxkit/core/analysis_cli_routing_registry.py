@@ -64,6 +64,7 @@ register_analysis_command("trainset_data", module_path="reaxkit.workflows.force_
 register_analysis_command("trainset_group_comments", module_path="reaxkit.workflows.force_field_workflow")
 register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
 register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command("diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("rdf", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")

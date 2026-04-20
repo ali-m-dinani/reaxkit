@@ -1,0 +1,13 @@
+{
+  "generators": [
+    {
+      "command": "make-geo",
+      "generator_id": "gen_20260414_182947_2448",
+      "output_path": "reaxkit_workspace\\inputs\\run_20260414_182947_0bbc25\\slab.xyz",
+      "settings_path": "reaxkit_workspace\\inputs\\run_20260414_182947_0bbc25\\settings.json",
+      "updated_at": "2026-04-14T22:29:47.545370+00:00"
+    }
+  ],
+  "run_id": "run_20260414_182947_0bbc25",
+  "updated_at": "2026-04-14T22:29:47.545370+00:00"
+}

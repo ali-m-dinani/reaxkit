@@ -1,5 +1,7 @@
 """Trajectory analysis tasks."""
 
+from reaxkit.analysis.trajectory.dihedral import DihedralRequest, DihedralResult, DihedralTask
+from reaxkit.analysis.trajectory.diffusivity import DiffusivityRequest, DiffusivityResult, DiffusivityTask
 from reaxkit.analysis.trajectory.msd import MSDRequest, MSDResult, MSDTask
 from reaxkit.analysis.trajectory.relabel import (
     TrajectoryRelabelByCoordinationRequest,
@@ -25,6 +27,12 @@ from reaxkit.analysis.trajectory.voronoi import (
 )
 
 __all__ = [
+    "DihedralRequest",
+    "DihedralResult",
+    "DihedralTask",
+    "DiffusivityRequest",
+    "DiffusivityResult",
+    "DiffusivityTask",
     "MSDRequest",
     "MSDResult",
     "MSDTask",

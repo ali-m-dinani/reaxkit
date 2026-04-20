@@ -125,6 +125,7 @@ class Fort7Handler(BaseHandler):
                 if self._reporter and (lines_read % 5000 == 0 or lines_read == total_lines):
                     self._reporter("load", lines_read, total_lines, "Parsing fort.7")
                 values = raw.split()
+                # print(f"line {lines_read} has {len(values)} values")
                 if not values:
                     continue
 

@@ -155,6 +155,12 @@ commands:
       - mean-square-displacement
       - mean_square_displacement
     help: Mean square displacement
+  diffusivity:
+    kind: analysis
+    aliases:
+      - diffusion-coefficient
+      - diffusion_coefficient
+    help: Diffusivity from Einstein relation
   rdf:
     kind: analysis
     aliases:

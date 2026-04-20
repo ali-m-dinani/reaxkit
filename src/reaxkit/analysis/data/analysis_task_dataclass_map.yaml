@@ -38,6 +38,12 @@ tasks:
   dipole:
     consumes_dataclass: ElectrostaticsData
     module: reaxkit.analysis.electrostatics.electrostatics
+  dihedral:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.trajectory.dihedral
+  diffusivity:
+    consumes_dataclass: TrajectoryData
+    module: reaxkit.analysis.trajectory.diffusivity
   dominant_species:
     consumes_dataclass: MolecularAnalysisData
     module: reaxkit.analysis.molecular_analysis.molecular_analysis
@@ -147,7 +153,7 @@ dataclass_usage:
   PartialEnergyData: [partial_energy_series]
   RestraintData: [restraint_series]
   SimulationData: [cell_dimensions, simulation_series]
-  TrajectoryData: [msd, rdf, rdf_property, trajectory_coordinate_series]
+  TrajectoryData: [dihedral, diffusivity, msd, rdf, rdf_property, trajectory_coordinate_series]
 
 composite_dataclasses:
   ConnectivityTrajectoryData:

@@ -753,6 +753,8 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
 
         rows: list[dict[str, object]] = []
         dim_to_col = {"x": 0, "y": 1, "z": 2}
+        total_groups = max(1, len(atom_indices) * len(dims))
+        done_groups = 0
         for atom_id, atom_idx in zip(atom_ids, atom_indices):
             atom_type = str(data.elements[atom_idx])
             for dim in dims:
@@ -769,9 +771,11 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
                             "coord": float(values[rel_i]),
                         }
                     )
+                done_groups += 1
+                if callable(reporter):
+                    reporter("analyze", done_groups, total_groups, "Building trajectory coordinate series")
 
         table = pd.DataFrame(rows)
-        print(table.head())
         if not table.empty:
             table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
 

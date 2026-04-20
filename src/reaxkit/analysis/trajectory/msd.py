@@ -13,6 +13,7 @@ from reaxkit.core.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
+from reaxkit.analysis.trajectory.pbc import maybe_unwrap_selected_positions
 from reaxkit.presentation.specs import PresentationSpec
 
 
@@ -43,6 +44,10 @@ class MSDRequest(BaseRequest):
     every: int = dc_field(
         default=1,
         metadata={"label": "Stride", "help": "Stride over selected frames.", "min": 1, "units": "frames"},
+    )
+    unwrap: bool = dc_field(
+        default=True,
+        metadata={"label": "Unwrap PBC", "help": "Unwrap coordinates across periodic boundaries when cell data is available."},
     )
 
 
@@ -111,6 +116,8 @@ class MSDTask(AnalysisTask):
 
     def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:
         out_cols = ["frame_index", "iter", "atom_id", "atom_type", "dim", "msd"]
+        if data.simulation is None or data.simulation.cell_lengths is None:
+            raise ValueError("MSD requires TrajectoryData.simulation.cell_lengths.")
         dims = tuple(d for d in request.dims if d in ("x", "y", "z"))
         if not dims:
             raise ValueError("dims must include at least one of 'x','y','z'")
@@ -143,17 +150,23 @@ class MSDTask(AnalysisTask):
         axes = {"x": 0, "y": 1, "z": 2}
         use_cols = [axes[d] for d in dims]
 
-        sel = np.asarray(sel_idx, dtype=int)
         atom_ids = [data.atom_ids[i] for i in sel_idx]
         atom_types = [str(data.elements[i]) for i in sel_idx]
         dim_label = ",".join(dims)
 
-        r0 = data.positions[ref_frame][sel[:, None], use_cols].astype(float)
+        coords_series = maybe_unwrap_selected_positions(
+            data,
+            frame_idx=frame_idx,
+            sel_idx=sel_idx,
+            unwrap=bool(request.unwrap),
+        )[:, :, use_cols]
+        ref_i = int(frame_idx.index(ref_frame))
+        r0 = coords_series[ref_i].astype(float)
         rows: list[dict] = []
         n_steps = len(frame_idx)
 
-        for step_i, i in enumerate(frame_idx, start=1):
-            coords = data.positions[i][sel[:, None], use_cols].astype(float)
+        for step_i, (i, coords) in enumerate(zip(frame_idx, coords_series, strict=False), start=1):
+            coords = np.asarray(coords, dtype=float)
             dr = coords - r0
             sq = np.sum(dr * dr, axis=1)
 

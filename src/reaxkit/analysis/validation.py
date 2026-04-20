@@ -84,6 +84,7 @@ def _validate_str_list(task_name: str, field_name: str, values: Any, *, allow_em
 def _validate_msd(task_name: str, data: Any, request: Any) -> None:
     if not isinstance(data, TrajectoryData):
         return
+    _require_simulation_cells(task_name, data)
     dims = tuple(str(d).lower() for d in getattr(request, "dims", ()) if str(d).lower() in {"x", "y", "z"})
     if not dims:
         _raise(task_name, "dims must include at least one of x, y, z.")
@@ -92,6 +93,27 @@ def _validate_msd(task_name: str, data: Any, request: Any) -> None:
     origin = getattr(request, "origin", "first")
     if not (origin == "first" or isinstance(origin, (int, np.integer))):
         _raise(task_name, "origin must be 'first' or an integer frame index.")
+
+
+def _require_simulation_cells(task_name: str, data: TrajectoryData) -> None:
+    sim = getattr(data, "simulation", None)
+    if sim is None:
+        _raise(task_name, "TrajectoryData.simulation is required (for periodic-cell aware analysis).")
+    cell_l = getattr(sim, "cell_lengths", None)
+    if cell_l is None:
+        _raise(task_name, "SimulationData.cell_lengths is required.")
+    arr_l = np.asarray(cell_l, dtype=float)
+    if arr_l.ndim != 2 or arr_l.shape[1] != 3:
+        _raise(task_name, "SimulationData.cell_lengths must have shape (n_frames, 3).")
+    if arr_l.shape[0] != int(np.asarray(data.positions).shape[0]):
+        _raise(task_name, "SimulationData.cell_lengths frame count must match trajectory frame count.")
+    cell_a = getattr(sim, "cell_angles", None)
+    if cell_a is not None:
+        arr_a = np.asarray(cell_a, dtype=float)
+        if arr_a.ndim != 2 or arr_a.shape[1] != 3:
+            _raise(task_name, "SimulationData.cell_angles must have shape (n_frames, 3).")
+        if arr_a.shape[0] != arr_l.shape[0]:
+            _raise(task_name, "SimulationData.cell_angles frame count must match cell_lengths.")
 
 
 def _trajectory_selection_indices(data: TrajectoryData, request: Any) -> tuple[np.ndarray, np.ndarray]:
@@ -172,6 +194,14 @@ def _validate_task_specific(task: Any, data: Any, request: Any) -> None:
     if task_name == "MSDTask":
         _validate_msd(task_name, data, request)
         _validate_trajectory_selection_finite(task_name, data, request)
+        return
+
+    if task_name == "DiffusivityTask":
+        if isinstance(data, TrajectoryData):
+            _require_simulation_cells(task_name, data)
+            _validate_trajectory_like(task_name, request)
+            _validate_numeric_positive(task_name, "d", getattr(request, "d", None), allow_none=False)
+            _validate_trajectory_selection_finite(task_name, data, request)
         return
 
     if task_name in {"RDFTask", "RDFPropertyTask"}:

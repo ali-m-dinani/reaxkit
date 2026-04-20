@@ -39,5 +39,8 @@ def write_structure(
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    write(path, atoms, format=format, comment=comment)
+    kwargs = {"format": format}
+    if comment is not None:
+        kwargs["comment"] = comment
+    write(path, atoms, **kwargs)
     return path

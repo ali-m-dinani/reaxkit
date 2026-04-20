@@ -105,6 +105,11 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "y_candidates": ("msd",),
         "group_candidates": ("atom_id",),
     },
+    "diffusivity": {
+        "x_candidates": ("atom_id",),
+        "y_candidates": ("diffusivity",),
+        "group_candidates": ("atom_type",),
+    },
     "rdf": {
         "x_candidates": ("r", "radius", "distance"),
         "y_candidates": ("g_r", "g(r)", "rdf"),

@@ -9,6 +9,8 @@ import pandas as pd
 from typing import Callable, Sequence
 
 from reaxkit.analysis import trajectory as _trajectory_tasks  # noqa: F401
+from reaxkit.analysis.trajectory.dihedral import DihedralRequest
+from reaxkit.analysis.trajectory.diffusivity import DiffusivityRequest
 from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFRequest
 from reaxkit.analysis.trajectory.voronoi import VoronoiRequest
@@ -20,7 +22,7 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
-TRAJECTORY_COMMANDS = ("msd", "rdf", "rdf_property", "voronoi")
+TRAJECTORY_COMMANDS = ("dihedral", "diffusivity", "msd", "rdf", "rdf_property", "voronoi")
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -58,6 +60,30 @@ def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
         origin=args.origin,
         frames=parse_frame_indices(args.frames),
         every=args.every,
+        unwrap=bool(args.unwrap),
+    )
+
+
+def _build_diffusivity_request(args: argparse.Namespace) -> DiffusivityRequest:
+    return DiffusivityRequest(
+        atom_ids=args.atom_ids,
+        atom_types=args.atom_types,
+        dims=tuple(args.dims),
+        origin=args.origin,
+        frames=parse_frame_indices(args.frames),
+        every=args.every,
+        d=float(args.d),
+        unwrap=bool(args.unwrap),
+    )
+
+
+def _build_dihedral_request(args: argparse.Namespace) -> DihedralRequest:
+    return DihedralRequest(
+        atom_ids=args.atom_ids,
+        frames=parse_frame_indices(args.frames),
+        every=args.every,
+        units=args.units,
+        backend=args.backend,
     )
 
 
@@ -101,6 +127,8 @@ def _build_voronoi_request(args: argparse.Namespace) -> VoronoiRequest:
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
+    "dihedral": _build_dihedral_request,
+    "diffusivity": _build_diffusivity_request,
     "msd": _build_msd_request,
     "rdf": _build_rdf_request,
     "rdf_property": _build_rdf_property_request,
@@ -119,7 +147,18 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _add_presentation_arguments(parser)
     _add_common_arguments(parser)
 
-    if canonical == "msd":
+    if canonical == "dihedral":
+        parser.description = (
+            "Compute a dihedral angle (atom1-atom2-atom3-atom4) over selected frames.\n\n"
+            "Examples:\n"
+            "  reaxkit dihedral --atom-ids 1 2 3 4 --plot single\n"
+            "  reaxkit dihedral --atom-ids 8 3 4 9 --frames 0:500:10 --units rad --export dih.csv\n"
+            "  reaxkit dihedral --atom-ids 5 7 9 11 --xaxis iter --save dihedral_iter.png"
+        )
+        parser.add_argument("--atom-ids", type=int, nargs=4, required=True, help="Exactly four 1-based atom ids")
+        parser.add_argument("--units", choices=["deg", "rad"], default="deg", help="Output angle units")
+        parser.add_argument("--backend", choices=["numpy", "mdanalysis"], default="numpy", help="Dihedral backend")
+    elif canonical == "msd":
         parser.description = (
             "Compute mean-squared displacement for selected atoms.\n\n"
             "Examples:\n"
@@ -131,6 +170,31 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include")
         parser.add_argument("--origin", default="first", help="Reference frame: 'first' or an explicit index")
+        parser.add_argument(
+            "--unwrap",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Unwrap coordinates across periodic boundaries when cell data exists",
+        )
+    elif canonical == "diffusivity":
+        parser.description = (
+            "Estimate per-atom diffusivity from Einstein relation MSD = 2*d*D*t.\n\n"
+            "Examples:\n"
+            "  reaxkit diffusivity --atom-ids 1 2 3 --plot single\n"
+            "  reaxkit diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n"
+            "  reaxkit diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
+        )
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
+        parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include")
+        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or an explicit index")
+        parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t")
+        parser.add_argument(
+            "--unwrap",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Unwrap coordinates across periodic boundaries when cell data exists",
+        )
     elif canonical == "rdf":
         parser.description = (
             "Compute radial distribution functions for selected atoms.\n\n"
@@ -417,6 +481,42 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "ylabel": "A^2",
             "title": title,
             "legend": True,
+        }
+
+    if command == "diffusivity":
+        if "atom_id" not in table.columns or "diffusivity" not in table.columns:
+            return None
+        work = table.sort_values("atom_id")
+        return {
+            "plot_type": "single_plot",
+            "x": pd.to_numeric(work["atom_id"], errors="coerce").tolist(),
+            "y": pd.to_numeric(work["diffusivity"], errors="coerce").tolist(),
+            "xlabel": "Atom ID",
+            "ylabel": "Diffusivity",
+            "title": "Diffusivity by Atom",
+        }
+
+    if command == "dihedral":
+        x_col = "frame_index"
+        xlabel = "Frame Index"
+        if getattr(args, "xaxis", "frame") == "iter" and "iter" in table.columns:
+            x_col = "iter"
+            xlabel = "Iteration"
+        elif getattr(args, "xaxis", "frame") == "time":
+            source = "iter" if "iter" in table.columns else "frame_index"
+            converted, xlabel = convert_xaxis(table[source].to_numpy(dtype=int), "time")
+            table = table.copy()
+            table["x_axis"] = np.asarray(converted, dtype=float)
+            x_col = "x_axis"
+
+        units = str(table["units"].iloc[0]) if "units" in table.columns and not table.empty else ""
+        return {
+            "plot_type": "single_plot",
+            "x": table[x_col].tolist(),
+            "y": table["dihedral"].tolist(),
+            "xlabel": xlabel,
+            "ylabel": f"Dihedral ({units})" if units else "Dihedral",
+            "title": "Dihedral Angle",
         }
 
     if command == "rdf":

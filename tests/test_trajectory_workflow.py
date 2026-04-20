@@ -26,6 +26,8 @@ def _base_args(**overrides):
         "atom_types": None,
         "dims": ("x", "y", "z"),
         "origin": "first",
+        "unwrap": True,
+        "d": 3.0,
         "atom_ids_a": None,
         "atom_ids_b": None,
         "atom_types_a": None,
@@ -77,6 +79,24 @@ def test_run_main_rdf_property_uses_property_task(monkeypatch):
     assert captured["request_name"] == "RDFPropertyRequest"
 
 
+def test_run_main_diffusivity_uses_diffusivity_task(monkeypatch):
+    captured = {}
+
+    def fake_run(self, task, request, args):
+        captured["task_name"] = task.__class__.__name__
+        captured["request_name"] = request.__class__.__name__
+        return SimpleNamespace(table=pd.DataFrame({"atom_id": [1], "diffusivity": [0.5]}))
+
+    monkeypatch.setattr(trajectory_workflow.AnalysisExecutor, "run", fake_run)
+    monkeypatch.setattr(trajectory_workflow, "present_result", lambda command, result, args, plot_payload_builder=None: None)
+
+    rc = trajectory_workflow.run_main("diffusion-coefficient", _base_args(atom_ids=[1], d=3.0))
+
+    assert rc == 0
+    assert captured["task_name"] == "DiffusivityTask"
+    assert captured["request_name"] == "DiffusivityRequest"
+
+
 def test_present_result_exports_csv_and_renders_plot(monkeypatch, tmp_path):
     calls = {}
 
@@ -115,6 +135,23 @@ def test_msd_subplot_payload_carries_grid():
 
     assert payload["plot_type"] == "multi_subplots"
     assert payload["grid"] == "2x1"
+
+
+def test_diffusivity_payload_builds_single_plot():
+    result = SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "atom_id": [1, 2],
+                "diffusivity": [0.5, 0.25],
+            }
+        )
+    )
+
+    payload = trajectory_workflow._plot_payload("diffusivity", result, _base_args(plot="single"))
+
+    assert payload["plot_type"] == "single_plot"
+    assert payload["x"] == [1, 2]
+    assert payload["y"] == [0.5, 0.25]
 
 
 def test_rdf_property_payload_uses_selected_property_and_xaxis():
