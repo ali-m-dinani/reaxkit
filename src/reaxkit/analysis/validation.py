@@ -254,9 +254,17 @@ def validate_task_inputs(task: Any, data: Any, request: Any) -> None:
     """Validate task data/request before entering task logic."""
     task_name = type(task).__name__
 
-    required = getattr(task, "required_data", None)
+    resolver = getattr(task, "required_data_for", None)
+    if callable(resolver):
+        required = resolver(request, None)
+    else:
+        required = getattr(task, "required_data", None)
     if required is not None and not isinstance(data, required):
-        _raise(task_name, f"expected data type {required.__name__}, got {type(data).__name__}.")
+        if isinstance(required, tuple):
+            exp = ", ".join(getattr(t, "__name__", str(t)) for t in required)
+        else:
+            exp = getattr(required, "__name__", str(required))
+        _raise(task_name, f"expected data type {exp}, got {type(data).__name__}.")
 
     if not isinstance(request, BaseRequest):
         _raise(task_name, f"expected request type BaseRequest, got {type(request).__name__}.")

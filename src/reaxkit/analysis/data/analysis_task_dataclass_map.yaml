@@ -5,6 +5,12 @@ _meta:
   last_updated: "2026-03-04"
 
 tasks:
+  active_site_events:
+    consumes_dataclass: ConnectivityTrajectoryData
+    module: reaxkit.analysis.active_sites.events
+  active_site_structural:
+    consumes_dataclass: ConnectivityTrajectoryData
+    module: reaxkit.analysis.active_sites.structural
   atomic_kinematics:
     consumes_dataclass: AtomicKinematicsData
     module: reaxkit.analysis.kinematics.kinematics
@@ -136,7 +142,7 @@ dataclass_usage:
   AtomicKinematicsData: [atomic_kinematics]
   ChargeData: [charge_series, charge_table]
   ConnectivityData: [bond_events, connection_list, connection_stats, connection_table, coordination, hybridization]
-  ConnectivityTrajectoryData: [trajectory_relabel_by_coordination]
+  ConnectivityTrajectoryData: [active_site_events, active_site_structural, trajectory_relabel_by_coordination]
   ControlParametersData: [control_value]
   EregimeData: [eregime_series]
   ElectricFieldData: [electric_field_series]

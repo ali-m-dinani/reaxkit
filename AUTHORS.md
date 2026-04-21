@@ -12,6 +12,9 @@ Parts of this codebase were inspired by or adapted from work contributed by:
 
 - **[Yun Kyung Shin]** – developed the `elastic_energy.f` and `elastic_geo.f` fortran codes used in `trainset_generator.py`
 - **[Alireza Sepehrinezhad]** – developed the initial version of `make_eregime_sinusoidal` used in `eregime_generator.py` and `dipole_analyzer.py` code used in the `electrostatics_analyzers.py`
+- **[Seyed Mahmoud Mortazavi]** – helped with developing the LAMMPS support
+- **[Anirban]** – developed the initial version of `` used in ``
+- **[Jupjeet]** – developed the initial version of `` used in ``
 
 Their original contributions have been modified and integrated with permission.
 

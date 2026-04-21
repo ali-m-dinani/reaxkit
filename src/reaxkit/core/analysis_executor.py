@@ -175,6 +175,9 @@ class AnalysisExecutor:
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
+        required_data = (
+            task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
+        )
         handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
         handler_cache_dir.mkdir(parents=True, exist_ok=True)
         os.environ["REAXKIT_HANDLER_CACHE_DIR"] = str(handler_cache_dir.resolve())
@@ -201,7 +204,7 @@ class AnalysisExecutor:
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
         adapter = resolve_engine(input_path, engine=forced_engine)
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
-        snapshot_names = adapter.required_input_files(task.required_data, args)
+        snapshot_names = adapter.required_input_files(required_data, args)
         snapshot_storage_inputs(args, names=snapshot_names)
         if run_id := args.get("run_id"):
             project_root = Path(args.get("project_root") or ".")
@@ -251,7 +254,7 @@ class AnalysisExecutor:
         use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
         analysis_id = None
         if parsed_id is not None:
-            data_name = getattr(task.required_data, "__name__", "parsed_data")
+            data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
             if layout is not None:
                 cached_parsed = layout.load_parsed_artifact(
@@ -259,7 +262,7 @@ class AnalysisExecutor:
                     artifact_name=artifact_name,
                 )
                 if cached_parsed is not None:
-                    expected_type = task.required_data
+                    expected_type = required_data
                     if isinstance(cached_parsed, expected_type):
                         logger.debug("Parsed cache hit for data_type=%s parsed_id=%s", data_name, parsed_id[:12])
                         t_load = 0.0
@@ -376,12 +379,12 @@ class AnalysisExecutor:
 
         t_load0 = perf_counter()
         try:
-            data = adapter.load(task.required_data, args, reporter=reporter)
+            data = adapter.load(required_data, args, reporter=reporter)
         except ParseError:
             raise
         except Exception as exc:
             raise ParseError(
-                f"Failed to load required data '{getattr(task.required_data, '__name__', str(task.required_data))}' "
+                f"Failed to load required data '{getattr(required_data, '__name__', str(required_data))}' "
                 f"for task '{task.__class__.__name__}': {exc}"
             ) from exc
         if run_id and layout is not None and parsed_id is None:
@@ -409,7 +412,7 @@ class AnalysisExecutor:
 
         if parsed_id is not None and layout is not None:
             try:
-                data_name = getattr(task.required_data, "__name__", "parsed_data")
+                data_name = getattr(required_data, "__name__", "parsed_data")
                 artifact_name = data_name.lower()
                 parsed_artifact_path = layout.persist_parsed_artifact(
                     parsed_id=parsed_id,
@@ -431,7 +434,7 @@ class AnalysisExecutor:
         t_load = perf_counter() - t_load0
         logger.debug(
             "Loaded data_type=%s for task=%s",
-            getattr(task.required_data, "__name__", str(task.required_data)),
+            getattr(required_data, "__name__", str(required_data)),
             task.__class__.__name__,
         )
         self._record_timing(args, phase="load_total", task_name=task.__class__.__name__, seconds=t_load)

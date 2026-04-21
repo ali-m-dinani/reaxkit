@@ -201,6 +201,14 @@ class AnalysisTask(ABC):
     def run(self, data, request, reporter=None):
         """Run scientific analysis on normalized domain data."""
 
+    def required_data_for(self, request: object, args: dict | None = None):
+        """Resolve required input dataclass for this run.
+
+        Default behavior keeps existing static ``required_data`` semantics.
+        """
+        _ = (request, args)
+        return self.required_data
+
     @classmethod
     def recommended_presentations(cls, _result: object, payload: dict[str, Any]) -> list[PresentationSpec]:
         """Default typed presentation specs for analysis results."""

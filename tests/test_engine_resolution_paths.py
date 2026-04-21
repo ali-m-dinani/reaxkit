@@ -96,3 +96,45 @@ def test_reaxff_detect_accepts_renamed_xmolout_file(tmp_path):
     adapter = ReaxFFAdapter()
 
     assert adapter.detect(renamed) > 0.0
+
+
+def test_analysis_executor_uses_task_required_data_for(monkeypatch):
+    captured = {}
+
+    class DummyAdapter:
+        def required_input_files(self, data_type, args):
+            captured["required_input_files_data_type"] = data_type
+            return ()
+
+        def load(self, data_type, args, reporter=None):
+            captured["load_data_type"] = data_type
+            return "payload"
+
+    class DynamicTask:
+        required_data = object
+
+        @staticmethod
+        def required_data_for(request, args):
+            _ = (request, args)
+            return str
+
+        def run(self, data, request):
+            _ = request
+            return data
+
+    def fake_resolve_engine(path, engine=None):
+        _ = (path, engine)
+        return DummyAdapter()
+
+    monkeypatch.setattr("reaxkit.core.analysis_executor.resolve_engine", fake_resolve_engine)
+
+    executor = AnalysisExecutor()
+    result = executor.run(
+        DynamicTask(),
+        request=object(),
+        args={"xmolout": "renamed_xmolout", "no_cache": True},
+    )
+
+    assert result == "payload"
+    assert captured["required_input_files_data_type"] is str
+    assert captured["load_data_type"] is str

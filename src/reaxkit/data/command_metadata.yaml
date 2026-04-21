@@ -202,3 +202,9 @@ commands:
   atom_property_heatmap2d:
     kind: analysis
     help: 2D atom property heatmap
+  active_site_structural:
+    kind: analysis
+    help: Active-site structural analysis
+  active_site_events:
+    kind: analysis
+    help: Active-site event analysis

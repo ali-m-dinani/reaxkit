@@ -77,3 +77,5 @@ register_analysis_command("coordination_relabel", module_path="reaxkit.workflows
 register_analysis_command("hybridization", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("atom_property_plot3d", module_path="reaxkit.workflows.spatial_property_workflow")
 register_analysis_command("atom_property_heatmap2d", module_path="reaxkit.workflows.spatial_property_workflow")
+register_analysis_command("active_site_structural", module_path="reaxkit.workflows.active_site_workflow")
+register_analysis_command("active_site_events", module_path="reaxkit.workflows.active_site_workflow")
