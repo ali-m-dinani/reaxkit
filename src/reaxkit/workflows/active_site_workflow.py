@@ -40,6 +40,18 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
     parser.add_argument("--export", default=None, help="Write the result table to CSV")
     parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
+    parser.add_argument(
+        "--report",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Generate a report under reports/<command>/<analysis_id>/",
+    )
+    parser.add_argument(
+        "--report-format",
+        choices=["both", "pdf", "docx"],
+        default="both",
+        help="Report format when --report is enabled.",
+    )
 
 
 def _build_active_site_structural_request(args: argparse.Namespace) -> ActiveSiteStructuralRequest:
@@ -87,7 +99,6 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = resolve_command_name(command, task_names=ACTIVE_SITE_COMMANDS)
     parser.set_defaults(command=canonical)
-    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
@@ -177,21 +188,29 @@ def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, 
         return None
 
     if command == "active_site_structural":
-        if not {"atom_id", "d_pyr"}.issubset(table.columns):
-            return None
-        if "label" in table.columns:
+        if {"x", "y", "label"}.issubset(table.columns):
             series = []
-            for label, group in table.groupby("label", sort=True):
-                group = group.sort_values("atom_id")
-                series.append({"x": group["atom_id"].tolist(), "y": group["d_pyr"].tolist(), "label": str(label)})
+            for lbl, group in table.groupby("label", sort=True):
+                series.append(
+                    {
+                        "x": group["x"].tolist(),
+                        "y": group["y"].tolist(),
+                        "label": str(lbl),
+                        "markersize": 8,
+                        "alpha": 0.8,
+                    }
+                )
             return {
                 "plot_type": "single_plot",
                 "series": series,
-                "xlabel": "atom_id",
-                "ylabel": "d_pyr",
-                "title": "Pyramidalization by Atom",
+                "xlabel": "x [A]",
+                "ylabel": "y [A]",
+                "title": "Atom Label Map",
                 "legend": True,
+                "kind": "scatter",
             }
+        if not {"atom_id", "d_pyr"}.issubset(table.columns):
+            return None
         ordered = table.sort_values("atom_id")
         return {
             "plot_type": "single_plot",
@@ -229,5 +248,10 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
     bundled = bundle_canonical_and_tract_tables(result)
-    present_result(canonical, bundled, args, plot_payload_builder=_plot_payload)
+    present_result(
+        canonical,
+        bundled,
+        args,
+        plot_payload_builder=_plot_payload,
+    )
     return 0

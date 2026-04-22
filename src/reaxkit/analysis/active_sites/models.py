@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Optional, Sequence
 
+import numpy as np
 import pandas as pd
 
 from reaxkit.domain.base_request import BaseRequest
@@ -145,6 +146,7 @@ class ActiveSiteStructuralResult(BaseResult):
     tract_table: pd.DataFrame
     summary: dict[str, Any]
     request: ActiveSiteStructuralRequest
+    soap_descriptors: Optional[np.ndarray] = None
 
 
 @dataclass

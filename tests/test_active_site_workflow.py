@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from reaxkit.workflows import active_site_workflow
@@ -22,6 +23,8 @@ def _base_args(**overrides):
         "save": None,
         "export": None,
         "grid": None,
+        "report": False,
+        "report_format": "both",
         "frame": 0,
         "bo_threshold": 0.3,
         "bond_mode": "bo",
@@ -62,9 +65,10 @@ def test_active_site_structural_run_main_bundles_tables_and_passes_strict(monkey
             tract_table=pd.DataFrame({"atom_id": [1]}),
             summary={},
             request=request,
+            soap_descriptors=np.asarray([[0.1, 0.2]], dtype=float),
         )
 
-    def fake_present(command, result, args, plot_payload_builder=None):
+    def fake_present(command, result, args, plot_payload_builder=None, report_payload_builder=None):
         captured["command"] = command
         captured["present_result"] = result
         captured["present_args"] = args
@@ -87,6 +91,7 @@ def test_active_site_structural_run_main_bundles_tables_and_passes_strict(monkey
     assert captured["request"].bond_scale == 1.2
     assert isinstance(captured["present_result"].table, pd.DataFrame)
     assert isinstance(captured["present_result"].tract_table, pd.DataFrame)
+    assert isinstance(captured["present_result"].soap_descriptors, np.ndarray)
 
 
 def test_active_site_events_run_main_bundles_tables_and_passes_strict(monkeypatch):
@@ -102,7 +107,7 @@ def test_active_site_events_run_main_bundles_tables_and_passes_strict(monkeypatc
             request=request,
         )
 
-    def fake_present(command, result, args, plot_payload_builder=None):
+    def fake_present(command, result, args, plot_payload_builder=None, report_payload_builder=None):
         captured["command"] = command
         captured["present_result"] = result
 

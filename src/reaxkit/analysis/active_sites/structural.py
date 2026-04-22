@@ -655,12 +655,13 @@ class ActiveSiteStructuralTask(AnalysisTask):
 
         soap_pc = np.full((n_atoms, 3), np.nan, dtype=float)
         soap_score_col = np.full(n_atoms, np.nan, dtype=float)
+        soap_descriptors: np.ndarray | None = None
         if bool(getattr(request, "soap", False)) and n_c > 0:
             soap_ref = None
             soap_ref_path = getattr(request, "soap_ref_path", None)
             if soap_ref_path:
                 soap_ref = np.load(Path(str(soap_ref_path)))
-            _, pca_scores, soap_score = _compute_soap(
+            soap_descriptors, pca_scores, soap_score = _compute_soap(
                 xyz=xyz,
                 elements=elements,
                 c_idx=c_idx,
@@ -749,6 +750,28 @@ class ActiveSiteStructuralTask(AnalysisTask):
         if not bool(request.include_noncarbon):
             table = table[table["element"] == carbon_element].reset_index(drop=True)
 
+        ring_histogram: dict[str, int] = {}
+        for cyc in rings:
+            key = str(len(cyc))
+            ring_histogram[key] = int(ring_histogram.get(key, 0)) + 1
+
+        carbon_table = table[table["element"] == carbon_element]
+        defect_cluster_counts = {
+            str(k): int(v)
+            for k, v in carbon_table["defect_type"].value_counts().to_dict().items()
+            if str(k) != "none"
+        }
+        regular_carbon = carbon_table[~carbon_table["is_undercoord"]]
+        if len(regular_carbon) > 0:
+            abs_dp = regular_carbon["d_pyr"].abs().to_numpy(dtype=float)
+            dpyr_stats = {
+                "mean_abs": float(np.mean(abs_dp)),
+                "median_abs": float(np.median(abs_dp)),
+                "frac_above_tau": float((abs_dp > 0.229).sum() / max(len(abs_dp), 1)),
+            }
+        else:
+            dpyr_stats = {"mean_abs": 0.0, "median_abs": 0.0, "frac_above_tau": 0.0}
+
         summary = {
             "frame_idx": frame_index,
             "bond_mode": bond_mode,
@@ -761,8 +784,12 @@ class ActiveSiteStructuralTask(AnalysisTask):
             "n_boundary_carbon": int(((table["element"] == carbon_element) & table["boundary"]).sum()),
             "n_edge_zigzag": int((table["edge_label"] == "edge_zigzag").sum()),
             "n_edge_armchair": int((table["edge_label"] == "edge_armchair").sum()),
+            "n_bonds_total": int(graph.number_of_edges()),
             "n_rings_primitive": int(len(rings)),
+            "ring_histogram": ring_histogram,
+            "defect_cluster_counts": defect_cluster_counts,
             "n_grains": int(np.max(grain_id) + 1) if np.any(grain_id >= 0) else 0,
+            "dpyr_stats": dpyr_stats,
             "is_periodic": bool(is_periodic),
             "label_counts": {str(k): int(v) for k, v in table["label"].value_counts().to_dict().items()},
         }
@@ -770,7 +797,13 @@ class ActiveSiteStructuralTask(AnalysisTask):
         if reporter:
             reporter("analyze", 1, 1, "Active-site structural descriptors assembled")
         tract_table = to_tract_structural_table(table, strict=bool(request.strict_tract))
-        return ActiveSiteStructuralResult(table=table, tract_table=tract_table, summary=summary, request=request)
+        return ActiveSiteStructuralResult(
+            table=table,
+            tract_table=tract_table,
+            summary=summary,
+            request=request,
+            soap_descriptors=soap_descriptors,
+        )
 
 
 __all__ = [

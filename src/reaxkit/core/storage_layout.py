@@ -164,7 +164,6 @@ class ReaxkitStorageLayout:
             self.parsed_root,
             self.run_index_root,
             self.analysis_root,
-            self.figures_root,
             self.reports_root,
             self.cache_root,
             self.logs_root,

@@ -6,13 +6,16 @@ from pathlib import Path
 from typing import Callable
 
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.storage_layout import normalize_storage_args
-from reaxkit.presentation.persist import persist_analysis_result
+from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
+from reaxkit.presentation.persist import append_artifacts_to_settings, persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
+from reaxkit.presentation.report_registry import get_report_payload_builder
+from reaxkit.presentation.reporting import normalize_report_formats, write_report_artifacts
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_plot_payload
 
 
 PlotPayloadBuilder = Callable[[str, object, object], dict[str, object] | None]
+ReportPayloadBuilder = Callable[[str, object, object, Path], dict[str, object] | None]
 
 _RAW_PLOT_DATA_KEYS = frozenset(
     {
@@ -77,6 +80,7 @@ def present_result(
     args,
     *,
     plot_payload_builder: PlotPayloadBuilder | None = None,
+    report_payload_builder: ReportPayloadBuilder | None = None,
 ) -> None:
     """Dispatch result presentation from CLI-style arguments."""
     normalized = normalize_storage_args(vars(args), snapshot=False)
@@ -91,6 +95,8 @@ def present_result(
     plot_mode = getattr(args, "plot", None)
     show = bool(getattr(args, "show", False))
     wants_plot = bool(plot_mode or save or show)
+    wants_report = bool(getattr(args, "report", False))
+    report_mode = str(getattr(args, "report_format", "both") or "both")
 
     if export_csv:
         export_path = resolve_output_path(
@@ -138,6 +144,36 @@ def present_result(
                 if show or (plot_mode and not save):
                     render_plot(payload)
 
-    if not (wants_plot or export_csv):
+    if wants_report:
+        if report_payload_builder is None:
+            report_payload_builder = get_report_payload_builder(str(command))
+        if report_payload_builder is None:
+            print("Report generation is not available for this command.")
+        else:
+            payload = report_payload_builder(command, result, args, analysis_dir)
+            if payload is None:
+                print("No data available for report generation.")
+            else:
+                analysis_id = (
+                    getattr(args, "analysis_id", None)
+                    or getattr(args, "run_id", None)
+                    or getattr(args, "_analysis_id", None)
+                    or "analysis"
+                )
+                layout = ReaxkitStorageLayout(project_root=Path(getattr(args, "project_root", ".")))
+                report_dir = layout.reports_root / str(command) / str(analysis_id)
+                report_files, report_notes = write_report_artifacts(
+                    payload,
+                    out_dir=report_dir,
+                    stem=str(analysis_id),
+                    formats=normalize_report_formats(report_mode),
+                )
+                if report_files:
+                    append_artifacts_to_settings(analysis_dir, reports=report_files)
+                    result_dirs.append(report_dir)
+                for note in report_notes:
+                    print(f"[report] {note}")
+
+    if not (wants_plot or export_csv or wants_report):
         print_result_table(result)
     _print_output_dirs(result_dirs)

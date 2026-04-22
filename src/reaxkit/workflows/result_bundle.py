@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 
@@ -16,6 +17,7 @@ class DualTableResultBundle:
     tract_table: pd.DataFrame
     summary: dict[str, Any] | None = None
     request: Any = None
+    soap_descriptors: np.ndarray | None = None
 
 
 def bundle_canonical_and_tract_tables(
@@ -40,6 +42,7 @@ def bundle_canonical_and_tract_tables(
         tract_table=tract,
         summary=getattr(result, "summary", None),
         request=getattr(result, "request", None),
+        soap_descriptors=getattr(result, "soap_descriptors", None),
     )
 
 
