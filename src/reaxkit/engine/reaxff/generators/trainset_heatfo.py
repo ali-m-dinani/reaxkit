@@ -4,7 +4,7 @@ Materials Project heat-of-formation trainset generation utilities.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -32,9 +32,10 @@ class HeatFoReferenceSpec:
 
 @dataclass(frozen=True)
 class MaterialsProjectHeatFoSpec:
-    elements: List[str]
-    references_by_element: Dict[str, HeatFoReferenceSpec]
     out_dir: str | Path
+    elements: List[str] = field(default_factory=list)
+    material_ids: Optional[List[str]] = None
+    references_by_element: Dict[str, HeatFoReferenceSpec] = field(default_factory=dict)
     exact_element_count: bool = True
     api_key: Optional[str] = None
     max_materials: Optional[int] = None
@@ -74,6 +75,22 @@ def parse_elements_csv(value: str) -> List[str]:
             normalized.append(e)
             seen.add(e)
     return normalized
+
+
+def parse_mp_ids_csv(value: str) -> List[str]:
+    ids = [token.strip() for token in re.split(r"[,\s]+", str(value)) if token.strip()]
+    out: List[str] = []
+    seen = set()
+    for material_id in ids:
+        mid = str(material_id).strip()
+        if not mid:
+            continue
+        if mid not in seen:
+            out.append(mid)
+            seen.add(mid)
+    if not out:
+        raise ValueError("No Materials Project ids were provided.")
+    return out
 
 
 def parse_heatfo_references(value: str) -> Dict[str, HeatFoReferenceSpec]:
@@ -244,6 +261,40 @@ def _search_summary_docs(
     return list(picked.values())
 
 
+def _fetch_summary_docs_by_material_ids(mpr: MPRester, *, material_ids: List[str]) -> List[object]:
+    fields = [
+        "material_id",
+        "formula_pretty",
+        "symmetry",
+        "structure",
+        "formation_energy_per_atom",
+        "elements",
+        "nelements",
+    ]
+    docs = mpr.materials.summary.search(material_ids=material_ids, fields=fields)
+    found_map = {str(_doc_field(doc, "material_id", "")).strip(): doc for doc in docs}
+    missing = [mid for mid in material_ids if mid not in found_map]
+    if missing:
+        raise ValueError(f"Materials Project ids not found or inaccessible: {missing}")
+    return [found_map[mid] for mid in material_ids]
+
+
+def _derive_elements_from_docs(docs: List[object]) -> List[str]:
+    ordered: List[str] = []
+    seen = set()
+    for doc in docs:
+        structure = _doc_field(doc, "structure", None)
+        if structure is None:
+            continue
+        counts = _extract_integer_composition_counts(structure)
+        for element in counts.keys():
+            e = str(element)
+            if e not in seen:
+                ordered.append(e)
+                seen.add(e)
+    return ordered
+
+
 def _extract_energy_above_hull(doc_obj) -> float:
     eah = _doc_field(doc_obj, "energy_above_hull", None)
     if eah is not None:
@@ -371,7 +422,8 @@ def _build_energy_line(
 
 
 def generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> MaterialsProjectHeatFoResult:
-    elements = parse_elements_csv(",".join(spec.elements))
+    material_ids = parse_mp_ids_csv(",".join(spec.material_ids)) if spec.material_ids else None
+    elements = parse_elements_csv(",".join(spec.elements)) if spec.elements else []
     references_by_element = {
         str(k)[:1].upper() + str(k)[1:].lower(): v for k, v in spec.references_by_element.items()
     }
@@ -402,6 +454,22 @@ def generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Materi
     written_geo_seen: set[Path] = set()
 
     with MPRester(api_key) as mpr:
+        if material_ids:
+            docs = _fetch_summary_docs_by_material_ids(mpr, material_ids=material_ids)
+            if not elements:
+                elements = _derive_elements_from_docs(docs)
+            if not elements:
+                raise ValueError("Could not derive elements from selected material ids.")
+        else:
+            if not elements:
+                raise ValueError("Heatfo batch mode requires elements.")
+            docs = _search_summary_docs(
+                mpr,
+                elements=elements,
+                exact_element_count=bool(spec.exact_element_count),
+                max_materials=spec.max_materials,
+            )
+
         missing_refs = [e for e in elements if e not in references_by_element]
         if missing_refs:
             if spec.verbose:
@@ -432,15 +500,11 @@ def generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Materi
                         f"(atoms_per_structure={ref_count})"
                     )
 
-        docs = _search_summary_docs(
-            mpr,
-            elements=elements,
-            exact_element_count=bool(spec.exact_element_count),
-            max_materials=spec.max_materials,
-        )
-
         if spec.verbose:
-            print(f"[MP] Selected {len(docs)} systems for elements={elements}")
+            if material_ids:
+                print(f"[MP] Selected {len(docs)} systems for material_ids={material_ids}")
+            else:
+                print(f"[MP] Selected {len(docs)} systems for elements={elements}")
 
         for doc in docs:
             try:
