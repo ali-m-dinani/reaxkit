@@ -5,17 +5,19 @@ Materials Project heat-of-formation trainset generation utilities.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import combinations
 from pathlib import Path
 from typing import Dict, List, Optional
 import os
 import re
 
-from mp_api.client import MPRester
-
 from reaxkit.core.constants import const
 from reaxkit.engine.common.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.geo_generator import xtob
+from reaxkit.engine.reaxff.generators.trainset_mp import (
+    mp_collect_heatfo_docs,
+    mp_doc_field,
+    mp_pick_unary_reference_docs,
+)
 
 
 _SUBSCRIPT_TRANSLATION = str.maketrans(
@@ -94,10 +96,6 @@ def parse_mp_ids_csv(value: str) -> List[str]:
 
 
 def parse_heatfo_references(value: str) -> Dict[str, HeatFoReferenceSpec]:
-    """
-    Parse references in the form:
-        "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"
-    """
     refs: Dict[str, HeatFoReferenceSpec] = {}
     chunks = [token.strip() for token in re.split(r"[;,]", str(value)) if token.strip()]
     if not chunks:
@@ -124,25 +122,6 @@ def parse_heatfo_references(value: str) -> Dict[str, HeatFoReferenceSpec]:
     return refs
 
 
-def _to_plain_dict(doc_obj) -> dict:
-    if hasattr(doc_obj, "model_dump"):
-        return dict(doc_obj.model_dump())
-    if hasattr(doc_obj, "dict"):
-        return dict(doc_obj.dict())
-    if isinstance(doc_obj, dict):
-        return doc_obj
-    return {}
-
-
-def _doc_field(doc_obj, key: str, default=None):
-    if hasattr(doc_obj, key):
-        value = getattr(doc_obj, key)
-        if value is not None:
-            return value
-    doc = _to_plain_dict(doc_obj)
-    return doc.get(key, default)
-
-
 def _clean_formula(formula_pretty: str) -> str:
     formula_ascii = str(formula_pretty).translate(_SUBSCRIPT_TRANSLATION)
     formula_ascii = formula_ascii.replace(" ", "")
@@ -153,7 +132,7 @@ def _clean_formula(formula_pretty: str) -> str:
 
 
 def _extract_crystal_system(doc_obj) -> str:
-    symmetry = _doc_field(doc_obj, "symmetry")
+    symmetry = mp_doc_field(doc_obj, "symmetry")
     if symmetry is None:
         return "unknown"
     crystal = None
@@ -203,149 +182,6 @@ def _extract_integer_composition_counts(structure_obj) -> Dict[str, int]:
     return counts
 
 
-def _search_summary_docs(
-    mpr: MPRester,
-    *,
-    elements: List[str],
-    exact_element_count: bool,
-    max_materials: Optional[int],
-) -> List[object]:
-    fields = [
-        "material_id",
-        "formula_pretty",
-        "symmetry",
-        "structure",
-        "formation_energy_per_atom",
-        "elements",
-        "nelements",
-    ]
-    allowed = set(elements)
-    subset_sizes = [len(elements)] if exact_element_count else list(range(1, len(elements) + 1))
-    subsets = [list(combo) for size in subset_sizes for combo in combinations(elements, size)]
-
-    picked: Dict[str, object] = {}
-    for subset in subsets:
-        docs = mpr.materials.summary.search(
-            elements=subset,
-            num_elements=len(subset),
-            fields=fields,
-        )
-        for doc in docs:
-            material_id = str(_doc_field(doc, "material_id", "")).strip()
-            if not material_id:
-                continue
-
-            doc_elements = _doc_field(doc, "elements", None)
-            if doc_elements:
-                doc_element_set = {str(e) for e in doc_elements}
-            else:
-                structure = _doc_field(doc, "structure", None)
-                if structure is None:
-                    continue
-                doc_element_set = set(_extract_integer_composition_counts(structure).keys())
-
-            if not doc_element_set.issubset(allowed):
-                continue
-            if exact_element_count and doc_element_set != allowed:
-                continue
-
-            formation_e = _doc_field(doc, "formation_energy_per_atom", None)
-            if formation_e is None:
-                continue
-            if _doc_field(doc, "structure", None) is None:
-                continue
-
-            picked[material_id] = doc
-            if max_materials is not None and len(picked) >= max_materials:
-                return list(picked.values())
-    return list(picked.values())
-
-
-def _fetch_summary_docs_by_material_ids(mpr: MPRester, *, material_ids: List[str]) -> List[object]:
-    fields = [
-        "material_id",
-        "formula_pretty",
-        "symmetry",
-        "structure",
-        "formation_energy_per_atom",
-        "elements",
-        "nelements",
-    ]
-    docs = mpr.materials.summary.search(material_ids=material_ids, fields=fields)
-    found_map = {str(_doc_field(doc, "material_id", "")).strip(): doc for doc in docs}
-    missing = [mid for mid in material_ids if mid not in found_map]
-    if missing:
-        raise ValueError(f"Materials Project ids not found or inaccessible: {missing}")
-    return [found_map[mid] for mid in material_ids]
-
-
-def _derive_elements_from_docs(docs: List[object]) -> List[str]:
-    ordered: List[str] = []
-    seen = set()
-    for doc in docs:
-        structure = _doc_field(doc, "structure", None)
-        if structure is None:
-            continue
-        counts = _extract_integer_composition_counts(structure)
-        for element in counts.keys():
-            e = str(element)
-            if e not in seen:
-                ordered.append(e)
-                seen.add(e)
-    return ordered
-
-
-def _extract_energy_above_hull(doc_obj) -> float:
-    eah = _doc_field(doc_obj, "energy_above_hull", None)
-    if eah is not None:
-        return float(eah)
-    # Fallback for stable entries when explicit E_hull is missing.
-    is_stable = _doc_field(doc_obj, "is_stable", None)
-    if bool(is_stable):
-        return 0.0
-    return float("inf")
-
-
-def _pick_unary_reference_doc(mpr: MPRester, *, element: str) -> object:
-    fields = [
-        "material_id",
-        "formula_pretty",
-        "symmetry",
-        "structure",
-        "formation_energy_per_atom",
-        "energy_above_hull",
-        "is_stable",
-        "elements",
-        "nelements",
-    ]
-    docs = mpr.materials.summary.search(
-        elements=[element],
-        num_elements=1,
-        fields=fields,
-    )
-    if not docs:
-        raise ValueError(f"No unary systems found for element {element}.")
-
-    candidates = []
-    for idx, doc in enumerate(docs):
-        fep = _doc_field(doc, "formation_energy_per_atom", None)
-        structure = _doc_field(doc, "structure", None)
-        if fep is None or structure is None:
-            continue
-        if abs(float(fep)) > 1e-8:
-            continue
-        eah = _extract_energy_above_hull(doc)
-        candidates.append((eah, idx, doc))
-
-    if not candidates:
-        raise ValueError(
-            f"No unary reference for {element} satisfies formation_energy_per_atom = 0."
-        )
-
-    candidates.sort(key=lambda item: (item[0], item[1]))
-    return candidates[0][2]
-
-
 def _write_structure_triplet(
     *,
     doc_obj,
@@ -353,10 +189,10 @@ def _write_structure_triplet(
     xyz_dir: Path,
     geo_dir: Path,
 ) -> _WrittenStructure:
-    material_id = str(_doc_field(doc_obj, "material_id"))
-    formula_pretty = str(_doc_field(doc_obj, "formula_pretty", material_id))
+    material_id = str(mp_doc_field(doc_obj, "material_id"))
+    formula_pretty = str(mp_doc_field(doc_obj, "formula_pretty", material_id))
     crystal_system = _extract_crystal_system(doc_obj)
-    structure = _doc_field(doc_obj, "structure")
+    structure = mp_doc_field(doc_obj, "structure")
     if structure is None:
         raise ValueError(f"{material_id}: missing structure.")
 
@@ -453,91 +289,86 @@ def generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Materi
     generated_geo_paths: List[Path] = []
     written_geo_seen: set[Path] = set()
 
-    with MPRester(api_key) as mpr:
+    collected = mp_collect_heatfo_docs(
+        api_key=api_key,
+        elements=elements,
+        material_ids=material_ids,
+        exact_element_count=bool(spec.exact_element_count),
+        max_materials=spec.max_materials,
+    )
+    docs = collected.docs
+    elements = collected.elements
+    if not elements:
+        raise ValueError("Could not determine element set for selected systems.")
+
+    missing_refs = [e for e in elements if e not in references_by_element]
+    if missing_refs:
+        if spec.verbose:
+            print(f"[MP] Auto-discovering unary references for: {missing_refs}")
+        reference_docs = mp_pick_unary_reference_docs(api_key=api_key, elements=missing_refs)
+        for element in missing_refs:
+            ref_written = _write_structure_triplet(
+                doc_obj=reference_docs[element],
+                cif_dir=cif_dir,
+                xyz_dir=xyz_dir,
+                geo_dir=geo_dir,
+            )
+            ref_count = ref_written.composition_counts.get(element, 0)
+            if ref_count <= 0:
+                raise ValueError(
+                    f"Auto reference for {element} has invalid composition: {ref_written.composition_counts}"
+                )
+            references_by_element[element] = HeatFoReferenceSpec(
+                iden=ref_written.identifier,
+                atoms_per_structure=ref_count,
+            )
+            if ref_written.geo_path not in written_geo_seen:
+                generated_geo_paths.append(ref_written.geo_path)
+                written_geo_seen.add(ref_written.geo_path)
+            if spec.verbose:
+                print(
+                    f"[MP][ref] {element}: {ref_written.identifier} "
+                    f"(atoms_per_structure={ref_count})"
+                )
+
+    if spec.verbose:
         if material_ids:
-            docs = _fetch_summary_docs_by_material_ids(mpr, material_ids=material_ids)
-            if not elements:
-                elements = _derive_elements_from_docs(docs)
-            if not elements:
-                raise ValueError("Could not derive elements from selected material ids.")
+            print(f"[MP] Selected {len(docs)} systems for material_ids={material_ids}")
         else:
-            if not elements:
-                raise ValueError("Heatfo batch mode requires elements.")
-            docs = _search_summary_docs(
-                mpr,
-                elements=elements,
-                exact_element_count=bool(spec.exact_element_count),
-                max_materials=spec.max_materials,
+            print(f"[MP] Selected {len(docs)} systems for elements={elements}")
+
+    for doc in docs:
+        try:
+            written = _write_structure_triplet(
+                doc_obj=doc,
+                cif_dir=cif_dir,
+                xyz_dir=xyz_dir,
+                geo_dir=geo_dir,
             )
 
-        missing_refs = [e for e in elements if e not in references_by_element]
-        if missing_refs:
+            formation_e_pa = float(mp_doc_field(doc, "formation_energy_per_atom"))
+            formation_e_total_kcal_mol = formation_e_pa * float(written.total_atoms) * ev_to_kcal_mol
+            per_atom_heat_kcal_mol = formation_e_total_kcal_mol / float(written.total_atoms)
+
+            energy_lines.append(
+                _build_energy_line(
+                    identifier=written.identifier,
+                    composition_counts=written.composition_counts,
+                    element_order=elements,
+                    total_atoms=written.total_atoms,
+                    per_atom_heat_kcal_mol=per_atom_heat_kcal_mol,
+                    weight=float(spec.weight),
+                    references_by_element=references_by_element,
+                )
+            )
+            generated_identifiers.append(written.identifier)
+            if written.geo_path not in written_geo_seen:
+                generated_geo_paths.append(written.geo_path)
+                written_geo_seen.add(written.geo_path)
+        except Exception as exc:
             if spec.verbose:
-                print(f"[MP] Auto-discovering unary references for: {missing_refs}")
-            for element in missing_refs:
-                ref_doc = _pick_unary_reference_doc(mpr, element=element)
-                ref_written = _write_structure_triplet(
-                    doc_obj=ref_doc,
-                    cif_dir=cif_dir,
-                    xyz_dir=xyz_dir,
-                    geo_dir=geo_dir,
-                )
-                ref_count = ref_written.composition_counts.get(element, 0)
-                if ref_count <= 0:
-                    raise ValueError(
-                        f"Auto reference for {element} has invalid composition: {ref_written.composition_counts}"
-                    )
-                references_by_element[element] = HeatFoReferenceSpec(
-                    iden=ref_written.identifier,
-                    atoms_per_structure=ref_count,
-                )
-                if ref_written.geo_path not in written_geo_seen:
-                    generated_geo_paths.append(ref_written.geo_path)
-                    written_geo_seen.add(ref_written.geo_path)
-                if spec.verbose:
-                    print(
-                        f"[MP][ref] {element}: {ref_written.identifier} "
-                        f"(atoms_per_structure={ref_count})"
-                    )
-
-        if spec.verbose:
-            if material_ids:
-                print(f"[MP] Selected {len(docs)} systems for material_ids={material_ids}")
-            else:
-                print(f"[MP] Selected {len(docs)} systems for elements={elements}")
-
-        for doc in docs:
-            try:
-                written = _write_structure_triplet(
-                    doc_obj=doc,
-                    cif_dir=cif_dir,
-                    xyz_dir=xyz_dir,
-                    geo_dir=geo_dir,
-                )
-
-                formation_e_pa = float(_doc_field(doc, "formation_energy_per_atom"))
-                formation_e_total_kcal_mol = formation_e_pa * float(written.total_atoms) * ev_to_kcal_mol
-                per_atom_heat_kcal_mol = formation_e_total_kcal_mol / float(written.total_atoms)
-
-                energy_lines.append(
-                    _build_energy_line(
-                        identifier=written.identifier,
-                        composition_counts=written.composition_counts,
-                        element_order=elements,
-                        total_atoms=written.total_atoms,
-                        per_atom_heat_kcal_mol=per_atom_heat_kcal_mol,
-                        weight=float(spec.weight),
-                        references_by_element=references_by_element,
-                    )
-                )
-                generated_identifiers.append(written.identifier)
-                if written.geo_path not in written_geo_seen:
-                    generated_geo_paths.append(written.geo_path)
-                    written_geo_seen.add(written.geo_path)
-            except Exception as exc:
-                if spec.verbose:
-                    mid = str(_doc_field(doc, "material_id", "unknown"))
-                    print(f"[MP][skip] {mid}: {exc}")
+                mid = str(mp_doc_field(doc, "material_id", "unknown"))
+                print(f"[MP][skip] {mid}: {exc}")
 
     trainset_path = out_dir / spec.trainset_filename
     element_label = ",".join(elements)

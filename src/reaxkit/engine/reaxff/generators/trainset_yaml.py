@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import Dict, Optional
 import shutil
 
-from reaxkit.engine.reaxff.generators.trainset_energy import (
+from reaxkit.engine.reaxff.generators.trainset_elastic_energy import (
     BulkEnergySpec,
     CellSpec,
     ElasticEnergySpec,
     generate_trainset_energy,
     write_trainset_energy,
 )
-from reaxkit.engine.reaxff.generators.trainset_geometry import (
+from reaxkit.engine.reaxff.generators.trainset_elastic_geometry import (
     StrainedGeometrySpec,
     generate_strained_geometries,
     write_strained_geometries,
@@ -218,6 +218,44 @@ def write_trainset_settings_yaml(
     out_path_obj = Path(out_path)
     out_path_obj.parent.mkdir(parents=True, exist_ok=True)
     out_path_obj.write_text(generate_trainset_settings_yaml(spec), encoding="utf-8")
+
+
+def generate_heatfo_settings_yaml_text() -> str:
+    lines = [
+        "# Heatfo trainset settings for `make-trainset-heatfo --input-mode yaml`",
+        "# Edit values to match your system.",
+        "",
+        "source: mp  # Data source: mp (jarvis can be added later)",
+        "input_mode: batch  # batch or material-id",
+        "",
+        "# Used in batch mode",
+        "elements: [Ba, B, O]  # Allowed element pool",
+        "element_count_scope: exact  # exact or up-to",
+        "max_materials: null  # Optional integer cap",
+        "",
+        "# Used in material-id mode",
+        "mat_id: null  # Single material id for selected source, e.g. mp-661",
+        "material_ids: null  # Optional list, e.g. [mp-661, mp-1234]",
+        "",
+        "# Optional explicit references; if null, unary references are auto-discovered from MP",
+        "references: null  # or {Ba: \"Babcc_opt:2\", B: \"B_alp:12\", O: \"O2:2\"}",
+        "",
+        "weight: 1.0  # Trainset weight",
+        "trainset_file: trainset_heatfo.in  # Output trainset filename",
+        "geo_file: geo  # Output concatenated geo filename",
+        "",
+        "api_key: null  # Optional MP API key; if null, use MP_API_KEY env var",
+        "verbose: false",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def write_heatfo_settings_yaml(*, out_path: str | Path) -> Path:
+    out_path_obj = Path(out_path)
+    out_path_obj.parent.mkdir(parents=True, exist_ok=True)
+    out_path_obj.write_text(generate_heatfo_settings_yaml_text(), encoding="utf-8")
+    return out_path_obj
 
 
 def read_trainset_settings_yaml(yaml_path: str) -> dict:

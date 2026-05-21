@@ -1,10 +1,11 @@
 """
-Materials Project helpers for trainset settings generation.
+Materials Project helpers for trainset generation.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 import os
@@ -12,7 +13,7 @@ import os
 from mp_api.client import MPRester
 
 from reaxkit.engine.common.geo_io import read_structure, write_structure
-from reaxkit.engine.reaxff.generators.trainset_energy import CellSpec
+from reaxkit.engine.reaxff.generators.trainset_elastic_energy import CellSpec
 from reaxkit.engine.reaxff.generators.trainset_yaml import write_trainset_settings_yaml
 
 
@@ -27,6 +28,232 @@ class MaterialsProjectTrainsetSpec:
     bulk_mode: BulkModulusMode = "vrh"
     api_key: Optional[str] = None
     verbose: bool = True
+
+
+@dataclass(frozen=True)
+class MaterialsProjectHeatFoDocs:
+    docs: list[object]
+    elements: list[str]
+
+
+def mp_to_plain_dict(doc_obj) -> dict:
+    if hasattr(doc_obj, "model_dump"):
+        return dict(doc_obj.model_dump())
+    if hasattr(doc_obj, "dict"):
+        return dict(doc_obj.dict())
+    if isinstance(doc_obj, dict):
+        return doc_obj
+    return {}
+
+
+def mp_doc_field(doc_obj, key: str, default=None):
+    if hasattr(doc_obj, key):
+        value = getattr(doc_obj, key)
+        if value is not None:
+            return value
+    doc = mp_to_plain_dict(doc_obj)
+    return doc.get(key, default)
+
+
+def mp_search_summary_docs_by_elements(
+    *,
+    mpr: MPRester,
+    elements: list[str],
+    exact_element_count: bool,
+    max_materials: Optional[int] = None,
+    fields: Optional[list[str]] = None,
+) -> list[object]:
+    fields = fields or [
+        "material_id",
+        "formula_pretty",
+        "symmetry",
+        "structure",
+        "formation_energy_per_atom",
+        "elements",
+        "nelements",
+    ]
+    allowed = set(elements)
+    subset_sizes = [len(elements)] if exact_element_count else list(range(1, len(elements) + 1))
+    subsets = [list(combo) for size in subset_sizes for combo in combinations(elements, size)]
+
+    picked: dict[str, object] = {}
+    for subset in subsets:
+        docs = mpr.materials.summary.search(
+            elements=subset,
+            num_elements=len(subset),
+            fields=fields,
+        )
+        for doc in docs:
+            material_id = str(mp_doc_field(doc, "material_id", "")).strip()
+            if not material_id:
+                continue
+
+            doc_elements = mp_doc_field(doc, "elements", None)
+            if doc_elements:
+                doc_element_set = {str(e) for e in doc_elements}
+            else:
+                structure = mp_doc_field(doc, "structure", None)
+                if structure is None:
+                    continue
+                doc_element_set = {str(e) for e in structure.composition.get_el_amt_dict().keys()}
+
+            if not doc_element_set.issubset(allowed):
+                continue
+            if exact_element_count and doc_element_set != allowed:
+                continue
+
+            picked[material_id] = doc
+            if max_materials is not None and len(picked) >= max_materials:
+                return list(picked.values())
+    return list(picked.values())
+
+
+def mp_fetch_summary_docs_by_material_ids(
+    *,
+    mpr: MPRester,
+    material_ids: list[str],
+    fields: Optional[list[str]] = None,
+) -> list[object]:
+    fields = fields or [
+        "material_id",
+        "formula_pretty",
+        "symmetry",
+        "structure",
+        "formation_energy_per_atom",
+        "elements",
+        "nelements",
+    ]
+    docs = mpr.materials.summary.search(material_ids=material_ids, fields=fields)
+    found_map = {str(mp_doc_field(doc, "material_id", "")).strip(): doc for doc in docs}
+    missing = [mid for mid in material_ids if mid not in found_map]
+    if missing:
+        raise ValueError(f"Materials Project ids not found or inaccessible: {missing}")
+    return [found_map[mid] for mid in material_ids]
+
+
+def mp_derive_elements_from_summary_docs(docs: list[object]) -> list[str]:
+    ordered: list[str] = []
+    seen = set()
+    for doc in docs:
+        structure = mp_doc_field(doc, "structure", None)
+        if structure is None:
+            continue
+        for element in structure.composition.get_el_amt_dict().keys():
+            e = str(element)
+            if e not in seen:
+                ordered.append(e)
+                seen.add(e)
+    return ordered
+
+
+def mp_pick_unary_reference_doc(*, mpr: MPRester, element: str) -> object:
+    fields = [
+        "material_id",
+        "formula_pretty",
+        "symmetry",
+        "structure",
+        "formation_energy_per_atom",
+        "energy_above_hull",
+        "is_stable",
+        "elements",
+        "nelements",
+    ]
+    docs = mpr.materials.summary.search(
+        elements=[element],
+        num_elements=1,
+        fields=fields,
+    )
+    if not docs:
+        raise ValueError(f"No unary systems found for element {element}.")
+
+    def _energy_above_hull(doc_obj) -> float:
+        eah = mp_doc_field(doc_obj, "energy_above_hull", None)
+        if eah is not None:
+            return float(eah)
+        if bool(mp_doc_field(doc_obj, "is_stable", None)):
+            return 0.0
+        return float("inf")
+
+    candidates: list[tuple[float, int, object]] = []
+    for idx, doc in enumerate(docs):
+        fep = mp_doc_field(doc, "formation_energy_per_atom", None)
+        structure = mp_doc_field(doc, "structure", None)
+        if fep is None or structure is None:
+            continue
+        if abs(float(fep)) > 1e-8:
+            continue
+        candidates.append((_energy_above_hull(doc), idx, doc))
+
+    if not candidates:
+        raise ValueError(
+            f"No unary reference for {element} satisfies formation_energy_per_atom = 0."
+        )
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates[0][2]
+
+
+def mp_search_material_ids_by_elements(
+    *,
+    api_key: str,
+    elements: list[str],
+    exact_element_count: bool,
+    max_materials: Optional[int] = None,
+) -> list[str]:
+    with MPRester(api_key) as mpr:
+        docs = mp_search_summary_docs_by_elements(
+            mpr=mpr,
+            elements=elements,
+            exact_element_count=exact_element_count,
+            max_materials=max_materials,
+            fields=["material_id", "elements", "structure", "nelements"],
+        )
+    ids: list[str] = []
+    seen = set()
+    for doc in docs:
+        mid = str(mp_doc_field(doc, "material_id", "")).strip()
+        if not mid or mid in seen:
+            continue
+        ids.append(mid)
+        seen.add(mid)
+    return ids
+
+
+def mp_collect_heatfo_docs(
+    *,
+    api_key: str,
+    elements: list[str],
+    material_ids: Optional[list[str]] = None,
+    exact_element_count: bool = True,
+    max_materials: Optional[int] = None,
+) -> MaterialsProjectHeatFoDocs:
+    with MPRester(api_key) as mpr:
+        if material_ids:
+            docs = mp_fetch_summary_docs_by_material_ids(mpr=mpr, material_ids=material_ids)
+            resolved_elements = list(elements) if elements else mp_derive_elements_from_summary_docs(docs)
+        else:
+            if not elements:
+                raise ValueError("Heatfo batch mode requires elements.")
+            docs = mp_search_summary_docs_by_elements(
+                mpr=mpr,
+                elements=elements,
+                exact_element_count=exact_element_count,
+                max_materials=max_materials,
+            )
+            resolved_elements = list(elements)
+    return MaterialsProjectHeatFoDocs(docs=docs, elements=resolved_elements)
+
+
+def mp_pick_unary_reference_docs(
+    *,
+    api_key: str,
+    elements: list[str],
+) -> Dict[str, object]:
+    picked: Dict[str, object] = {}
+    with MPRester(api_key) as mpr:
+        for element in elements:
+            picked[element] = mp_pick_unary_reference_doc(mpr=mpr, element=element)
+    return picked
 
 
 def _tensor6x6_to_cij_dict(t6: list[list[float]]) -> Dict[str, float]:
@@ -74,13 +301,16 @@ def write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict[
     xyz_path = structure_dir / f"{base}.xyz"
 
     with MPRester(api_key) as mpr:
-        sdoc = mpr.materials.summary.search(
+        sdoc = mp_fetch_summary_docs_by_material_ids(
+            mpr=mpr,
             material_ids=[spec.mp_id],
             fields=["material_id", "formula_pretty", "structure"],
         )[0]
-        structure = sdoc.structure
+        structure = mp_doc_field(sdoc, "structure")
+        if structure is None:
+            raise ValueError(f"{spec.mp_id}: structure missing/unreadable.")
         lat = structure.lattice
-        name = getattr(sdoc, "formula_pretty", None) or spec.mp_id
+        name = mp_doc_field(sdoc, "formula_pretty", None) or spec.mp_id
         cell = CellSpec(
             a=float(lat.a),
             b=float(lat.b),
