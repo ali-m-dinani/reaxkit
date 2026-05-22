@@ -1,0 +1,188 @@
+# Searchable capability index for ReaxFF generator functions.
+# Used by `reaxkit help` to discover generator-side features from natural
+# language queries, then link those features to source generator modules.
+
+_meta:
+  version: '1.0'
+  source: reaxkit.engine.reaxff.generators.*
+  purpose: Maps ReaxFF generator functions to searchable capabilities and workflow links.
+  last_updated: '2026-05-21'
+generators:
+  add_restraints_to_geo:
+    description: Add bond/angle/torsion/mass-center restraint blocks to GEO files.
+    tags:
+    - geo
+    - generator
+    - restraint
+    - bond restraint
+    - angle restraint
+    - torsion
+    - constraints
+    implementation_module: reaxkit.engine.reaxff.generators.geo_generator
+    related_workflow_module: reaxkit.workflows.file_tools.geo_workflow
+    notes:
+    - Exposed via reaxkit add-geo-restraint.
+    - Implemented by add_restraints_to_geo in geo_generator.
+    aliases:
+    - add geo restraint
+    - add_geo_restraint
+    help_search_examples:
+    - reaxkit help "add geometry file restraint"
+    - run add geometry file restraint
+  xtob:
+    description: Convert XYZ structures into ReaxFF GEO/XTLGRF format.
+    tags:
+    - geo
+    - generator
+    - xtob
+    - conversion
+    - xyz
+    implementation_module: reaxkit.engine.reaxff.generators.geo_generator
+    related_workflow_module: reaxkit.workflows.file_tools.geo_workflow
+    aliases:
+    - xtob
+    help_search_examples:
+    - reaxkit help "trajectory coordinates to geometry file"
+    - run trajectory coordinates to geometry file
+  generate_a_given_eregime:
+    description: Generate eregime.in electric-field schedules (sin, pulse, function).
+    tags:
+    - eregime
+    - electric field
+    - generator
+    - schedule
+    - field
+    implementation_module: reaxkit.engine.reaxff.generators.eregime_generator
+    related_workflow_module: reaxkit.workflows.file_tools.eregime_workflow
+    aliases:
+    - make eregime
+    - make_eregime
+    - generate eregime
+    help_search_examples:
+    - reaxkit help "make electric field regime"
+    - make electric field regime
+  generate_charges_template:
+    description: Generate charges template files for ReaxFF workflows.
+    tags:
+    - charges
+    - generator
+    - template
+    implementation_module: reaxkit.engine.reaxff.generators.charges_generator
+    related_workflow_module: reaxkit.workflows.file_tools.charges_workflow
+    aliases:
+    - make charges
+    - make_charges
+    - generate charges
+    help_search_examples:
+    - reaxkit help "make charges"
+    - make charges
+  generate_trainset_settings_yaml:
+    description: Write trainset settings YAML templates for general and heatfo workflows.
+    tags:
+    - trainset settings
+    - yaml template
+    - heatfo settings
+    - generator
+    implementation_module: reaxkit.engine.reaxff.generators.trainset_yaml
+    related_workflow_module: reaxkit.workflows.file_tools.trainset_workflow
+    aliases:
+    - make trainset settings
+    - make_trainset_settings
+    - generate trainset settings
+    - heatfo settings
+    - trainset heatfo settings
+    help_search_examples:
+    - reaxkit help "make training set settings"
+    - make training set settings
+    - create heat of formation training set settings
+    - write heat of formation training set yaml
+  generate_control_template:
+    description: Generate, inspect, and rewrite ReaxFF control files.
+    tags:
+    - control
+    - control file
+    - generator
+    - template
+    - keywords
+    implementation_module: reaxkit.engine.reaxff.generators.control_generator
+    related_workflow_module: reaxkit.workflows.file_tools.control_workflow
+    aliases:
+    - get control
+    - get_control
+    - read control
+    - make control
+    - make_control
+    - generate control
+    - write control
+    - write_control
+    help_search_examples:
+    - reaxkit help "get control"
+    - get control
+    - reaxkit help "make control"
+    - make control
+    - reaxkit help "write control"
+    - run write control
+  generate_addmol_template:
+    description: Generate addmol.bgf and addmol.vel templates for molecule insertion workflows.
+    tags:
+    - addmol
+    - molecule insertion
+    - generator
+    - template
+    implementation_module: reaxkit.engine.reaxff.generators.addmol_generator
+    related_workflow_module: reaxkit.workflows.file_tools.addmol_workflow
+    aliases:
+    - make addmol
+    - make_addmol
+    - generate addmol
+    help_search_examples:
+    - reaxkit help "make molecule insertion"
+    - make molecule insertion
+  generate_kopple2_template:
+    description: Generate kopple2 template files for coupling or parameter setup workflows.
+    tags:
+    - kopple2
+    - coupling template
+    - generator
+    - template
+    implementation_module: reaxkit.engine.reaxff.generators.kopple2_generator
+    related_workflow_module: reaxkit.workflows.file_tools.kopple2_workflow
+    aliases:
+    - make kopple2
+    - make_kopple2
+    - generate kopple2
+    help_search_examples:
+    - reaxkit help "make coupling template"
+    - make coupling template
+  generate_sample_tregime:
+    description: Generate tregime.in temperature schedule files for MD simulations.
+    tags:
+    - tregime
+    - temperature regime
+    - generator
+    - schedule
+    implementation_module: reaxkit.engine.reaxff.generators.tregime_generator
+    related_workflow_module: reaxkit.workflows.file_tools.tregime_workflow
+    aliases:
+    - make tregime
+    - make_tregime
+    - generate tregime
+    help_search_examples:
+    - reaxkit help "make temperature regime"
+    - make temperature regime
+  generate_sample_vregime:
+    description: Generate vregime.in volume or cell schedule files for MD simulations.
+    tags:
+    - vregime
+    - volume regime
+    - generator
+    - schedule
+    implementation_module: reaxkit.engine.reaxff.generators.vregime_generator
+    related_workflow_module: reaxkit.workflows.file_tools.vregime_workflow
+    aliases:
+    - make vregime
+    - make_vregime
+    - generate vregime
+    help_search_examples:
+    - reaxkit help "make volume regime"
+    - make volume regime

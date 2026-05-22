@@ -1,0 +1,234 @@
+# ReaxFF loader/writer mapping used by `reaxkit help`.
+# Tracks read-side loaders and write-side operations as structured YAML metadata.
+
+_meta:
+  version: '1.2'
+  source: reaxkit.engine.reaxff.adapter.ReaxFFAdapter + file-tool workflows
+  purpose: Maps ReaxFF loaders and writers to dataclasses and related files/generators.
+  last_updated: '2026-05-21'
+loaders:
+  load_trajectory:
+    dataclass: TrajectoryData
+    primary_files:
+    - xmolout
+    supplemental_files:
+    - summary.txt
+    notes:
+    - Trajectory frames are read from xmolout.
+    - Simulation-level fields may be merged from summary.txt when available.
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_geometry:
+    dataclass: GeometryData
+    primary_files:
+    - geo
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_simulation:
+    dataclass: SimulationData
+    primary_files:
+    - xmolout
+    - summary.txt
+    supplemental_files: []
+    notes:
+    - Returns error if neither xmolout nor summary.txt exists.
+    merge_strategy: xmolout + summary.txt (if both are available)
+    composed_of: []
+    fallback_files: []
+  load_connectivity:
+    dataclass: ConnectivityData
+    primary_files:
+    - fort.7
+    supplemental_files:
+    - xmolout
+    - summary.txt
+    notes:
+    - Bond/connectivity content is read from fort.7.
+    - Atom IDs/elements and shared simulation fields may be merged from xmolout/summary.txt.
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_connectivity_trajectory:
+    dataclass: ConnectivityTrajectoryData
+    primary_files:
+    - fort.7
+    - xmolout
+    supplemental_files:
+    - summary.txt
+    notes: []
+    merge_strategy: ''
+    composed_of:
+    - ConnectivityData
+    - TrajectoryData
+    fallback_files: []
+  load_force_field:
+    dataclass: ForceFieldParametersData
+    primary_files:
+    - ffield
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_force_field_optimization:
+    dataclass: ForceFieldOptimizationProgressData
+    primary_files:
+    - fort.13
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_force_field_optimization_report:
+    dataclass: ForceFieldOptimizationReportData
+    primary_files:
+    - fort.99
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_force_field_optimization_training_set:
+    dataclass: ForceFieldOptimizationTrainingSetData
+    primary_files:
+    - trainset.in
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_force_field_optimization_parameters:
+    dataclass: ForceFieldOptimizationParameterData
+    primary_files:
+    - params
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_parameter_optimization_diagnostic:
+    dataclass: ForceFieldOptimizationDiagnosticData
+    primary_files:
+    - fort.79
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_structure_summary:
+    dataclass: GeometrySummaryData
+    primary_files:
+    - fort.74
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_partial_energy:
+    dataclass: PartialEnergyData
+    primary_files:
+    - fort.73
+    supplemental_files: []
+    notes:
+    - If input is a directory, adapter checks fort.73, then energylog, then fort.58.
+    merge_strategy: ''
+    composed_of: []
+    fallback_files:
+    - energylog
+    - fort.58
+  load_restraints:
+    dataclass: RestraintData
+    primary_files:
+    - fort.76
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_geometry_optimization:
+    dataclass: GeometryOptimizationProgressData
+    primary_files:
+    - fort.57
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_control_parameters:
+    dataclass: ControlParametersData
+    primary_files:
+    - control
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_eregime:
+    dataclass: EregimeData
+    primary_files:
+    - eregime.in
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_charges:
+    dataclass: ChargeData
+    primary_files:
+    - fort.7
+    supplemental_files:
+    - xmolout
+    - summary.txt
+    notes:
+    - Charge values come from fort.7.
+    - Simulation metadata may be merged from xmolout/summary.txt.
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_atomic_kinematics:
+    dataclass: AtomicKinematicsData
+    primary_files:
+    - vels
+    supplemental_files: []
+    notes:
+    - If input is a directory, adapter checks vels, then moldyn.vel, then molsav.
+    merge_strategy: ''
+    composed_of: []
+    fallback_files:
+    - moldyn.vel
+    - molsav
+  load_electric_field:
+    dataclass: ElectricFieldData
+    primary_files:
+    - fort.78
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files: []
+  load_molecular_analysis:
+    dataclass: MolecularAnalysisData
+    primary_files:
+    - molfra.out
+    supplemental_files: []
+    notes: []
+    merge_strategy: ''
+    composed_of: []
+    fallback_files:
+    - molfra_ig.out
+writers:
+  write_control:
+    description: Reads an existing control file as ControlParametersData, applies overrides, and writes a canonical control
+      file.
+    dataclass: ControlParametersData
+    generator: control_generator
+    generator_function: write_control
+    generator_module: reaxkit.engine.reaxff.generators.control_generator
+    workflow_command: write-control
+    workflow_module: reaxkit.workflows.file_tools.control_workflow
+    output_files:
+    - control

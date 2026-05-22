@@ -1,0 +1,79 @@
+_meta:
+  version: "1.0"
+  purpose: "Explain where `reaxkit help` pulls metadata used for search and relationship reporting."
+  owner: "reaxkit.help"
+  last_updated: "2026-05-21"
+
+index_and_intent:
+  - file: reaxkit/help/data/help_intents.yaml
+    role: "Canonical intent vocabulary (supplementary metadata; not the primary command index)."
+  - file: reaxkit/help/data/help_search_index.yaml
+    role: "Command search index and query normalization metadata."
+
+source_files_by_layer:
+  generator_level:
+    common:
+      - file: reaxkit/engine/common/data/common_generator_capabilities.yaml
+        role: "Common engine generator capability index linking natural-language concepts to shared generator implementations."
+    reaxff:
+      - file: reaxkit/engine/reaxff/data/reaxff_generator_capabilities.yaml
+        role: "Generator capability index linking natural-language concepts to generator implementations and commands."
+
+  file_level:
+    io:
+      reaxff:
+        - file: reaxkit/engine/reaxff/data/reaxff_input_files_contents.yaml
+          role: "Searchable descriptions and tags for ReaxFF input files."
+        - file: reaxkit/engine/reaxff/data/reaxff_output_files_contents.yaml
+          role: "Searchable descriptions and tags for ReaxFF output files."
+    mapping:
+      - reaxff:
+          - file: reaxkit/engine/reaxff/data/reaxff_io_dataclass_map.yaml
+            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+      - ams:
+          - file: reaxkit/engine/ams/data/ams_io_dataclass_map.yaml
+            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+      - lammps:
+          - file: reaxkit/engine/lammps/data/lammps_io_dataclass_map.yaml
+            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+
+  analyzer_level:
+    - file: reaxkit/analysis/data/analysis_task_dataclass_map.yaml
+      role: "Task -> dataclass -> module mapping for analyzer discovery and workflow links."
+
+  workflow_level:
+    - file: reaxkit/workflows/data/workflow_dataclass_map.yaml
+      role: "Workflow modules, routed commands, and command_to_workflow_module mapping."
+
+runtime_usage:
+  module: reaxkit/help/help_index_loader.py
+  functions:
+    - name: load_help_search_index
+      uses:
+        - reaxkit/help/data/help_search_index.yaml
+    - name: search_help_commands
+      uses:
+        - help_search_index.yaml:wording_alias
+        - help_search_index.yaml:commands
+    - name: search_help_indices
+      uses:
+        - reaxff_input_files_contents.yaml
+        - reaxff_output_files_contents.yaml
+    - name: search_generator_capabilities
+      uses:
+        - reaxff_generator_capabilities.yaml
+    - name: search_loader_map
+      uses:
+        - reaxff_io_dataclass_map.yaml
+    - name: search_analysis_task_map
+      uses:
+        - analysis_task_dataclass_map.yaml
+    - name: build_help_relationship_report
+      uses:
+        - help_search_index.yaml
+        - reaxff_input_files_contents.yaml
+        - reaxff_output_files_contents.yaml
+        - reaxff_generator_capabilities.yaml
+        - analysis_task_dataclass_map.yaml
+        - workflow_dataclass_map.yaml
+        - reaxff_io_dataclass_map.yaml

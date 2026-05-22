@@ -1,0 +1,662 @@
+# Mapping between ReaxKit workflow modules and related analysis/generator implementations.
+# Used for help, introspection, and cross-layer discovery.
+
+_meta:
+  version: '1.0'
+  source: workflow registries + analysis task dataclass map + workflow module docstrings
+  purpose: Maps workflow modules to related analysis and generator implementation modules.
+  last_updated: '2026-05-21'
+workflows:
+  active_site_workflow:
+    implementation_module: reaxkit.workflows.active_site_workflow
+    description: Direct command workflow for active-site analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.active_sites.events
+      - reaxkit.analysis.active_sites.structural
+      generator: []
+    tags:
+    - active site
+    - connectivity trajectory
+    - analysis workflow
+    notes: []
+    aliases:
+    - active site workflow
+    - active site analysis
+    help_search_examples:
+    - reaxkit help "active site workflow"
+    - run active site workflow
+  connectivity_workflow:
+    implementation_module: reaxkit.workflows.connectivity_workflow
+    description: Direct command workflow for connectivity analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.connectivity.connectivity
+      - reaxkit.analysis.connectivity.coordination
+      - reaxkit.analysis.trajectory.relabel
+      - reaxkit.analysis.connectivity.hybridization
+      generator: []
+    tags:
+    - connectivity
+    - bond order
+    - analysis workflow
+    notes: []
+    aliases:
+    - connectivity workflow
+    - bond order analysis
+    help_search_examples:
+    - reaxkit help "connectivity workflow"
+    - run connectivity workflow
+  electrostatics_workflow:
+    implementation_module: reaxkit.workflows.electrostatics_workflow
+    description: Command workflow for electrostatics analyses and local visualizations.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.electrostatics.charges
+      - reaxkit.analysis.electrostatics.electrostatics
+      generator: []
+    tags:
+    - electrostatics
+    - charges
+    - polarization
+    notes: []
+    aliases:
+    - electrostatics workflow
+    - charge analysis workflow
+    help_search_examples:
+    - reaxkit help "electrostatics workflow"
+    - run electrostatics workflow
+  force_field_workflow:
+    implementation_module: reaxkit.workflows.force_field_workflow
+    description: Direct command workflow for force-field analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.force_field.force_field
+      - reaxkit.analysis.force_field.optimization
+      - reaxkit.analysis.force_field.report
+      - reaxkit.analysis.force_field.diagnostics
+      - reaxkit.analysis.force_field.structure_summary
+      - reaxkit.analysis.force_field.trainset
+      generator: []
+    tags:
+    - force field
+    - optimization
+    - training set
+    notes: []
+    aliases:
+    - force field workflow
+    - force field analysis
+    help_search_examples:
+    - reaxkit help "force field workflow"
+    - run force field workflow
+  kinematics_workflow:
+    implementation_module: reaxkit.workflows.kinematics_workflow
+    description: Direct command workflow for atomic-kinematics analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.kinematics.kinematics
+      generator: []
+    tags:
+    - atomic kinematics
+    - velocity
+    - acceleration
+    notes: []
+    aliases:
+    - atomic kinematics workflow
+    - kinematics workflow
+    help_search_examples:
+    - reaxkit help "atomic kinematics workflow"
+    - run atomic kinematics workflow
+  molecular_analysis_workflow:
+    implementation_module: reaxkit.workflows.molecular_analysis_workflow
+    description: Direct command workflow for molecular analysis tasks.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.molecular_analysis.molecular_analysis
+      generator: []
+    tags:
+    - molecular analysis
+    - species
+    - molecule lifetime
+    notes: []
+    aliases:
+    - molecular analysis workflow
+    - molecule analysis workflow
+    help_search_examples:
+    - reaxkit help "molecular analysis workflow"
+    - run molecular analysis workflow
+  params_workflow:
+    implementation_module: reaxkit.workflows.params_workflow
+    description: Direct command workflow for optimization-parameter analysis.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.params.params
+      generator: []
+    tags:
+    - optimization parameters
+    - force field
+    notes: []
+    aliases:
+    - optimization parameters workflow
+    - params workflow
+    help_search_examples:
+    - reaxkit help "optimization parameters workflow"
+    - get optimization parameters workflow
+  spatial_property_workflow:
+    implementation_module: reaxkit.workflows.spatial_property_workflow
+    description: Direct command workflow for spatial per-atom property plots.
+    related_commands:
+      analysis:
+      - reaxkit.workflows.spatial_property_workflow
+      generator: []
+    tags:
+    - spatial property
+    - heatmap2d
+    - plot3d
+    notes: []
+    aliases:
+    - spatial property workflow
+    - atom property workflow
+    help_search_examples:
+    - reaxkit help "spatial property workflow"
+    - run atom property plot3d workflow
+  timeseries_workflow:
+    implementation_module: reaxkit.workflows.timeseries_workflow
+    description: Dispatcher workflow for time-series analyses.
+    dispatch_mode: kind_runner
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - time series
+    - dispatcher
+    - trajectory
+    notes:
+    - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries and geometry_optimization.
+    aliases:
+    - time series
+    - series workflow
+    help_search_examples:
+    - run time series analysis for coordinates
+    - get trajectory series
+  trajectory_workflow:
+    implementation_module: reaxkit.workflows.trajectory_workflow
+    description: Direct command workflow for trajectory analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.trajectory.diffusivity
+      - reaxkit.analysis.trajectory.msd
+      - reaxkit.analysis.trajectory.rdf
+      - reaxkit.analysis.trajectory.voronoi
+      generator: []
+    tags:
+    - trajectory
+    - diffusivity
+    - radial distribution function
+    notes: []
+    aliases:
+    - trajectory workflow
+    - trajectory analysis
+    help_search_examples:
+    - reaxkit help "trajectory workflow"
+    - run trajectory workflow
+  addmol_workflow:
+    implementation_module: reaxkit.workflows.file_tools.addmol_workflow
+    description: Direct command workflow for generating addmol files.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.addmol_generator
+    tags:
+    - addmol
+    - molecule insertion
+    - generator workflow
+    notes: []
+    aliases:
+    - addmol workflow
+    - molecule insertion workflow
+    help_search_examples:
+    - reaxkit help "make molecule insertion"
+    - make molecule insertion workflow
+  charges_workflow:
+    implementation_module: reaxkit.workflows.file_tools.charges_workflow
+    description: Direct command workflow for generating charges files.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.charges_generator
+    tags:
+    - charges
+    - template
+    - generator workflow
+    notes: []
+    aliases:
+    - charges workflow
+    - charges generator workflow
+    help_search_examples:
+    - reaxkit help "make charges"
+    - make charges workflow
+  control_workflow:
+    implementation_module: reaxkit.workflows.file_tools.control_workflow
+    description: Task-oriented workflow for control-file analyses and utilities.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.analysis.control.control
+      - reaxkit.engine.reaxff.generators.control_generator
+    tags:
+    - control file
+    - control parameters
+    - generator workflow
+    notes: []
+    aliases:
+    - control workflow
+    - control file workflow
+    help_search_examples:
+    - reaxkit help "make control"
+    - write control workflow
+  eregime_workflow:
+    implementation_module: reaxkit.workflows.file_tools.eregime_workflow
+    description: Direct command workflow for generating eregime.in files.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.eregime_generator
+    tags:
+    - electric field regime
+    - electric field
+    - generator workflow
+    notes: []
+    aliases:
+    - electric field regime workflow
+    - eregime workflow
+    help_search_examples:
+    - reaxkit help "make electric field regime"
+    - make electric field regime workflow
+  fort83_workflow:
+    implementation_module: reaxkit.workflows.file_tools.fort83_workflow
+    description: Direct command workflow for extracting optimized force fields from fort.83.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.workflows.file_tools.fort83_workflow
+    tags:
+    - force field
+    - fort83
+    - optimized force field
+    notes: []
+    aliases:
+    - fort83 workflow
+    - optimized force field workflow
+    help_search_examples:
+    - reaxkit help "extract optimized force field"
+    - extract optimized force field workflow
+  geo_workflow:
+    implementation_module: reaxkit.workflows.file_tools.geo_workflow
+    description: Direct command workflows for GEO and structure file utilities.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.geo_generator
+      - reaxkit.engine.common.geo_transforms
+    tags:
+    - geometry file
+    - geo
+    - structure conversion
+    notes: []
+    aliases:
+    - geometry file workflow
+    - geo workflow
+    help_search_examples:
+    - reaxkit help "geometry file workflow"
+    - run trajectory coordinates to geometry file workflow
+  kopple2_workflow:
+    implementation_module: reaxkit.workflows.file_tools.kopple2_workflow
+    description: Direct command workflow for generating kopple2 files.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.kopple2_generator
+    tags:
+    - kopple2
+    - coupling template
+    - generator workflow
+    notes: []
+    aliases:
+    - kopple2 workflow
+    - coupling template workflow
+    help_search_examples:
+    - reaxkit help "make coupling template"
+    - make coupling template workflow
+  trainset_workflow:
+    implementation_module: reaxkit.workflows.file_tools.trainset_workflow
+    description: Direct command workflows for trainset export and generation utilities.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.workflows.file_tools.trainset_workflow
+      - reaxkit.engine.reaxff.generators.trainset_elastic_energy
+      - reaxkit.engine.reaxff.generators.trainset_heatfo
+      - reaxkit.engine.reaxff.generators.trainset_yaml
+    tags:
+    - training set
+    - heat of formation
+    - elastic
+    notes: []
+    aliases:
+    - training set workflow
+    - trainset workflow
+    help_search_examples:
+    - reaxkit help "training set workflow"
+    - create heat of formation training set workflow
+  tregime_workflow:
+    implementation_module: reaxkit.workflows.file_tools.tregime_workflow
+    description: Direct command workflow for tregime generation.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.tregime_generator
+    tags:
+    - temperature regime
+    - temperature schedule
+    - generator workflow
+    notes: []
+    aliases:
+    - temperature regime workflow
+    - tregime workflow
+    help_search_examples:
+    - reaxkit help "make temperature regime"
+    - make temperature regime workflow
+  vregime_workflow:
+    implementation_module: reaxkit.workflows.file_tools.vregime_workflow
+    description: Direct command workflow for vregime generation.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.vregime_generator
+    tags:
+    - volume regime
+    - cell schedule
+    - generator workflow
+    notes: []
+    aliases:
+    - volume regime workflow
+    - vregime workflow
+    help_search_examples:
+    - reaxkit help "make volume regime"
+    - make volume regime workflow
+  xmolout_workflow:
+    implementation_module: reaxkit.workflows.file_tools.xmolout_workflow
+    description: Direct command workflow for xmolout file utilities.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.xmolout_generator
+    tags:
+    - xmolout
+    - trajectory output
+    - generator workflow
+    notes: []
+    aliases:
+    - xmolout workflow
+    - trim xmolout workflow
+    help_search_examples:
+    - reaxkit help "trim xmolout"
+    - trim xmolout workflow
+  command_alias_workflow:
+    implementation_module: reaxkit.workflows.meta.command_alias_workflow
+    description: Direct command workflow for managing user-defined command aliases.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.workflows.meta.command_alias_workflow
+    tags:
+    - command alias
+    - metadata
+    - workflow
+    notes: []
+    aliases:
+    - command alias workflow
+    - alias workflow
+    help_search_examples:
+    - reaxkit help "command alias workflow"
+    - add command alias workflow
+  gui_workflow:
+    implementation_module: reaxkit.workflows.meta.gui_workflow
+    description: Launch the ReaxKit Dash Web UI.
+    dispatch_mode: kind_runner
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - graphical user interface
+    - dash
+    - workflow
+    notes: []
+    aliases:
+    - gui
+    - user interface
+    - graphical interface
+    help_search_examples:
+    - reaxkit help "graphical user interface"
+    - launch graphical user interface
+  help_workflow:
+    implementation_module: reaxkit.workflows.meta.help_workflow
+    description: Interactive help and discovery workflow for ReaxKit.
+    dispatch_mode: kind_runner
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - help
+    - intent
+    - discovery
+    notes: []
+    aliases:
+    - help
+    help_search_examples:
+    - reaxkit help "help"
+    - run help
+  introspection_workflow:
+    implementation_module: reaxkit.workflows.meta.introspection_workflow
+    description: CLI workflow for introspecting ReaxKit modules and folders.
+    dispatch_mode: intspec_runner
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - introspection
+    - modules
+    - workflow
+    notes: []
+    aliases:
+    - intspec
+    help_search_examples:
+    - reaxkit help "introspection workflow"
+    - run introspection workflow
+  make_video_workflow:
+    implementation_module: reaxkit.workflows.meta.make_video_workflow
+    description: Video generation workflow for ReaxKit.
+    dispatch_mode: task_subcommands
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - video
+    - visualization
+    - workflow
+    notes: []
+    aliases:
+    - video
+    help_search_examples:
+    - reaxkit help "video workflow"
+    - run video workflow
+  plotter_workflow:
+    implementation_module: reaxkit.workflows.meta.plotter_workflow
+    description: General-purpose plotting workflow for ReaxKit.
+    dispatch_mode: task_subcommands
+    related_commands:
+      analysis: []
+      generator: []
+    tags:
+    - plotter
+    - plotting
+    - visualization
+    notes: []
+    aliases:
+    - plotter
+    help_search_examples:
+    - reaxkit help "plotter workflow"
+    - run plotter workflow
+  study_workflow:
+    implementation_module: reaxkit.workflows.meta.study_workflow
+    description: 'Study planning workflow: generate sweep/replicate folder structures from YAML.'
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.workflows.meta.study_workflow
+    tags:
+    - study planning
+    - parameter sweep
+    - replicate
+    notes: []
+    aliases:
+    - study workflow
+    - study planning workflow
+    help_search_examples:
+    - reaxkit help "study planning workflow"
+    - create study planning workflow
+  workspace_management_workflow:
+    implementation_module: reaxkit.workflows.meta.workspace_management_workflow
+    description: Workspace cleanup and archiving commands.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.workflows.meta.workspace_management_workflow
+    tags:
+    - workspace
+    - cleanup
+    - archive
+    notes: []
+    aliases:
+    - workspace management workflow
+    - workspace cleanup workflow
+    help_search_examples:
+    - reaxkit help "workspace cleanup"
+    - manage workspace workflow
+dataclass_usage:
+  AtomicKinematicsData:
+  - kinematics_workflow
+  ChargeData:
+  - electrostatics_workflow
+  - timeseries_workflow
+  ConnectivityData:
+  - connectivity_workflow
+  ConnectivityTrajectoryData:
+  - active_site_workflow
+  EregimeData:
+  - timeseries_workflow
+  ElectricFieldData:
+  - timeseries_workflow
+  ElectrostaticsData:
+  - electrostatics_workflow
+  ForceFieldOptimizationDiagnosticData:
+  - force_field_workflow
+  ForceFieldOptimizationParameterData:
+  - params_workflow
+  ForceFieldOptimizationProgressData:
+  - force_field_workflow
+  ForceFieldOptimizationReportData:
+  - force_field_workflow
+  ForceFieldOptimizationTrainingSetData:
+  - force_field_workflow
+  ForceFieldParametersData:
+  - force_field_workflow
+  GeometryOptimizationProgressData:
+  - timeseries_workflow
+  GeometrySummaryData:
+  - force_field_workflow
+  MolecularAnalysisData:
+  - molecular_analysis_workflow
+  - timeseries_workflow
+  PartialEnergyData:
+  - timeseries_workflow
+  RestraintData:
+  - timeseries_workflow
+  SimulationData:
+  - timeseries_workflow
+  TrajectoryData:
+  - timeseries_workflow
+  - trajectory_workflow
+command_to_workflow_module:
+  active_site_events: reaxkit.workflows.active_site_workflow
+  active_site_structural: reaxkit.workflows.active_site_workflow
+  add-alias: reaxkit.workflows.meta.command_alias_workflow
+  add-geo-restraint: reaxkit.workflows.file_tools.geo_workflow
+  atom_property_heatmap2d: reaxkit.workflows.spatial_property_workflow
+  atom_property_plot3d: reaxkit.workflows.spatial_property_workflow
+  bond_events: reaxkit.workflows.connectivity_workflow
+  charge-table: reaxkit.workflows.electrostatics_workflow
+  connection_list: reaxkit.workflows.connectivity_workflow
+  connection_stats: reaxkit.workflows.connectivity_workflow
+  connection_table: reaxkit.workflows.connectivity_workflow
+  coordination: reaxkit.workflows.connectivity_workflow
+  coordination_relabel: reaxkit.workflows.connectivity_workflow
+  diffusivity: reaxkit.workflows.trajectory_workflow
+  dipole: reaxkit.workflows.electrostatics_workflow
+  dominant_species: reaxkit.workflows.molecular_analysis_workflow
+  export-trainset: reaxkit.workflows.file_tools.trainset_workflow
+  extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
+  force_field_data: reaxkit.workflows.force_field_workflow
+  force_field_optimization: reaxkit.workflows.force_field_workflow
+  force_field_optimization_report: reaxkit.workflows.force_field_workflow
+  force_field_optimization_report_bulk_modulus: reaxkit.workflows.force_field_workflow
+  force_field_optimization_report_eos: reaxkit.workflows.force_field_workflow
+  free-up: reaxkit.workflows.meta.workspace_management_workflow
+  get-control: reaxkit.workflows.file_tools.control_workflow
+  get-params: reaxkit.workflows.params_workflow
+  gui: reaxkit.workflows.meta.gui_workflow
+  help: reaxkit.workflows.meta.help_workflow
+  hybridization: reaxkit.workflows.connectivity_workflow
+  intspec: reaxkit.workflows.meta.introspection_workflow
+  kinematics: reaxkit.workflows.kinematics_workflow
+  kinematics_heatmap2d: reaxkit.workflows.kinematics_workflow
+  kinematics_plot3d: reaxkit.workflows.kinematics_workflow
+  largest_molecule_by_mass: reaxkit.workflows.molecular_analysis_workflow
+  largest_molecule_composition: reaxkit.workflows.molecular_analysis_workflow
+  make-addmol: reaxkit.workflows.file_tools.addmol_workflow
+  make-charges: reaxkit.workflows.file_tools.charges_workflow
+  make-control: reaxkit.workflows.file_tools.control_workflow
+  make-eregime: reaxkit.workflows.file_tools.eregime_workflow
+  make-geo: reaxkit.workflows.file_tools.geo_workflow
+  make-kopple2: reaxkit.workflows.file_tools.kopple2_workflow
+  make-trainset-elastic: reaxkit.workflows.file_tools.trainset_workflow
+  make-trainset-heatfo: reaxkit.workflows.file_tools.trainset_workflow
+  make-trainset-settings: reaxkit.workflows.file_tools.trainset_workflow
+  make-trainset-settings-heatfo: reaxkit.workflows.file_tools.trainset_workflow
+  make-tregime: reaxkit.workflows.file_tools.tregime_workflow
+  make-vregime: reaxkit.workflows.file_tools.vregime_workflow
+  manage-workspace: reaxkit.workflows.meta.workspace_management_workflow
+  molecule_lifetime: reaxkit.workflows.molecular_analysis_workflow
+  msd: reaxkit.workflows.trajectory_workflow
+  orthogonalize-geo: reaxkit.workflows.file_tools.geo_workflow
+  parameter_optimization_diagnostic: reaxkit.workflows.force_field_workflow
+  parameter_optimization_most_sensitive: reaxkit.workflows.force_field_workflow
+  parameter_optimization_tornado: reaxkit.workflows.force_field_workflow
+  place-geo: reaxkit.workflows.file_tools.geo_workflow
+  plotter: reaxkit.workflows.meta.plotter_workflow
+  polarization: reaxkit.workflows.electrostatics_workflow
+  polarization_field: reaxkit.workflows.electrostatics_workflow
+  rdf: reaxkit.workflows.trajectory_workflow
+  rdf_property: reaxkit.workflows.trajectory_workflow
+  sort-geo: reaxkit.workflows.file_tools.geo_workflow
+  structure_summary_data: reaxkit.workflows.force_field_workflow
+  study: reaxkit.workflows.meta.study_workflow
+  timeseries: reaxkit.workflows.timeseries_workflow
+  trainset_data: reaxkit.workflows.force_field_workflow
+  trainset_group_comments: reaxkit.workflows.force_field_workflow
+  trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
+  video: reaxkit.workflows.meta.make_video_workflow
+  voronoi: reaxkit.workflows.trajectory_workflow
+  write-control: reaxkit.workflows.file_tools.control_workflow
+  xtob: reaxkit.workflows.file_tools.geo_workflow

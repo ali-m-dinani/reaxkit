@@ -1,0 +1,165 @@
+# LAMMPS loader/writer mapping used by `reaxkit help`.
+# Tracks how LAMMPS dump and log data fill ReaxKit dataclasses.
+
+_meta:
+  version: "1.0"
+  source: "reaxkit.engine.lammps.adapter.LAMMPSAdapter + LAMMPS dump/log handlers"
+  purpose: "Maps LAMMPS IO entrypoints to produced dataclasses and source files."
+  last_updated: "2026-05-22"
+
+loaders:
+  load_trajectory:
+    dataclass: TrajectoryData
+    primary_files:
+      - dump.xyz
+      - dump.lammpstrj
+      - lammpstrj
+    supplemental_files: []
+    notes:
+      - "LAMMPSAdapter resolves explicit dump/dump_file/trajectory paths first, then scans the input/run directory for the first file with 'dump' in its name."
+      - "LAMMPSDumpHandler supports XYZ-like blocks and native ITEM dump blocks."
+      - "ITEM dump box bounds are converted to orthogonal cell lengths; cell angles are set to 90 degrees when bounds are present."
+    merge_strategy: ""
+    composed_of: []
+    fallback_files: []
+    implementation_module: reaxkit.engine.lammps.adapter
+    handler_module: reaxkit.engine.lammps.dump_handler
+    field_map:
+      positions:
+        source: dump frame coordinates
+        handler_field: coords
+        transform: "Stacked to (n_frames, n_atoms, 3) with NaN padding."
+      elements:
+        source: dump atom labels
+        handler_field: atom_types
+        transform: "First non-empty per-atom label encountered across frames; defaults to X."
+      atom_ids:
+        source: derived
+        transform: "1..n_atoms, where n_atoms is the maximum frame atom count."
+      iterations:
+        source: dump timestep metadata
+        handler_field: iter
+        transform: "Uses parsed timestep values; falls back to frame index if missing."
+      atom_labels:
+        source: dump atom labels
+        handler_field: atom_types
+        transform: "Per-frame atom labels padded with empty strings."
+      simulation:
+        source: derived from dump metadata
+        transform: "Embedded SimulationData with atom_ids, iterations, elements, optional num_of_atoms, cell_lengths, and cell_angles."
+
+  load_simulation:
+    dataclass: SimulationData
+    primary_files:
+      - log.lammps
+    supplemental_files:
+      - dump.xyz
+      - dump.lammpstrj
+      - lammpstrj
+    notes:
+      - "LAMMPSLogHandler uses lammps.formats.LogFile, which requires the optional LAMMPS Python package."
+      - "If a dump file is available, its metadata is used to infer atom count; otherwise Atoms/NumAtoms/NAtoms thermo columns are used when present."
+      - "Raises an error when no thermodynamic table is found in log.lammps."
+    merge_strategy: "Thermo columns from log.lammps, with optional atom-count metadata from the resolved dump file."
+    composed_of: []
+    fallback_files: []
+    implementation_module: reaxkit.engine.lammps.adapter
+    handler_module: reaxkit.engine.lammps.lammps_log_handler
+    field_map:
+      atom_ids:
+        source: derived
+        transform: "1..n_atoms, where n_atoms comes from dump metadata or Atoms/NumAtoms/NAtoms thermo columns."
+      iterations:
+        source: thermo table
+        handler_field: Step
+        transform: "Uses Step as integer iterations; falls back to 0..n_rows-1."
+      time:
+        source: thermo table
+        handler_fields:
+          - Time
+          - time
+      potential_energy:
+        source: thermo table
+        handler_fields:
+          - PotEng
+          - E_pair
+          - TotEng
+      volume:
+        source: thermo table
+        handler_field: Volume
+      temperature:
+        source: thermo table
+        handler_fields:
+          - Temp
+          - Temperature
+      pressure:
+        source: thermo table
+        handler_fields:
+          - Press
+          - Pressure
+      density:
+        source: thermo table
+        handler_field: Density
+      elapsed_time:
+        source: thermo table
+        handler_fields:
+          - Elapsed
+          - CPU
+          - ElapsedTime
+
+  load_connectivity:
+    dataclass: ConnectivityData
+    primary_files:
+      - dump.xyz
+      - dump.lammpstrj
+      - lammpstrj
+    supplemental_files: []
+    notes:
+      - "Current LAMMPS connectivity loader is a placeholder."
+      - "It returns an empty integer connectivity matrix and does not parse bonds from dump files yet."
+    merge_strategy: ""
+    composed_of: []
+    fallback_files: []
+    implementation_module: reaxkit.engine.lammps.adapter
+    handler_module: ""
+    field_map:
+      connectivity:
+        source: placeholder
+        transform: "Returns np.empty((0, 0), dtype=int)."
+
+  load_connectivity_trajectory:
+    dataclass: ConnectivityTrajectoryData
+    primary_files:
+      - dump.xyz
+      - dump.lammpstrj
+      - lammpstrj
+    supplemental_files:
+      - log.lammps
+    notes:
+      - "Composes the current placeholder ConnectivityData with TrajectoryData loaded from the resolved dump file."
+    merge_strategy: "Composed from load_connectivity and load_trajectory."
+    composed_of:
+      - ConnectivityData
+      - TrajectoryData
+    fallback_files: []
+    implementation_module: reaxkit.engine.lammps.adapter
+    handler_module: reaxkit.engine.lammps.dump_handler
+    field_map:
+      connectivity:
+        source: load_connectivity
+      trajectory:
+        source: load_trajectory
+
+writers:
+  write_trajectory:
+    description: "Write a TrajectoryData object to an XYZ trajectory using the shared engine-common XYZ generator."
+    dataclass: TrajectoryData
+    generator: write_xyz_trajectory
+    generator_function: write_xyz_trajectory
+    generator_module: reaxkit.engine.common.generators.xyz_generator
+    workflow_command: ""
+    workflow_module: ""
+    output_files:
+      - "*.xyz"
+    notes:
+      - "LAMMPSAdapter.write_trajectory forwards precision to write_xyz_trajectory; default precision is 6."
