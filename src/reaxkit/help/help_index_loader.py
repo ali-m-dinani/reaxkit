@@ -2070,6 +2070,90 @@ def _find_file_usage_refs(file_name: str, mapping_data: Dict[str, Any]) -> Dict[
     }
 
 
+def _search_mapping_file_refs(
+    mapping_data: Dict[str, Any],
+    q: str,
+    q_toks: set[str],
+    *,
+    top_k: int,
+    min_score: float,
+    exact_match: bool = False,
+    exact_query: str = "",
+) -> List[Tuple[str, float, Dict[str, Any]]]:
+    """
+    Search `file_to_dataclass_across_loaders_and_writers` directly.
+
+    Used as fallback for engines without file-level IO index.
+    """
+    refs = (mapping_data.get("file_to_dataclass_across_loaders_and_writers") or {})
+    if not isinstance(refs, dict):
+        return []
+
+    hits: List[Tuple[str, float, Dict[str, Any]]] = []
+    for file_name, row in refs.items():
+        if not isinstance(row, dict):
+            continue
+
+        file_key = str(file_name)
+        if exact_match:
+            primary = row.get("primary_files") or []
+            supplemental = row.get("supplemental_files") or []
+            output_files = row.get("output_files") or []
+            field_vals: List[str] = [file_key]
+            for block in (primary, supplemental, output_files):
+                if not isinstance(block, list):
+                    continue
+                for item in block:
+                    if not isinstance(item, dict):
+                        continue
+                    for k in ("kind", "name", "dataclass"):
+                        if item.get(k):
+                            field_vals.append(str(item.get(k)))
+            exact_pool = {_norm(v) for v in field_vals if str(v).strip()}
+            if exact_query not in exact_pool:
+                continue
+            hits.append((file_key, 1000.0, row))
+            continue
+
+        # Build searchable mapping entry from primary/supplemental (+ output) usage rows.
+        primary = row.get("primary_files") or []
+        supplemental = row.get("supplemental_files") or []
+        output_files = row.get("output_files") or []
+
+        def _row_blob(items: Any) -> str:
+            if not isinstance(items, list):
+                return ""
+            chunks: List[str] = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                for k in ("kind", "name", "dataclass"):
+                    v = item.get(k)
+                    if v is not None:
+                        chunks.append(str(v))
+            return " ".join(chunks)
+
+        pseudo_entry = {
+            "aliases": [file_key],
+            "help_search_examples": [],
+            "tags": ["mapping", "loader", "writer"],
+            "description": " ".join([
+                _row_blob(primary),
+                _row_blob(supplemental),
+                _row_blob(output_files),
+            ]).strip(),
+            "notes": [],
+        }
+
+        # Reuse weighted scorer: title + aliases + description text from mapping rows.
+        score = _score_metadata_entry(file_key, pseudo_entry, q, q_toks)
+        if score >= min_score:
+            hits.append((file_key, float(score), row))
+
+    hits.sort(key=lambda x: x[1], reverse=True)
+    return hits[:top_k]
+
+
 def _format_notes_text(notes: Any) -> str:
     """Render notes as a concise single line."""
     vals = _as_list(notes)
@@ -2229,6 +2313,19 @@ def build_help_relationship_report(
     file_hits = file_hits[:top_k]
     mapping_path = _file_level_mapping_source(engine)
     mapping_data = _load_yaml_rel_cached(mapping_path) if mapping_path else {}
+
+    # Engines like ams/lammps may not have IO index files; search mapping directly.
+    if not file_hits and mapping_data:
+        mapping_hits = _search_mapping_file_refs(
+            mapping_data,
+            q,
+            q_toks,
+            top_k=top_k,
+            min_score=min_score,
+            exact_match=exact_match,
+            exact_query=q_exact,
+        )
+        file_hits = [(fname, sc, {}, mapping_path) for fname, sc, _ in mapping_hits]
 
     if file_hits:
         _append_section_header(out, "FILE LEVEL -> DATACLASS")
