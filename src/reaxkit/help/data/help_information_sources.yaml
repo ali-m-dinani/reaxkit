@@ -87,6 +87,7 @@ Search_mechanism:
       - wording_alias expansion to canonical wording
   generator_level:
     searched_fields_in_descending_importance_order:
+      - title (yaml item key)
       - aliases
       - help_search_examples
       - tags
@@ -104,6 +105,7 @@ Search_mechanism:
       - source_files_by_layer.file_level.<engine>.io
       - source_files_by_layer.file_level.<engine>.mapping
     searched_fields_in_descending_importance_order:
+      - title (yaml item key)
       - aliases
       - help_search_examples
       - tags
@@ -116,6 +118,7 @@ Search_mechanism:
       - all loader/writer usage fields from mapping file
   analyzer_level:
     searched_fields_in_descending_importance_order:
+      - title (yaml item key)
       - aliases
       - help_search_examples
       - tags
@@ -131,6 +134,7 @@ Search_mechanism:
       - all analyzer fields
   workflow_level:
     searched_fields_in_descending_importance_order:
+      - title (yaml item key)
       - aliases
       - help_search_examples
       - tags

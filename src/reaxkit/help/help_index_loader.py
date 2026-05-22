@@ -1960,8 +1960,8 @@ def _iter_file_level_io_sources(engine: str) -> List[str]:
     src = load_help_information_sources()
     source_layers = src.get("source_files_by_layer") or {}
     file_level = (source_layers.get("file_level") or {}) if isinstance(source_layers, dict) else {}
-    io_map = (file_level.get("io") or {}) if isinstance(file_level, dict) else {}
-    engine_rows = io_map.get(_norm(engine)) or io_map.get(str(engine)) or []
+    engine_block = file_level.get(_norm(engine)) or file_level.get(str(engine)) or {}
+    engine_rows = (engine_block.get("io") or []) if isinstance(engine_block, dict) else []
     out: List[str] = []
     for item in engine_rows:
         if isinstance(item, dict) and item.get("file"):
@@ -1972,16 +1972,15 @@ def _iter_file_level_io_sources(engine: str) -> List[str]:
 def _file_level_mapping_source(engine: str) -> str:
     """Return file-level mapping source file for selected engine."""
     src = load_help_information_sources()
-    mapping_rows = (((src.get("source_files_by_layer") or {}).get("file_level") or {}).get("mapping") or [])
-    for row in mapping_rows:
-        if not isinstance(row, dict):
-            continue
-        for key, entries in row.items():
-            if _norm(str(key)) != _norm(engine):
-                continue
-            for item in (entries or []):
-                if isinstance(item, dict) and item.get("file"):
-                    return str(item["file"])
+    file_level = (((src.get("source_files_by_layer") or {}).get("file_level")) or {})
+    if not isinstance(file_level, dict):
+        return ""
+    engine_block = file_level.get(_norm(engine)) or file_level.get(str(engine)) or {}
+    if not isinstance(engine_block, dict):
+        return ""
+    for item in (engine_block.get("mapping") or []):
+        if isinstance(item, dict) and item.get("file"):
+            return str(item["file"])
     return ""
 
 
@@ -2021,6 +2020,8 @@ def _search_named_section(
     *,
     top_k: int,
     min_score: float,
+    exact_match: bool = False,
+    exact_query: str = "",
 ) -> List[Tuple[str, float, Dict[str, Any], str]]:
     """Search a named mapping section and return ranked `(name, score, entry, source)` rows."""
     data = _load_yaml_rel_cached(rel_path)
@@ -2031,6 +2032,14 @@ def _search_named_section(
     hits: List[Tuple[str, float, Dict[str, Any], str]] = []
     for name, entry in section.items():
         if not isinstance(entry, dict):
+            continue
+        if exact_match:
+            name_norm = _norm(str(name))
+            alias_norms = {_norm(a) for a in _as_list(entry.get("aliases"))}
+            if exact_query and exact_query not in ({name_norm} | alias_norms):
+                continue
+            score = 1000.0 if exact_query == name_norm else 950.0
+            hits.append((str(name), float(score), entry, rel_path))
             continue
         score = _score_metadata_entry(str(name), entry, q, q_toks)
         if score >= min_score:
@@ -2112,13 +2121,15 @@ def build_help_relationship_report(
     min_score: float = 35.0,
     engine: str = "reaxff",
     all_info: bool = False,
+    exact_match: bool = False,
 ) -> str:
     """Build layered help report from `help_information_sources.yaml`."""
-    q_proc = _normalize_help_query(query)
+    q_proc = _norm(query) if exact_match else _normalize_help_query(query)
     if not q_proc:
         return "No matches."
     q = _norm(q_proc)
     q_toks = _token_set(q_proc)
+    q_exact = _norm(query)
 
     out: List[str] = [f"Normalized query: {q_proc}"]
 
@@ -2133,6 +2144,8 @@ def build_help_relationship_report(
                 q_toks,
                 top_k=top_k,
                 min_score=min_score,
+                exact_match=exact_match,
+                exact_query=q_exact,
             )
         )
     generator_hits.sort(key=lambda x: x[1], reverse=True)
@@ -2166,6 +2179,8 @@ def build_help_relationship_report(
                 q_toks,
                 top_k=top_k,
                 min_score=min_score,
+                exact_match=exact_match,
+                exact_query=q_exact,
             )
         )
     file_hits.sort(key=lambda x: x[1], reverse=True)
@@ -2229,6 +2244,8 @@ def build_help_relationship_report(
                 q_toks,
                 top_k=top_k,
                 min_score=min_score,
+                exact_match=exact_match,
+                exact_query=q_exact,
             )
         )
     analyzer_hits.sort(key=lambda x: x[1], reverse=True)
@@ -2263,6 +2280,8 @@ def build_help_relationship_report(
                 q_toks,
                 top_k=top_k,
                 min_score=min_score,
+                exact_match=exact_match,
+                exact_query=q_exact,
             )
         )
     workflow_hits.sort(key=lambda x: x[1], reverse=True)

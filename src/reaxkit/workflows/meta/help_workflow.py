@@ -19,6 +19,7 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "Examples:\n"
         "  reaxkit help \"msd\"\n"
         "  reaxkit help \"bond order\"\n"
+        "  reaxkit help \"bond order\" --top 3\n"
         "  reaxkit help \"restraint\" --engine reaxff\n"
         "  reaxkit help \"fort.7\" --all-info\n"
         "  reaxkit help \"xmolout\" --all-info"
@@ -32,10 +33,10 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     )
 
     p.add_argument(
-        "--min-score",
-        type=float,
-        default=35.0,
-        help="Minimum score threshold; lower-scoring matches are hidden.",
+        "--top",
+        type=int,
+        default=8,
+        help="Maximum results per category (generator/file/analyzer/workflow), sorted by score.",
     )
 
     p.add_argument(
@@ -50,6 +51,13 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         dest="all_info",
         action="store_true",
         help="Show detailed implementation and file/dataclass/analyzer mapping information.",
+    )
+
+    p.add_argument(
+        "--exact-match",
+        dest="exact_match",
+        action="store_true",
+        help="Match query exactly against item title (and aliases) before returning results.",
     )
 
 
@@ -69,10 +77,10 @@ def run_main(args: argparse.Namespace) -> None:
     engine = getattr(args, "engine", None) or "reaxff"
     report = build_help_relationship_report(
         args.query,
-        top_k=8,
-        min_score=getattr(args, "min_score", 35.0),
+        top_k=max(1, int(getattr(args, "top", 8))),
         engine=engine,
         all_info=bool(getattr(args, "all_info", False)),
+        exact_match=bool(getattr(args, "exact_match", False)),
     )
     print(report)
 
