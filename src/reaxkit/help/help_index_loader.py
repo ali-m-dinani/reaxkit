@@ -2082,6 +2082,49 @@ def _format_all_fields(entry: Dict[str, Any]) -> str:
     return dumped if dumped else "{}"
 
 
+def _append_all_fields_bulleted(
+    lines: List[str],
+    data: Dict[str, Any],
+    *,
+    base_indent: str = "  ",
+) -> None:
+    """Render all fields using bullet/indent style (o -> • -> -)."""
+    if not isinstance(data, dict) or not data:
+        lines.append(f"{base_indent}• all fields: None")
+        return
+
+    for key, value in data.items():
+        if isinstance(value, list):
+            lines.append(f"{base_indent}• {key}:")
+            if not value:
+                lines.append(f"{base_indent}  - None")
+            else:
+                for item in value:
+                    if isinstance(item, dict):
+                        lines.append(f"{base_indent}  -")
+                        for sub_key, sub_val in item.items():
+                            lines.append(f"{base_indent}    • {sub_key}: {sub_val}")
+                    else:
+                        lines.append(f"{base_indent}  - {item}")
+        elif isinstance(value, dict):
+            lines.append(f"{base_indent}• {key}:")
+            if not value:
+                lines.append(f"{base_indent}  - None")
+            else:
+                for sub_key, sub_val in value.items():
+                    if isinstance(sub_val, list):
+                        lines.append(f"{base_indent}  • {sub_key}:")
+                        if not sub_val:
+                            lines.append(f"{base_indent}    - None")
+                        else:
+                            for item in sub_val:
+                                lines.append(f"{base_indent}    - {item}")
+                    else:
+                        lines.append(f"{base_indent}  • {sub_key}: {sub_val}")
+        else:
+            lines.append(f"{base_indent}• {key}: {value}")
+
+
 def _search_score_label(score: float) -> str:
     """Map numeric search score to qualitative likelihood label."""
     s = float(score)
@@ -2157,8 +2200,7 @@ def build_help_relationship_report(
             score_label = _search_score_label(score)
             if all_info:
                 out.append(f"o (search score: {score_label}) {name} (score={score:.1f})")
-                out.append("  • all fields:")
-                out.append(_format_all_fields(entry))
+                _append_all_fields_bulleted(out, entry, base_indent="  ")
             else:
                 out.append(f"o (search score: {score_label}) {name}")
                 out.append(f"  • description: {str(entry.get('description') or '').strip()}")
@@ -2215,9 +2257,9 @@ def build_help_relationship_report(
             out.append(f"o (search score: {score_label}) {file_name} (score={score:.1f})")
             out.append(f"  • source_file: {file_src}")
             out.append("  • file_fields:")
-            out.append(_format_all_fields(file_entry))
+            _append_all_fields_bulleted(out, file_entry, base_indent="    ")
             out.append("  • mapping_usage:")
-            out.append(_format_all_fields(refs))
+            _append_all_fields_bulleted(out, refs, base_indent="    ")
 
             loaders = mapping_data.get("loaders") or {}
             writers = mapping_data.get("writers") or {}
@@ -2228,10 +2270,10 @@ def build_help_relationship_report(
                     continue
                 if ref_kind == "loader" and isinstance(loaders, dict) and ref_name in loaders:
                     out.append(f"  • loader::{ref_name}")
-                    out.append(_format_all_fields(loaders.get(ref_name) or {}))
+                    _append_all_fields_bulleted(out, loaders.get(ref_name) or {}, base_indent="    ")
                 if ref_kind == "writer" and isinstance(writers, dict) and ref_name in writers:
                     out.append(f"  • writer::{ref_name}")
-                    out.append(_format_all_fields(writers.get(ref_name) or {}))
+                    _append_all_fields_bulleted(out, writers.get(ref_name) or {}, base_indent="    ")
 
     # 3) analyzer level
     analyzer_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2257,8 +2299,7 @@ def build_help_relationship_report(
             score_label = _search_score_label(score)
             if all_info:
                 out.append(f"o (search score: {score_label}) {name} (score={score:.1f})")
-                out.append("  • all fields:")
-                out.append(_format_all_fields(entry))
+                _append_all_fields_bulleted(out, entry, base_indent="  ")
             else:
                 out.append(f"o (search score: {score_label}) {name}")
                 out.append(f"  • consumes_dataclass: {str(entry.get('consumes_dataclass') or '').strip()}")
@@ -2293,8 +2334,7 @@ def build_help_relationship_report(
             score_label = _search_score_label(score)
             if all_info:
                 out.append(f"o (search score: {score_label}) {name} (score={score:.1f})")
-                out.append("  • all fields:")
-                out.append(_format_all_fields(entry))
+                _append_all_fields_bulleted(out, entry, base_indent="  ")
             else:
                 out.append(f"o (search score: {score_label}) {name}")
                 out.append(f"  • description: {str(entry.get('description') or '').strip()}")
