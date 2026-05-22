@@ -566,7 +566,8 @@ def _series_local(
 
             cluster = np.concatenate(([int(ci)], neigh))
             cluster_coords = coords[cluster]
-            rel = cluster_coords - cluster_coords[0:1]
+            # rel = cluster_coords - cluster_coords[0:1]
+            rel = cluster_coords # i don't want to find the relative coordinates
             if box_lengths is not None:
                 rel = _minimum_image_delta(rel, box_lengths)
 

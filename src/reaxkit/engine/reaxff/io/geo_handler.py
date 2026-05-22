@@ -35,6 +35,11 @@ class GeoHandler(BaseHandler):
         One row per atom, returned by ``dataframe()``, with columns:
         ["atom_id", "atom_type", "x", "y", "z"]
 
+    Connectivity table
+        One row per declared CONECT edge, returned by ``connectivity()``,
+        with columns:
+        ["source_atom_id", "target_atom_id"]
+
     Metadata
         Returned by ``metadata()``, containing:
         {
@@ -56,6 +61,8 @@ class GeoHandler(BaseHandler):
     Notes
     -----
     - Only ``ATOM`` and ``HETATM`` records are parsed into the atom table.
+    - ``CONECT`` records (after ``FORMAT CONECT``) are parsed into a
+      separate connectivity table.
     - Cell parameters are optional and may be absent for non-periodic systems.
     - Non-structural lines (e.g. ``XTLGRF``, ``FORMAT``) are ignored.
     - This handler is not frame-based; the file represents a single structure.
@@ -73,6 +80,7 @@ class GeoHandler(BaseHandler):
         """
         super().__init__(file_path)
         self._n_atoms: Optional[int] = None
+        self._connectivity_df: Optional[pd.DataFrame] = None
         self._reporter = reporter
 
     # ------------------------------------------------------------------
@@ -89,11 +97,13 @@ class GeoHandler(BaseHandler):
 
         """
         atoms: List[Dict[str, Any]] = []
+        connectivity_rows: List[Dict[str, int]] = []
 
         descriptor: Optional[str] = None
         remark: Optional[str] = None
         cell_lengths: Optional[Dict[str, float]] = None
         cell_angles: Optional[Dict[str, float]] = None
+        in_conect_section = False
 
         total_lines = self._count_lines()
         with open(self.path, "r") as fh:
@@ -105,6 +115,35 @@ class GeoHandler(BaseHandler):
                 line = raw.rstrip("\n")
                 stripped = line.strip()
                 if not stripped:
+                    continue
+
+                # Enter/leave CONECT block.
+                if stripped.upper().startswith("FORMAT CONECT"):
+                    in_conect_section = True
+                    continue
+                if stripped.upper().startswith("END"):
+                    in_conect_section = False
+                    continue
+
+                # Connectivity records: CONECT src dst1 dst2 ...
+                if in_conect_section and stripped.upper().startswith("CONECT"):
+                    parts = stripped.split()
+                    if len(parts) >= 2:
+                        try:
+                            source_atom_id = int(parts[1])
+                        except ValueError:
+                            continue
+                        for token in parts[2:]:
+                            try:
+                                target_atom_id = int(token)
+                            except ValueError:
+                                continue
+                            connectivity_rows.append(
+                                {
+                                    "source_atom_id": source_atom_id,
+                                    "target_atom_id": target_atom_id,
+                                }
+                            )
                     continue
 
                 # Descriptor
@@ -189,6 +228,10 @@ class GeoHandler(BaseHandler):
                 # Other lines (XTLGRF, FORMAT, etc.) are ignored
 
         df = pd.DataFrame(atoms, columns=["atom_id", "atom_type", "x", "y", "z"])
+        self._connectivity_df = pd.DataFrame(
+            connectivity_rows,
+            columns=["source_atom_id", "target_atom_id"],
+        )
         n_atoms = len(df)
         self._n_atoms = n_atoms
 
@@ -198,6 +241,7 @@ class GeoHandler(BaseHandler):
             "cell_lengths": cell_lengths,
             "cell_angles": cell_angles,
             "n_atoms": n_atoms,
+            "n_connectivity_edges": int(len(self._connectivity_df)),
         }
         if self._reporter:
             self._reporter("load", total_lines, total_lines, "Finished parsing geo")
@@ -260,3 +304,20 @@ class GeoHandler(BaseHandler):
         to make the intent explicit.
         """
         return self.dataframe().copy()
+
+    def connectivity(self) -> pd.DataFrame:
+        """
+        Return a copy of the parsed CONECT edge table.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns:
+            - source_atom_id
+            - target_atom_id
+        """
+        if not self._parsed:
+            self.parse()
+        if self._connectivity_df is None:
+            return pd.DataFrame(columns=["source_atom_id", "target_atom_id"])
+        return self._connectivity_df.copy()

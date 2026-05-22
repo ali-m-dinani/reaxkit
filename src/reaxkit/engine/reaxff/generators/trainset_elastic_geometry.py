@@ -117,7 +117,7 @@ def _make_base_atoms_from_xyz_and_cell(xyz_path: str | Path, cell: np.ndarray) -
     return atoms
 
 
-def generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometryResult:
+def _generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometryResult:
     def idx_abs_from_eps(eps: float, step: float) -> int:
         if abs(eps) < 1e-15:
             return 0
@@ -195,7 +195,7 @@ def generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometry
     return StrainedGeometryResult(records_by_mode=out)
 
 
-def write_strained_geometries(
+def _write_strained_geometries(
     result: StrainedGeometryResult,
     *,
     out_dir: str | Path,
@@ -225,7 +225,7 @@ def write_strained_geometries(
     return written
 
 
-def generate_strained_geometries_with_xtob(
+def _generate_strained_geometries_with_xtob(
     *,
     elastic_xyz: str | Path,
     bulk_xyz: Optional[str | Path],
@@ -249,4 +249,32 @@ def generate_strained_geometries_with_xtob(
         dstrain_bulk_linear=dstrain_bulk_linear,
         sort_by=sort_by,
     )
-    return write_strained_geometries(generate_strained_geometries(spec), out_dir=out_dir, sort_by=sort_by)
+    return _write_strained_geometries(_generate_strained_geometries(spec), out_dir=out_dir, sort_by=sort_by)
+
+
+def _gen_elastic_trainset_strained_geo_files(
+    *,
+    elastic_xyz: str | Path,
+    bulk_xyz: Optional[str | Path],
+    elastic_cell: Dict[str, float],
+    bulk_cell: Dict[str, float],
+    max_strain_elastic: float,
+    dstrain_elastic: float,
+    max_strain_bulk_linear: float,
+    dstrain_bulk_linear: float,
+    out_dir: str | Path,
+    sort_by: Optional[str] = None,
+) -> Dict[str, List[Path]]:
+    """Canonical alias for generating elastic strained GEO files."""
+    return _generate_strained_geometries_with_xtob(
+        elastic_xyz=elastic_xyz,
+        bulk_xyz=bulk_xyz,
+        elastic_cell=elastic_cell,
+        bulk_cell=bulk_cell,
+        max_strain_elastic=max_strain_elastic,
+        dstrain_elastic=dstrain_elastic,
+        max_strain_bulk_linear=max_strain_bulk_linear,
+        dstrain_bulk_linear=dstrain_bulk_linear,
+        out_dir=out_dir,
+        sort_by=sort_by,
+    )

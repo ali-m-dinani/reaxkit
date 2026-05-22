@@ -204,7 +204,7 @@ workflows:
     - reaxkit help "trajectory workflow"
     - run trajectory workflow
   addmol_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: make-addmol'
+    implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: gen_template_addmol'
     description: Direct command workflow for generating addmol files.
     related_commands:
       analysis: []
@@ -222,7 +222,7 @@ workflows:
     - reaxkit help "make molecule insertion"
     - make molecule insertion workflow
   charges_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.charges_workflow: make-charges'
+    implementation_module: 'reaxkit.workflows.file_tools.charges_workflow: gen_template_charges'
     description: Direct command workflow for generating charges files.
     related_commands:
       analysis: []
@@ -240,7 +240,7 @@ workflows:
     - reaxkit help "make charges"
     - make charges workflow
   control_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: gen_control'
     description: Task-oriented workflow for control-file analyses and utilities.
     related_commands:
       analysis: []
@@ -259,7 +259,7 @@ workflows:
     - reaxkit help "make control"
     - write control workflow
   eregime_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.eregime_workflow: make-eregime'
+    implementation_module: 'reaxkit.workflows.file_tools.eregime_workflow: gen_eregime'
     description: Direct command workflow for generating eregime.in files.
     related_commands:
       analysis: []
@@ -315,7 +315,7 @@ workflows:
     - reaxkit help "geometry file workflow"
     - run trajectory coordinates to geometry file workflow
   kopple2_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.kopple2_workflow: make-kopple2'
+    implementation_module: 'reaxkit.workflows.file_tools.kopple2_workflow: gen_template_kopple2'
     description: Direct command workflow for generating kopple2 files.
     related_commands:
       analysis: []
@@ -333,7 +333,7 @@ workflows:
     - reaxkit help "make coupling template"
     - make coupling template workflow
   trainset_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_elastic_settings'
     description: Direct command workflows for trainset export and generation utilities.
     related_commands:
       analysis: []
@@ -354,7 +354,7 @@ workflows:
     - reaxkit help "training set workflow"
     - create heat of formation training set workflow
   tregime_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.tregime_workflow: make-tregime'
+    implementation_module: 'reaxkit.workflows.file_tools.tregime_workflow: gen_template_tregime'
     description: Direct command workflow for tregime generation.
     related_commands:
       analysis: []
@@ -372,7 +372,7 @@ workflows:
     - reaxkit help "make temperature regime"
     - make temperature regime workflow
   vregime_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.vregime_workflow: make-vregime'
+    implementation_module: 'reaxkit.workflows.file_tools.vregime_workflow: gen_template_vregime'
     description: Direct command workflow for vregime generation.
     related_commands:
       analysis: []
@@ -598,7 +598,7 @@ command_to_workflow_module:
   active_site_events: reaxkit.workflows.active_site_workflow
   active_site_structural: reaxkit.workflows.active_site_workflow
   add-alias: reaxkit.workflows.meta.command_alias_workflow
-  add-geo-restraint: reaxkit.workflows.file_tools.geo_workflow
+  add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
   atom_property_heatmap2d: reaxkit.workflows.spatial_property_workflow
   atom_property_plot3d: reaxkit.workflows.spatial_property_workflow
   bond_events: reaxkit.workflows.connectivity_workflow
@@ -666,3 +666,11 @@ command_to_workflow_module:
   voronoi: reaxkit.workflows.trajectory_workflow
   write-control: reaxkit.workflows.file_tools.control_workflow
   xtob: reaxkit.workflows.file_tools.geo_workflow
+  gen_eregime: reaxkit.workflows.file_tools.eregime_workflow
+  gen_template_charges: reaxkit.workflows.file_tools.charges_workflow
+  gen_control: reaxkit.workflows.file_tools.control_workflow
+  gen_template_addmol: reaxkit.workflows.file_tools.addmol_workflow
+  gen_template_kopple2: reaxkit.workflows.file_tools.kopple2_workflow
+  gen_template_tregime: reaxkit.workflows.file_tools.tregime_workflow
+  gen_template_vregime: reaxkit.workflows.file_tools.vregime_workflow
+  gen_template_yaml_for_elastic_settings: reaxkit.workflows.file_tools.trainset_workflow

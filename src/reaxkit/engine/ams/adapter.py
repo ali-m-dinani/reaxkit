@@ -25,7 +25,7 @@ from reaxkit.domain.data_models import (
 )
 from reaxkit.engine.base import EngineAdapter
 from reaxkit.engine.ams.rkf_handler import RKFHandler
-from reaxkit.engine.common.xyz_generator import write_xyz_trajectory
+from reaxkit.engine.common.generators.xyz_generator import write_xyz_trajectory
 
 
 @register_engine("ams")

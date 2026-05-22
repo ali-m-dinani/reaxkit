@@ -29,9 +29,7 @@ __all__ = [
     "Kopple2GeneratorSpec",
     "DEFAULT_KOPPLE2_SPEC",
     "KOPPLE2_GENERATOR_REGISTRY",
-    "generate_kopple2_template",
-    "write_kopple2",
-    "write_kopple2_template",
+    "gen_template_kopple2",
 ]
 
 
@@ -53,14 +51,14 @@ class Kopple2GeneratorSpec:
 DEFAULT_KOPPLE2_SPEC = Kopple2GeneratorSpec()
 
 
-def generate_kopple2_template(spec: Kopple2GeneratorSpec = DEFAULT_KOPPLE2_SPEC) -> str:
+def _gen_template_kopple2_text(spec: Kopple2GeneratorSpec = DEFAULT_KOPPLE2_SPEC) -> str:
     """
     Generate the default ReaxFF ``kopple2`` file content as text.
     """
     return spec.template_text
 
 
-def write_kopple2_template(
+def _write_kopple2_template(
     out_path: str | Path = "kopple2",
     spec: Kopple2GeneratorSpec = DEFAULT_KOPPLE2_SPEC,
 ) -> Path:
@@ -69,18 +67,18 @@ def write_kopple2_template(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_kopple2_template(spec), encoding="utf-8")
+    out_path.write_text(_gen_template_kopple2_text(spec), encoding="utf-8")
     return out_path
 
 
-def write_kopple2(
+def gen_template_kopple2(
     out_path: str | Path = "kopple2",
     spec: Kopple2GeneratorSpec = DEFAULT_KOPPLE2_SPEC,
 ) -> Path:
     """
-    Backward-compatible wrapper for writing template ``kopple2`` files.
+    Generate template ``kopple2`` file.
     """
-    return write_kopple2_template(out_path=out_path, spec=spec)
+    return _write_kopple2_template(out_path=out_path, spec=spec)
 
 
 KOPPLE2_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -88,7 +86,7 @@ KOPPLE2_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "ReaxFF Kopple2 File",
         "default_filename": "kopple2",
         "spec_type": Kopple2GeneratorSpec,
-        "generate": generate_kopple2_template,
-        "write": write_kopple2_template,
+        "generate": _gen_template_kopple2_text,
+        "write": gen_template_kopple2,
     }
 }

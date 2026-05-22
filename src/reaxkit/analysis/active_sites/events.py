@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -12,7 +13,7 @@ from reaxkit.analysis.active_sites.pbc import frame_cell_matrix, pairwise_min_im
 from reaxkit.analysis.active_sites.tract_compat import to_tract_events_table
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.analysis_task_registry import register_task
-from reaxkit.domain.data_models import ConnectivityTrajectoryData
+from reaxkit.domain.data_models import ConnectivityTrajectoryData, TrajectoryData
 from reaxkit.presentation.specs import PresentationSpec
 
 
@@ -57,11 +58,72 @@ def merge_active_site_tables(
     return merged
 
 
+def _fort7_available(args: dict) -> bool:
+    candidates: list[Path] = []
+    raw_fort7 = args.get("fort7")
+    if raw_fort7:
+        p = Path(str(raw_fort7))
+        candidates.append(p / "fort.7" if p.is_dir() else p)
+
+    for key in ("run_dir", "input"):
+        raw = args.get(key)
+        if not raw:
+            continue
+        p = Path(str(raw))
+        if p.is_dir():
+            candidates.append(p / "fort.7")
+
+    candidates.append(Path("fort.7"))
+    return any(path.exists() for path in candidates)
+
+
+def _rkf_like_input(args: dict) -> bool:
+    def _is_kf(p: Path) -> bool:
+        return p.is_file() and p.suffix.lower() in {".rkf", ".kf"}
+
+    for key in ("rkf", "kf", "ams_kf", "ams_rkf"):
+        raw = args.get(key)
+        if raw:
+            p = Path(str(raw))
+            if _is_kf(p):
+                return True
+
+    raw_input = args.get("input")
+    if raw_input:
+        p = Path(str(raw_input))
+        if _is_kf(p):
+            return True
+        if p.is_dir() and (list(p.glob("*.rkf")) or list(p.glob("*.kf"))):
+            return True
+    return False
+
+
 @register_task("active_site_events", label="Active Site Events")
 class ActiveSiteEventsTask(AnalysisTask):
     """Extract persistent C-O and C-Si active-site events over trajectory frames."""
 
     required_data = ConnectivityTrajectoryData
+
+    def required_data_for(self, request: object, args: dict | None = None):
+        mode = str(getattr(request, "mode", "auto")).strip().lower()
+        if mode == "dist":
+            if args is None:
+                return (TrajectoryData, ConnectivityTrajectoryData)
+            return TrajectoryData
+        if mode == "bo":
+            return ConnectivityTrajectoryData
+
+        # auto mode
+        if args is None:
+            return (TrajectoryData, ConnectivityTrajectoryData)
+        engine = str(args.get("engine") or "").strip().lower()
+        if engine == "ams" or _rkf_like_input(args):
+            return ConnectivityTrajectoryData
+        if engine == "reaxff":
+            return ConnectivityTrajectoryData if _fort7_available(args) else TrajectoryData
+        if engine == "lammps":
+            return TrajectoryData
+        return ConnectivityTrajectoryData if _fort7_available(args) else TrajectoryData
 
     @staticmethod
     def recommended_presentations(
@@ -87,26 +149,46 @@ class ActiveSiteEventsTask(AnalysisTask):
 
     def run(
         self,
-        data: ConnectivityTrajectoryData,
+        data: ConnectivityTrajectoryData | TrajectoryData,
         request: ActiveSiteEventsRequest,
         reporter=None,
     ) -> ActiveSiteEventsResult:
-        positions = np.asarray(data.trajectory.positions, dtype=float)
+        if isinstance(data, ConnectivityTrajectoryData):
+            trajectory = data.trajectory
+            connectivity_data = data
+        elif isinstance(data, TrajectoryData):
+            trajectory = data
+            connectivity_data = None
+        else:
+            raise TypeError(
+                "ActiveSiteEventsTask expects ConnectivityTrajectoryData or TrajectoryData."
+            )
+
+        positions = np.asarray(trajectory.positions, dtype=float)
         if positions.ndim != 3:
             raise ValueError("TrajectoryData.positions must have shape (n_frames, n_atoms, 3).")
         n_frames, n_atoms, _ = positions.shape
-        if len(data.trajectory.atom_ids) != n_atoms:
+        if len(trajectory.atom_ids) != n_atoms:
             raise ValueError("TrajectoryData.atom_ids length must match trajectory atom count.")
-        if len(data.trajectory.elements) != n_atoms:
+        if len(trajectory.elements) != n_atoms:
             raise ValueError("TrajectoryData.elements length must match trajectory atom count.")
 
         frames = list(range(n_frames)) if request.frames is None else [int(i) for i in request.frames if 0 <= int(i) < n_frames]
         frames = frames[:: max(1, int(request.every))]
         if not frames:
             raise ValueError("No frames selected for event extraction.")
+        frame_markers = np.arange(n_frames, dtype=int)
+        if trajectory.iterations is not None:
+            iters = np.asarray(trajectory.iterations, dtype=int)
+            if iters.ndim == 1 and iters.shape[0] == n_frames:
+                frame_markers = iters
+        elif trajectory.simulation is not None and trajectory.simulation.iterations is not None:
+            iters = np.asarray(trajectory.simulation.iterations, dtype=int)
+            if iters.ndim == 1 and iters.shape[0] == n_frames:
+                frame_markers = iters
 
-        elements = np.asarray([str(e) for e in data.trajectory.elements], dtype=object)
-        atom_ids = np.asarray(data.trajectory.atom_ids, dtype=int)
+        elements = np.asarray([str(e) for e in trajectory.elements], dtype=object)
+        atom_ids = np.asarray(trajectory.atom_ids, dtype=int)
         carbon_element = str(request.carbon_element)
         oxygen_element = str(request.oxygen_element)
         silicon_element = str(request.silicon_element)
@@ -137,8 +219,8 @@ class ActiveSiteEventsTask(AnalysisTask):
             summary = {
                 "mode": str(request.mode).lower(),
                 "frames_analyzed": int(len(frames)),
-                "frame_first": int(frames[0]),
-                "frame_last": int(frames[-1]),
+                "frame_first": int(frame_markers[frames[0]]),
+                "frame_last": int(frame_markers[frames[-1]]),
                 "every": int(request.every),
                 "persist": int(request.persist),
                 "n_carbon": 0,
@@ -151,7 +233,7 @@ class ActiveSiteEventsTask(AnalysisTask):
             return ActiveSiteEventsResult(table=empty, tract_table=tract_table, summary=summary, request=request)
 
         mode = str(request.mode).lower()
-        has_bo = data.connectivity.bond_orders is not None
+        has_bo = bool(connectivity_data is not None and connectivity_data.connectivity.bond_orders is not None)
         if mode == "auto":
             use_bo = has_bo
         elif mode == "bo":
@@ -191,7 +273,9 @@ class ActiveSiteEventsTask(AnalysisTask):
             cell = frame_cell_matrix(data, fi)
 
             if use_bo:
-                bo = _bond_order_frame(data, fi)
+                if connectivity_data is None:
+                    raise ValueError("mode='bo' requires ConnectivityTrajectoryData with bond_orders.")
+                bo = _bond_order_frame(connectivity_data, fi)
                 if bo.shape != (n_atoms, n_atoms):
                     raise ValueError("bond-order frame shape must match trajectory atom dimension.")
                 bo = np.maximum(bo, bo.T)
@@ -248,8 +332,9 @@ class ActiveSiteEventsTask(AnalysisTask):
             new_si = (consec_si == persist) & (~in_event_si)
             n_events_o[new_o] += 1
             n_events_si[new_si] += 1
-            first_o[(new_o) & (first_o < 0)] = int(fi)
-            first_si[(new_si) & (first_si < 0)] = int(fi)
+            frame_value = int(frame_markers[fi])
+            first_o[(new_o) & (first_o < 0)] = frame_value
+            first_si[(new_si) & (first_si < 0)] = frame_value
 
             in_event_o |= new_o
             in_event_si |= new_si
@@ -297,8 +382,8 @@ class ActiveSiteEventsTask(AnalysisTask):
         summary = {
             "mode": "bo" if use_bo else "dist",
             "frames_analyzed": int(len(frames)),
-            "frame_first": int(frames[0]),
-            "frame_last": int(frames[-1]),
+            "frame_first": int(frame_markers[frames[0]]),
+            "frame_last": int(frame_markers[frames[-1]]),
             "every": int(request.every),
             "persist": persist,
             "n_carbon": int(n_c),

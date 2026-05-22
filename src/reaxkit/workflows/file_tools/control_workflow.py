@@ -20,12 +20,12 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.control_generator import write_control
+from reaxkit.engine.reaxff.generators.control_generator import gen_control
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.data_models import ControlParametersData
 
 CONTROL_COMMANDS = ("get-control", "write-control")
-MAKE_CONTROL_COMMAND = "make-control"
+MAKE_CONTROL_COMMAND = "gen_control"
 WRITE_CONTROL_COMMAND = "write-control"
 
 
@@ -96,10 +96,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Generate a default control file template.\n\n"
             "Examples:\n"
-            "  reaxkit make-control\n"
-            "  reaxkit make-control --output control\n"
-            "  reaxkit make-control --parameter nmdit --value 100000\n"
-            "  reaxkit make-control --output control --copy-to-dot"
+            "  reaxkit gen_control\n"
+            "  reaxkit gen_control --output control\n"
+            "  reaxkit gen_control --parameter nmdit --value 100000\n"
+            "  reaxkit gen_control --output control --copy-to-dot"
         )
         add_storage_cli_arguments(parser)
         parser.add_argument(
@@ -218,7 +218,7 @@ def _run_make(args: argparse.Namespace) -> int:
         raise ValueError("--parameter and --value must be provided the same number of times.")
     overrides = {str(k).strip(): str(v) for k, v in zip(parameters, values)}
 
-    write_control(output, overrides=overrides or None)
+    gen_control(output, overrides=overrides or None)
     persist_generator_metadata(
         args,
         command=MAKE_CONTROL_COMMAND,

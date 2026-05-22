@@ -13,7 +13,7 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.common.geo_transforms import (
     build_surface,
     make_supercell,
@@ -21,19 +21,18 @@ from reaxkit.engine.common.geo_transforms import (
     place2,
 )
 from reaxkit.engine.reaxff.generators.geo_generator import (
-    _format_crystx,
-    _format_hetatm_line,
     add_restraints_to_geo,
+    sort_geo,
     xtob,
 )
-from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
 GEO_FILE_TOOL_COMMANDS = (
     "xtob",
     "make-geo",
-    "sort-geo",
+    "sort_geo",
     "orthogonalize-geo",
     "place-geo",
+    "add_restraints_to_geo",
     "add-geo-restraint",
 )
 
@@ -103,49 +102,16 @@ def _run_make_geo(args: argparse.Namespace) -> int:
 
 
 def _run_sort_geo(args: argparse.Namespace) -> int:
+    out_path = sort_geo(
+        input_geo=args.file,
+        output_geo=args.output,
+        sort_by=args.sort,
+        descending=bool(args.descending),
+    )
     in_path = Path(args.file)
-    if not in_path.is_file():
-        raise FileNotFoundError(f"Input GEO file not found: {in_path}")
-
-    handler = GeoHandler(in_path)
-    df = handler.dataframe().copy()
-    meta = handler.metadata()
-
-    sort_map = {"m": "atom_id", "x": "x", "y": "y", "z": "z", "atom_type": "atom_type"}
-    sort_col = sort_map[args.sort]
-    df_sorted = df.sort_values(by=sort_col, ascending=not args.descending).reset_index(drop=True)
-    df_sorted["atom_id"] = df_sorted.index + 1
-
-    descriptor = meta.get("descriptor") or ""
-    remark = meta.get("remark")
-    cell_lengths = meta.get("cell_lengths")
-    cell_angles = meta.get("cell_angles")
-
-    out_path = Path(args.output)
     direction = "descending" if args.descending else "ascending"
     sort_label_map = {"m": "atom index", "x": "x-coordinate", "y": "y-coordinate", "z": "z-coordinate", "atom_type": "atom type"}
     sort_label = sort_label_map[args.sort]
-
-    with out_path.open("w", encoding="utf-8") as fh:
-        fh.write("XTLGRF 200\n")
-        if descriptor:
-            fh.write(f"DESCRP  {descriptor}\n")
-        if remark:
-            fh.write(f"REMARK {remark}\n")
-        fh.write(f"REMARK Structure sorted by {sort_label} ({direction})\n")
-        if cell_lengths and cell_angles:
-            try:
-                lengths = [cell_lengths.get(k) for k in ("a", "b", "c")]
-                angles = [cell_angles.get(k) for k in ("alpha", "beta", "gamma")]
-                if all(v is not None for v in lengths + angles):
-                    fh.write(_format_crystx(lengths, angles) + "\n")
-            except Exception:
-                pass
-        fh.write("FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x,a5,i3,i2,1x,f8.5)\n")
-        for row in df_sorted.itertuples(index=False):
-            fh.write(_format_hetatm_line(row.atom_id, row.atom_type, row.x, row.y, row.z) + "\n")
-        fh.write("END\n")
-
     print(f"[Done] Sorted {in_path} by {sort_label} ({direction}) to {out_path}")
     return 0
 
@@ -239,9 +205,10 @@ def _run_add_geo_restraint(args: argparse.Namespace) -> int:
 RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "xtob": _run_xtob,
     "make-geo": _run_make_geo,
-    "sort-geo": _run_sort_geo,
+    "sort_geo": _run_sort_geo,
     "orthogonalize-geo": _run_orthogonalize_geo,
     "place-geo": _run_place_geo,
+    "add_restraints_to_geo": _run_add_geo_restraint,
     "add-geo-restraint": _run_add_geo_restraint,
 }
 
@@ -274,12 +241,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--surface", required=True, help="Miller indices h,k,l")
         parser.add_argument("--expand", required=True, help="Supercell and layers nx,ny,layers")
         parser.add_argument("--vacuum", required=True, help="Vacuum thickness in angstrom")
-    elif command == "sort-geo":
+    elif command == "sort_geo":
         parser.description = (
             "Sort atoms in a GEO file and write a new GEO file.\n\n"
             "Examples:\n"
-            "  reaxkit sort-geo --file geo --output sorted_geo --sort x\n"
-            "  reaxkit sort-geo --file geo --output sorted_geo --sort atom_type --descending"
+            "  reaxkit sort_geo --file geo --output sorted_geo --sort x\n"
+            "  reaxkit sort_geo --file geo --output sorted_geo --sort atom_type --descending"
         )
         parser.add_argument("--file", required=True, help="Input GEO file")
         parser.add_argument("--output", required=True, help="Output GEO file")
@@ -310,12 +277,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--baseplace", default="as-is", choices=["as-is", "center", "origin"], help="Base placement mode")
         parser.add_argument("--maxattempt", default=50000, help="Maximum placement attempts per copy")
         parser.add_argument("--randomseed", default=None, help="Random seed")
-    elif command == "add-geo-restraint":
+    elif command in {"add_restraints_to_geo", "add-geo-restraint"}:
         parser.description = (
             "Insert sample or explicit restraint blocks into a GEO file.\n\n"
             "Examples:\n"
-            "  reaxkit add-geo-restraint --file geo --bond --output geo_r\n"
-            "  reaxkit add-geo-restraint --file geo --angle '1 2 3 109.5000 600.00 0.25000 0.0000000' --output geo_r"
+            "  reaxkit add_restraints_to_geo --file geo --bond --output geo_r\n"
+            "  reaxkit add_restraints_to_geo --file geo --angle '1 2 3 109.5000 600.00 0.25000 0.0000000' --output geo_r"
         )
         parser.add_argument("--file", default="geo", help="Input GEO file")
         parser.add_argument("--output", default=None, help="Output GEO file")
@@ -333,7 +300,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     output_value = getattr(args, "output", None)
-    if command == "add-geo-restraint" and not output_value:
+    if command in {"add_restraints_to_geo", "add-geo-restraint"} and not output_value:
         output_value = f"{Path(args.file).name}_with_restraints"
     if not output_value:
         output_value = command

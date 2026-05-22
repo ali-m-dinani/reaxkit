@@ -64,7 +64,7 @@ class BaseHandler(ABC):
     """
 
     _CACHE_ENV_VAR = "REAXKIT_HANDLER_CACHE_DIR"
-    _CACHE_VERSION = "1"
+    _CACHE_VERSION = "2"
     _MEMORY_CACHE: dict[str, bytes] = {}
     _MEMORY_LOCK = threading.Lock()
 
@@ -215,19 +215,61 @@ class BaseHandler(ABC):
             cls._MEMORY_CACHE.clear()
 
     def _handler_id(self) -> str:
+        identity: dict[str, Any] = {
+            "handler": f"{self.__class__.__module__}.{self.__class__.__qualname__}",
+            "cache_version": str(self._CACHE_VERSION),
+            "options": self._identity_options(),
+        }
         try:
             resolved = self.path.resolve()
-            stat = resolved.stat()
-            identity = (
-                f"{self.__class__.__module__}.{self.__class__.__qualname__}|"
-                f"{resolved}|{stat.st_size}|{stat.st_mtime_ns}|{self._CACHE_VERSION}"
-            )
+            identity["source"] = self._file_fingerprint(resolved)
         except OSError:
-            identity = (
-                f"{self.__class__.__module__}.{self.__class__.__qualname__}|"
-                f"{self.path}|missing|{self._CACHE_VERSION}"
-            )
-        return sha256(identity.encode("utf-8")).hexdigest()
+            identity["source"] = {"path": str(self.path), "missing": True}
+        blob = json.dumps(identity, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return sha256(blob.encode("utf-8")).hexdigest()
+
+    def _identity_options(self) -> dict[str, Any]:
+        """Return deterministic handler options that affect parse output."""
+        state = self._state_snapshot()
+        options: dict[str, Any] = {}
+        for name, value in state.items():
+            if name.startswith("_report"):
+                continue
+            options[name] = self._normalize_identity_value(value)
+        return options
+
+    @classmethod
+    def _normalize_identity_value(cls, value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, Path):
+            return str(value)
+        if isinstance(value, dict):
+            return {
+                str(k): cls._normalize_identity_value(v)
+                for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))
+            }
+        if isinstance(value, (list, tuple)):
+            return [cls._normalize_identity_value(v) for v in value]
+        if isinstance(value, set):
+            return sorted(cls._normalize_identity_value(v) for v in value)
+        return repr(value)
+
+    @staticmethod
+    def _file_fingerprint(path: Path) -> dict[str, Any]:
+        stat = path.stat()
+        digest = sha256()
+        with open(path, "rb") as fh:
+            while True:
+                chunk = fh.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return {
+            "sha256": digest.hexdigest(),
+            "size": int(stat.st_size),
+            "mtime_ns": int(stat.st_mtime_ns),
+        }
 
     # Backward-compatible alias
     def _cache_key(self) -> str:

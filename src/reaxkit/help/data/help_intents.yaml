@@ -1,15 +1,3 @@
-# Canonical intent vocabulary and wording aliases for `reaxkit help` capability discovery.
-#
-# How this file is used:
-# - `wording_alias` is for query normalization only.
-#   It maps shorthand/synonym forms (for example `heatfo`, `msd`, `traj`) to a
-#   canonical wording phrase. This step happens before layered search so user
-#   phrasing can be standardized consistently.
-# - `intents` is semantic intent metadata.
-#   It describes capability groups (description, aliases, dataclasses,
-#   workflows, generators). It is used as structured intent knowledge, while
-#   `wording_alias` is purely lexical normalization.
-
 _meta:
   version: '1.0'
   purpose: Canonical intent vocabulary for `reaxkit help` capability discovery.
@@ -181,6 +169,7 @@ intents:
     workflows:
     - timeseries
     generators:
+    - gen_eregime
     - make-eregime
   force_field:
     description: Inspect force-field parameters and optimization outputs.
@@ -202,8 +191,10 @@ intents:
     generators:
     - extract-optimized-ffield
     - export-trainset
+    - gen_template_yaml_for_elastic_settings
     - make-trainset-settings
     - make-trainset-settings-heatfo
+    - gen_elastic_trainset_from_yaml
     - make-trainset-elastic
     - make-trainset-heatfo
   molecular_species:
@@ -230,4 +221,5 @@ intents:
     workflows: []
     generators:
     - get-control
+    - gen_control
     - make-control

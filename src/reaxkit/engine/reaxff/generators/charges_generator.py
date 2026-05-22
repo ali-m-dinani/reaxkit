@@ -36,9 +36,7 @@ __all__ = [
     "ChargesGeneratorSpec",
     "DEFAULT_CHARGES_SPEC",
     "CHARGES_GENERATOR_REGISTRY",
-    "generate_charges_template",
-    "write_charges",
-    "write_charges_template",
+    "gen_template_charges",
 ]
 
 
@@ -60,14 +58,14 @@ class ChargesGeneratorSpec:
 DEFAULT_CHARGES_SPEC = ChargesGeneratorSpec()
 
 
-def generate_charges_template(spec: ChargesGeneratorSpec = DEFAULT_CHARGES_SPEC) -> str:
+def _gen_template_charges_text(spec: ChargesGeneratorSpec = DEFAULT_CHARGES_SPEC) -> str:
     """
     Generate the default ReaxFF ``charges`` file content as text.
     """
     return spec.template_text
 
 
-def write_charges_template(
+def _write_charges_template(
     out_path: str | Path = "charges",
     spec: ChargesGeneratorSpec = DEFAULT_CHARGES_SPEC,
 ) -> Path:
@@ -76,18 +74,18 @@ def write_charges_template(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_charges_template(spec), encoding="utf-8")
+    out_path.write_text(_gen_template_charges_text(spec), encoding="utf-8")
     return out_path
 
 
-def write_charges(
+def gen_template_charges(
     out_path: str | Path = "charges",
     spec: ChargesGeneratorSpec = DEFAULT_CHARGES_SPEC,
 ) -> Path:
     """
-    Backward-compatible wrapper for writing template ``charges`` files.
+    Generate template ``charges`` file.
     """
-    return write_charges_template(out_path=out_path, spec=spec)
+    return _write_charges_template(out_path=out_path, spec=spec)
 
 
 CHARGES_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -95,7 +93,7 @@ CHARGES_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "ReaxFF Charges File",
         "default_filename": "charges",
         "spec_type": ChargesGeneratorSpec,
-        "generate": generate_charges_template,
-        "write": write_charges_template,
+        "generate": _gen_template_charges_text,
+        "write": gen_template_charges,
     }
 }

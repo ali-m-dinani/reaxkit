@@ -10,7 +10,7 @@ import pandas as pd
 from reaxkit.core.engine_registry import register_engine
 from reaxkit.domain.data_models import ConnectivityData, ConnectivityTrajectoryData, SimulationData, TrajectoryData
 from reaxkit.engine.base import EngineAdapter
-from reaxkit.engine.common.xyz_generator import write_xyz_trajectory
+from reaxkit.engine.common.generators.xyz_generator import write_xyz_trajectory
 from reaxkit.engine.lammps.dump_handler import LAMMPSDumpHandler
 from reaxkit.engine.lammps.lammps_log_handler import LAMMPSLogHandler
 

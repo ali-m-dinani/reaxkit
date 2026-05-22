@@ -12,19 +12,19 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.addmol_generator import write_addmol
+from reaxkit.engine.reaxff.generators.addmol_generator import gen_template_addmol
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
-    parser.set_defaults(command="make-addmol")
+    parser.set_defaults(command="gen_template_addmol")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Generate ReaxFF addmol templates (addmol.bgf and addmol.vel).\n\n"
         "Examples:\n"
-        "  reaxkit make-addmol\n"
-        "  reaxkit make-addmol --output addmol.bgf\n"
-        "  reaxkit make-addmol --output custom_addmol.bgf --copy-to-dot"
+        "  reaxkit gen_template_addmol\n"
+        "  reaxkit gen_template_addmol --output addmol.bgf\n"
+        "  reaxkit gen_template_addmol --output custom_addmol.bgf --copy-to-dot"
     )
     parser.add_argument(
         "--output",
@@ -42,7 +42,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    bgf_path = write_addmol(out_path)
+    bgf_path = gen_template_addmol(out_path)
     vel_path = Path(bgf_path).with_name("addmol.vel")
 
     persist_generator_metadata(

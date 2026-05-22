@@ -11,19 +11,19 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.charges_generator import write_charges
+from reaxkit.engine.reaxff.generators.charges_generator import gen_template_charges
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
-    parser.set_defaults(command="make-charges")
+    parser.set_defaults(command="gen_template_charges")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Generate a ReaxFF charges template file.\n\n"
         "Examples:\n"
-        "  reaxkit make-charges\n"
-        "  reaxkit make-charges --output charges\n"
-        "  reaxkit make-charges --output charges.template --copy-to-dot"
+        "  reaxkit gen_template_charges\n"
+        "  reaxkit gen_template_charges --output charges\n"
+        "  reaxkit gen_template_charges --output charges.template --copy-to-dot"
     )
     parser.add_argument(
         "--output",
@@ -41,7 +41,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    written = write_charges(out_path)
+    written = gen_template_charges(out_path)
     persist_generator_metadata(
         args,
         command=command,

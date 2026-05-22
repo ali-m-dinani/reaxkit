@@ -28,11 +28,7 @@ __all__ = [
     "XmoloutFromHandlerSpec",
     "XmoloutFromFramesSpec",
     "XMOL_GENERATOR_REGISTRY",
-    "generate_xmolout_from_handler",
-    "generate_xmolout_from_frames",
-    "write_xmolout",
-    "write_xmolout_from_handler",
-    "write_xmolout_from_frames",
+    "trim_xmolout",
 ]
 
 
@@ -143,7 +139,7 @@ def _format_atom_line_extended(row: pd.Series, precision: int, extra_order: list
     return " ".join(parts) + "\n"
 
 
-def generate_xmolout_from_handler(spec: XmoloutFromHandlerSpec) -> str:
+def _generate_xmolout_from_handler(spec: XmoloutFromHandlerSpec) -> str:
     """
     Generate filtered ``xmolout`` text from an existing ``XmoloutHandler``.
     """
@@ -207,7 +203,7 @@ def generate_xmolout_from_handler(spec: XmoloutFromHandlerSpec) -> str:
     return "".join(lines)
 
 
-def write_xmolout(
+def _write_xmolout(
     out_path: str | Path,
     text: str,
 ) -> Path:
@@ -220,7 +216,7 @@ def write_xmolout(
     return out_path
 
 
-def write_xmolout_from_handler(
+def _write_xmolout_from_handler(
     xh: XmoloutHandler,
     out_path: str | Path,
     *,
@@ -243,10 +239,36 @@ def write_xmolout_from_handler(
         precision=precision,
         include_extras=include_extras,
     )
-    return write_xmolout(out_path, generate_xmolout_from_handler(spec))
+    return _write_xmolout(out_path, _generate_xmolout_from_handler(spec))
 
 
-def generate_xmolout_from_frames(spec: XmoloutFromFramesSpec) -> str:
+def trim_xmolout(
+    input_file: str | Path = "xmolout",
+    out_path: str | Path = "xmolout_trimmed",
+    *,
+    frames: FrameSel = None,
+    atoms: AtomSel = None,
+    atom_types: Optional[Sequence[str]] = None,
+    simulation_name: Optional[str] = None,
+    precision: int = 6,
+) -> Path:
+    """
+    Generate a lightweight ``xmolout`` file with only atom type and x/y/z columns.
+    """
+    xh = XmoloutHandler(input_file)
+    return _write_xmolout_from_handler(
+        xh,
+        out_path,
+        frames=frames,
+        atoms=atoms,
+        atom_types=atom_types,
+        simulation_name=simulation_name,
+        precision=precision,
+        include_extras=False,
+    )
+
+
+def _generate_xmolout_from_frames(spec: XmoloutFromFramesSpec) -> str:
     """
     Generate ``xmolout`` text from explicit per-frame dictionaries.
     """
@@ -310,7 +332,7 @@ def generate_xmolout_from_frames(spec: XmoloutFromFramesSpec) -> str:
     return "".join(lines)
 
 
-def write_xmolout_from_frames(
+def _write_xmolout_from_frames(
     frames: Iterable[Dict[str, Any]],
     out_path: str | Path,
     *,
@@ -336,7 +358,7 @@ def write_xmolout_from_frames(
             "gamma": 90.0,
         },
     )
-    return write_xmolout(out_path, generate_xmolout_from_frames(spec))
+    return _write_xmolout(out_path, _generate_xmolout_from_frames(spec))
 
 
 XMOL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -344,14 +366,14 @@ XMOL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "XMOL Trajectory From Handler",
         "default_filename": "xmolout",
         "spec_type": XmoloutFromHandlerSpec,
-        "generate": generate_xmolout_from_handler,
-        "write": write_xmolout_from_handler,
+        "generate": _generate_xmolout_from_handler,
+        "write": _write_xmolout_from_handler,
     },
     "xmolout_from_frames": {
         "label": "XMOL Trajectory From Frames",
         "default_filename": "xmolout",
         "spec_type": XmoloutFromFramesSpec,
-        "generate": generate_xmolout_from_frames,
-        "write": write_xmolout_from_frames,
+        "generate": _generate_xmolout_from_frames,
+        "write": _write_xmolout_from_frames,
     },
 }

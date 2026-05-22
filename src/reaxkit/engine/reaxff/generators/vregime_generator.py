@@ -16,9 +16,7 @@ from typing import Any
 __all__ = [
     "VRegimeSampleSpec",
     "VREGIME_GENERATOR_REGISTRY",
-    "generate_sample_vregime",
-    "write_vregime",
-    "write_sample_vregime",
+    "gen_template_vregime",
 ]
 
 
@@ -69,7 +67,7 @@ def _build_sample_rows() -> list[dict[str, Any]]:
     ]
 
 
-def generate_sample_vregime(spec: VRegimeSampleSpec = VRegimeSampleSpec()) -> str:
+def _gen_template_vregime_text(spec: VRegimeSampleSpec = VRegimeSampleSpec()) -> str:
     """
     Generate sample ``vregime.in`` text with fixed-width, left-aligned columns.
     """
@@ -129,7 +127,7 @@ def generate_sample_vregime(spec: VRegimeSampleSpec = VRegimeSampleSpec()) -> st
     return "\n".join(lines) + "\n"
 
 
-def write_vregime(
+def _write_vregime(
     out_path: str | Path = "vregime.in",
     spec: VRegimeSampleSpec = VRegimeSampleSpec(),
 ) -> Path:
@@ -138,19 +136,19 @@ def write_vregime(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_sample_vregime(spec), encoding="utf-8", newline="\n")
+    out_path.write_text(_gen_template_vregime_text(spec), encoding="utf-8", newline="\n")
     return out_path
 
 
-def write_sample_vregime(
+def gen_template_vregime(
     out_path: str | Path = "vregime.in",
     *,
     n_rows: int = 5,
 ) -> Path:
     """
-    Backward-compatible wrapper for writing sample ``vregime.in`` text.
+    Generate sample ``vregime.in`` file.
     """
-    return write_vregime(out_path=out_path, spec=VRegimeSampleSpec(n_rows=n_rows))
+    return _write_vregime(out_path=out_path, spec=VRegimeSampleSpec(n_rows=n_rows))
 
 
 VREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -158,7 +156,7 @@ VREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "Volume Regime Sample",
         "default_filename": "vregime.in",
         "spec_type": VRegimeSampleSpec,
-        "generate": generate_sample_vregime,
-        "write": write_vregime,
+        "generate": _gen_template_vregime_text,
+        "write": gen_template_vregime,
     }
 }

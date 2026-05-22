@@ -11,8 +11,7 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_handler
-from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+from reaxkit.engine.reaxff.generators.xmolout_generator import trim_xmolout
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
@@ -33,8 +32,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    xh = XmoloutHandler(args.file)
-    write_xmolout_from_handler(xh, out_path, include_extras=False)
+    trim_xmolout(input_file=args.file, out_path=out_path)
     persist_generator_metadata(
         args,
         command=command,

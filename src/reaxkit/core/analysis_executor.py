@@ -171,6 +171,14 @@ class AnalysisExecutor:
                 return str(value)
         return "."
 
+    @staticmethod
+    def _console_step(args: dict, message: str) -> None:
+        if args.get("quiet"):
+            return
+        run_id = args.get("run_id")
+        suffix = f" run_id={run_id}" if run_id else ""
+        print(f"[ReaxKit] {message}{suffix}", flush=True)
+
     def run(self, task, request, args: dict):
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
@@ -178,12 +186,16 @@ class AnalysisExecutor:
         required_data = (
             task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
         )
+        task_name = task.__class__.__name__
+        data_name = getattr(required_data, "__name__", str(required_data))
+        self._console_step(args, f"Starting task={task_name} required_data={data_name}")
         handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
         handler_cache_dir.mkdir(parents=True, exist_ok=True)
         os.environ["REAXKIT_HANDLER_CACHE_DIR"] = str(handler_cache_dir.resolve())
+        self._console_step(args, f"Handler cache dir={handler_cache_dir}")
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
-        args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task.__class__.__name__)
+        args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task_name)
         log_level = args.get("log")
         if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")
@@ -192,7 +204,7 @@ class AnalysisExecutor:
         self._record_general(
             args,
             event="session_start",
-            task_name=task.__class__.__name__,
+            task_name=task_name,
             extra={
                 "command": args.get("command"),
                 "project_root": args.get("project_root"),
@@ -201,19 +213,23 @@ class AnalysisExecutor:
 
         input_path = str(args.get("_snapshot_source_dir") or self._detection_path(args))
         forced_engine = args.get("engine")
+        self._console_step(args, f"Resolving engine input={input_path} forced_engine={forced_engine or 'auto'}")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
         adapter = resolve_engine(input_path, engine=forced_engine)
+        self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
         snapshot_names = adapter.required_input_files(required_data, args)
+        self._console_step(args, "Snapshotting raw inputs")
         snapshot_storage_inputs(args, names=snapshot_names)
         if run_id := args.get("run_id"):
             project_root = Path(args.get("project_root") or ".")
             raw_dir = ReaxkitStorageLayout(project_root=project_root).raw_run_dir(str(run_id))
             copied = sorted([p.name for p in raw_dir.iterdir() if p.is_file()]) if raw_dir.exists() else []
+            self._console_step(args, f"Snapshot ready raw_dir={raw_dir}")
             self._record_general(
                 args,
                 event="snapshot_raw_ready",
-                task_name=task.__class__.__name__,
+                task_name=task_name,
                 extra={
                     "raw_dir": str(raw_dir),
                     "files": ",".join(copied),
@@ -236,10 +252,11 @@ class AnalysisExecutor:
                     engine=engine_name,
                 )
                 parsed_id = str(args["_parsed_id"])
+                self._console_step(args, f"Registered parsed dataset parsed_id={parsed_id}")
                 self._record_general(
                     args,
                     event="parsed_dataset_registered",
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     extra={
                         "parsed_id": parsed_id,
                         "parsed_dir": str(layout.parsed_dir(parsed_id)),
@@ -252,11 +269,13 @@ class AnalysisExecutor:
         cache_root = Path(args.get("cache_dir") or (Path(input_path) / ".reaxkit_cache"))
         cache = CacheManager(CacheConfig(root=cache_root, namespace="analysis"))
         use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
+        self._console_step(args, f"Analysis cache={'enabled' if use_cache else 'disabled'} root={cache_root}")
         analysis_id = None
         if parsed_id is not None:
             data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
             if layout is not None:
+                self._console_step(args, f"Checking parsed artifact cache parsed_id={parsed_id} artifact={artifact_name}")
                 cached_parsed = layout.load_parsed_artifact(
                     parsed_id=parsed_id,
                     artifact_name=artifact_name,
@@ -265,8 +284,9 @@ class AnalysisExecutor:
                     expected_type = required_data
                     if isinstance(cached_parsed, expected_type):
                         logger.debug("Parsed cache hit for data_type=%s parsed_id=%s", data_name, parsed_id[:12])
+                        self._console_step(args, f"Parsed artifact cache hit parsed_id={parsed_id}")
                         t_load = 0.0
-                        self._record_timing(args, phase="load_total", task_name=task.__class__.__name__, seconds=t_load)
+                        self._record_timing(args, phase="load_total", task_name=task_name, seconds=t_load)
                         data = cached_parsed
                         analysis_id = cache.analysis_id_for(
                             task=task,
@@ -281,18 +301,19 @@ class AnalysisExecutor:
                                 run_id=str(run_id),
                                 parsed_id=parsed_id,
                                 analysis_id=analysis_id,
-                                task_name=task.__class__.__name__,
+                                task_name=task_name,
                                 task_version=task_version,
                             )
                         except Exception as exc:  # pragma: no cover - best-effort index update
                             logger.debug("Run analysis index update skipped: %s", exc)
 
                         if use_cache and cache.exists(analysis_id):
-                            logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                            logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
+                            self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_hit",
-                                task_name=task.__class__.__name__,
+                                task_name=task_name,
                                 extra={"analysis_id": analysis_id},
                             )
                             cached = cache.load(analysis_id)
@@ -303,15 +324,18 @@ class AnalysisExecutor:
                             )
 
                         if not use_cache:
-                            logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
+                            logger.info("Cache disabled; executing task=%s", task_name)
+                            self._console_step(args, "Analysis cache disabled (running task)")
                         else:
-                            logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                            logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
+                            self._console_step(args, f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_miss",
-                                task_name=task.__class__.__name__,
+                                task_name=task_name,
                                 extra={"analysis_id": analysis_id},
                             )
+                        self._console_step(args, f"Running analysis task={task_name}")
                         t_run0 = perf_counter()
                         try:
                             result = self._run_task(task, data, request, reporter)
@@ -319,7 +343,7 @@ class AnalysisExecutor:
                             raise
                         except Exception as exc:
                             raise AnalysisError(
-                                f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
+                                f"Task '{task_name}' failed during analysis: {exc}"
                             ) from exc
                         result = enrich_result_with_time(
                             result,
@@ -327,20 +351,22 @@ class AnalysisExecutor:
                             control_file=str(args.get("control") or "control"),
                         )
                         t_run = perf_counter() - t_run0
-                        self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
+                        self._record_timing(args, phase="analyze", task_name=task_name, seconds=t_run)
                         if use_cache:
-                            cache.store(analysis_id, result, task_name=task.__class__.__name__)
+                            cache.store(analysis_id, result, task_name=task_name)
                             logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
+                            self._console_step(args, f"Stored analysis result in cache analysis_id={analysis_id[:12]}")
                         self._record_general(
                             args,
                             event="analysis_done",
-                            task_name=task.__class__.__name__,
+                            task_name=task_name,
                             extra={
                                 "analysis_id": analysis_id,
                                 "analysis_dir": str(self._analysis_output_dir(args)),
                                 "status": "success",
                             },
                         )
+                        self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
                         return result
 
             analysis_id = cache.analysis_id_for(
@@ -356,18 +382,19 @@ class AnalysisExecutor:
                     run_id=str(run_id),
                     parsed_id=parsed_id,
                     analysis_id=analysis_id,
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     task_version=task_version,
                 )
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)
 
             if use_cache and cache.exists(analysis_id):
-                logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+                logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
+                self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                 self._record_general(
                     args,
                     event="analysis_cache_hit",
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     extra={"analysis_id": analysis_id},
                 )
                 cached = cache.load(analysis_id)
@@ -378,6 +405,7 @@ class AnalysisExecutor:
                 )
 
         t_load0 = perf_counter()
+        self._console_step(args, f"Loading data via adapter={adapter.__class__.__name__} data_type={data_name}")
         try:
             data = adapter.load(required_data, args, reporter=reporter)
         except ParseError:
@@ -385,8 +413,9 @@ class AnalysisExecutor:
         except Exception as exc:
             raise ParseError(
                 f"Failed to load required data '{getattr(required_data, '__name__', str(required_data))}' "
-                f"for task '{task.__class__.__name__}': {exc}"
+                f"for task '{task_name}': {exc}"
             ) from exc
+        self._console_step(args, "Data loading complete")
         if run_id and layout is not None and parsed_id is None:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
@@ -397,10 +426,11 @@ class AnalysisExecutor:
                     engine=engine_name,
                 )
                 parsed_id = str(args["_parsed_id"])
+                self._console_step(args, f"Registered parsed dataset parsed_id={parsed_id}")
                 self._record_general(
                     args,
                     event="parsed_dataset_registered",
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     extra={
                         "parsed_id": parsed_id,
                         "parsed_dir": str(layout.parsed_dir(parsed_id)),
@@ -422,22 +452,23 @@ class AnalysisExecutor:
                 self._record_general(
                     args,
                     event="parsed_artifact_saved",
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     extra={
                         "parsed_id": parsed_id,
                         "artifact": artifact_name,
                         "path": str(parsed_artifact_path),
                     },
                 )
+                self._console_step(args, f"Saved parsed artifact path={parsed_artifact_path}")
             except Exception as exc:  # pragma: no cover - best-effort artifact persistence
                 logger.debug("Parsed artifact write skipped: %s", exc)
         t_load = perf_counter() - t_load0
         logger.debug(
             "Loaded data_type=%s for task=%s",
             getattr(required_data, "__name__", str(required_data)),
-            task.__class__.__name__,
+            task_name,
         )
-        self._record_timing(args, phase="load_total", task_name=task.__class__.__name__, seconds=t_load)
+        self._record_timing(args, phase="load_total", task_name=task_name, seconds=t_load)
 
         analysis_id = analysis_id or cache.analysis_id_for(
             task=task,
@@ -453,14 +484,16 @@ class AnalysisExecutor:
                     run_id=str(run_id),
                     parsed_id=parsed_id,
                     analysis_id=analysis_id,
-                    task_name=task.__class__.__name__,
+                    task_name=task_name,
                     task_version=task_version,
                 )
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)
 
         if not use_cache:
-            logger.info("Cache disabled; executing task=%s", task.__class__.__name__)
+            logger.info("Cache disabled; executing task=%s", task_name)
+            self._console_step(args, "Analysis cache disabled (running task)")
+            self._console_step(args, f"Running analysis task={task_name}")
             t_run0 = perf_counter()
             try:
                 result = self._run_task(task, data, request, reporter)
@@ -468,7 +501,7 @@ class AnalysisExecutor:
                 raise
             except Exception as exc:
                 raise AnalysisError(
-                    f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
+                    f"Task '{task_name}' failed during analysis: {exc}"
                 ) from exc
             result = enrich_result_with_time(
                 result,
@@ -476,25 +509,27 @@ class AnalysisExecutor:
                 control_file=str(args.get("control") or "control"),
             )
             t_run = perf_counter() - t_run0
-            self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
+            self._record_timing(args, phase="analyze", task_name=task_name, seconds=t_run)
             self._record_general(
                 args,
                 event="analysis_done",
-                task_name=task.__class__.__name__,
+                task_name=task_name,
                 extra={
                     "analysis_id": analysis_id,
                     "analysis_dir": str(self._analysis_output_dir(args)),
                     "status": "success",
                 },
             )
+            self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
             return result
 
         if cache.exists(analysis_id):
-            logger.info("Cache hit for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+            logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
+            self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
             self._record_general(
                 args,
                 event="analysis_cache_hit",
-                task_name=task.__class__.__name__,
+                task_name=task_name,
                 extra={"analysis_id": analysis_id},
             )
             cached = cache.load(analysis_id)
@@ -504,13 +539,15 @@ class AnalysisExecutor:
                 control_file=str(args.get("control") or "control"),
             )
 
-        logger.info("Cache miss for task=%s analysis_id=%s", task.__class__.__name__, analysis_id[:12])
+        logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
+        self._console_step(args, f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
         self._record_general(
             args,
             event="analysis_cache_miss",
-            task_name=task.__class__.__name__,
+            task_name=task_name,
             extra={"analysis_id": analysis_id},
         )
+        self._console_step(args, f"Running analysis task={task_name}")
         t_run0 = perf_counter()
         try:
             result = self._run_task(task, data, request, reporter)
@@ -518,7 +555,7 @@ class AnalysisExecutor:
             raise
         except Exception as exc:
             raise AnalysisError(
-                f"Task '{task.__class__.__name__}' failed during analysis: {exc}"
+                f"Task '{task_name}' failed during analysis: {exc}"
             ) from exc
         result = enrich_result_with_time(
             result,
@@ -526,17 +563,19 @@ class AnalysisExecutor:
             control_file=str(args.get("control") or "control"),
         )
         t_run = perf_counter() - t_run0
-        self._record_timing(args, phase="analyze", task_name=task.__class__.__name__, seconds=t_run)
-        cache.store(analysis_id, result, task_name=task.__class__.__name__)
+        self._record_timing(args, phase="analyze", task_name=task_name, seconds=t_run)
+        cache.store(analysis_id, result, task_name=task_name)
+        self._console_step(args, f"Stored analysis result in cache analysis_id={analysis_id[:12]}")
         logger.debug("Stored result in cache analysis_id=%s", analysis_id[:12])
         self._record_general(
             args,
             event="analysis_done",
-            task_name=task.__class__.__name__,
+            task_name=task_name,
             extra={
                 "analysis_id": analysis_id,
                 "analysis_dir": str(self._analysis_output_dir(args)),
                 "status": "success",
             },
         )
+        self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
         return result

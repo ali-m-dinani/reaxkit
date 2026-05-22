@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
-from typing import Dict, List
+from typing import List
 
 from reaxkit.core.generator_runtime import (
     maybe_copy_output_to_dot,
@@ -17,22 +16,20 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.engine.reaxff.generators.trainset_heatfo import (
-    HeatFoReferenceSpec,
-    parse_elements_csv,
-    parse_heatfo_references,
-)
-from reaxkit.engine.reaxff.generators.trainset_source_adapter import (
-    HeatFoTrainsetRequest,
-    get_trainset_source_adapter,
+    gen_heatfo_trainset,
 )
 from reaxkit.engine.reaxff.generators.trainset_yaml import (
-    generate_trainset_from_yaml,
-    write_heatfo_settings_yaml,
-    write_trainset_settings_yaml,
+    gen_elastic_trainset,
+    gen_template_yaml_for_elastic_settings,
+    gen_template_yaml_for_heatfo_settings,
 )
 
 TRAINSET_FILE_COMMANDS = (
     "export-trainset",
+    "gen_template_yaml_for_elastic_settings",
+    "gen_template_yaml_for_heatfo_settings",
+    "gen_elastic_trainset",
+    "gen_heatfo_trainset",
     "make-trainset-settings",
     "make-trainset-settings-heatfo",
     "make-trainset-elastic",
@@ -54,70 +51,6 @@ def _load_trainset_tables(path: str) -> dict[str, object]:
     }
 
 
-def _concat_geo_strained(out_dir: Path) -> Path | None:
-    geo_dir = out_dir / "geo_strained"
-    all_geo_file = geo_dir / "all_trainset_geo.bgf"
-    if not geo_dir.exists():
-        return None
-    bgf_files = sorted(geo_dir.glob("*.bgf"))
-    if not bgf_files:
-        return None
-    with all_geo_file.open("w", encoding="utf-8") as fout:
-        for bgf in bgf_files:
-            fout.write(f"# ===== BEGIN {bgf.name} =====\n")
-            with bgf.open("r", encoding="utf-8") as fin:
-                fout.write(fin.read())
-            fout.write(f"\n# ===== END {bgf.name} =====\n\n")
-    return all_geo_file
-
-
-def _parse_heatfo_reference_map(ref_obj) -> Dict[str, HeatFoReferenceSpec]:
-    if ref_obj is None:
-        return {}
-    if isinstance(ref_obj, str):
-        return parse_heatfo_references(ref_obj)
-    if not isinstance(ref_obj, dict):
-        raise ValueError("heatfo YAML references must be a string or mapping.")
-    out: Dict[str, HeatFoReferenceSpec] = {}
-    for element_raw, value in ref_obj.items():
-        element = str(element_raw).strip()
-        if not element:
-            continue
-        e_norm = element[:1].upper() + element[1:].lower()
-        if isinstance(value, str):
-            text = value.strip()
-            if ":" not in text:
-                raise ValueError(
-                    f"Invalid reference for element {element!r}. "
-                    "Expected 'identifier:atoms_per_structure'."
-                )
-            iden, atoms = text.rsplit(":", 1)
-            out[e_norm] = HeatFoReferenceSpec(iden=iden.strip(), atoms_per_structure=int(atoms.strip()))
-        elif isinstance(value, dict):
-            iden = str(value.get("iden", "")).strip()
-            atoms_per_structure = int(value.get("atoms_per_structure"))
-            if not iden:
-                raise ValueError(f"Missing iden in reference for element {element!r}.")
-            out[e_norm] = HeatFoReferenceSpec(iden=iden, atoms_per_structure=atoms_per_structure)
-        else:
-            raise ValueError(f"Unsupported reference value for element {element!r}: {value!r}")
-    return out
-
-
-def _load_heatfo_yaml(path: str | Path) -> dict:
-    try:
-        import yaml
-    except ImportError as exc:
-        raise ImportError("PyYAML is required for heatfo YAML mode. Install with: pip install pyyaml") from exc
-    yaml_path = Path(path)
-    if not yaml_path.exists():
-        raise FileNotFoundError(f"YAML file does not exist: {yaml_path}")
-    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict):
-        raise ValueError("Heatfo YAML root must be a mapping.")
-    return data
-
-
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     parser.formatter_class = argparse.RawTextHelpFormatter
 
@@ -132,24 +65,24 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--section", default="all", help="Section: all, charge, heatfo, geometry, cell_parameters, energy")
         parser.add_argument("--output", default="trainset_export", help="Output directory for exported CSV files")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    elif command == "make-trainset-settings":
+    elif command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:
         parser.description = (
             "Write a sample trainset settings YAML.\n\n"
             "Examples:\n"
-            "  reaxkit make-trainset-settings\n"
-            "  reaxkit make-trainset-settings --output trainset_settings.yaml"
+            "  reaxkit gen_template_yaml_for_elastic_settings\n"
+            "  reaxkit gen_template_yaml_for_elastic_settings --output trainset_settings.yaml"
         )
         parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    elif command == "make-trainset-settings-heatfo":
+    elif command in {"gen_template_yaml_for_heatfo_settings", "make-trainset-settings-heatfo"}:
         parser.description = (
             "Write a sample heatfo trainset settings YAML.\n\n"
             "Example:\n"
-            "  reaxkit make-trainset-settings-heatfo --output trainset_heatfo_settings.yaml"
+            "  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml"
         )
         parser.add_argument("--output", default="trainset_heatfo_settings.yaml", help="Output YAML path")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    elif command == "make-trainset-elastic":
+    elif command in {"gen_elastic_trainset", "make-trainset-elastic"}:
         parser.description = (
             "Generate elastic trainsets.\n\n"
             "input-mode options:\n"
@@ -171,7 +104,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
         parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs.")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    elif command == "make-trainset-heatfo":
+    elif command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
         parser.description = (
             "Generate heat-of-formation trainsets.\n\n"
             "input-mode options:\n"
@@ -246,12 +179,12 @@ def _run_export_trainset(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_make_trainset_settings(args: argparse.Namespace) -> int:
-    out, layout = prepare_generator_output(args, command="make-trainset-settings", output_value=str(args.output))
-    write_trainset_settings_yaml(out_path=str(out))
+def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) -> int:
+    out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
+    gen_template_yaml_for_elastic_settings(out_path=str(out))
     persist_generator_metadata(
         args,
-        command="make-trainset-settings",
+        command=command_name,
         output_path=out,
         layout=layout,
         copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
@@ -264,12 +197,12 @@ def _run_make_trainset_settings(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_make_trainset_settings_heatfo(args: argparse.Namespace) -> int:
-    out, layout = prepare_generator_output(args, command="make-trainset-settings-heatfo", output_value=str(args.output))
-    write_heatfo_settings_yaml(out_path=str(out))
+def _run_make_trainset_settings_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
+    out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
+    gen_template_yaml_for_heatfo_settings(out_path=str(out))
     persist_generator_metadata(
         args,
-        command="make-trainset-settings-heatfo",
+        command=command_name,
         output_path=out,
         layout=layout,
         copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
@@ -282,100 +215,29 @@ def _run_make_trainset_settings_heatfo(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_make_trainset_elastic(args: argparse.Namespace) -> int:
-    source_adapter = get_trainset_source_adapter(str(args.source))
-    out_dir, layout = prepare_generator_output(args, command="make-trainset-elastic", output_value=str(args.output))
+def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -> int:
+    out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    mode = str(args.input_mode).strip().lower()
-
-    def run_single_material_id(mat_id: str, target_dir: Path) -> str:
-        api_key = args.api_key or os.getenv("MP_API_KEY")
-        if not api_key:
-            raise ValueError(
-                f"Missing API key for source '{source_adapter.source_name}'. "
-                "For MP, provide --api-key or set MP_API_KEY."
-            )
-        out_yaml = target_dir / Path(str(args.out_yaml)).name
-        structure_dir = Path(args.structure_dir) if args.structure_dir else (target_dir / "downloaded_structures")
-        structure_dir.mkdir(parents=True, exist_ok=True)
-        res = source_adapter.generate_elastic_settings_yaml_from_material_id(
-            mat_id=mat_id,
-            out_yaml=str(out_yaml),
-            structure_dir=str(structure_dir),
-            bulk_mode=args.bulk_mode,
-            api_key=api_key,
-            verbose=bool(args.verbose),
-        )
-        generate_trainset_from_yaml(yaml_path=res["yaml"], out_dir=str(target_dir))
-        _concat_geo_strained(target_dir)
-        return res["yaml"]
-
-    extra = {"mode": mode}
-    if mode == "yaml":
-        if not args.yaml:
-            raise ValueError("yaml mode requires --yaml.")
-        generate_trainset_from_yaml(yaml_path=args.yaml, out_dir=str(out_dir))
-        geo_path = _concat_geo_strained(out_dir)
-        if geo_path is not None:
-            print(f"[Done] Concatenated strained geometries to: {geo_path}")
-        print(f"[Done] Elastic trainset written to: {out_dir}")
-        extra["yaml_path"] = str(args.yaml)
-    elif mode == "material-id":
-        if not args.mat_id:
-            raise ValueError("material-id mode requires --mat-id.")
-        yaml_path = run_single_material_id(str(args.mat_id), out_dir)
-        print(f"[Done] Generated settings from source '{source_adapter.source_name}': {yaml_path}")
-        print(f"[Done] Elastic trainset written to: {out_dir}")
-        extra["yaml_path"] = str(yaml_path)
-        extra["mat_id"] = str(args.mat_id)
-    elif mode == "batch":
-        if not args.elements:
-            raise ValueError("batch mode requires --elements.")
-        api_key = args.api_key or os.getenv("MP_API_KEY")
-        if not api_key:
-            raise ValueError(
-                f"Missing API key for source '{source_adapter.source_name}'. "
-                "For MP, provide --api-key or set MP_API_KEY."
-            )
-        elements = parse_elements_csv(str(args.elements))
-        mat_ids = source_adapter.search_material_ids_by_elements(
-            api_key=api_key,
-            elements=elements,
-            exact_element_count=str(args.element_count_scope).strip().lower() == "exact",
-            max_materials=args.max_materials,
-        )
-        if not mat_ids:
-            raise ValueError(f"No source systems found for batch query in source '{source_adapter.source_name}'.")
-        ok = 0
-        skipped = 0
-        for mat_id in mat_ids:
-            target_dir = out_dir / mat_id
-            try:
-                run_single_material_id(mat_id, target_dir)
-                ok += 1
-            except Exception as exc:
-                skipped += 1
-                if args.verbose:
-                    print(f"[{source_adapter.source_name.upper()}][skip] {mat_id}: {exc}")
-        print(
-            f"[Done] Elastic batch completed ({source_adapter.source_name}): "
-            f"success={ok}, skipped={skipped}, total={len(mat_ids)}"
-        )
-        extra.update(
-            {
-                "elements": elements,
-                "mat_ids_total": len(mat_ids),
-                "mat_ids_success": ok,
-                "mat_ids_skipped": skipped,
-            }
-        )
-    else:
-        raise ValueError(f"Unsupported input mode: {mode!r}")
+    extra = gen_elastic_trainset(
+        out_dir=str(out_dir),
+        source=str(args.source),
+        input_mode=str(args.input_mode),
+        yaml_path=args.yaml,
+        mat_id=args.mat_id,
+        elements=args.elements,
+        element_count_scope=str(args.element_count_scope),
+        max_materials=args.max_materials,
+        api_key=args.api_key,
+        bulk_mode=str(args.bulk_mode),
+        out_yaml=str(args.out_yaml),
+        structure_dir=args.structure_dir,
+        verbose=bool(args.verbose),
+    )
 
     persist_generator_metadata(
         args,
-        command="make-trainset-elastic",
+        command=command_name,
         output_path=out_dir,
         layout=layout,
         copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
@@ -389,101 +251,28 @@ def _run_make_trainset_elastic(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_make_trainset_heatfo(args: argparse.Namespace) -> int:
-    out_dir, layout = prepare_generator_output(args, command="make-trainset-heatfo", output_value=str(args.output))
+def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
+    out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    mode = str(args.input_mode).strip().lower()
-
-    if mode == "yaml":
-        if not args.yaml:
-            raise ValueError("yaml mode requires --yaml.")
-        data = _load_heatfo_yaml(args.yaml)
-        yaml_source = str(data.get("source", args.source))
-        source_adapter = get_trainset_source_adapter(yaml_source)
-        yaml_mode = str(data.get("input_mode", "batch")).strip().lower()
-        yaml_elements = data.get("elements", [])
-        if isinstance(yaml_elements, str):
-            yaml_elements = parse_elements_csv(yaml_elements)
-        elif isinstance(yaml_elements, list):
-            yaml_elements = parse_elements_csv(",".join(str(x) for x in yaml_elements))
-        else:
-            yaml_elements = []
-        material_ids = None
-        if yaml_mode == "material-id":
-            if isinstance(data.get("material_ids"), list) and data.get("material_ids"):
-                material_ids = [str(x).strip() for x in data.get("material_ids") if str(x).strip()]
-            elif data.get("mat_id"):
-                material_ids = [str(data.get("mat_id")).strip()]
-            elif data.get("mp_id"):
-                material_ids = [str(data.get("mp_id")).strip()]
-            if not material_ids:
-                raise ValueError("heatfo YAML material-id mode requires mat_id (or legacy mp_id) or material_ids.")
-        elif yaml_mode != "batch":
-            raise ValueError("heatfo YAML input_mode must be 'batch' or 'material-id'.")
-        refs = _parse_heatfo_reference_map(data.get("references"))
-        result = source_adapter.generate_heatfo_trainset(
-            HeatFoTrainsetRequest(
-                out_dir=str(out_dir),
-                elements=yaml_elements,
-                material_ids=material_ids,
-                references_by_element=refs,
-                exact_element_count=str(data.get("element_count_scope", "exact")).strip().lower() == "exact",
-                api_key=str(data.get("api_key")) if data.get("api_key") else (args.api_key or os.getenv("MP_API_KEY")),
-                max_materials=(int(data["max_materials"]) if data.get("max_materials") is not None else None),
-                weight=float(data.get("weight", 1.0)),
-                trainset_filename=str(data.get("trainset_file", "trainset_heatfo.in")),
-                concatenated_geo_filename=str(data.get("geo_file", "geo")),
-                verbose=bool(data.get("verbose", args.verbose)),
-            )
-        )
-        extra = {"mode": "yaml", "yaml_path": str(args.yaml), "generated_count": int(result.generated_count)}
-    elif mode == "material-id":
-        source_adapter = get_trainset_source_adapter(str(args.source))
-        if not args.mat_id:
-            raise ValueError("material-id mode requires --mat-id.")
-        refs = parse_heatfo_references(str(args.references)) if args.references else {}
-        elements = parse_elements_csv(str(args.elements)) if args.elements else []
-        result = source_adapter.generate_heatfo_trainset(
-            HeatFoTrainsetRequest(
-                out_dir=str(out_dir),
-                elements=elements,
-                material_ids=[str(args.mat_id)],
-                references_by_element=refs,
-                exact_element_count=True,
-                api_key=args.api_key or os.getenv("MP_API_KEY"),
-                max_materials=None,
-                weight=float(args.weight),
-                trainset_filename=str(args.trainset_file),
-                concatenated_geo_filename=str(args.geo_file),
-                verbose=bool(args.verbose),
-            )
-        )
-        extra = {"mode": "material-id", "mat_id": str(args.mat_id), "generated_count": int(result.generated_count)}
-    elif mode == "batch":
-        source_adapter = get_trainset_source_adapter(str(args.source))
-        if not args.elements:
-            raise ValueError("batch mode requires --elements.")
-        refs = parse_heatfo_references(str(args.references)) if args.references else {}
-        elements = parse_elements_csv(str(args.elements))
-        result = source_adapter.generate_heatfo_trainset(
-            HeatFoTrainsetRequest(
-                out_dir=str(out_dir),
-                elements=elements,
-                material_ids=None,
-                references_by_element=refs,
-                exact_element_count=str(args.element_count_scope).strip().lower() == "exact",
-                api_key=args.api_key or os.getenv("MP_API_KEY"),
-                max_materials=args.max_materials,
-                weight=float(args.weight),
-                trainset_filename=str(args.trainset_file),
-                concatenated_geo_filename=str(args.geo_file),
-                verbose=bool(args.verbose),
-            )
-        )
-        extra = {"mode": "batch", "elements": elements, "generated_count": int(result.generated_count)}
-    else:
-        raise ValueError(f"Unsupported input mode: {mode!r}")
+    run_result = gen_heatfo_trainset(
+        out_dir=str(out_dir),
+        source=str(args.source),
+        input_mode=str(args.input_mode),
+        yaml_path=args.yaml,
+        mat_id=args.mat_id,
+        elements=args.elements,
+        references=args.references,
+        element_count_scope=str(args.element_count_scope),
+        max_materials=args.max_materials,
+        weight=float(args.weight),
+        trainset_file=str(args.trainset_file),
+        geo_file=str(args.geo_file),
+        api_key=args.api_key,
+        verbose=bool(args.verbose),
+    )
+    result = run_result.result
+    extra = run_result.metadata
 
     print(f"[Done] Heatfo trainset written to: {result.trainset_path}")
     print(f"[Done] Concatenated geo written to: {result.concatenated_geo_path}")
@@ -492,7 +281,7 @@ def _run_make_trainset_heatfo(args: argparse.Namespace) -> int:
 
     persist_generator_metadata(
         args,
-        command="make-trainset-heatfo",
+        command=command_name,
         output_path=out_dir,
         layout=layout,
         copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
@@ -509,12 +298,12 @@ def _run_make_trainset_heatfo(args: argparse.Namespace) -> int:
 def run_main(command: str, args: argparse.Namespace) -> int:
     if command == "export-trainset":
         return _run_export_trainset(args)
-    if command == "make-trainset-settings":
-        return _run_make_trainset_settings(args)
-    if command == "make-trainset-settings-heatfo":
-        return _run_make_trainset_settings_heatfo(args)
-    if command == "make-trainset-elastic":
-        return _run_make_trainset_elastic(args)
-    if command == "make-trainset-heatfo":
-        return _run_make_trainset_heatfo(args)
+    if command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:
+        return _run_make_trainset_settings(args, command_name=command)
+    if command in {"gen_template_yaml_for_heatfo_settings", "make-trainset-settings-heatfo"}:
+        return _run_make_trainset_settings_heatfo(args, command_name=command)
+    if command in {"gen_elastic_trainset", "make-trainset-elastic"}:
+        return _run_make_trainset_elastic(args, command_name=command)
+    if command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
+        return _run_make_trainset_heatfo(args, command_name=command)
     raise KeyError(f"Unsupported trainset file-tool command {command!r}.")

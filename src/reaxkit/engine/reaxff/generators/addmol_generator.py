@@ -43,11 +43,7 @@ __all__ = [
     "AddmolGeneratorSpec",
     "DEFAULT_ADDMOL_SPEC",
     "ADDMOL_GENERATOR_REGISTRY",
-    "generate_addmol_template",
-    "generate_addmol_vel_template",
-    "write_addmol",
-    "write_addmol_template",
-    "write_addmol_vel_template",
+    "gen_template_addmol",
 ]
 
 
@@ -73,21 +69,21 @@ class AddmolGeneratorSpec:
 DEFAULT_ADDMOL_SPEC = AddmolGeneratorSpec()
 
 
-def generate_addmol_template(spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC) -> str:
+def _gen_template_addmol_text(spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC) -> str:
     """
     Generate the default ReaxFF ``addmol.bgf`` file content as text.
     """
     return spec.template_text
 
 
-def generate_addmol_vel_template(spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC) -> str:
+def _gen_template_addmol_vel_text(spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC) -> str:
     """
     Generate the default ReaxFF ``addmol.vel`` file content as text.
     """
     return spec.vel_template_text
 
 
-def write_addmol_template(
+def _write_addmol_bgf(
     out_path: str | Path = "addmol.bgf",
     spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC,
 ) -> Path:
@@ -96,11 +92,11 @@ def write_addmol_template(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_addmol_template(spec), encoding="utf-8")
+    out_path.write_text(_gen_template_addmol_text(spec), encoding="utf-8")
     return out_path
 
 
-def write_addmol_vel_template(
+def _write_addmol_vel(
     out_path: str | Path = "addmol.vel",
     spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC,
 ) -> Path:
@@ -109,11 +105,11 @@ def write_addmol_vel_template(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_addmol_vel_template(spec), encoding="utf-8")
+    out_path.write_text(_gen_template_addmol_vel_text(spec), encoding="utf-8")
     return out_path
 
 
-def write_addmol(
+def gen_template_addmol(
     out_path: str | Path = "addmol.bgf",
     spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC,
 ) -> Path:
@@ -122,9 +118,9 @@ def write_addmol(
 
     Returns the path to the written ``addmol.bgf`` file.
     """
-    bgf_path = write_addmol_template(out_path=out_path, spec=spec)
+    bgf_path = _write_addmol_bgf(out_path=out_path, spec=spec)
     vel_path = Path(bgf_path).with_name("addmol.vel")
-    write_addmol_vel_template(out_path=vel_path, spec=spec)
+    _write_addmol_vel(out_path=vel_path, spec=spec)
     return bgf_path
 
 
@@ -133,7 +129,7 @@ ADDMOL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "ReaxFF Addmol File",
         "default_filename": "addmol.bgf",
         "spec_type": AddmolGeneratorSpec,
-        "generate": generate_addmol_template,
-        "write": write_addmol,
+        "generate": _gen_template_addmol_text,
+        "write": gen_template_addmol,
     }
 }

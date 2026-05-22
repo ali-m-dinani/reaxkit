@@ -353,10 +353,19 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
     )
 
 
-def _geometry_from_geo_handler(handler: GeoHandler) -> GeometryData:
+def _geometry_from_geo_handler(
+    handler: GeoHandler,
+    *,
+    source_file: str,
+    geometry_role: str,
+) -> GeometryData:
     """Normalize a ``GeoHandler`` into ``GeometryData``."""
     df = handler.coordinates()
+    connectivity_df = handler.connectivity()
     meta = dict(handler.metadata())
+    meta["source_file"] = str(source_file)
+    meta["geometry_role"] = str(geometry_role)
+    meta.setdefault("source", "geo_handler")
     atom_ids = df["atom_id"].astype(int).tolist() if "atom_id" in df.columns else list(range(1, len(df) + 1))
     elements = df["atom_type"].astype(str).tolist() if "atom_type" in df.columns else []
     cell = handler.cell()
@@ -369,6 +378,7 @@ def _geometry_from_geo_handler(handler: GeoHandler) -> GeometryData:
     )
     return GeometryData(
         coordinates=df,
+        connectivity=connectivity_df,
         atom_ids=atom_ids,
         elements=elements,
         descriptor=str(meta.get("descriptor") or ""),
@@ -1118,7 +1128,7 @@ class ReaxFFAdapter(EngineAdapter):
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("xmolout", "summary.txt"),
-            GeometryData: ("geo",),
+            GeometryData: ("geo", "fort.90"),
             SimulationData: ("xmolout", "summary.txt"),
             ConnectivityData: ("fort.7", "xmolout", "summary.txt"),
             ConnectivityTrajectoryData: ("fort.7", "xmolout", "summary.txt", "ffield"),
@@ -1219,9 +1229,15 @@ class ReaxFFAdapter(EngineAdapter):
     def load_geometry(self, args: dict, reporter=None) -> GeometryData:
         from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
+        if str(args.get("geometry_role") or "").strip().lower() == "final":
+            return self.load_final_geometry(args, reporter=reporter)
+
         raw = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
         p = Path(raw)
         geo_path = p / "geo" if p.is_dir() else p
+        geo_path = self._resolve_against_run_dir(args, geo_path)
+        if geo_path.name.lower() == "fort.90":
+            return self.load_final_geometry({**args, "final_geometry": str(geo_path)}, reporter=reporter)
         handler = self._build_handler(
             args,
             handler_name="GeoHandler",
@@ -1232,7 +1248,35 @@ class ReaxFFAdapter(EngineAdapter):
             args,
             handler_name="GeoHandler",
             source_path=geo_path,
-            loader=lambda: _geometry_from_geo_handler(handler),
+            loader=lambda: _geometry_from_geo_handler(
+                handler,
+                source_file=geo_path.name or "geo",
+                geometry_role="initial",
+            ),
+        )
+
+    def load_final_geometry(self, args: dict, reporter=None) -> GeometryData:
+        from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
+
+        raw = args.get("final_geometry") or args.get("fort90") or args.get("input") or "fort.90"
+        p = Path(raw)
+        fort90_path = p / "fort.90" if p.is_dir() else p
+        fort90_path = self._resolve_against_run_dir(args, fort90_path)
+        handler = self._build_handler(
+            args,
+            handler_name="GeoHandler",
+            source_path=fort90_path,
+            factory=lambda: GeoHandler(fort90_path, reporter=reporter),
+        )
+        return self._time_source(
+            args,
+            handler_name="GeoHandler",
+            source_path=fort90_path,
+            loader=lambda: _geometry_from_geo_handler(
+                handler,
+                source_file=fort90_path.name or "fort.90",
+                geometry_role="final",
+            ),
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
@@ -1787,21 +1831,21 @@ class ReaxFFAdapter(EngineAdapter):
         out_path: str | Path,
         args: dict | None = None,
     ):
-        from reaxkit.engine.reaxff.generators.control_generator import write_control_from_data
+        from reaxkit.engine.reaxff.generators.control_generator import _write_control_from_data
 
         args = args or {}
         if not isinstance(data, ControlParametersData):
             raise TypeError("write_control expects ControlParametersData.")
 
         overrides = args.get("overrides") or args.get("control_overrides")
-        return write_control_from_data(
+        return _write_control_from_data(
             data,
             out_path=out_path,
             overrides=overrides,
         )
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
-        from reaxkit.engine.reaxff.generators.xmolout_generator import write_xmolout_from_frames
+        from reaxkit.engine.reaxff.generators.xmolout_generator import _write_xmolout_from_frames
 
         args = args or {}
         positions = np.asarray(data.positions, dtype=float)
@@ -1858,7 +1902,7 @@ class ReaxFFAdapter(EngineAdapter):
                 }
             )
 
-        return write_xmolout_from_frames(
+        return _write_xmolout_from_frames(
             frames,
             out_path,
             simulation_name=str(args.get("simulation") or "MD"),

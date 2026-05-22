@@ -178,7 +178,7 @@ tasks:
     description: Reads and returns values for control-file keywords from structured
       control-parameter data. Use it to verify simulation settings, compare control
       files, or expose individual ReaxFF options in scripts.
-    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
+    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: gen_control'
     tags:
     - control file
     - control parameters

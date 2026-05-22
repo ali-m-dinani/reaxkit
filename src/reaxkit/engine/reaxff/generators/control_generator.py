@@ -102,11 +102,7 @@ __all__ = [
     "ControlGeneratorSpec",
     "DEFAULT_CONTROL_SPEC",
     "CONTROL_GENERATOR_REGISTRY",
-    "generate_control_template",
-    "write_control_from_data",
-    "write_control",
-    "write_control_template",
-    "write_control_template_with_overrides",
+    "gen_control",
 ]
 
 
@@ -128,7 +124,7 @@ class ControlGeneratorSpec:
 DEFAULT_CONTROL_SPEC = ControlGeneratorSpec()
 
 
-def generate_control_template(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC) -> str:
+def _gen_control_text(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC) -> str:
     """
     Generate the default ReaxFF ``control`` file content as text.
 
@@ -207,7 +203,7 @@ def _control_overrides_from_data(data: ControlParametersData) -> dict[str, Any]:
     return overrides
 
 
-def write_control_template(
+def _write_control_template(
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
 ) -> Path:
@@ -216,11 +212,11 @@ def write_control_template(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_control_template(spec), encoding="utf-8")
+    out_path.write_text(_gen_control_text(spec), encoding="utf-8")
     return out_path
 
 
-def write_control_template_with_overrides(
+def _write_control_template_with_overrides(
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
     overrides: dict[str, Any] | None = None,
@@ -242,12 +238,12 @@ def write_control_template_with_overrides(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    rendered = _apply_control_overrides(generate_control_template(spec), overrides=_normalize_overrides(overrides))
+    rendered = _apply_control_overrides(_gen_control_text(spec), overrides=_normalize_overrides(overrides))
     out_path.write_text(rendered, encoding="utf-8")
     return out_path
 
 
-def write_control_from_data(
+def _write_control_from_data(
     data: ControlParametersData,
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
@@ -258,14 +254,14 @@ def write_control_from_data(
     """
     merged = _normalize_overrides(_control_overrides_from_data(data))
     merged.update(_normalize_overrides(overrides))
-    return write_control_template_with_overrides(
+    return _write_control_template_with_overrides(
         out_path=out_path,
         spec=spec,
         overrides=merged,
     )
 
 
-def write_control(
+def _write_control(
     out_path: str | Path = "control",
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
     overrides: dict[str, Any] | None = None,
@@ -273,7 +269,22 @@ def write_control(
     """
     Backward-compatible wrapper for writing template control files with overrides.
     """
-    return write_control_template_with_overrides(
+    return gen_control(
+        out_path=out_path,
+        spec=spec,
+        overrides=overrides,
+    )
+
+
+def gen_control(
+    out_path: str | Path = "control",
+    spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
+    overrides: dict[str, Any] | None = None,
+) -> Path:
+    """
+    Generate template ``control`` file with optional key/value overrides.
+    """
+    return _write_control_template_with_overrides(
         out_path=out_path,
         spec=spec,
         overrides=overrides,
@@ -285,7 +296,7 @@ CONTROL_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "ReaxFF Control File",
         "default_filename": "control",
         "spec_type": ControlGeneratorSpec,
-        "generate": generate_control_template,
-        "write": write_control_template_with_overrides,
+        "generate": _gen_control_text,
+        "write": gen_control,
     }
 }

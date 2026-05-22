@@ -161,7 +161,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             default=None,
             help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
         )
-        parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
+        parser.add_argument("--every", type=int, default=10, help="Use every Nth selected frame (default: 10)")
         parser.add_argument("--mode", choices=["auto", "bo", "dist"], default="auto", help="Event detection mode")
         parser.add_argument("--bo-threshold", type=float, default=0.8, help="Bond-order threshold for bo mode")
         parser.add_argument("--r-co", type=float, default=1.65, help="C-O distance cutoff in angstrom for dist mode")

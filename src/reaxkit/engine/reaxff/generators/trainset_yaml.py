@@ -6,20 +6,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
+import os
 import shutil
 
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import (
     BulkEnergySpec,
     CellSpec,
     ElasticEnergySpec,
-    generate_trainset_energy,
-    write_trainset_energy,
+    _generate_trainset_energy,
+    _write_trainset_energy,
 )
 from reaxkit.engine.reaxff.generators.trainset_elastic_geometry import (
     StrainedGeometrySpec,
-    generate_strained_geometries,
-    write_strained_geometries,
+    _generate_strained_geometries,
+    _write_strained_geometries,
 )
 
 
@@ -50,6 +51,23 @@ DEFAULT_TABLES = {
 }
 
 
+def _concat_geo_strained(out_dir: Path) -> Path | None:
+    geo_dir = out_dir / "geo_strained"
+    all_geo_file = geo_dir / "all_trainset_geo.bgf"
+    if not geo_dir.exists():
+        return None
+    bgf_files = sorted(geo_dir.glob("*.bgf"))
+    if not bgf_files:
+        return None
+    with all_geo_file.open("w", encoding="utf-8") as fout:
+        for bgf in bgf_files:
+            fout.write(f"# ===== BEGIN {bgf.name} =====\n")
+            with bgf.open("r", encoding="utf-8") as fin:
+                fout.write(fin.read())
+            fout.write(f"\n# ===== END {bgf.name} =====\n\n")
+    return all_geo_file
+
+
 @dataclass(frozen=True)
 class TrainsetSettingsSpec:
     out_path: str
@@ -73,7 +91,7 @@ class TrainsetSettingsSpec:
     geo_sort_by: Optional[str] = None
 
 
-def generate_trainset_settings_yaml(spec: TrainsetSettingsSpec) -> str:
+def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
     required_cij = ("c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
     missing = [key for key in required_cij if key not in spec.cij_gpa]
     if missing:
@@ -172,7 +190,51 @@ def generate_trainset_settings_yaml(spec: TrainsetSettingsSpec) -> str:
     return "\n".join(lines)
 
 
-def write_trainset_settings_yaml(
+def gen_template_yaml_for_elastic_settings(
+    spec: TrainsetSettingsSpec | None = None,
+    *,
+    out_path: str | Path | None = None,
+) -> str | Path:
+    """
+    Public entrypoint for elastic settings template generation.
+
+    - If `spec` is provided and `out_path` is omitted: returns YAML text.
+    - If `out_path` is provided: writes YAML file and returns the output path.
+    """
+    if spec is not None and out_path is None:
+        return _generate_trainset_settings_yaml_text(spec)
+
+    if out_path is None:
+        raise ValueError("Either provide spec (for text generation) or out_path (for file generation).")
+
+    if spec is None:
+        _write_trainset_settings_yaml(out_path=str(out_path))
+    else:
+        _write_trainset_settings_yaml(
+            out_path=str(out_path),
+            name=spec.name,
+            source=spec.source,
+            mp_id=spec.mp_id,
+            elastic_max_strain_percent=spec.elastic_max_strain_percent,
+            elastic_dstrain=spec.elastic_dstrain,
+            cij_gpa=spec.cij_gpa,
+            elastic_cell=spec.elastic_cell.as_dict(),
+            B0_gpa=spec.B0_gpa,
+            B0_prime=spec.B0_prime,
+            bulk_max_volumetric_strain_percent=spec.bulk_max_volumetric_strain_percent,
+            bulk_dstrain_linear=spec.bulk_dstrain_linear,
+            bulk_cell=spec.bulk_cell.as_dict(),
+            trainset_file=spec.trainset_file,
+            tables=spec.tables,
+            elastic_xyz=spec.elastic_xyz,
+            bulk_xyz=spec.bulk_xyz,
+            geo_enable=spec.geo_enable,
+            geo_sort_by=spec.geo_sort_by,
+        )
+    return Path(out_path)
+
+
+def _write_trainset_settings_yaml(
     *,
     out_path: str,
     name: str = "AlN example",
@@ -217,10 +279,10 @@ def write_trainset_settings_yaml(
     )
     out_path_obj = Path(out_path)
     out_path_obj.parent.mkdir(parents=True, exist_ok=True)
-    out_path_obj.write_text(generate_trainset_settings_yaml(spec), encoding="utf-8")
+    out_path_obj.write_text(_generate_trainset_settings_yaml_text(spec), encoding="utf-8")
 
 
-def generate_heatfo_settings_yaml_text() -> str:
+def _generate_heatfo_settings_yaml_text() -> str:
     lines = [
         "# Heatfo trainset settings for `make-trainset-heatfo --input-mode yaml`",
         "# Edit values to match your system.",
@@ -251,14 +313,21 @@ def generate_heatfo_settings_yaml_text() -> str:
     return "\n".join(lines)
 
 
-def write_heatfo_settings_yaml(*, out_path: str | Path) -> Path:
+def _write_heatfo_settings_yaml(*, out_path: str | Path) -> Path:
     out_path_obj = Path(out_path)
     out_path_obj.parent.mkdir(parents=True, exist_ok=True)
-    out_path_obj.write_text(generate_heatfo_settings_yaml_text(), encoding="utf-8")
+    out_path_obj.write_text(_generate_heatfo_settings_yaml_text(), encoding="utf-8")
     return out_path_obj
 
 
-def read_trainset_settings_yaml(yaml_path: str) -> dict:
+def gen_template_yaml_for_heatfo_settings(*, out_path: str | Path) -> Path:
+    """
+    Public entrypoint for generating heatfo settings YAML template files.
+    """
+    return _write_heatfo_settings_yaml(out_path=out_path)
+
+
+def _read_trainset_settings_yaml(yaml_path: str) -> dict:
     try:
         import yaml
     except ImportError as exc:
@@ -305,14 +374,14 @@ def read_trainset_settings_yaml(yaml_path: str) -> dict:
     return data
 
 
-def generate_trainset_from_yaml(
+def _generate_trainset_from_yaml(
     yaml_path: str,
     out_dir: str,
     *,
     place_all_outputs_in_out_dir: bool = True,
     copy_input_xyz_into_out_dir: bool = True,
 ):
-    cfg = read_trainset_settings_yaml(yaml_path)
+    cfg = _read_trainset_settings_yaml(yaml_path)
     yaml_path_p = Path(yaml_path).resolve()
     out_dir_p = Path(out_dir).resolve()
     out_dir_p.mkdir(parents=True, exist_ok=True)
@@ -322,7 +391,7 @@ def generate_trainset_from_yaml(
     bulk_cell = CellSpec(**bulk_cfg["cell"])
     elastic_cell = CellSpec(**elastic_cfg.get("cell", bulk_cfg["cell"]))
 
-    energy_result = generate_trainset_energy(
+    energy_result = _generate_trainset_energy(
         BulkEnergySpec(
             bulk_modulus_gpa=bulk_cfg["B0_gpa"],
             bulk_modulus_pressure_derivative=bulk_cfg["B0_prime"],
@@ -337,7 +406,7 @@ def generate_trainset_from_yaml(
             strain_step=elastic_cfg.get("dstrain", 0.005),
         ),
     )
-    write_trainset_energy(
+    _write_trainset_energy(
         energy_result,
         out_dir=out_dir_p,
         trainset_filename=cfg.get("output", {}).get("trainset_file", "trainset_elastic.in"),
@@ -364,7 +433,7 @@ def generate_trainset_from_yaml(
             bulk_xyz = bulk_dst
 
     max_vol = bulk_cfg["max_volumetric_strain_percent"] / 100.0
-    geometry_result = generate_strained_geometries(
+    geometry_result = _generate_strained_geometries(
         StrainedGeometrySpec(
             elastic_xyz=str(elastic_xyz),
             bulk_xyz=None if bulk_xyz is None else str(bulk_xyz),
@@ -377,4 +446,219 @@ def generate_trainset_from_yaml(
             sort_by=geo_cfg.get("sort_by"),
         )
     )
-    write_strained_geometries(geometry_result, out_dir=geo_out_dir, sort_by=geo_cfg.get("sort_by"))
+    _write_strained_geometries(geometry_result, out_dir=geo_out_dir, sort_by=geo_cfg.get("sort_by"))
+
+
+def _gen_elastic_trainset_from_yaml_mode(*, yaml_path: str, out_dir: Path) -> dict[str, Any]:
+    _generate_trainset_from_yaml(yaml_path=yaml_path, out_dir=str(out_dir))
+    geo_path = _concat_geo_strained(out_dir)
+    if geo_path is not None:
+        print(f"[Done] Concatenated strained geometries to: {geo_path}")
+    print(f"[Done] Elastic trainset written to: {out_dir}")
+    return {"mode": "yaml", "yaml_path": str(yaml_path)}
+
+
+def _run_single_material_id_elastic_trainset(
+    *,
+    source_adapter,
+    mat_id: str,
+    out_dir: Path,
+    out_yaml: str,
+    structure_dir: str | Path | None,
+    bulk_mode: str,
+    api_key: str,
+    verbose: bool,
+) -> str:
+    out_yaml_path = out_dir / Path(str(out_yaml)).name
+    structure_dir_path = Path(structure_dir) if structure_dir else (out_dir / "downloaded_structures")
+    structure_dir_path.mkdir(parents=True, exist_ok=True)
+    result = source_adapter.generate_elastic_settings_yaml_from_material_id(
+        mat_id=mat_id,
+        out_yaml=str(out_yaml_path),
+        structure_dir=str(structure_dir_path),
+        bulk_mode=bulk_mode,
+        api_key=api_key,
+        verbose=verbose,
+    )
+    _generate_trainset_from_yaml(yaml_path=result["yaml"], out_dir=str(out_dir))
+    _concat_geo_strained(out_dir)
+    return result["yaml"]
+
+
+def _gen_elastic_trainset_from_material_id_mode(
+    *,
+    source_adapter,
+    out_dir: Path,
+    mat_id: str,
+    out_yaml: str,
+    structure_dir: str | Path | None,
+    bulk_mode: str,
+    api_key: str,
+    verbose: bool,
+) -> dict[str, Any]:
+    yaml_path = _run_single_material_id_elastic_trainset(
+        source_adapter=source_adapter,
+        mat_id=mat_id,
+        out_dir=out_dir,
+        out_yaml=out_yaml,
+        structure_dir=structure_dir,
+        bulk_mode=bulk_mode,
+        api_key=api_key,
+        verbose=verbose,
+    )
+    print(f"[Done] Generated settings from source '{source_adapter.source_name}': {yaml_path}")
+    print(f"[Done] Elastic trainset written to: {out_dir}")
+    return {"mode": "material-id", "yaml_path": str(yaml_path), "mat_id": str(mat_id)}
+
+
+def _gen_elastic_trainset_batch_mode(
+    *,
+    source_adapter,
+    out_dir: Path,
+    elements_csv: str,
+    element_count_scope: str,
+    max_materials: int | None,
+    out_yaml: str,
+    structure_dir: str | Path | None,
+    bulk_mode: str,
+    api_key: str,
+    verbose: bool,
+) -> dict[str, Any]:
+    from reaxkit.engine.reaxff.generators.trainset_heatfo import _parse_elements_csv
+
+    elements = _parse_elements_csv(str(elements_csv))
+    mat_ids = source_adapter.search_material_ids_by_elements(
+        api_key=api_key,
+        elements=elements,
+        exact_element_count=str(element_count_scope).strip().lower() == "exact",
+        max_materials=max_materials,
+    )
+    if not mat_ids:
+        raise ValueError(f"No source systems found for batch query in source '{source_adapter.source_name}'.")
+
+    ok = 0
+    skipped = 0
+    for mat_id in mat_ids:
+        target_dir = out_dir / mat_id
+        try:
+            _run_single_material_id_elastic_trainset(
+                source_adapter=source_adapter,
+                mat_id=mat_id,
+                out_dir=target_dir,
+                out_yaml=out_yaml,
+                structure_dir=structure_dir,
+                bulk_mode=bulk_mode,
+                api_key=api_key,
+                verbose=verbose,
+            )
+            ok += 1
+        except Exception as exc:
+            skipped += 1
+            if verbose:
+                print(f"[{source_adapter.source_name.upper()}][skip] {mat_id}: {exc}")
+
+    print(
+        f"[Done] Elastic batch completed ({source_adapter.source_name}): "
+        f"success={ok}, skipped={skipped}, total={len(mat_ids)}"
+    )
+    return {
+        "mode": "batch",
+        "elements": elements,
+        "mat_ids_total": len(mat_ids),
+        "mat_ids_success": ok,
+        "mat_ids_skipped": skipped,
+    }
+
+
+def gen_elastic_trainset(
+    *,
+    out_dir: str | Path,
+    source: str = "mp",
+    input_mode: str = "yaml",
+    yaml_path: str | None = None,
+    mat_id: str | None = None,
+    elements: str | None = None,
+    element_count_scope: str = "exact",
+    max_materials: int | None = None,
+    api_key: str | None = None,
+    bulk_mode: str = "voigt",
+    out_yaml: str = "trainset_settings_source.yaml",
+    structure_dir: str | Path | None = None,
+    verbose: bool = False,
+) -> dict[str, Any]:
+    """
+    Public entrypoint for elastic trainset generation.
+
+    Supports:
+    - yaml mode
+    - material-id mode
+    - batch mode
+    """
+    from reaxkit.engine.reaxff.generators.trainset_source_adapter import _get_trainset_source_adapter
+
+    source_adapter = _get_trainset_source_adapter(str(source))
+    out_dir_path = Path(out_dir)
+    out_dir_path.mkdir(parents=True, exist_ok=True)
+    mode = str(input_mode).strip().lower()
+
+    if mode == "yaml":
+        if not yaml_path:
+            raise ValueError("yaml mode requires yaml_path.")
+        return _gen_elastic_trainset_from_yaml_mode(yaml_path=str(yaml_path), out_dir=out_dir_path)
+
+    resolved_api_key = api_key or os.getenv("MP_API_KEY")
+    if not resolved_api_key:
+        raise ValueError(
+            f"Missing API key for source '{source_adapter.source_name}'. "
+            "For MP, provide --api-key or set MP_API_KEY."
+        )
+
+    if mode == "material-id":
+        if not mat_id:
+            raise ValueError("material-id mode requires mat_id.")
+        return _gen_elastic_trainset_from_material_id_mode(
+            source_adapter=source_adapter,
+            out_dir=out_dir_path,
+            mat_id=str(mat_id),
+            out_yaml=out_yaml,
+            structure_dir=structure_dir,
+            bulk_mode=bulk_mode,
+            api_key=resolved_api_key,
+            verbose=bool(verbose),
+        )
+
+    if mode == "batch":
+        if not elements:
+            raise ValueError("batch mode requires elements.")
+        return _gen_elastic_trainset_batch_mode(
+            source_adapter=source_adapter,
+            out_dir=out_dir_path,
+            elements_csv=str(elements),
+            element_count_scope=element_count_scope,
+            max_materials=max_materials,
+            out_yaml=out_yaml,
+            structure_dir=structure_dir,
+            bulk_mode=bulk_mode,
+            api_key=resolved_api_key,
+            verbose=bool(verbose),
+        )
+
+    raise ValueError(f"Unsupported input mode: {mode!r}")
+
+
+def _gen_elastic_trainset_from_yaml(
+    yaml_path: str,
+    out_dir: str,
+    *,
+    place_all_outputs_in_out_dir: bool = True,
+    copy_input_xyz_into_out_dir: bool = True,
+):
+    """
+    Internal helper for elastic trainset generation from YAML.
+    """
+    return _generate_trainset_from_yaml(
+        yaml_path=yaml_path,
+        out_dir=out_dir,
+        place_all_outputs_in_out_dir=place_all_outputs_in_out_dir,
+        copy_input_xyz_into_out_dir=copy_input_xyz_into_out_dir,
+    )

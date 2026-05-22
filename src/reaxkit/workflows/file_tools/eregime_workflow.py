@@ -12,13 +12,9 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.eregime_generator import (
-    write_eregime_from_function,
-    write_eregime_sinusoidal,
-    write_eregime_smooth_pulse,
-)
+from reaxkit.engine.reaxff.generators.eregime_generator import gen_eregime
 
-EREGIME_FILE_TOOL_COMMANDS = ("make-eregime",)
+EREGIME_FILE_TOOL_COMMANDS = ("gen_eregime", "make-eregime")
 
 
 def _safe_build_func(expr: str) -> Callable[[float], float]:
@@ -37,14 +33,14 @@ def _safe_build_func(expr: str) -> Callable[[float], float]:
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
-    parser.set_defaults(command="make-eregime")
+    parser.set_defaults(command="gen_eregime")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Generate ReaxFF eregime.in files from standard field profiles.\n\n"
         "Examples:\n"
-        "  reaxkit make-eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n"
-        "  reaxkit make-eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n"
-        "  reaxkit make-eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1"
+        "  reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n"
+        "  reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n"
+        "  reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1"
     )
 
     parser.add_argument("--type", choices=["sin", "pulse", "func"], required=True, help="Generator profile type")
@@ -79,59 +75,28 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
 
-    if args.type == "sin":
-        if args.max_magnitude is None or args.step_angle is None or args.num_cycles is None:
-            raise ValueError("--type sin requires --max-magnitude, --step-angle, and --num-cycles.")
-        write_eregime_sinusoidal(
-            out_path,
-            max_magnitude=args.max_magnitude,
-            step_angle=args.step_angle,
-            iteration_step=args.iteration_step,
-            num_cycles=args.num_cycles,
-            direction=args.direction,
-            voltage_idx=args.V,
-            phase=args.phase,
-            dc_offset=args.dc_offset,
-            start_iter=args.start_iter,
-        )
-    elif args.type == "pulse":
-        required = {
-            "--amplitude": args.amplitude,
-            "--width": args.width,
-            "--period": args.period,
-            "--slope": args.slope,
-            "--num-cycles": args.num_cycles,
-        }
-        missing = [name for name, value in required.items() if value is None]
-        if missing:
-            raise ValueError(f"--type pulse requires {', '.join(missing)}.")
-        write_eregime_smooth_pulse(
-            out_path,
-            amplitude=args.amplitude,
-            width=args.width,
-            period=args.period,
-            slope=args.slope,
-            iteration_step=args.iteration_step,
-            num_of_cycles=args.num_cycles,
-            step_size=args.step_size,
-            direction=args.direction,
-            voltage_idx=args.V,
-            baseline=args.baseline,
-            start_iter=args.start_iter,
-        )
-    else:
-        if args.expr is None or args.t_end is None or args.dt is None:
-            raise ValueError("--type func requires --expr, --t-end, and --dt.")
-        write_eregime_from_function(
-            out_path,
-            func=_safe_build_func(args.expr),
-            t_end=args.t_end,
-            dt=args.dt,
-            iteration_step=args.iteration_step,
-            direction=args.direction,
-            voltage_idx=args.V,
-            start_iter=args.start_iter,
-        )
+    gen_eregime(
+        out_path,
+        profile_type=args.type,
+        iteration_step=args.iteration_step,
+        direction=args.direction,
+        voltage_idx=args.V,
+        start_iter=args.start_iter,
+        max_magnitude=args.max_magnitude,
+        step_angle=args.step_angle,
+        num_cycles=args.num_cycles,
+        phase=args.phase,
+        dc_offset=args.dc_offset,
+        amplitude=args.amplitude,
+        width=args.width,
+        period=args.period,
+        slope=args.slope,
+        step_size=args.step_size,
+        baseline=args.baseline,
+        func=_safe_build_func(args.expr) if args.expr is not None else None,
+        t_end=args.t_end,
+        dt=args.dt,
+    )
 
     persist_generator_metadata(
         args,

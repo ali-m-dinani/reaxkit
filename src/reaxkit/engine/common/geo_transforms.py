@@ -15,7 +15,7 @@ from ase import Atoms
 from ase.build import make_supercell as ase_make_supercell, surface as ase_surface
 from ase.geometry import cellpar_to_cell
 
-from reaxkit.engine.common.geo_io import read_structure
+from reaxkit.engine.common.io.geo_io import read_structure
 
 
 TerminationSide = Literal["top", "bottom"]

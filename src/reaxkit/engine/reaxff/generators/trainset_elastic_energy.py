@@ -234,7 +234,7 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
     return result
 
 
-def generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEnergySpec) -> TrainsetEnergyResult:
+def _generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEnergySpec) -> TrainsetEnergyResult:
     warnings_list: List[str] = []
     for label, cell in (("Elastic", elastic_spec.volume_reference_cell), ("Bulk", bulk_spec.cell)):
         warning_message = _warn_if_nonorthogonal(cell, label)
@@ -259,7 +259,7 @@ def generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEne
     )
 
 
-def write_trainset_energy(
+def _write_trainset_energy(
     result: TrainsetEnergyResult,
     *,
     out_dir: str | Path,
@@ -287,7 +287,7 @@ def write_trainset_energy(
     return written
 
 
-def generate_all_energy_vs_volume_data(
+def _generate_all_energy_vs_volume_data(
     *,
     out_dir: str,
     bulk_inputs: Dict[str, float],
@@ -316,7 +316,31 @@ def generate_all_energy_vs_volume_data(
         volume_reference_cell=CellSpec(**elastic_volume_cell),
         strain_step=float(elastic_options.get("strain_step", 0.005)),
     )
-    result = generate_trainset_energy(bulk_spec, elastic_spec)
+    result = _generate_trainset_energy(bulk_spec, elastic_spec)
     for message in result.warnings:
         warnings.warn(message, stacklevel=2)
-    write_trainset_energy(result, out_dir=out_dir, trainset_filename=trainset_filename)
+    _write_trainset_energy(result, out_dir=out_dir, trainset_filename=trainset_filename)
+
+
+def _gen_elastic_trainset_energy_vs_volume_data(
+    *,
+    out_dir: str,
+    bulk_inputs: Dict[str, float],
+    elastic_inputs: Dict[str, float],
+    bulk_cell: Dict[str, float],
+    elastic_volume_cell: Optional[Dict[str, float]] = None,
+    bulk_options: Optional[Dict[str, float]] = None,
+    elastic_options: Optional[Dict[str, float]] = None,
+    trainset_filename: str = "trainset_elastic.in",
+) -> None:
+    """Canonical alias for elastic trainset energy-vs-volume generation."""
+    return _generate_all_energy_vs_volume_data(
+        out_dir=out_dir,
+        bulk_inputs=bulk_inputs,
+        elastic_inputs=elastic_inputs,
+        bulk_cell=bulk_cell,
+        elastic_volume_cell=elastic_volume_cell,
+        bulk_options=bulk_options,
+        elastic_options=elastic_options,
+        trainset_filename=trainset_filename,
+    )

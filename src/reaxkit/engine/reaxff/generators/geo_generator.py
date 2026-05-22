@@ -12,20 +12,24 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.common.geo_transforms import (
     build_surface,
     make_supercell,
     orthogonalize_hexagonal_cell,
     place2,
 )
+from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
 
 SortKey = Literal["x", "y", "z", "atom_type"]
+GeoSortKey = Literal["m", "x", "y", "z", "atom_type"]
 
 __all__ = [
     "SortKey",
+    "GeoSortKey",
     "xtob",
+    "sort_geo",
     "add_restraints_to_geo",
     "_format_crystx",
     "_format_hetatm_line",
@@ -203,6 +207,67 @@ def xtob(
     geo_file.parent.mkdir(parents=True, exist_ok=True)
     geo_file.write_text(text, encoding="utf-8")
     return geo_file
+
+
+def sort_geo(
+    *,
+    input_geo: str | Path,
+    output_geo: str | Path,
+    sort_by: GeoSortKey,
+    descending: bool = False,
+) -> Path:
+    """
+    Sort atoms in an existing GEO file and write a new GEO file.
+    """
+    in_path = Path(input_geo)
+    if not in_path.is_file():
+        raise FileNotFoundError(f"Input GEO file not found: {in_path}")
+
+    handler = GeoHandler(in_path)
+    df = handler.dataframe().copy()
+    meta = handler.metadata()
+
+    sort_map = {"m": "atom_id", "x": "x", "y": "y", "z": "z", "atom_type": "atom_type"}
+    sort_col = sort_map[sort_by]
+    df_sorted = df.sort_values(by=sort_col, ascending=not descending).reset_index(drop=True)
+    df_sorted["atom_id"] = df_sorted.index + 1
+
+    descriptor = meta.get("descriptor") or ""
+    remark = meta.get("remark")
+    cell_lengths = meta.get("cell_lengths")
+    cell_angles = meta.get("cell_angles")
+
+    out_path = Path(output_geo)
+    direction = "descending" if descending else "ascending"
+    sort_label_map = {
+        "m": "atom index",
+        "x": "x-coordinate",
+        "y": "y-coordinate",
+        "z": "z-coordinate",
+        "atom_type": "atom type",
+    }
+    sort_label = sort_label_map[sort_by]
+
+    with out_path.open("w", encoding="utf-8") as fh:
+        fh.write("XTLGRF 200\n")
+        if descriptor:
+            fh.write(f"DESCRP  {descriptor}\n")
+        if remark:
+            fh.write(f"REMARK {remark}\n")
+        fh.write(f"REMARK Structure sorted by {sort_label} ({direction})\n")
+        if cell_lengths and cell_angles:
+            try:
+                lengths = [cell_lengths.get(k) for k in ("a", "b", "c")]
+                angles = [cell_angles.get(k) for k in ("alpha", "beta", "gamma")]
+                if all(v is not None for v in lengths + angles):
+                    fh.write(_format_crystx(lengths, angles) + "\n")
+            except Exception:
+                pass
+        fh.write("FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x,a5,i3,i2,1x,f8.5)\n")
+        for row in df_sorted.itertuples(index=False):
+            fh.write(_format_hetatm_line(row.atom_id, row.atom_type, row.x, row.y, row.z) + "\n")
+        fh.write("END\n")
+    return out_path
 
 
 def add_restraints_to_geo(

@@ -104,8 +104,8 @@ from reaxkit.core.study.schema import (
 )
 from reaxkit.engine.reaxff.generators.control_generator import (
     ControlGeneratorSpec,
-    write_control,
-    write_control_template_with_overrides,
+    _write_control,
+    _write_control_template_with_overrides,
 )
 from reaxkit.presentation.plot.registry import plot as render_plot
 
@@ -612,7 +612,7 @@ def _write_stage_control_if_needed(
         template_path = _resolve_template_path(str(template_value), study_dir=study_dir)
         if template_path.exists():
             template_text = template_path.read_text(encoding="utf-8")
-            write_control_template_with_overrides(
+            _write_control_template_with_overrides(
                 out_path=control_out,
                 spec=ControlGeneratorSpec(template_text=template_text),
                 overrides=overrides,
@@ -621,13 +621,13 @@ def _write_stage_control_if_needed(
         else:
             # Phase-1 planning should still initialize even if external templates
             # are not present yet; fall back to the bundled control template.
-            write_control(
+            _write_control(
                 out_path=control_out,
                 overrides=overrides,
             )
             template_used = "default_control_template"
     else:
-        write_control(
+        _write_control(
             out_path=control_out,
             overrides=overrides,
         )

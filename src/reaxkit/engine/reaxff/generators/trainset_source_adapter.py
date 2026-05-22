@@ -14,11 +14,11 @@ from typing import Dict, Optional, Protocol
 from reaxkit.engine.reaxff.generators.trainset_heatfo import (
     HeatFoReferenceSpec,
     MaterialsProjectHeatFoSpec,
-    generate_heatfo_trainset_from_mp,
+    _generate_heatfo_trainset_from_mp,
 )
 from reaxkit.engine.reaxff.generators.trainset_mp import (
-    generate_trainset_settings_yaml_from_mp_simple,
-    mp_search_material_ids_by_elements,
+    _generate_trainset_settings_yaml_from_mp_simple,
+    _mp_search_material_ids_by_elements,
 )
 
 
@@ -79,7 +79,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
-        return generate_trainset_settings_yaml_from_mp_simple(
+        return _generate_trainset_settings_yaml_from_mp_simple(
             mp_id=mat_id,
             out_yaml=out_yaml,
             structure_dir=structure_dir,
@@ -96,7 +96,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
         exact_element_count: bool,
         max_materials: Optional[int],
     ) -> list[str]:
-        return mp_search_material_ids_by_elements(
+        return _mp_search_material_ids_by_elements(
             api_key=api_key,
             elements=elements,
             exact_element_count=exact_element_count,
@@ -104,7 +104,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
         )
 
     def generate_heatfo_trainset(self, request: HeatFoTrainsetRequest):
-        return generate_heatfo_trainset_from_mp(
+        return _generate_heatfo_trainset_from_mp(
             MaterialsProjectHeatFoSpec(
                 out_dir=request.out_dir,
                 elements=request.elements,
@@ -157,15 +157,15 @@ class _JarvisTrainsetSourceAdapter:
         self._not_implemented()
 
 
-def normalize_trainset_source_name(source: str) -> str:
+def _normalize_trainset_source_name(source: str) -> str:
     value = str(source).strip().lower()
     if not value:
         raise ValueError("Source must be provided.")
     return value
 
 
-def get_trainset_source_adapter(source: str) -> TrainsetSourceAdapter:
-    source_name = normalize_trainset_source_name(source)
+def _get_trainset_source_adapter(source: str) -> TrainsetSourceAdapter:
+    source_name = _normalize_trainset_source_name(source)
     if source_name == "mp":
         return _MaterialsProjectTrainsetSourceAdapter()
     if source_name == "jarvis":

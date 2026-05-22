@@ -11,19 +11,19 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.kopple2_generator import write_kopple2
+from reaxkit.engine.reaxff.generators.kopple2_generator import gen_template_kopple2
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
-    parser.set_defaults(command="make-kopple2")
+    parser.set_defaults(command="gen_template_kopple2")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Generate a ReaxFF kopple2 template file.\n\n"
         "Examples:\n"
-        "  reaxkit make-kopple2\n"
-        "  reaxkit make-kopple2 --output kopple2\n"
-        "  reaxkit make-kopple2 --output kopple2.template --copy-to-dot"
+        "  reaxkit gen_template_kopple2\n"
+        "  reaxkit gen_template_kopple2 --output kopple2\n"
+        "  reaxkit gen_template_kopple2 --output kopple2.template --copy-to-dot"
     )
     parser.add_argument(
         "--output",
@@ -41,7 +41,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    written = write_kopple2(out_path)
+    written = gen_template_kopple2(out_path)
     persist_generator_metadata(
         args,
         command=command,

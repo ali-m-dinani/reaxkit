@@ -16,9 +16,7 @@ from typing import Any
 __all__ = [
     "TRegimeSampleSpec",
     "TREGIME_GENERATOR_REGISTRY",
-    "generate_sample_tregime",
-    "write_tregime",
-    "write_sample_tregime",
+    "gen_template_tregime",
 ]
 
 
@@ -60,7 +58,7 @@ def _build_sample_rows() -> list[dict[str, Any]]:
     ]
 
 
-def generate_sample_tregime(spec: TRegimeSampleSpec = TRegimeSampleSpec()) -> str:
+def _gen_template_tregime_text(spec: TRegimeSampleSpec = TRegimeSampleSpec()) -> str:
     """
     Generate sample ``tregime.in`` text with fixed-width, left-aligned columns.
     """
@@ -110,7 +108,7 @@ def generate_sample_tregime(spec: TRegimeSampleSpec = TRegimeSampleSpec()) -> st
     return "\n".join(lines) + "\n"
 
 
-def write_tregime(
+def _write_tregime(
     out_path: str | Path = "tregime.in",
     spec: TRegimeSampleSpec = TRegimeSampleSpec(),
 ) -> Path:
@@ -119,19 +117,19 @@ def write_tregime(
     """
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(generate_sample_tregime(spec), encoding="utf-8", newline="\n")
+    out_path.write_text(_gen_template_tregime_text(spec), encoding="utf-8", newline="\n")
     return out_path
 
 
-def write_sample_tregime(
+def gen_template_tregime(
     out_path: str | Path = "tregime.in",
     *,
     n_rows: int = 3,
 ) -> Path:
     """
-    Backward-compatible wrapper for writing sample ``tregime.in`` text.
+    Generate sample ``tregime.in`` file.
     """
-    return write_tregime(out_path=out_path, spec=TRegimeSampleSpec(n_rows=n_rows))
+    return _write_tregime(out_path=out_path, spec=TRegimeSampleSpec(n_rows=n_rows))
 
 
 TREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -139,7 +137,7 @@ TREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "Temperature Regime Sample",
         "default_filename": "tregime.in",
         "spec_type": TRegimeSampleSpec,
-        "generate": generate_sample_tregime,
-        "write": write_tregime,
+        "generate": _gen_template_tregime_text,
+        "write": gen_template_tregime,
     }
 }

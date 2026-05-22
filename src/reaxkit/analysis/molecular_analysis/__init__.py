@@ -14,6 +14,11 @@ from reaxkit.analysis.molecular_analysis.molecular_analysis import (
     MoleculeLifetimeResult,
     MoleculeLifetimeTask,
 )
+from reaxkit.analysis.molecular_analysis.isomer_detection import (
+    MoleculeIsomerDetectionRequest,
+    MoleculeIsomerDetectionResult,
+    MoleculeIsomerDetectionTask,
+)
 
 __all__ = [
     "DominantSpeciesRequest",
@@ -28,4 +33,7 @@ __all__ = [
     "MoleculeLifetimeRequest",
     "MoleculeLifetimeResult",
     "MoleculeLifetimeTask",
+    "MoleculeIsomerDetectionRequest",
+    "MoleculeIsomerDetectionResult",
+    "MoleculeIsomerDetectionTask",
 ]

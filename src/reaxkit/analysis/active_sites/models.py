@@ -162,7 +162,7 @@ class ActiveSiteEventsRequest(BaseRequest):
         },
     )
     every: int = dc_field(
-        default=1,
+        default=10,
         metadata={
             "label": "Every",
             "help": "Frame stride for selected frames.",

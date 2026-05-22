@@ -23,15 +23,7 @@ __all__ = [
     "SmoothPulseERegimeSpec",
     "FunctionalERegimeSpec",
     "EREGIME_GENERATOR_REGISTRY",
-    "generate_a_given_eregime",
-    "generate_eregime_sinusoidal",
-    "generate_eregime_smooth_pulse",
-    "generate_eregime_from_function",
-    "write_eregime_rows",
-    "write_a_given_eregime",
-    "write_eregime_sinusoidal",
-    "write_eregime_smooth_pulse",
-    "write_eregime_from_function",
+    "gen_eregime",
 ]
 
 
@@ -100,14 +92,21 @@ def _format_eregime_text(rows: Iterable[tuple[int, int, str, float]]) -> str:
     return "".join(lines)
 
 
-def generate_a_given_eregime(spec: ExplicitERegimeSpec) -> str:
+def _gen_eregime_text(spec: ExplicitERegimeSpec) -> str:
     """
     Generate ``eregime.in`` text from explicit row definitions.
     """
     return _format_eregime_text(spec.rows)
 
 
-def write_eregime_rows(
+def _generate_a_given_eregime(spec: ExplicitERegimeSpec) -> str:
+    """
+    Backward-compatible alias for ``gen_eregime``.
+    """
+    return _gen_eregime_text(spec)
+
+
+def _write_eregime_rows(
     file_path: str | Path,
     rows: Iterable[tuple[int, int, str, float]],
 ) -> Path:
@@ -120,17 +119,17 @@ def write_eregime_rows(
     return file_path
 
 
-def write_a_given_eregime(
+def _write_a_given_eregime(
     file_path: str | Path,
     rows: Iterable[tuple[int, int, str, float]],
 ) -> Path:
     """
     Backward-compatible wrapper for writing explicit ``eregime.in`` rows.
     """
-    return write_eregime_rows(file_path=file_path, rows=rows)
+    return _write_eregime_rows(file_path=file_path, rows=rows)
 
 
-def generate_eregime_sinusoidal(spec: SinusoidalERegimeSpec) -> str:
+def _generate_eregime_sinusoidal(spec: SinusoidalERegimeSpec) -> str:
     """
     Generate a sinusoidal electric-field schedule as ``eregime.in`` text.
     """
@@ -152,7 +151,7 @@ def generate_eregime_sinusoidal(spec: SinusoidalERegimeSpec) -> str:
     return _format_eregime_text(rows)
 
 
-def write_eregime_sinusoidal(
+def _write_eregime_sinusoidal(
     file_path: str | Path,
     *,
     max_magnitude: float,
@@ -181,12 +180,12 @@ def write_eregime_sinusoidal(
     )
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    text = generate_eregime_sinusoidal(spec)
+    text = _generate_eregime_sinusoidal(spec)
     file_path.write_text(text, encoding="utf-8")
     return file_path
 
 
-def generate_eregime_smooth_pulse(spec: SmoothPulseERegimeSpec) -> str:
+def _generate_eregime_smooth_pulse(spec: SmoothPulseERegimeSpec) -> str:
     """
     Generate smooth bipolar electric-field pulses as ``eregime.in`` text.
     """
@@ -233,7 +232,7 @@ def generate_eregime_smooth_pulse(spec: SmoothPulseERegimeSpec) -> str:
     return _format_eregime_text(rows)
 
 
-def write_eregime_smooth_pulse(
+def _write_eregime_smooth_pulse(
     file_path: str | Path,
     *,
     amplitude: float,
@@ -266,12 +265,12 @@ def write_eregime_smooth_pulse(
     )
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    text = generate_eregime_smooth_pulse(spec)
+    text = _generate_eregime_smooth_pulse(spec)
     file_path.write_text(text, encoding="utf-8")
     return file_path
 
 
-def generate_eregime_from_function(spec: FunctionalERegimeSpec) -> str:
+def _generate_eregime_from_function(spec: FunctionalERegimeSpec) -> str:
     """
     Generate an electric-field regime by sampling an arbitrary function.
     """
@@ -292,7 +291,7 @@ def generate_eregime_from_function(spec: FunctionalERegimeSpec) -> str:
     return _format_eregime_text(rows)
 
 
-def write_eregime_from_function(
+def _write_eregime_from_function(
     file_path: str | Path,
     *,
     func: Callable[[float], float],
@@ -317,9 +316,86 @@ def write_eregime_from_function(
     )
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    text = generate_eregime_from_function(spec)
+    text = _generate_eregime_from_function(spec)
     file_path.write_text(text, encoding="utf-8")
     return file_path
+
+
+def gen_eregime(
+    out_path: str | Path = "eregime.in",
+    *,
+    profile_type: str,
+    iteration_step: int,
+    direction: str = "z",
+    voltage_idx: int = 1,
+    start_iter: int = 0,
+    max_magnitude: float | None = None,
+    step_angle: float | None = None,
+    num_cycles: float | None = None,
+    phase: float = 0.0,
+    dc_offset: float = 0.0,
+    amplitude: float | None = None,
+    width: float | None = None,
+    period: float | None = None,
+    slope: float | None = None,
+    step_size: float = 0.1,
+    baseline: float = 0.0,
+    func: Callable[[float], float] | None = None,
+    t_end: float | None = None,
+    dt: float | None = None,
+) -> Path:
+    """
+    Canonical eregime generator entrypoint used by workflow command ``gen_eregime``.
+    """
+    kind = str(profile_type).strip().lower()
+    if kind == "sin":
+        if max_magnitude is None or step_angle is None or num_cycles is None:
+            raise ValueError("sin profile requires max_magnitude, step_angle, and num_cycles.")
+        return _write_eregime_sinusoidal(
+            out_path,
+            max_magnitude=max_magnitude,
+            step_angle=step_angle,
+            iteration_step=iteration_step,
+            num_cycles=num_cycles,
+            direction=direction,
+            voltage_idx=voltage_idx,
+            phase=phase,
+            dc_offset=dc_offset,
+            start_iter=start_iter,
+        )
+    if kind == "pulse":
+        required = {"amplitude": amplitude, "width": width, "period": period, "slope": slope, "num_cycles": num_cycles}
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            raise ValueError(f"pulse profile missing required arguments: {', '.join(missing)}")
+        return _write_eregime_smooth_pulse(
+            out_path,
+            amplitude=amplitude,
+            width=width,
+            period=period,
+            slope=slope,
+            iteration_step=iteration_step,
+            num_of_cycles=num_cycles,
+            step_size=step_size,
+            direction=direction,
+            voltage_idx=voltage_idx,
+            baseline=baseline,
+            start_iter=start_iter,
+        )
+    if kind == "func":
+        if func is None or t_end is None or dt is None:
+            raise ValueError("func profile requires func, t_end, and dt.")
+        return _write_eregime_from_function(
+            out_path,
+            func=func,
+            t_end=t_end,
+            dt=dt,
+            iteration_step=iteration_step,
+            direction=direction,
+            voltage_idx=voltage_idx,
+            start_iter=start_iter,
+        )
+    raise ValueError(f"Unsupported profile_type: {profile_type!r}. Choose from sin|pulse|func.")
 
 
 EREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
@@ -327,28 +403,28 @@ EREGIME_GENERATOR_REGISTRY: dict[str, dict[str, Any]] = {
         "label": "Electric Field Regime From Rows",
         "default_filename": "eregime.in",
         "spec_type": ExplicitERegimeSpec,
-        "generate": generate_a_given_eregime,
-        "write": write_a_given_eregime,
+        "generate": _gen_eregime_text,
+        "write": _write_a_given_eregime,
     },
     "eregime_sinusoidal": {
         "label": "Electric Field Regime Sinusoidal",
         "default_filename": "eregime.in",
         "spec_type": SinusoidalERegimeSpec,
-        "generate": generate_eregime_sinusoidal,
-        "write": write_eregime_sinusoidal,
+        "generate": _generate_eregime_sinusoidal,
+        "write": _write_eregime_sinusoidal,
     },
     "eregime_smooth_pulse": {
         "label": "Electric Field Regime Smooth Pulse",
         "default_filename": "eregime.in",
         "spec_type": SmoothPulseERegimeSpec,
-        "generate": generate_eregime_smooth_pulse,
-        "write": write_eregime_smooth_pulse,
+        "generate": _generate_eregime_smooth_pulse,
+        "write": _write_eregime_smooth_pulse,
     },
     "eregime_from_function": {
         "label": "Electric Field Regime From Function",
         "default_filename": "eregime.in",
         "spec_type": FunctionalERegimeSpec,
-        "generate": generate_eregime_from_function,
-        "write": write_eregime_from_function,
+        "generate": _generate_eregime_from_function,
+        "write": _write_eregime_from_function,
     },
 }
