@@ -1,4 +1,14 @@
 # Canonical intent vocabulary and wording aliases for `reaxkit help` capability discovery.
+#
+# How this file is used:
+# - `wording_alias` is for query normalization only.
+#   It maps shorthand/synonym forms (for example `heatfo`, `msd`, `traj`) to a
+#   canonical wording phrase. This step happens before layered search so user
+#   phrasing can be standardized consistently.
+# - `intents` is semantic intent metadata.
+#   It describes capability groups (description, aliases, dataclasses,
+#   workflows, generators). It is used as structured intent knowledge, while
+#   `wording_alias` is purely lexical normalization.
 
 _meta:
   version: '1.0'

@@ -1,6 +1,3 @@
-# ReaxFF loader/writer mapping used by `reaxkit help`.
-# Tracks read-side loaders and write-side operations as structured YAML metadata.
-
 _meta:
   version: '1.2'
   source: reaxkit.engine.reaxff.adapter.ReaxFFAdapter + file-tool workflows
@@ -232,3 +229,240 @@ writers:
     workflow_module: reaxkit.workflows.file_tools.control_workflow
     output_files:
     - control
+file_to_dataclass_across_loaders_and_writers:
+  control:
+    primary_files:
+    - kind: loader
+      name: load_control_parameters
+      dataclass: ControlParametersData
+    supplemental_files: []
+    output_files:
+    - kind: writer
+      name: write_control
+      dataclass: ControlParametersData
+  energylog:
+    primary_files: []
+    supplemental_files:
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    output_files: []
+  eregime.in:
+    primary_files:
+    - kind: loader
+      name: load_eregime
+      dataclass: EregimeData
+    supplemental_files: []
+    output_files: []
+  exe (run script):
+    primary_files: []
+    supplemental_files: []
+    output_files: []
+  ffield:
+    primary_files:
+    - kind: loader
+      name: load_force_field
+      dataclass: ForceFieldParametersData
+    supplemental_files: []
+    output_files: []
+  fort.13:
+    primary_files:
+    - kind: loader
+      name: load_force_field_optimization
+      dataclass: ForceFieldOptimizationProgressData
+    supplemental_files: []
+    output_files: []
+  fort.57:
+    primary_files:
+    - kind: loader
+      name: load_geometry_optimization
+      dataclass: GeometryOptimizationProgressData
+    supplemental_files: []
+    output_files: []
+  fort.58:
+    primary_files: []
+    supplemental_files:
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    output_files: []
+  fort.7:
+    primary_files:
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    supplemental_files: []
+    output_files: []
+  fort.73:
+    primary_files:
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    supplemental_files: []
+    output_files: []
+  fort.74:
+    primary_files:
+    - kind: loader
+      name: load_structure_summary
+      dataclass: GeometrySummaryData
+    supplemental_files: []
+    output_files: []
+  fort.76:
+    primary_files:
+    - kind: loader
+      name: load_restraints
+      dataclass: RestraintData
+    supplemental_files: []
+    output_files: []
+  fort.78:
+    primary_files:
+    - kind: loader
+      name: load_electric_field
+      dataclass: ElectricFieldData
+    supplemental_files: []
+    output_files: []
+  fort.79:
+    primary_files:
+    - kind: loader
+      name: load_parameter_optimization_diagnostic
+      dataclass: ForceFieldOptimizationDiagnosticData
+    supplemental_files: []
+    output_files: []
+  fort.8:
+    primary_files: []
+    supplemental_files: []
+    output_files: []
+  fort.99:
+    primary_files:
+    - kind: loader
+      name: load_force_field_optimization_report
+      dataclass: ForceFieldOptimizationReportData
+    supplemental_files: []
+    output_files: []
+  geo:
+    primary_files:
+    - kind: loader
+      name: load_geometry
+      dataclass: GeometryData
+    supplemental_files: []
+    output_files: []
+  iopt:
+    primary_files: []
+    supplemental_files: []
+    output_files: []
+  moldyn.vel:
+    primary_files: []
+    supplemental_files:
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    output_files: []
+  molfra.out:
+    primary_files:
+    - kind: loader
+      name: load_molecular_analysis
+      dataclass: MolecularAnalysisData
+    supplemental_files: []
+    output_files: []
+  molsav.####:
+    primary_files: []
+    supplemental_files:
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    output_files: []
+  params:
+    primary_files:
+    - kind: loader
+      name: load_force_field_optimization_parameters
+      dataclass: ForceFieldOptimizationParameterData
+    supplemental_files: []
+    output_files: []
+  summary:
+    primary_files:
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    supplemental_files:
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    output_files: []
+  summary.txt:
+    primary_files:
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    supplemental_files:
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    output_files: []
+  trainset.in:
+    primary_files:
+    - kind: loader
+      name: load_force_field_optimization_training_set
+      dataclass: ForceFieldOptimizationTrainingSetData
+    supplemental_files: []
+    output_files: []
+  tregime.in:
+    primary_files: []
+    supplemental_files: []
+    output_files: []
+  vels:
+    primary_files:
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    supplemental_files: []
+    output_files: []
+  vregime.in:
+    primary_files:
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    supplemental_files: []
+    output_files: []
+  xmolout:
+    primary_files:
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    supplemental_files:
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    output_files: []

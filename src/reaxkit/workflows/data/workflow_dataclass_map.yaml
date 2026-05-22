@@ -1,14 +1,12 @@
-# Mapping between ReaxKit workflow modules and related analysis/generator implementations.
-# Used for help, introspection, and cross-layer discovery.
-
 _meta:
   version: '1.0'
   source: workflow registries + analysis task dataclass map + workflow module docstrings
-  purpose: Maps workflow modules to related analysis and generator implementation modules.
+  purpose: Maps workflow modules to related analysis and generator implementation
+    modules.
   last_updated: '2026-05-21'
 workflows:
   active_site_workflow:
-    implementation_module: reaxkit.workflows.active_site_workflow
+    implementation_module: 'reaxkit.workflows.active_site_workflow: active_site_events'
     description: Direct command workflow for active-site analyses.
     related_commands:
       analysis:
@@ -27,7 +25,7 @@ workflows:
     - reaxkit help "active site workflow"
     - run active site workflow
   connectivity_workflow:
-    implementation_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
     description: Direct command workflow for connectivity analyses.
     related_commands:
       analysis:
@@ -48,7 +46,7 @@ workflows:
     - reaxkit help "connectivity workflow"
     - run connectivity workflow
   electrostatics_workflow:
-    implementation_module: reaxkit.workflows.electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
     description: Command workflow for electrostatics analyses and local visualizations.
     related_commands:
       analysis:
@@ -67,7 +65,7 @@ workflows:
     - reaxkit help "electrostatics workflow"
     - run electrostatics workflow
   force_field_workflow:
-    implementation_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.workflows.force_field_workflow: force_field_data'
     description: Direct command workflow for force-field analyses.
     related_commands:
       analysis:
@@ -90,7 +88,7 @@ workflows:
     - reaxkit help "force field workflow"
     - run force field workflow
   kinematics_workflow:
-    implementation_module: reaxkit.workflows.kinematics_workflow
+    implementation_module: 'reaxkit.workflows.kinematics_workflow: kinematics'
     description: Direct command workflow for atomic-kinematics analyses.
     related_commands:
       analysis:
@@ -108,7 +106,7 @@ workflows:
     - reaxkit help "atomic kinematics workflow"
     - run atomic kinematics workflow
   molecular_analysis_workflow:
-    implementation_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
     description: Direct command workflow for molecular analysis tasks.
     related_commands:
       analysis:
@@ -126,7 +124,7 @@ workflows:
     - reaxkit help "molecular analysis workflow"
     - run molecular analysis workflow
   params_workflow:
-    implementation_module: reaxkit.workflows.params_workflow
+    implementation_module: 'reaxkit.workflows.params_workflow: get-params'
     description: Direct command workflow for optimization-parameter analysis.
     related_commands:
       analysis:
@@ -143,7 +141,7 @@ workflows:
     - reaxkit help "optimization parameters workflow"
     - get optimization parameters workflow
   spatial_property_workflow:
-    implementation_module: reaxkit.workflows.spatial_property_workflow
+    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
     description: Direct command workflow for spatial per-atom property plots.
     related_commands:
       analysis:
@@ -161,8 +159,10 @@ workflows:
     - reaxkit help "spatial property workflow"
     - run atom property plot3d workflow
   timeseries_workflow:
-    implementation_module: reaxkit.workflows.timeseries_workflow
-    description: Dispatcher workflow for time-series analyses.
+    implementation_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    description: Dispatcher workflow for time-series analyses. this supports multiple
+      time-series analysis tasks (like restraint time series data) and routes to the
+      appropriate one based on user intent and command context.
     dispatch_mode: kind_runner
     related_commands:
       analysis: []
@@ -171,16 +171,19 @@ workflows:
     - time series
     - dispatcher
     - trajectory
+    - restraint
     notes:
-    - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries and geometry_optimization.
+    - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries
+      and geometry_optimization.
     aliases:
     - time series
     - series workflow
     help_search_examples:
     - run time series analysis for coordinates
     - get trajectory series
+    - get or plot restraint time series
   trajectory_workflow:
-    implementation_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
     description: Direct command workflow for trajectory analyses.
     related_commands:
       analysis:
@@ -201,7 +204,7 @@ workflows:
     - reaxkit help "trajectory workflow"
     - run trajectory workflow
   addmol_workflow:
-    implementation_module: reaxkit.workflows.file_tools.addmol_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: make-addmol'
     description: Direct command workflow for generating addmol files.
     related_commands:
       analysis: []
@@ -219,7 +222,7 @@ workflows:
     - reaxkit help "make molecule insertion"
     - make molecule insertion workflow
   charges_workflow:
-    implementation_module: reaxkit.workflows.file_tools.charges_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.charges_workflow: make-charges'
     description: Direct command workflow for generating charges files.
     related_commands:
       analysis: []
@@ -237,7 +240,7 @@ workflows:
     - reaxkit help "make charges"
     - make charges workflow
   control_workflow:
-    implementation_module: reaxkit.workflows.file_tools.control_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
     description: Task-oriented workflow for control-file analyses and utilities.
     related_commands:
       analysis: []
@@ -256,7 +259,7 @@ workflows:
     - reaxkit help "make control"
     - write control workflow
   eregime_workflow:
-    implementation_module: reaxkit.workflows.file_tools.eregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.eregime_workflow: make-eregime'
     description: Direct command workflow for generating eregime.in files.
     related_commands:
       analysis: []
@@ -274,8 +277,9 @@ workflows:
     - reaxkit help "make electric field regime"
     - make electric field regime workflow
   fort83_workflow:
-    implementation_module: reaxkit.workflows.file_tools.fort83_workflow
-    description: Direct command workflow for extracting optimized force fields from fort.83.
+    implementation_module: 'reaxkit.workflows.file_tools.fort83_workflow: extract-optimized-ffield'
+    description: Direct command workflow for extracting optimized force fields from
+      fort.83.
     related_commands:
       analysis: []
       generator:
@@ -292,7 +296,7 @@ workflows:
     - reaxkit help "extract optimized force field"
     - extract optimized force field workflow
   geo_workflow:
-    implementation_module: reaxkit.workflows.file_tools.geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
     description: Direct command workflows for GEO and structure file utilities.
     related_commands:
       analysis: []
@@ -311,7 +315,7 @@ workflows:
     - reaxkit help "geometry file workflow"
     - run trajectory coordinates to geometry file workflow
   kopple2_workflow:
-    implementation_module: reaxkit.workflows.file_tools.kopple2_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.kopple2_workflow: make-kopple2'
     description: Direct command workflow for generating kopple2 files.
     related_commands:
       analysis: []
@@ -329,7 +333,7 @@ workflows:
     - reaxkit help "make coupling template"
     - make coupling template workflow
   trainset_workflow:
-    implementation_module: reaxkit.workflows.file_tools.trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
     description: Direct command workflows for trainset export and generation utilities.
     related_commands:
       analysis: []
@@ -350,7 +354,7 @@ workflows:
     - reaxkit help "training set workflow"
     - create heat of formation training set workflow
   tregime_workflow:
-    implementation_module: reaxkit.workflows.file_tools.tregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.tregime_workflow: make-tregime'
     description: Direct command workflow for tregime generation.
     related_commands:
       analysis: []
@@ -368,7 +372,7 @@ workflows:
     - reaxkit help "make temperature regime"
     - make temperature regime workflow
   vregime_workflow:
-    implementation_module: reaxkit.workflows.file_tools.vregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.vregime_workflow: make-vregime'
     description: Direct command workflow for vregime generation.
     related_commands:
       analysis: []
@@ -386,7 +390,7 @@ workflows:
     - reaxkit help "make volume regime"
     - make volume regime workflow
   xmolout_workflow:
-    implementation_module: reaxkit.workflows.file_tools.xmolout_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.xmolout_workflow: trim-xmolout'
     description: Direct command workflow for xmolout file utilities.
     related_commands:
       analysis: []
@@ -404,7 +408,7 @@ workflows:
     - reaxkit help "trim xmolout"
     - trim xmolout workflow
   command_alias_workflow:
-    implementation_module: reaxkit.workflows.meta.command_alias_workflow
+    implementation_module: 'reaxkit.workflows.meta.command_alias_workflow: add-alias'
     description: Direct command workflow for managing user-defined command aliases.
     related_commands:
       analysis: []
@@ -422,7 +426,7 @@ workflows:
     - reaxkit help "command alias workflow"
     - add command alias workflow
   gui_workflow:
-    implementation_module: reaxkit.workflows.meta.gui_workflow
+    implementation_module: 'reaxkit.workflows.meta.gui_workflow: gui'
     description: Launch the ReaxKit Dash Web UI.
     dispatch_mode: kind_runner
     related_commands:
@@ -441,7 +445,7 @@ workflows:
     - reaxkit help "graphical user interface"
     - launch graphical user interface
   help_workflow:
-    implementation_module: reaxkit.workflows.meta.help_workflow
+    implementation_module: 'reaxkit.workflows.meta.help_workflow: help'
     description: Interactive help and discovery workflow for ReaxKit.
     dispatch_mode: kind_runner
     related_commands:
@@ -458,7 +462,7 @@ workflows:
     - reaxkit help "help"
     - run help
   introspection_workflow:
-    implementation_module: reaxkit.workflows.meta.introspection_workflow
+    implementation_module: 'reaxkit.workflows.meta.introspection_workflow: intspec'
     description: CLI workflow for introspecting ReaxKit modules and folders.
     dispatch_mode: intspec_runner
     related_commands:
@@ -475,7 +479,7 @@ workflows:
     - reaxkit help "introspection workflow"
     - run introspection workflow
   make_video_workflow:
-    implementation_module: reaxkit.workflows.meta.make_video_workflow
+    implementation_module: 'reaxkit.workflows.meta.make_video_workflow: video'
     description: Video generation workflow for ReaxKit.
     dispatch_mode: task_subcommands
     related_commands:
@@ -492,7 +496,7 @@ workflows:
     - reaxkit help "video workflow"
     - run video workflow
   plotter_workflow:
-    implementation_module: reaxkit.workflows.meta.plotter_workflow
+    implementation_module: 'reaxkit.workflows.meta.plotter_workflow: plotter'
     description: General-purpose plotting workflow for ReaxKit.
     dispatch_mode: task_subcommands
     related_commands:
@@ -509,8 +513,9 @@ workflows:
     - reaxkit help "plotter workflow"
     - run plotter workflow
   study_workflow:
-    implementation_module: reaxkit.workflows.meta.study_workflow
-    description: 'Study planning workflow: generate sweep/replicate folder structures from YAML.'
+    implementation_module: 'reaxkit.workflows.meta.study_workflow: study'
+    description: 'Study planning workflow: generate sweep/replicate folder structures
+      from YAML.'
     related_commands:
       analysis: []
       generator:
@@ -527,7 +532,8 @@ workflows:
     - reaxkit help "study planning workflow"
     - create study planning workflow
   workspace_management_workflow:
-    implementation_module: reaxkit.workflows.meta.workspace_management_workflow
+    implementation_module: 'reaxkit.workflows.meta.workspace_management_workflow:
+      free-up'
     description: Workspace cleanup and archiving commands.
     related_commands:
       analysis: []

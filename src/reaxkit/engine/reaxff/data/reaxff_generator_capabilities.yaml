@@ -1,11 +1,8 @@
-# Searchable capability index for ReaxFF generator functions.
-# Used by `reaxkit help` to discover generator-side features from natural
-# language queries, then link those features to source generator modules.
-
 _meta:
   version: '1.0'
   source: reaxkit.engine.reaxff.generators.*
-  purpose: Maps ReaxFF generator functions to searchable capabilities and workflow links.
+  purpose: Maps ReaxFF generator functions to searchable capabilities and workflow
+    links.
   last_updated: '2026-05-21'
 generators:
   add_restraints_to_geo:
@@ -18,8 +15,8 @@ generators:
     - angle restraint
     - torsion
     - constraints
-    implementation_module: reaxkit.engine.reaxff.generators.geo_generator
-    related_workflow_module: reaxkit.workflows.file_tools.geo_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: add_restraints_to_geo'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: add-geo-restraint'
     notes:
     - Exposed via reaxkit add-geo-restraint.
     - Implemented by add_restraints_to_geo in geo_generator.
@@ -37,8 +34,8 @@ generators:
     - xtob
     - conversion
     - xyz
-    implementation_module: reaxkit.engine.reaxff.generators.geo_generator
-    related_workflow_module: reaxkit.workflows.file_tools.geo_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: xtob'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: xtob'
     aliases:
     - xtob
     help_search_examples:
@@ -52,8 +49,8 @@ generators:
     - generator
     - schedule
     - field
-    implementation_module: reaxkit.engine.reaxff.generators.eregime_generator
-    related_workflow_module: reaxkit.workflows.file_tools.eregime_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.eregime_generator: generate_a_given_eregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.eregime_workflow: make-eregime'
     aliases:
     - make eregime
     - make_eregime
@@ -67,8 +64,8 @@ generators:
     - charges
     - generator
     - template
-    implementation_module: reaxkit.engine.reaxff.generators.charges_generator
-    related_workflow_module: reaxkit.workflows.file_tools.charges_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.charges_generator: generate_charges_template'
+    related_workflow_module: 'reaxkit.workflows.file_tools.charges_workflow: make-charges'
     aliases:
     - make charges
     - make_charges
@@ -83,8 +80,8 @@ generators:
     - yaml template
     - heatfo settings
     - generator
-    implementation_module: reaxkit.engine.reaxff.generators.trainset_yaml
-    related_workflow_module: reaxkit.workflows.file_tools.trainset_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_yaml: generate_trainset_settings_yaml'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-settings'
     aliases:
     - make trainset settings
     - make_trainset_settings
@@ -96,6 +93,87 @@ generators:
     - make training set settings
     - create heat of formation training set settings
     - write heat of formation training set yaml
+  generate_trainset_from_yaml:
+    description: Generate trainset files and related outputs from trainset settings
+      YAML.
+    tags:
+    - trainset
+    - yaml
+    - generator
+    - training set
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_yaml: generate_trainset_from_yaml'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
+    notes:
+    - Used by trainset workflows to materialize trainset files from YAML configuration.
+    aliases:
+    - make trainset
+    - generate trainset
+    - trainset from yaml
+    - make trainset from yaml
+    help_search_examples:
+    - reaxkit help "make trainset from yaml"
+    - make training set from yaml settings
+  generate_heatfo_trainset_from_mp:
+    description: Generate heat of formation trainset and geometry outputs from Materials
+      Project data.
+    tags:
+    - trainset
+    - heat of formation
+    - generator
+    - materials project
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_heatfo: generate_heatfo_trainset_from_mp'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-heatfo'
+    notes:
+    - Core generator used for heat of formation training set generation.
+    aliases:
+    - make trainset heat of formation
+    - generate heat of formation trainset
+    - make trainset using heat of formation
+    - make-trainset-heatfo
+    help_search_examples:
+    - reaxkit help "make trainset using heat of formation"
+    - create heat of formation training set from materials project
+  generate_all_energy_vs_volume_data:
+    description: Generate elastic energy versus volume training data for trainset
+      construction.
+    tags:
+    - trainset
+    - elastic
+    - energy volume
+    - generator
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_elastic_energy:
+      generate_all_energy_vs_volume_data'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
+    notes:
+    - Generates deformation-mode energy tables consumed by elastic trainset workflows.
+    aliases:
+    - make elastic trainset
+    - generate elastic trainset energy data
+    - trainset elastic energy
+    - make-trainset-elastic
+    help_search_examples:
+    - reaxkit help "make elastic training set"
+    - generate elastic energy volume training set data
+  generate_strained_geometries_with_xtob:
+    description: Generate strained geometries and GEO entries used in elastic trainset
+      workflows.
+    tags:
+    - trainset
+    - elastic
+    - strained geometry
+    - generator
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_elastic_geometry:
+      generate_strained_geometries_with_xtob'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
+    notes:
+    - Produces strained structures that complement elastic energy trainset generation.
+    aliases:
+    - generate strained geometries
+    - elastic strained geometry generator
+    - trainset elastic geometry
+    help_search_examples:
+    - reaxkit help "generate strained geometries for elastic training set"
+    - make strained geometry inputs for elastic trainset
   generate_control_template:
     description: Generate, inspect, and rewrite ReaxFF control files.
     tags:
@@ -104,8 +182,8 @@ generators:
     - generator
     - template
     - keywords
-    implementation_module: reaxkit.engine.reaxff.generators.control_generator
-    related_workflow_module: reaxkit.workflows.file_tools.control_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.control_generator: generate_control_template'
+    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
     aliases:
     - get control
     - get_control
@@ -123,14 +201,15 @@ generators:
     - reaxkit help "write control"
     - run write control
   generate_addmol_template:
-    description: Generate addmol.bgf and addmol.vel templates for molecule insertion workflows.
+    description: Generate addmol.bgf and addmol.vel templates for molecule insertion
+      workflows.
     tags:
     - addmol
     - molecule insertion
     - generator
     - template
-    implementation_module: reaxkit.engine.reaxff.generators.addmol_generator
-    related_workflow_module: reaxkit.workflows.file_tools.addmol_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.addmol_generator: generate_addmol_template'
+    related_workflow_module: 'reaxkit.workflows.file_tools.addmol_workflow: make-addmol'
     aliases:
     - make addmol
     - make_addmol
@@ -145,8 +224,8 @@ generators:
     - coupling template
     - generator
     - template
-    implementation_module: reaxkit.engine.reaxff.generators.kopple2_generator
-    related_workflow_module: reaxkit.workflows.file_tools.kopple2_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.kopple2_generator: generate_kopple2_template'
+    related_workflow_module: 'reaxkit.workflows.file_tools.kopple2_workflow: make-kopple2'
     aliases:
     - make kopple2
     - make_kopple2
@@ -161,8 +240,8 @@ generators:
     - temperature regime
     - generator
     - schedule
-    implementation_module: reaxkit.engine.reaxff.generators.tregime_generator
-    related_workflow_module: reaxkit.workflows.file_tools.tregime_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.tregime_generator: generate_sample_tregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.tregime_workflow: make-tregime'
     aliases:
     - make tregime
     - make_tregime
@@ -177,8 +256,8 @@ generators:
     - volume regime
     - generator
     - schedule
-    implementation_module: reaxkit.engine.reaxff.generators.vregime_generator
-    related_workflow_module: reaxkit.workflows.file_tools.vregime_workflow
+    implementation_module: 'reaxkit.engine.reaxff.generators.vregime_generator: generate_sample_vregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.vregime_workflow: make-vregime'
     aliases:
     - make vregime
     - make_vregime

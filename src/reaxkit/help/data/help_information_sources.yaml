@@ -7,8 +7,6 @@ _meta:
 index_and_intent:
   - file: reaxkit/help/data/help_intents.yaml
     role: "Canonical intent vocabulary (supplementary metadata; not the primary command index)."
-  - file: reaxkit/help/data/help_search_index.yaml
-    role: "Command search index and query normalization metadata."
 
 source_files_by_layer:
   generator_level:
@@ -48,13 +46,9 @@ source_files_by_layer:
 runtime_usage:
   module: reaxkit/help/help_index_loader.py
   functions:
-    - name: load_help_search_index
+    - name: normalize_help_query
       uses:
-        - reaxkit/help/data/help_search_index.yaml
-    - name: search_help_commands
-      uses:
-        - help_search_index.yaml:wording_alias
-        - help_search_index.yaml:commands
+        - reaxkit/help/data/help_intents.yaml:wording_alias
     - name: search_help_indices
       uses:
         - reaxff_input_files_contents.yaml
@@ -70,10 +64,78 @@ runtime_usage:
         - analysis_task_dataclass_map.yaml
     - name: build_help_relationship_report
       uses:
-        - help_search_index.yaml
+        - help_intents.yaml
+        - help_information_sources.yaml
         - reaxff_input_files_contents.yaml
         - reaxff_output_files_contents.yaml
         - reaxff_generator_capabilities.yaml
+        - common_generator_capabilities.yaml
         - analysis_task_dataclass_map.yaml
         - workflow_dataclass_map.yaml
         - reaxff_io_dataclass_map.yaml
+        - ams_io_dataclass_map.yaml
+        - lammps_io_dataclass_map.yaml
+
+Search_mechanism:
+  index_and_intent:
+    query_preprocessing:
+      - normalize
+      - lemmatize
+      - wording_alias expansion to canonical wording
+  generator_level:
+    searched_fields_in_descending_importance_order:
+      - aliases
+      - help_search_examples
+      - tags
+      - description
+      - notes
+    default_output_fields:
+      - title
+      - description
+      - notes
+      - how_to_use
+    all_info_output_fields:
+      - all generator fields
+  file_level:
+    search_order:
+      - source_files_by_layer.file_level.io.<engine>
+      - source_files_by_layer.file_level.mapping.<engine>
+    searched_fields_in_descending_importance_order:
+      - aliases
+      - help_search_examples
+      - tags
+      - description
+      - notes
+    default_output_fields:
+      - file_to_dataclass statement using mapping:file_to_dataclass_across_loaders_and_writers
+    all_info_output_fields:
+      - all file fields from io file entry
+      - all loader/writer usage fields from mapping file
+  analyzer_level:
+    searched_fields_in_descending_importance_order:
+      - aliases
+      - help_search_examples
+      - tags
+      - description
+      - notes
+    default_output_fields:
+      - title
+      - consumes_dataclass
+      - description
+      - notes
+      - how_to_use
+    all_info_output_fields:
+      - all analyzer fields
+  workflow_level:
+    searched_fields_in_descending_importance_order:
+      - aliases
+      - help_search_examples
+      - tags
+      - description
+      - notes
+    default_output_fields:
+      - title
+      - description
+      - notes
+    all_info_output_fields:
+      - all workflow fields

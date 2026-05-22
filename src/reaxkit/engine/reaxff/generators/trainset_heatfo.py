@@ -11,7 +11,7 @@ import os
 import re
 
 from reaxkit.core.constants import const
-from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.geo_generator import xtob
 from reaxkit.engine.reaxff.generators.trainset_mp import (
     mp_collect_heatfo_docs,

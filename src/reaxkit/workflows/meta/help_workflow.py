@@ -18,9 +18,9 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "Interactive help and discovery for ReaxKit commands and file semantics.\n\n"
         "Examples:\n"
         "  reaxkit help \"msd\"\n"
-        "  reaxkit help \"bond order\" --top 12\n"
+        "  reaxkit help \"bond order\"\n"
         "  reaxkit help \"restraint\" --engine reaxff\n"
-        "  reaxkit help \"fort.7\" --why --tags\n"
+        "  reaxkit help \"fort.7\" --all-info\n"
         "  reaxkit help \"xmolout\" --all-info"
     )
 
@@ -31,12 +31,6 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         help="Search query (use quotes for multi-word queries).",
     )
 
-    p.add_argument(
-        "--top",
-        type=int,
-        default=8,
-        help="Maximum number of matches to display (for capability and file matches).",
-    )
     p.add_argument(
         "--min-score",
         type=float,
@@ -51,20 +45,11 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         help="Optional engine context (example: reaxff) for dataclass-to-file mappings.",
     )
 
-    # Output detail toggles for file-index results
-    p.add_argument("--why", action="store_true", help="Show why each file matched the query.")
-    p.add_argument("--file_templates", action="store_true", help="Show one example command per file match.")
-    p.add_argument("--tags", action="store_true", help="Show tags for each file match.")
-    p.add_argument("--core-vars", dest="core_vars", action="store_true", help="Show core variables.")
-    p.add_argument("--optional-vars", dest="optional_vars", action="store_true", help="Show optional variables.")
-    p.add_argument("--derived-vars", dest="derived_vars", action="store_true", help="Show derived variables.")
-    p.add_argument("--notes", action="store_true", help="Show notes for each file match.")
-
     p.add_argument(
         "--all-info",
         dest="all_info",
         action="store_true",
-        help="Show why/file_templates/tags/core/optional/derived/notes all at once.",
+        help="Show detailed implementation and file/dataclass/analyzer mapping information.",
     )
 
 
@@ -78,57 +63,18 @@ def run_main(args: argparse.Namespace) -> None:
         return
 
     from reaxkit.help.help_index_loader import (
-        _format_command_hits,
-        _format_hits,
-        search_help_indices,
-        search_help_commands,
+        build_help_relationship_report,
     )
-
-    command_hits = search_help_commands(
-        args.query,
-        top_k=getattr(args, "top", 8),
-        min_score=getattr(args, "min_score", 35.0),
-    )
-    file_hits = search_help_indices(
-        args.query,
-        top_k=getattr(args, "top", 8),
-        min_score=getattr(args, "min_score", 35.0),
-    )
-
-    if not command_hits and not file_hits:
-        print(f"No matches for: {args.query!r}")
-        return
-
-    all_info = getattr(args, "all_info", False)
-    show_why = all_info or getattr(args, "why", False)
-    show_examples = all_info or getattr(args, "file_templates", False)
-    show_tags = all_info or getattr(args, "tags", False)
-    show_core_vars = all_info or getattr(args, "core_vars", False)
-    show_optional_vars = all_info or getattr(args, "optional_vars", False)
-    show_derived_vars = all_info or getattr(args, "derived_vars", False)
-    show_notes = all_info or getattr(args, "notes", False)
 
     engine = getattr(args, "engine", None) or "reaxff"
-
-    if command_hits:
-        print(_format_command_hits(command_hits))
-        if file_hits:
-            print("\n-------------")
-
-    if file_hits:
-        print(
-            _format_hits(
-                file_hits,
-                show_why=show_why,
-                show_examples=show_examples,
-                show_tags=show_tags,
-                show_core_vars=show_core_vars,
-                show_optional_vars=show_optional_vars,
-                show_derived_vars=show_derived_vars,
-                show_notes=show_notes,
-                engine=engine,
-            )
-        )
+    report = build_help_relationship_report(
+        args.query,
+        top_k=8,
+        min_score=getattr(args, "min_score", 35.0),
+        engine=engine,
+        all_info=bool(getattr(args, "all_info", False)),
+    )
+    print(report)
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:

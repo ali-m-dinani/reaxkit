@@ -12,7 +12,7 @@ import os
 
 from mp_api.client import MPRester
 
-from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import CellSpec
 from reaxkit.engine.reaxff.generators.trainset_yaml import write_trainset_settings_yaml
 

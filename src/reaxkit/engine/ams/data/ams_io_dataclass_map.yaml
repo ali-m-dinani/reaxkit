@@ -270,3 +270,164 @@ loaders:
         - zx
         - zy
     notes: []
+file_to_dataclass_across_loaders_and_writers:
+  '*.kf':
+    primary_files:
+    - kind: loader
+      name: load_kf
+      dataclass: KFFile handle (internal)
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    - kind: loader
+      name: load_atom_temperature
+      dataclass: AtomTemperatureData
+    - kind: loader
+      name: load_atom_strain_energy
+      dataclass: AtomStrainEnergyData
+    - kind: loader
+      name: load_molecular_analysis
+      dataclass: MolecularAnalysisData
+    - kind: loader
+      name: load_stress
+      dataclass: StressData
+    supplemental_files: []
+    output_files: []
+  '*.rkf':
+    primary_files:
+    - kind: loader
+      name: load_kf
+      dataclass: KFFile handle (internal)
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    - kind: loader
+      name: load_atom_temperature
+      dataclass: AtomTemperatureData
+    - kind: loader
+      name: load_atom_strain_energy
+      dataclass: AtomStrainEnergyData
+    - kind: loader
+      name: load_molecular_analysis
+      dataclass: MolecularAnalysisData
+    - kind: loader
+      name: load_stress
+      dataclass: StressData
+    supplemental_files: []
+    output_files: []
+  reaxout.kf:
+    primary_files:
+    - kind: loader
+      name: load_kf
+      dataclass: KFFile handle (internal)
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    - kind: loader
+      name: load_atom_temperature
+      dataclass: AtomTemperatureData
+    - kind: loader
+      name: load_atom_strain_energy
+      dataclass: AtomStrainEnergyData
+    - kind: loader
+      name: load_molecular_analysis
+      dataclass: MolecularAnalysisData
+    - kind: loader
+      name: load_stress
+      dataclass: StressData
+    supplemental_files: []
+    output_files: []
+  reaxout.rkf:
+    primary_files:
+    - kind: loader
+      name: load_kf
+      dataclass: KFFile handle (internal)
+    - kind: loader
+      name: load_trajectory
+      dataclass: TrajectoryData
+    - kind: loader
+      name: load_connectivity
+      dataclass: ConnectivityData
+    - kind: loader
+      name: load_connectivity_trajectory
+      dataclass: ConnectivityTrajectoryData
+    - kind: loader
+      name: load_simulation
+      dataclass: SimulationData
+    - kind: loader
+      name: load_partial_energy
+      dataclass: PartialEnergyData
+    - kind: loader
+      name: load_charges
+      dataclass: ChargeData
+    - kind: loader
+      name: load_atomic_kinematics
+      dataclass: AtomicKinematicsData
+    - kind: loader
+      name: load_atom_temperature
+      dataclass: AtomTemperatureData
+    - kind: loader
+      name: load_atom_strain_energy
+      dataclass: AtomStrainEnergyData
+    - kind: loader
+      name: load_molecular_analysis
+      dataclass: MolecularAnalysisData
+    - kind: loader
+      name: load_stress
+      dataclass: StressData
+    supplemental_files: []
+    output_files: []

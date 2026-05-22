@@ -1,16 +1,12 @@
-# Structured descriptions of ReaxFF output files and the data they contain.
-# Used by the CLI to provide file-aware help, variable discovery, and validation.
-# The Python API consumes this metadata for introspection, analysis routing, and documentation generation.
-
 _meta:
   version: '1.0'
   comment: generated using reaxff_output_files_contents.xlsx
   last_updated: '2026-05-21'
 files:
   energylog:
-    description: 'Energy log written during MD by AMS: iteration/time and per-term energy contributions, which resembles fort.73
-      in structure.'
-    implementation_module: reaxkit.engine.reaxff.io.fort73_handler
+    description: 'Energy log written during MD by AMS: iteration/time and per-term
+      energy contributions, which resembles fort.73 in structure.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort73_handler: load_partial_energy'
     aliases:
     - energy log
     - partial energy log
@@ -34,10 +30,12 @@ files:
     - monitoring MD stability
     notes:
     - The output-frequency to fort.73 is regulated by control-file keyword iout1
-    - The sum of these terms should be the same as the number in the Epot-column in fort.71.
+    - The sum of these terms should be the same as the number in the Epot-column in
+      fort.71.
   fort.13:
-    description: 'Force-field optimization error summary: reports total error (objective) for the current force field.'
-    implementation_module: reaxkit.engine.reaxff.io.fort13_handler
+    description: 'Force-field optimization error summary: reports total error (objective)
+      for the current force field.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort13_handler: load_force_field_optimization'
     aliases:
     - force field optimization error
     - fort 13
@@ -57,8 +55,9 @@ files:
     best_for:
     - monitor optimization error
   fort.57:
-    description: 'MM/minimization progress log: iteration, potential energy, RMS force (RMSG), and optimizer diagnostics.'
-    implementation_module: reaxkit.engine.reaxff.io.fort57_handler
+    description: 'MM/minimization progress log: iteration, potential energy, RMS force
+      (RMSG), and optimizer diagnostics.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort57_handler: load_geometry_optimization'
     aliases:
     - minimization progress
     - fort 57
@@ -83,11 +82,12 @@ files:
     - minimization convergence
     notes:
     - When RMSG drops below the value of control-file keyword endmm the MM run terminates.
-    - Alternatively, the run terminates when the maximum number of iterations (control-file keyword maxit) has been reached.
+    - Alternatively, the run terminates when the maximum number of iterations (control-file
+      keyword maxit) has been reached.
   fort.58:
-    description: 'MM/minimization energy-term report: iteration and partial energy contribution table, which resembles fort.73
-      in structure.'
-    implementation_module: reaxkit.engine.reaxff.io.fort73_handler
+    description: 'MM/minimization energy-term report: iteration and partial energy
+      contribution table, which resembles fort.73 in structure.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort73_handler: load_partial_energy'
     aliases:
     - minimization energy terms
     - fort 58
@@ -109,9 +109,9 @@ files:
     best_for:
     - energy breakdown in MM runs
   fort.7:
-    description: 'Connectivity (bond-order) table: per-atom neighbor list, bond orders, molecule IDs, charges (only bonds
-      above a cutoff are stored).'
-    implementation_module: reaxkit.engine.reaxff.io.fort7_handler
+    description: 'Connectivity (bond-order) table: per-atom neighbor list, bond orders,
+      molecule IDs, charges (only bonds above a cutoff are stored).'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort7_handler: load_connectivity'
     aliases:
     - connectivity file
     - bond order table
@@ -142,22 +142,25 @@ files:
     - Number of lone pairs
     - Partial charge
     derived_vars:
-    - coordination workflow (accessed through CLI by reaxkit coord) analyzes and relabels atoms based on their coordination
-      status
-    - electrostatics workflow (accessed through CLI by reaxkit elect) obtains dipole moments, polarization, hysteresis, etc.
+    - coordination workflow (accessed through CLI by reaxkit coord) analyzes and relabels
+      atoms based on their coordination status
+    - electrostatics workflow (accessed through CLI by reaxkit elect) obtains dipole
+      moments, polarization, hysteresis, etc.
     best_for:
     - bonding topology
     - species tracking
     - electrostatics
     notes:
-    - This file gets updated with the same frequency as the xmolout-file; every iout2 iterations during MD simulations or
-      every iout4 iterations during an MM-run.
-    - fort.7 contains only the bonds with a bond order greater then control-file keyword cutof2.
-    - fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though,
-      causes output to these files to get appended.
+    - This file gets updated with the same frequency as the xmolout-file; every iout2
+      iterations during MD simulations or every iout4 iterations during an MM-run.
+    - fort.7 contains only the bonds with a bond order greater then control-file keyword
+      cutof2.
+    - fort.7 and fort.8 get overwritten by the most recent information. Setting control-file
+      keyword iappen to 1, though, causes output to these files to get appended.
   fort.73:
-    description: 'Energy-term output: iteration/time and partial energy contributions (bonded, nonbonded, total).'
-    implementation_module: reaxkit.engine.reaxff.io.fort73_handler
+    description: 'Energy-term output: iteration/time and partial energy contributions
+      (bonded, nonbonded, total).'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort73_handler: load_partial_energy'
     aliases:
     - partial energy
     - energy terms
@@ -180,11 +183,12 @@ files:
     - run diagnostics
     notes:
     - The output-frequency to fort.73 is regulated by control-file keyword iout1
-    - The sum of these terms should be the same as the number in the Epot-column in fort.71.
+    - The sum of these terms should be the same as the number in the Epot-column in
+      fort.71.
   fort.74:
-    description: 'MM/FF-optimization summary table: per-structure/epoch values such as minimum energy, heat of formation,
-      volume, and density.'
-    implementation_module: reaxkit.engine.reaxff.io.fort74_handler
+    description: 'MM/FF-optimization summary table: per-structure/epoch values such
+      as minimum energy, heat of formation, volume, and density.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort74_handler: load_structure_summary'
     aliases:
     - structure summary
     - heat of formation summary
@@ -208,14 +212,16 @@ files:
     - volume
     - density
     derived_vars:
-    - in conjunction with fort.99, it is used to obtain energy-volume data and bulk modulus
+    - in conjunction with fort.99, it is used to obtain energy-volume data and bulk
+      modulus
     best_for:
     - tabulated MM/optimization summary
     - EOS
     - equation of state. bulk modulus
   fort.76:
-    description: 'Restraint output: iteration, restraint energy, potential energy, and target vs actual restraint distances.'
-    implementation_module: reaxkit.engine.reaxff.io.fort76_handler
+    description: 'Restraint output: iteration, restraint energy, potential energy,
+      and target vs actual restraint distances.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort76_handler: load_restraints'
     aliases:
     - restraint output
     - restraint diagnostics
@@ -239,8 +245,9 @@ files:
     best_for:
     - restraint diagnostics
   fort.78:
-    description: 'Electric-field output: iteration, field components/magnitudes and the associated electric-field energy term.'
-    implementation_module: reaxkit.engine.reaxff.io.fort78_handler
+    description: 'Electric-field output: iteration, field components/magnitudes and
+      the associated electric-field energy term.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort78_handler: load_electric_field'
     aliases:
     - electric field output
     - electric field data
@@ -266,9 +273,9 @@ files:
     - field schedule diagnostics
     - polarization hysteresis
   fort.79:
-    description: 'FF-optimization parabola-fit report: logs parameter trial values, fitted parabola coefficients, optimum
-      estimate, and error values.'
-    implementation_module: reaxkit.engine.reaxff.io.fort79_handler
+    description: 'FF-optimization parabola-fit report: logs parameter trial values,
+      fitted parabola coefficients, optimum estimate, and error values.'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort79_handler: load_parameter_optimization_diagnostic'
     aliases:
     - parameter optimization diagnostic
     - parabola fit report
@@ -295,12 +302,12 @@ files:
     best_for:
     - debug/inspect optimization steps
     notes:
-    - This file contains the report from the parabolic extrapolation procedure used by ReaxFF to optimize the force field
-      parameters.
+    - This file contains the report from the parabolic extrapolation procedure used
+      by ReaxFF to optimize the force field parameters.
   fort.8:
-    description: Connectivity (bond-order) table similar to fort.7, typically updated at a given frequency and overwritten
-      by the latest snapshot.
-    implementation_module: reaxkit.engine.reaxff.io.fort7_handler
+    description: Connectivity (bond-order) table similar to fort.7, typically updated
+      at a given frequency and overwritten by the latest snapshot.
+    implementation_module: 'reaxkit.engine.reaxff.io.fort7_handler: file_handler'
     aliases:
     - latest connectivity snapshot
     - bond order snapshot
@@ -330,14 +337,14 @@ files:
     best_for:
     - latest bonding snapshot
     notes:
-    - This file gets updated with the same frequency as the xmolout-file; every iout2 iterations during MD simulations or
-      every iout4 iterations during an MM-run.
-    - fort.7 and fort.8 get overwritten by the most recent information. Setting control-file keyword iappen to 1, though,
-      causes output to these files to get appended.
+    - This file gets updated with the same frequency as the xmolout-file; every iout2
+      iterations during MD simulations or every iout4 iterations during an MM-run.
+    - fort.7 and fort.8 get overwritten by the most recent information. Setting control-file
+      keyword iappen to 1, though, causes output to these files to get appended.
   fort.99:
-    description: 'FF-optimization results summary: reports optimized ffield values and reference/target comparison metrics
-      (e.g., QM/literature targets).'
-    implementation_module: reaxkit.engine.reaxff.io.fort99_handler
+    description: 'FF-optimization results summary: reports optimized ffield values
+      and reference/target comparison metrics (e.g., QM/literature targets).'
+    implementation_module: 'reaxkit.engine.reaxff.io.fort99_handler: load_force_field_optimization_report'
     aliases:
     - force field optimization report
     - training set report
@@ -352,7 +359,8 @@ files:
     - results
     - summary
     core_vars:
-    - ff-optimization results (ffield value, QM/literature value, weight, error, total error)
+    - ff-optimization results (ffield value, QM/literature value, weight, error, total
+      error)
     derived_vars:
     - equation of state, bulk modulus, etc.
     best_for:
@@ -361,9 +369,9 @@ files:
     - equation of state
     - bulk modulus
   moldyn.vel:
-    description: 'MD restart file (latest): coordinates, velocities, accelerations, and temperature state for restarting a
-      run.'
-    implementation_module: reaxkit.engine.reaxff.io.vels_handler
+    description: 'MD restart file (latest): coordinates, velocities, accelerations,
+      and temperature state for restarting a run.'
+    implementation_module: 'reaxkit.engine.reaxff.io.vels_handler: load_atomic_kinematics'
     aliases:
     - restart velocities
     - moldyn velocities
@@ -387,8 +395,9 @@ files:
     best_for:
     - restart MD
   molfra.out:
-    description: 'Molecular species report: per-iteration species counts/fractions (molecule fragments) during MD.'
-    implementation_module: reaxkit.engine.reaxff.io.molfra_handler
+    description: 'Molecular species report: per-iteration species counts/fractions
+      (molecule fragments) during MD.'
+    implementation_module: 'reaxkit.engine.reaxff.io.molfra_handler: load_molecular_analysis'
     aliases:
     - molecular species report
     - molecule fragments
@@ -403,15 +412,16 @@ files:
     - fragments
     - md
     core_vars:
-    - molecular species report (iteration, frequency, molecular formula, molecular mass, total molecules, total atoms, total
-      molecular mass)
+    - molecular species report (iteration, frequency, molecular formula, molecular
+      mass, total molecules, total atoms, total molecular mass)
     derived_vars:
     - 'ReaxKit: species time series; plot counts vs iteration'
     best_for:
     - species evolution
   molsav.####:
-    description: 'MD restart snapshots written periodically: same contents as moldyn.vel but saved with an index.'
-    implementation_module: reaxkit.engine.reaxff.io.vels_handler
+    description: 'MD restart snapshots written periodically: same contents as moldyn.vel
+      but saved with an index.'
+    implementation_module: 'reaxkit.engine.reaxff.io.vels_handler: load_atomic_kinematics'
     aliases:
     - restart snapshot
     - molsav snapshot
@@ -435,9 +445,10 @@ files:
     best_for:
     - restart from earlier point
   summary:
-    description: 'Compact run summary time series: iteration/time plus global quantities like temperature, pressure, density,
-      volume, potential energy, and molecule count.'
-    implementation_module: reaxkit.engine.reaxff.io.summary_handler
+    description: 'Compact run summary time series: iteration/time plus global quantities
+      like temperature, pressure, density, volume, potential energy, and molecule
+      count.'
+    implementation_module: 'reaxkit.engine.reaxff.io.summary_handler: load_simulation'
     aliases:
     - simulation summary
     - run summary
@@ -467,9 +478,9 @@ files:
     best_for:
     - quick run monitoring
   xmolout:
-    description: 'Trajectory output: per-frame atomic positions; may also include cell parameters and per-frame energies;
-      optional velocities/molecule IDs.'
-    implementation_module: reaxkit.engine.reaxff.io.xmolout_handler
+    description: 'Trajectory output: per-frame atomic positions; may also include
+      cell parameters and per-frame energies; optional velocities/molecule IDs.'
+    implementation_module: 'reaxkit.engine.reaxff.io.xmolout_handler: load_trajectory'
     aliases:
     - trajectory output
     - trajectory coordinates
@@ -510,17 +521,19 @@ files:
     - MSD (mean square displacement)
     - RDF (radial distribution function)
     - diffusion coefficient
-    - connectivity workflow is used to analyze and relabel the coordination status of atoms (xmolout is used in conjunction
-      with fort.7)
-    - electrostatics workflow is used to obtain dipole moments, polarizations, etc. (xmolout is used in conjunction with fort.7)
-    - spatial-property direct commands are used to plot charge or connectivity values on atomic coordinates (for example atom_property_plot3d
-      and atom_property_heatmap2d)
+    - connectivity workflow is used to analyze and relabel the coordination status
+      of atoms (xmolout is used in conjunction with fort.7)
+    - electrostatics workflow is used to obtain dipole moments, polarizations, etc.
+      (xmolout is used in conjunction with fort.7)
+    - spatial-property direct commands are used to plot charge or connectivity values
+      on atomic coordinates (for example atom_property_plot3d and atom_property_heatmap2d)
     best_for:
     - trajectory analysis
     - structure evolution
     notes:
-    - In MD-runs, the frequency of structure output to xmolout is controlled by the control-file keyword iout2; a frame is
-      saved every iout2 MD-iterations.
+    - In MD-runs, the frequency of structure output to xmolout is controlled by the
+      control-file keyword iout2; a frame is saved every iout2 MD-iterations.
     - In a similar way, iout4 controls the frame output frequency during MM simulations.
-    - If the ixmolo control-switch has a value of 1 additional velocity and molecule number output is generated in the xmolout-file.
+    - If the ixmolo control-switch has a value of 1 additional velocity and molecule
+      number output is generated in the xmolout-file.
     - Optional fields depend on control settings and build options.

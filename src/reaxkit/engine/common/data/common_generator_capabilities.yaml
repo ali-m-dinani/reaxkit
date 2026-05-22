@@ -1,30 +1,26 @@
-# Searchable capability index for engine-common generator functions.
-# Used by `reaxkit help` to discover generator-side features shared across
-# engines, then link those features to source generator modules.
-
 _meta:
-  version: "1.0"
-  source: "reaxkit.engine.common.generators.*"
-  purpose: "Maps engine-common generator functions to searchable capabilities and workflow links."
-  last_updated: "2026-05-22"
-
+  version: '1.0'
+  source: reaxkit.engine.common.generators.*
+  purpose: Maps engine-common generator functions to searchable capabilities and workflow
+    links.
+  last_updated: '2026-05-22'
 generators:
   write_xyz_trajectory:
-    description: "Write a TrajectoryData object as a multi-frame XYZ trajectory file."
+    description: Write a TrajectoryData object as a multi-frame XYZ trajectory file.
     tags:
-      - xyz
-      - trajectory
-      - trajectory coordinates
-      - generator
-      - export
-      - engine common
-    implementation_module: reaxkit.engine.common.generators.xyz_generator
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    - xyz
+    - trajectory
+    - trajectory coordinates
+    - generator
+    - export
+    - engine common
+    implementation_module: 'reaxkit.engine.common.generators.xyz_generator: write_xyz_trajectory'
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
     notes: []
     aliases:
-      - write xyz trajectory
-      - export xyz trajectory
-      - generate xyz trajectory
+    - write xyz trajectory
+    - export xyz trajectory
+    - generate xyz trajectory
     help_search_examples:
-      - reaxkit help "write trajectory coordinates as xyz"
-      - export trajectory coordinates to xyz
+    - reaxkit help "write trajectory coordinates as xyz"
+    - export trajectory coordinates to xyz

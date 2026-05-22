@@ -13,7 +13,7 @@ from ase import Atoms
 from ase.geometry import cellpar_to_cell, cell_to_cellpar
 
 from reaxkit.engine.reaxff.generators.geo_generator import xtob
-from reaxkit.engine.common.geo_io import read_structure, write_structure
+from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import CellSpec
 
 

@@ -72,18 +72,17 @@ def register_generator_command(
 
 @lru_cache(maxsize=1)
 def _load_packaged_command_metadata() -> dict[str, dict[str, object]]:
-    """Load packaged command metadata from YAML."""
-    pkg = "reaxkit"
-    rel = "data/command_metadata.yaml"
+    """Load packaged command metadata from help YAML sources."""
+    pkg = "reaxkit.help.data"
+    rel = "help_search_index.yaml"
 
     try:
         with ir.files(pkg).joinpath(rel).open("r", encoding="utf-8") as f:
             doc = yaml.safe_load(f) or {}
-    except FileNotFoundError as e:
-        raise FileNotFoundError(
-            f"Could not find packaged command metadata at '{pkg}/{rel}'. "
-            "Make sure command_metadata.yaml is included as package data."
-        ) from e
+    except FileNotFoundError:
+        # help_search_index.yaml was deprecated in favor of layer-specific maps.
+        # Return an empty metadata map and let registries provide command names.
+        return {}
 
     raw_commands = doc.get("commands") or {}
     out: dict[str, dict[str, object]] = {}
@@ -95,7 +94,7 @@ def _load_packaged_command_metadata() -> dict[str, dict[str, object]]:
         out[str(name)] = {
             "kind": str(meta_map.get("kind") or "analysis"),
             "aliases": tuple(str(alias) for alias in aliases if str(alias)),
-            "help_text": str(meta_map.get("help") or ""),
+            "help_text": str(meta_map.get("desc") or meta_map.get("help") or ""),
         }
     return out
 

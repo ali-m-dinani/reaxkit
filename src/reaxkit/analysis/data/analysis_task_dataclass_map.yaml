@@ -1,9 +1,3 @@
-# Mapping between ReaxKit analysis task names and the dataclass each task consumes.
-# Used by help, introspection, and routing utilities to explain which prepared
-# data object is required before a task can run.
-# This metadata connects analysis capabilities to engine loader outputs; it is
-# not the command registry and does not define CLI dispatch.
-
 _meta:
   version: '1.0'
   source: analysis task required_data declarations
@@ -12,9 +6,11 @@ _meta:
 tasks:
   active_site_events:
     consumes_dataclass: ConnectivityTrajectoryData
-    implementation_module: reaxkit.analysis.active_sites.events
-    description: Detects time-resolved active-site events from connectivity trajectories by comparing bonded environments across frames. Use it to identify when selected sites form, break, or reorganize bonds during reactive simulations.
-    related_workflow_module: reaxkit.workflows.active_site_workflow
+    implementation_module: 'reaxkit.analysis.active_sites.events: active_site_events'
+    description: Detects time-resolved active-site events from connectivity trajectories
+      by comparing bonded environments across frames. Use it to identify when selected
+      sites form, break, or reorganize bonds during reactive simulations.
+    related_workflow_module: 'reaxkit.workflows.active_site_workflow: active_site_events'
     tags:
     - active site
     - connectivity trajectory
@@ -27,9 +23,11 @@ tasks:
     - run active site events
   active_site_structural:
     consumes_dataclass: ConnectivityTrajectoryData
-    implementation_module: reaxkit.analysis.active_sites.structural
-    description: Computes structural descriptors for active sites across frames using trajectory-aligned connectivity data. It summarizes local neighbor counts, bonding patterns, and structural states around selected reactive sites.
-    related_workflow_module: reaxkit.workflows.active_site_workflow
+    implementation_module: 'reaxkit.analysis.active_sites.structural: active_site_structural'
+    description: Computes structural descriptors for active sites across frames using
+      trajectory-aligned connectivity data. It summarizes local neighbor counts, bonding
+      patterns, and structural states around selected reactive sites.
+    related_workflow_module: 'reaxkit.workflows.active_site_workflow: active_site_structural'
     tags:
     - active site
     - connectivity trajectory
@@ -42,9 +40,11 @@ tasks:
     - run active site structural
   atomic_kinematics:
     consumes_dataclass: AtomicKinematicsData
-    implementation_module: reaxkit.analysis.kinematics.kinematics
-    description: Extracts per-atom kinematic quantities from velocity or restart-derived data. Use it to analyze atom-level motion, velocity components, acceleration-like values, and spatially resolved dynamics.
-    related_workflow_module: reaxkit.workflows.kinematics_workflow
+    implementation_module: 'reaxkit.analysis.kinematics.kinematics: atomic_kinematics'
+    description: Extracts per-atom kinematic quantities from velocity or restart-derived
+      data. Use it to analyze atom-level motion, velocity components, acceleration-like
+      values, and spatially resolved dynamics.
+    related_workflow_module: 'reaxkit.workflows.kinematics_workflow: kinematics'
     tags:
     - atomic kinematics
     - analysis
@@ -64,9 +64,11 @@ tasks:
     - run atomic kinematics plot3d
   bond_events:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.connectivity
-    description: Identifies bond formation and bond breaking events by comparing connectivity records. It helps convert raw bond-order snapshots into reaction-event tables for later filtering and interpretation.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: bond_events'
+    description: Identifies bond formation and bond breaking events by comparing connectivity
+      records. It helps convert raw bond-order snapshots into reaction-event tables
+      for later filtering and interpretation.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
     tags:
     - connectivity
     - bond order
@@ -79,9 +81,11 @@ tasks:
     - run bond events
   cell_dimensions:
     consumes_dataclass: SimulationData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns time series for simulation cell lengths, angles, and related box dimensions. Use it to inspect expansion, compression, deformation, or volume-coupled behavior in ReaxFF runs.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: cell_dimensions'
+    description: Returns time series for simulation cell lengths, angles, and related
+      box dimensions. Use it to inspect expansion, compression, deformation, or volume-coupled
+      behavior in ReaxFF runs.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - cell dimensions
@@ -89,9 +93,11 @@ tasks:
     notes: []
   charge_series:
     consumes_dataclass: ChargeData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns time series of selected atomic charges from parsed ReaxFF charge output. It is useful for following charge transfer, local oxidation changes, and atom-specific electrostatic behavior.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: charge_series'
+    description: Returns time series of selected atomic charges from parsed ReaxFF
+      charge output. It is useful for following charge transfer, local oxidation changes,
+      and atom-specific electrostatic behavior.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - charges
@@ -99,9 +105,11 @@ tasks:
     notes: []
   charge_table:
     consumes_dataclass: ChargeData
-    implementation_module: reaxkit.analysis.electrostatics.charges
-    description: Builds tabular views of atomic charge values with atom-indexed rows and frame-aware values. Use it to inspect, filter, export, or plot charge data outside the raw ReaxFF output format.
-    related_workflow_module: reaxkit.workflows.electrostatics_workflow
+    implementation_module: 'reaxkit.analysis.electrostatics.charges: charge_table'
+    description: Builds tabular views of atomic charge values with atom-indexed rows
+      and frame-aware values. Use it to inspect, filter, export, or plot charge data
+      outside the raw ReaxFF output format.
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
     tags:
     - electrostatics
     - charges
@@ -115,9 +123,11 @@ tasks:
     - run charge table
   connection_list:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.connectivity
-    description: Outputs connectivity neighbor lists and bond-order pairs from parsed ReaxFF connectivity data. It exposes the raw bonded relationships that feed coordination, hybridization, and bond-event analyses.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_list'
+    description: Outputs connectivity neighbor lists and bond-order pairs from parsed
+      ReaxFF connectivity data. It exposes the raw bonded relationships that feed
+      coordination, hybridization, and bond-event analyses.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_list'
     tags:
     - connectivity
     - connections
@@ -130,9 +140,11 @@ tasks:
     - run connection list
   connection_stats:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.connectivity
-    description: Computes summary statistics over connectivity data, including bond counts, neighbor counts, and bond-order-derived measures. Use it for compact comparisons across frames or simulations.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_stats'
+    description: Computes summary statistics over connectivity data, including bond
+      counts, neighbor counts, and bond-order-derived measures. Use it for compact
+      comparisons across frames or simulations.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_stats'
     tags:
     - connectivity
     - connections
@@ -145,9 +157,11 @@ tasks:
     - run connection stats
   connection_table:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.connectivity
-    description: Builds a table representation of connectivity records with atoms, neighbors, bond orders, and frame context. This makes connectivity output easier to query, export, and join with other atom-level data.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_table'
+    description: Builds a table representation of connectivity records with atoms,
+      neighbors, bond orders, and frame context. This makes connectivity output easier
+      to query, export, and join with other atom-level data.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_table'
     tags:
     - connectivity
     - connections
@@ -160,18 +174,22 @@ tasks:
     - run connection table
   control_value:
     consumes_dataclass: ControlParametersData
-    implementation_module: reaxkit.analysis.control.control
-    description: Reads and returns values for control-file keywords from structured control-parameter data. Use it to verify simulation settings, compare control files, or expose individual ReaxFF options in scripts.
-    related_workflow_module: reaxkit.workflows.file_tools.control_workflow
+    implementation_module: 'reaxkit.analysis.control.control: control_value'
+    description: Reads and returns values for control-file keywords from structured
+      control-parameter data. Use it to verify simulation settings, compare control
+      files, or expose individual ReaxFF options in scripts.
+    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
     tags:
     - control file
     - control parameters
     notes: []
   coordination:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.coordination
-    description: Computes coordination numbers and local neighbor environments from connectivity data. It labels atom environments by neighbor counts or bonding context for structural classification and downstream relabeling.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.coordination: coordination'
+    description: Computes coordination numbers and local neighbor environments from
+      connectivity data. It labels atom environments by neighbor counts or bonding
+      context for structural classification and downstream relabeling.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: coordination'
     tags:
     - connectivity
     - coordination
@@ -183,9 +201,11 @@ tasks:
     - run coordination
   dipole:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: reaxkit.analysis.electrostatics.electrostatics
-    description: Computes dipole-moment metrics from electrostatics inputs that combine coordinates, charges, connectivity, and optional field data. Use it to quantify molecular or system-level charge separation over time.
-    related_workflow_module: reaxkit.workflows.electrostatics_workflow
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: dipole'
+    description: Computes dipole-moment metrics from electrostatics inputs that combine
+      coordinates, charges, connectivity, and optional field data. Use it to quantify
+      molecular or system-level charge separation over time.
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
     tags:
     - electrostatics
     - dipole
@@ -197,18 +217,22 @@ tasks:
     - run dipole
   dihedral:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.dihedral
-    description: Computes dihedral-angle trajectories for selected atom quartets from trajectory coordinates. It helps track torsional motion, conformational changes, and geometry evolution during a simulation.
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.dihedral: dihedral'
+    description: Computes dihedral-angle trajectories for selected atom quartets from
+      trajectory coordinates. It helps track torsional motion, conformational changes,
+      and geometry evolution during a simulation.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
     tags:
     - trajectory
     - analysis
     notes: []
   diffusivity:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.diffusivity
-    description: Estimates diffusivity from trajectory displacement statistics, typically using mean-squared displacement behavior. Use it to turn atom motion into diffusion coefficients for selected species or atom groups.
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.diffusivity: diffusivity'
+    description: Estimates diffusivity from trajectory displacement statistics, typically
+      using mean-squared displacement behavior. Use it to turn atom motion into diffusion
+      coefficients for selected species or atom groups.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
     tags:
     - trajectory
     - diffusivity
@@ -221,9 +245,12 @@ tasks:
     - run diffusivity
   dominant_species:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.molecular_analysis.molecular_analysis
-    description: Finds the most frequent molecular species over time from molecular analysis output. It highlights dominant reactants, products, or persistent species in reactive simulations.
-    related_workflow_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
+      dominant_species'
+    description: Finds the most frequent molecular species over time from molecular
+      analysis output. It highlights dominant reactants, products, or persistent species
+      in reactive simulations.
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
     tags:
     - molecular analysis
     - dominant species
@@ -236,18 +263,22 @@ tasks:
     - run dominant species
   electric_field_series:
     consumes_dataclass: ElectricFieldData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns electric-field component and magnitude time series from parsed field data. Use it to inspect applied-field schedules and align field changes with polarization, charge, or structural response.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: electric_field_series'
+    description: Returns electric-field component and magnitude time series from parsed
+      field data. Use it to inspect applied-field schedules and align field changes
+      with polarization, charge, or structural response.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field
     notes: []
   eregime_series:
     consumes_dataclass: EregimeData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns time series fields parsed from eregime schedules. It connects generated electric-field regime inputs to analysis-ready tables that can be compared with simulation response.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: eregime_series'
+    description: Returns time series fields parsed from eregime schedules. It connects
+      generated electric-field regime inputs to analysis-ready tables that can be
+      compared with simulation response.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field regime
@@ -255,9 +286,11 @@ tasks:
     notes: []
   force_field_data:
     consumes_dataclass: ForceFieldParametersData
-    implementation_module: reaxkit.analysis.force_field.force_field
-    description: Extracts and structures force-field parameter sections from ffield-style data. Use it to inspect atom, bond, angle, torsion, and other ReaxFF parameter groups in a table-friendly form.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.force_field: force_field_data'
+    description: Extracts and structures force-field parameter sections from ffield-style
+      data. Use it to inspect atom, bond, angle, torsion, and other ReaxFF parameter
+      groups in a table-friendly form.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_data'
     tags:
     - force field
     - force field parameters
@@ -270,9 +303,11 @@ tasks:
     - run force field data
   force_field_optimization:
     consumes_dataclass: ForceFieldOptimizationProgressData
-    implementation_module: reaxkit.analysis.force_field.optimization
-    description: Analyzes force-field optimization progress across iterations using parsed training or optimization output. It helps evaluate convergence, objective changes, and the progression of fitted parameter sets.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.optimization: force_field_optimization'
+    description: Analyzes force-field optimization progress across iterations using
+      parsed training or optimization output. It helps evaluate convergence, objective
+      changes, and the progression of fitted parameter sets.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization'
     tags:
     - force field
     - force field optimization progress
@@ -285,9 +320,11 @@ tasks:
     - run force field optimization
   force_field_optimization_parameters:
     consumes_dataclass: ForceFieldOptimizationParameterData
-    implementation_module: reaxkit.analysis.params.params
-    description: Extracts optimizable parameter definitions, bounds, and metadata from params-style input. Use it to understand which ReaxFF parameters are active during force-field training.
-    related_workflow_module: reaxkit.workflows.params_workflow
+    implementation_module: 'reaxkit.analysis.params.params: force_field_optimization_parameters'
+    description: Extracts optimizable parameter definitions, bounds, and metadata
+      from params-style input. Use it to understand which ReaxFF parameters are active
+      during force-field training.
+    related_workflow_module: 'reaxkit.workflows.params_workflow: get-params'
     tags:
     - optimization parameters
     - force field
@@ -302,9 +339,11 @@ tasks:
     - get optimization parameters
   force_field_optimization_report:
     consumes_dataclass: ForceFieldOptimizationReportData
-    implementation_module: reaxkit.analysis.force_field.report
-    description: Builds report tables from final optimization outputs, including target comparisons, reference values, predicted values, and errors. It supports review of final force-field training quality.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report'
+    description: Builds report tables from final optimization outputs, including target
+      comparisons, reference values, predicted values, and errors. It supports review
+      of final force-field training quality.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report'
     tags:
     - force field
     - force field optimization report
@@ -317,9 +356,11 @@ tasks:
     - run force field optimization report
   force_field_optimization_report_bulk_modulus:
     consumes_dataclass: ForceFieldOptimizationReportData
-    implementation_module: reaxkit.analysis.force_field.report
-    description: Derives bulk-modulus metrics from optimization report data. Use it when training or validation includes elastic response, equation-of-state points, or pressure-volume behavior.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_bulk_modulus'
+    description: Derives bulk-modulus metrics from optimization report data. Use it
+      when training or validation includes elastic response, equation-of-state points,
+      or pressure-volume behavior.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report_bulk_modulus'
     tags:
     - force field
     - bulk modulus
@@ -333,9 +374,11 @@ tasks:
     - run force field optimization report bulk modulus
   force_field_optimization_report_eos:
     consumes_dataclass: ForceFieldOptimizationReportData
-    implementation_module: reaxkit.analysis.force_field.report
-    description: Derives equation-of-state relationships from force-field optimization report data. It is intended for energy-volume, pressure-volume, and related property curves in fitted force fields.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_eos'
+    description: Derives equation-of-state relationships from force-field optimization
+      report data. It is intended for energy-volume, pressure-volume, and related
+      property curves in fitted force fields.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report_eos'
     tags:
     - force field
     - equation of state
@@ -349,9 +392,11 @@ tasks:
     - run force field optimization report equation of state
   geometry_optimization_data:
     consumes_dataclass: GeometryOptimizationProgressData
-    implementation_module: reaxkit.analysis.timeseries.geometry_optimization
-    description: Returns geometry-minimization progress series such as potential energy, gradient metrics, and convergence indicators. Use it to inspect optimization stability and final relaxation quality.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.geometry_optimization: geometry_optimization_data'
+    description: Returns geometry-minimization progress series such as potential energy,
+      gradient metrics, and convergence indicators. Use it to inspect optimization
+      stability and final relaxation quality.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - geometry optimization
@@ -359,9 +404,11 @@ tasks:
     notes: []
   hybridization:
     consumes_dataclass: ConnectivityData
-    implementation_module: reaxkit.analysis.connectivity.hybridization
-    description: Assigns hybridization-like states from connectivity patterns and local neighbor environments. It provides a structural label useful for carbon-rich systems, bonding-state analysis, and atom relabeling.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.connectivity.hybridization: hybridization'
+    description: Assigns hybridization-like states from connectivity patterns and
+      local neighbor environments. It provides a structural label useful for carbon-rich
+      systems, bonding-state analysis, and atom relabeling.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: hybridization'
     tags:
     - connectivity
     - hybridization
@@ -373,9 +420,12 @@ tasks:
     - run hybridization
   largest_molecule_by_mass:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.molecular_analysis.molecular_analysis
-    description: Tracks the largest molecule by mass over time from molecular analysis data. Use it to study aggregation, polymerization, cluster growth, or fragmentation in reactive trajectories.
-    related_workflow_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
+      largest_molecule_by_mass'
+    description: Tracks the largest molecule by mass over time from molecular analysis
+      data. Use it to study aggregation, polymerization, cluster growth, or fragmentation
+      in reactive trajectories.
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: largest_molecule_by_mass'
     tags:
     - molecular analysis
     - largest molecule
@@ -388,9 +438,12 @@ tasks:
     - run largest molecule by mass
   largest_molecule_composition:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.molecular_analysis.molecular_analysis
-    description: Reports composition of the largest molecule over time, including atom counts or formula-like summaries where available. It complements largest-mass tracking by explaining what the dominant cluster contains.
-    related_workflow_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
+      largest_molecule_composition'
+    description: Reports composition of the largest molecule over time, including
+      atom counts or formula-like summaries where available. It complements largest-mass
+      tracking by explaining what the dominant cluster contains.
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: largest_molecule_composition'
     tags:
     - molecular analysis
     - largest molecule
@@ -403,9 +456,11 @@ tasks:
     - run largest molecule composition
   molecular_frequency_series:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns species-frequency time series from molecular analysis data. Use it to follow how counts of selected molecules, products, or intermediates change across frames.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: molecular_frequency_series'
+    description: Returns species-frequency time series from molecular analysis data.
+      Use it to follow how counts of selected molecules, products, or intermediates
+      change across frames.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular frequency
@@ -413,9 +468,11 @@ tasks:
     notes: []
   molecular_totals_series:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns totals series such as molecule count, atom count, and molecular mass from molecular analysis data. It provides compact aggregate trends for reaction or decomposition studies.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: molecular_totals_series'
+    description: Returns totals series such as molecule count, atom count, and molecular
+      mass from molecular analysis data. It provides compact aggregate trends for
+      reaction or decomposition studies.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular totals
@@ -423,9 +480,12 @@ tasks:
     notes: []
   molecule_isomer_detection:
     consumes_dataclass: GeometryData
-    implementation_module: reaxkit.analysis.molecular_analysis.isomer_detection
-    description: Detects isomeric variants from geometry-derived molecular graphs. Use it to distinguish structures with the same composition but different bonding topology or spatial arrangement.
-    related_workflow_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.analysis.molecular_analysis.isomer_detection:
+      molecule_isomer_detection'
+    description: Detects isomeric variants from geometry-derived molecular graphs.
+      Use it to distinguish structures with the same composition but different bonding
+      topology or spatial arrangement.
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
     tags:
     - molecular analysis
     - molecule isomer detection
@@ -433,9 +493,12 @@ tasks:
     notes: []
   molecule_lifetime:
     consumes_dataclass: MolecularAnalysisData
-    implementation_module: reaxkit.analysis.molecular_analysis.molecular_analysis
-    description: Estimates lifetimes of molecular species occurrences across frames or iterations. It is useful for separating transient intermediates from stable products in molecular analysis output.
-    related_workflow_module: reaxkit.workflows.molecular_analysis_workflow
+    implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
+      molecule_lifetime'
+    description: Estimates lifetimes of molecular species occurrences across frames
+      or iterations. It is useful for separating transient intermediates from stable
+      products in molecular analysis output.
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: molecule_lifetime'
     tags:
     - molecular analysis
     - molecule lifetime
@@ -448,9 +511,11 @@ tasks:
     - run molecule lifetime
   msd:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.msd
-    description: Computes mean-squared displacement time series from trajectory coordinates. Use it to quantify atom or species mobility and to prepare displacement data for diffusivity estimation.
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.msd: msd'
+    description: Computes mean-squared displacement time series from trajectory coordinates.
+      Use it to quantify atom or species mobility and to prepare displacement data
+      for diffusivity estimation.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: msd'
     tags:
     - trajectory
     - mean squared displacement
@@ -463,9 +528,11 @@ tasks:
     - calculate mean squared displacement from coordinates
   parameter_optimization_diagnostic:
     consumes_dataclass: ForceFieldOptimizationDiagnosticData
-    implementation_module: reaxkit.analysis.force_field.diagnostics
-    description: Summarizes per-parameter optimization diagnostics from force-field fitting output. It helps explain trial values, sensitivity behavior, fitted curves, and error changes for individual parameters.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.diagnostics: parameter_optimization_diagnostic'
+    description: Summarizes per-parameter optimization diagnostics from force-field
+      fitting output. It helps explain trial values, sensitivity behavior, fitted
+      curves, and error changes for individual parameters.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: parameter_optimization_diagnostic'
     tags:
     - force field
     - diagnostics
@@ -487,18 +554,22 @@ tasks:
     - run parameter optimization tornado
   partial_energy_series:
     consumes_dataclass: PartialEnergyData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns series for selected partial-energy components from parsed ReaxFF energy output. Use it to inspect how bond, angle, torsion, van der Waals, Coulomb, or other terms evolve over time.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: partial_energy_series'
+    description: Returns series for selected partial-energy components from parsed
+      ReaxFF energy output. Use it to inspect how bond, angle, torsion, van der Waals,
+      Coulomb, or other terms evolve over time.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - partial energy
     notes: []
   polarization:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: reaxkit.analysis.electrostatics.electrostatics
-    description: Computes polarization metrics from electrostatics data built from charges, coordinates, connectivity, and optional field values. It supports dielectric-response and field-driven charge-separation studies.
-    related_workflow_module: reaxkit.workflows.electrostatics_workflow
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization'
+    description: Computes polarization metrics from electrostatics data built from
+      charges, coordinates, connectivity, and optional field values. It supports dielectric-response
+      and field-driven charge-separation studies.
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
     tags:
     - electrostatics
     - polarization
@@ -510,9 +581,11 @@ tasks:
     - run polarization
   polarization_field:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: reaxkit.analysis.electrostatics.electrostatics
-    description: Analyzes polarization response versus applied electric field. Use it to relate field schedules to polarization curves, hysteresis behavior, or field-dependent electrostatic response.
-    related_workflow_module: reaxkit.workflows.electrostatics_workflow
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization_field'
+    description: Analyzes polarization response versus applied electric field. Use
+      it to relate field schedules to polarization curves, hysteresis behavior, or
+      field-dependent electrostatic response.
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization_field'
     tags:
     - electrostatics
     - polarization
@@ -524,9 +597,11 @@ tasks:
     - run hysteresis
   rdf:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.rdf
-    description: Computes radial distribution functions from trajectory coordinates and atom selections. It measures pair-correlation structure, local ordering, and neighbor-shell distances.
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.rdf: rdf'
+    description: Computes radial distribution functions from trajectory coordinates
+      and atom selections. It measures pair-correlation structure, local ordering,
+      and neighbor-shell distances.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: rdf'
     tags:
     - trajectory
     - radial distribution function
@@ -539,9 +614,11 @@ tasks:
     - compute radial distribution function from trajectory
   rdf_property:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.rdf
-    description: Computes property-resolved radial distribution functions from trajectory coordinates and atom-level properties. It combines structural distance distributions with values such as charge, type, or selected labels.
-    related_workflow_module: reaxkit.workflows.trajectory_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.rdf: rdf_property'
+    description: Computes property-resolved radial distribution functions from trajectory
+      coordinates and atom-level properties. It combines structural distance distributions
+      with values such as charge, type, or selected labels.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: rdf_property'
     tags:
     - trajectory
     - rdf property
@@ -557,9 +634,11 @@ tasks:
     - run rdf property
   restraint_series:
     consumes_dataclass: RestraintData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns restraint-related time series such as restraint energies, distances, angles, or other restraint measures parsed from fort.76. Use it to evaluate restraints created in GEO input workflows.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: restraint_series'
+    description: Returns restraint-related time series such as restraint energies,
+      distances, angles, or other restraint measures parsed from fort.76. Use it to
+      evaluate restraints created in GEO input workflows.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - restraint data
@@ -567,9 +646,11 @@ tasks:
     notes: []
   simulation_series:
     consumes_dataclass: SimulationData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns simulation-level scalar series such as temperature, pressure, volume, energy, density, and timestep values. It is the general time-series task for ReaxFF log-style simulation data.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: simulation_series'
+    description: Returns simulation-level scalar series such as temperature, pressure,
+      volume, energy, density, and timestep values. It is the general time-series
+      task for ReaxFF log-style simulation data.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - simulation data
@@ -577,9 +658,11 @@ tasks:
     notes: []
   structure_summary_data:
     consumes_dataclass: GeometrySummaryData
-    implementation_module: reaxkit.analysis.force_field.structure_summary
-    description: Extracts structure-level summary quantities from optimization outputs, including energy, heat of formation, volume, density, or related structural metrics. Use it to compare training-set structures.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.structure_summary: structure_summary_data'
+    description: Extracts structure-level summary quantities from optimization outputs,
+      including energy, heat of formation, volume, density, or related structural
+      metrics. Use it to compare training-set structures.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: structure_summary_data'
     tags:
     - force field
     - structure summary
@@ -593,9 +676,11 @@ tasks:
     - run structure summary data
   trainset_group_comments:
     consumes_dataclass: ForceFieldOptimizationTrainingSetData
-    implementation_module: reaxkit.analysis.force_field.trainset
-    description: Extracts and groups comments or category labels from training-set definitions. It helps understand how force-field training targets are organized by system, property, or reference-data source.
-    related_workflow_module: reaxkit.workflows.force_field_workflow
+    implementation_module: 'reaxkit.analysis.force_field.trainset: trainset_group_comments'
+    description: Extracts and groups comments or category labels from training-set
+      definitions. It helps understand how force-field training targets are organized
+      by system, property, or reference-data source.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: trainset_group_comments'
     tags:
     - force field
     - training set
@@ -610,9 +695,11 @@ tasks:
     - inspect training set categories
   trajectory_coordinate_series:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.analysis.timeseries.timeseries
-    description: Returns coordinate trajectories for selected atoms and axes from trajectory data. Use it to track atom positions, displacement paths, or coordinate components as time-series output.
-    related_workflow_module: reaxkit.workflows.timeseries_workflow
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: trajectory_coordinate_series'
+    description: Returns coordinate trajectories for selected atoms and axes from
+      trajectory data. Use it to track atom positions, displacement paths, or coordinate
+      components as time-series output.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
     tags:
     - time series
     - trajectory coordinates
@@ -628,9 +715,11 @@ tasks:
     - extract coordinates over trajectory
   trajectory_relabel_by_coordination:
     consumes_dataclass: ConnectivityTrajectoryData
-    implementation_module: reaxkit.analysis.trajectory.relabel
-    description: Relabels trajectory atoms using coordination-derived states from connectivity trajectory data. It connects local bonding analysis to trajectory files so atoms can be grouped by changing environments.
-    related_workflow_module: reaxkit.workflows.connectivity_workflow
+    implementation_module: 'reaxkit.analysis.trajectory.relabel: trajectory_relabel_by_coordination'
+    description: Relabels trajectory atoms using coordination-derived states from
+      connectivity trajectory data. It connects local bonding analysis to trajectory
+      files so atoms can be grouped by changing environments.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
     tags:
     - trajectory
     - coordination
@@ -645,9 +734,10 @@ tasks:
     - run coordination relabeling
   atom_property_heatmap2d:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.workflows.spatial_property_workflow
-    description: Plots atom-level properties as 2D spatial heatmaps. Use it to project atom-indexed values onto a plane and compare spatial gradients or hotspots.
-    related_workflow_module: reaxkit.workflows.spatial_property_workflow
+    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
+    description: Plots atom-level properties as 2D spatial heatmaps. Use it to project
+      atom-indexed values onto a plane and compare spatial gradients or hotspots.
+    related_workflow_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
     tags:
     - spatial property
     - heatmap2d
@@ -661,9 +751,11 @@ tasks:
     - run atom property heatmap2d
   atom_property_plot3d:
     consumes_dataclass: TrajectoryData
-    implementation_module: reaxkit.workflows.spatial_property_workflow
-    description: Plots atom-level properties in 3D using trajectory coordinates and per-atom values. It is useful for visualizing charges, velocities, coordination labels, or other atom-indexed quantities in space.
-    related_workflow_module: reaxkit.workflows.spatial_property_workflow
+    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_plot3d'
+    description: Plots atom-level properties in 3D using trajectory coordinates and
+      per-atom values. It is useful for visualizing charges, velocities, coordination
+      labels, or other atom-indexed quantities in space.
+    related_workflow_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_plot3d'
     tags:
     - spatial property
     - plot3d
