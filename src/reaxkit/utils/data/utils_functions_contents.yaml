@@ -1,0 +1,284 @@
+_meta:
+  version: '1.0'
+  source: reaxkit.utils.*
+  purpose: Searchable utility-function metadata for help discovery.
+  last_updated: '2026-05-22'
+
+utilities:
+  vinet_energy_ev:
+    description: Compute Vinet equation-of-state energy as a function of volume in eV units.
+    implementation_module: 'reaxkit.utils.equation_of_states: vinet_energy_ev'
+    aliases:
+    - vinet equation of state
+    - eos energy volume
+    - vinet energy
+    help_search_examples:
+    - reaxkit help "vinet equation of state energy"
+    - compute equation of state energy from volume
+    tags:
+    - utility
+    - equation of state
+    - vinet
+    - energy volume
+    notes: []
+    related_workflow_module: []
+
+  vinet_energy_trainset:
+    description: Compute legacy trainset-style Vinet energy using bulk modulus and reference volume inputs.
+    implementation_module: 'reaxkit.utils.equation_of_states: vinet_energy_trainset'
+    aliases:
+    - trainset equation of state
+    - vinet trainset energy
+    - elastic equation of state energy
+    help_search_examples:
+    - reaxkit help "trainset vinet equation of state"
+    - compute elastic trainset energy from equation of state
+    tags:
+    - utility
+    - equation of state
+    - trainset
+    - elastic
+    notes: []
+    related_workflow_module: []
+
+  write_table:
+    description: Export tabular rows to csv or xlsx files.
+    implementation_module: 'reaxkit.utils.export_utils: write_table'
+    aliases:
+    - export table
+    - write csv
+    - write xlsx
+    help_search_examples:
+    - reaxkit help "export table to csv"
+    - write xlsx table output
+    tags:
+    - utility
+    - export
+    - table
+    - csv
+    notes: []
+    related_workflow_module:
+    - reaxkit.workflows.meta.plotter_workflow
+
+  write_figure:
+    description: Export a plotly figure to png or jpeg image files.
+    implementation_module: 'reaxkit.utils.export_utils: write_figure'
+    aliases:
+    - export figure
+    - save figure image
+    - write plot image
+    help_search_examples:
+    - reaxkit help "save figure as png"
+    - export plot image as jpeg
+    tags:
+    - utility
+    - export
+    - figure
+    - plotly
+    notes: []
+    related_workflow_module:
+    - reaxkit.workflows.meta.plotter_workflow
+
+  autocorrelation:
+    description: Compute auto-correlation values for a one-dimensional signal.
+    implementation_module: 'reaxkit.utils.numerical.autocorrelation: autocorrelation'
+    aliases:
+    - auto correlation
+    - signal autocorrelation
+    help_search_examples:
+    - reaxkit help "signal autocorrelation"
+    - compute auto correlation for time series
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - autocorrelation
+    notes: []
+    related_workflow_module: []
+
+  autocorrelation_time:
+    description: Estimate integrated auto-correlation time from a one-dimensional signal.
+    implementation_module: 'reaxkit.utils.numerical.autocorrelation: autocorrelation_time'
+    aliases:
+    - autocorrelation time
+    - integrated autocorrelation time
+    help_search_examples:
+    - reaxkit help "autocorrelation time"
+    - estimate integrated auto correlation time
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - autocorrelation
+    notes: []
+    related_workflow_module: []
+
+  detrend_signal:
+    description: Remove mean or linear trend from a one-dimensional signal.
+    implementation_module: 'reaxkit.utils.numerical.fft: detrend_signal'
+    aliases:
+    - detrend signal
+    - remove linear trend
+    help_search_examples:
+    - reaxkit help "detrend signal"
+    - remove linear trend from time series
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - fft
+    notes: []
+    related_workflow_module: []
+
+  window_function:
+    description: Build standard FFT window arrays such as hann, hamming, or blackman.
+    implementation_module: 'reaxkit.utils.numerical.fft: window_function'
+    aliases:
+    - fft window
+    - signal window function
+    help_search_examples:
+    - reaxkit help "fft window function"
+    - generate hanning window for spectrum
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - fft
+    notes: []
+    related_workflow_module: []
+
+  fft_spectrum:
+    description: Compute frequency-domain spectrum for a one-dimensional signal.
+    implementation_module: 'reaxkit.utils.numerical.fft: fft_spectrum'
+    aliases:
+    - fft spectrum
+    - frequency spectrum
+    help_search_examples:
+    - reaxkit help "fft spectrum"
+    - compute frequency spectrum from signal
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - fft
+    notes: []
+    related_workflow_module: []
+
+  dominant_frequency:
+    description: Find dominant spectral frequency from a one-dimensional signal.
+    implementation_module: 'reaxkit.utils.numerical.fft: dominant_frequency'
+    aliases:
+    - dominant frequency
+    - peak frequency
+    help_search_examples:
+    - reaxkit help "dominant frequency"
+    - find peak frequency from signal
+    tags:
+    - utility
+    - numerical
+    - signal processing
+    - fft
+    notes: []
+    related_workflow_module: []
+
+  get_extrema_points:
+    description: Detect local extrema points in paired x-y series data.
+    implementation_module: 'reaxkit.utils.numerical.extrema_finder: get_extrema_points'
+    aliases:
+    - find extrema
+    - peak and valley detection
+    help_search_examples:
+    - reaxkit help "find extrema points"
+    - detect peaks and valleys in series
+    tags:
+    - utility
+    - numerical
+    - extrema
+    - signal processing
+    notes: []
+    related_workflow_module: []
+
+  simple_moving_average:
+    description: Compute simple moving average for a numeric signal.
+    implementation_module: 'reaxkit.utils.numerical.moving_average: simple_moving_average'
+    aliases:
+    - moving average
+    - simple moving average
+    help_search_examples:
+    - reaxkit help "simple moving average"
+    - smooth signal with moving average
+    tags:
+    - utility
+    - numerical
+    - smoothing
+    - signal processing
+    notes: []
+    related_workflow_module: []
+
+  exponential_moving_average:
+    description: Compute exponential moving average for a numeric signal.
+    implementation_module: 'reaxkit.utils.numerical.moving_average: exponential_moving_average'
+    aliases:
+    - exponential moving average
+    - ema
+    help_search_examples:
+    - reaxkit help "exponential moving average"
+    - smooth series with ema
+    tags:
+    - utility
+    - numerical
+    - smoothing
+    - signal processing
+    notes: []
+    related_workflow_module: []
+
+  find_zero_crossings:
+    description: Find approximate x locations where a series crosses zero.
+    implementation_module: 'reaxkit.utils.numerical.numerical_calcs: find_zero_crossings'
+    aliases:
+    - zero crossing
+    - crossing points
+    help_search_examples:
+    - reaxkit help "find zero crossings"
+    - locate where signal crosses zero
+    tags:
+    - utility
+    - numerical
+    - zero crossing
+    - signal processing
+    notes: []
+    related_workflow_module: []
+
+  schmitt_hysteresis:
+    description: Apply Schmitt-trigger hysteresis thresholding to a signal.
+    implementation_module: 'reaxkit.utils.numerical.signal_ops: schmitt_hysteresis'
+    aliases:
+    - schmitt trigger
+    - hysteresis threshold
+    help_search_examples:
+    - reaxkit help "schmitt hysteresis"
+    - apply hysteresis threshold to signal
+    tags:
+    - utility
+    - numerical
+    - hysteresis
+    - signal processing
+    notes: []
+    related_workflow_module: []
+
+  clean_flicker:
+    description: Remove short on-off flicker runs from a boolean state signal.
+    implementation_module: 'reaxkit.utils.numerical.signal_ops: clean_flicker'
+    aliases:
+    - clean flicker
+    - remove short state flips
+    help_search_examples:
+    - reaxkit help "clean flicker in signal"
+    - remove short boolean flicker runs
+    tags:
+    - utility
+    - numerical
+    - hysteresis
+    - signal processing
+    notes: []
+    related_workflow_module: []

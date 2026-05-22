@@ -693,6 +693,25 @@ tasks:
     help_search_examples:
     - show training set group comments
     - inspect training set categories
+  trainset_data:
+    consumes_dataclass: ForceFieldOptimizationTrainingSetData
+    implementation_module: 'reaxkit.analysis.force_field.trainset: trainset_data'
+    description: Returns trainset rows for one selected section or all sections.
+      Use it to inspect CHARGE, HEATFO, GEOMETRY, CELL_PARAMETERS, and ENERGY entries
+      from training-set definitions in a table form.
+    related_workflow_module: 'reaxkit.workflows.force_field_workflow: trainset_data'
+    tags:
+    - force field
+    - training set
+    - force field optimization training set
+    notes: []
+    aliases:
+    - trainset data
+    - training set data
+    - trainset-data
+    help_search_examples:
+    - show training set data
+    - inspect trainset rows by section
   trajectory_coordinate_series:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.timeseries.timeseries: trajectory_coordinate_series'
@@ -732,6 +751,80 @@ tasks:
     help_search_examples:
     - reaxkit help "coordination relabeling"
     - run coordination relabeling
+  voronoi_geometry_pyvoro:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_geometry_pyvoro'
+    description: Computes per-atom Voronoi cell geometry using the pyvoro backend.
+      Returns vertices, faces, neighbors, and per-cell metrics for visualization and
+      geometric post-processing.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: voronoi'
+    tags:
+    - trajectory
+    - voronoi
+    - geometry
+    - pyvoro
+    notes: []
+    aliases:
+    - voronoi geometry pyvoro
+    - voronoi-geometry-pyvoro
+    help_search_examples:
+    - reaxkit help "voronoi geometry pyvoro"
+    - run voronoi geometry pyvoro
+  voronoi_geometry_scipy:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_geometry_scipy'
+    description: Computes per-atom Voronoi cell geometry using SciPy Voronoi routines.
+      Returns vertices, faces, neighbors, and per-cell metrics for visualization and
+      geometric post-processing.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: voronoi'
+    tags:
+    - trajectory
+    - voronoi
+    - geometry
+    - scipy
+    notes: []
+    aliases:
+    - voronoi geometry scipy
+    - voronoi-geometry-scipy
+    help_search_examples:
+    - reaxkit help "voronoi geometry scipy"
+    - run voronoi geometry scipy
+  voronoi_pyvoro:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_pyvoro'
+    description: Computes per-atom Voronoi metrics using the pyvoro backend.
+      Use it to evaluate cell volumes, face counts, and boundedness with periodic-aware
+      tessellation support when box data is available.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: voronoi'
+    tags:
+    - trajectory
+    - voronoi
+    - pyvoro
+    notes: []
+    aliases:
+    - voronoi pyvoro
+    - voronoi-pyvoro
+    help_search_examples:
+    - reaxkit help "voronoi pyvoro"
+    - run voronoi pyvoro
+  voronoi_scipy:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_scipy'
+    description: Computes per-atom Voronoi metrics using SciPy Voronoi routines.
+      Use it to evaluate cell volumes, face counts, and boundedness from trajectory
+      coordinates.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: voronoi'
+    tags:
+    - trajectory
+    - voronoi
+    - scipy
+    notes: []
+    aliases:
+    - voronoi scipy
+    - voronoi-scipy
+    help_search_examples:
+    - reaxkit help "voronoi scipy"
+    - run voronoi scipy
   atom_property_heatmap2d:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
@@ -805,6 +898,7 @@ dataclass_usage_across_tasks:
   - force_field_optimization_report_bulk_modulus
   - force_field_optimization_report_eos
   ForceFieldOptimizationTrainingSetData:
+  - trainset_data
   - trainset_group_comments
   ForceFieldParametersData:
   - force_field_data
@@ -835,5 +929,9 @@ dataclass_usage_across_tasks:
   - rdf
   - rdf_property
   - trajectory_coordinate_series
+  - voronoi_scipy
+  - voronoi_pyvoro
+  - voronoi_geometry_scipy
+  - voronoi_geometry_pyvoro
   - atom_property_heatmap2d
   - atom_property_plot3d

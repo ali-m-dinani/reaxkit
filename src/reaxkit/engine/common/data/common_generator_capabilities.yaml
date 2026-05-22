@@ -24,3 +24,67 @@ generators:
     help_search_examples:
     - reaxkit help "write trajectory coordinates as xyz"
     - export trajectory coordinates to xyz
+  build_surface:
+    description: Build a surface slab from a bulk structure using Miller indices.
+    tags:
+    - geometry file
+    - surface
+    - generator
+    - engine common
+    implementation_module: 'reaxkit.engine.common.generators.structure_transformers: build_surface'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
+    notes: []
+    aliases:
+    - build surface
+    - make surface slab
+    help_search_examples:
+    - reaxkit help "build surface slab from bulk structure"
+    - make surface slab using miller indices
+  make_supercell:
+    description: Generate a supercell or apply a lattice transformation to a structure.
+    tags:
+    - geometry file
+    - supercell
+    - generator
+    - engine common
+    implementation_module: 'reaxkit.engine.common.generators.structure_transformers: make_supercell'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
+    notes: []
+    aliases:
+    - make supercell
+    - expand supercell
+    help_search_examples:
+    - reaxkit help "make supercell"
+    - expand geometry into supercell
+  orthogonalize_hexagonal_cell:
+    description: Convert a hexagonal unit cell into an orthorhombic cell.
+    tags:
+    - geometry file
+    - orthogonalization
+    - generator
+    - engine common
+    implementation_module: 'reaxkit.engine.common.generators.structure_transformers: orthogonalize_hexagonal_cell'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: orthogonalize-geo'
+    notes: []
+    aliases:
+    - orthogonalize hexagonal cell
+    - orthogonalize geometry
+    help_search_examples:
+    - reaxkit help "orthogonalize hexagonal geometry"
+    - convert hexagonal cell to orthorhombic
+  place2:
+    description: Randomly place copies of a molecule into a simulation box with minimum-distance constraints.
+    tags:
+    - geometry file
+    - placement
+    - generator
+    - engine common
+    implementation_module: 'reaxkit.engine.common.generators.structure_transformers: place2'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: place-geo'
+    notes: []
+    aliases:
+    - place molecule in box
+    - random molecule placement
+    help_search_examples:
+    - reaxkit help "place molecules in geometry box"
+    - run random placement of molecules in box

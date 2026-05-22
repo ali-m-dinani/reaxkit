@@ -18,22 +18,25 @@ source_files_by_layer:
         role: "Generator capability index linking natural-language concepts to generator implementations and commands."
 
   file_level:
-    io:
-      reaxff:
+    reaxff:
+      io:
         - file: reaxkit/engine/reaxff/data/reaxff_input_files_contents.yaml
           role: "Searchable descriptions and tags for ReaxFF input files."
         - file: reaxkit/engine/reaxff/data/reaxff_output_files_contents.yaml
           role: "Searchable descriptions and tags for ReaxFF output files."
-    mapping:
-      - reaxff:
-          - file: reaxkit/engine/reaxff/data/reaxff_io_dataclass_map.yaml
-            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
-      - ams:
-          - file: reaxkit/engine/ams/data/ams_io_dataclass_map.yaml
-            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
-      - lammps:
-          - file: reaxkit/engine/lammps/data/lammps_io_dataclass_map.yaml
-            role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+      mapping:
+        - file: reaxkit/engine/reaxff/data/reaxff_io_dataclass_map.yaml
+          role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+    ams:
+      io: []
+      mapping:
+        - file: reaxkit/engine/ams/data/ams_io_dataclass_map.yaml
+          role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
+    lammps:
+      io: []
+      mapping:
+        - file: reaxkit/engine/lammps/data/lammps_io_dataclass_map.yaml
+          role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
 
   analyzer_level:
     - file: reaxkit/analysis/data/analysis_task_dataclass_map.yaml
@@ -98,8 +101,8 @@ Search_mechanism:
       - all generator fields
   file_level:
     search_order:
-      - source_files_by_layer.file_level.io.<engine>
-      - source_files_by_layer.file_level.mapping.<engine>
+      - source_files_by_layer.file_level.<engine>.io
+      - source_files_by_layer.file_level.<engine>.mapping
     searched_fields_in_descending_importance_order:
       - aliases
       - help_search_examples

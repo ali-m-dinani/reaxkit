@@ -13,7 +13,7 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
 import pandas as pd
 
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
-from reaxkit.engine.common.geo_transforms import (
+from reaxkit.engine.common.generators.structure_transformers import (
     build_surface,
     make_supercell,
     orthogonalize_hexagonal_cell,

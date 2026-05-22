@@ -302,7 +302,7 @@ workflows:
       analysis: []
       generator:
       - reaxkit.engine.reaxff.generators.geo_generator
-      - reaxkit.engine.common.geo_transforms
+      - reaxkit.engine.common.generators.structure_transformers
     tags:
     - geometry file
     - geo
