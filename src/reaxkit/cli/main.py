@@ -123,6 +123,11 @@ def main() -> int:
         action="store_true",
         help="Enable progress reporting for supported handlers and analysis tasks.",
     )
+    parser.add_argument(
+        "--log-in-terminal",
+        action="store_true",
+        help="Show [ReaxKit] runtime log lines in terminal output.",
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 

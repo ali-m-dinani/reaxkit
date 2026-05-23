@@ -173,13 +173,16 @@ class AnalysisExecutor:
 
     @staticmethod
     def _console_step(args: dict, message: str) -> None:
-        if args.get("quiet"):
+        if args.get("quiet") or not args.get("log_in_terminal"):
             return
         run_id = args.get("run_id")
         suffix = f" run_id={run_id}" if run_id else ""
         print(f"[ReaxKit] {message}{suffix}", flush=True)
 
     def run(self, task, request, args: dict):
+        # ---------------------------------------------------------------------
+        # 1) Normalize runtime/storage arguments and derive task/data metadata.
+        # ---------------------------------------------------------------------
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
@@ -188,6 +191,11 @@ class AnalysisExecutor:
         )
         task_name = task.__class__.__name__
         data_name = getattr(required_data, "__name__", str(required_data))
+
+        # ---------------------------------------------------------------------
+        # 2) Initialize runtime side effects (terminal logs, handler cache env,
+        #    file logging session, timing hooks, and log verbosity).
+        # ---------------------------------------------------------------------
         self._console_step(args, f"Starting task={task_name} required_data={data_name}")
         handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
         handler_cache_dir.mkdir(parents=True, exist_ok=True)
@@ -211,6 +219,10 @@ class AnalysisExecutor:
             },
         )
 
+        # ---------------------------------------------------------------------
+        # 3) Resolve engine adapter from input hints and snapshot required raw
+        #    inputs into run-scoped storage for traceability/reproducibility.
+        # ---------------------------------------------------------------------
         input_path = str(args.get("_snapshot_source_dir") or self._detection_path(args))
         forced_engine = args.get("engine")
         self._console_step(args, f"Resolving engine input={input_path} forced_engine={forced_engine or 'auto'}")
@@ -242,6 +254,11 @@ class AnalysisExecutor:
         task_version = str(getattr(task, "VERSION", "1"))
         layout = ReaxkitStorageLayout(project_root=Path(args.get("project_root") or ".")) if run_id else None
         parsed_id = None
+
+        # ---------------------------------------------------------------------
+        # 4) If run-scoped layout is active, pre-register parsed dataset
+        #    metadata (best effort) before loading/parsing input data.
+        # ---------------------------------------------------------------------
         if layout is not None:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
@@ -266,6 +283,11 @@ class AnalysisExecutor:
             except Exception as exc:  # pragma: no cover - best-effort metadata persistence
                 logger.debug("Storage index update skipped: %s", exc)
 
+        # ---------------------------------------------------------------------
+        # 5) Prepare analysis cache and attempt fast path:
+        #    - parsed artifact hit (typed data already materialized), then
+        #    - analysis result cache hit/miss for the derived analysis_id.
+        # ---------------------------------------------------------------------
         cache_root = Path(args.get("cache_dir") or (Path(input_path) / ".reaxkit_cache"))
         cache = CacheManager(CacheConfig(root=cache_root, namespace="analysis"))
         use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
@@ -399,11 +421,14 @@ class AnalysisExecutor:
                 )
                 cached = cache.load(analysis_id)
                 return enrich_result_with_time(
-                    cached,
-                    None,
-                    control_file=str(args.get("control") or "control"),
-                )
+                cached,
+                None,
+                control_file=str(args.get("control") or "control"),
+            )
 
+        # ---------------------------------------------------------------------
+        # 6) Slow path data load: parse required typed data via adapter.
+        # ---------------------------------------------------------------------
         t_load0 = perf_counter()
         self._console_step(args, f"Loading data via adapter={adapter.__class__.__name__} data_type={data_name}")
         try:
@@ -470,6 +495,10 @@ class AnalysisExecutor:
         )
         self._record_timing(args, phase="load_total", task_name=task_name, seconds=t_load)
 
+        # ---------------------------------------------------------------------
+        # 7) Compute analysis_id (if needed), update run index metadata, then
+        #    execute cache decision (disabled / hit / miss).
+        # ---------------------------------------------------------------------
         analysis_id = analysis_id or cache.analysis_id_for(
             task=task,
             data=data,
@@ -490,6 +519,10 @@ class AnalysisExecutor:
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)
 
+        # ---------------------------------------------------------------------
+        # 8) Execute analysis task, enrich result with time axis metadata,
+        #    persist cache/log metadata, and return final result object.
+        # ---------------------------------------------------------------------
         if not use_cache:
             logger.info("Cache disabled; executing task=%s", task_name)
             self._console_step(args, "Analysis cache disabled (running task)")
