@@ -230,6 +230,24 @@ generators:
     help_search_examples:
     - reaxkit help "trim xmolout"
     - create lightweight xmolout trajectory
+  repair_fort7:
+    description: Repair corrupted ``fort.7`` atom lines caused by fused integer columns at large atom counts.
+    tags:
+    - fort7
+    - generator
+    - repair
+    - connectivity
+    - reaxff output
+    implementation_module: 'reaxkit.engine.reaxff.generators.fort7_repair: repair_fort7'
+    related_workflow_module: 'reaxkit.workflows.file_tools.fort7_workflow: repair_fort7'
+    aliases:
+    - repair fort7
+    - repair-fort7
+    - fix fort7
+    - repair_fort7
+    help_search_examples:
+    - reaxkit help "fix fort7"
+    - repair corrupted fort.7 output
   gen_template_yaml_for_elastic_settings:
     description: Write elastic trainset settings YAML templates.
     tags:

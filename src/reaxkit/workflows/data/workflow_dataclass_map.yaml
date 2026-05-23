@@ -311,6 +311,25 @@ workflows:
     help_search_examples:
     - reaxkit help "extract optimized force field"
     - extract optimized force field workflow
+  fort7_workflow:
+    implementation_module: 'reaxkit.workflows.file_tools.fort7_workflow: repair_fort7'
+    description: Direct command workflow for repairing corrupted fort.7 files.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.fort7_repair
+    tags:
+    - fort7
+    - repair
+    - connectivity output
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be repair_fort7'
+    aliases:
+    - fort7 workflow
+    - fort7 repair workflow
+    help_search_examples:
+    - reaxkit help "fix fort7"
+    - repair fort.7 workflow
   geo_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
     description: Direct command workflows for GEO and structure file utilities.
@@ -643,6 +662,7 @@ command_to_workflow_module:
   dominant_species: reaxkit.workflows.molecular_analysis_workflow
   export-trainset: reaxkit.workflows.file_tools.trainset_workflow
   extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
+  repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
   force_field_data: reaxkit.workflows.force_field_workflow
   force_field_optimization: reaxkit.workflows.force_field_workflow
   force_field_optimization_report: reaxkit.workflows.force_field_workflow

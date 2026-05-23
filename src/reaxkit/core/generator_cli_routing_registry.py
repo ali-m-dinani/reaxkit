@@ -43,6 +43,7 @@ register_generator("make-charges", module_path="reaxkit.workflows.file_tools.cha
 register_generator("gen_template_kopple2", module_path="reaxkit.workflows.file_tools.kopple2_workflow")
 register_generator("make-kopple2", module_path="reaxkit.workflows.file_tools.kopple2_workflow")
 register_generator("trim-xmolout", module_path="reaxkit.workflows.file_tools.xmolout_workflow")
+register_generator("repair_fort7", module_path="reaxkit.workflows.file_tools.fort7_workflow")
 register_generator("xtob", module_path="reaxkit.workflows.file_tools.geo_workflow")
 register_generator("make-geo", module_path="reaxkit.workflows.file_tools.geo_workflow")
 register_generator("sort_geo", module_path="reaxkit.workflows.file_tools.geo_workflow")

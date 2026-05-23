@@ -99,6 +99,7 @@ class Fort7Handler(BaseHandler):
         cur_num_particles: Optional[int] = None
         cur_nbonds: Optional[int] = None
         sim_name: str = ""
+        warned_large_atom_count = False
 
         def _finalize_iteration() -> None:
             if cur_num_particles is None or cur_nbonds is None or not cur_atoms_rows:
@@ -137,6 +138,20 @@ class Fort7Handler(BaseHandler):
                         cur_totals.clear()
 
                     cur_num_particles = int(values[0])
+                    if cur_num_particles > 9999 and not warned_large_atom_count:
+                        warning_msg = (
+                            "Warning: fort.7 reports > 9999 atoms. ReaxFF fixed-width atom-index fields "
+                            "can overflow at this size, which may concatenate neighbor indices and corrupt "
+                            "fort.7 connectivity parsing. Consider running 'repair_fort7' before analysis."
+                        )
+                        print(warning_msg)
+                        if self._reporter:
+                            try:
+                                self._reporter("warn", lines_read, total_lines, warning_msg)
+                            except TypeError:
+                                # Backward-compatible fallback for reporters that only handle load events.
+                                self._reporter("load", lines_read, total_lines, warning_msg)
+                        warned_large_atom_count = True
                     sim_name = values[1]
                     iteration = int(values[3])
                     cur_nbonds = int(values[5])

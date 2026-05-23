@@ -139,7 +139,8 @@ intents:
     - ConnectivityTrajectoryData
     workflows:
     - timeseries
-    generators: []
+    generators:
+    - repair_fort7
   charges:
     description: Analyze per-atom charge and charge-derived time series.
     aliases:
