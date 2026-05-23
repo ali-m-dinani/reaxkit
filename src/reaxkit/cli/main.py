@@ -21,6 +21,41 @@ from reaxkit.core.generator_cli_routing_registry import get_registered_generator
 from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
 
 
+class _ReaxKitArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser with clearer UX for unknown command/flag cases."""
+
+    def __init__(self, *args, selected_command: str | None = None, known_commands: set[str] | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._selected_command = selected_command
+        self._known_commands = known_commands or set()
+
+    def error(self, message: str) -> None:
+        if message.startswith("argument command: invalid choice: "):
+            bad_command = None
+            parts = message.split("'")
+            if len(parts) >= 2:
+                bad_command = parts[1]
+            bad_command = bad_command or str(self._selected_command or "").strip() or "<unknown>"
+            print(
+                f"There is no command {bad_command}. Please run 'reaxkit help \"query\"' "
+                f"where query can be {bad_command} to see if any relevant command exists or not.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+
+        if message.startswith("unrecognized arguments:") and self._selected_command in self._known_commands:
+            unknown_args = message.split(":", 1)[1].strip().split()
+            bad_flag = next((token for token in unknown_args if token.startswith("-")), unknown_args[0] if unknown_args else "")
+            print(
+                f"There is no flag {bad_flag} for command {self._selected_command}. "
+                f"Please run 'reaxkit {self._selected_command} -h' to see the list of appropriate flags.",
+                file=sys.stderr,
+            )
+            raise SystemExit(2)
+
+        super().error(message)
+
+
 def _print_error_with_hints(title: str, message: str, *, hints: list[str] | None = None) -> None:
     print(f"[{title}] {message}", file=sys.stderr)
     for hint in hints or []:
@@ -112,7 +147,18 @@ def main() -> int:
     command_ns, _ = probe.parse_known_args(sys_argv[1:])
     selected_command = getattr(command_ns, "command", None)
 
-    parser = argparse.ArgumentParser("reaxkit CLI")
+    direct_commands = {
+        **get_registered_analysis_commands(),
+        **get_registered_generators(),
+    }
+    workflow_commands = get_registered_workflows()
+    known_commands = set(direct_commands) | set(workflow_commands)
+
+    parser = _ReaxKitArgumentParser(
+        "reaxkit CLI",
+        selected_command=selected_command,
+        known_commands=known_commands,
+    )
     parser.add_argument(
         "--timing",
         action="store_true",
@@ -130,12 +176,6 @@ def main() -> int:
     )
 
     sub = parser.add_subparsers(dest="command", required=True)
-
-    direct_commands = {
-        **get_registered_analysis_commands(),
-        **get_registered_generators(),
-    }
-    workflow_commands = get_registered_workflows()
 
     for command, spec in direct_commands.items():
         cp = sub.add_parser(command, help=_command_help_text(command, f"{command} command"))
