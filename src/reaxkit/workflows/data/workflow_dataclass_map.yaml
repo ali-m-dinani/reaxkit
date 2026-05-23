@@ -17,7 +17,8 @@ workflows:
     - active site
     - connectivity trajectory
     - analysis workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be active_site_events, active_site_structural'
     aliases:
     - active site workflow
     - active site analysis
@@ -38,7 +39,8 @@ workflows:
     - connectivity
     - bond order
     - analysis workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be bond_events, connection_list, connection_stats, connection_table, coordination, coordination_relabel, hybridization'
     aliases:
     - connectivity workflow
     - bond order analysis
@@ -57,7 +59,8 @@ workflows:
     - electrostatics
     - charges
     - polarization
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be charge-table, dipole, polarization, polarization_field'
     aliases:
     - electrostatics workflow
     - charge analysis workflow
@@ -80,7 +83,8 @@ workflows:
     - force field
     - optimization
     - training set
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be force_field_data, force_field_optimization, force_field_optimization_report, force_field_optimization_report_bulk_modulus, force_field_optimization_report_eos, parameter_optimization_diagnostic, parameter_optimization_most_sensitive, parameter_optimization_tornado, structure_summary_data, trainset_data, trainset_group_comments'
     aliases:
     - force field workflow
     - force field analysis
@@ -98,7 +102,8 @@ workflows:
     - atomic kinematics
     - velocity
     - acceleration
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be kinematics, kinematics_heatmap2d, kinematics_plot3d'
     aliases:
     - atomic kinematics workflow
     - kinematics workflow
@@ -116,7 +121,8 @@ workflows:
     - molecular analysis
     - species
     - molecule lifetime
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be dominant_species, largest_molecule_by_mass, largest_molecule_composition, molecule_lifetime'
     aliases:
     - molecular analysis workflow
     - molecule analysis workflow
@@ -133,7 +139,8 @@ workflows:
     tags:
     - optimization parameters
     - force field
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get-params'
     aliases:
     - optimization parameters workflow
     - params workflow
@@ -151,7 +158,8 @@ workflows:
     - spatial property
     - heatmap2d
     - plot3d
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be atom_property_heatmap2d, atom_property_plot3d'
     aliases:
     - spatial property workflow
     - atom property workflow
@@ -175,6 +183,7 @@ workflows:
     notes:
     - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries
       and geometry_optimization.
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be timeseries'
     aliases:
     - time series
     - series workflow
@@ -196,13 +205,15 @@ workflows:
     - trajectory
     - diffusivity
     - radial distribution function
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be dihedral, msd, diffusivity, rdf, rdf-property, voronoi'
     aliases:
     - trajectory workflow
     - trajectory analysis
     help_search_examples:
     - reaxkit help "trajectory workflow"
     - run trajectory workflow
+    - mean square displacement workflow
   addmol_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: gen_template_addmol'
     description: Direct command workflow for generating addmol files.
@@ -214,7 +225,8 @@ workflows:
     - addmol
     - molecule insertion
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_addmol, make-addmol'
     aliases:
     - addmol workflow
     - molecule insertion workflow
@@ -232,7 +244,8 @@ workflows:
     - charges
     - template
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_charges, make-charges'
     aliases:
     - charges workflow
     - charges generator workflow
@@ -251,7 +264,8 @@ workflows:
     - control file
     - control parameters
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_control, get-control, make-control, write-control'
     aliases:
     - control workflow
     - control file workflow
@@ -269,7 +283,8 @@ workflows:
     - electric field regime
     - electric field
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_eregime, make-eregime'
     aliases:
     - electric field regime workflow
     - eregime workflow
@@ -288,7 +303,8 @@ workflows:
     - force field
     - fort83
     - optimized force field
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be extract-optimized-ffield'
     aliases:
     - fort83 workflow
     - optimized force field workflow
@@ -307,7 +323,8 @@ workflows:
     - geometry file
     - geo
     - structure conversion
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be add_restraints_to_geo, make-geo, orthogonalize-geo, place-geo, sort-geo, xtob'
     aliases:
     - geometry file workflow
     - geo workflow
@@ -325,7 +342,8 @@ workflows:
     - kopple2
     - coupling template
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_kopple2, make-kopple2'
     aliases:
     - kopple2 workflow
     - coupling template workflow
@@ -346,7 +364,8 @@ workflows:
     - training set
     - heat of formation
     - elastic
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be export-trainset, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
     aliases:
     - training set workflow
     - trainset workflow
@@ -364,7 +383,8 @@ workflows:
     - temperature regime
     - temperature schedule
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_tregime, make-tregime'
     aliases:
     - temperature regime workflow
     - tregime workflow
@@ -382,7 +402,8 @@ workflows:
     - volume regime
     - cell schedule
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_vregime, make-vregime'
     aliases:
     - volume regime workflow
     - vregime workflow
@@ -400,7 +421,8 @@ workflows:
     - xmolout
     - trajectory output
     - generator workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be trim-xmolout'
     aliases:
     - xmolout workflow
     - trim xmolout workflow
@@ -418,7 +440,8 @@ workflows:
     - command alias
     - metadata
     - workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be add-alias'
     aliases:
     - command alias workflow
     - alias workflow
@@ -436,7 +459,8 @@ workflows:
     - graphical user interface
     - dash
     - workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gui'
     aliases:
     - gui
     - user interface
@@ -455,7 +479,8 @@ workflows:
     - help
     - intent
     - discovery
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be help'
     aliases:
     - help
     help_search_examples:
@@ -472,7 +497,8 @@ workflows:
     - introspection
     - modules
     - workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be intspec'
     aliases:
     - intspec
     help_search_examples:
@@ -489,7 +515,8 @@ workflows:
     - video
     - visualization
     - workflow
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be video'
     aliases:
     - video
     help_search_examples:
@@ -506,7 +533,8 @@ workflows:
     - plotter
     - plotting
     - visualization
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be plotter'
     aliases:
     - plotter
     help_search_examples:
@@ -524,7 +552,8 @@ workflows:
     - study planning
     - parameter sweep
     - replicate
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be study'
     aliases:
     - study workflow
     - study planning workflow
@@ -543,7 +572,8 @@ workflows:
     - workspace
     - cleanup
     - archive
-    notes: []
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be free-up, manage-workspace'
     aliases:
     - workspace management workflow
     - workspace cleanup workflow
