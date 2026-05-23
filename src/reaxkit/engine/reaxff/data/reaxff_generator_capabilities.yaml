@@ -214,6 +214,25 @@ generators:
     help_search_examples:
     - reaxkit help "make volume regime"
     - make volume regime
+  merge_ffields:
+    description: Merge selected atom-type parameter blocks from a source ffield into a destination ffield with index remapping and merge-audit reports.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - merge
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: merge_ffields'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
+    aliases:
+    - merge ffield
+    - merge-ffield
+    - merge_ffield
+    - merge force fields
+    - combine ffields
+    help_search_examples:
+    - reaxkit help "merge ffield"
+    - merge source and destination force fields
   trim_xmolout:
     description: Create a lightweight xmolout file containing atom type and xyz coordinates.
     tags:
