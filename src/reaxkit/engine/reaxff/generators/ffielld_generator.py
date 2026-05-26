@@ -86,6 +86,13 @@ class FFieldMergeSummary:
     source_blocks: dict[str, list[str]]
     destination_labels: dict[str, list[str]]
     destination_blocks: dict[str, list[str]]
+    skipped_existing_labels: dict[str, list[str]]
+    skipped_existing_blocks: dict[str, list[str]]
+    template_labels: dict[str, list[str]]
+    template_blocks: dict[str, list[str]]
+    template_generated: dict[str, int]
+    template_choices: dict[str, str]
+    template_similarity_details: dict[str, dict[str, object]]
 
 
 @dataclass(frozen=True)
@@ -559,6 +566,10 @@ def merge_ffields(
     fields: Iterable[str] | None = None,
     replace_existing: bool = False,
     allow_torsion_wildcard: bool = True,
+    fill_missing_with_template: bool = False,
+    template_similarity_mode: str = "group",
+    template_closest_atom: str | None = None,
+    template_radius_metrics: Iterable[str] | None = None,
 ) -> FFieldMergeSummary:
     """
     Merge selected atom-type parameters from source ``ffield`` into destination.
@@ -573,9 +584,11 @@ def merge_ffields(
 
     src_atom_df = src_sections["atom"].copy()
     dst_atom_df = dst_sections["atom"].copy()
+    base_dst_sections = {name: df.copy() for name, df in dst_sections.items()}
 
     src_idx_to_sym, src_sym_to_idx = _atom_maps(src_atom_df)
     _, dst_sym_to_idx = _atom_maps(dst_atom_df)
+    base_dst_idx_to_sym, base_dst_sym_to_idx = _atom_maps(base_dst_sections["atom"])
 
     missing_in_source = [sym for sym in wanted_atoms if sym not in src_sym_to_idx]
     if missing_in_source:
@@ -590,6 +603,11 @@ def merge_ffields(
     skipped_incompatible = {field: 0 for field in SUPPORTED_FIELDS}
     appended_indices: dict[str, list[int]] = {field: [] for field in SUPPORTED_FIELDS}
     source_rows_used: dict[str, list[pd.Series]] = {field: [] for field in SUPPORTED_FIELDS}
+    skipped_rows_projected: dict[str, list[dict[str, object]]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_rows_used: dict[str, list[pd.Series]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_generated = {field: 0 for field in SUPPORTED_FIELDS}
+    template_choices: dict[str, str] = {}
+    template_similarity_details: dict[str, dict[str, object]] = {}
 
     if "atom" in wanted_fields:
         next_idx = int(max(dst_atom_df.index.tolist())) + 1 if len(dst_atom_df.index) else 1
@@ -603,6 +621,9 @@ def merge_ffields(
                             dst_atom_df.loc[dst_idx, col] = src_row[col]
                     updated["atom"] += 1
                 else:
+                    skipped_atom_payload = {col: (src_row[col] if col in src_row.index else float("nan")) for col in dst_atom_df.columns}
+                    skipped_atom_payload["symbol"] = symbol
+                    skipped_rows_projected["atom"].append(skipped_atom_payload)
                     skipped_existing["atom"] += 1
                 continue
 
@@ -672,6 +693,8 @@ def merge_ffields(
                             dst_df.loc[target_idx, col] = src_row[col]
                     updated[section] += 1
                 else:
+                    skipped_payload = _mapped_row_for_destination(src_row, atom_cols, mapped_atoms, param_cols)
+                    skipped_rows_projected[section].append(skipped_payload)
                     skipped_existing[section] += 1
                 continue
 
@@ -683,6 +706,62 @@ def merge_ffields(
             source_rows_used[section].append(src_row.copy())
 
         dst_sections[section] = dst_df.sort_index()
+
+    if fill_missing_with_template:
+        t_mode = _normalize_similarity_mode(template_similarity_mode)
+        t_radius_metrics = _normalize_radius_metrics(template_radius_metrics)
+        base_candidate_symbols = sorted(set(base_dst_sym_to_idx.keys()))
+
+        for merged_symbol in wanted_atoms:
+            target_idx = dst_sym_to_idx.get(merged_symbol)
+            if target_idx is None:
+                continue
+            available = [s for s in base_candidate_symbols if s != merged_symbol]
+            if not available:
+                continue
+            chosen_template, _details = _pick_template_atom(
+                target_symbol=merged_symbol,
+                available_symbols=available,
+                mode=t_mode,
+                manual_template=template_closest_atom,
+                radius_metrics=t_radius_metrics,
+            )
+            template_choices[merged_symbol] = chosen_template
+            template_similarity_details[merged_symbol] = _details
+            template_idx = base_dst_sym_to_idx[chosen_template]
+
+            for section, atom_cols in SECTION_ATOM_COLS.items():
+                if section not in wanted_fields:
+                    continue
+                template_df = base_dst_sections[section]
+                dst_df = dst_sections[section].copy()
+                param_cols = [col for col in dst_df.columns if col not in atom_cols]
+
+                for _, tpl_row in template_df.iterrows():
+                    tpl_atoms = [_safe_int(tpl_row[col]) for col in atom_cols]
+                    if any(v is None for v in tpl_atoms):
+                        continue
+                    tpl_atom_ints = [int(v) for v in tpl_atoms if v is not None]
+                    if section == "torsion" and not allow_torsion_wildcard and any(v == 0 for v in tpl_atom_ints):
+                        continue
+                    variants = _replacement_variants(tpl_atom_ints, src_atom_idx=int(template_idx), dst_atom_idx=int(target_idx))
+                    if not variants:
+                        continue
+
+                    for mapped_atoms in variants:
+                        row_payload = _mapped_row_for_destination(tpl_row, atom_cols, mapped_atoms, param_cols)
+                        existing_rows = _atom_tuple_exists(dst_df, atom_cols, mapped_atoms)
+                        if not existing_rows.empty:
+                            skipped_rows_projected[section].append(row_payload)
+                            continue
+                        new_idx = int(max(dst_df.index.tolist())) + 1 if len(dst_df.index) else 1
+                        dst_df.loc[new_idx] = row_payload
+                        appended[section] += 1
+                        template_generated[section] += 1
+                        appended_indices[section].append(new_idx)
+                        template_rows_used[section].append(tpl_row.copy())
+
+                dst_sections[section] = dst_df.sort_index()
 
     out_path = _write_ffield_sections(output, dst_sections, dst_handler)
     dst_idx_to_sym, _ = _atom_maps(dst_sections["atom"])
@@ -724,6 +803,46 @@ def merge_ffields(
         source_labels[section] = _labels_for_rows(section, temp_df, temp_df.index.tolist(), src_idx_to_sym)
         source_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), src_format_helper)
 
+    template_labels: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_blocks: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_format_helper = FFieldHandler(destination)
+    for section in SUPPORTED_FIELDS:
+        rows = template_rows_used[section]
+        if not rows:
+            continue
+        if section == "atom":
+            temp_df = pd.DataFrame(rows)
+            if "symbol" not in temp_df.columns:
+                temp_df["symbol"] = None
+            temp_df.index = list(range(1, len(temp_df) + 1))
+            template_labels[section] = [str(temp_df.loc[i, "symbol"]).strip() for i in temp_df.index]
+            template_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), template_format_helper)
+            continue
+        temp_df = pd.DataFrame(rows)
+        temp_df.index = list(range(1, len(temp_df) + 1))
+        template_labels[section] = _labels_for_rows(section, temp_df, temp_df.index.tolist(), base_dst_idx_to_sym)
+        template_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), template_format_helper)
+
+    skipped_existing_labels: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    skipped_existing_blocks: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    for section in SUPPORTED_FIELDS:
+        rows = skipped_rows_projected[section]
+        if not rows:
+            continue
+        temp_df = pd.DataFrame(rows)
+        if temp_df.empty:
+            continue
+        if section == "atom":
+            if "symbol" not in temp_df.columns:
+                temp_df["symbol"] = None
+            temp_df.index = list(range(1, len(temp_df) + 1))
+            skipped_existing_labels[section] = [str(temp_df.loc[i, "symbol"]).strip() for i in temp_df.index]
+            skipped_existing_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), dst_handler)
+            continue
+        temp_df.index = list(range(1, len(temp_df) + 1))
+        skipped_existing_labels[section] = _labels_for_rows(section, temp_df, temp_df.index.tolist(), dst_idx_to_sym)
+        skipped_existing_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), dst_handler)
+
     return FFieldMergeSummary(
         output_path=out_path,
         atom_types_merged=wanted_atoms,
@@ -736,6 +855,13 @@ def merge_ffields(
         source_blocks=source_blocks,
         destination_labels=destination_labels,
         destination_blocks=destination_blocks,
+        skipped_existing_labels=skipped_existing_labels,
+        skipped_existing_blocks=skipped_existing_blocks,
+        template_labels=template_labels,
+        template_blocks=template_blocks,
+        template_generated=template_generated,
+        template_choices=template_choices,
+        template_similarity_details=template_similarity_details,
     )
 
 

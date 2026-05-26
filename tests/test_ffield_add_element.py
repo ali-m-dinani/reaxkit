@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield
+from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield, merge_ffields
 from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
 from reaxkit.workflows.file_tools import ffield_workflow
 
@@ -12,6 +12,12 @@ _SRC_FFIELD = (
     Path(__file__).resolve().parents[1]
     / "full_sim_examples"
     / "heatfo_trainset_generation_babo_case"
+    / "ffield"
+)
+_MERGE_SOURCE_FFIELD = (
+    Path(__file__).resolve().parents[1]
+    / "examples_to_test"
+    / "params_interpret_test"
     / "ffield"
 )
 
@@ -74,3 +80,46 @@ def test_build_parser_add_element_command_accepts_new_flags():
     assert args.similarity == "group"
     assert args.closest_atom == "B"
     assert args.radius_metrics == "all"
+
+
+def test_merge_fill_missing_with_template_adds_missing_destination_terms(tmp_path: Path):
+    out_plain = tmp_path / "ffield_merge_plain"
+    out_templ = tmp_path / "ffield_merge_templ"
+
+    plain = merge_ffields(
+        source=_MERGE_SOURCE_FFIELD,
+        destination=_SRC_FFIELD,
+        output=out_plain,
+        atom_types=("Al",),
+        fields=("atom", "bond"),
+        fill_missing_with_template=False,
+    )
+    templ = merge_ffields(
+        source=_MERGE_SOURCE_FFIELD,
+        destination=_SRC_FFIELD,
+        output=out_templ,
+        atom_types=("Al",),
+        fields=("atom", "bond"),
+        fill_missing_with_template=True,
+        template_closest_atom="B",
+        template_similarity_mode="group",
+    )
+
+    assert plain.template_generated["bond"] == 0
+    assert templ.template_generated["bond"] >= 1
+    assert templ.template_choices.get("Al") == "B"
+
+    plain_sections = FFieldHandler(out_plain).sections
+    templ_sections = FFieldHandler(out_templ).sections
+    plain_syms = {str(r["symbol"]): int(i) for i, r in plain_sections["atom"].iterrows()}
+    templ_syms = {str(r["symbol"]): int(i) for i, r in templ_sections["atom"].iterrows()}
+    ba_plain, al_plain = plain_syms["Ba"], plain_syms["Al"]
+    ba_templ, al_templ = templ_syms["Ba"], templ_syms["Al"]
+
+    b_plain = plain_sections["bond"]
+    b_templ = templ_sections["bond"]
+    ba_al_plain = (((b_plain["i"] == ba_plain) & (b_plain["j"] == al_plain)) | ((b_plain["i"] == al_plain) & (b_plain["j"] == ba_plain))).sum()
+    ba_al_templ = (((b_templ["i"] == ba_templ) & (b_templ["j"] == al_templ)) | ((b_templ["i"] == al_templ) & (b_templ["j"] == ba_templ))).sum()
+
+    assert int(ba_al_plain) == 0
+    assert int(ba_al_templ) >= 1
