@@ -99,8 +99,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode.")
         parser.add_argument("--api-key", default=None, help="Source API key (MP uses --api-key or MP_API_KEY).")
         parser.add_argument("--bulk-mode", default="voigt", choices=["voigt", "reuss", "vrh"], help="Bulk modulus mode for supported sources.")
+        parser.add_argument(
+            "--crystallographic-setting-conversion",
+            choices=["to-conventional", "to-primitive"],
+            default="to-primitive",
+            help="Convert fetched crystal structure setting before generating files.",
+        )
         parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes.")
         parser.add_argument("--structure-dir", default=None, help="Directory for downloaded source structures.")
+        parser.add_argument(
+            "--skip-not-orthogonal",
+            action="store_true",
+            help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90).",
+        )
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
         parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs.")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
@@ -128,6 +139,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact")
         parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode.")
+        parser.add_argument(
+            "--crystallographic-setting-conversion",
+            choices=["to-conventional", "to-primitive"],
+            default="to-primitive",
+            help="Convert fetched crystal structure setting before generating files.",
+        )
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines.")
         parser.add_argument("--trainset-file", default="trainset_heatfo.in", help="Output trainset filename.")
         parser.add_argument("--geo-file", default="geo", help="Output concatenated geo filename.")
@@ -230,8 +247,10 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
         max_materials=args.max_materials,
         api_key=args.api_key,
         bulk_mode=str(args.bulk_mode),
+        crystallographic_setting_conversion=str(args.crystallographic_setting_conversion),
         out_yaml=str(args.out_yaml),
         structure_dir=args.structure_dir,
+        skip_no_orthogonal=bool(getattr(args, "skip_not_orthogonal", False)),
         verbose=bool(args.verbose),
     )
 
@@ -265,6 +284,7 @@ def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) ->
         references=args.references,
         element_count_scope=str(args.element_count_scope),
         max_materials=args.max_materials,
+        crystallographic_setting_conversion=str(args.crystallographic_setting_conversion),
         weight=float(args.weight),
         trainset_file=str(args.trainset_file),
         geo_file=str(args.geo_file),

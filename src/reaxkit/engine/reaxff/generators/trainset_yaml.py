@@ -7,6 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
+import csv
 import os
 import shutil
 
@@ -14,7 +15,7 @@ from reaxkit.engine.reaxff.generators.trainset_elastic_energy import (
     BulkEnergySpec,
     CellSpec,
     ElasticEnergySpec,
-    _generate_trainset_energy,
+    _generate_trainset_energy_with_source_note,
     _write_trainset_energy,
 )
 from reaxkit.engine.reaxff.generators.trainset_elastic_geometry import (
@@ -52,20 +53,120 @@ DEFAULT_TABLES = {
 
 
 def _concat_geo_strained(out_dir: Path) -> Path | None:
-    geo_dir = out_dir / "geo_strained"
-    all_geo_file = geo_dir / "all_trainset_geo.bgf"
+    geo_dir = out_dir / "structures" / "geo_strained"
+    all_geo_file = out_dir / "geo"
     if not geo_dir.exists():
         return None
-    bgf_files = sorted(geo_dir.glob("*.bgf"))
-    if not bgf_files:
+    geo_files = sorted([*geo_dir.glob("*.bgf"), *geo_dir.glob("*.geo")])
+    if not geo_files:
         return None
     with all_geo_file.open("w", encoding="utf-8") as fout:
-        for bgf in bgf_files:
-            fout.write(f"# ===== BEGIN {bgf.name} =====\n")
-            with bgf.open("r", encoding="utf-8") as fin:
-                fout.write(fin.read())
-            fout.write(f"\n# ===== END {bgf.name} =====\n\n")
+        for geo_file in geo_files:
+            text = geo_file.read_text(encoding="utf-8").rstrip()
+            if text:
+                fout.write(text + "\n\n")
     return all_geo_file
+
+
+def _normalize_formula_for_eos_label(formula: str) -> str:
+    text = str(formula or "").strip()
+    if not text:
+        return "UnknownFormula"
+    text = text.replace(" ", "")
+    if "(" not in text and ")" not in text:
+        return text
+    text = text.replace("(", "_").replace(")", "_")
+    out: list[str] = []
+    for i, ch in enumerate(text):
+        if i > 0:
+            prev = text[i - 1]
+            if (prev.isalpha() and ch.isdigit()) or (prev.isdigit() and ch.isalpha()):
+                if out and out[-1] != "_":
+                    out.append("_")
+        out.append(ch)
+    normalized = "".join(out)
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    return normalized.strip("_") or "UnknownFormula"
+
+
+def _build_eos_source_note(cfg: dict) -> str | None:
+    metadata = cfg.get("metadata", {}) or {}
+    mp_id = str(metadata.get("mp_id", "") or "").strip()
+    formula = str(metadata.get("formula_pretty", "") or "").strip()
+    crystal = str(metadata.get("crystal_system", "") or "").strip()
+    if not (mp_id and formula and crystal):
+        return None
+    crystal_label = crystal[:1].upper() + crystal[1:].lower()
+    formula_label = _normalize_formula_for_eos_label(formula)
+    return f"# EOS data based on {formula_label} {crystal_label} {mp_id}"
+
+
+def _extract_material_metadata_from_yaml(yaml_path: str | Path) -> Dict[str, str]:
+    try:
+        import yaml
+    except ImportError:
+        return {"formula_pretty": "", "crystal_system": "", "mp_id": ""}
+    path = Path(yaml_path)
+    if not path.exists():
+        return {"formula_pretty": "", "crystal_system": "", "mp_id": ""}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return {"formula_pretty": "", "crystal_system": "", "mp_id": ""}
+    meta = data.get("metadata", {}) or {}
+    return {
+        "formula_pretty": str(meta.get("formula_pretty", "") or "").strip(),
+        "crystal_system": str(meta.get("crystal_system", "") or "").strip(),
+        "mp_id": str(meta.get("mp_id", "") or "").strip(),
+    }
+
+
+def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
+    try:
+        import yaml
+    except ImportError:
+        return []
+    path = Path(yaml_path)
+    if not path.exists():
+        return []
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return []
+    bulk_cfg = data.get("bulk", {}) or {}
+    elastic_cfg = data.get("elastic", {}) or {}
+    bulk_cell_cfg = bulk_cfg.get("cell")
+    elastic_cell_cfg = elastic_cfg.get("cell", bulk_cell_cfg)
+    if not isinstance(bulk_cell_cfg, dict) or not isinstance(elastic_cell_cfg, dict):
+        return []
+
+    warnings_list: list[str] = []
+    try:
+        bulk_cell = CellSpec(**bulk_cell_cfg)
+        if not _is_orthogonal_cell(bulk_cell):
+            warnings_list.append(
+                f"Bulk cell is non-orthogonal (angles = [{bulk_cell.alpha}, {bulk_cell.beta}, {bulk_cell.gamma}]). "
+                "Elastic energy targets assume an orthogonal lattice."
+            )
+    except Exception:
+        pass
+    try:
+        elastic_cell = CellSpec(**elastic_cell_cfg)
+        if not _is_orthogonal_cell(elastic_cell):
+            warnings_list.append(
+                f"Elastic cell is non-orthogonal (angles = [{elastic_cell.alpha}, {elastic_cell.beta}, {elastic_cell.gamma}]). "
+                "Elastic energy targets assume an orthogonal lattice."
+            )
+    except Exception:
+        pass
+    return warnings_list
+
+
+def _is_orthogonal_cell(cell: CellSpec, *, tol: float = 1e-6) -> bool:
+    return (
+        abs(float(cell.alpha) - 90.0) <= tol
+        and abs(float(cell.beta) - 90.0) <= tol
+        and abs(float(cell.gamma) - 90.0) <= tol
+    )
 
 
 @dataclass(frozen=True)
@@ -74,6 +175,8 @@ class TrainsetSettingsSpec:
     name: str = "AlN example"
     source: str = "manual"
     mp_id: Optional[str] = None
+    formula_pretty: Optional[str] = None
+    crystal_system: Optional[str] = None
     elastic_max_strain_percent: float = 3.0
     elastic_dstrain: float = 0.005
     cij_gpa: Dict[str, float] = field(default_factory=lambda: dict(DEFAULT_CIJ_GPA))
@@ -103,6 +206,8 @@ def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
 
     out_path = Path(spec.out_path)
     mp_id_yaml = "null" if spec.mp_id is None else _q(spec.mp_id)
+    formula_pretty_yaml = "null" if spec.formula_pretty is None else _q(spec.formula_pretty)
+    crystal_system_yaml = "null" if spec.crystal_system is None else _q(spec.crystal_system)
     geo_sort = "null" if spec.geo_sort_by is None else _q(str(spec.geo_sort_by))
     elastic_xyz = spec.elastic_xyz if spec.elastic_xyz is not None else "null"
     bulk_xyz = spec.bulk_xyz if spec.bulk_xyz is not None else "null"
@@ -117,6 +222,8 @@ def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
         f"  name: {_q(spec.name)}",
         f"  source: {_q(spec.source)}  # 'manual' or 'materials_project'",
         f"  mp_id: {mp_id_yaml}  # Optional: e.g. \"mp-661\"",
+        f"  formula_pretty: {formula_pretty_yaml}",
+        f"  crystal_system: {crystal_system_yaml}",
         "",
         "units:",
         '  elastic_constants: "GPa"',
@@ -179,8 +286,8 @@ def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
             "# Output section: you can usually keep this as-is unless you want different filenames.",
             "output:",
             f"  trainset_file: {_q(spec.trainset_file)}",
-            f"  xyz_strained_dir: {_q('xyz_strained')}",
-            f"  geo_strained_dir: {_q('geo_strained')}",
+            f"  xyz_strained_dir: {_q('structures/xyz_strained')}",
+            f"  geo_strained_dir: {_q('structures/geo_strained')}",
             "  tables:",
         ]
     )
@@ -240,6 +347,8 @@ def _write_trainset_settings_yaml(
     name: str = "AlN example",
     source: str = "manual",
     mp_id: Optional[str] = None,
+    formula_pretty: Optional[str] = None,
+    crystal_system: Optional[str] = None,
     elastic_max_strain_percent: float = 3.0,
     elastic_dstrain: float = 0.005,
     cij_gpa: Optional[Dict[str, float]] = None,
@@ -261,6 +370,8 @@ def _write_trainset_settings_yaml(
         name=name,
         source=source,
         mp_id=mp_id,
+        formula_pretty=formula_pretty,
+        crystal_system=crystal_system,
         elastic_max_strain_percent=elastic_max_strain_percent,
         elastic_dstrain=elastic_dstrain,
         cij_gpa=dict(DEFAULT_CIJ_GPA if cij_gpa is None else cij_gpa),
@@ -294,6 +405,7 @@ def _generate_heatfo_settings_yaml_text() -> str:
         "elements: [Ba, B, O]  # Allowed element pool",
         "element_count_scope: exact  # exact or up-to",
         "max_materials: null  # Optional integer cap",
+        "crystallographic_setting_conversion: to-primitive  # to-conventional or to-primitive",
         "",
         "# Used in material-id mode",
         "mat_id: null  # Single material id for selected source, e.g. mp-661",
@@ -380,6 +492,7 @@ def _generate_trainset_from_yaml(
     *,
     place_all_outputs_in_out_dir: bool = True,
     copy_input_xyz_into_out_dir: bool = True,
+    skip_no_orthogonal: bool = False,
 ):
     cfg = _read_trainset_settings_yaml(yaml_path)
     yaml_path_p = Path(yaml_path).resolve()
@@ -388,10 +501,33 @@ def _generate_trainset_from_yaml(
 
     bulk_cfg = cfg["bulk"]
     elastic_cfg = cfg["elastic"]
+    metadata = cfg.get("metadata", {}) or {}
+    material_id = str(metadata.get("mp_id", "") or "").strip()
+    material_prefix = f"for material ID [{material_id}] " if material_id else ""
     bulk_cell = CellSpec(**bulk_cfg["cell"])
     elastic_cell = CellSpec(**elastic_cfg.get("cell", bulk_cfg["cell"]))
 
-    energy_result = _generate_trainset_energy(
+    if skip_no_orthogonal:
+        is_elastic_ortho = _is_orthogonal_cell(elastic_cell)
+        is_bulk_ortho = _is_orthogonal_cell(bulk_cell)
+        if not is_elastic_ortho:
+            print(
+                f"[Warning] {material_prefix}Elastic cell is non-orthogonal "
+                f"(angles = [{elastic_cell.alpha}, {elastic_cell.beta}, {elastic_cell.gamma}]). "
+                "Elastic energy targets assume an orthogonal lattice."
+            )
+        if not is_bulk_ortho:
+            print(
+                f"[Warning] {material_prefix}Bulk cell is non-orthogonal "
+                f"(angles = [{bulk_cell.alpha}, {bulk_cell.beta}, {bulk_cell.gamma}]). "
+                "Elastic energy targets assume an orthogonal lattice."
+            )
+        if (not is_elastic_ortho) or (not is_bulk_ortho):
+            print("[Skip] Lattice is non-orthogonal; skipping this lattice.\n")
+            return False
+
+    source_note = _build_eos_source_note(cfg)
+    energy_result = _generate_trainset_energy_with_source_note(
         BulkEnergySpec(
             bulk_modulus_gpa=bulk_cfg["B0_gpa"],
             bulk_modulus_pressure_derivative=bulk_cfg["B0_prime"],
@@ -405,29 +541,45 @@ def _generate_trainset_from_yaml(
             volume_reference_cell=elastic_cell,
             strain_step=elastic_cfg.get("dstrain", 0.005),
         ),
+        source_note=source_note,
     )
-    _write_trainset_energy(
+    for message in energy_result.warnings:
+        print(f"[Warning] {material_prefix}{message}")
+
+    written_energy_paths = _write_trainset_energy(
         energy_result,
         out_dir=out_dir_p,
         trainset_filename=cfg.get("output", {}).get("trainset_file", "trainset_elastic.in"),
     )
+    dat_dir = out_dir_p / "volume energy data"
+    dat_dir.mkdir(parents=True, exist_ok=True)
+    for key, path in written_energy_paths.items():
+        if key == "trainset":
+            continue
+        target_path = dat_dir / path.name
+        if path.resolve() != target_path.resolve():
+            shutil.move(str(path), str(target_path))
 
     geo_cfg = cfg.get("geo", {}) or {}
     if not bool(geo_cfg.get("enable", False)):
-        return
+        return True
 
     elastic_xyz = Path(cfg["structure 1"]["elastic_xyz"])
     bulk_xyz_val = (cfg.get("structure 2", {}) or {}).get("bulk_xyz")
     bulk_xyz = Path(bulk_xyz_val) if bulk_xyz_val and str(bulk_xyz_val).lower() != "null" else None
     geo_out_dir = out_dir_p if place_all_outputs_in_out_dir else yaml_path_p.parent
+    structures_dir = geo_out_dir / "structures"
+    downloaded_structures_dir = structures_dir / "downloaded_structures"
+    structures_dir.mkdir(parents=True, exist_ok=True)
+    downloaded_structures_dir.mkdir(parents=True, exist_ok=True)
 
     if copy_input_xyz_into_out_dir:
-        elastic_dst = geo_out_dir / elastic_xyz.name
+        elastic_dst = downloaded_structures_dir / elastic_xyz.name
         if elastic_xyz.resolve() != elastic_dst.resolve():
             shutil.copy2(elastic_xyz, elastic_dst)
         elastic_xyz = elastic_dst
         if bulk_xyz is not None:
-            bulk_dst = geo_out_dir / bulk_xyz.name
+            bulk_dst = downloaded_structures_dir / bulk_xyz.name
             if bulk_xyz.resolve() != bulk_dst.resolve():
                 shutil.copy2(bulk_xyz, bulk_dst)
             bulk_xyz = bulk_dst
@@ -446,11 +598,24 @@ def _generate_trainset_from_yaml(
             sort_by=geo_cfg.get("sort_by"),
         )
     )
-    _write_strained_geometries(geometry_result, out_dir=geo_out_dir, sort_by=geo_cfg.get("sort_by"))
+    _write_strained_geometries(geometry_result, out_dir=structures_dir, sort_by=geo_cfg.get("sort_by"))
+    return True
 
 
-def _gen_elastic_trainset_from_yaml_mode(*, yaml_path: str, out_dir: Path) -> dict[str, Any]:
-    _generate_trainset_from_yaml(yaml_path=yaml_path, out_dir=str(out_dir))
+def _gen_elastic_trainset_from_yaml_mode(
+    *,
+    yaml_path: str,
+    out_dir: Path,
+    skip_no_orthogonal: bool = False,
+) -> dict[str, Any]:
+    generated = _generate_trainset_from_yaml(
+        yaml_path=yaml_path,
+        out_dir=str(out_dir),
+        skip_no_orthogonal=skip_no_orthogonal,
+    )
+    if not generated:
+        print(f"[Done] Skipped non-orthogonal lattice for YAML: {yaml_path}")
+        return {"mode": "yaml", "yaml_path": str(yaml_path), "skipped_non_orthogonal": True}
     geo_path = _concat_geo_strained(out_dir)
     if geo_path is not None:
         print(f"[Done] Concatenated strained geometries to: {geo_path}")
@@ -466,23 +631,32 @@ def _run_single_material_id_elastic_trainset(
     out_yaml: str,
     structure_dir: str | Path | None,
     bulk_mode: str,
+    crystallographic_setting_conversion: str,
     api_key: str,
+    skip_no_orthogonal: bool,
     verbose: bool,
-) -> str:
+) -> tuple[str, bool]:
     out_yaml_path = out_dir / Path(str(out_yaml)).name
-    structure_dir_path = Path(structure_dir) if structure_dir else (out_dir / "downloaded_structures")
+    structure_dir_path = Path(structure_dir) if structure_dir else (out_dir / "structures" / "downloaded_structures")
     structure_dir_path.mkdir(parents=True, exist_ok=True)
     result = source_adapter.generate_elastic_settings_yaml_from_material_id(
         mat_id=mat_id,
         out_yaml=str(out_yaml_path),
         structure_dir=str(structure_dir_path),
         bulk_mode=bulk_mode,
+        crystallographic_setting_conversion=crystallographic_setting_conversion,
         api_key=api_key,
         verbose=verbose,
     )
-    _generate_trainset_from_yaml(yaml_path=result["yaml"], out_dir=str(out_dir))
+    generated = _generate_trainset_from_yaml(
+        yaml_path=result["yaml"],
+        out_dir=str(out_dir),
+        skip_no_orthogonal=skip_no_orthogonal,
+    )
+    if not generated:
+        return result["yaml"], False
     _concat_geo_strained(out_dir)
-    return result["yaml"]
+    return result["yaml"], True
 
 
 def _gen_elastic_trainset_from_material_id_mode(
@@ -493,19 +667,32 @@ def _gen_elastic_trainset_from_material_id_mode(
     out_yaml: str,
     structure_dir: str | Path | None,
     bulk_mode: str,
+    crystallographic_setting_conversion: str,
     api_key: str,
+    skip_no_orthogonal: bool,
     verbose: bool,
 ) -> dict[str, Any]:
-    yaml_path = _run_single_material_id_elastic_trainset(
+    yaml_path, generated = _run_single_material_id_elastic_trainset(
         source_adapter=source_adapter,
         mat_id=mat_id,
         out_dir=out_dir,
         out_yaml=out_yaml,
         structure_dir=structure_dir,
         bulk_mode=bulk_mode,
+        crystallographic_setting_conversion=crystallographic_setting_conversion,
         api_key=api_key,
+        skip_no_orthogonal=skip_no_orthogonal,
         verbose=verbose,
     )
+    if not generated:
+        print(f"[Done] Generated settings from source '{source_adapter.source_name}': {yaml_path}")
+        print(f"[Done] Skipped non-orthogonal lattice: {mat_id}")
+        return {
+            "mode": "material-id",
+            "yaml_path": str(yaml_path),
+            "mat_id": str(mat_id),
+            "skipped_non_orthogonal": True,
+        }
     print(f"[Done] Generated settings from source '{source_adapter.source_name}': {yaml_path}")
     print(f"[Done] Elastic trainset written to: {out_dir}")
     return {"mode": "material-id", "yaml_path": str(yaml_path), "mat_id": str(mat_id)}
@@ -521,10 +708,13 @@ def _gen_elastic_trainset_batch_mode(
     out_yaml: str,
     structure_dir: str | Path | None,
     bulk_mode: str,
+    crystallographic_setting_conversion: str,
     api_key: str,
+    skip_no_orthogonal: bool,
     verbose: bool,
 ) -> dict[str, Any]:
     from reaxkit.engine.reaxff.generators.trainset_heatfo import _parse_elements_csv
+    from reaxkit.engine.reaxff.generators.trainset_mp import _mp_fetch_material_summary_metadata
 
     elements = _parse_elements_csv(str(elements_csv))
     mat_ids = source_adapter.search_material_ids_by_elements(
@@ -536,37 +726,117 @@ def _gen_elastic_trainset_batch_mode(
     if not mat_ids:
         raise ValueError(f"No source systems found for batch query in source '{source_adapter.source_name}'.")
 
+    successful_root = out_dir / "successful"
+    skipped_root = out_dir / "skipped"
+    successful_root.mkdir(parents=True, exist_ok=True)
+    skipped_root.mkdir(parents=True, exist_ok=True)
+
     ok = 0
     skipped = 0
-    for mat_id in mat_ids:
-        target_dir = out_dir / mat_id
+    skipped_non_orthogonal = 0
+    status_rows: list[dict[str, str]] = []
+    for idx, mat_id in enumerate(mat_ids):
+        if idx > 0:
+            print("")
+        target_dir = successful_root / mat_id
         try:
-            _run_single_material_id_elastic_trainset(
+            yaml_path, generated = _run_single_material_id_elastic_trainset(
                 source_adapter=source_adapter,
                 mat_id=mat_id,
                 out_dir=target_dir,
                 out_yaml=out_yaml,
                 structure_dir=structure_dir,
                 bulk_mode=bulk_mode,
+                crystallographic_setting_conversion=crystallographic_setting_conversion,
                 api_key=api_key,
+                skip_no_orthogonal=skip_no_orthogonal,
                 verbose=verbose,
             )
-            ok += 1
+            meta = _extract_material_metadata_from_yaml(yaml_path)
+            warnings_list = _collect_cell_warnings_from_yaml(yaml_path)
+            warning_text = " | ".join(warnings_list)
+            if generated:
+                ok += 1
+                status_rows.append(
+                    {
+                        "chemical_formula": meta.get("formula_pretty", ""),
+                        "crystal_system": meta.get("crystal_system", ""),
+                        "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        "status": "success",
+                        "warning": warning_text,
+                    }
+                )
+            else:
+                skipped_non_orthogonal += 1
+                skipped_target = skipped_root / mat_id
+                if skipped_target.exists():
+                    shutil.rmtree(skipped_target)
+                if target_dir.exists():
+                    shutil.move(str(target_dir), str(skipped_target))
+                status_rows.append(
+                    {
+                        "chemical_formula": meta.get("formula_pretty", ""),
+                        "crystal_system": meta.get("crystal_system", ""),
+                        "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        "status": "skip",
+                        "warning": warning_text,
+                    }
+                )
         except Exception as exc:
             skipped += 1
+            skipped_target = skipped_root / mat_id
+            if skipped_target.exists():
+                shutil.rmtree(skipped_target)
+            if target_dir.exists():
+                shutil.move(str(target_dir), str(skipped_target))
+            else:
+                skipped_target.mkdir(parents=True, exist_ok=True)
+
+            formula = ""
+            crystal = ""
+            material_id_for_row = mat_id
+            if str(getattr(source_adapter, "source_name", "")).strip().lower() == "mp":
+                try:
+                    meta = _mp_fetch_material_summary_metadata(api_key=api_key, material_id=mat_id)
+                    formula = meta.get("formula_pretty", "")
+                    crystal = meta.get("crystal_system", "")
+                    material_id_for_row = meta.get("material_id", mat_id) or mat_id
+                except Exception:
+                    pass
+            status_rows.append(
+                {
+                    "chemical_formula": formula,
+                    "crystal_system": crystal,
+                    "material_id": material_id_for_row,
+                    "status": "skip",
+                    "warning": "",
+                }
+            )
             if verbose:
                 print(f"[{source_adapter.source_name.upper()}][skip] {mat_id}: {exc}")
 
+    csv_path = out_dir / "materials_status.csv"
+    with csv_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=["chemical_formula", "crystal_system", "material_id", "status", "warning"],
+        )
+        writer.writeheader()
+        writer.writerows(status_rows)
+
     print(
         f"[Done] Elastic batch completed ({source_adapter.source_name}): "
-        f"success={ok}, skipped={skipped}, total={len(mat_ids)}"
+        f"success={ok}, skipped={skipped}, skipped_non_orthogonal={skipped_non_orthogonal}, total={len(mat_ids)}"
     )
+    print(f"[Done] Saved material status CSV: {csv_path}")
     return {
         "mode": "batch",
         "elements": elements,
         "mat_ids_total": len(mat_ids),
         "mat_ids_success": ok,
         "mat_ids_skipped": skipped,
+        "mat_ids_skipped_non_orthogonal": skipped_non_orthogonal,
+        "status_csv": str(csv_path),
     }
 
 
@@ -582,8 +852,10 @@ def gen_elastic_trainset(
     max_materials: int | None = None,
     api_key: str | None = None,
     bulk_mode: str = "voigt",
+    crystallographic_setting_conversion: str = "to-primitive",
     out_yaml: str = "trainset_settings_source.yaml",
     structure_dir: str | Path | None = None,
+    skip_no_orthogonal: bool = False,
     verbose: bool = False,
 ) -> dict[str, Any]:
     """
@@ -604,7 +876,11 @@ def gen_elastic_trainset(
     if mode == "yaml":
         if not yaml_path:
             raise ValueError("yaml mode requires yaml_path.")
-        return _gen_elastic_trainset_from_yaml_mode(yaml_path=str(yaml_path), out_dir=out_dir_path)
+        return _gen_elastic_trainset_from_yaml_mode(
+            yaml_path=str(yaml_path),
+            out_dir=out_dir_path,
+            skip_no_orthogonal=bool(skip_no_orthogonal),
+        )
 
     resolved_api_key = api_key or os.getenv("MP_API_KEY")
     if not resolved_api_key:
@@ -623,7 +899,9 @@ def gen_elastic_trainset(
             out_yaml=out_yaml,
             structure_dir=structure_dir,
             bulk_mode=bulk_mode,
+            crystallographic_setting_conversion=crystallographic_setting_conversion,
             api_key=resolved_api_key,
+            skip_no_orthogonal=bool(skip_no_orthogonal),
             verbose=bool(verbose),
         )
 
@@ -639,7 +917,9 @@ def gen_elastic_trainset(
             out_yaml=out_yaml,
             structure_dir=structure_dir,
             bulk_mode=bulk_mode,
+            crystallographic_setting_conversion=crystallographic_setting_conversion,
             api_key=resolved_api_key,
+            skip_no_orthogonal=bool(skip_no_orthogonal),
             verbose=bool(verbose),
         )
 

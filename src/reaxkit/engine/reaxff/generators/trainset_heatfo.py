@@ -14,6 +14,7 @@ from reaxkit.core.constants import const
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.geo_generator import xtob
 from reaxkit.engine.reaxff.generators.trainset_mp import (
+    _convert_structure_setting,
     _mp_collect_heatfo_docs,
     _mp_doc_field,
     _mp_pick_unary_reference_docs,
@@ -41,6 +42,7 @@ class MaterialsProjectHeatFoSpec:
     exact_element_count: bool = True
     api_key: Optional[str] = None
     max_materials: Optional[int] = None
+    crystallographic_setting_conversion: str = "to-primitive"
     weight: float = 1.0
     trainset_filename: str = "trainset_heatfo.in"
     concatenated_geo_filename: str = "geo"
@@ -241,6 +243,7 @@ def _write_structure_triplet(
     cif_dir: Path,
     xyz_dir: Path,
     geo_dir: Path,
+    crystallographic_setting_conversion: str = "to-primitive",
 ) -> _WrittenStructure:
     material_id = str(_mp_doc_field(doc_obj, "material_id"))
     formula_pretty = str(_mp_doc_field(doc_obj, "formula_pretty", material_id))
@@ -248,6 +251,7 @@ def _write_structure_triplet(
     structure = _mp_doc_field(doc_obj, "structure")
     if structure is None:
         raise ValueError(f"{material_id}: missing structure.")
+    structure = _convert_structure_setting(structure, crystallographic_setting_conversion)
 
     identifier = _build_identifier(
         formula_pretty=formula_pretty,
@@ -365,6 +369,7 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
                 cif_dir=cif_dir,
                 xyz_dir=xyz_dir,
                 geo_dir=geo_dir,
+                crystallographic_setting_conversion=spec.crystallographic_setting_conversion,
             )
             ref_count = ref_written.composition_counts.get(element, 0)
             if ref_count <= 0:
@@ -397,6 +402,7 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
                 cif_dir=cif_dir,
                 xyz_dir=xyz_dir,
                 geo_dir=geo_dir,
+                crystallographic_setting_conversion=spec.crystallographic_setting_conversion,
             )
 
             formation_e_pa = float(_mp_doc_field(doc, "formation_energy_per_atom"))
@@ -464,6 +470,7 @@ def gen_heatfo_trainset(
     references: str | None = None,
     element_count_scope: str = "exact",
     max_materials: int | None = None,
+    crystallographic_setting_conversion: str = "to-primitive",
     weight: float = 1.0,
     trainset_file: str = "trainset_heatfo.in",
     geo_file: str = "geo",
@@ -526,6 +533,9 @@ def gen_heatfo_trainset(
                 exact_element_count=str(data.get("element_count_scope", "exact")).strip().lower() == "exact",
                 api_key=str(data.get("api_key")) if data.get("api_key") else (api_key or os.getenv("MP_API_KEY")),
                 max_materials=(int(data["max_materials"]) if data.get("max_materials") is not None else None),
+                crystallographic_setting_conversion=str(
+                    data.get("crystallographic_setting_conversion", crystallographic_setting_conversion)
+                ),
                 weight=float(data.get("weight", 1.0)),
                 trainset_filename=str(data.get("trainset_file", "trainset_heatfo.in")),
                 concatenated_geo_filename=str(data.get("geo_file", "geo")),
@@ -554,6 +564,7 @@ def gen_heatfo_trainset(
                 exact_element_count=True,
                 api_key=resolved_api_key,
                 max_materials=None,
+                crystallographic_setting_conversion=str(crystallographic_setting_conversion),
                 weight=float(weight),
                 trainset_filename=str(trainset_file),
                 concatenated_geo_filename=str(geo_file),
@@ -579,6 +590,7 @@ def gen_heatfo_trainset(
                 exact_element_count=str(element_count_scope).strip().lower() == "exact",
                 api_key=resolved_api_key,
                 max_materials=max_materials,
+                crystallographic_setting_conversion=str(crystallographic_setting_conversion),
                 weight=float(weight),
                 trainset_filename=str(trainset_file),
                 concatenated_geo_filename=str(geo_file),

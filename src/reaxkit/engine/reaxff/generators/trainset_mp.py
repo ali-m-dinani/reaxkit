@@ -18,6 +18,7 @@ from reaxkit.engine.reaxff.generators.trainset_yaml import _write_trainset_setti
 
 
 BulkModulusMode = Literal["voigt", "reuss", "vrh"]
+CrystallographicSettingConversion = Literal["to-conventional", "to-primitive"]
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class MaterialsProjectTrainsetSpec:
     out_yaml: str | Path
     structure_dir: Optional[str | Path] = None
     bulk_mode: BulkModulusMode = "vrh"
+    crystallographic_setting_conversion: CrystallographicSettingConversion = "to-primitive"
     api_key: Optional[str] = None
     verbose: bool = True
 
@@ -113,6 +115,7 @@ def _mp_fetch_summary_docs_by_material_ids(
     mpr: MPRester,
     material_ids: list[str],
     fields: Optional[list[str]] = None,
+    log_retrieval: bool = True,
 ) -> list[object]:
     fields = fields or [
         "material_id",
@@ -123,6 +126,12 @@ def _mp_fetch_summary_docs_by_material_ids(
         "elements",
         "nelements",
     ]
+    if log_retrieval:
+        for idx, mid in enumerate(material_ids):
+            if idx > 0:
+                print("")
+            print(f"[RetrievalStart] Retrieving data for material ID [{mid}]")
+            print("Retrieving SummaryDoc documents")
     docs = mpr.materials.summary.search(material_ids=material_ids, fields=fields)
     found_map = {str(_mp_doc_field(doc, "material_id", "")).strip(): doc for doc in docs}
     missing = [mid for mid in material_ids if mid not in found_map]
@@ -200,7 +209,7 @@ def _mp_search_material_ids_by_elements(
     exact_element_count: bool,
     max_materials: Optional[int] = None,
 ) -> list[str]:
-    with MPRester(api_key) as mpr:
+    with MPRester(api_key, mute_progress_bars=True) as mpr:
         docs = _mp_search_summary_docs_by_elements(
             mpr=mpr,
             elements=elements,
@@ -227,7 +236,7 @@ def _mp_collect_heatfo_docs(
     exact_element_count: bool = True,
     max_materials: Optional[int] = None,
 ) -> MaterialsProjectHeatFoDocs:
-    with MPRester(api_key) as mpr:
+    with MPRester(api_key, mute_progress_bars=True) as mpr:
         if material_ids:
             docs = _mp_fetch_summary_docs_by_material_ids(mpr=mpr, material_ids=material_ids)
             resolved_elements = list(elements) if elements else _mp_derive_elements_from_summary_docs(docs)
@@ -250,7 +259,7 @@ def _mp_pick_unary_reference_docs(
     elements: list[str],
 ) -> Dict[str, object]:
     picked: Dict[str, object] = {}
-    with MPRester(api_key) as mpr:
+    with MPRester(api_key, mute_progress_bars=True) as mpr:
         for element in elements:
             picked[element] = _mp_pick_unary_reference_doc(mpr=mpr, element=element)
     return picked
@@ -286,6 +295,92 @@ def _pick_bulk_modulus(bm: Any, mode: BulkModulusMode) -> Optional[float]:
     return None if value is None else float(value)
 
 
+def _extract_crystal_system(symmetry_obj: Any) -> Optional[str]:
+    if symmetry_obj is None:
+        return None
+    crystal = getattr(symmetry_obj, "crystal_system", None)
+    if crystal is None and isinstance(symmetry_obj, dict):
+        crystal = symmetry_obj.get("crystal_system")
+    if crystal is None:
+        return None
+    if hasattr(crystal, "value"):
+        crystal = crystal.value
+    text = str(crystal).strip()
+    return text or None
+
+
+def _mp_fetch_material_summary_metadata(
+    *,
+    api_key: str,
+    material_id: str,
+) -> Dict[str, str]:
+    with MPRester(api_key, mute_progress_bars=True) as mpr:
+        doc = _mp_fetch_summary_docs_by_material_ids(
+            mpr=mpr,
+            material_ids=[material_id],
+            fields=["material_id", "formula_pretty", "symmetry"],
+            log_retrieval=False,
+        )[0]
+    return {
+        "material_id": str(_mp_doc_field(doc, "material_id", material_id) or material_id),
+        "formula_pretty": str(_mp_doc_field(doc, "formula_pretty", "") or ""),
+        "crystal_system": str(_extract_crystal_system(_mp_doc_field(doc, "symmetry", None)) or ""),
+    }
+
+
+def _convert_structure_setting(structure: Any, conversion: str):
+    conversion_mode = str(conversion).strip().lower()
+    if conversion_mode not in {"to-conventional", "to-primitive"}:
+        raise ValueError(
+            "crystallographic_setting_conversion must be one of: "
+            "'to-conventional', 'to-primitive'."
+        )
+    if conversion_mode == "to-conventional":
+        converted = structure.to_conventional()
+    else:
+        conventional = structure.to_conventional()
+        converted = conventional.get_primitive_structure()
+    return _normalize_non_orthogonal_angle_to_gamma(converted)
+
+
+def _is_close_90(value: float, tol: float = 1e-6) -> bool:
+    return abs(float(value) - 90.0) <= tol
+
+
+def _normalize_non_orthogonal_angle_to_gamma(structure: Any):
+    lat = structure.lattice
+    alpha = float(lat.alpha)
+    beta = float(lat.beta)
+    gamma = float(lat.gamma)
+
+    # If exactly one lattice angle is non-orthogonal, canonicalize axis order so that
+    # the non-90 angle appears as gamma (a,b), matching expected ReaxFF-style ordering.
+    non_orth = [not _is_close_90(alpha), not _is_close_90(beta), not _is_close_90(gamma)]
+    if sum(non_orth) != 1:
+        return structure
+    if non_orth[2]:
+        return structure
+
+    if non_orth[0]:
+        # alpha = angle(b,c) -> make it new gamma by (a', b', c') = (b, c, a)
+        perm = (1, 2, 0)
+    else:
+        # beta = angle(a,c) -> make it new gamma by (a', b', c') = (a, c, b)
+        perm = (0, 2, 1)
+
+    m = lat.matrix
+    new_matrix = [m[perm[0]], m[perm[1]], m[perm[2]]]
+    frac = structure.frac_coords
+    new_frac = [[f[perm[0]], f[perm[1]], f[perm[2]]] for f in frac]
+    return structure.__class__(
+        lattice=new_matrix,
+        species=structure.species,
+        coords=new_frac,
+        coords_are_cartesian=False,
+        site_properties=structure.site_properties,
+    )
+
+
 def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict[str, str]:
     api_key = spec.api_key or os.getenv("MP_API_KEY")
     if not api_key:
@@ -300,17 +395,20 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
     cif_path = structure_dir / f"{base}.cif"
     xyz_path = structure_dir / f"{base}.xyz"
 
-    with MPRester(api_key) as mpr:
+    with MPRester(api_key, mute_progress_bars=True) as mpr:
         sdoc = _mp_fetch_summary_docs_by_material_ids(
             mpr=mpr,
             material_ids=[spec.mp_id],
-            fields=["material_id", "formula_pretty", "structure"],
+            fields=["material_id", "formula_pretty", "structure", "symmetry"],
         )[0]
         structure = _mp_doc_field(sdoc, "structure")
         if structure is None:
             raise ValueError(f"{spec.mp_id}: structure missing/unreadable.")
+        structure = _convert_structure_setting(structure, spec.crystallographic_setting_conversion)
         lat = structure.lattice
-        name = _mp_doc_field(sdoc, "formula_pretty", None) or spec.mp_id
+        formula_pretty = _mp_doc_field(sdoc, "formula_pretty", None)
+        name = formula_pretty or spec.mp_id
+        crystal_system = _extract_crystal_system(_mp_doc_field(sdoc, "symmetry", None))
         cell = CellSpec(
             a=float(lat.a),
             b=float(lat.b),
@@ -320,11 +418,13 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
             gamma=float(lat.gamma),
         )
 
+        print("Retrieving ElasticityDoc documents")
         edocs = mpr.materials.elasticity.search(
             material_ids=[spec.mp_id],
             fields=["material_id", "elastic_tensor", "bulk_modulus"],
         )
         if not edocs:
+            print("[RetrievalResult] No elastic data found!")
             raise ValueError(f"No elasticity data for {spec.mp_id} (cannot populate elastic/bulk).")
         edoc = edocs[0]
         tensor6 = _extract_tensor6(getattr(edoc, "elastic_tensor", None))
@@ -345,6 +445,8 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
         name=f"{name} ({spec.mp_id})",
         source="materials_project",
         mp_id=spec.mp_id,
+        formula_pretty=(str(formula_pretty) if formula_pretty is not None else None),
+        crystal_system=crystal_system,
         cij_gpa=cij,
         B0_gpa=bulk_modulus,
         elastic_cell=cell.as_dict(),
@@ -368,6 +470,7 @@ def _generate_trainset_settings_yaml_from_mp_simple(
     out_yaml: str | Path,
     structure_dir: Optional[str | Path] = None,
     bulk_mode: BulkModulusMode = "vrh",
+    crystallographic_setting_conversion: CrystallographicSettingConversion = "to-primitive",
     api_key: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict[str, str]:
@@ -377,6 +480,7 @@ def _generate_trainset_settings_yaml_from_mp_simple(
             out_yaml=out_yaml,
             structure_dir=structure_dir,
             bulk_mode=bulk_mode,
+            crystallographic_setting_conversion=crystallographic_setting_conversion,
             api_key=api_key,
             verbose=verbose,
         )

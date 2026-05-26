@@ -259,6 +259,27 @@ def _generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEn
     )
 
 
+def _generate_trainset_energy_with_source_note(
+    bulk_spec: BulkEnergySpec,
+    elastic_spec: ElasticEnergySpec,
+    *,
+    source_note: str | None = None,
+) -> TrainsetEnergyResult:
+    result = _generate_trainset_energy(bulk_spec, elastic_spec)
+    if not source_note:
+        return result
+    lines = result.trainset_text.splitlines()
+    if not lines or lines[0] != "ENERGY":
+        return result
+    lines.insert(1, source_note)
+    return TrainsetEnergyResult(
+        trainset_text="\n".join(lines) + "\n",
+        bulk_table=result.bulk_table,
+        elastic_tables=result.elastic_tables,
+        warnings=result.warnings,
+    )
+
+
 def _write_trainset_energy(
     result: TrainsetEnergyResult,
     *,

@@ -31,6 +31,7 @@ class HeatFoTrainsetRequest:
     exact_element_count: bool
     api_key: Optional[str]
     max_materials: Optional[int]
+    crystallographic_setting_conversion: str
     weight: float
     trainset_filename: str
     concatenated_geo_filename: str
@@ -47,6 +48,7 @@ class TrainsetSourceAdapter(Protocol):
         out_yaml: str | Path,
         structure_dir: Optional[str | Path],
         bulk_mode: str,
+        crystallographic_setting_conversion: str,
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
@@ -76,6 +78,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
         out_yaml: str | Path,
         structure_dir: Optional[str | Path],
         bulk_mode: str,
+        crystallographic_setting_conversion: str,
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
@@ -84,6 +87,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
             out_yaml=out_yaml,
             structure_dir=structure_dir,
             bulk_mode=bulk_mode,
+            crystallographic_setting_conversion=crystallographic_setting_conversion,
             api_key=api_key,
             verbose=verbose,
         )
@@ -113,6 +117,7 @@ class _MaterialsProjectTrainsetSourceAdapter:
                 exact_element_count=request.exact_element_count,
                 api_key=request.api_key,
                 max_materials=request.max_materials,
+                crystallographic_setting_conversion=request.crystallographic_setting_conversion,
                 weight=request.weight,
                 trainset_filename=request.trainset_filename,
                 concatenated_geo_filename=request.concatenated_geo_filename,
@@ -138,6 +143,7 @@ class _JarvisTrainsetSourceAdapter:
         out_yaml: str | Path,
         structure_dir: Optional[str | Path],
         bulk_mode: str,
+        crystallographic_setting_conversion: str,
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
