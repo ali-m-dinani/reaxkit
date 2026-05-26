@@ -1,4 +1,4 @@
-"""Direct command workflow for merging ReaxFF ``ffield`` files."""
+"""Direct command workflows for ReaxFF ``ffield`` tools."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.ffielld_generator import merge_ffields
+from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield, merge_ffields
 
 
 def _parse_csv_items(value: str) -> list[str]:
@@ -71,32 +71,120 @@ def _write_snapshot_field_csvs(root: Path, labels_by_field: dict[str, list[str]]
     return files
 
 
+def _write_similarity_summary(path: Path, details: dict[str, object]) -> Path:
+    lines: list[str] = ["Similarity selection", ""]
+    lines.append(f"Mode: {details.get('mode', '')}")
+    target = details.get("target", {})
+    chosen = details.get("chosen", {})
+    if isinstance(target, dict):
+        lines.append(f"Target: {target.get('symbol', '')}")
+        lines.append(f"  group: {target.get('group', '')}")
+        lines.append(f"  family: {target.get('family', '')}")
+    if isinstance(chosen, dict):
+        lines.append(f"Chosen template: {chosen.get('symbol', '')}")
+        lines.append(f"  group: {chosen.get('group', '')}")
+        lines.append(f"  family: {chosen.get('family', '')}")
+    lines.append("")
+    lines.append("Candidates:")
+    candidates = details.get("candidates", [])
+    if isinstance(candidates, list) and candidates:
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                continue
+            selected = "*" if bool(candidate.get("selected")) else " "
+            lines.append(
+                f"{selected} {candidate.get('symbol', '')}: "
+                f"group={candidate.get('group', '')}, "
+                f"family={candidate.get('family', '')}, "
+                f"radius_distance={candidate.get('radius_distance', '')}"
+            )
+        lines.append("")
+        lines.append(
+            "radius_distance = mean absolute difference across the selected radius metrics "
+            "(metrics with missing values are ignored; if all are missing, distance is infinite)."
+        )
+    else:
+        lines.append("No candidate diagnostics available.")
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return path
+
+
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    _ = command
     parser.formatter_class = argparse.RawTextHelpFormatter
-    parser.description = (
-        "Merge selected atom-type parameter blocks from one ffield into another.\n\n"
-        "Examples:\n"
-        "  reaxkit merge-ffield --src ffield_src --dest ffield_dst --output ffield_merged --atom-types W\n"
-        "  reaxkit merge-ffield --source f_src --destination f_dst --output merged --atom-types W,Mo --fields atom,bond,angle,torsion"
-    )
-    parser.add_argument("--source", "--src", required=True, dest="source", help="Source ffield path")
-    parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
-    parser.add_argument("--output", default="ffield_merged", help="Output merged ffield path")
-    parser.add_argument(
-        "--atom-types",
-        required=True,
-        help="Comma-separated source atom symbols to merge, for example: W or W,Mo",
-    )
+    parser.set_defaults(command=command)
+
+    if command in {"add-element-to-ffield", "add_element_to_ffield"}:
+        parser.description = (
+            "Add one atom type to an existing ffield by cloning the most similar existing atom terms.\n\n"
+            "Examples:\n"
+            "  reaxkit add-element-to-ffield --dest ffield --element Al --output ffield_al\n"
+            "  reaxkit add-element-to-ffield --dest ffield --element Al --similarity group --closest-atom B --fields atom,bond,angle"
+        )
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
+        parser.add_argument("--output", default="ffield_with_element", help="Output expanded ffield path")
+        parser.add_argument("--element", required=True, help="Element symbol to add, for example: Al")
+        parser.add_argument(
+            "--similarity",
+            default="group",
+            choices=["family", "group", "radius"],
+            help=(
+                "Similarity rule for template-atom selection: "
+                "'family' = chemical family match "
+                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
+                "halogen, noble_gas, metalloid, post_transition_metal, other), "
+                "'group' = same periodic-table group number (column), "
+                "'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance."
+            ),
+        )
+        parser.add_argument(
+            "--radius-metrics",
+            default="atomic_radius,covalent_radius,van_der_waals_radius",
+            help=(
+                "Comma-separated radius metrics used when --similarity radius is selected. "
+                "Use 'all' to include every supported metric. "
+                "Options: atomic_radius (empirical neutral-atom radius), "
+                "covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), "
+                "van_der_waals_radius (non-bonded contact radius), "
+                "atomic_radius_calculated (theoretical neutral-atom radius), "
+                "average_ionic_radius (mean ionic radius over known oxidation states), "
+                "average_cationic_radius (mean radius over positive oxidation states), "
+                "average_anionic_radius (mean radius over negative oxidation states)."
+            ),
+        )
+        parser.add_argument(
+            "--closest-atom",
+            default=None,
+            help="Override automatic selection and force template atom symbol, for example: B",
+        )
+        parser.add_argument(
+            "--replace-existing",
+            action="store_true",
+            help="Replace destination rows when the same atom tuple already exists.",
+        )
+    else:
+        parser.description = (
+            "Merge selected atom-type parameter blocks from one ffield into another.\n\n"
+            "Examples:\n"
+            "  reaxkit merge-ffield --src ffield_src --dest ffield_dst --output ffield_merged --atom-types W\n"
+            "  reaxkit merge-ffield --source f_src --destination f_dst --output merged --atom-types W,Mo --fields atom,bond,angle,torsion"
+        )
+        parser.add_argument("--source", "--src", required=True, dest="source", help="Source ffield path")
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
+        parser.add_argument("--output", default="ffield_merged", help="Output merged ffield path")
+        parser.add_argument(
+            "--atom-types",
+            required=True,
+            help="Comma-separated source atom symbols to merge, for example: W or W,Mo",
+        )
+        parser.add_argument(
+            "--replace-existing",
+            action="store_true",
+            help="Replace destination rows when the same atom tuple already exists.",
+        )
     parser.add_argument(
         "--fields",
         default="atom,bond,off_diagonal,angle,torsion,hbond",
-        help="Comma-separated fields to merge: atom,bond,off_diagonal,angle,torsion,hbond",
-    )
-    parser.add_argument(
-        "--replace-existing",
-        action="store_true",
-        help="Replace destination rows when the same atom tuple already exists.",
+        help="Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond",
     )
     parser.add_argument(
         "--disallow-torsion-wildcard",
@@ -116,81 +204,160 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-
-    atom_types = _parse_csv_items(args.atom_types)
     fields = _parse_csv_items(args.fields)
 
-    summary = merge_ffields(
-        source=args.source,
-        destination=args.destination,
-        output=out_path,
-        atom_types=atom_types,
-        fields=fields,
-        replace_existing=bool(args.replace_existing),
-        allow_torsion_wildcard=not bool(args.disallow_torsion_wildcard),
-    )
-
-    print(f"[Done] Merged ffield written to {summary.output_path}")
-    print(f"  atom types: {', '.join(summary.atom_types_merged)}")
-    print(f"  fields: {', '.join(summary.fields)}")
-    print(f"  appended: {summary.appended}")
-    if any(summary.updated.values()):
-        print(f"  updated: {summary.updated}")
-    if any(summary.skipped_existing.values()):
-        print(f"  skipped_existing: {summary.skipped_existing}")
-    if any(summary.skipped_incompatible.values()):
-        print(f"  skipped_incompatible: {summary.skipped_incompatible}")
-
     report_paths: list[Path] = []
-    base = Path(summary.output_path)
-    report_root = base.parent / f"{base.stem}_merge_audit"
-    source_root = report_root / "source_snapshot"
-    destination_root = report_root / "destination_projection"
-    source_root.mkdir(parents=True, exist_ok=True)
-    destination_root.mkdir(parents=True, exist_ok=True)
-
-    if args.report_format in {"txt", "both"}:
-        report_paths.append(
-            _write_snapshot_text(
-                source_root / "source_snapshot_summary.txt",
-                "Source snapshot of transferred entries",
-                summary.source_labels,
-                summary.source_blocks,
-            )
+    if command in {"add-element-to-ffield", "add_element_to_ffield"}:
+        summary = add_element_to_ffield(
+            destination=args.destination,
+            output=out_path,
+            element=args.element,
+            fields=fields,
+            similarity_mode=str(args.similarity),
+            closest_atom=args.closest_atom,
+            radius_metrics=_parse_csv_items(args.radius_metrics),
+            replace_existing=bool(args.replace_existing),
+            allow_torsion_wildcard=not bool(args.disallow_torsion_wildcard),
         )
-        report_paths.append(
-            _write_snapshot_text(
-                destination_root / "destination_projection_summary.txt",
-                "Destination projection of transferred entries",
-                summary.destination_labels,
-                summary.destination_blocks,
-            )
-        )
-    if args.report_format in {"csv", "both"}:
-        report_paths.extend(_write_snapshot_field_csvs(source_root, summary.source_labels, summary.source_blocks))
-        report_paths.extend(_write_snapshot_field_csvs(destination_root, summary.destination_labels, summary.destination_blocks))
-    for report_path in report_paths:
-        print(f"[Done] Merge report written to {report_path}")
 
-    persist_generator_metadata(
-        args,
-        command=command,
-        output_path=summary.output_path,
-        layout=layout,
-        extra={
-            "source": str(args.source),
-            "destination": str(args.destination),
-            "atom_types": list(summary.atom_types_merged),
-            "fields": list(summary.fields),
-            "report_format": str(args.report_format),
-            "report_paths": [str(p) for p in report_paths],
-            "appended": summary.appended,
-            "updated": summary.updated,
-            "skipped_existing": summary.skipped_existing,
-            "skipped_incompatible": summary.skipped_incompatible,
-        },
-        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
-    )
+        print(f"[Done] Expanded ffield written to {summary.output_path}")
+        print(f"  element: {summary.element}")
+        print(f"  template atom: {summary.template_atom}")
+        print(f"  similarity: {summary.similarity_mode}")
+        print(f"  fields: {', '.join(summary.fields)}")
+        print(f"  appended: {summary.appended}")
+        if any(summary.updated.values()):
+            print(f"  updated: {summary.updated}")
+        if any(summary.skipped_existing.values()):
+            print(f"  skipped_existing: {summary.skipped_existing}")
+        if any(summary.skipped_incompatible.values()):
+            print(f"  skipped_incompatible: {summary.skipped_incompatible}")
+
+        base = Path(summary.output_path)
+        report_root = base.parent / f"{base.stem}_add_element_audit"
+        template_root = report_root / "template_snapshot"
+        destination_root = report_root / "destination_projection"
+        template_root.mkdir(parents=True, exist_ok=True)
+        destination_root.mkdir(parents=True, exist_ok=True)
+
+        if args.report_format in {"txt", "both"}:
+            report_paths.append(_write_similarity_summary(report_root / "similarity_summary.txt", summary.similarity_details))
+            report_paths.append(
+                _write_snapshot_text(
+                    template_root / "template_snapshot_summary.txt",
+                    f"Template snapshot of entries projected from {summary.template_atom}",
+                    summary.template_labels,
+                    summary.template_blocks,
+                )
+            )
+            report_paths.append(
+                _write_snapshot_text(
+                    destination_root / "destination_projection_summary.txt",
+                    f"Destination projection of entries added for {summary.element}",
+                    summary.destination_labels,
+                    summary.destination_blocks,
+                )
+            )
+        if args.report_format in {"csv", "both"}:
+            report_paths.extend(_write_snapshot_field_csvs(template_root, summary.template_labels, summary.template_blocks))
+            report_paths.extend(_write_snapshot_field_csvs(destination_root, summary.destination_labels, summary.destination_blocks))
+        for report_path in report_paths:
+            print(f"[Done] Add-element report written to {report_path}")
+
+        persist_generator_metadata(
+            args,
+            command=command,
+            output_path=summary.output_path,
+            layout=layout,
+            extra={
+                "destination": str(args.destination),
+                "element": summary.element,
+                "template_atom": summary.template_atom,
+                "similarity_mode": summary.similarity_mode,
+                "similarity_details": summary.similarity_details,
+                "fields": list(summary.fields),
+                "report_format": str(args.report_format),
+                "report_paths": [str(p) for p in report_paths],
+                "appended": summary.appended,
+                "updated": summary.updated,
+                "skipped_existing": summary.skipped_existing,
+                "skipped_incompatible": summary.skipped_incompatible,
+            },
+            copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+        )
+    else:
+        atom_types = _parse_csv_items(args.atom_types)
+        summary = merge_ffields(
+            source=args.source,
+            destination=args.destination,
+            output=out_path,
+            atom_types=atom_types,
+            fields=fields,
+            replace_existing=bool(args.replace_existing),
+            allow_torsion_wildcard=not bool(args.disallow_torsion_wildcard),
+        )
+
+        print(f"[Done] Merged ffield written to {summary.output_path}")
+        print(f"  atom types: {', '.join(summary.atom_types_merged)}")
+        print(f"  fields: {', '.join(summary.fields)}")
+        print(f"  appended: {summary.appended}")
+        if any(summary.updated.values()):
+            print(f"  updated: {summary.updated}")
+        if any(summary.skipped_existing.values()):
+            print(f"  skipped_existing: {summary.skipped_existing}")
+        if any(summary.skipped_incompatible.values()):
+            print(f"  skipped_incompatible: {summary.skipped_incompatible}")
+
+        base = Path(summary.output_path)
+        report_root = base.parent / f"{base.stem}_merge_audit"
+        source_root = report_root / "source_snapshot"
+        destination_root = report_root / "destination_projection"
+        source_root.mkdir(parents=True, exist_ok=True)
+        destination_root.mkdir(parents=True, exist_ok=True)
+
+        if args.report_format in {"txt", "both"}:
+            report_paths.append(
+                _write_snapshot_text(
+                    source_root / "source_snapshot_summary.txt",
+                    "Source snapshot of transferred entries",
+                    summary.source_labels,
+                    summary.source_blocks,
+                )
+            )
+            report_paths.append(
+                _write_snapshot_text(
+                    destination_root / "destination_projection_summary.txt",
+                    "Destination projection of transferred entries",
+                    summary.destination_labels,
+                    summary.destination_blocks,
+                )
+            )
+        if args.report_format in {"csv", "both"}:
+            report_paths.extend(_write_snapshot_field_csvs(source_root, summary.source_labels, summary.source_blocks))
+            report_paths.extend(_write_snapshot_field_csvs(destination_root, summary.destination_labels, summary.destination_blocks))
+        for report_path in report_paths:
+            print(f"[Done] Merge report written to {report_path}")
+
+        persist_generator_metadata(
+            args,
+            command=command,
+            output_path=summary.output_path,
+            layout=layout,
+            extra={
+                "source": str(args.source),
+                "destination": str(args.destination),
+                "atom_types": list(summary.atom_types_merged),
+                "fields": list(summary.fields),
+                "report_format": str(args.report_format),
+                "report_paths": [str(p) for p in report_paths],
+                "appended": summary.appended,
+                "updated": summary.updated,
+                "skipped_existing": summary.skipped_existing,
+                "skipped_incompatible": summary.skipped_incompatible,
+            },
+            copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+        )
+
     copied = maybe_copy_output_to_dot(summary.output_path, enabled=bool(getattr(args, "copy_to_dot", False)))
     dirs = [summary.output_path.parent]
     if copied is not None:

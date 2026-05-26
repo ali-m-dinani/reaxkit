@@ -15,6 +15,11 @@ import pandas as pd
 
 from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
 
+try:
+    from pymatgen.core.periodic_table import Element as _PMElement
+except Exception:  # pragma: no cover - optional dependency in some environments
+    _PMElement = None
+
 
 SECTION_ATOM_COLS: dict[str, tuple[str, ...]] = {
     "bond": ("i", "j"),
@@ -44,6 +49,27 @@ FIELD_ALIASES: dict[str, str] = {
 
 SUPPORTED_FIELDS: tuple[str, ...] = ("atom", "bond", "off_diagonal", "angle", "torsion", "hbond")
 
+SIMILARITY_ALIASES: dict[str, str] = {
+    "family": "family",
+    "group": "group",
+    # backward-compatible aliases
+    "column": "group",
+    "periodic-column": "group",
+    "periodic_column": "group",
+    "radius": "radius",
+    "radii": "radius",
+}
+
+RADIUS_KEYS: tuple[str, ...] = (
+    "atomic_radius",
+    "covalent_radius",
+    "van_der_waals_radius",
+    "atomic_radius_calculated",
+    "average_ionic_radius",
+    "average_cationic_radius",
+    "average_anionic_radius",
+)
+
 
 @dataclass(frozen=True)
 class FFieldMergeSummary:
@@ -60,6 +86,26 @@ class FFieldMergeSummary:
     source_blocks: dict[str, list[str]]
     destination_labels: dict[str, list[str]]
     destination_blocks: dict[str, list[str]]
+
+
+@dataclass(frozen=True)
+class FFieldAddElementSummary:
+    """Summary of a single-element add operation."""
+
+    output_path: Path
+    element: str
+    template_atom: str
+    similarity_mode: str
+    fields: tuple[str, ...]
+    appended: dict[str, int]
+    updated: dict[str, int]
+    skipped_existing: dict[str, int]
+    skipped_incompatible: dict[str, int]
+    template_labels: dict[str, list[str]]
+    template_blocks: dict[str, list[str]]
+    destination_labels: dict[str, list[str]]
+    destination_blocks: dict[str, list[str]]
+    similarity_details: dict[str, object]
 
 
 def _normalize_fields(fields: Iterable[str] | None) -> tuple[str, ...]:
@@ -91,6 +137,39 @@ def _normalize_atom_types(atom_types: Iterable[str]) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _normalize_similarity_mode(mode: str | None) -> str:
+    token = str(mode or "group").strip().lower()
+    canonical = SIMILARITY_ALIASES.get(token)
+    if canonical is None:
+        choices = ", ".join(sorted(set(SIMILARITY_ALIASES.values())))
+        raise ValueError(f"Unsupported similarity mode {mode!r}. Supported: {choices}")
+    return canonical
+
+
+def _normalize_radius_metrics(metrics: Iterable[str] | None) -> tuple[str, ...]:
+    if metrics is None:
+        return ("atomic_radius", "covalent_radius", "van_der_waals_radius")
+    raw_tokens: list[str] = []
+    for token in metrics:
+        part = str(token).strip()
+        if part:
+            raw_tokens.append(part)
+    if len(raw_tokens) == 1 and raw_tokens[0].lower() == "all":
+        return RADIUS_KEYS
+    out: list[str] = []
+    for token in raw_tokens:
+        key = token.strip().lower().replace(" ", "_").replace("-", "_")
+        if key == "vdw_radius":
+            key = "van_der_waals_radius"
+        if key not in RADIUS_KEYS:
+            raise ValueError(f"Unsupported radius metric {token!r}. Supported: {', '.join(RADIUS_KEYS)} or 'all'.")
+        if key not in out:
+            out.append(key)
+    if not out:
+        raise ValueError("At least one radius metric is required.")
+    return tuple(out)
+
+
 def _safe_int(value) -> int | None:
     if value is None or pd.isna(value):
         return None
@@ -98,6 +177,18 @@ def _safe_int(value) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _safe_float(value) -> float | None:
+    if value is None or pd.isna(value):
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(out):
+        return None
+    return out
 
 
 def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
@@ -239,11 +330,156 @@ def _mapped_row_for_destination(
     return payload
 
 
-def _write_ffield_sections(path: str | Path, sections: dict[str, pd.DataFrame], handler: FFieldHandler) -> Path:
+def _element_family(symbol: str) -> str | None:
+    if _PMElement is None:
+        return None
+    try:
+        elem = _PMElement(symbol)
+    except Exception:
+        return None
+    if bool(getattr(elem, "is_transition_metal", False)):
+        return "transition_metal"
+    if bool(getattr(elem, "is_lanthanoid", False)):
+        return "lanthanoid"
+    if bool(getattr(elem, "is_actinoid", False)):
+        return "actinoid"
+    if bool(getattr(elem, "is_alkali", False)):
+        return "alkali_metal"
+    if bool(getattr(elem, "is_alkaline", False)):
+        return "alkaline_earth_metal"
+    if bool(getattr(elem, "is_halogen", False)):
+        return "halogen"
+    if bool(getattr(elem, "is_noble_gas", False)):
+        return "noble_gas"
+    if bool(getattr(elem, "is_metalloid", False)):
+        return "metalloid"
+    if bool(getattr(elem, "is_post_transition_metal", False)):
+        return "post_transition_metal"
+    return "other"
+
+
+def _element_metadata(symbol: str, *, strict: bool = False) -> dict[str, object]:
+    if _PMElement is None:
+        return {"symbol": symbol, "group": None, "family": None, "atomic_radius": None, "covalent_radius": None, "van_der_waals_radius": None}
+    try:
+        elem = _PMElement(symbol)
+    except Exception as exc:
+        if strict:
+            raise ValueError(f"Unknown or unsupported element symbol {symbol!r}.") from exc
+        return {"symbol": symbol, "group": None, "family": None, "atomic_radius": None, "covalent_radius": None, "van_der_waals_radius": None}
+    return {
+        "symbol": symbol,
+        "group": _safe_int(getattr(elem, "group", None)),
+        "family": _element_family(symbol),
+        # pymatgen does not expose a direct covalent radius consistently; atomic_radius_calculated is a close proxy.
+        "atomic_radius": _safe_float(getattr(elem, "atomic_radius", None)),
+        "covalent_radius": _safe_float(getattr(elem, "atomic_radius_calculated", None)),
+        "van_der_waals_radius": _safe_float(getattr(elem, "van_der_waals_radius", None)),
+    }
+
+
+def _radius_distance(a: dict[str, object], b: dict[str, object], radius_metrics: tuple[str, ...]) -> float:
+    diffs: list[float] = []
+    for key in radius_metrics:
+        av = _safe_float(a.get(key))
+        bv = _safe_float(b.get(key))
+        if av is None or bv is None:
+            continue
+        diffs.append(abs(av - bv))
+    if not diffs:
+        return float("inf")
+    return float(sum(diffs) / len(diffs))
+
+
+def _selection_sort_key(
+    *,
+    mode: str,
+    target: dict[str, object],
+    candidate: dict[str, object],
+    radius_metrics: tuple[str, ...],
+) -> tuple[object, ...]:
+    tgt_group = _safe_int(target.get("group"))
+    cand_group = _safe_int(candidate.get("group"))
+    tgt_family = target.get("family")
+    cand_family = candidate.get("family")
+    same_group = int(not (tgt_family is not None and tgt_family == cand_family))
+    same_column = int(not (tgt_group is not None and cand_group is not None and tgt_group == cand_group))
+    group_gap = abs(tgt_group - cand_group) if (tgt_group is not None and cand_group is not None) else 999
+    rdist = _radius_distance(target, candidate, radius_metrics)
+    symbol = str(candidate.get("symbol", ""))
+
+    if mode == "family":
+        return same_group, same_column, group_gap, rdist, symbol
+    if mode == "group":
+        return same_column, group_gap, same_group, rdist, symbol
+    return rdist, same_column, group_gap, same_group, symbol
+
+
+def _pick_template_atom(
+    *,
+    target_symbol: str,
+    available_symbols: Iterable[str],
+    mode: str,
+    manual_template: str | None,
+    radius_metrics: tuple[str, ...],
+) -> tuple[str, dict[str, object]]:
+    candidates = [str(s).strip() for s in available_symbols if str(s).strip()]
+    if not candidates:
+        raise ValueError("Destination ffield has no atom symbols available for template matching.")
+
+    target_md = _element_metadata(target_symbol, strict=True)
+
+    if manual_template:
+        picked = str(manual_template).strip()
+        if picked not in candidates:
+            raise ValueError(f"Requested template atom {picked!r} is not present in destination ffield.")
+        picked_md = _element_metadata(picked)
+        return picked, {
+            "mode": "manual",
+            "target": target_md,
+            "chosen": picked_md,
+            "candidates": [{"symbol": c, "selected": bool(c == picked)} for c in sorted(candidates)],
+        }
+
+    scored: list[tuple[tuple[object, ...], str, dict[str, object]]] = []
+    for symbol in sorted(candidates):
+        md = _element_metadata(symbol)
+        scored.append(
+            (
+                _selection_sort_key(mode=mode, target=target_md, candidate=md, radius_metrics=radius_metrics),
+                symbol,
+                md,
+            )
+        )
+    scored.sort(key=lambda x: x[0])
+    chosen_symbol = scored[0][1]
+    chosen_md = scored[0][2]
+
+    details = []
+    for key, symbol, md in scored:
+        _ = key
+        details.append(
+            {
+                "symbol": symbol,
+                "group": md.get("group"),
+                "family": md.get("family"),
+                "radius_distance": _radius_distance(target_md, md, radius_metrics),
+                "selected": bool(symbol == chosen_symbol),
+            }
+        )
+    return chosen_symbol, {"mode": mode, "target": target_md, "chosen": chosen_md, "candidates": details}
+
+
+def _write_ffield_sections(
+    path: str | Path,
+    sections: dict[str, pd.DataFrame],
+    handler: FFieldHandler,
+    *,
+    description: str = "Merged force field generated by reaxkit.",
+) -> Path:
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    description = "Merged force field generated by reaxkit."
     general_df = sections["general"]
     atom_df = sections["atom"]
     bond_df = sections["bond"]
@@ -285,6 +521,33 @@ def _write_ffield_sections(path: str | Path, sections: dict[str, pd.DataFrame], 
 
     out_path.write_text("\n".join(text).rstrip() + "\n", encoding="utf-8")
     return out_path
+
+
+def _atom_tuple_exists(df: pd.DataFrame, atom_cols: tuple[str, ...], atom_values: list[int]) -> pd.DataFrame:
+    mask = pd.Series([True] * len(df), index=df.index)
+    for col, value in zip(atom_cols, atom_values):
+        mask &= (pd.to_numeric(df[col], errors="coerce").astype("Int64") == int(value))
+    return df.loc[mask]
+
+
+def _replacement_variants(
+    atoms: list[int],
+    *,
+    src_atom_idx: int,
+    dst_atom_idx: int,
+) -> list[list[int]]:
+    positions = [i for i, val in enumerate(atoms) if int(val) == int(src_atom_idx)]
+    if not positions:
+        return []
+    variants: list[list[int]] = []
+    n = len(positions)
+    for mask in range(1, 2 ** n):
+        mapped = list(atoms)
+        for bit in range(n):
+            if mask & (1 << bit):
+                mapped[positions[bit]] = int(dst_atom_idx)
+        variants.append(mapped)
+    return variants
 
 
 def merge_ffields(
@@ -473,4 +736,179 @@ def merge_ffields(
         source_blocks=source_blocks,
         destination_labels=destination_labels,
         destination_blocks=destination_blocks,
+    )
+
+
+def add_element_to_ffield(
+    destination: str | Path,
+    output: str | Path,
+    element: str,
+    *,
+    fields: Iterable[str] | None = None,
+    similarity_mode: str = "group",
+    closest_atom: str | None = None,
+    radius_metrics: Iterable[str] | None = None,
+    replace_existing: bool = False,
+    allow_torsion_wildcard: bool = True,
+) -> FFieldAddElementSummary:
+    """
+    Add one element to a destination ``ffield`` by cloning parameters from the closest existing atom type.
+    """
+    target_symbol = str(element).strip()
+    if not target_symbol:
+        raise ValueError("Element symbol must be non-empty.")
+    wanted_fields = _normalize_fields(fields)
+    mode = _normalize_similarity_mode(similarity_mode)
+    chosen_radius_metrics = _normalize_radius_metrics(radius_metrics)
+
+    dst_handler = FFieldHandler(destination)
+    dst_sections = {name: df.copy() for name, df in dst_handler.sections.items()}
+    dst_atom_df = dst_sections["atom"].copy()
+    dst_idx_to_sym, dst_sym_to_idx = _atom_maps(dst_atom_df)
+
+    if target_symbol in dst_sym_to_idx and not replace_existing:
+        raise ValueError(
+            f"Atom {target_symbol!r} already exists in destination ffield. "
+            "Use --replace-existing to refresh atom parameters and projected terms."
+        )
+
+    candidate_symbols = [sym for sym in dst_sym_to_idx.keys() if sym != target_symbol]
+    template_symbol, similarity_details = _pick_template_atom(
+        target_symbol=target_symbol,
+        available_symbols=candidate_symbols,
+        mode=mode,
+        manual_template=closest_atom,
+        radius_metrics=chosen_radius_metrics,
+    )
+    if template_symbol not in dst_sym_to_idx:
+        raise ValueError(f"Template atom {template_symbol!r} was not found in destination ffield.")
+    template_idx = int(dst_sym_to_idx[template_symbol])
+
+    appended = {field: 0 for field in SUPPORTED_FIELDS}
+    updated = {field: 0 for field in SUPPORTED_FIELDS}
+    skipped_existing = {field: 0 for field in SUPPORTED_FIELDS}
+    skipped_incompatible = {field: 0 for field in SUPPORTED_FIELDS}
+    appended_indices: dict[str, list[int]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_rows_used: dict[str, list[pd.Series]] = {field: [] for field in SUPPORTED_FIELDS}
+
+    target_idx = dst_sym_to_idx.get(target_symbol)
+    if target_idx is None:
+        target_idx = int(max(dst_atom_df.index.tolist())) + 1 if len(dst_atom_df.index) else 1
+        if "atom" in wanted_fields:
+            src_row = dst_atom_df.loc[template_idx].copy()
+            src_row["symbol"] = target_symbol
+            dst_atom_df.loc[target_idx] = src_row
+            appended["atom"] += 1
+            appended_indices["atom"].append(target_idx)
+            template_rows_used["atom"].append(dst_atom_df.loc[template_idx].copy())
+        dst_sym_to_idx[target_symbol] = target_idx
+        dst_idx_to_sym[target_idx] = target_symbol
+    elif "atom" in wanted_fields and replace_existing:
+        src_row = dst_atom_df.loc[template_idx].copy()
+        for col in dst_atom_df.columns:
+            if col == "symbol":
+                continue
+            if col in src_row.index:
+                dst_atom_df.loc[target_idx, col] = src_row[col]
+        updated["atom"] += 1
+        template_rows_used["atom"].append(dst_atom_df.loc[template_idx].copy())
+    elif "atom" in wanted_fields:
+        skipped_existing["atom"] += 1
+
+    dst_atom_df = dst_atom_df.sort_index()
+    dst_sections["atom"] = dst_atom_df
+
+    for section, atom_cols in SECTION_ATOM_COLS.items():
+        if section not in wanted_fields:
+            continue
+        src_df = dst_sections[section].copy()
+        dst_df = dst_sections[section].copy()
+        param_cols = [col for col in dst_df.columns if col not in atom_cols]
+
+        for _, src_row in src_df.iterrows():
+            atoms = [_safe_int(src_row[col]) for col in atom_cols]
+            if any(v is None for v in atoms):
+                skipped_incompatible[section] += 1
+                continue
+            atom_ints = [int(v) for v in atoms if v is not None]
+            if section == "torsion" and not allow_torsion_wildcard and any(v == 0 for v in atom_ints):
+                skipped_incompatible[section] += 1
+                continue
+
+            variants = _replacement_variants(atom_ints, src_atom_idx=template_idx, dst_atom_idx=target_idx)
+            if not variants:
+                continue
+
+            for mapped_atoms in variants:
+                existing_rows = _atom_tuple_exists(dst_df, atom_cols, mapped_atoms)
+                if not existing_rows.empty:
+                    if replace_existing:
+                        target_row = existing_rows.index[0]
+                        for col in param_cols:
+                            if col in src_row.index:
+                                dst_df.loc[target_row, col] = src_row[col]
+                        updated[section] += 1
+                        template_rows_used[section].append(src_row.copy())
+                    else:
+                        skipped_existing[section] += 1
+                    continue
+
+                row_payload = _mapped_row_for_destination(src_row, atom_cols, mapped_atoms, param_cols)
+                new_idx = int(max(dst_df.index.tolist())) + 1 if len(dst_df.index) else 1
+                dst_df.loc[new_idx] = row_payload
+                appended[section] += 1
+                appended_indices[section].append(new_idx)
+                template_rows_used[section].append(src_row.copy())
+
+        dst_sections[section] = dst_df.sort_index()
+
+    out_path = _write_ffield_sections(
+        output,
+        dst_sections,
+        dst_handler,
+        description=f"Force field expanded with {target_symbol} from template {template_symbol} generated by reaxkit.",
+    )
+
+    destination_labels: dict[str, list[str]] = {}
+    destination_blocks: dict[str, list[str]] = {}
+    for section in SUPPORTED_FIELDS:
+        destination_labels[section] = _labels_for_rows(section, dst_sections[section], appended_indices[section], dst_idx_to_sym)
+        destination_blocks[section] = _format_section_rows(section, dst_sections[section], appended_indices[section], dst_handler)
+
+    template_labels: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_blocks: dict[str, list[str]] = {field: [] for field in SUPPORTED_FIELDS}
+    template_idx_to_sym = dict(dst_idx_to_sym)
+    template_format_helper = FFieldHandler(destination)
+    for section in SUPPORTED_FIELDS:
+        rows = template_rows_used[section]
+        if not rows:
+            continue
+        if section == "atom":
+            temp_df = pd.DataFrame(rows)
+            if "symbol" not in temp_df.columns:
+                temp_df["symbol"] = None
+            temp_df.index = list(range(1, len(temp_df) + 1))
+            template_labels[section] = [str(temp_df.loc[i, "symbol"]).strip() for i in temp_df.index]
+            template_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), template_format_helper)
+            continue
+        temp_df = pd.DataFrame(rows)
+        temp_df.index = list(range(1, len(temp_df) + 1))
+        template_labels[section] = _labels_for_rows(section, temp_df, temp_df.index.tolist(), template_idx_to_sym)
+        template_blocks[section] = _format_section_rows(section, temp_df, temp_df.index.tolist(), template_format_helper)
+
+    return FFieldAddElementSummary(
+        output_path=out_path,
+        element=target_symbol,
+        template_atom=template_symbol,
+        similarity_mode="manual" if closest_atom else mode,
+        fields=wanted_fields,
+        appended=appended,
+        updated=updated,
+        skipped_existing=skipped_existing,
+        skipped_incompatible=skipped_incompatible,
+        template_labels=template_labels,
+        template_blocks=template_blocks,
+        destination_labels=destination_labels,
+        destination_blocks=destination_blocks,
+        similarity_details=similarity_details,
     )

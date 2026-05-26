@@ -233,6 +233,25 @@ generators:
     help_search_examples:
     - reaxkit help "merge ffield"
     - merge source and destination force fields
+  add_element_to_ffield:
+    description: Add one missing atom type to an existing ffield by selecting the closest existing template atom and projecting bond/angle/torsion/hbond terms.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - add element
+    - extrapolation
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: add_element_to_ffield'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-element-to-ffield'
+    aliases:
+    - add element to ffield
+    - add-element-to-ffield
+    - add_element_to_ffield
+    - expand ffield element
+    help_search_examples:
+    - reaxkit help "add element to ffield"
+    - add Al to existing force field using closest atom template
   trim_xmolout:
     description: Create a lightweight xmolout file containing atom type and xyz coordinates.
     tags:
