@@ -441,7 +441,7 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
         for geo_path in sorted(generated_geo_paths):
             text = geo_path.read_text(encoding="utf-8").rstrip()
             if text:
-                fout.write(text + "\n")
+                fout.write(text + "\n\n")
 
     return MaterialsProjectHeatFoResult(
         out_dir=out_dir,
