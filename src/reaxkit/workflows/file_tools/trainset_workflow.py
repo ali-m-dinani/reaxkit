@@ -73,10 +73,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if command == "get_trainset_data":
         parser.description = (
-            "Read trainset entries from one section or all sections and return them as a table.\n\n"
+            "Read trainset entries from one section or all sections and return them as a table.\n"
+            "There are multiple sections in a training set file such as ENRGY, CHARGET, etc., and they are "
+            "separated by lines starting with keyword END. \n"
             "Examples:\n"
-            "  reaxkit get_trainset_data --section all --export trainset_data.csv\n"
-            "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data.csv"
+            " 1. Getting all training sets in all sections:\n"
+            "   reaxkit get_trainset_data --section all --export trainset_data.csv\n\n"
+            " 2. Getting training sets in a specific section, for example geometry:\n"
+            "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data.csv\n\n"
         )
         parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
         parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
@@ -93,10 +97,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if command == "get_trainset_group_comments":
         parser.description = (
-            "Read grouped/comment metadata from trainset sections.\n\n"
+            "Read grouped/comment metadata from trainset sections.\n"
+            "In each section of training set files, different data are separated by line comments above them which shows "
+            "what those data are exactly (for example separating the EOS data for a material from the reaction barriers in "
+            "the ENERGY seciton.\n"
+            "Getting these group comments helps user get a summary of training set and understand what the ffield was trained against.\n\n"
             "Examples:\n"
-            "  reaxkit get_trainset_group_comments --section all --export trainset_group_comments.csv\n"
-            "  reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
+            " 1. Getting all group comments in all sections:\n"
+            "   reaxkit get_trainset_group_comments --section all --export trainset_group_comments.csv\n\n"
+            " 2. Getting group comments in a specific section, for example geometry:\n"
+            "   reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
         )
         parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
         parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
