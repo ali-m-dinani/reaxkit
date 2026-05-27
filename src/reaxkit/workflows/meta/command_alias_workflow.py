@@ -17,14 +17,25 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _ = command
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Add a user-defined alias for a ReaxKit command.\n\n"
+        "Add a user-defined alias for an existing ReaxKit command.\n"
+        "Use this command to create shorter or more memorable names for frequently used commands.\n"
+        "The alias is saved in your user alias configuration and becomes available in future CLI runs.\n\n"
         "Examples:\n"
-        "  reaxkit add-alias timeseries ts\n"
-        "  reaxkit add-alias mean-square-displacement msd2\n"
-        "  reaxkit add-alias charge-table charges"
+        "  1. Add a short alias for `timeseries`:\n"
+        "   reaxkit add-alias timeseries ts\n\n"
+        "  2. Add a custom alias for `mean-square-displacement`:\n"
+        "   reaxkit add-alias mean-square-displacement msd2\n\n"
+        "  3. Add an alias for `charge-table`:\n"
+        "   reaxkit add-alias charge-table charges"
     )
-    parser.add_argument("target_command", help="Canonical command or any existing alias for it")
-    parser.add_argument("alias", help="New alias to add for that command")
+    parser.add_argument(
+        "target_command",
+        help="Canonical command or any existing alias for it. Example: timeseries, which resolves to the command you want to alias.",
+    )
+    parser.add_argument(
+        "alias",
+        help="New alias to add for that command. Example: ts, which becomes a shortcut you can use instead of the full command name.",
+    )
     return parser
 
 

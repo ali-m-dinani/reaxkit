@@ -260,46 +260,101 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if command == MANAGE_WORKSPACE_COMMAND:
         parser.description = (
-            "Manage ReaxKit workspace storage.\n\n"
+            "Manage workspace storage by listing, deleting, keeping, or archiving entries.\n"
+            "Use this command to control disk usage under selected workspace folders such as\n"
+            "`data/raw` or `cache`, while optionally preserving the newest N entries.\n\n"
             "Examples:\n"
-            "  reaxkit manage-workspace --folder data/raw\n"
-            "  reaxkit manage-workspace --folder data/raw --action keep --number 5\n"
-            "  reaxkit manage-workspace --folder data/raw --action archive --number 5 --format zst\n"
-            "  reaxkit manage-workspace --folder cache --action list"
+            "  1. Delete all entries in a target folder (default action):\n"
+            "   reaxkit manage-workspace --folder data/raw\n\n"
+            "  2. Keep only the latest 5 entries and delete older ones:\n"
+            "   reaxkit manage-workspace --folder data/raw --action keep --number 5\n\n"
+            "  3. Archive older entries (then delete originals) and keep latest 5:\n"
+            "   reaxkit manage-workspace --folder data/raw --action archive --number 5 --format zst\n\n"
+            "  4. List entries and sizes without deleting anything:\n"
+            "   reaxkit manage-workspace --folder cache --action list"
         )
-        parser.add_argument("--folder", required=True, help="Target folder inside workspace, e.g. data/raw, cache.")
+        parser.add_argument(
+            "--folder",
+            required=True,
+            help="Target folder inside workspace. Example: --folder data/raw, which selects the raw-data folder for management.",
+        )
         parser.add_argument(
             "--action",
             choices=("list", "delete", "keep", "archive"),
             default="delete",
-            help="Action to perform. 'archive' always deletes originals after successful archive.",
+            help="Action to perform. Example: --action archive, which compresses targets then removes originals when archive succeeds.",
         )
         parser.add_argument(
             "--number",
             type=_positive_int,
             default=0,
-            help="Retention count N. Used by keep/archive; for delete, keeps latest N and deletes the rest.",
+            help="Retention count N. Example: --number 5, which keeps the 5 most recent entries and applies action to older ones.",
         )
-        parser.add_argument("--format", choices=("gz", "zst"), default="gz", help="Archive format for --action archive.")
-        parser.add_argument("--workspace-root", default=None, help="Workspace root path (auto-detected by default).")
-        parser.add_argument("--dry-run", action="store_true", help="Preview only; do not write/delete files.")
+        parser.add_argument(
+            "--format",
+            choices=("gz", "zst"),
+            default="gz",
+            help="Archive format for --action archive. Example: --format zst, which writes .tar.zst archives.",
+        )
+        parser.add_argument(
+            "--workspace-root",
+            default=None,
+            help="Workspace root path (auto-detected by default). Example: --workspace-root /path/to/reaxkit_workspace, which forces root resolution to that location.",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview only; do not write/delete files. Example: --dry-run, which shows what would change without modifying disk.",
+        )
         return parser
 
     if command == FREE_UP_COMMAND:
         parser.description = (
-            "Legacy raw-data cleanup command.\n\n"
+            "Legacy raw-data cleanup command for `data/raw` style run folders.\n"
+            "This command supports two exclusive modes: keep latest N by deleting older runs,\n"
+            "or archive+delete older runs while keeping latest N unchanged.\n\n"
             "Examples:\n"
-            "  reaxkit free-up --last 5\n"
-            "  reaxkit free-up --compress 5 --format zst\n"
-            "  reaxkit free-up --last 3 --dry-run"
+            "  1. Keep latest 5 raw runs and delete older ones:\n"
+            "   reaxkit free-up --last 5\n\n"
+            "  2. Archive+delete older runs while keeping latest 5:\n"
+            "   reaxkit free-up --compress 5 --format zst\n\n"
+            "  3. Preview cleanup actions without changing files:\n"
+            "   reaxkit free-up --last 3 --dry-run"
         )
         mode_group = parser.add_mutually_exclusive_group(required=True)
-        mode_group.add_argument("--last", type=_positive_int, metavar="N", help="Keep only the latest N raw runs.")
-        mode_group.add_argument("--compress", type=_positive_int, metavar="N", help="Archive+delete all but latest N runs.")
-        parser.add_argument("--raw-root", default=None, help="Raw root path (default: <workspace>/data/raw).")
-        parser.add_argument("--workspace-root", default=None, help="Workspace root path (auto-detected by default).")
-        parser.add_argument("--format", choices=("gz", "zst"), default="gz", help="Archive format for --compress.")
-        parser.add_argument("--dry-run", action="store_true", help="Preview only; do not write/delete files.")
+        mode_group.add_argument(
+            "--last",
+            type=_positive_int,
+            metavar="N",
+            help="Keep only the latest N raw runs. Example: --last 5, which deletes runs older than the newest five.",
+        )
+        mode_group.add_argument(
+            "--compress",
+            type=_positive_int,
+            metavar="N",
+            help="Archive+delete all but latest N runs. Example: --compress 5, which archives older runs and keeps five newest unarchived.",
+        )
+        parser.add_argument(
+            "--raw-root",
+            default=None,
+            help="Raw root path (default: <workspace>/data/raw). Example: --raw-root /tmp/raw_runs, which targets that folder directly.",
+        )
+        parser.add_argument(
+            "--workspace-root",
+            default=None,
+            help="Workspace root path (auto-detected by default). Example: --workspace-root /path/to/reaxkit_workspace, which sets the base for default raw-root resolution.",
+        )
+        parser.add_argument(
+            "--format",
+            choices=("gz", "zst"),
+            default="gz",
+            help="Archive format for --compress. Example: --format gz, which creates .tar.gz archives.",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Preview only; do not write/delete files. Example: --dry-run, which reports planned actions without modifying files.",
+        )
         return parser
 
     raise KeyError(f"Unsupported workspace command: {command!r}.")

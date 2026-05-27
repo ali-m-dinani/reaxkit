@@ -592,22 +592,22 @@ def _add_common_io_args(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--file",
         required=True,
-        help="Path to input txt/csv/tsv table.",
+        help="Path to input txt/csv/tsv table. Example: --file table.csv, which loads plotting data from that file.",
     )
     p.add_argument(
         "--save",
         default=None,
-        help="Path to save plot (file or directory). If omitted, show interactively.",
+        help="Path to save plot (file or directory). Example: --save figures/msd.png, which writes the generated figure to that path.",
     )
     p.add_argument(
         "--title",
         default=None,
-        help="Optional custom plot title.",
+        help="Optional custom plot title. Example: --title \"MSD vs Time\", which overrides the default auto title.",
     )
     p.add_argument(
         "--plot",
         action="store_true",
-        help="Generate and display/save the plot",
+        help="Generate and display/save the plot. Example: --plot, which opens the plot interactively when supported.",
     )
 
 
@@ -621,22 +621,26 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "single",
         help="Plot one or more y columns vs x columns (line/scatter).",
         description=(
+            "Plot one or more y-series against one or more x-series.\n"
+            "Use paired x/y lists for one-to-one series mapping, or one x column with multiple y columns.\n\n"
             "Examples:\n"
-            "  reaxkit plotter single --file reaxkit_workspace/analysis/msd/run_xxx/msd.csv --xaxis c1 --yaxis c2 --plot\n"
-            "  reaxkit plotter single --file table.csv --xaxis c1 --yaxis c2,c3 --scatter --save single.png"
+            "  1. Single-series interactive line plot:\n"
+            "   reaxkit plotter single --file reaxkit_workspace/analysis/msd/run_xxx/msd.csv --xaxis c1 --yaxis c2 --plot\n\n"
+            "  2. Multi-series scatter plot saved to file:\n"
+            "   reaxkit plotter single --file table.csv --xaxis c1 --yaxis c2,c3 --scatter --save single.png"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_single)
     p_single.add_argument("--xaxis", required=True,
-        help="Comma-separated list of x columns (e.g., 'c1' or 'c1,c3').",
+        help="Comma-separated list of x columns. Example: --xaxis c1,c3, which uses columns 1 and 3 as x-series.",
     )
     p_single.add_argument("--yaxis", required=True,
-        help="Comma-separated list of y columns (e.g., 'c2' or 'c2,c4').",
+        help="Comma-separated list of y columns. Example: --yaxis c2,c4, which uses columns 2 and 4 as y-series.",
     )
-    p_single.add_argument("--xlabel", default=None, help="Optional x-axis label.")
-    p_single.add_argument("--ylabel", default=None, help="Optional y-axis label.")
-    p_single.add_argument("--scatter", action="store_true", help="Use scatter instead of line plot.")
+    p_single.add_argument("--xlabel", default=None, help="Optional x-axis label. Example: --xlabel Time(ps), which labels the x-axis explicitly.")
+    p_single.add_argument("--ylabel", default=None, help="Optional y-axis label. Example: --ylabel MSD, which labels the y-axis explicitly.")
+    p_single.add_argument("--scatter", action="store_true", help="Use scatter instead of line plot. Example: --scatter, which switches marker-based rendering.")
     p_single.set_defaults(_run=_plotter_single_task)
 
     # ---- directed ----
@@ -644,16 +648,18 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "directed",
         help="Line plot with arrows showing direction along the path.",
         description=(
+            "Create a line plot with directional arrows along the path.\n"
+            "Use this when path direction over sample order matters.\n\n"
             "Example:\n"
             "  reaxkit plotter directed --file table.csv --xaxis c1 --yaxis c2 --save directed.png"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_directed)
-    p_directed.add_argument("--xaxis", required=True, help="Single x column (e.g., 'c1').")
-    p_directed.add_argument("--yaxis", required=True, help="Single y column (e.g., 'c2').")
-    p_directed.add_argument("--xlabel", default=None, help="Optional x-axis label.")
-    p_directed.add_argument("--ylabel", default=None, help="Optional y-axis label.")
+    p_directed.add_argument("--xaxis", required=True, help="Single x column. Example: --xaxis c1, which maps column 1 to x values.")
+    p_directed.add_argument("--yaxis", required=True, help="Single y column. Example: --yaxis c2, which maps column 2 to y values.")
+    p_directed.add_argument("--xlabel", default=None, help="Optional x-axis label. Example: --xlabel Step, which customizes x-axis text.")
+    p_directed.add_argument("--ylabel", default=None, help="Optional y-axis label. Example: --ylabel Energy, which customizes y-axis text.")
     p_directed.set_defaults(_run=_plotter_directed_task)
 
     # ---- dual ----
@@ -661,18 +667,20 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "dual",
         help="Dual y-axis plot: one x column, two y columns.",
         description=(
+            "Create a dual y-axis plot with one shared x column and two y columns.\n"
+            "Use this to compare two metrics with different value scales on the same x progression.\n\n"
             "Example:\n"
             "  reaxkit plotter dual --file table.csv --xaxis c1 --y1 c2 --y2 c3 --save dual_plot.png"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_dual)
-    p_dual.add_argument("--xaxis", required=True, help="Single x column (e.g., 'c1').")
-    p_dual.add_argument("--y1", required=True, help="Left y-axis column (e.g., 'c2').")
-    p_dual.add_argument("--y2", required=True, help="Right y-axis column (e.g., 'c3').")
-    p_dual.add_argument("--xlabel", default=None, help="Optional x-axis label.")
-    p_dual.add_argument("--ylabel1", default=None, help="Optional left y-axis label.")
-    p_dual.add_argument("--ylabel2", default=None, help="Optional right y-axis label.")
+    p_dual.add_argument("--xaxis", required=True, help="Single x column. Example: --xaxis c1, which sets column 1 as shared x-axis.")
+    p_dual.add_argument("--y1", required=True, help="Left y-axis column. Example: --y1 c2, which plots column 2 on the left y-axis.")
+    p_dual.add_argument("--y2", required=True, help="Right y-axis column. Example: --y2 c3, which plots column 3 on the right y-axis.")
+    p_dual.add_argument("--xlabel", default=None, help="Optional x-axis label. Example: --xlabel Time, which customizes x-axis text.")
+    p_dual.add_argument("--ylabel1", default=None, help="Optional left y-axis label. Example: --ylabel1 Temp, which labels the left axis.")
+    p_dual.add_argument("--ylabel2", default=None, help="Optional right y-axis label. Example: --ylabel2 Pressure, which labels the right axis.")
     p_dual.set_defaults(_run=_plotter_dual_task)
 
     # ---- tornado ----
@@ -680,21 +688,25 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "tornado",
         help="Tornado plot: label + min/max (+ optional median).",
         description=(
+            "Create a tornado plot using label + min/max columns, with optional median overlays.\n"
+            "Use this for sensitivity-style comparisons across parameters.\n\n"
             "Examples:\n"
-            "  reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --median c4 --top 10 --save tornado.png\n"
-            "  reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --plot"
+            "  1. Save tornado plot with median and top-N filtering:\n"
+            "   reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --median c4 --top 10 --save tornado.png\n\n"
+            "  2. Display tornado plot interactively:\n"
+            "   reaxkit plotter tornado --file table.csv --label c1 --min c2 --max c3 --plot"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_tornado)
-    p_tornado.add_argument("--label", required=True, help="Column for labels (e.g., 'c1').")
-    p_tornado.add_argument("--min", required=True, help="Column for minimum values (e.g., 'c2').")
-    p_tornado.add_argument("--max", required=True, help="Column for maximum values (e.g., 'c3').")
-    p_tornado.add_argument("--median", default=None, help="Optional column for median values (e.g., 'c4').")
-    p_tornado.add_argument("--top", type=int, default=0, help="Show only top-N widest bars (0 = all).")
-    p_tornado.add_argument("--vline", type=float, default=None, help="Optional vertical reference line (e.g., 0.0).")
-    p_tornado.add_argument("--xlabel", default=None, help="Optional x-axis label.")
-    p_tornado.add_argument("--ylabel", default=None, help="Optional y-axis label.")
+    p_tornado.add_argument("--label", required=True, help="Column for labels. Example: --label c1, which uses column 1 as parameter names.")
+    p_tornado.add_argument("--min", required=True, help="Column for minimum values. Example: --min c2, which provides left-side bar bounds.")
+    p_tornado.add_argument("--max", required=True, help="Column for maximum values. Example: --max c3, which provides right-side bar bounds.")
+    p_tornado.add_argument("--median", default=None, help="Optional column for median values. Example: --median c4, which overlays median markers/lines.")
+    p_tornado.add_argument("--top", type=int, default=0, help="Show only top-N widest bars (0 = all). Example: --top 10, which keeps the 10 widest ranges.")
+    p_tornado.add_argument("--vline", type=float, default=None, help="Optional vertical reference line. Example: --vline 0.0, which draws a baseline at zero.")
+    p_tornado.add_argument("--xlabel", default=None, help="Optional x-axis label. Example: --xlabel Sensitivity, which customizes x-axis text.")
+    p_tornado.add_argument("--ylabel", default=None, help="Optional y-axis label. Example: --ylabel Parameter, which customizes y-axis text.")
     p_tornado.set_defaults(_run=_plotter_tornado_task)
 
     # ---- scatter3d ----
@@ -702,16 +714,18 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "scatter3d",
         help="3D scatter of (x,y,z) points colored by a value.",
         description=(
+            "Create a 3D scatter plot of coordinates colored by a scalar value.\n"
+            "Use this to inspect spatial patterns and value gradients together.\n\n"
             "Example:\n"
             "  reaxkit plotter scatter3d --file table.csv --x c1 --y c2 --z c3 --value c4 --save scatter3d.png"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_scatter3d)
-    p_scatter3d.add_argument("--x", required=True, help="x coordinate column (e.g., 'c1').")
-    p_scatter3d.add_argument("--y", required=True, help="y coordinate column (e.g., 'c2').")
-    p_scatter3d.add_argument("--z", required=True, help="z coordinate column (e.g., 'c3').")
-    p_scatter3d.add_argument("--value", required=True, help="Value column for coloring (e.g., 'c4').")
+    p_scatter3d.add_argument("--x", required=True, help="x coordinate column. Example: --x c1, which maps column 1 to x coordinates.")
+    p_scatter3d.add_argument("--y", required=True, help="y coordinate column. Example: --y c2, which maps column 2 to y coordinates.")
+    p_scatter3d.add_argument("--z", required=True, help="z coordinate column. Example: --z c3, which maps column 3 to z coordinates.")
+    p_scatter3d.add_argument("--value", required=True, help="Value column for coloring. Example: --value c4, which maps column 4 to point colors.")
     p_scatter3d.set_defaults(_run=_plotter_scatter3d_task)
 
     # ---- heatmap2d ----
@@ -719,20 +733,22 @@ def register_tasks(subparsers: argparse._SubParsersAction) -> None:
         "heatmap2d",
         help="2D heatmap from 3D coords + values (projection plane selectable).",
         description=(
+            "Create a 2D aggregated heatmap by projecting 3D coordinates onto a selected plane.\n"
+            "Use this to summarize spatial value distributions on XY/XZ/YZ views.\n\n"
             "Example:\n"
             "  reaxkit plotter heatmap2d --file table.csv --x c1 --y c2 --z c3 --value c4 --plane xz --bins 100,80 --save heat_xz.png"
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
     _add_common_io_args(p_heatmap2d)
-    p_heatmap2d.add_argument("--x", required=True, help="x coordinate column (e.g., 'c1').")
-    p_heatmap2d.add_argument("--y", required=True, help="y coordinate column (e.g., 'c2').")
-    p_heatmap2d.add_argument("--z", required=True, help="z coordinate column (e.g., 'c3').")
-    p_heatmap2d.add_argument("--value", required=True, help="value column to aggregate (e.g., 'c4').")
+    p_heatmap2d.add_argument("--x", required=True, help="x coordinate column. Example: --x c1, which maps column 1 to x coordinates.")
+    p_heatmap2d.add_argument("--y", required=True, help="y coordinate column. Example: --y c2, which maps column 2 to y coordinates.")
+    p_heatmap2d.add_argument("--z", required=True, help="z coordinate column. Example: --z c3, which maps column 3 to z coordinates.")
+    p_heatmap2d.add_argument("--value", required=True, help="Value column to aggregate. Example: --value c4, which provides scalar values for bin aggregation.")
     p_heatmap2d.add_argument("--plane", choices=["xy", "xz", "yz"], default="xy",
-        help="Projection plane for heatmap (default: xy).",
+        help="Projection plane for heatmap. Example: --plane xz, which projects data onto the XZ plane.",
     )
     p_heatmap2d.add_argument("--bins", default="50",
-        help="Grid resolution: int (e.g., 50) or 'nx,ny' (e.g., '50,100').",
+        help="Grid resolution: int or 'nx,ny'. Example: --bins 100,80, which uses 100 bins on one axis and 80 on the other.",
     )
     p_heatmap2d.set_defaults(_run=_plotter_heatmap2d_task)

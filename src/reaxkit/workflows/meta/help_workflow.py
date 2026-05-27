@@ -15,49 +15,57 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     """Define CLI arguments for `reaxkit help`."""
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
-        "Interactive help and discovery for ReaxKit commands and file semantics.\n\n"
+        "Interactive help and discovery for ReaxKit commands, capabilities, and file semantics.\n"
+        "Use this command to search ReaxKit concepts (for example analyses or generators) and\n"
+        "ReaxFF-related files by keyword. You can narrow results, enforce exact matching, and\n"
+        "request detailed mapping information.\n\n"
         "Examples:\n"
-        "  reaxkit help \"msd\"\n"
-        "  reaxkit help \"bond order\"\n"
-        "  reaxkit help \"bond order\" --top 3\n"
-        "  reaxkit help \"restraint\" --engine reaxff\n"
-        "  reaxkit help \"fort.7\" --all-info\n"
-        "  reaxkit help \"xmolout\" --all-info"
+        "  1. Basic keyword search:\n"
+        "   reaxkit help \"msd\"\n\n"
+        "  2. Search with multi-word phrase:\n"
+        "   reaxkit help \"bond order\"\n\n"
+        "  3. Limit result count:\n"
+        "   reaxkit help \"bond order\" --top 3\n\n"
+        "  4. Search with explicit engine context:\n"
+        "   reaxkit help \"restraint\" --engine reaxff\n\n"
+        "  5. Show detailed mapping information:\n"
+        "   reaxkit help \"fort.7\" --all-info\n"
+        "   reaxkit help \"xmolout\" --all-info"
     )
 
     p.add_argument(
         "query",
         nargs="?",
         default=None,
-        help="Search query (use quotes for multi-word queries).",
+        help="Search query (use quotes for multi-word queries). Example: \"bond order\", which searches that phrase across help index entries.",
     )
 
     p.add_argument(
         "--top",
         type=int,
         default=8,
-        help="Maximum results per category (generator/file/analyzer/workflow), sorted by score.",
+        help="Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3 hits per category.",
     )
 
     p.add_argument(
         "--engine",
         type=str,
         default=None,
-        help="Optional engine context (example: reaxff) for dataclass-to-file mappings.",
+        help="Optional engine context for dataclass-to-file mappings. Example: --engine reaxff, which resolves relationships using ReaxFF context.",
     )
 
     p.add_argument(
         "--all-info",
         dest="all_info",
         action="store_true",
-        help="Show detailed implementation and file/dataclass/analyzer mapping information.",
+        help="Show detailed implementation and file/dataclass/analyzer mapping information. Example: --all-info, which expands output beyond summary hits.",
     )
 
     p.add_argument(
         "--exact-match",
         dest="exact_match",
         action="store_true",
-        help="Match query exactly against item title (and aliases) before returning results.",
+        help="Match query exactly against item title (and aliases) before returning results. Example: --exact-match, which avoids broad fuzzy matches.",
     )
 
 

@@ -209,16 +209,28 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     """
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
-        "Inspect ReaxKit modules and folders.\n\n"
+        "Inspect ReaxKit modules and folders for quick codebase discovery.\n"
+        "This command supports two mutually exclusive modes:\n"
+        "  1. `--file`   -> inspect one module/file and list public symbols\n"
+        "  2. `--folder` -> recursively list modules with docstring summaries\n"
+        "Use it to understand available functionality without opening files manually.\n\n"
         "Examples:\n"
-        "  reaxkit intspec --folder workflows\n"
-        "  reaxkit intspec --folder reaxkit.workflows.meta\n"
-        "  reaxkit intspec --file reaxkit.workflows.meta.help_workflow\n"
-        "  reaxkit intspec --file reaxkit/workflows/meta/help_workflow.py"
+        "  1. Recursively inspect the workflows package via shorthand:\n"
+        "   reaxkit intspec --folder workflows\n\n"
+        "  2. Inspect a specific dotted package path:\n"
+        "   reaxkit intspec --folder reaxkit.workflows.meta\n\n"
+        "  3. Inspect a module by dotted module name:\n"
+        "   reaxkit intspec --file reaxkit.workflows.meta.help_workflow\n\n"
     )
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
-    g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
+    g.add_argument(
+        "--file",
+        help="Module name or path to .py. Example: --file reaxkit.workflows.meta.help_workflow, which inspects that module and lists public symbols.",
+    )
+    g.add_argument(
+        "--folder",
+        help="Folder/package to scan recursively. Example: --folder workflows, which expands to the workflows package and lists contained modules.",
+    )
 
 
 # ------------------------- FILE MODE -------------------------
