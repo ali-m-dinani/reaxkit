@@ -18,14 +18,33 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _ = command
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Trim xmolout to a lighter file with only atom type and x,y,z coordinates.\n\n"
+        "Trim an `xmolout` file to a lighter format containing only atom type and x/y/z coordinates.\n"
+        "This command is useful when full xmolout output is too large for quick inspection or downstream\n"
+        "tools that support reading atomic positions (not other variables like velocities, molecule numbers, etc."
+        "which may be written to the xmolout file using ixmolo keyword in the control file)."
+        " It writes a reduced output file and does not modify\n"
+        "the input file in place.\n\n"
         "Examples:\n"
-        "  reaxkit trim-xmolout --file xmolout --output xmolout_trimmed\n"
-        "  reaxkit trim-xmolout --output xmolout_light"
+        "  1. Trim a specific xmolout file to a named output:\n"
+        "   reaxkit trim-xmolout --file xmolout --output xmolout_trimmed\n\n"
+        "  2. Trim using a custom output filename:\n"
+        "   reaxkit trim-xmolout --output xmolout_light"
     )
-    parser.add_argument("--file", default="xmolout", help="Input xmolout file")
-    parser.add_argument("--output", default="xmolout_trimmed", help="Output trimmed xmolout file")
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    parser.add_argument(
+        "--file",
+        default="xmolout",
+        help="Input xmolout file. Example: --file runs/job1/xmolout, which reads that trajectory/output file as input.",
+    )
+    parser.add_argument(
+        "--output",
+        default="xmolout_trimmed",
+        help="Output trimmed xmolout file. Example: --output xmolout_light, which writes the reduced-content file with that name.",
+    )
+    parser.add_argument(
+        "--copy-to-dot",
+        action="store_true",
+        help="Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
+    )
     add_storage_cli_arguments(parser)
     return parser
 

@@ -36,38 +36,147 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="gen_eregime")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate ReaxFF eregime.in files from standard field profiles.\n\n"
+        "Generate a ReaxFF `eregime.in` file from a selected electric-field profile.\n"
+        "This command writes sampled field values for three profile types:\n"
+        "  1. `sin`  -> sinusoidal waveform\n"
+        "  2. `pulse` -> pulse waveform with rise/flat/fall regions\n"
+        "  3. `func` -> custom expression in `t`\n"
+        "It only generates the input file and does not execute the simulation.\n\n"
         "Examples:\n"
-        "  reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n"
-        "  reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n"
-        "  reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1"
+        "  1. Sinusoidal profile:\n"
+        "   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n\n"
+        "  2. Pulse profile:\n"
+        "   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n\n"
+        "  3. Custom function profile:\n"
+        "   reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1"
     )
 
-    parser.add_argument("--type", choices=["sin", "pulse", "func"], required=True, help="Generator profile type")
-    parser.add_argument("--output", default="eregime.in", help="Output file path")
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    parser.add_argument("--direction", default="z", help="Field direction: x|y|z")
-    parser.add_argument("--V", type=int, default=1, help="Voltage index")
-    parser.add_argument("--start-iter", type=int, default=0, help="Starting iteration")
+    parser.add_argument(
+        "--type",
+        choices=["sin", "pulse", "func"],
+        required=True,
+        help="Generator profile type. Example: --type sin, which selects sinusoidal waveform generation.",
+    )
+    parser.add_argument(
+        "--output",
+        default="eregime.in",
+        help="Output file path. Example: --output eregime_custom.in, which writes the generated file with that name.",
+    )
+    parser.add_argument(
+        "--copy-to-dot",
+        action="store_true",
+        help="Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
+    )
+    parser.add_argument(
+        "--direction",
+        default="z",
+        help="Field direction: x|y|z. Example: --direction x, which applies the field along x-axis.",
+    )
+    parser.add_argument(
+        "--V",
+        type=int,
+        default=1,
+        help="Voltage index. Example: --V 2, which writes the field under voltage channel/index 2.",
+    )
+    parser.add_argument(
+        "--start-iter",
+        type=int,
+        default=0,
+        help="Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000.",
+    )
 
-    parser.add_argument("--max-magnitude", type=float, default=None, help="Peak amplitude for sin profile (V/A)")
-    parser.add_argument("--step-angle", type=float, default=None, help="Angular sampling step for sin profile (radians)")
-    parser.add_argument("--num-cycles", type=float, default=None, help="Number of cycles for sin or pulse profile")
-    parser.add_argument("--phase", type=float, default=0.0, help="Phase offset for sin profile (radians)")
-    parser.add_argument("--dc-offset", type=float, default=0.0, help="DC offset for sin profile (V/A)")
+    parser.add_argument(
+        "--max-magnitude",
+        type=float,
+        default=None,
+        help="Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength.",
+    )
+    parser.add_argument(
+        "--step-angle",
+        type=float,
+        default=None,
+        help="Angular sampling step for sin profile (radians). Example: --step-angle 0.05, which controls sine sampling density per cycle.",
+    )
+    parser.add_argument(
+        "--num-cycles",
+        type=float,
+        default=None,
+        help="Number of cycles for sin or pulse profile. Example: --num-cycles 3, which repeats the waveform for three cycles.",
+    )
+    parser.add_argument(
+        "--phase",
+        type=float,
+        default=0.0,
+        help="Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2.",
+    )
+    parser.add_argument(
+        "--dc-offset",
+        type=float,
+        default=0.0,
+        help="DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform.",
+    )
 
-    parser.add_argument("--amplitude", type=float, default=None, help="Peak amplitude for pulse profile (V/A)")
-    parser.add_argument("--width", type=float, default=None, help="Flat-top width for pulse profile")
-    parser.add_argument("--period", type=float, default=None, help="Full-cycle period for pulse profile")
-    parser.add_argument("--slope", type=float, default=None, help="Ramp duration for pulse profile")
-    parser.add_argument("--step-size", type=float, default=0.1, help="Temporal resolution for pulse profile")
-    parser.add_argument("--baseline", type=float, default=0.0, help="Baseline for pulse profile (V/A)")
+    parser.add_argument(
+        "--amplitude",
+        type=float,
+        default=None,
+        help="Peak amplitude for pulse profile (V/A). Example: --amplitude 0.003, which sets the pulse peak field strength.",
+    )
+    parser.add_argument(
+        "--width",
+        type=float,
+        default=None,
+        help="Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level.",
+    )
+    parser.add_argument(
+        "--period",
+        type=float,
+        default=None,
+        help="Full-cycle period for pulse profile. Example: --period 200, which sets one pulse cycle duration.",
+    )
+    parser.add_argument(
+        "--slope",
+        type=float,
+        default=None,
+        help="Ramp duration for pulse profile. Example: --slope 20, which sets rise/fall transition duration.",
+    )
+    parser.add_argument(
+        "--step-size",
+        type=float,
+        default=0.1,
+        help="Temporal resolution for pulse profile. Example: --step-size 0.1, which samples the pulse every 0.1 time unit.",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=float,
+        default=0.0,
+        help="Baseline for pulse profile (V/A). Example: --baseline 0.0005, which shifts the pulse around a non-zero base field.",
+    )
 
-    parser.add_argument("--expr", default=None, help="Python expression in t for func profile")
-    parser.add_argument("--t-end", type=float, default=None, help="End time for func profile")
-    parser.add_argument("--dt", type=float, default=None, help="Time step for func profile")
+    parser.add_argument(
+        "--expr",
+        default=None,
+        help="Python expression in t for func profile. Example: --expr '0.003*cos(2*pi*t/100)', which defines field value as a function of t.",
+    )
+    parser.add_argument(
+        "--t-end",
+        type=float,
+        default=None,
+        help="End time for func profile. Example: --t-end 1000, which sets the final time point for function sampling.",
+    )
+    parser.add_argument(
+        "--dt",
+        type=float,
+        default=None,
+        help="Time step for func profile. Example: --dt 1, which samples the function every 1 time unit.",
+    )
 
-    parser.add_argument("--iteration-step", type=int, required=True, help="Iterations per sample")
+    parser.add_argument(
+        "--iteration-step",
+        type=int,
+        required=True,
+        help="Iterations per sample. Example: --iteration-step 250, which maps each generated sample to 250 MD iterations.",
+    )
     add_storage_cli_arguments(parser)
     return parser
 

@@ -20,11 +20,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="gen_template_addmol")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate ReaxFF addmol templates (addmol.bgf and addmol.vel).\n\n"
+        "Write template addmol files for ReaxFF workflows (addmol.bgf and addmol.vel).\n"
+        "This command generates starter templates only. It does not run molecular dynamics or modify\n"
+        "existing simulation data. Use the generated files as a clean starting point, then edit them\n"
+        "based on your target system before running downstream workflows.\n\n"
         "Examples:\n"
-        "  reaxkit gen_template_addmol\n"
-        "  reaxkit gen_template_addmol --output addmol.bgf\n"
-        "  reaxkit gen_template_addmol --output custom_addmol.bgf --copy-to-dot"
+        "  1. Generate templates using default output name ('addmol.bgf'):\n"
+        "   reaxkit gen_template_addmol\n\n"
+        "  2. Generate templates with a custom BGF filename:\n"
+        "   reaxkit gen_template_addmol --output custom_addmol.bgf\n\n"
+        "  3. Generate templates and also copy them to the current directory:\n"
+        "   reaxkit gen_template_addmol --output custom_addmol.bgf --copy-to-dot"
     )
     parser.add_argument(
         "--output",

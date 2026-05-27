@@ -18,14 +18,31 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _ = command
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Extract the optimized force-field block from fort.83.\n\n"
+        "Extract the optimized force-field block from a `fort.83` file.\n"
+        "This command scans for the `Error force field` marker and writes everything after that\n"
+        "marker to a separate output file. Use it to recover the trained/optimized force field\n"
+        "from optimization output.\n\n"
         "Examples:\n"
-        "  reaxkit extract-optimized-ffield --fort83 fort.83 --output ffield_optimized\n"
-        "  reaxkit extract-optimized-ffield --output trained_ffield"
+        "  1. Extract from a specific `fort.83` file with explicit output name:\n"
+        "   reaxkit extract-optimized-ffield --fort83 fort.83 --output ffield_optimized\n\n"
+        "  2. Extract using a custom output filename:\n"
+        "   reaxkit extract-optimized-ffield --output trained_ffield"
     )
-    parser.add_argument("--fort83", default="fort.83", help="Path to fort.83")
-    parser.add_argument("--output", default="ffield_optimized", help="Output path for the extracted force field")
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    parser.add_argument(
+        "--fort83",
+        default="fort.83",
+        help="Path to fort.83. Example: --fort83 runs/job1/fort.83, which reads that optimization output file.",
+    )
+    parser.add_argument(
+        "--output",
+        default="ffield_optimized",
+        help="Output path for the extracted force field. Example: --output trained_ffield, which writes extracted parameters to that filename.",
+    )
+    parser.add_argument(
+        "--copy-to-dot",
+        action="store_true",
+        help="Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
+    )
     add_storage_cli_arguments(parser)
     return parser
 

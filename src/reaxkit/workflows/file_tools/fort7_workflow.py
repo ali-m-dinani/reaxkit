@@ -19,20 +19,38 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="repair_fort7")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Repair corrupted fort.7 atom lines where fused integer columns break tokenization.\n\n"
+        "Repair corrupted `fort.7` atom lines where fused integer columns break tokenization.\n"
+        "This command rewrites a repaired output file while preserving lines that do not need\n"
+        "changes. It is useful when malformed spacing/column fusion causes downstream parsing\n"
+        "failures, which happen in +9999-atom-simulations using Standalone ReaxFF, in trajectory or "
+        "analysis workflows.\n\n"
         "Examples:\n"
-        "  reaxkit repair_fort7 --file fort.7 --output fort7_fixed\n"
-        "  reaxkit repair_fort7 --output fort7_repaired --copy-to-dot"
+        "  1. Repair a specific input file and write to a named output:\n"
+        "   reaxkit repair_fort7 --file fort.7 --output fort7_fixed\n\n"
+        "  2. Repair using custom output and also copy result to current directory:\n"
+        "   reaxkit repair_fort7 --output fort7_repaired --copy-to-dot"
     )
-    parser.add_argument("--file", default="fort.7", help="Input fort.7 file")
-    parser.add_argument("--output", default="fort7_fixed", help="Output repaired fort.7 file")
+    parser.add_argument(
+        "--file",
+        default="fort.7",
+        help="Input fort.7 file. Example: --file runs/job1/fort.7, which reads that file as repair source.",
+    )
+    parser.add_argument(
+        "--output",
+        default="fort7_fixed",
+        help="Output repaired fort.7 file. Example: --output fort7_repaired, which writes repaired content using that output name.",
+    )
     parser.add_argument(
         "--progress-every",
         type=int,
         default=5000,
-        help="Progress interval in lines (stored for metadata compatibility).",
+        help="Progress interval in lines (stored for metadata compatibility). Example: --progress-every 10000, which records progress in larger line-step chunks.",
     )
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    parser.add_argument(
+        "--copy-to-dot",
+        action="store_true",
+        help="Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
+    )
     add_storage_cli_arguments(parser)
     return parser
 

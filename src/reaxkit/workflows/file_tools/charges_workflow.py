@@ -19,11 +19,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="gen_template_charges")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate a ReaxFF charges template file.\n\n"
+        "Write a template charges file for ReaxFF workflows.\n"
+        "This command generates a starter charges file only. It does not run simulation steps\n"
+        "or apply charges to an existing trajectory/run. Use the generated file as a base, then\n"
+        "edit it according to your system and workflow requirements.\n\n"
         "Examples:\n"
-        "  reaxkit gen_template_charges\n"
-        "  reaxkit gen_template_charges --output charges\n"
-        "  reaxkit gen_template_charges --output charges.template --copy-to-dot"
+        "  1. Generate a template using default output name ('charges'):\n"
+        "   reaxkit gen_template_charges\n\n"
+        "  2. Generate a template with a custom filename:\n"
+        "   reaxkit gen_template_charges --output charges.template\n\n"
+        "  3. Generate a template and also copy it to the current directory:\n"
+        "   reaxkit gen_template_charges --output charges.template --copy-to-dot"
     )
     parser.add_argument(
         "--output",

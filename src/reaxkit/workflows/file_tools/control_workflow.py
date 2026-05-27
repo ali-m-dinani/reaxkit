@@ -68,11 +68,37 @@ def _format_value(value):
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--control", "--file", dest="control", default="control", help="Path to control file")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument(
+        "--engine",
+        choices=["reaxff", "ams", "lammps"],
+        default=None,
+        help="Engine override. Example: --engine reaxff, which forces ReaxFF parsing/writing rules.",
+    )
+    parser.add_argument(
+        "--input",
+        default=".",
+        help="Input file or directory for engine resolution. Example: --input runs/job1, which tells the resolver where to inspect files.",
+    )
+    parser.add_argument(
+        "--run-dir",
+        "--dir",
+        dest="run_dir",
+        default=".",
+        help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which is used when --input is not enough to resolve context.",
+    )
+    parser.add_argument(
+        "--control",
+        "--file",
+        dest="control",
+        default="control",
+        help="Path to control file. Example: --control runs/job1/control, which reads that specific control file instead of the default one.",
+    )
+    parser.add_argument(
+        "--log",
+        choices=["verbose", "quiet"],
+        default=None,
+        help="Logging level. Example: --log verbose, which prints more runtime details.",
+    )
     add_storage_cli_arguments(parser)
 
 
@@ -94,35 +120,40 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.set_defaults(progress=True)
         parser.formatter_class = argparse.RawTextHelpFormatter
         parser.description = (
-            "Generate a default control file template.\n\n"
+            "Write a template ReaxFF control file.\n"
+            "This command generates a starter control file only. It does not run a simulation.\n"
+            "You can optionally override one or more parameters at generation time by repeating\n"
+            "--parameter/--value pairs.\n\n"
             "Examples:\n"
-            "  reaxkit gen_control\n"
-            "  reaxkit gen_control --output control\n"
-            "  reaxkit gen_control --parameter nmdit --value 100000\n"
-            "  reaxkit gen_control --output control --copy-to-dot"
+            "  1. Generate a default control template ('control'):\n"
+            "   reaxkit gen_control\n\n"
+            "  2. Generate a template and override one parameter:\n"
+            "   reaxkit gen_control --parameter nmdit --value 100000\n\n"
+            "  3. Generate a template and also copy it to the current directory:\n"
+            "   reaxkit gen_control --output control --copy-to-dot"
         )
         add_storage_cli_arguments(parser)
         parser.add_argument(
             "--output",
             default="control",
-            help="Output filename to write under <project_root>/input/",
+            help="Output filename under <project_root>/input/. Example: --output control.fast, which writes the generated template with that filename.",
         )
         parser.add_argument(
             "--copy-to-dot",
             action="store_true",
-            help="Also copy the generated control file to the current directory.",
+            help="Also copy the generated control file to the current directory. Example: --copy-to-dot, which keeps an extra copy beside where you run the command.",
         )
         parser.add_argument(
             "--parameter",
             action="append",
             default=[],
-            help="Control parameter key to override (repeatable, must pair with --value).",
+            help="Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which selects the key to change.",
         )
         parser.add_argument(
             "--value",
             action="append",
             default=[],
-            help="Override value for the corresponding --parameter entry.",
+            help="Override value for the corresponding --parameter entry. Example: --value 100000, which sets the new value for the paired key.",
         )
         return parser
 
@@ -131,39 +162,69 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.set_defaults(progress=True)
         parser.formatter_class = argparse.RawTextHelpFormatter
         parser.description = (
-            "Read a control file, apply key changes, and write a new control file.\n\n"
+            "Read an existing control file, apply parameter overrides, and write an updated file.\n"
+            "Use this command when you want to keep most of a control file unchanged while updating\n"
+            "specific keys through repeatable --parameter/--value pairs.\n\n"
             "Examples:\n"
-            "  reaxkit write-control --control control --output control.new\n"
-            "  reaxkit write-control --control control --parameter nmdit --value 200000 --output control.fast"
+            "  1. Copy a control file to a new output name without changing parameters:\n"
+            "   reaxkit write-control --control control --output control.new\n\n"
+            "  2. Update one parameter while writing a new control file:\n"
+            "   reaxkit write-control --control control --parameter nmdit --value 200000 --output control.fast"
         )
         add_storage_cli_arguments(parser)
-        parser.add_argument("--engine", choices=["reaxff"], default="reaxff")
-        parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-        parser.add_argument("--control", "--file", dest="control", default="control", help="Path to source control file")
+        parser.add_argument(
+            "--engine",
+            choices=["reaxff"],
+            default="reaxff",
+            help="Engine type for control IO. Example: --engine reaxff, which applies ReaxFF-specific control-file handling.",
+        )
+        parser.add_argument(
+            "--input",
+            default=".",
+            help="Input file or directory for engine resolution. Example: --input runs/job1, which points resolution to that run location.",
+        )
+        parser.add_argument(
+            "--run-dir",
+            "--dir",
+            dest="run_dir",
+            default=".",
+            help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup context for engine detection.",
+        )
+        parser.add_argument(
+            "--control",
+            "--file",
+            dest="control",
+            default="control",
+            help="Path to source control file. Example: --control runs/job1/control, which is the file to read and modify.",
+        )
         parser.add_argument(
             "--output",
             default="control",
-            help="Output filename to write under <project_root>/input/",
+            help="Output filename under <project_root>/input/. Example: --output control.new, which writes the updated file under that name.",
         )
         parser.add_argument(
             "--copy-to-dot",
             action="store_true",
-            help="Also copy the generated control file to the current directory.",
+            help="Also copy the generated control file to the current directory. Example: --copy-to-dot, which creates a convenience copy in your working directory.",
         )
         parser.add_argument(
             "--parameter",
             action="append",
             default=[],
-            help="Control parameter key to override (repeatable, must pair with --value).",
+            help="Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement.",
         )
         parser.add_argument(
             "--value",
             action="append",
             default=[],
-            help="Override value for the corresponding --parameter entry.",
+            help="Override value for the corresponding --parameter entry. Example: --value 200000, which becomes the new value for the matched parameter key.",
         )
-        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+        parser.add_argument(
+            "--log",
+            choices=["verbose", "quiet"],
+            default=None,
+            help="Logging level. Example: --log quiet, which suppresses non-essential log output.",
+        )
         return parser
 
     canonical = resolve_command_name(command, task_names=CONTROL_COMMANDS)
@@ -173,15 +234,28 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     if canonical == "get-control":
         _add_runtime_arguments(parser)
         parser.description = (
-            "Get the value of a control parameter.\n\n"
+            "Read and print the value of one control parameter key.\n"
+            "Use this command to quickly inspect a control file without opening or parsing it manually.\n"
+            "You can optionally scope lookup to a section and provide a fallback default value.\n\n"
             "Examples:\n"
-            "  reaxkit get-control nmdit\n"
-            "  reaxkit get-control iout2 --control control --section md\n"
-            "  reaxkit get-control imetho --control runs/job1/control"
+            "  1. Read a key from the default control file ('control'):\n"
+            "   reaxkit get-control nmdit\n\n"
+            "  2. Read a key from a specific section:\n"
+            "   reaxkit get-control iout2 --control control --section md\n\n"
+            "  3. Read a key from a control file at a custom path:\n"
+            "   reaxkit get-control imetho --control runs/job1/control"
         )
-        parser.add_argument("key", help="Control key to look up, e.g. 'nmdit'")
-        parser.add_argument("--section", default=None, help="Optional section: general, md, mm, ff, outdated")
-        parser.add_argument("--default", default=None, help="Fallback value when the key is missing")
+        parser.add_argument("key", help="Control key to look up. Example: nmdit, which queries the `nmdit` parameter value.")
+        parser.add_argument(
+            "--section",
+            default=None,
+            help="Optional section: general, md, mm, ff, outdated. Example: --section md, which narrows lookup to the MD section.",
+        )
+        parser.add_argument(
+            "--default",
+            default=None,
+            help="Fallback value if key is missing. Example: --default 0, which prints 0 instead of failing when the key is absent.",
+        )
     else:
         raise KeyError(f"Unsupported control command '{canonical}'.")
 

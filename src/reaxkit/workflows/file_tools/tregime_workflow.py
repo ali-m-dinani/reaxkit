@@ -19,14 +19,31 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="gen_template_tregime")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate a sample tregime.in file.\n\n"
+        "Write a template `tregime.in` file for ReaxFF workflows.\n"
+        "This command generates a starter tregime file with configurable sample-row count.\n"
+        "It is intended as a baseline template and does not execute simulation steps.\n\n"
         "Examples:\n"
-        "  reaxkit gen_template_tregime\n"
-        "  reaxkit gen_template_tregime --rows 5 --output tregime.in"
+        "  1. Generate a template using defaults:\n"
+        "   reaxkit gen_template_tregime\n\n"
+        "  2. Generate a template with more sample rows and explicit output name:\n"
+        "   reaxkit gen_template_tregime --rows 5 --output tregime.in"
     )
-    parser.add_argument("--output", default="tregime.in", help="Output tregime path")
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    parser.add_argument("--rows", type=int, default=3, help="Number of sample rows")
+    parser.add_argument(
+        "--output",
+        default="tregime.in",
+        help="Output tregime path. Example: --output tregime_custom.in, which writes the generated template using that filename.",
+    )
+    parser.add_argument(
+        "--copy-to-dot",
+        action="store_true",
+        help="Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
+    )
+    parser.add_argument(
+        "--rows",
+        type=int,
+        default=3,
+        help="Number of sample rows. Example: --rows 5, which generates five template data rows.",
+    )
     add_storage_cli_arguments(parser)
     return parser
 

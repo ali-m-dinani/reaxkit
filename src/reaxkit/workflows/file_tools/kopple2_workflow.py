@@ -19,21 +19,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command="gen_template_kopple2")
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate a ReaxFF kopple2 template file.\n\n"
+        "Write a template `kopple2` file for ReaxFF workflows.\n"
+        "This command generates a starter `kopple2` file only. It does not run simulation steps\n"
+        "or modify existing run outputs. Use the generated template as a base and adjust values\n"
+        "for your target system.\n\n"
         "Examples:\n"
-        "  reaxkit gen_template_kopple2\n"
-        "  reaxkit gen_template_kopple2 --output kopple2\n"
-        "  reaxkit gen_template_kopple2 --output kopple2.template --copy-to-dot"
+        "  1. Generate a template using default output name ('kopple2'):\n"
+        "   reaxkit gen_template_kopple2\n\n"
+        "  2. Generate a template with a custom filename:\n"
+        "   reaxkit gen_template_kopple2 --output kopple2.template\n\n"
+        "  3. Generate a template and also copy it to the current directory:\n"
+        "   reaxkit gen_template_kopple2 --output kopple2.template --copy-to-dot"
     )
     parser.add_argument(
         "--output",
         default="kopple2",
-        help="Output filename to write under <project_root>/input/",
+        help="Output filename to write under <project_root>/input/. Example: --output kopple2.template, which writes the template using that filename.",
     )
     parser.add_argument(
         "--copy-to-dot",
         action="store_true",
-        help="Also copy generated output to the current directory.",
+        help="Also copy generated output to the current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command.",
     )
     add_storage_cli_arguments(parser)
     return parser
