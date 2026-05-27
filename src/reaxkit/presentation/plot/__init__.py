@@ -2,6 +2,7 @@
 
 from reaxkit.presentation.plot.renderers.base import PlotRenderer
 from reaxkit.presentation.plot.renderers.boxplot import BoxWhiskerPlotRenderer
+from reaxkit.presentation.plot.renderers.beeswarm import BeeswarmPlotRenderer
 from reaxkit.presentation.plot.renderers.directed import DirectedPlotRenderer
 from reaxkit.presentation.plot.renderers.dual_yaxis import DualYaxisPlotRenderer
 from reaxkit.presentation.plot.renderers.errorbar import ErrorbarPlotRenderer
@@ -51,6 +52,10 @@ def box_whisker_plot(data, labels=None, **kwargs):
     return plot({"plot_type": "box_whisker_plot", "data": data, "labels": labels, **kwargs})
 
 
+def beeswarm_plot(x, y, **kwargs):
+    return plot({"plot_type": "beeswarm_plot", "x": x, "y": y, **kwargs})
+
+
 __all__ = [
     "PlotRenderer",
     "SinglePlotRenderer",
@@ -64,6 +69,7 @@ __all__ = [
     "Heatmap2DRenderer",
     "ErrorbarPlotRenderer",
     "BoxWhiskerPlotRenderer",
+    "BeeswarmPlotRenderer",
     "PLOT_REGISTRY",
     "plot",
     "single_plot",
@@ -75,4 +81,5 @@ __all__ = [
     "heatmap2d_from_3d",
     "errorbar_plot",
     "box_whisker_plot",
+    "beeswarm_plot",
 ]

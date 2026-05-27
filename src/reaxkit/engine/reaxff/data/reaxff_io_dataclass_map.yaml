@@ -81,7 +81,7 @@ loaders:
     composed_of: []
     fallback_files: []
   load_force_field_optimization_report:
-    dataclass: ForceFieldOptimizationReportData
+    dataclass: ForceFieldOptimizationResultsData
     primary_files:
     - fort.99
     supplemental_files: []
@@ -117,7 +117,7 @@ loaders:
     composed_of: []
     fallback_files: []
   load_structure_summary:
-    dataclass: GeometrySummaryData
+    dataclass: EnergyMinimizationSummaryData
     primary_files:
     - fort.74
     supplemental_files: []
@@ -310,7 +310,7 @@ file_to_dataclass_across_loaders_and_writers:
     primary_files:
     - kind: loader
       name: load_structure_summary
-      dataclass: GeometrySummaryData
+      dataclass: EnergyMinimizationSummaryData
     supplemental_files: []
     output_files: []
   fort.76:
@@ -342,7 +342,7 @@ file_to_dataclass_across_loaders_and_writers:
     primary_files:
     - kind: loader
       name: load_force_field_optimization_report
-      dataclass: ForceFieldOptimizationReportData
+      dataclass: ForceFieldOptimizationResultsData
     supplemental_files: []
     output_files: []
   geo:

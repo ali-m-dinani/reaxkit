@@ -33,7 +33,11 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
-from reaxkit.domain.data_models import ForceFieldParametersData, GeometrySummaryData
+from reaxkit.domain.data_models import (
+    ForceFieldOptimizationReportData as ForceFieldOptimizationResultsData,
+    ForceFieldParametersData,
+    GeometrySummaryData as EnergyMinimizationSummaryData,
+)
 from reaxkit.engine.reaxff.generators.ffield_generator import (
     add_element_to_ffield,
     add_term_to_ffield,
@@ -188,33 +192,46 @@ FFIELD_TOOL_COMMANDS = (
 )
 
 FFIELD_ANALYSIS_COMMANDS = (
-    "ffield_data",
-    "ffield_optimization",
-    "structure_summary_data",
-    "parameter_optimization_diagnostic",
-    "parameter_optimization_most_sensitive",
-    "parameter_optimization_tornado",
-    "ffield_optimization_report",
-    "ffield_optimization_report_eos",
-    "ffield_optimization_report_bulk_modulus",
-    "trainset_data",
-    "trainset_group_comments",
+    "get_ffield_data",
+    "get_ffield_opt_progress_data",
+    "get_energy_min_summary_data",
+    "get_ffield_diagnostic_data",
+    "get_ffield_opt_results",
+    "get_ffield_opt_eos",
+    "ffield_opt_bulk_modulus",
+    "get_trainset_data",
+    "get_trainset_group_comments",
 )
 
 LEGACY_FORCE_FIELD_ALIASES = {
-    "force_field_data": "ffield_data",
-    "force_field_optimization": "ffield_optimization",
-    "force_field_optimization_report": "ffield_optimization_report",
-    "force_field_optimization_report_eos": "ffield_optimization_report_eos",
-    "force_field_optimization_report_bulk_modulus": "ffield_optimization_report_bulk_modulus",
+    "force_field_data": "get_ffield_data",
+    "force_field_optimization": "get_ffield_opt_progress_data",
+    "force_field_optimization_report": "get_ffield_opt_results",
+    "force_field_optimization_report_eos": "get_ffield_opt_eos",
+    "force_field_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "ffield_data": "get_ffield_data",
+    "ffield_optimization": "get_ffield_opt_progress_data",
+    "structure_summary_data": "get_energy_min_summary_data",
+    "parameter_optimization_diagnostic": "get_ffield_diagnostic_data",
+    "ffield_optimization_report": "get_ffield_opt_results",
+    "ffield_optimization_report_eos": "get_ffield_opt_eos",
+    "ffield_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "trainset_data": "get_trainset_data",
+    "trainset_group_comments": "get_trainset_group_comments",
+    "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
+    "parameter_optimization_tornado": "get_ffield_diagnostic_data",
 }
 
 WORKFLOW_TASK_NAME_MAP = {
-    "ffield_data": "force_field_data",
-    "ffield_optimization": "force_field_optimization",
-    "ffield_optimization_report": "force_field_optimization_report",
-    "ffield_optimization_report_eos": "force_field_optimization_report_eos",
-    "ffield_optimization_report_bulk_modulus": "force_field_optimization_report_bulk_modulus",
+    "get_ffield_data": "force_field_data",
+    "get_ffield_opt_progress_data": "force_field_optimization",
+    "get_energy_min_summary_data": "structure_summary_data",
+    "get_ffield_diagnostic_data": "parameter_optimization_diagnostic",
+    "get_ffield_opt_results": "force_field_optimization_report",
+    "get_ffield_opt_eos": "force_field_optimization_report_eos",
+    "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
+    "get_trainset_data": "trainset_data",
+    "get_trainset_group_comments": "trainset_group_comments",
 }
 
 ALL_FFIELD_COMMANDS = FFIELD_TOOL_COMMANDS + FFIELD_ANALYSIS_COMMANDS
@@ -242,22 +259,22 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
         _add_runtime_arguments(parser)
         _add_presentation_arguments(parser)
 
-        if command == "ffield_data":
+        if command == "get_ffield_data":
             parser.description = (
                 "Load, filter, and export raw or interpreted ffield sections.\n"
                 "Interpreted means converting numeric values of atom types into Atom types. For example, 1 will be "
                 "interepreted as C if carbon is the first element in the ffield. \n\n"
                 "Examples:\n"
                 " 1. Reading bond section of the ffield, obtaining the C-H bond parameters in interpreted format, and exporting to CSV:\n"
-                "    reaxkit ffield_data --section bond --term C-H --format interpreted --export CH_bond.csv\n\n"
+                "    reaxkit get_ffield_data --field bond --term C-H --format interpreted --export CH_bond.csv\n\n"
                 " 2. Reading angle section of the ffield, obtaining the C-C-H angle parameters in interpreted format, and exporting to CSV:\n"
-                "    reaxkit ffield_data --section angle --term CCH --any-order --format interpreted --export CCH_angles.csv\n\n"
+                "    reaxkit get_ffield_data --field angle --term CCH --any-order --format interpreted --export CCH_angles.csv\n\n"
                 " 3. Reading all sections of the ffield, obtaining all parameters in interpreted format, and exporting to them as "
                 "individual CSV files (one per section):\n"
-                "    reaxkit ffield_data --format interpreted --outdir ffield_export\n\n"
+                "    reaxkit get_ffield_data --format interpreted --outdir ffield_export\n\n"
             )
             parser.add_argument(
-                "--section",
+                "--field",
                 default=None,
                 help="Single section to query: general, atom, bond, off_diagonal, angle, torsion, hbond.",
             )
@@ -287,14 +304,16 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 default=None,
                 help="Write per-section CSV exports into this output directory.",
             )
-        elif command == "ffield_optimization":
+        elif command == "get_ffield_opt_progress_data":
             parser.description = (
-                "Return total force-field optimization error versus epoch.\n\n"
+                "Return total force-field optimization error versus epoch.\n"
+                "If you do the ffield optimization using ReaxFF's Successive One-Parameter Parabolic Interpolation (SOPPI) method, "
+                "this will simply be the total force field error vs epoch.\n"
                 "Examples:\n"
                 " 1. Reading optimization output from ReaxFF fort.13 file, plotting error vs epoch, and saving the plot:\n"
-                "   reaxkit ffield_optimization --fort13 fort.13 --plot single --save ffield_opt.png\n\n"
+                "   reaxkit get_ffield_opt_progress_data --fort13 fort.13 --plot single --save ffield_opt.png\n\n"
                 " 2. Reading optimization output, exporting error vs epoch data to CSV for epochs 1 5 10 as CSV:\n"
-                "  reaxkit ffield_optimization --epochs 1 5 10 --export ffield_opt.csv\n"
+                "  reaxkit get_ffield_opt_progress_data --epochs 1 5 10 --export ffield_opt.csv\n"
             )
             parser.add_argument(
                 "--epochs",
@@ -303,89 +322,89 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 default=None,
                 help="Optional epoch numbers to keep; default uses all available epochs.",
             )
-        elif command == "structure_summary_data":
+        elif command == "get_energy_min_summary_data":
             parser.description = (
-                "Load structure-summary data (for example from fort.74).\n\n"
+                "Get energy minimization summary data (energy, heat of formation, volume, density, etc.) per geo file, "
+                "which can be obtained from fort.74 file if using ReaxFF standalone code for ffield optimization.\n\n"
                 "Examples:\n"
-                "  1. reaxkit structure_summary_data --export fort74.csv\n"
-                "  2. reaxkit structure_summary_data --col density --export fort74_density.csv\n"
-                "  3. reaxkit structure_summary_data --plot single --xaxis identifier"
+                " 1. Getting the data and exporting all columns to CSV:\n"
+                "   reaxkit get_energy_min_summary_data --export fort74.csv\n\n"
+                " 2. Getting only density data, and exporting to CSV:\n"
+                "  reaxkit get_energy_min_summary_data --col density --export fort74_density.csv\n\n"
             )
             parser.add_argument(
                 "--col",
                 default="all",
                 help="Single column to keep (identifier is retained when present), or 'all'.",
             )
-        elif command == "parameter_optimization_diagnostic":
+        elif command == "get_ffield_diagnostic_data":
             parser.description = (
-                "Compute parameter-optimization sensitivity diagnostics (for example from fort.79).\n\n"
+                "Get per-parameter optimization diagnostics from force-field optimization diagnostic output. "
+                "Diagnostics data is simply the data in fort.79 which shows how the optimizer (i.e., Successive One-Parameter Parabolic Interpolation (SOPPI) method) "
+                "has gone through the parameter space during optimization, and how the error has changed when each parameter was perturbed. \n\n"
                 "Examples:\n"
-                "  1. reaxkit parameter_optimization_diagnostic --export fort79_diag.csv\n"
-                "  2. reaxkit parameter_optimization_diagnostic --plot single\n"
-                "  3. reaxkit parameter_optimization_diagnostic --save fort79_diag.png"
+                "  1. Getting all diagnostic data and exporting to CSV:\n"
+                "   reaxkit get_ffield_diagnostic_data --export fort79_diag.csv\n\n"
+                
+                "  2. Getting the diagnostics data along with the data related to the most sensitive parameter during ffield optimization:\n"
+                "   reaxkit get_ffield_diagnostic_data --report-most-sensitive --export most_sensitive.csv --export-all fort79_all.csv\n\n"
+                
+                " 3. Getting the diagnostics data, plotting a tornado plot for the top 10 most sensitive parameters, and adding a vertical guide line at x=1.0:\n"
+                "  This plot shows the relative sensitivity of the parameters in a tornado format, where the bars represent the span between the error at the current parameter value and the error at the perturbed parameter value. "
+                "  This is helpful for understanding the marginal effect of each parameter on the total error, and for identifying which parameters are the most sensitive ones during optimization. \n"
+                "   reaxkit get_ffield_diagnostic_data --plot tornado --top 10 --vline 1.0 --export tornado.csv\n"
+                
+                "  4. Getting the diagnostics data, plotting a beeswarm plot for all parameters, and saving the plot:\n"
+                "   This plot is very similar to the tornado plot, but instead of showing the span between the current and perturbed error as a bar, "
+                "it shows the actual distribution of the error values at the current and perturbed parameter values as swarm points. \n"
+                "   A really good example of this plot can be found at: "
+                "reaxkit get_ffield_diagnostic_data --plot beeswarm --save diagnostic_beeswarm.png\n\n"
             )
             parser.add_argument(
                 "--interpret",
                 action="store_true",
                 help="Interpret identifier triplets with ffield symbol mapping when possible.",
             )
-        elif command == "parameter_optimization_most_sensitive":
-            parser.description = (
-                "Find the minimum-sensitivity parameter and inspect epoch-wise sensitivity ratios.\n\n"
-                "Examples:\n"
-                "  1. reaxkit parameter_optimization_most_sensitive --plot single\n"
-                "  2. reaxkit parameter_optimization_most_sensitive --export most_sensitive.csv --export-all fort79_all.csv\n"
-                "  3. reaxkit parameter_optimization_most_sensitive --save most_sensitive.png"
-            )
             parser.add_argument(
-                "--interpret",
+                "--report-most-sensitive",
                 action="store_true",
-                help="Interpret identifier triplets with ffield symbol mapping when possible.",
+                help="Return only the minimum-sensitivity parameter view.",
             )
             parser.add_argument(
                 "--export-all",
                 default=None,
-                help="Optional CSV path to export the full diagnostic table before filtering.",
-            )
-        elif command == "parameter_optimization_tornado":
-            parser.description = (
-                "Aggregate min/median/max parameter sensitivities into a tornado summary.\n\n"
-                "Examples:\n"
-                "  1. reaxkit parameter_optimization_tornado --top 6 --plot single\n"
-                "  2. reaxkit parameter_optimization_tornado --top 10 --save tornado.png --export tornado.csv\n"
-                "  3. reaxkit parameter_optimization_tornado --vline 1.0"
-            )
-            parser.add_argument(
-                "--interpret",
-                action="store_true",
-                help="Interpret identifier triplets with ffield symbol mapping when possible.",
+                help="Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive).",
             )
             parser.add_argument(
                 "--top",
                 type=int,
                 default=0,
-                help="Keep only top-N widest spans; 0 keeps all rows.",
+                help="For tornado view, keep top-N widest spans; 0 keeps all.",
             )
             parser.add_argument(
                 "--vline",
                 type=float,
                 default=1.0,
-                help="Reference x-value for the tornado plot guide line.",
+                help="For tornado view, reference x-value for the guide line.",
             )
-        elif command == "ffield_optimization_report":
+        elif command == "get_ffield_opt_results":
             parser.description = (
-                "Load optimization report rows (for example from fort.99) with QM-FF differences.\n\n"
+                "Get force-field optimization report data, which can be obtained from fort.99 file if using ReaxFF standalone code for ffield optimization. \n"
+                "This includes the values in training set and the values generated by the optimized ffield. \n\n"
                 "Examples:\n"
-                "  1. reaxkit ffield_optimization_report --export fort99.csv\n"
-                "  2. reaxkit ffield_optimization_report --plot single --xaxis lineno"
+                "  1. Getting all optimization report data and exporting to CSV:\n"
+                "    reaxkit get_ffield_opt_results --export fort99.csv\n\n"
             )
-        elif command == "ffield_optimization_report_eos":
+        elif command == "get_ffield_opt_eos":
             parser.description = (
                 "Build energy-vs-volume EOS data from optimization outputs.\n\n"
                 "Examples:\n"
-                "  1. reaxkit ffield_optimization_report_eos --iden MgO --plot single\n"
-                "  2. reaxkit ffield_optimization_report_eos --iden all --export eos.csv\n"
-                "  3. reaxkit ffield_optimization_report_eos --iden all --plot subplot --save eos.png"
+                "  1. Getting the EOS data for a specific identifier (for example, MgO) and plotting energy vs volume curve:\n"
+                "    reaxkit get_ffield_opt_eos --iden MgO --plot single\n\n"
+                "  2. Getting the EOS data for all available identifiers, exporting to CSV, and plotting all EOS curves in subplots:\n"
+                "    reaxkit get_ffield_opt_eos --iden all --export eos.csv\n\n"
+                "  3. Getting the EOS data for all available identifiers, plotting all EOS curves in subplots, and saving the plot:\n"
+                "    reaxkit get_ffield_opt_eos --iden all --plot subplot --save eos.png"
             )
             parser.add_argument(
                 "--iden",
@@ -397,13 +416,18 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 action="store_true",
                 help="Flip sign of energy values before plotting/export.",
             )
-        elif command == "ffield_optimization_report_bulk_modulus":
+        elif command == "ffield_opt_bulk_modulus":
             parser.description = (
                 "Fit a Vinet bulk modulus from optimization report energy-volume data.\n\n"
                 "Examples:\n"
-                "  1. reaxkit ffield_optimization_report_bulk_modulus --iden bulk_0\n"
-                "  2. reaxkit ffield_optimization_report_bulk_modulus --iden all --export bulk_modulus.csv\n"
-                "  3. reaxkit ffield_optimization_report_bulk_modulus --flip-sign --min-points 8"
+                "  1. Fitting bulk modulus for a specific identifier (for example, MgO) and plotting the fitted curve:\n"
+                "  reaxkit ffield_opt_bulk_modulus --iden bulk_0\n\n"
+                "  2. Fitting bulk modulus for all available identifiers, exporting the fitted parameters to CSV:\n"
+                "  reaxkit ffield_opt_bulk_modulus --iden all --export bulk_modulus.csv\n\n"
+                "  3. Fitting bulk modulus for all available identifiers, plotting the fitted curves, and saving the plot.\n"
+                "Here we have used --flip-sign flag since some values where negative (sign convention) and we couldn't "
+                "get the bulk modulus from them:\n"
+                "  reaxkit ffield_opt_bulk_modulus --flip-sign --iden all --plot subplot --save bulk_modulus.png\n\n"
             )
             parser.add_argument(
                 "--iden",
@@ -426,24 +450,29 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 default=6,
                 help="Minimum number of finite points required per base identifier.",
             )
-        elif command == "trainset_data":
+        elif command == "get_trainset_data":
             parser.description = (
                 "Return trainset rows for one section or all sections.\n\n"
                 "Examples:\n"
-                "  1. reaxkit trainset_data --section all --export trainset_all.csv\n"
-                "  2. reaxkit trainset_data --section energy --export trainset_energy.csv"
+                "  1. reaxkit get_trainset_data --section all --export trainset_all.csv\n"
+                "  2. reaxkit get_trainset_data --section energy --export trainset_energy.csv"
             )
             parser.add_argument(
                 "--section",
                 default="all",
                 help="Trainset section: all, charge, heatfo, geometry, cell_parameters, or energy.",
             )
-        elif command == "trainset_group_comments":
+        elif command == "get_trainset_group_comments":
             parser.description = (
                 "Return unique trainset group comments by section.\n\n"
                 "Examples:\n"
-                "  1. reaxkit trainset_group_comments --export group_comments.csv\n"
-                "  2. reaxkit trainset_group_comments"
+                "  1. reaxkit get_trainset_group_comments --section all --export group_comments.csv\n"
+                "  2. reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
+            )
+            parser.add_argument(
+                "--section",
+                default="all",
+                help="Trainset section: all, charge, heatfo, geometry, cell_parameters, or energy.",
             )
         else:
             raise KeyError(f"Unsupported ffield command '{command}'.")
@@ -1131,7 +1160,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
+    parser.add_argument("--plot", choices=["single", "subplot", "tornado", "beeswarm"], default=None, help="Render a plot")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
     parser.add_argument("--export", default=None, help="Write the result table to CSV")
@@ -1140,7 +1169,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataRequest:
-    section = args.section if args.section else None
+    section = args.field if args.field else None
     fmt = _normalize_force_field_format(args.format)
     return ForceFieldDataRequest(
         section=section,
@@ -1184,7 +1213,7 @@ def _build_force_field_optimization_report_bulk_modulus_request(
 
 
 def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:
-    return TrainsetGroupCommentsRequest()
+    return TrainsetGroupCommentsRequest(section=str(getattr(args, "section", "all")))
 
 
 def _build_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
@@ -1192,21 +1221,19 @@ def _build_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataReq
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "ffield_data": _build_force_field_data_request,
-    "ffield_optimization": _build_force_field_optimization_request,
-    "structure_summary_data": _build_structure_summary_request,
-    "parameter_optimization_diagnostic": _build_parameter_optimization_diagnostic_request,
-    "parameter_optimization_most_sensitive": _build_parameter_optimization_diagnostic_request,
-    "parameter_optimization_tornado": _build_parameter_optimization_diagnostic_request,
-    "ffield_optimization_report": _build_force_field_optimization_report_request,
-    "ffield_optimization_report_eos": _build_force_field_optimization_report_eos_request,
-    "ffield_optimization_report_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
-    "trainset_data": _build_trainset_data_request,
-    "trainset_group_comments": _build_trainset_group_comments_request,
+    "get_ffield_data": _build_force_field_data_request,
+    "get_ffield_opt_progress_data": _build_force_field_optimization_request,
+    "get_energy_min_summary_data": _build_structure_summary_request,
+    "get_ffield_diagnostic_data": _build_parameter_optimization_diagnostic_request,
+    "get_ffield_opt_results": _build_force_field_optimization_report_request,
+    "get_ffield_opt_eos": _build_force_field_optimization_report_eos_request,
+    "ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
+    "get_trainset_data": _build_trainset_data_request,
+    "get_trainset_group_comments": _build_trainset_group_comments_request,
 }
 
 def _prepare_result(command: str, result) -> object:
-    if command == "ffield_data" and getattr(result, "table", None) is None and getattr(result, "tables", None):
+    if command == "get_ffield_data" and getattr(result, "table", None) is None and getattr(result, "tables", None):
         frames = []
         for section, table in result.tables.items():
             df = table.copy()
@@ -1312,7 +1339,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
 
-    if command == "ffield_optimization":
+    if command == "get_ffield_opt_progress_data":
         return {
             "plot_type": "single_plot",
             "x": table["epoch"].tolist(),
@@ -1322,7 +1349,98 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Force-Field Optimization",
         }
 
-    if command == "parameter_optimization_diagnostic":
+    if command == "get_ffield_diagnostic_data":
+        if getattr(args, "plot", None) == "beeswarm":
+            if "identifier" not in table.columns:
+                return None
+            candidate_cols = [col for col in table.columns if "sensitivity" in str(col).lower()]
+            if not candidate_cols:
+                return None
+            long = (
+                table[["identifier"] + candidate_cols]
+                .melt(id_vars=["identifier"], value_vars=candidate_cols, var_name="metric", value_name="value")
+                .dropna(subset=["value"])
+            )
+            if long.empty:
+                return None
+            long["value"] = pd.to_numeric(long["value"], errors="coerce")
+            long = long.dropna(subset=["value"])
+            if long.empty:
+                return None
+            top = int(getattr(args, "top", 0) or 0)
+            if top > 0:
+                spans = (
+                    long.groupby("identifier", dropna=False)["value"]
+                    .agg(lambda s: float(s.max() - s.min()))
+                    .sort_values(ascending=False)
+                )
+                keep = set(spans.head(top).index.tolist())
+                long = long.loc[long["identifier"].isin(keep)].copy()
+                if long.empty:
+                    return None
+            return {
+                "plot_type": "beeswarm_plot",
+                "x": long["value"].tolist(),
+                "y": long["identifier"].astype(str).tolist(),
+                "hue": long["value"].tolist(),
+                "palette": "coolwarm",
+                "size": 5,
+                "legend": False,
+                "xlabel": "Sensitivity",
+                "ylabel": "",
+                "title": "Parameter Sensitivity Beeswarm",
+            }
+        if getattr(args, "plot", None) == "tornado":
+            if not {"min_eff", "max_eff", "median_eff", "identifier"}.issubset(set(table.columns)):
+                return None
+            return {
+                "plot_type": "tornado_plot",
+                "labels": table["identifier"].tolist(),
+                "min_vals": pd.to_numeric(table["min_eff"], errors="coerce").tolist(),
+                "max_vals": pd.to_numeric(table["max_eff"], errors="coerce").tolist(),
+                "median_vals": pd.to_numeric(table["median_eff"], errors="coerce").tolist(),
+                "xlabel": "Sensitivity (Error Response)",
+                "ylabel": "Parameter",
+                "title": "Parameter Sensitivity Tornado Plot",
+                "vline": getattr(args, "vline", None),
+            }
+        if getattr(args, "report_most_sensitive", False):
+            if "sensitivity" not in table.columns:
+                return None
+            series = []
+            if "sensitivity_name" in table.columns:
+                for name, group in table.groupby("sensitivity_name", dropna=False):
+                    series.append(
+                        {
+                            "x": pd.to_numeric(group["epoch_set"], errors="coerce").tolist(),
+                            "y": pd.to_numeric(group["sensitivity"], errors="coerce").tolist(),
+                            "label": str(name),
+                            "marker": "o",
+                            "linewidth": 0,
+                            "markersize": 20,
+                            "alpha": 1,
+                        }
+                    )
+            else:
+                series.append(
+                    {
+                        "x": pd.to_numeric(table["epoch_set"], errors="coerce").tolist(),
+                        "y": pd.to_numeric(table["sensitivity"], errors="coerce").tolist(),
+                        "label": str(table["identifier"].iloc[0]) if "identifier" in table.columns and not table.empty else "most_sensitive",
+                        "marker": "o",
+                        "linewidth": 0,
+                        "markersize": 20,
+                        "alpha": 1,
+                    }
+                )
+            return {
+                "plot_type": "single_plot",
+                "series": series,
+                "xlabel": "Epoch Set",
+                "ylabel": "Sensitivity (Error Response)",
+                "title": "Most Sensitive Parameter Ratios",
+                "legend": True,
+            }
         return {
             "plot_type": "single_plot",
             "series": [
@@ -1335,58 +1453,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "parameter_optimization_most_sensitive":
-        if "sensitivity" not in table.columns:
-            return None
-        series = []
-        if "sensitivity_name" in table.columns:
-            for name, group in table.groupby("sensitivity_name", dropna=False):
-                series.append(
-                    {
-                        "x": pd.to_numeric(group["epoch_set"], errors="coerce").tolist(),
-                        "y": pd.to_numeric(group["sensitivity"], errors="coerce").tolist(),
-                        "label": str(name),
-                        "marker": "o",
-                        "linewidth": 0,
-                        "markersize": 20,
-                        "alpha": 1,
-                    }
-                )
-        else:
-            series.append(
-                {
-                    "x": pd.to_numeric(table["epoch_set"], errors="coerce").tolist(),
-                    "y": pd.to_numeric(table["sensitivity"], errors="coerce").tolist(),
-                    "label": str(table["identifier"].iloc[0]) if "identifier" in table.columns and not table.empty else "most_sensitive",
-                    "marker": "o",
-                    "linewidth": 0,
-                    "markersize": 20,
-                    "alpha": 1,
-                }
-            )
-        return {
-            "plot_type": "single_plot",
-            "series": series,
-            "xlabel": "Epoch Set",
-            "ylabel": "Sensitivity (Error Response)",
-            "title": "Most Sensitive Parameter Ratios",
-            "legend": True,
-        }
-
-    if command == "parameter_optimization_tornado":
-        return {
-            "plot_type": "tornado_plot",
-            "labels": table["identifier"].tolist(),
-            "min_vals": pd.to_numeric(table["min_eff"], errors="coerce").tolist(),
-            "max_vals": pd.to_numeric(table["max_eff"], errors="coerce").tolist(),
-            "median_vals": pd.to_numeric(table["median_eff"], errors="coerce").tolist(),
-            "xlabel": "Sensitivity (Error Response)",
-            "ylabel": "Parameter",
-            "title": "Parameter Sensitivity Tornado Plot",
-            "vline": getattr(args, "vline", None),
-        }
-
-    if command == "ffield_optimization_report":
+    if command == "get_ffield_opt_results":
         x_col = getattr(args, "xaxis", None) or "lineno"
         if x_col not in table.columns:
             x_col = "lineno"
@@ -1400,7 +1467,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Force-Field Optimization Report",
         }
 
-    if command == "ffield_optimization_report_eos":
+    if command == "get_ffield_opt_eos":
         work = table.copy()
         for col in ("V_other_iden", "E_other_iden"):
             if col in work.columns:
@@ -1434,7 +1501,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "structure_summary_data":
+    if command == "get_energy_min_summary_data":
         x_col = getattr(args, "xaxis", None) or "identifier"
         if x_col not in table.columns:
             x_col = "identifier"
@@ -1464,7 +1531,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "ffield_data":
+    if command == "get_ffield_data":
         x_col = getattr(args, "xaxis", None)
         if x_col is None or x_col not in table.columns:
             x_col = table.columns[0]
@@ -1486,11 +1553,11 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 def _run_ffield_data(args: argparse.Namespace) -> int:
     data = _load_force_field_data(args)
-    request = REQUEST_BUILDERS["ffield_data"](args)
+    request = REQUEST_BUILDERS["get_ffield_data"](args)
     task = ForceFieldDataTask()
     if args.term:
         if request.section is None:
-            raise ValueError("--term requires exactly one selected section via --section.")
+            raise ValueError("--term requires exactly one selected section via --field.")
         selected_section = request.section
         raw_result = task.run(data, ForceFieldDataRequest(section=selected_section, interpret=False))
         raw_table = raw_result.table
@@ -1511,7 +1578,7 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
         result.table = table
     else:
         result = task.run(data, request)
-    result = _prepare_result("ffield_data", result)
+    result = _prepare_result("get_ffield_data", result)
     if args.outdir:
         export_tables: dict[str, pd.DataFrame] = {}
         if isinstance(getattr(result, "table", None), pd.DataFrame) and not result.table.empty:
@@ -1525,52 +1592,49 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
         export_fmt = "interpreted" if request.interpret else "raw"
         _export_force_field_tables(export_tables, args.outdir, fmt=export_fmt)
         print(f"[Done] Exported section tables to {args.outdir}")
-    present_result("ffield_data", result, args, plot_payload_builder=_plot_payload)
+    present_result("get_ffield_data", result, args, plot_payload_builder=_plot_payload)
     return 0
 
 
 def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
     canonical = _resolve_workflow_command(command)
-    if canonical == "ffield_data":
+    if canonical == "get_ffield_data":
         return _run_ffield_data(args)
-    if canonical == "parameter_optimization_most_sensitive":
+
+    if canonical == "get_ffield_diagnostic_data":
         executor = AnalysisExecutor()
         base_result = executor.run(
             TASK_REGISTRY["parameter_optimization_diagnostic"](),
-            REQUEST_BUILDERS["parameter_optimization_most_sensitive"](args),
+            REQUEST_BUILDERS["get_ffield_diagnostic_data"](args),
             vars(args),
         )
-        result = _build_most_sensitive_result(base_result)
-        if getattr(args, "export_all", None):
-            out_all = resolve_output_path(
-                args.export_all,
-                canonical,
-                run_id=getattr(args, "run_id", None),
-                project_root=getattr(args, "project_root", "."),
-                analysis_id=getattr(args, "analysis_id", None),
-            )
-            export_result_csv(argparse.Namespace(table=result.metadata["full_table"]), str(out_all))
-            print(f"[Done] Exported full diagnostic table to {out_all}")
+        if bool(getattr(args, "report_most_sensitive", False)):
+            result = _build_most_sensitive_result(base_result)
+            if getattr(args, "export_all", None):
+                out_all = resolve_output_path(
+                    args.export_all,
+                    canonical,
+                    run_id=getattr(args, "run_id", None),
+                    project_root=getattr(args, "project_root", "."),
+                    analysis_id=getattr(args, "analysis_id", None),
+                )
+                export_result_csv(argparse.Namespace(table=result.metadata["full_table"]), str(out_all))
+                print(f"[Done] Exported full diagnostic table to {out_all}")
+        elif getattr(args, "plot", None) == "tornado":
+            result = _build_tornado_result(base_result, top=int(args.top))
+        else:
+            result = base_result
         present_result(canonical, result, args, plot_payload_builder=_plot_payload)
         return 0
-    if canonical == "parameter_optimization_tornado":
-        executor = AnalysisExecutor()
-        base_result = executor.run(
-            TASK_REGISTRY["parameter_optimization_diagnostic"](),
-            REQUEST_BUILDERS["parameter_optimization_tornado"](args),
-            vars(args),
-        )
-        result = _build_tornado_result(base_result, top=int(args.top))
-        present_result(canonical, result, args, plot_payload_builder=_plot_payload)
-        return 0
+
     task_cls = TASK_REGISTRY[_task_name_for_command(canonical)]
     request = REQUEST_BUILDERS[canonical](args)
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
     result = _prepare_result(canonical, result)
-    if canonical == "structure_summary_data":
+    if canonical == "get_energy_min_summary_data":
         _filter_structure_summary_columns(result, getattr(args, "col", "all"))
-    elif canonical == "ffield_optimization_report_eos":
+    elif canonical == "get_ffield_opt_eos":
         _prepare_eos_table(result, flip_sign=bool(getattr(args, "flip_sign", False)))
     present_result(canonical, result, args, plot_payload_builder=_plot_payload)
     return 0

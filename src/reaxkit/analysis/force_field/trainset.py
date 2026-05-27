@@ -232,6 +232,19 @@ class GetTrainsetDataTask(AnalysisTask):
 class TrainsetGroupCommentsRequest(BaseRequest):
     """Request for unique trainset group comments."""
 
+    section: str = dc_field(
+        default="all",
+        metadata={
+            "label": "Section",
+            "help": (
+                "Trainset section to return comments for. "
+                "Use 'all' for all sections. "
+                "Examples: 'energy', 'geometry', 'cell_parameters'."
+            ),
+            "choices": ["all", "charge", "heatfo", "geometry", "cell_parameters", "energy"],
+        },
+    )
+
 
 @dataclass
 class TrainsetGroupCommentsResult(BaseResult):
@@ -294,6 +307,9 @@ class TrainsetGroupCommentsTask(AnalysisTask):
         reporter=None,
     ) -> TrainsetGroupCommentsResult:
         table = _get_trainset_group_comments(data)
+        section_key = _normalize_trainset_section(request.section)
+        if section_key != "all" and not table.empty and "section" in table.columns:
+            table = table.loc[table["section"] == section_key.lower()].copy().reset_index(drop=True)
         return TrainsetGroupCommentsResult(table=table, request=request)
 
 

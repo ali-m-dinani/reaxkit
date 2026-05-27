@@ -330,7 +330,7 @@ workflows:
     - optimization
     - training set
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, ffield_data, ffield_optimization, ffield_optimization_report, ffield_optimization_report_bulk_modulus, ffield_optimization_report_eos, parameter_optimization_diagnostic, parameter_optimization_most_sensitive, parameter_optimization_tornado, structure_summary_data, trainset_data, trainset_group_comments'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results, ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data, get_trainset_data, get_trainset_group_comments'
     aliases:
     - ffield workflow
     - force field file workflow
@@ -628,7 +628,7 @@ dataclass_usage:
   - params_workflow
   ForceFieldOptimizationProgressData:
   - ffield_workflow
-  ForceFieldOptimizationReportData:
+  ForceFieldOptimizationResultsData:
   - ffield_workflow
   ForceFieldOptimizationTrainingSetData:
   - ffield_workflow
@@ -636,7 +636,7 @@ dataclass_usage:
   - ffield_workflow
   GeometryOptimizationProgressData:
   - timeseries_workflow
-  GeometrySummaryData:
+  EnergyMinimizationSummaryData:
   - ffield_workflow
   MolecularAnalysisData:
   - molecular_analysis_workflow
@@ -675,11 +675,11 @@ command_to_workflow_module:
   export-trainset: reaxkit.workflows.file_tools.trainset_workflow
   extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
-  ffield_data: reaxkit.workflows.file_tools.ffield_workflow
-  ffield_optimization: reaxkit.workflows.file_tools.ffield_workflow
-  ffield_optimization_report: reaxkit.workflows.file_tools.ffield_workflow
-  ffield_optimization_report_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
-  ffield_optimization_report_eos: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_opt_progress_data: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_opt_results: reaxkit.workflows.file_tools.ffield_workflow
+  ffield_opt_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_opt_eos: reaxkit.workflows.file_tools.ffield_workflow
   free-up: reaxkit.workflows.meta.workspace_management_workflow
   get-control: reaxkit.workflows.file_tools.control_workflow
   get-params: reaxkit.workflows.params_workflow
@@ -709,9 +709,7 @@ command_to_workflow_module:
   molecule_lifetime: reaxkit.workflows.molecular_analysis_workflow
   msd: reaxkit.workflows.trajectory_workflow
   orthogonalize-geo: reaxkit.workflows.file_tools.geo_workflow
-  parameter_optimization_diagnostic: reaxkit.workflows.file_tools.ffield_workflow
-  parameter_optimization_most_sensitive: reaxkit.workflows.file_tools.ffield_workflow
-  parameter_optimization_tornado: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_diagnostic_data: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
   plotter: reaxkit.workflows.meta.plotter_workflow
   polarization: reaxkit.workflows.electrostatics_workflow
@@ -719,11 +717,11 @@ command_to_workflow_module:
   rdf: reaxkit.workflows.trajectory_workflow
   rdf_property: reaxkit.workflows.trajectory_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
-  structure_summary_data: reaxkit.workflows.file_tools.ffield_workflow
+  get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.meta.study_workflow
   timeseries: reaxkit.workflows.timeseries_workflow
-  trainset_data: reaxkit.workflows.file_tools.ffield_workflow
-  trainset_group_comments: reaxkit.workflows.file_tools.ffield_workflow
+  get_trainset_data: reaxkit.workflows.file_tools.ffield_workflow
+  get_trainset_group_comments: reaxkit.workflows.file_tools.ffield_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
   video: reaxkit.workflows.meta.make_video_workflow
   voronoi: reaxkit.workflows.trajectory_workflow

@@ -39,11 +39,11 @@ register_analysis_command("dominant_species", module_path="reaxkit.workflows.mol
 register_analysis_command("largest_molecule_by_mass", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("largest_molecule_composition", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("molecule_lifetime", module_path="reaxkit.workflows.molecular_analysis_workflow")
-register_analysis_command("ffield_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_analysis_command("ffield_optimization", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_analysis_command("structure_summary_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_ffield_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_ffield_opt_progress_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_energy_min_summary_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_analysis_command(
-    "parameter_optimization_diagnostic",
+    "get_ffield_diagnostic_data",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command(
@@ -51,17 +51,17 @@ register_analysis_command(
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command("parameter_optimization_tornado", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_analysis_command("ffield_optimization_report", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_ffield_opt_results", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_analysis_command(
-    "ffield_optimization_report_eos",
+    "get_ffield_opt_eos",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command(
-    "ffield_optimization_report_bulk_modulus",
+    "ffield_opt_bulk_modulus",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
-register_analysis_command("trainset_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_analysis_command("trainset_group_comments", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
 register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
