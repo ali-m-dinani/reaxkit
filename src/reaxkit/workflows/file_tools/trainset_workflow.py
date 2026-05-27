@@ -136,10 +136,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Generate elastic trainsets (i.e., EOS data).\n"
             "This comamnd supports 3 input-mode options:\n"
-            "  1. yaml: which needs an existing trainset YAML. "
+            "  1. yaml: which needs an existing trainset YAML. \n"
             "           This trainset YAML can be generated using command 'gen_template_yaml_for_elastic_settings' \n"
             "  2. material-id: fetch one source material id (i.e., material ID [mp-1234] from material's project website)\n"
             "  3. batch: fetch many source systems by elements (i.e., all materials with Ba, B, and O)\n\n"
+            
             "[NOTE] To use the source-backed modes (material-id or batch), you need to provide the your API key "
             "and specify the source (MP (material's project) or Jarvis, where default is MP). You API-key can be obtained from the source website. For "
             "example, for MP, you can: \n"
@@ -151,16 +152,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             
             "Examples:\n"
             "  1. YAML mode:\n"
-            "    reaxkit gen_elastic_trainset --input-mode yaml --yaml trainset_settings.yaml --output trainset_elastic_generated\n\n"
+            "    reaxkit gen_elastic_trainset --input-mode yaml --yaml trainset_settings.yaml --output trainset_elastic_generated\n"
             "  2. Material-id mode:\n"
-            "    reaxkit gen_elastic_trainset --input-mode material-id --mat-id mp-1234 --output trainset_elastic_mp-1234 --api-key YOUR_KEY\n\n"
+            "    reaxkit gen_elastic_trainset --input-mode material-id --mat-id mp-1234 --output trainset_elastic_mp-1234 --api-key YOUR_KEY\n"
             "  3. Batch mode:\n"
             "    - for materials containing only and exactly Ba, B, O elements as in Ba2B2O5:\n"
-            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY\n"
             "    - for materials any or all of Ba, B, O elements (now, BaO10 is also acceptable):\n"
-            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --element-count-scope up-to --api-key YOUR_KEY"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to\n "
             "    - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:\n"
-            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --element-count-scope up-to --max-materials 100 --api-key YOUR_KEY\n\n"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100\n\n"
             
             "[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  "
             "retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles than"
@@ -204,11 +205,50 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     elif command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
         parser.description = (
-            "Generate heat-of-formation trainsets.\n\n"
-            "input-mode options:\n"
-            "  yaml: use heatfo YAML config\n"
-            "  material-id: use one source material id\n"
-            "  batch: fetch many source systems by elements"
+            "Generate heat-of-formation training sets.\n"
+            "This command gets the heat of formation data and balances the equation element-wise.\n\n"
+            
+            "This comamnd supports 3 input-mode options:\n"
+            "  1. yaml: which needs an existing heatfo trainset YAML. \n"
+            "           This trainset YAML can be generated using command 'gen_template_yaml_for_heatfo_settings' \n"
+            "  2. material-id: fetch one source material id (i.e., material ID [mp-1234] from material's project website)\n"
+            "  3. batch: fetch many source systems by elements (i.e., all materials with Ba, B, and O)\n\n"
+            
+            "[NOTE] To use the source-backed modes (material-id or batch), you need to provide the your API key "
+            "and specify the source (MP (material's project) or Jarvis, where default is MP). You API-key can be obtained from the source website. For "
+            "example, for MP, you can: \n"
+            " 1. login to your account on MP website\n"
+            " 2. on the top right of the page, near your account logo, click on the API access page link,\n"
+            " 3. this brings you to https://next-gen.materialsproject.org/api"
+            " 4. you can now copy your personal API key, which you will provide it to this command using --api-key flag "
+            "or set it as an environment variable MP_API_KEY. \n\n"
+            
+            "Examples:\n"
+            "  1. YAML mode:\n"
+            "    reaxkit gen_heatfo_trainset --input-mode yaml --yaml trainset_heatfo_settings.yaml --output trainset_heatfo_generated\n"
+            "  2.   Material-id mode:\n"
+            "    reaxkit gen_heatfo_trainset --input-mode material-id --mat-id mp-1234 --output trainset_heatfo_mp-1234 --api-key YOUR_KEY\n"
+            "  3. Batch mode:\n"
+            "    - for materials containing only and exactly Ba, B, O elements as in Ba2B2O5:\n"
+            "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY\n"
+            "    - for materials any or all of Ba, B, O elements (now, BaO10 is also acceptable):\n"
+            "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to\n"
+            "     - same as the first one but this time passing reference list:\n"
+            "       This means that for balancing the heat of formation equation, the reference geo files will be geo file Babcc_opt with 2 atoms for Ba, "
+            "       geo file B_alp with 12 atoms for B, and the geo file O2 with 2 atoms for O. "
+            "       If you don't provide the reference list, the command will automatically find the most stable structure of elemnts from the source"
+            "       website and uses them for balancing purposes:\n"
+            "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --references Ba=Babcc_opt:2,B=B_alp:12,O=O2:2\n"
+            "    - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:\n"
+            "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100 \n\n"
+
+            "[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  "
+            "retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles than"
+            "that of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). "
+            "For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure "
+            "setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, "
+            "but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.\n\n"
+
         )
         parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source.")
         parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="batch")
@@ -234,7 +274,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
                  "see the article on material's project website "
                  "https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project",
         )
-        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines.")
+        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set.")
         parser.add_argument("--trainset-file", default="trainset_heatfo.in", help="Output trainset filename.")
         parser.add_argument("--geo-file", default="geo", help="Output concatenated geo filename.")
         parser.add_argument("--api-key", default=None, help="Source API key (MP uses --api-key or MP_API_KEY).")
