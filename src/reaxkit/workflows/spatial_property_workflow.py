@@ -37,33 +37,33 @@ _PROPERTY_ALIASES = {
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--xmolout", default="xmolout", help="Path to trajectory file")
-    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific loading rules.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets base context for file discovery.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path.")
+    parser.add_argument("--xmolout", default="xmolout", help="Path to trajectory file. Example: --xmolout runs/job1/xmolout, which provides atom coordinates over frames.")
+    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file. Example: --fort7 runs/job1/fort.7, which provides connectivity/bond-order data.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt path. Example: --summary runs/job1/summary.txt, which supplies auxiliary simulation metadata when available.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--property", default=None, help="Property to map: charge, q, partial_charge, sum_BOs, connectivity")
+    parser.add_argument("--property", default=None, help="Property to map: charge, q, partial_charge, sum_BOs, connectivity. Example: --property charge, which colors atoms by partial charge.")
     parser.add_argument(
         "--frames",
         nargs="*",
         default=None,
-        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
-    parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="Restrict to selected 1-based atom ids")
-    parser.add_argument("--atom-types", nargs="*", default=None, help="Restrict to selected atom types/elements")
-    parser.add_argument("--save", default=None, help="Directory used when saving frame plots")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot windows")
-    parser.add_argument("--export", default=None, help="Export the assembled per-atom table to CSV")
-    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum")
-    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum")
-    parser.add_argument("--cmap", default=None, help="Matplotlib colormap")
+    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by a factor of five.")
+    parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="Restrict to selected 1-based atom ids. Example: --atom-ids 1 2 5, which keeps only those atoms.")
+    parser.add_argument("--atom-types", nargs="*", default=None, help="Restrict to selected atom types/elements. Example: --atom-types O H, which keeps only oxygen and hydrogen.")
+    parser.add_argument("--save", default=None, help="Directory used when saving frame plots. Example: --save plots3d, which writes one image per frame to that folder.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot windows. Example: --show, which opens plots interactively.")
+    parser.add_argument("--export", default=None, help="Export the assembled per-atom table to CSV. Example: --export atom_values.csv, which saves coordinates and mapped values.")
+    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum. Example: --vmin -0.5, which clamps the lower color bound.")
+    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum. Example: --vmax 0.5, which clamps the upper color bound.")
+    parser.add_argument("--cmap", default=None, help="Matplotlib colormap. Example: --cmap coolwarm, which sets the visualization color palette.")
 
 
 def _parse_bins(spec: str) -> int | tuple[int, int]:
@@ -292,27 +292,37 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical == "atom_property_plot3d":
         parser.description = (
-            "Render a 3D scatter of per-atom charge or connectivity values on trajectory coordinates.\n\n"
+            "Render 3D scatter plots of per-atom properties on trajectory coordinates.\n"
+            "This command maps a chosen property (for example charge or connectivity sum_BOs)\n"
+            "to atom colors and generates frame-wise 3D visualizations.\n\n"
             "Examples:\n"
-            "  reaxkit atom_property_plot3d --property charge --frames 0 10 20 --save plots3d\n"
-            "  reaxkit atom_property_plot3d --property sum_BOs --atom-types O H --show\n"
-            "  reaxkit atom_property_plot3d --property q --export atom_charge_coords.csv"
+            "  1. Save 3D charge plots for selected frames:\n"
+            "   reaxkit atom_property_plot3d --property charge --frames 0 10 20 --save plots3d\n\n"
+            "  2. Show 3D connectivity plots for selected atom types:\n"
+            "   reaxkit atom_property_plot3d --property sum_BOs --atom-types O H --show\n\n"
+            "  3. Export assembled charge-coordinate table:\n"
+            "   reaxkit atom_property_plot3d --property q --export atom_charge_coords.csv"
         )
-        parser.add_argument("--size", type=float, default=8.0, help="Marker size")
-        parser.add_argument("--alpha", type=float, default=0.9, help="Marker transparency")
-        parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation")
-        parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth")
+        parser.add_argument("--size", type=float, default=8.0, help="Marker size. Example: --size 12, which renders larger point markers.")
+        parser.add_argument("--alpha", type=float, default=0.9, help="Marker transparency. Example: --alpha 0.6, which makes points more transparent.")
+        parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation. Example: --elev 30, which raises the camera tilt angle.")
+        parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth. Example: --azim 120, which rotates camera around the scene.")
     elif canonical == "atom_property_heatmap2d":
         parser.description = (
-            "Render 2D projected heatmaps of per-atom charge or connectivity values.\n\n"
+            "Render 2D projected heatmaps of per-atom properties.\n"
+            "This command projects atom coordinates onto a selected plane and aggregates mapped\n"
+            "property values into heatmap bins.\n\n"
             "Examples:\n"
-            "  reaxkit atom_property_heatmap2d --property charge --plane xz --bins 60 --save heatmaps\n"
-            "  reaxkit atom_property_heatmap2d --property sum_BOs --agg max --frames 0 50 100\n"
-            "  reaxkit atom_property_heatmap2d --plane xy --export atom_count_coords.csv"
+            "  1. Save charge heatmaps on XZ projection:\n"
+            "   reaxkit atom_property_heatmap2d --property charge --plane xz --bins 60 --save heatmaps\n\n"
+            "  2. Use max aggregation for connectivity values on selected frames:\n"
+            "   reaxkit atom_property_heatmap2d --property sum_BOs --agg max --frames 0 50 100\n\n"
+            "  3. Export assembled count-based coordinate table:\n"
+            "   reaxkit atom_property_heatmap2d --plane xy --export atom_count_coords.csv"
         )
-        parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane")
-        parser.add_argument("--bins", default="40", help='Grid bins: "N" or "Nx,Ny"')
-        parser.add_argument("--agg", default="mean", help="Aggregation: mean|max|min|sum|count")
+        parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane. Example: --plane xz, which projects points onto XZ before binning.")
+        parser.add_argument("--bins", default="40", help='Grid bins: "N" or "Nx,Ny". Example: --bins 80,60, which sets non-square grid resolution.')
+        parser.add_argument("--agg", default="mean", help="Aggregation: mean|max|min|sum|count. Example: --agg max, which stores the maximum value in each bin.")
     else:
         raise KeyError(f"Unsupported spatial property command '{canonical}'.")
 

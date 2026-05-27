@@ -91,31 +91,31 @@ def _parse_int_tokens(spec: str) -> list[int]:
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--field", default=None, help="Dispatcher field expression, for example temperature, atom[1].x, charge[1], geo_opt.E_pot")
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt path")
-    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7")
-    parser.add_argument("--fort73", default="fort.73", help="Path to fort.73-style file")
-    parser.add_argument("--fort76", default="fort.76", help="Path to fort.76")
-    parser.add_argument("--fort78", default="fort.78", help="Path to fort.78")
-    parser.add_argument("--fort57", default="fort.57", help="Path to fort.57")
-    parser.add_argument("--eregime", default="eregime.in", help="Path to eregime.in")
-    parser.add_argument("--molfra", default="molfra.out", help="Path to molfra.out")
-    parser.add_argument("--control", default="control", help="Path to control file for time-axis conversion")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--field", default=None, help="Dispatcher field expression. Example: --field temperature, which selects simulation temperature time series.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific loaders.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets base context for file detection.")
+    parser.add_argument("--run-dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which is used as backup lookup path.")
+    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout. Example: --xmolout runs/job1/xmolout, which supplies trajectory coordinate data.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt path. Example: --summary runs/job1/summary.txt, which provides scalar simulation series data.")
+    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7. Example: --fort7 runs/job1/fort.7, which provides charge/bond-order source data.")
+    parser.add_argument("--fort73", default="fort.73", help="Path to fort.73-style file. Example: --fort73 fort.73, which provides partial-energy time series data.")
+    parser.add_argument("--fort76", default="fort.76", help="Path to fort.76. Example: --fort76 fort.76, which provides restraint series data.")
+    parser.add_argument("--fort78", default="fort.78", help="Path to fort.78. Example: --fort78 fort.78, which provides electric-field series data.")
+    parser.add_argument("--fort57", default="fort.57", help="Path to fort.57. Example: --fort57 fort.57, which provides geometry-optimization series data.")
+    parser.add_argument("--eregime", default="eregime.in", help="Path to eregime.in. Example: --eregime eregime.in, which provides imposed field program values.")
+    parser.add_argument("--molfra", default="molfra.out", help="Path to molfra.out. Example: --molfra molfra.out, which provides molecular frequency/total series.")
+    parser.add_argument("--control", default="control", help="Path to control file for time-axis conversion. Example: --control control, which provides timestep metadata.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="X-axis domain")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined chart.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save temperature.png, which writes the plot image.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export temperature.csv, which saves tabular output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
+    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="X-axis domain. Example: --xaxis time, which converts iterations to physical time when possible.")
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -123,18 +123,18 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
-    parser.add_argument("--format", choices=["long", "wide"], default="long", help="Trajectory output table format")
-    parser.add_argument("--atoms", default=None, help='Legacy trajectory atom selector, for example "1,5,12"')
-    parser.add_argument("--atom-types", nargs="*", default=None, help="Legacy trajectory atom-type selector")
-    parser.add_argument("--dims", nargs="*", default=None, choices=["x", "y", "z"], help="Legacy trajectory coordinate dimensions")
-    parser.add_argument("--boxdims", action="store_true", help="Legacy shortcut for cell-dimension extraction from xmolout")
-    parser.add_argument("--cell-fields", nargs="*", default=None, help="Legacy cell-dimension fields, for example a b c alpha beta gamma")
-    parser.add_argument("--field-kind", choices=["applied", "energy", "auto"], default="auto", help="Electric-field group")
-    parser.add_argument("--dropna-rows", action="store_true", help="Drop rows that are all-NaN across selected restraint fields")
-    parser.add_argument("--include-geo-descriptor", action="store_true", help="Include geo descriptor for geometry optimization data")
+    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by five.")
+    parser.add_argument("--format", choices=["long", "wide"], default="long", help="Trajectory output table format. Example: --format wide, which pivots compatible outputs into wide columns.")
+    parser.add_argument("--atoms", default=None, help='Legacy trajectory atom selector. Example: --atoms "1,5,12", which limits trajectory-series extraction to those atom ids.')
+    parser.add_argument("--atom-types", nargs="*", default=None, help="Legacy trajectory atom-type selector. Example: --atom-types O H, which limits trajectory-series extraction to oxygen/hydrogen.")
+    parser.add_argument("--dims", nargs="*", default=None, choices=["x", "y", "z"], help="Legacy trajectory coordinate dimensions. Example: --dims z, which extracts only z-coordinate series.")
+    parser.add_argument("--boxdims", action="store_true", help="Legacy shortcut for cell-dimension extraction from xmolout. Example: --boxdims, which switches to lattice-parameter series mode.")
+    parser.add_argument("--cell-fields", nargs="*", default=None, help="Legacy cell-dimension fields. Example: --cell-fields a b c alpha beta gamma, which selects listed lattice fields.")
+    parser.add_argument("--field-kind", choices=["applied", "energy", "auto"], default="auto", help="Electric-field group. Example: --field-kind applied, which selects externally applied field channels.")
+    parser.add_argument("--dropna-rows", action="store_true", help="Drop rows that are all-NaN across selected restraint fields. Example: --dropna-rows, which removes empty restraint records.")
+    parser.add_argument("--include-geo-descriptor", action="store_true", help="Include geo descriptor for geometry optimization data. Example: --include-geo-descriptor, which keeps descriptor annotations in output.")
 
 
 def _coerce_atom_ids(value) -> tuple[int, ...] | None:
@@ -405,23 +405,27 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     p.set_defaults(progress=True)
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
-        "Dispatcher for time-series and related sequential analyses.\n\n"
+        "Dispatcher for time-series and related sequential analyses.\n"
+        "This command routes `--field` expressions to the appropriate analysis backend\n"
+        "for simulation scalars, trajectory coordinates, charges, fields, energies, restraints,\n"
+        "molecular frequencies/totals, and geometry-optimization data.\n\n"
         "Examples:\n"
-        "  reaxkit timeseries --field temperature --summary summary.txt --plot single\n"
-        "  reaxkit timeseries --field atom[1,2].z --xaxis time --save atom_z.png\n"
-        "  reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv\n"
-        "  reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single\n"
-        "  reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot\n"
-        "  reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single\n"
-        "  reaxkit timeseries --field restraint[2] --fort76 fort.76 --xaxis frame --export restraint2.csv\n"
-        "  reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single\n"
-        "  reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n"
-        "  reaxkit timeseries --field energy.all --fort73 energylog --plot subplot\n"
-        "  reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single\n"
-        "  reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n\n"
-        "for legacy CLI commands use\n"
-        "  reaxkit timeseries --atoms 1,5,12 --dims z --xaxis time --save atom_z.png\n"
-        "  reaxkit timeseries --boxdims --cell-fields a b c --xaxis iter --plot subplot\n"
+        "  1. Plot simulation scalar series:\n"
+        "   reaxkit timeseries --field temperature --summary summary.txt --plot single\n\n"
+        "  2. Plot atom-coordinate series on time axis:\n"
+        "   reaxkit timeseries --field atom[1,2].z --xaxis time --save atom_z.png\n\n"
+        "  3. Export charge series for selected atom:\n"
+        "   reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv\n\n"
+        "  4. Plot molecular frequency/totals series:\n"
+        "   reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single\n"
+        "   reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot\n\n"
+        "  5. Plot restraint/electric-field/energy series:\n"
+        "   reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single\n"
+        "   reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single\n"
+        "   reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n\n"
+        "  6. Plot geometry-optimization fields:\n"
+        "   reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single\n"
+        "   reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n\n"
     )
     _add_runtime_arguments(p)
     _add_presentation_arguments(p)

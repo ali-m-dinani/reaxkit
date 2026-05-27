@@ -26,20 +26,20 @@ TRAJECTORY_COMMANDS = ("dihedral", "diffusivity", "msd", "rdf", "rdf_property", 
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory (fallback for detection)")
-    parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Trajectory file path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific trajectory loading behavior.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory (fallback for detection). Example: --run-dir runs/job1, which sets backup path for file discovery.")
+    parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Trajectory file path. Example: --xmolout runs/job1/xmolout, which provides coordinate trajectory input.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", default="frame", choices=["iter", "frame", "time"], help="Quantity on x-axis")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined figure.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save msd.png, which writes the figure image to disk.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export rdf.csv, which saves tabular analysis output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout.")
+    parser.add_argument("--xaxis", default="frame", choices=["iter", "frame", "time"], help="Quantity on x-axis. Example: --xaxis time, which uses converted physical time when available.")
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -47,9 +47,9 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Frame stride")
+    parser.add_argument("--every", type=int, default=1, help="Frame stride. Example: --every 5, which keeps every fifth selected frame.")
 
 
 def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
@@ -149,99 +149,124 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical == "dihedral":
         parser.description = (
-            "Compute a dihedral angle (atom1-atom2-atom3-atom4) over selected frames.\n\n"
+            "Compute a dihedral angle (atom1-atom2-atom3-atom4) over selected frames.\n"
+            "Use this command to track torsional evolution for a specific four-atom tuple.\n\n"
             "Examples:\n"
-            "  reaxkit dihedral --atom-ids 1 2 3 4 --plot single\n"
-            "  reaxkit dihedral --atom-ids 8 3 4 9 --frames 0:500:10 --units rad --export dih.csv\n"
-            "  reaxkit dihedral --atom-ids 5 7 9 11 --xaxis iter --save dihedral_iter.png"
+            "  1. Plot dihedral trajectory for one atom tuple:\n"
+            "   reaxkit dihedral --atom-ids 1 2 3 4 --plot single\n\n"
+            "  2. Export sampled frames in radians:\n"
+            "   reaxkit dihedral --atom-ids 8 3 4 9 --frames 0:500:10 --units rad --export dih.csv\n\n"
+            "  3. Save dihedral plot on iteration axis:\n"
+            "   reaxkit dihedral --atom-ids 5 7 9 11 --xaxis iter --save dihedral_iter.png"
         )
-        parser.add_argument("--atom-ids", type=int, nargs=4, required=True, help="Exactly four 1-based atom ids")
-        parser.add_argument("--units", choices=["deg", "rad"], default="deg", help="Output angle units")
-        parser.add_argument("--backend", choices=["numpy", "mdanalysis"], default="numpy", help="Dihedral backend")
+        parser.add_argument("--atom-ids", type=int, nargs=4, required=True, help="Exactly four 1-based atom ids. Example: --atom-ids 1 2 3 4, which defines the torsion tuple order.")
+        parser.add_argument("--units", choices=["deg", "rad"], default="deg", help="Output angle units. Example: --units rad, which reports dihedral values in radians.")
+        parser.add_argument("--backend", choices=["numpy", "mdanalysis"], default="numpy", help="Dihedral backend. Example: --backend mdanalysis, which uses MDAnalysis implementation.")
     elif canonical == "msd":
         parser.description = (
-            "Compute mean-squared displacement for selected atoms.\n\n"
+            "Compute mean-squared displacement (MSD) for selected atoms.\n"
+            "MSD is computed over selected frames and can be filtered by atom ids or atom types.\n\n"
             "Examples:\n"
-            "  reaxkit msd --atom-ids 1 2 3 --plot single\n"
-            "  reaxkit msd --atom-types O --xaxis time --save msd_oxygen.png\n"
-            "  reaxkit msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
+            "  1. Plot MSD for selected atom ids:\n"
+            "   reaxkit msd --atom-ids 1 2 3 --plot single\n\n"
+            "  2. Save oxygen-only MSD on time axis:\n"
+            "   reaxkit msd --atom-types O --xaxis time --save msd_oxygen.png\n\n"
+            "  3. Export MSD for one atom on selected frames:\n"
+            "   reaxkit msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
         )
-        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
-        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
-        parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include")
-        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or an explicit index")
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts MSD to those atoms.")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which computes MSD for oxygen atoms only.")
+        parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y, which computes MSD using in-plane displacement.")
+        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,
             default=True,
-            help="Unwrap coordinates across periodic boundaries when cell data exists",
+            help="Unwrap coordinates across periodic boundaries when cell data exists. Example: --no-unwrap, which keeps wrapped coordinates.",
         )
     elif canonical == "diffusivity":
         parser.description = (
-            "Estimate per-atom diffusivity from Einstein relation MSD = 2*d*D*t.\n\n"
+            "Estimate per-atom diffusivity from Einstein relation `MSD = 2*d*D*t`.\n"
+            "This command fits/derives diffusivity using selected dimensions, atoms, and frame windows.\n\n"
             "Examples:\n"
-            "  reaxkit diffusivity --atom-ids 1 2 3 --plot single\n"
-            "  reaxkit diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n"
-            "  reaxkit diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
+            "  1. Plot diffusivity for selected atom ids:\n"
+            "   reaxkit diffusivity --atom-ids 1 2 3 --plot single\n\n"
+            "  2. Export oxygen diffusivity using 3D Einstein dimensionality:\n"
+            "   reaxkit diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n\n"
+            "  3. Save atom-specific diffusivity with frame sampling:\n"
+            "   reaxkit diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
         )
-        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
-        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
-        parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include")
-        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or an explicit index")
-        parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t")
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts diffusivity estimates to those atoms.")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which limits analysis to oxygen atoms.")
+        parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y z, which uses full 3D displacement.")
+        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
+        parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t. Example: --d 2, which applies 2D diffusivity relation.")
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,
             default=True,
-            help="Unwrap coordinates across periodic boundaries when cell data exists",
+            help="Unwrap coordinates across periodic boundaries when cell data exists. Example: --no-unwrap, which keeps wrapped coordinates.",
         )
     elif canonical == "rdf":
         parser.description = (
-            "Compute radial distribution functions for selected atoms.\n\n"
+            "Compute radial distribution functions (RDF) for selected atom groups.\n"
+            "Group A and B can be defined by atom ids or atom types, with configurable bins/radius.\n\n"
             "Examples:\n"
-            "  reaxkit rdf --atom-types-a O --atom-types-b H --plot single\n"
-            "  reaxkit rdf --atom-ids-a 1 2 --atom-ids-b 10 11 --bins 300 --save rdf_pairs.png\n"
-            "  reaxkit rdf --atom-types-a Al --atom-types-b O --frames 0 50 100 --plot subplot"
+            "  1. Plot O-H RDF using type selectors:\n"
+            "   reaxkit rdf --atom-types-a O --atom-types-b H --plot single\n\n"
+            "  2. Save RDF for specific atom-id groups with higher resolution bins:\n"
+            "   reaxkit rdf --atom-ids-a 1 2 --atom-ids-b 10 11 --bins 300 --save rdf_pairs.png\n\n"
+            "  3. Plot frame-wise RDF subplots for Al-O:\n"
+            "   reaxkit rdf --atom-types-a Al --atom-types-b O --frames 0 50 100 --plot subplot"
         )
-        parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A")
-        parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B")
-        parser.add_argument("--atom-types-a", nargs="*", default=None, help="Element symbols for group A")
-        parser.add_argument("--atom-types-b", nargs="*", default=None, help="Element symbols for group B")
-        parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins")
-        parser.add_argument("--r-max", type=float, default=None, help="Maximum radius")
-        parser.add_argument("--backend", choices=["freud", "ovito"], default="freud")
+        parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A. Example: --atom-ids-a 1 2, which defines source RDF group.")
+        parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B. Example: --atom-ids-b 10 11, which defines target RDF group.")
+        parser.add_argument("--atom-types-a", nargs="*", default=None, help="Element symbols for group A. Example: --atom-types-a O, which sets group A by atom type.")
+        parser.add_argument("--atom-types-b", nargs="*", default=None, help="Element symbols for group B. Example: --atom-types-b H, which sets group B by atom type.")
+        parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins. Example: --bins 300, which increases radial histogram resolution.")
+        parser.add_argument("--r-max", type=float, default=None, help="Maximum radius. Example: --r-max 8.0, which truncates RDF computation at radius 8.0.")
+        parser.add_argument("--backend", choices=["freud", "ovito"], default="freud", help="RDF backend. Example: --backend ovito, which computes RDF using OVITO backend.")
     elif canonical == "rdf_property":
         parser.description = (
-            "Compute RDF-derived properties across selected frames.\n\n"
+            "Compute RDF-derived properties across selected frames.\n"
+            "Supported properties include first peak, dominant peak, area, and excess area.\n\n"
             "Examples:\n"
-            "  reaxkit rdf_property --property first_peak --atom-types-a O --atom-types-b H --plot single\n"
-            "  reaxkit rdf_property --prop area --atom-types-a Al --atom-types-b O --xaxis iter --save rdf_area.png\n"
-            "  reaxkit rdf_property --property dominant_peak --frames 0 20 40 --export rdf_peak.csv"
+            "  1. Plot first-peak position for O-H pairs:\n"
+            "   reaxkit rdf_property --property first_peak --atom-types-a O --atom-types-b H --plot single\n\n"
+            "  2. Save RDF area series using legacy alias flag:\n"
+            "   reaxkit rdf_property --prop area --atom-types-a Al --atom-types-b O --xaxis iter --save rdf_area.png\n\n"
+            "  3. Export dominant-peak series on selected frames:\n"
+            "   reaxkit rdf_property --property dominant_peak --frames 0 20 40 --export rdf_peak.csv"
         )
-        parser.add_argument("--property", default=None, help="RDF property to extract")
-        parser.add_argument("--prop", choices=["first_peak", "dominant_peak", "area", "excess_area"], default=None, help="Legacy alias for --property")
-        parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A")
-        parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B")
-        parser.add_argument("--atom-types-a", nargs="*", default=None, help="Element symbols for group A")
-        parser.add_argument("--atom-types-b", nargs="*", default=None, help="Element symbols for group B")
-        parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins")
-        parser.add_argument("--r-max", type=float, default=None, help="Maximum radius")
-        parser.add_argument("--backend", choices=["freud", "ovito"], default="freud")
+        parser.add_argument("--property", default=None, help="RDF property to extract. Example: --property first_peak, which returns first-peak position series.")
+        parser.add_argument("--prop", choices=["first_peak", "dominant_peak", "area", "excess_area"], default=None, help="Legacy alias for --property. Example: --prop area, which requests integrated RDF area series.")
+        parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A. Example: --atom-ids-a 1 2, which sets RDF group A atoms.")
+        parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B. Example: --atom-ids-b 10 11, which sets RDF group B atoms.")
+        parser.add_argument("--atom-types-a", nargs="*", default=None, help="Element symbols for group A. Example: --atom-types-a Al, which sets group A by type.")
+        parser.add_argument("--atom-types-b", nargs="*", default=None, help="Element symbols for group B. Example: --atom-types-b O, which sets group B by type.")
+        parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins. Example: --bins 250, which refines radial resolution.")
+        parser.add_argument("--r-max", type=float, default=None, help="Maximum radius. Example: --r-max 10.0, which sets RDF cutoff radius.")
+        parser.add_argument("--backend", choices=["freud", "ovito"], default="freud", help="RDF backend. Example: --backend freud, which uses freud-based RDF implementation.")
     elif canonical == "voronoi":
         parser.description = (
-            "Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.\n\n"
+            "Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.\n"
+            "Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geometry visualization.\n\n"
             "Examples:\n"
-            "  reaxkit voronoi --frames 0 10 20 --export voronoi.csv\n"
-            "  reaxkit voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n"
-            "  reaxkit voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n"
-            "  reaxkit voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
+            "  1. Export Voronoi metrics table:\n"
+            "   reaxkit voronoi --frames 0 10 20 --export voronoi.csv\n\n"
+            "  2. Plot Voronoi metric series for selected atom types:\n"
+            "   reaxkit voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n\n"
+            "  3. Plot a 2D Voronoi diagram projection:\n"
+            "   reaxkit voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n\n"
+            "  4. Plot 3D Voronoi diagrams as subplots over frame samples:\n"
+            "   reaxkit voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
         )
-        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids")
-        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
-        parser.add_argument("--backend", choices=["scipy", "pyvoro"], default="scipy", help="Voronoi backend")
-        parser.add_argument("--plot-target", choices=["metrics", "diagram"], default="metrics", help="Plot Voronoi metrics or cell diagrams")
-        parser.add_argument("--diagram-dim", choices=["2d", "3d"], default="2d", help="Diagram dimensionality")
-        parser.add_argument("--projection", choices=["xy", "xz", "yz"], default="xy", help="Projection plane for 2D diagram mode")
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which limits Voronoi analysis to those atoms.")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which restricts analysis to oxygen atoms.")
+        parser.add_argument("--backend", choices=["scipy", "pyvoro"], default="scipy", help="Voronoi backend. Example: --backend pyvoro, which uses pyvoro-based computation.")
+        parser.add_argument("--plot-target", choices=["metrics", "diagram"], default="metrics", help="Plot Voronoi metrics or cell diagrams. Example: --plot-target diagram, which switches to geometry visualization mode.")
+        parser.add_argument("--diagram-dim", choices=["2d", "3d"], default="2d", help="Diagram dimensionality. Example: --diagram-dim 3d, which renders 3D Voronoi cell wireframes.")
+        parser.add_argument("--projection", choices=["xy", "xz", "yz"], default="xy", help="Projection plane for 2D diagram mode. Example: --projection xz, which projects 2D diagram onto XZ plane.")
     else:
         raise KeyError(f"Unsupported trajectory command '{canonical}'.")
 
