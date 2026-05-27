@@ -96,24 +96,24 @@ def _parse_status_labels(spec: str | None) -> dict[int, str]:
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7")
-    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF file parsing rules.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which points loader context to that run.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup search location.")
+    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7. Example: --fort7 runs/job1/fort.7, which uses that bond-order trajectory file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout. Example: --xmolout runs/job1/xmolout, which supplies atom/trajectory metadata.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt path. Example: --summary runs/job1/summary.txt, which provides auxiliary timeline data when needed.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more processing details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="Quantity on x-axis")
-    parser.add_argument("--control", default="control", help="Control file for time-axis conversion")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which generates a single-panel figure.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save figures/conn.png, which writes the plot image to that path.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export connectivity.csv, which saves tabular results for post-processing.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout.")
+    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="Quantity on x-axis. Example: --xaxis time, which converts iteration axis to physical time when possible.")
+    parser.add_argument("--control", default="control", help="Control file for time-axis conversion. Example: --control control, which supplies timestep settings for time conversion.")
 
 
 def _add_frame_arguments(parser: argparse.ArgumentParser) -> None:
@@ -121,9 +121,9 @@ def _add_frame_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frames selection syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
+    parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by a factor of 5.")
 
 
 def _build_connection_list_request(args: argparse.Namespace) -> ConnectionListRequest:
@@ -243,106 +243,139 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical == "connection_list":
         parser.description = (
-            "List connections from bond-order frames.\n\n"
+            "List atom-to-atom connections extracted from bond-order frames.\n"
+            "Use this command to inspect which atom pairs are connected at selected frames,\n"
+            "with optional bond-order thresholding and direction collapsing.\n\n"
             "Examples:\n"
-            "  reaxkit connection_list --fort7 fort.7 --frames 0 1 2 --export connections.csv\n"
-            "  reaxkit connection_list --fort7 fort.7 --min-bo 0.3 --undirected\n"
-            "  reaxkit connection_list --fort7 fort.7 --include-self"
+            "  1. Export connections for selected frames:\n"
+            "   reaxkit connection_list --fort7 fort.7 --frames 0 1 2 --export connections.csv\n\n"
+            "  2. Keep only edges above a BO threshold and collapse i-j/j-i duplicates:\n"
+            "   reaxkit connection_list --fort7 fort.7 --min-bo 0.3 --undirected\n\n"
+            "  3. Include self-connections in output:\n"
+            "   reaxkit connection_list --fort7 fort.7 --include-self"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
-        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
-        parser.add_argument("--include-self", action="store_true", help="Include self connections")
+        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which filters out weaker bonds below 0.3.")
+        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps directed pair ordering.")
+        parser.add_argument("--include-self", action="store_true", help="Include self connections. Example: --include-self, which keeps i->i entries when present.")
     elif canonical == "connection_table":
         parser.description = (
-            "Build one or more frame-wise connectivity matrices.\n\n"
+            "Build frame-wise connectivity matrices from bond-order data.\n"
+            "For one frame, the command returns a single matrix. For multiple frames, export mode\n"
+            "writes one CSV per frame.\n\n"
             "Examples:\n"
-            "  reaxkit connection_table --fort7 fort.7 --frames 0 --export connection_table.csv\n"
-            "  reaxkit connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n"
-            "  reaxkit connection_table --fort7 fort.7 --frames 10 --min-bo 0.3\n"
-            "  reaxkit connection_table --fort7 fort.7 --frames 5 --fill-value -1"
+            "  1. Export a single-frame connectivity table:\n"
+            "   reaxkit connection_table --fort7 fort.7 --frames 0 --export connection_table.csv\n\n"
+            "  2. Export connectivity tables for multiple frames:\n"
+            "   reaxkit connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n\n"
+            "  3. Apply bond-order threshold and custom fill value:\n"
+            "   reaxkit connection_table --fort7 fort.7 --frames 5 --min-bo 0.3 --fill-value -1"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
-        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
-        parser.add_argument("--fill-value", type=float, default=0.0, help="Fill value for missing entries")
+        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which keeps only stronger connections.")
+        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps direction-specific matrix entries.")
+        parser.add_argument("--fill-value", type=float, default=0.0, help="Fill value for missing entries. Example: --fill-value -1, which marks absent entries explicitly as -1.")
     elif canonical == "connection_stats":
         parser.description = (
-            "Aggregate connectivity statistics across frames.\n\n"
+            "Aggregate connectivity statistics across selected frames.\n"
+            "Use this command to summarize connectivity behavior with mean/max/count aggregations.\n\n"
             "Examples:\n"
-            "  reaxkit connection_stats --fort7 fort.7 --how mean --export connection_stats.csv\n"
-            "  reaxkit connection_stats --fort7 fort.7 --frames 0 10 20 --how count\n"
-            "  reaxkit connection_stats --fort7 fort.7 --min-bo 0.3 --how max"
+            "  1. Export mean connectivity statistics:\n"
+            "   reaxkit connection_stats --fort7 fort.7 --how mean --export connection_stats.csv\n\n"
+            "  2. Compute edge counts on specific frames:\n"
+            "   reaxkit connection_stats --fort7 fort.7 --frames 0 10 20 --how count\n\n"
+            "  3. Use thresholded max aggregation:\n"
+            "   reaxkit connection_stats --fort7 fort.7 --min-bo 0.3 --how max"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order")
-        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
-        parser.add_argument("--how", choices=["mean", "max", "count"], default="mean", help="Statistic to compute")
+        parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which removes weak edges before statistics.")
+        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which treats reverse directions separately.")
+        parser.add_argument("--how", choices=["mean", "max", "count"], default="mean", help="Statistic to compute. Example: --how count, which reports occurrence counts instead of mean/max BO.")
     elif canonical == "bond_events":
         parser.description = (
-            "Detect bond formation and breakage events.\n\n"
+            "Detect bond formation and breakage events over time.\n"
+            "The command applies threshold/hysteresis logic and optional smoothing to bond-order\n"
+            "signals, then reports event points.\n\n"
             "Examples:\n"
-            "  reaxkit bond_events --fort7 fort.7 --src 1 --dst 2 --export bond_events.csv\n"
-            "  reaxkit bond_events --fort7 fort.7 --threshold 0.35 --hysteresis 0.05 --plot single\n"
-            "  reaxkit bond_events --fort7 fort.7 --smooth ema --window 9 --xaxis frame"
+            "  1. Detect events for one atom pair and export:\n"
+            "   reaxkit bond_events --fort7 fort.7 --src 1 --dst 2 --export bond_events.csv\n\n"
+            "  2. Tune threshold/hysteresis and plot events:\n"
+            "   reaxkit bond_events --fort7 fort.7 --threshold 0.35 --hysteresis 0.05 --plot single\n\n"
+            "  3. Use EMA smoothing and frame axis for plotting:\n"
+            "   reaxkit bond_events --fort7 fort.7 --smooth ema --window 9 --xaxis frame"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--src", type=int, default=None, help="Source atom id filter")
-        parser.add_argument("--dst", type=int, default=None, help="Destination atom id filter")
-        parser.add_argument("--threshold", type=float, default=0.35, help="Schmitt threshold")
-        parser.add_argument("--hysteresis", type=float, default=0.05, help="Schmitt hysteresis width")
-        parser.add_argument("--smooth", choices=["ma", "ema"], default="ma", help="Smoothing method")
-        parser.add_argument("--window", type=int, default=7, help="Smoothing window")
-        parser.add_argument("--ema-alpha", type=float, default=None, help="Optional EMA alpha")
-        parser.add_argument("--min-run", type=int, default=3, help="Minimum run length after flicker cleanup")
-        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i")
+        parser.add_argument("--src", type=int, default=None, help="Source atom-id filter. Example: --src 1, which keeps events where source atom id is 1.")
+        parser.add_argument("--dst", type=int, default=None, help="Destination atom-id filter. Example: --dst 2, which keeps events where destination atom id is 2.")
+        parser.add_argument("--threshold", type=float, default=0.35, help="Schmitt threshold. Example: --threshold 0.4, which raises event trigger level.")
+        parser.add_argument("--hysteresis", type=float, default=0.05, help="Schmitt hysteresis width. Example: --hysteresis 0.05, which adds separation between open/close transitions.")
+        parser.add_argument("--smooth", choices=["ma", "ema"], default="ma", help="Smoothing method. Example: --smooth ema, which applies exponential moving average.")
+        parser.add_argument("--window", type=int, default=7, help="Smoothing window. Example: --window 9, which increases smoothing span.")
+        parser.add_argument("--ema-alpha", type=float, default=None, help="Optional EMA alpha. Example: --ema-alpha 0.3, which controls EMA responsiveness.")
+        parser.add_argument("--min-run", type=int, default=3, help="Minimum run length after flicker cleanup. Example: --min-run 5, which suppresses short-lived toggles.")
+        parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps direction-specific events.")
     elif canonical == "coordination":
         parser.description = (
-            "Classify atoms as under-, coordinated, or over-coordinated.\n\n"
+            "Classify atoms as under-, coordinated-, or over-coordinated.\n"
+            "Classification compares bond-order totals against target valences from explicit maps\n"
+            "or inferred values.\n\n"
             "Examples:\n"
-            "  reaxkit coordination --fort7 fort.7 --xmolout xmolout --valences Mg=2,O=2 --export coordination.csv\n"
-            "  reaxkit coordination --fort7 fort.7 --xmolout xmolout --ffield ffield --frames 0 10 20\n"
-            "  reaxkit coordination --fort7 fort.7 --xmolout xmolout --threshold 0.2 --plot single"
+            "  1. Classify using explicit valence map and export:\n"
+            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --valences Mg=2,O=2 --export coordination.csv\n\n"
+            "  2. Classify using valences inferred from force field:\n"
+            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --ffield ffield --frames 0 10 20\n\n"
+            "  3. Adjust tolerance and plot results:\n"
+            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --threshold 0.2 --plot single"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2")
-        parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences")
-        parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence")
-        parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences")
+        parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2. Example: --valences Mg=2,O=2, which sets target valences directly.")
+        parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences. Example: --ffield ffield, which derives valence targets from that force field.")
+        parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence. Example: --threshold 0.2, which tightens classification around target BO sums.")
+        parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences. Example: --allow-missing-valences, which skips strict failure when some mappings are absent.")
     elif canonical == "coordination_relabel":
         parser.description = (
-            "Relabel trajectory atom labels from coordination status and write engine-specific output.\n\n"
+            "Relabel trajectory atom labels based on coordination status.\n"
+            "This command computes coordination classes and writes a relabeled trajectory using\n"
+            "engine-specific output formatting.\n\n"
             "Examples:\n"
-            "  reaxkit coordination_relabel --fort7 fort.7 --xmolout xmolout --output xmolout_relabeled\n"
-            "  reaxkit coordination_relabel --valences Mg=2,O=2 --mode by_type --keep-coord-original --output relabeled.xyz\n"
-            "  reaxkit coordination_relabel --ffield ffield --frames 0 10 20 --labels=-1=U,0=C,1=O --export coordination.csv --output relabeled.xmolout"
+            "  1. Relabel using defaults and write output trajectory:\n"
+            "   reaxkit coordination_relabel --fort7 fort.7 --xmolout xmolout --output xmolout_relabeled\n\n"
+            "  2. Use explicit valences and type-aware relabeling:\n"
+            "   reaxkit coordination_relabel --valences Mg=2,O=2 --mode by_type --keep-coord-original --output relabeled.xyz\n\n"
+            "  3. Use inferred valences, custom status labels, and export status table:\n"
+            "   reaxkit coordination_relabel --ffield ffield --frames 0 10 20 --labels=-1=U,0=C,1=O --export coordination.csv --output relabeled.xmolout"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2")
-        parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences")
-        parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence")
-        parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences")
-        parser.add_argument("--output", required=True, help="Output trajectory path")
-        parser.add_argument("--mode", choices=["global", "by_type"], default="global", help="Relabeling mode")
-        parser.add_argument("--labels", default=None, help="Status tag map like -1=U,0=C,1=O")
-        parser.add_argument("--keep-coord-original", action="store_true", help="Keep original label when status is coordinated in by_type mode")
-        parser.add_argument("--precision", type=int, default=6, help="Writer precision when supported by the engine")
-        parser.add_argument("--simulation", default=None, help="Optional trajectory writer simulation label")
+        parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2. Example: --valences Mg=2,O=2, which sets coordination targets directly.")
+        parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences. Example: --ffield ffield, which derives target valences automatically.")
+        parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence. Example: --threshold 0.2, which makes status classification stricter.")
+        parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences. Example: --allow-missing-valences, which permits partial valence definitions.")
+        parser.add_argument("--output", required=True, help="Output trajectory path. Example: --output relabeled.xmolout, which writes relabeled trajectory to that file.")
+        parser.add_argument("--mode", choices=["global", "by_type"], default="global", help="Relabeling mode. Example: --mode by_type, which applies status labels per atom type context.")
+        parser.add_argument("--labels", default=None, help="Status tag map like -1=U,0=C,1=O. Example: --labels=-1=U,0=C,1=O, which customizes output status tokens.")
+        parser.add_argument("--keep-coord-original", action="store_true", help="Keep original label when status is coordinated in by_type mode. Example: --keep-coord-original, which preserves original labels for coordinated atoms.")
+        parser.add_argument("--precision", type=int, default=6, help="Writer precision when supported by the engine. Example: --precision 8, which writes numeric coordinates with higher decimal precision.")
+        parser.add_argument("--simulation", default=None, help="Optional trajectory writer simulation label. Example: --simulation run_01, which tags output with that simulation name when supported.")
     elif canonical == "hybridization":
         parser.description = (
-            "Classify atoms against target hybridization bond-order sums.\n\n"
+            "Classify atoms against target hybridization bond-order sums.\n"
+            "You can define global hybridization targets or per-element target maps, then restrict\n"
+            "classification to specific elements or atom ids.\n\n"
             "Examples:\n"
-            "  reaxkit hybridization --fort7 fort.7 --xmolout xmolout --hybridizations sp=1,sp2=2,sp3=3 --export hyb.csv\n"
-            "  reaxkit hybridization --fort7 fort.7 --xmolout xmolout --element-hybridizations \"C:sp=1,sp2=2,sp3=3;N:sp2=2,sp3=3\"\n"
-            "  reaxkit hybridization --fort7 fort.7 --xmolout xmolout --target-elements C O --threshold 0.2"
+            "  1. Use global hybridization targets and export:\n"
+            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --hybridizations sp=1,sp2=2,sp3=3 --export hyb.csv\n\n"
+            "  2. Use element-specific hybridization targets:\n"
+            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --element-hybridizations \"C:sp=1,sp2=2,sp3=3;N:sp2=2,sp3=3\"\n\n"
+            "  3. Restrict to selected elements and tighten tolerance:\n"
+            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --target-elements C O --threshold 0.2"
         )
         _add_frame_arguments(parser)
-        parser.add_argument("--hybridizations", default=None, help="Global map like sp=1,sp2=2,sp3=3")
-        parser.add_argument("--element-hybridizations", default=None, help="Per-element map like C:sp=1,sp2=2;N:sp2=2,sp3=3")
-        parser.add_argument("--target-elements", nargs="*", default=None, help="Restrict to selected elements")
-        parser.add_argument("--target-atom-ids", type=int, nargs="*", default=None, help="Restrict to selected atom ids")
-        parser.add_argument("--threshold", type=float, default=0.3, help="Tolerance around target BO sum")
-        parser.add_argument("--allow-undefined-hybridization", action="store_true", help="Do not fail on missing mappings")
+        parser.add_argument("--hybridizations", default=None, help="Global map like sp=1,sp2=2,sp3=3. Example: --hybridizations sp=1,sp2=2,sp3=3, which applies one map to all elements.")
+        parser.add_argument("--element-hybridizations", default=None, help="Per-element map like C:sp=1,sp2=2;N:sp2=2,sp3=3. Example: --element-hybridizations \"C:sp=1,sp2=2,sp3=3\", which customizes targets for specific elements.")
+        parser.add_argument("--target-elements", nargs="*", default=None, help="Restrict to selected elements. Example: --target-elements C O, which evaluates only carbon and oxygen atoms.")
+        parser.add_argument("--target-atom-ids", type=int, nargs="*", default=None, help="Restrict to selected atom ids. Example: --target-atom-ids 1 2 5, which evaluates only those atom indices.")
+        parser.add_argument("--threshold", type=float, default=0.3, help="Tolerance around target BO sum. Example: --threshold 0.2, which tightens hybridization matching tolerance.")
+        parser.add_argument("--allow-undefined-hybridization", action="store_true", help="Do not fail on missing mappings. Example: --allow-undefined-hybridization, which allows output even when some atoms have no configured target.")
     else:
         raise KeyError(f"Unsupported connectivity command '{canonical}'.")
 

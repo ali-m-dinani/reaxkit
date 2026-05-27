@@ -23,32 +23,32 @@ KINEMATICS_KEYS = ("metadata", "coordinates", "velocities", "accelerations", "pr
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--vels", "--file", dest="vels", default="vels", help="Atomic kinematics file path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context.")
+    parser.add_argument("--vels", "--file", dest="vels", default="vels", help="Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", choices=["atom_index"], default="atom_index", help="Quantity on x-axis")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot subplot, which creates one panel per value column.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save accelerations.png, which writes the figure image.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export velocities.csv, which saves tabular output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout.")
+    parser.add_argument("--xaxis", choices=["atom_index"], default="atom_index", help="Quantity on x-axis. Example: --xaxis atom_index, which uses atom index for horizontal axis.")
 
 
 def _add_spatial_plot_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the merged coordinate/value table to CSV")
-    parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids")
-    parser.add_argument("--value", required=True, help="Scalar to plot: vx, vy, vz, ax, ay, az, pax, pay, paz")
-    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum")
-    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum")
-    parser.add_argument("--cmap", default="coolwarm", help="Matplotlib colormap")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the rendered spatial plot.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save vx_3d.png, which writes the spatial figure to disk.")
+    parser.add_argument("--export", default=None, help="Write the merged coordinate/value table to CSV. Example: --export merged.csv, which saves plotted coordinates and values.")
+    parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atoms 1 5 9, which limits plotting to those atoms.")
+    parser.add_argument("--value", required=True, help="Scalar to plot: vx, vy, vz, ax, ay, az, pax, pay, paz. Example: --value vz, which colors points by z-velocity.")
+    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum. Example: --vmin -0.2, which clamps lower color bound.")
+    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum. Example: --vmax 0.2, which clamps upper color bound.")
+    parser.add_argument("--cmap", default="coolwarm", help="Matplotlib colormap. Example: --cmap viridis, which sets the plot color palette.")
 
 
 def _parse_bins(bins: str):
@@ -92,14 +92,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     if canonical == "kinematics":
         _add_presentation_arguments(parser)
         parser.description = (
-            "Extract metadata or atomic coordinate, velocity, or acceleration tables.\n\n"
+            "Extract kinematics datasets from atomic kinematics files.\n"
+            "This command can return metadata, coordinates, velocities, accelerations, or previous\n"
+            "accelerations, optionally filtered to selected atoms.\n\n"
             "Examples:\n"
-            "  reaxkit kinematics --key velocities --atoms 1 3 7 --export velocities.csv\n"
-            "  reaxkit kinematics --key metadata --vels moldyn.vel\n"
-            "  reaxkit kinematics --key accelerations --plot subplot --save accelerations.png"
+            "  1. Export selected-atom velocities:\n"
+            "   reaxkit kinematics --key velocities --atoms 1 3 7 --export velocities.csv\n\n"
+            "  2. Read metadata from a specific kinematics file:\n"
+            "   reaxkit kinematics --key metadata --vels moldyn.vel\n\n"
+            "  3. Plot accelerations using subplot layout:\n"
+            "   reaxkit kinematics --key accelerations --plot subplot --save accelerations.png"
         )
-        parser.add_argument("--key", choices=KINEMATICS_KEYS, required=True, help="Requested kinematics dataset")
-        parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids")
+        parser.add_argument("--key", choices=KINEMATICS_KEYS, required=True, help="Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom.")
+        parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms.")
     else:
         raise KeyError(f"Unsupported kinematics command '{canonical}'.")
 

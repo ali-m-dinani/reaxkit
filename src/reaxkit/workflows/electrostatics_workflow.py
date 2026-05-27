@@ -38,48 +38,48 @@ ELECTROSTATICS_COMMANDS = ("charge_table", "dipole", "polarization", "polarizati
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for detection")
-    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout file")
-    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF loader/parsing rules.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for detection. Example: --run-dir runs/job1, which sets the base folder for file lookup.")
+    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout file. Example: --xmolout runs/job1/xmolout, which provides trajectory structure data.")
+    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7 file. Example: --fort7 runs/job1/fort.7, which provides bond-order/charge source data.")
     add_storage_cli_arguments(parser)
 
 
 def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--export", default=None, help="Write the analysis table to CSV")
+    parser.add_argument("--export", default=None, help="Write the analysis table to CSV. Example: --export dipole.csv, which saves computed values for external analysis.")
     parser.add_argument(
         "--plot",
         choices=["plot3d", "heatmap2d"],
         default=None,
-        help="Render local dipole or polarization results as a plot",
+        help="Render local dipole or polarization results as a plot. Example: --plot plot3d, which produces per-frame 3D colored scatter views.",
     )
-    parser.add_argument("--component", default=None, help="Component to color by for local plots")
+    parser.add_argument("--component", default=None, help="Component to color by for local plots. Example: --component mu_z, which colors by z-component values.")
     parser.add_argument(
         "--plot-frames",
         nargs="*",
         default=None,
-        help='Frames for local plots: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2" (defaults to --frames selection)',
+        help='Frames for local plots. Example: --plot-frames 0:20:2, which renders every second frame from 0 to 20.',
     )
-    parser.add_argument("--save", default=None, help="Directory used when saving local plots")
-    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum for local plots")
-    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum for local plots")
-    parser.add_argument("--cmap", default=None, help="Matplotlib colormap for local plots")
-    parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane for heatmaps")
-    parser.add_argument("--bins", default="40", help='Grid bins for heatmaps: "N" or "Nx,Ny"')
-    parser.add_argument("--agg", default="mean", help="Heatmap aggregation: mean|max|min|sum|count")
-    parser.add_argument("--size", type=float, default=20.0, help="3D marker size")
-    parser.add_argument("--alpha", type=float, default=0.9, help="3D marker transparency")
-    parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation")
-    parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth")
+    parser.add_argument("--save", default=None, help="Directory used when saving local plots. Example: --save dipole_plots, which writes one image per frame there.")
+    parser.add_argument("--vmin", type=float, default=None, help="Color scale minimum for local plots. Example: --vmin -0.5, which clamps lower color bound.")
+    parser.add_argument("--vmax", type=float, default=None, help="Color scale maximum for local plots. Example: --vmax 0.5, which clamps upper color bound.")
+    parser.add_argument("--cmap", default=None, help="Matplotlib colormap for local plots. Example: --cmap coolwarm, which sets the plot color palette.")
+    parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane for heatmaps. Example: --plane xz, which projects values onto XZ.")
+    parser.add_argument("--bins", default="40", help='Grid bins for heatmaps: "N" or "Nx,Ny". Example: --bins 80,60, which uses non-square bin resolution.')
+    parser.add_argument("--agg", default="mean", help="Heatmap aggregation: mean|max|min|sum|count. Example: --agg max, which stores the maximum value per bin.")
+    parser.add_argument("--size", type=float, default=20.0, help="3D marker size. Example: --size 12, which renders smaller scatter points.")
+    parser.add_argument("--alpha", type=float, default=0.9, help="3D marker transparency. Example: --alpha 0.6, which makes points more transparent.")
+    parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation. Example: --elev 30, which raises camera angle.")
+    parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth. Example: --azim 120, which rotates camera around the scene.")
 
 
 def _add_table_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="Quantity on x-axis")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which makes one combined chart.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the chart interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save charge_series.png, which writes the figure image.")
+    parser.add_argument("--export", default=None, help="Write the table to CSV. Example: --export charges.csv, which saves tabular output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
+    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="Quantity on x-axis. Example: --xaxis time, which uses converted time instead of iteration index.")
 
 
 def _parse_core_types(spec: str | None) -> tuple[str, ...]:
@@ -420,68 +420,84 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical in {"dipole", "polarization"}:
         parser.description = (
-            f"Compute {canonical} data for one or more frames.\n\n"
+            f"Compute {canonical} data for selected frames.\n"
+            "This command supports total and local scope. Local scope requires core atom types and can\n"
+            "optionally render per-frame spatial plots.\n\n"
             "Examples:\n"
-            f"  reaxkit {canonical} --frames 10 --scope total --export {canonical}_frame10.csv\n"
-            f"  reaxkit {canonical} --frames 0:20:2 --scope total --export {canonical}_series.csv\n"
-            f"  reaxkit {canonical} --frames 10 --scope local --core Al --export local_{canonical}_frame10.csv\n"
-            f"  reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
+            f"  1. Compute one-frame total values and export:\n"
+            f"   reaxkit {canonical} --frames 10 --scope total --export {canonical}_frame10.csv\n\n"
+            f"  2. Compute a frame series in total scope:\n"
+            f"   reaxkit {canonical} --frames 0:20:2 --scope total --export {canonical}_series.csv\n\n"
+            f"  3. Compute local values for selected core types:\n"
+            f"   reaxkit {canonical} --frames 10 --scope local --core Al --export local_{canonical}_frame10.csv\n\n"
+            f"  4. Render local 3D plots per frame:\n"
+            f"   reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
         )
         parser.add_argument(
             "--frames",
             nargs="*",
             default=None,
-            help='Frames to analyze: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+            help='Frames to analyze. Example: --frames 0:20:2, which selects every second frame from 0 to 20.',
         )
-        parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope")
-        parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope")
+        parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope. Example: --scope local, which computes per-core local contributions.")
+        parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope. Example: --core Al,Mg, which limits local analysis to those core types.")
         _add_scalar_presentation_arguments(parser)
     elif canonical == "charge_table":
         parser.description = (
-            "Extract per-atom charges across selected frames.\n\n"
+            "Extract per-atom charges across selected frames.\n"
+            "You can filter by atom ids or element types, subsample frames, export tables, and plot\n"
+            "charge series on iteration/frame/time axes.\n\n"
             "Examples:\n"
-            "  reaxkit charge_table --frames 0:10:2 --export charges.csv\n"
-            "  reaxkit charge_table --atom-ids 1 2 3 --frames 0,5,10 --plot single\n"
-            "  reaxkit charge_table --atom-types O H --every 5 --xaxis time --save charge_series.png"
+            "  1. Export charge table for a frame slice:\n"
+            "   reaxkit charge_table --frames 0:10:2 --export charges.csv\n\n"
+            "  2. Plot selected atom ids over selected frames:\n"
+            "   reaxkit charge_table --atom-ids 1 2 3 --frames 0,5,10 --plot single\n\n"
+            "  3. Filter by atom types and save time-axis plot:\n"
+            "   reaxkit charge_table --atom-types O H --every 5 --xaxis time --save charge_series.png"
         )
-        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids to include")
-        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include")
+        parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids to include. Example: --atom-ids 1 2 3, which keeps only those atoms.")
+        parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O H, which keeps only oxygen and hydrogen rows.")
         parser.add_argument(
             "--frames",
             nargs="*",
             default=None,
-            help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+            help='Frame selector syntax. Example: --frames 0,5,10, which evaluates only those three frames.',
         )
-        parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame")
-        parser.add_argument("--control", default="control", help="Control file for time-axis conversion")
+        parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by 5.")
+        parser.add_argument("--control", default="control", help="Control file for time-axis conversion. Example: --control control, which provides timestep metadata for time conversion.")
         _add_table_presentation_arguments(parser)
     elif canonical == "polarization_field":
         parser.description = (
-            "Analyze polarization-field hysteresis behavior.\n\n"
+            "Analyze polarization-field hysteresis behavior from trajectory-level data.\n"
+            "This command aggregates hysteresis points, plots response curves, exports tables, and can\n"
+            "report coercive/remnant roots.\n\n"
             "Examples:\n"
-            "  reaxkit polarization_field --plot --save hysteresis.png\n"
-            "  reaxkit polarization_field --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n"
-            "  reaxkit polarization_field --roots --summary hysteresis_summary.txt"
+            "  1. Plot and save aggregated hysteresis curve:\n"
+            "   reaxkit polarization_field --plot --save hysteresis.png\n\n"
+            "  2. Customize axes and aggregation, then export:\n"
+            "   reaxkit polarization_field --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n\n"
+            "  3. Print roots and write a summary text report:\n"
+            "   reaxkit polarization_field --roots --summary hysteresis_summary.txt"
         )
-        parser.add_argument("--fort78", default="fort.78", help="Path to fort.78 file")
-        parser.add_argument("--control", default="control", help="Path to control file")
-        parser.add_argument("--plot", action="store_true", help="Render the hysteresis plot")
-        parser.add_argument("--save", default="hysteresis_aggregated.png", help="Save plot to a file path")
-        parser.add_argument("--export", default="hysteresis_aggregated.csv", help="Write aggregated data to CSV")
+        parser.add_argument("--fort78", default="fort.78", help="Path to fort.78 file. Example: --fort78 runs/job1/fort.78, which reads field-response source data from that file.")
+        parser.add_argument("--control", default="control", help="Path to control file. Example: --control runs/job1/control, which provides simulation timing/control metadata.")
+        parser.add_argument("--plot", action="store_true", help="Render the hysteresis plot. Example: --plot, which generates the hysteresis curve figure.")
+        parser.add_argument("--save", default="hysteresis_aggregated.png", help="Save plot to a file path. Example: --save hysteresis.png, which writes the plotted curve to that image file.")
+        parser.add_argument("--export", default="hysteresis_aggregated.csv", help="Write aggregated data to CSV. Example: --export hysteresis.csv, which saves aggregated hysteresis table.")
         parser.add_argument(
             "--summary",
             default="hysteresis_summary.txt",
-            help="Write coercive fields and remnant polarizations to a text file",
+            help="Write coercive fields and remnant polarizations to a text file. Example: --summary hysteresis_summary.txt, which stores root summary values in text form.",
         )
-        parser.add_argument("--yaxis", default="pol_z", help="Quantity for y-axis")
-        parser.add_argument("--xaxis", default="field_z", help="Quantity for x-axis")
+        parser.add_argument("--yaxis", default="pol_z", help="Quantity for y-axis. Example: --yaxis pol_z, which plots z-polarization response on y-axis.")
+        parser.add_argument("--xaxis", default="field_z", help="Quantity for x-axis. Example: --xaxis field_z, which uses z-field strength on x-axis.")
         parser.add_argument(
             "--aggregate",
             choices=["mean", "max", "min", "last"],
             default="mean",
-            help="Aggregation method",
+            help="Aggregation method. Example: --aggregate mean, which averages values at each field point.",
         )
-        parser.add_argument("--roots", action="store_true", help="Also print coercive and remnant values to stdout")
+        parser.add_argument("--roots", action="store_true", help="Also print coercive and remnant values to stdout. Example: --roots, which prints root metrics directly in CLI output.")
     else:
         raise KeyError(f"Unsupported electrostatics command '{canonical}'.")
 

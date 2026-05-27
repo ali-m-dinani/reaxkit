@@ -31,21 +31,21 @@ MOLECULAR_ANALYSIS_COMMANDS = (
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--molfra", "--file", dest="molfra", default="molfra.out", help="Molecular analysis file path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path.")
+    parser.add_argument("--molfra", "--file", dest="molfra", default="molfra.out", help="Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", choices=["frame", "iter"], default="frame", help="Quantity on x-axis")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which draws one combined chart.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the plot interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout.")
+    parser.add_argument("--xaxis", choices=["frame", "iter"], default="frame", help="Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis.")
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -53,9 +53,9 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Frame stride")
+    parser.add_argument("--every", type=int, default=1, help="Frame stride. Example: --every 5, which keeps every fifth selected frame.")
 
 
 def _build_dominant_species_request(args: argparse.Namespace) -> DominantSpeciesRequest:
@@ -110,40 +110,59 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical == "dominant_species":
         parser.description = (
-            "Return the dominant molecular species for selected frames.\n\n"
+            "Return dominant molecular species for selected frames.\n"
+            "This command ranks species by frequency per frame and can return multiple top ranks,\n"
+            "with optional frequency threshold filtering.\n\n"
             "Examples:\n"
-            "  reaxkit dominant_species --top-n 3 --export dominant_species.csv\n"
-            "  reaxkit dominant_species --frames 0 10 20 --min-freq 2 --plot single\n"
-            "  reaxkit dominant_species --every 5 --xaxis iter --save dominant_species.png"
+            "  1. Export top 3 species per frame:\n"
+            "   reaxkit dominant_species --top-n 3 --export dominant_species.csv\n\n"
+            "  2. Analyze selected frames with minimum frequency and plot:\n"
+            "   reaxkit dominant_species --frames 0 10 20 --min-freq 2 --plot single\n\n"
+            "  3. Use frame stride and iteration axis in saved figure:\n"
+            "   reaxkit dominant_species --every 5 --xaxis iter --save dominant_species.png"
         )
-        parser.add_argument("--top-n", type=int, default=1, help="Number of ranked species per frame")
-        parser.add_argument("--min-freq", type=float, default=0.0, help="Minimum species frequency to include")
+        parser.add_argument("--top-n", type=int, default=1, help="Number of ranked species per frame. Example: --top-n 3, which returns first/second/third dominant species.")
+        parser.add_argument("--min-freq", type=float, default=0.0, help="Minimum species frequency to include. Example: --min-freq 2, which filters out low-frequency species.")
     elif canonical == "largest_molecule_by_mass":
         parser.description = (
-            "Return the heaviest molecular species for selected frames.\n\n"
+            "Return the heaviest molecular species for selected frames.\n"
+            "Use this command to track how the maximum molecular mass evolves over trajectory frames.\n\n"
             "Examples:\n"
-            "  reaxkit largest_molecule_by_mass --export largest_mass.csv\n"
-            "  reaxkit largest_molecule_by_mass --frames 0 20 40 --plot single\n"
-            "  reaxkit largest_molecule_by_mass --every 10 --xaxis iter --save largest_mass.png"
+            "  1. Export largest-mass species table:\n"
+            "   reaxkit largest_molecule_by_mass --export largest_mass.csv\n\n"
+            "  2. Plot largest-mass trend on selected frames:\n"
+            "   reaxkit largest_molecule_by_mass --frames 0 20 40 --plot single\n\n"
+            "  3. Subsample frames and save iteration-axis plot:\n"
+            "   reaxkit largest_molecule_by_mass --every 10 --xaxis iter --save largest_mass.png"
         )
     elif canonical == "largest_molecule_composition":
         parser.description = (
-            "Return element counts for the heaviest molecular species per frame.\n\n"
+            "Return elemental composition of the heaviest molecular species per frame.\n"
+            "This command reports element counts for the dominant-by-mass molecule in each frame,\n"
+            "which helps track composition shifts over time.\n\n"
             "Examples:\n"
-            "  reaxkit largest_molecule_composition --export composition.csv\n"
-            "  reaxkit largest_molecule_composition --frames 0 10 20 --plot subplot\n"
-            "  reaxkit largest_molecule_composition --every 5 --xaxis iter --save composition.png"
+            "  1. Export composition table:\n"
+            "   reaxkit largest_molecule_composition --export composition.csv\n\n"
+            "  2. Plot selected frames with subplot layout:\n"
+            "   reaxkit largest_molecule_composition --frames 0 10 20 --plot subplot\n\n"
+            "  3. Subsample frames and save iteration-axis plot:\n"
+            "   reaxkit largest_molecule_composition --every 5 --xaxis iter --save composition.png"
         )
     elif canonical == "molecule_lifetime":
         parser.description = (
-            "Compute molecule lifetimes.\n\n"
+            "Compute lifetimes of molecular species across selected frames.\n"
+            "You can restrict to target formulas and filter by minimum activity frequency before\n"
+            "lifetime statistics are reported.\n\n"
             "Examples:\n"
-            "  reaxkit molecule_lifetime --molecules H2O OH --export lifetimes.csv\n"
-            "  reaxkit molecule_lifetime --plot single\n"
-            "  reaxkit molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png"
+            "  1. Compute lifetimes for selected molecules and export:\n"
+            "   reaxkit molecule_lifetime --molecules H2O OH --export lifetimes.csv\n\n"
+            "  2. Compute and plot lifetimes for all detected molecules:\n"
+            "   reaxkit molecule_lifetime --plot single\n\n"
+            "  3. Apply frequency threshold on selected frames and save plot:\n"
+            "   reaxkit molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png"
         )
-        parser.add_argument("--molecules", nargs="*", default=None, help="Restrict to selected molecular formulae")
-        parser.add_argument("--min-freq", type=float, default=1.0, help="Minimum frequency for an active molecule")
+        parser.add_argument("--molecules", nargs="*", default=None, help="Restrict to selected molecular formulae. Example: --molecules H2O OH, which limits analysis to water and hydroxyl.")
+        parser.add_argument("--min-freq", type=float, default=1.0, help="Minimum frequency for an active molecule. Example: --min-freq 2, which treats only sufficiently frequent molecules as active.")
     else:
         raise KeyError(f"Unsupported molecular analysis command '{canonical}'.")
 

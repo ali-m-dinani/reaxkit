@@ -17,25 +17,25 @@ PARAMS_COMMANDS = ("get-params",)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--params", "--file", dest="params", default="params", help="Path to params file")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF parsing/loading behavior.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets the lookup context for files.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup resolution path.")
+    parser.add_argument("--params", "--file", dest="params", default="params", help="Path to params file. Example: --params params, which reads optimization parameter definitions from that file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints more runtime details.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which draws one combined chart.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the plot interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save params.png, which writes the figure image.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export params.csv, which saves tabular output.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout.")
     parser.add_argument(
         "--xaxis",
         choices=["ff_section_line", "ff_parameter"],
         default="ff_section_line",
-        help="Quantity on x-axis",
+        help="Quantity on x-axis. Example: --xaxis ff_parameter, which uses parameter-id/name style values on the horizontal axis.",
     )
 
 
@@ -62,15 +62,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if canonical == "get-params":
         parser.description = (
-            "Load raw or interpreted optimization-parameter definitions from params.\n\n"
+            "Load optimization-parameter definitions from `params`.\n"
+            "This command can return raw parameter rows or interpreted mappings into `ffield`\n"
+            "when pointer interpretation is enabled.\n\n"
             "Examples:\n"
-            "  reaxkit get-params --export params.csv\n"
-            "  reaxkit get-params --interpret --ffield ffield --export params_interpreted.csv\n"
-            "  reaxkit get-params --plot single"
+            "  1. Export raw parameters:\n"
+            "   reaxkit get-params --export params.csv\n\n"
+            "  2. Interpret parameter pointers using force-field file and export:\n"
+            "   reaxkit get-params --interpret --ffield ffield --export params_interpreted.csv\n\n"
+            "  3. Plot parameter search intervals:\n"
+            "   reaxkit get-params --plot single"
         )
-        parser.add_argument("--keep-duplicates", action="store_true", help="Do not drop duplicate parameter rows")
-        parser.add_argument("--interpret", action="store_true", help="Interpret params pointers into the ffield")
-        parser.add_argument("--ffield", default=None, help="Path to ffield file required for --interpret")
+        parser.add_argument("--keep-duplicates", action="store_true", help="Do not drop duplicate parameter rows. Example: --keep-duplicates, which keeps repeated rows exactly as found in input.")
+        parser.add_argument("--interpret", action="store_true", help="Interpret params pointers into the ffield. Example: --interpret, which resolves pointer-style entries to force-field context.")
+        parser.add_argument("--ffield", default=None, help="Path to ffield file required for --interpret. Example: --ffield ffield, which provides force-field content used for pointer interpretation.")
     else:
         raise KeyError(f"Unsupported params command '{canonical}'.")
 
