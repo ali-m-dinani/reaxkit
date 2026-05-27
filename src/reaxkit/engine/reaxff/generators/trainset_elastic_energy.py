@@ -50,6 +50,7 @@ class BulkEnergySpec:
     cell: CellSpec
     linear_strain_step: float = 0.004
     reference_energy: float = 0.0
+    weight: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class ElasticEnergySpec:
     max_strain_percent: float
     volume_reference_cell: CellSpec
     strain_step: float = 0.005
+    weight: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -174,7 +176,7 @@ def _generate_bulk_data(spec: BulkEnergySpec) -> Tuple[List[Tuple[float, float]]
         if eos_energy == 0.0:
             eos_energy = 1e-4
         label = _make_label("bulk", signed_step_index)
-        trainset_lines.append(f" 1.0   +   {label:<11} /1  -  bulk_0 /1          {eos_energy:12.4f}")
+        trainset_lines.append(f" {spec.weight:.4f}   +   {label:<11} /1  -  bulk_0 /1          {eos_energy:12.4f}")
         bulk_table.append((strained_volume, eos_energy))
     return bulk_table, trainset_lines
 
@@ -228,7 +230,7 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
             if energy == 0.0:
                 energy = 1e-4
             label = _make_label(mode_name, signed_step_index)
-            trainset_lines.append(f" 1.0   +   {label:<12} /1  -  {mode_name}_0 /1          {energy:12.4f}")
+            trainset_lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode_name}_0 /1          {energy:12.4f}")
             table_rows.append((linear_strain, energy))
         result[mode_name] = (table_rows, trainset_lines)
     return result

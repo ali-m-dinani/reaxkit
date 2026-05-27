@@ -493,6 +493,7 @@ def _generate_trainset_from_yaml(
     place_all_outputs_in_out_dir: bool = True,
     copy_input_xyz_into_out_dir: bool = True,
     skip_no_orthogonal: bool = False,
+    weight: float | None = None,
 ):
     cfg = _read_trainset_settings_yaml(yaml_path)
     yaml_path_p = Path(yaml_path).resolve()
@@ -501,6 +502,8 @@ def _generate_trainset_from_yaml(
 
     bulk_cfg = cfg["bulk"]
     elastic_cfg = cfg["elastic"]
+    output_cfg = cfg.get("output", {}) or {}
+    effective_weight = float(weight) if weight is not None else float(output_cfg.get("weight", 1.0))
     metadata = cfg.get("metadata", {}) or {}
     material_id = str(metadata.get("mp_id", "") or "").strip()
     material_prefix = f"for material ID [{material_id}] " if material_id else ""
@@ -534,12 +537,14 @@ def _generate_trainset_from_yaml(
             max_volumetric_strain_percent=bulk_cfg["max_volumetric_strain_percent"],
             cell=bulk_cell,
             linear_strain_step=bulk_cfg.get("dstrain_linear", 0.004),
+            weight=effective_weight,
         ),
         ElasticEnergySpec(
             elastic_constants_gpa=dict(elastic_cfg["cij_gpa"]),
             max_strain_percent=elastic_cfg["max_strain_percent"],
             volume_reference_cell=elastic_cell,
             strain_step=elastic_cfg.get("dstrain", 0.005),
+            weight=effective_weight,
         ),
         source_note=source_note,
     )
@@ -607,11 +612,13 @@ def _gen_elastic_trainset_from_yaml_mode(
     yaml_path: str,
     out_dir: Path,
     skip_no_orthogonal: bool = False,
+    weight: float | None = None,
 ) -> dict[str, Any]:
     generated = _generate_trainset_from_yaml(
         yaml_path=yaml_path,
         out_dir=str(out_dir),
         skip_no_orthogonal=skip_no_orthogonal,
+        weight=weight,
     )
     if not generated:
         print(f"[Done] Skipped non-orthogonal lattice for YAML: {yaml_path}")
@@ -635,6 +642,7 @@ def _run_single_material_id_elastic_trainset(
     api_key: str,
     skip_no_orthogonal: bool,
     verbose: bool,
+    weight: float | None,
 ) -> tuple[str, bool]:
     out_yaml_path = out_dir / Path(str(out_yaml)).name
     structure_dir_path = Path(structure_dir) if structure_dir else (out_dir / "structures" / "downloaded_structures")
@@ -652,6 +660,7 @@ def _run_single_material_id_elastic_trainset(
         yaml_path=result["yaml"],
         out_dir=str(out_dir),
         skip_no_orthogonal=skip_no_orthogonal,
+        weight=weight,
     )
     if not generated:
         return result["yaml"], False
@@ -671,6 +680,7 @@ def _gen_elastic_trainset_from_material_id_mode(
     api_key: str,
     skip_no_orthogonal: bool,
     verbose: bool,
+    weight: float | None,
 ) -> dict[str, Any]:
     yaml_path, generated = _run_single_material_id_elastic_trainset(
         source_adapter=source_adapter,
@@ -683,6 +693,7 @@ def _gen_elastic_trainset_from_material_id_mode(
         api_key=api_key,
         skip_no_orthogonal=skip_no_orthogonal,
         verbose=verbose,
+        weight=weight,
     )
     if not generated:
         print(f"[Done] Generated settings from source '{source_adapter.source_name}': {yaml_path}")
@@ -712,6 +723,7 @@ def _gen_elastic_trainset_batch_mode(
     api_key: str,
     skip_no_orthogonal: bool,
     verbose: bool,
+    weight: float | None,
 ) -> dict[str, Any]:
     from reaxkit.engine.reaxff.generators.trainset_heatfo import _parse_elements_csv
     from reaxkit.engine.reaxff.generators.trainset_mp import _mp_fetch_material_summary_metadata
@@ -751,6 +763,7 @@ def _gen_elastic_trainset_batch_mode(
                 api_key=api_key,
                 skip_no_orthogonal=skip_no_orthogonal,
                 verbose=verbose,
+                weight=weight,
             )
             meta = _extract_material_metadata_from_yaml(yaml_path)
             warnings_list = _collect_cell_warnings_from_yaml(yaml_path)
@@ -857,6 +870,7 @@ def gen_elastic_trainset(
     structure_dir: str | Path | None = None,
     skip_no_orthogonal: bool = False,
     verbose: bool = False,
+    weight: float | None = None,
 ) -> dict[str, Any]:
     """
     Public entrypoint for elastic trainset generation.
@@ -880,6 +894,7 @@ def gen_elastic_trainset(
             yaml_path=str(yaml_path),
             out_dir=out_dir_path,
             skip_no_orthogonal=bool(skip_no_orthogonal),
+            weight=weight,
         )
 
     resolved_api_key = api_key or os.getenv("MP_API_KEY")
@@ -903,6 +918,7 @@ def gen_elastic_trainset(
             api_key=resolved_api_key,
             skip_no_orthogonal=bool(skip_no_orthogonal),
             verbose=bool(verbose),
+            weight=weight,
         )
 
     if mode == "batch":
@@ -921,6 +937,7 @@ def gen_elastic_trainset(
             api_key=resolved_api_key,
             skip_no_orthogonal=bool(skip_no_orthogonal),
             verbose=bool(verbose),
+            weight=weight,
         )
 
     raise ValueError(f"Unsupported input mode: {mode!r}")

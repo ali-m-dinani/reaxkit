@@ -199,6 +199,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90).",
         )
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
+        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for elastic ENERGY lines in the training set.")
         parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs.")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
 
@@ -344,6 +345,7 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
         structure_dir=args.structure_dir,
         skip_no_orthogonal=bool(getattr(args, "skip_not_orthogonal", False)),
         verbose=bool(args.verbose),
+        weight=float(args.weight),
     )
 
     persist_generator_metadata(
