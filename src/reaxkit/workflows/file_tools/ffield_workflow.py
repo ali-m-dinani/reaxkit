@@ -182,15 +182,12 @@ def _write_similarity_summaries(path: Path, details_by_atom: dict[str, dict[str,
     return path
 
 
-FFIELD_TOOL_COMMANDS = (
+ALL_COMMANDS = (
     "merge-ffield",
     "add-element-to-ffield",
     "add_element_to_ffield",
     "add-term-to-ffield",
     "add_term_to_ffield",
-)
-
-FFIELD_ANALYSIS_COMMANDS = (
     "get_ffield_data",
     "get_ffield_opt_progress_data",
     "get_energy_min_summary_data",
@@ -199,6 +196,9 @@ FFIELD_ANALYSIS_COMMANDS = (
     "get_ffield_opt_eos",
     "ffield_opt_bulk_modulus",
 )
+ALL_LEGACY_COMMANDS = ()
+
+FFIELD_ANALYSIS_COMMANDS = tuple(c for c in ALL_COMMANDS if c.startswith("get_") or c == "ffield_opt_bulk_modulus")
 
 LEGACY_FORCE_FIELD_ALIASES = {
     "force_field_data": "get_ffield_data",
@@ -216,6 +216,7 @@ LEGACY_FORCE_FIELD_ALIASES = {
     "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
     "parameter_optimization_tornado": "get_ffield_diagnostic_data",
 }
+ALL_LEGACY_COMMANDS = tuple(LEGACY_FORCE_FIELD_ALIASES.keys())
 
 WORKFLOW_TASK_NAME_MAP = {
     "get_ffield_data": "force_field_data",
@@ -227,13 +228,10 @@ WORKFLOW_TASK_NAME_MAP = {
     "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
 }
 
-ALL_FFIELD_COMMANDS = FFIELD_TOOL_COMMANDS + FFIELD_ANALYSIS_COMMANDS
-
-
 def _resolve_workflow_command(command: str) -> str:
     canonical = resolve_command_name(
         command,
-        task_names=ALL_FFIELD_COMMANDS + tuple(LEGACY_FORCE_FIELD_ALIASES.keys()),
+        task_names=ALL_COMMANDS + ALL_LEGACY_COMMANDS,
     )
     return LEGACY_FORCE_FIELD_ALIASES.get(canonical, canonical)
 

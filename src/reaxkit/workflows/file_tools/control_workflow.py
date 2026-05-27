@@ -24,9 +24,10 @@ from reaxkit.engine.reaxff.generators.control_generator import gen_control
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.data_models import ControlParametersData
 
-CONTROL_COMMANDS = ("get-control", "write-control")
-MAKE_CONTROL_COMMAND = "gen_control"
-WRITE_CONTROL_COMMAND = "write-control"
+ALL_COMMANDS = ("get-control_data", "gen-control", "gen_template_control")
+ALL_LEGACY_COMMANDS = ("get_control_data", "gen_control", "write-control", "write_control", "make-control", "make_control")
+MAKE_CONTROL_COMMAND = "gen_template_control"
+WRITE_CONTROL_COMMAND = "gen-control"
 
 
 @dataclass
@@ -110,7 +111,7 @@ def _build_get_request(args: argparse.Namespace) -> ControlParametersTaskRequest
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "get-control": _build_get_request,
+    "get-control_data": _build_get_request,
 }
 
 
@@ -126,11 +127,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--parameter/--value pairs.\n\n"
             "Examples:\n"
             "  1. Generate a default control template ('control'):\n"
-            "   reaxkit gen_control\n\n"
+            "   reaxkit gen_template_control\n\n"
             "  2. Generate a template and override one parameter:\n"
-            "   reaxkit gen_control --parameter nmdit --value 100000\n\n"
+            "   reaxkit gen_template_control --parameter nmdit --value 100000\n\n"
             "  3. Generate a template and also copy it to the current directory:\n"
-            "   reaxkit gen_control --output control --copy-to-dot"
+            "   reaxkit gen_template_control --output control --copy-to-dot"
         )
         add_storage_cli_arguments(parser)
         parser.add_argument(
@@ -167,9 +168,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "specific keys through repeatable --parameter/--value pairs.\n\n"
             "Examples:\n"
             "  1. Copy a control file to a new output name without changing parameters:\n"
-            "   reaxkit write-control --control control --output control.new\n\n"
+            "   reaxkit gen-control --control control --output control.new\n\n"
             "  2. Update one parameter while writing a new control file:\n"
-            "   reaxkit write-control --control control --parameter nmdit --value 200000 --output control.fast"
+            "   reaxkit gen-control --control control --parameter nmdit --value 200000 --output control.fast"
         )
         add_storage_cli_arguments(parser)
         parser.add_argument(
@@ -227,11 +228,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         return parser
 
-    canonical = resolve_command_name(command, task_names=CONTROL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
-    if canonical == "get-control":
+    if canonical == "get-control_data":
         _add_runtime_arguments(parser)
         parser.description = (
             "Read and print the value of one control parameter key.\n"
@@ -239,11 +240,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "You can optionally scope lookup to a section and provide a fallback default value.\n\n"
             "Examples:\n"
             "  1. Read a key from the default control file ('control'):\n"
-            "   reaxkit get-control nmdit\n\n"
+            "   reaxkit get-control_data nmdit\n\n"
             "  2. Read a key from a specific section:\n"
-            "   reaxkit get-control iout2 --control control --section md\n\n"
+            "   reaxkit get-control_data iout2 --control control --section md\n\n"
             "  3. Read a key from a control file at a custom path:\n"
-            "   reaxkit get-control imetho --control runs/job1/control"
+            "   reaxkit get-control_data imetho --control runs/job1/control"
         )
         parser.add_argument("key", help="Control key to look up. Example: nmdit, which queries the `nmdit` parameter value.")
         parser.add_argument(
@@ -264,8 +265,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def _run_get(args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
-    task_cls = TASK_REGISTRY["control_value"]
-    request = REQUEST_BUILDERS["get-control"](args)
+    task_cls = TASK_REGISTRY["get_control_data"]
+    request = REQUEST_BUILDERS["get-control_data"](args)
     result = executor.run(task_cls(), request, vars(args))
     row = result.table.iloc[0] if getattr(result, "table", None) is not None and not result.table.empty else None
     found = bool(row["found"]) if row is not None and "found" in row else False
@@ -358,10 +359,10 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     if command == WRITE_CONTROL_COMMAND:
         return _run_write(args)
 
-    canonical = resolve_command_name(command, task_names=CONTROL_COMMANDS)
-    if canonical == "get-control":
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    if canonical == "get-control_data":
         return _run_get(args)
-    if canonical == "write-control":
+    if canonical == "gen-control":
         return _run_write(args)
     raise KeyError(f"Unsupported control command '{canonical}'.")
 
@@ -374,7 +375,7 @@ def _legacy_command_runner(command: str):
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    for command in CONTROL_COMMANDS:
+    for command in ALL_COMMANDS:
         parser = subparsers.add_parser(command, formatter_class=argparse.RawTextHelpFormatter)
         build_parser(parser, command=command)
         parser.set_defaults(_run=_legacy_command_runner(command))

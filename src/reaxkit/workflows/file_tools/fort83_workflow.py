@@ -13,6 +13,9 @@ from reaxkit.core.generator_runtime import (
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 
+ALL_COMMANDS = ("get-optimized-ffield",)
+ALL_LEGACY_COMMANDS = ("get_optimized_ffield", "extract-optimized-ffield", "extract_optimized_ffield")
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command
@@ -24,9 +27,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "from optimization output.\n\n"
         "Examples:\n"
         "  1. Extract from a specific `fort.83` file with explicit output name:\n"
-        "   reaxkit extract-optimized-ffield --fort83 fort.83 --output ffield_optimized\n\n"
+        "   reaxkit get-optimized-ffield --fort83 fort.83 --output ffield_optimized\n\n"
         "  2. Extract using a custom output filename:\n"
-        "   reaxkit extract-optimized-ffield --output trained_ffield"
+        "   reaxkit get-optimized-ffield --output trained_ffield"
     )
     parser.add_argument(
         "--fort83",

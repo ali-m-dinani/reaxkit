@@ -12,6 +12,9 @@ from reaxkit.core.command_alias_resolver import (
 from reaxkit.core.command_catalog import get_registered_commands
 from reaxkit.core.user_command_aliases import add_user_command_alias, user_command_aliases_path
 
+ALL_COMMANDS = ("add-alias",)
+ALL_LEGACY_COMMANDS = ("add_alias",)
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command

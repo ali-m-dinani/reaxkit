@@ -11,12 +11,12 @@ from reaxkit.presentation.specs import PresentationSpec
 _DEFAULT_X_CANDIDATES = ("iter", "frame_index", "frame_idx", "frame", "time", "x")
 _DEFAULT_GROUP_CANDIDATES = ("atom_id", "atom_type", "species", "src", "dst", "molecule")
 _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
-    "atomic_kinematics": {
+    "get_kinematics": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("value", "speed", "kinetic_energy", "vx", "vy", "vz"),
         "group_candidates": ("atom_id",),
     },
-    "bond_events": {
+    "get_bond_events": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("bo_at_event",),
         "group_candidates": ("event", "source", "destination"),
@@ -26,18 +26,18 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "y_candidates": ("charge",),
         "group_candidates": ("atom_id", "atom_type"),
     },
-    "connection_list": {
+    "get_connection_list": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("bo",),
         "group_candidates": ("src", "dst"),
     },
-    "connection_stats": {
+    "get_connection_stats": {
         "x_candidates": ("src", "dst"),
         "y_candidates": ("value",),
     },
-    "connection_table": {"disable_plot": True},
-    "control_value": {"disable_plot": True},
-    "coordination": {
+    "get_connection_table": {"disable_plot": True},
+    "get_control_data": {"disable_plot": True},
+    "get_coordination": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("coordination", "status"),
         "group_candidates": ("atom_id", "atom_type"),
@@ -46,7 +46,7 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("dipole_magnitude", "dipole_z", "dipole_y", "dipole_x"),
     },
-    "dominant_species": {
+    "get_dominant_species": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("frequency", "count"),
         "group_candidates": ("species", "formula"),
@@ -70,21 +70,21 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "x_candidates": ("volume", "strain", "x"),
         "y_candidates": ("energy", "y"),
     },
-    "hybridization": {
+    "get_hybridization": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("hybridization", "status"),
         "group_candidates": ("atom_id", "atom_type"),
     },
-    "largest_molecule_by_mass": {
+    "get_largest_molecule_by_mass": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("mass",),
     },
-    "largest_molecule_composition": {
+    "get_largest_molecule_composition": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("count", "mass_fraction"),
         "group_candidates": ("element", "species"),
     },
-    "molecule_lifetime": {
+    "get_molecule_lifetime": {
         "x_candidates": ("molecule", "species"),
         "y_candidates": ("lifetime", "mean_lifetime", "count"),
     },
@@ -100,21 +100,21 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "x_candidates": ("field_z", "field", "E"),
         "y_candidates": ("P_z (uC/cm^2)", "P_z", "polarization_z"),
     },
-    "msd": {
+    "get_msd": {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
-        "y_candidates": ("msd",),
+        "y_candidates": ("get_msd",),
         "group_candidates": ("atom_id",),
     },
-    "diffusivity": {
+    "get_diffusivity": {
         "x_candidates": ("atom_id",),
-        "y_candidates": ("diffusivity",),
+        "y_candidates": ("get_diffusivity",),
         "group_candidates": ("atom_type",),
     },
-    "rdf": {
+    "get_rdf": {
         "x_candidates": ("r", "radius", "distance"),
-        "y_candidates": ("g_r", "g(r)", "rdf"),
+        "y_candidates": ("g_r", "g(r)", "get_rdf"),
     },
-    "rdf_property": {
+    "get_rdf_property": {
         "x_candidates": ("frame_index", "frame_idx", "iter"),
         "y_candidates": ("value", "peak_height", "area"),
     },

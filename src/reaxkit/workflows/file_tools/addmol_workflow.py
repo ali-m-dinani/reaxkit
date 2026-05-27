@@ -14,6 +14,9 @@ from reaxkit.core.generator_runtime import (
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.addmol_generator import gen_template_addmol
 
+ALL_COMMANDS = ("gen_template_addmol",)
+ALL_LEGACY_COMMANDS = ("make-addmol", "make_addmol")
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command

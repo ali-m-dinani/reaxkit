@@ -28,6 +28,9 @@ from reaxkit.help.introspection_utils import (
     resolve_module_hint_to_file,
 )
 
+ALL_COMMANDS = ("intspec",)
+ALL_LEGACY_COMMANDS = ()
+
 # Try exact first, then common prefixes
 CANDIDATE_PREFIXES: List[str] = [
     "",  # fully-qualified or exact

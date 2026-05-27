@@ -4,13 +4,13 @@ _meta:
   purpose: Maps analysis tasks to the dataclass each task consumes.
   last_updated: '2026-05-21'
 tasks:
-  active_site_events:
+  get_active_site_events:
     consumes_dataclass: ConnectivityTrajectoryData
     implementation_module: 'reaxkit.analysis.active_sites.events: active_site_events'
     description: Detects time-resolved active-site events from connectivity trajectories
       by comparing bonded environments across frames. Use it to identify when selected
       sites form, break, or reorganize bonds during reactive simulations.
-    related_workflow_module: 'reaxkit.workflows.active_site_workflow: active_site_events'
+    related_workflow_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
     tags:
     - active site
     - connectivity trajectory
@@ -21,13 +21,13 @@ tasks:
     help_search_examples:
     - reaxkit help "active site events"
     - run active site events
-  active_site_structural:
+  get_active_site_structural:
     consumes_dataclass: ConnectivityTrajectoryData
     implementation_module: 'reaxkit.analysis.active_sites.structural: active_site_structural'
     description: Computes structural descriptors for active sites across frames using
       trajectory-aligned connectivity data. It summarizes local neighbor counts, bonding
       patterns, and structural states around selected reactive sites.
-    related_workflow_module: 'reaxkit.workflows.active_site_workflow: active_site_structural'
+    related_workflow_module: 'reaxkit.workflows.active_site_workflow: get_active_site_structural'
     tags:
     - active site
     - connectivity trajectory
@@ -38,13 +38,13 @@ tasks:
     help_search_examples:
     - reaxkit help "active site structural"
     - run active site structural
-  atomic_kinematics:
+  get_kinematics:
     consumes_dataclass: AtomicKinematicsData
-    implementation_module: 'reaxkit.analysis.kinematics.kinematics: atomic_kinematics'
+    implementation_module: 'reaxkit.analysis.kinematics.kinematics: get_kinematics'
     description: Extracts per-atom kinematic quantities from velocity or restart-derived
       data. Use it to analyze atom-level motion, velocity components, acceleration-like
       values, and spatially resolved dynamics.
-    related_workflow_module: 'reaxkit.workflows.kinematics_workflow: kinematics'
+    related_workflow_module: 'reaxkit.workflows.kinematics_workflow: get_kinematics'
     tags:
     - atomic kinematics
     - analysis
@@ -62,13 +62,13 @@ tasks:
     - run atomic kinematics heatmap2d
     - reaxkit help "atomic kinematics plot3d"
     - run atomic kinematics plot3d
-  bond_events:
+  get_bond_events:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.connectivity: bond_events'
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: get_bond_events'
     description: Identifies bond formation and bond breaking events by comparing connectivity
       records. It helps convert raw bond-order snapshots into reaction-event tables
       for later filtering and interpretation.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: relabel_traj_using_coordination'
     tags:
     - connectivity
     - bond order
@@ -121,13 +121,13 @@ tasks:
     help_search_examples:
     - reaxkit help "charge table"
     - run charge table
-  connection_list:
+  get_connection_list:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_list'
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: get_connection_list'
     description: Outputs connectivity neighbor lists and bond-order pairs from parsed
       ReaxFF connectivity data. It exposes the raw bonded relationships that feed
-      coordination, hybridization, and bond-event analyses.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_list'
+      get_coordination, get_hybridization, and bond-event analyses.
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: get_connection_list'
     tags:
     - connectivity
     - connections
@@ -138,13 +138,13 @@ tasks:
     help_search_examples:
     - reaxkit help "connection list"
     - run connection list
-  connection_stats:
+  get_connection_stats:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_stats'
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: get_connection_stats'
     description: Computes summary statistics over connectivity data, including bond
       counts, neighbor counts, and bond-order-derived measures. Use it for compact
       comparisons across frames or simulations.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_stats'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: get_connection_stats'
     tags:
     - connectivity
     - connections
@@ -155,13 +155,13 @@ tasks:
     help_search_examples:
     - reaxkit help "connection stats"
     - run connection stats
-  connection_table:
+  get_connection_table:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.connectivity: connection_table'
+    implementation_module: 'reaxkit.analysis.connectivity.connectivity: get_connection_table'
     description: Builds a table representation of connectivity records with atoms,
       neighbors, bond orders, and frame context. This makes connectivity output easier
       to query, export, and join with other atom-level data.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: connection_table'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: get_connection_table'
     tags:
     - connectivity
     - connections
@@ -172,33 +172,33 @@ tasks:
     help_search_examples:
     - reaxkit help "connection table"
     - run connection table
-  control_value:
+  get_control_data:
     consumes_dataclass: ControlParametersData
-    implementation_module: 'reaxkit.analysis.control.control: control_value'
+    implementation_module: 'reaxkit.analysis.control.control: get_control_data'
     description: Reads and returns values for control-file keywords from structured
       control-parameter data. Use it to verify simulation settings, compare control
       files, or expose individual ReaxFF options in scripts.
-    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: gen_control'
+    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: get-control_data'
     tags:
     - control file
     - control parameters
     notes: []
-  coordination:
+  get_coordination:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.coordination: coordination'
-    description: Computes coordination numbers and local neighbor environments from
+    implementation_module: 'reaxkit.analysis.connectivity.coordination: get_coordination'
+    description: Computes get_coordination numbers and local neighbor environments from
       connectivity data. It labels atom environments by neighbor counts or bonding
       context for structural classification and downstream relabeling.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: coordination'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: get_coordination'
     tags:
     - connectivity
-    - coordination
+    - get_coordination
     notes: []
     aliases:
-    - coordination
+    - get_coordination
     help_search_examples:
-    - reaxkit help "coordination"
-    - run coordination
+    - reaxkit help "get_coordination"
+    - run get_coordination
   dipole:
     consumes_dataclass: ElectrostaticsData
     implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: dipole'
@@ -215,42 +215,42 @@ tasks:
     help_search_examples:
     - reaxkit help "dipole"
     - run dipole
-  dihedral:
+  get_dihedral:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.dihedral: dihedral'
-    description: Computes dihedral-angle trajectories for selected atom quartets from
+    implementation_module: 'reaxkit.analysis.trajectory.get_dihedral: get_dihedral'
+    description: Computes get_dihedral-angle trajectories for selected atom quartets from
       trajectory coordinates. It helps track torsional motion, conformational changes,
       and geometry evolution during a simulation.
-    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: get_dihedral'
     tags:
     - trajectory
     - analysis
     notes: []
-  diffusivity:
+  get_diffusivity:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.diffusivity: diffusivity'
-    description: Estimates diffusivity from trajectory displacement statistics, typically
+    implementation_module: 'reaxkit.analysis.trajectory.get_diffusivity: get_diffusivity'
+    description: Estimates get_diffusivity from trajectory displacement statistics, typically
       using mean-squared displacement behavior. Use it to turn atom motion into diffusion
       coefficients for selected species or atom groups.
-    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: get_dihedral'
     tags:
     - trajectory
-    - diffusivity
+    - get_diffusivity
     notes: []
     aliases:
     - diffusion-coefficient
     - diffusion_coefficient
     help_search_examples:
-    - reaxkit help "diffusivity"
-    - run diffusivity
-  dominant_species:
+    - reaxkit help "get_diffusivity"
+    - run get_diffusivity
+  get_dominant_species:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
-      dominant_species'
+      get_dominant_species'
     description: Finds the most frequent molecular species over time from molecular
       analysis output. It highlights dominant reactants, products, or persistent species
       in reactive simulations.
-    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: get_dominant_species'
     tags:
     - molecular analysis
     - dominant species
@@ -402,30 +402,30 @@ tasks:
     - geometry optimization
     - geometry optimization progress
     notes: []
-  hybridization:
+  get_hybridization:
     consumes_dataclass: ConnectivityData
-    implementation_module: 'reaxkit.analysis.connectivity.hybridization: hybridization'
-    description: Assigns hybridization-like states from connectivity patterns and
+    implementation_module: 'reaxkit.analysis.connectivity.hybridization: get_hybridization'
+    description: Assigns get_hybridization-like states from connectivity patterns and
       local neighbor environments. It provides a structural label useful for carbon-rich
       systems, bonding-state analysis, and atom relabeling.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: hybridization'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: get_hybridization'
     tags:
     - connectivity
-    - hybridization
+    - get_hybridization
     notes: []
     aliases:
-    - hybridization
+    - get_hybridization
     help_search_examples:
-    - reaxkit help "hybridization"
-    - run hybridization
-  largest_molecule_by_mass:
+    - reaxkit help "get_hybridization"
+    - run get_hybridization
+  get_largest_molecule_by_mass:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
-      largest_molecule_by_mass'
+      get_largest_molecule_by_mass'
     description: Tracks the largest molecule by mass over time from molecular analysis
       data. Use it to study aggregation, polymerization, cluster growth, or fragmentation
       in reactive trajectories.
-    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: largest_molecule_by_mass'
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: get_largest_molecule_by_mass'
     tags:
     - molecular analysis
     - largest molecule
@@ -436,14 +436,14 @@ tasks:
     help_search_examples:
     - reaxkit help "largest molecule by mass"
     - run largest molecule by mass
-  largest_molecule_composition:
+  get_largest_molecule_composition:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
-      largest_molecule_composition'
+      get_largest_molecule_composition'
     description: Reports composition of the largest molecule over time, including
       atom counts or formula-like summaries where available. It complements largest-mass
       tracking by explaining what the dominant cluster contains.
-    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: largest_molecule_composition'
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: get_largest_molecule_composition'
     tags:
     - molecular analysis
     - largest molecule
@@ -485,20 +485,20 @@ tasks:
     description: Detects isomeric variants from geometry-derived molecular graphs.
       Use it to distinguish structures with the same composition but different bonding
       topology or spatial arrangement.
-    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: get_dominant_species'
     tags:
     - molecular analysis
     - molecule isomer detection
     - geometry
     notes: []
-  molecule_lifetime:
+  get_molecule_lifetime:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
-      molecule_lifetime'
+      get_molecule_lifetime'
     description: Estimates lifetimes of molecular species occurrences across frames
       or iterations. It is useful for separating transient intermediates from stable
       products in molecular analysis output.
-    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: molecule_lifetime'
+    related_workflow_module: 'reaxkit.workflows.molecular_analysis_workflow: get_molecule_lifetime'
     tags:
     - molecular analysis
     - molecule lifetime
@@ -509,13 +509,13 @@ tasks:
     help_search_examples:
     - reaxkit help "molecule lifetime"
     - run molecule lifetime
-  msd:
+  get_msd:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.msd: msd'
+    implementation_module: 'reaxkit.analysis.trajectory.get_msd: get_msd'
     description: Computes mean-squared displacement time series from trajectory coordinates.
       Use it to quantify atom or species mobility and to prepare displacement data
-      for diffusivity estimation.
-    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: msd'
+      for get_diffusivity estimation.
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: get_msd'
     tags:
     - trajectory
     - mean squared displacement
@@ -595,13 +595,13 @@ tasks:
     help_search_examples:
     - reaxkit help "hysteresis"
     - run hysteresis
-  rdf:
+  get_rdf:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.rdf: rdf'
+    implementation_module: 'reaxkit.analysis.trajectory.get_rdf: get_rdf'
     description: Computes radial distribution functions from trajectory coordinates
       and atom selections. It measures pair-correlation structure, local ordering,
       and neighbor-shell distances.
-    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: rdf'
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: get_rdf'
     tags:
     - trajectory
     - radial distribution function
@@ -612,26 +612,26 @@ tasks:
     - radial distribution function
     help_search_examples:
     - compute radial distribution function from trajectory
-  rdf_property:
+  get_rdf_property:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.rdf: rdf_property'
+    implementation_module: 'reaxkit.analysis.trajectory.get_rdf: get_rdf_property'
     description: Computes property-resolved radial distribution functions from trajectory
       coordinates and atom-level properties. It combines structural distance distributions
       with values such as charge, type, or selected labels.
-    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: rdf_property'
+    related_workflow_module: 'reaxkit.workflows.trajectory_workflow: get_rdf_property'
     tags:
     - trajectory
-    - rdf property
+    - get_rdf property
     - radial distribution function
     notes: []
     aliases:
-    - rdf-property
+    - get_rdf-property
     - rdfproperty
     - rdfprop
-    - rdf-prop
+    - get_rdf-prop
     help_search_examples:
-    - reaxkit help "rdf property"
-    - run rdf property
+    - reaxkit help "get_rdf property"
+    - run get_rdf property
   restraint_series:
     consumes_dataclass: RestraintData
     implementation_module: 'reaxkit.analysis.timeseries.timeseries: restraint_series'
@@ -735,25 +735,25 @@ tasks:
   trajectory_relabel_by_coordination:
     consumes_dataclass: ConnectivityTrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.relabel: trajectory_relabel_by_coordination'
-    description: Relabels trajectory atoms using coordination-derived states from
+    description: Relabels trajectory atoms using get_coordination-derived states from
       connectivity trajectory data. It connects local bonding analysis to trajectory
       files so atoms can be grouped by changing environments.
-    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
+    related_workflow_module: 'reaxkit.workflows.connectivity_workflow: relabel_traj_using_coordination'
     tags:
     - trajectory
-    - coordination
-    - coordination relabeling
+    - get_coordination
+    - get_coordination relabeling
     - connectivity trajectory
     notes: []
     aliases:
-    - coordination relabel
-    - coordination-relabel
+    - get_coordination relabel
+    - get_coordination-relabel
     help_search_examples:
-    - reaxkit help "coordination relabeling"
-    - run coordination relabeling
+    - reaxkit help "get_coordination relabeling"
+    - run get_coordination relabeling
   voronoi_geometry_pyvoro:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_geometry_pyvoro'
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: get_voronoi_geometry_pyvoro'
     description: Computes per-atom Voronoi cell geometry using the pyvoro backend.
       Returns vertices, faces, neighbors, and per-cell metrics for visualization and
       geometric post-processing.
@@ -772,7 +772,7 @@ tasks:
     - run voronoi geometry pyvoro
   voronoi_geometry_scipy:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_geometry_scipy'
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: get_voronoi_geometry_scipy'
     description: Computes per-atom Voronoi cell geometry using SciPy Voronoi routines.
       Returns vertices, faces, neighbors, and per-cell metrics for visualization and
       geometric post-processing.
@@ -791,7 +791,7 @@ tasks:
     - run voronoi geometry scipy
   voronoi_pyvoro:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_pyvoro'
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: get_voronoi_pyvoro'
     description: Computes per-atom Voronoi metrics using the pyvoro backend.
       Use it to evaluate cell volumes, face counts, and boundedness with periodic-aware
       tessellation support when box data is available.
@@ -809,7 +809,7 @@ tasks:
     - run voronoi pyvoro
   voronoi_scipy:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.analysis.trajectory.voronoi: voronoi_scipy'
+    implementation_module: 'reaxkit.analysis.trajectory.voronoi: get_voronoi_scipy'
     description: Computes per-atom Voronoi metrics using SciPy Voronoi routines.
       Use it to evaluate cell volumes, face counts, and boundedness from trajectory
       coordinates.
@@ -825,60 +825,44 @@ tasks:
     help_search_examples:
     - reaxkit help "voronoi scipy"
     - run voronoi scipy
-  atom_property_heatmap2d:
+  plot_atom_property:
     consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
-    description: Plots atom-level properties as 2D spatial heatmaps. Use it to project
-      atom-indexed values onto a plane and compare spatial gradients or hotspots.
-    related_workflow_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
+    implementation_module: 'reaxkit.workflows.meta.plot_atom_property_workflow: plot_atom_property'
+    description: Plots atom-level properties as either 2D heatmaps or 3D scatter maps
+      using one command selected by --type. Use it to visualize spatial gradients,
+      hotspots, and property distributions in trajectory frames.
+    related_workflow_module: 'reaxkit.workflows.meta.plot_atom_property_workflow: plot_atom_property'
     tags:
     - spatial property
     - heatmap2d
+    - scatter3d
     - trajectory
     notes: []
     aliases:
-    - atom property heatmap2d
-    - atom-property-heatmap2d
+    - atom property plot
+    - plot-atom-property
     help_search_examples:
-    - reaxkit help "atom property heatmap2d"
-    - run atom property heatmap2d
-  atom_property_plot3d:
-    consumes_dataclass: TrajectoryData
-    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_plot3d'
-    description: Plots atom-level properties in 3D using trajectory coordinates and
-      per-atom values. It is useful for visualizing charges, velocities, coordination
-      labels, or other atom-indexed quantities in space.
-    related_workflow_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_plot3d'
-    tags:
-    - spatial property
-    - plot3d
-    - trajectory
-    notes: []
-    aliases:
-    - atom property plot3d
-    - atom-property-plot3d
-    help_search_examples:
-    - reaxkit help "atom property plot3d"
-    - run atom property plot3d
+    - reaxkit help "plot atom property"
+    - run plot atom property
 dataclass_usage_across_tasks:
   AtomicKinematicsData:
-  - atomic_kinematics
+  - get_kinematics
   ChargeData:
   - charge_series
   - charge_table
   ConnectivityData:
-  - bond_events
-  - connection_list
-  - connection_stats
-  - connection_table
-  - coordination
-  - hybridization
+  - get_bond_events
+  - get_connection_list
+  - get_connection_stats
+  - get_connection_table
+  - get_coordination
+  - get_hybridization
   ConnectivityTrajectoryData:
-  - active_site_events
-  - active_site_structural
+  - get_active_site_events
+  - get_active_site_structural
   - trajectory_relabel_by_coordination
   ControlParametersData:
-  - control_value
+  - get_control_data
   EregimeData:
   - eregime_series
   ElectricFieldData:
@@ -909,12 +893,12 @@ dataclass_usage_across_tasks:
   EnergyMinimizationSummaryData:
   - get_energy_min_summary_data
   MolecularAnalysisData:
-  - dominant_species
-  - largest_molecule_by_mass
-  - largest_molecule_composition
+  - get_dominant_species
+  - get_largest_molecule_by_mass
+  - get_largest_molecule_composition
   - molecular_frequency_series
   - molecular_totals_series
-  - molecule_lifetime
+  - get_molecule_lifetime
   PartialEnergyData:
   - partial_energy_series
   RestraintData:
@@ -923,15 +907,19 @@ dataclass_usage_across_tasks:
   - cell_dimensions
   - simulation_series
   TrajectoryData:
-  - dihedral
-  - diffusivity
-  - msd
-  - rdf
-  - rdf_property
+  - get_dihedral
+  - get_diffusivity
+  - get_msd
+  - get_rdf
+  - get_rdf_property
   - trajectory_coordinate_series
   - voronoi_scipy
   - voronoi_pyvoro
   - voronoi_geometry_scipy
   - voronoi_geometry_pyvoro
-  - atom_property_heatmap2d
-  - atom_property_plot3d
+  - plot_atom_property
+
+
+
+
+

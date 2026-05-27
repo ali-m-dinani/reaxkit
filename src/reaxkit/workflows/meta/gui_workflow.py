@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import argparse
 
+ALL_COMMANDS = ("gui",)
+ALL_LEGACY_COMMANDS = ()
+
 
 def build_parser(p: argparse.ArgumentParser) -> None:
     """Define CLI arguments for `reaxkit gui`."""
@@ -16,4 +19,3 @@ def run_main(args: argparse.Namespace) -> int:
 
     webui_main()
     return 0
-

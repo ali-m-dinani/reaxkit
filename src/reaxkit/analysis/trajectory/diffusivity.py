@@ -75,7 +75,7 @@ def _axis_source(data: TrajectoryData, n_frames: int) -> tuple[np.ndarray, str]:
     return np.arange(n_frames, dtype=float), "frame_index"
 
 
-@register_task("diffusivity", label="Diffusivity")
+@register_task("get_diffusivity", label="Diffusivity")
 class DiffusivityTask(AnalysisTask):
     """Estimate per-atom diffusivity using Einstein's relation.
 

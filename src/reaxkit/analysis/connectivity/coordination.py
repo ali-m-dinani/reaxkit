@@ -232,7 +232,7 @@ def _sum_bond_orders_matrix(data: ConnectivityData) -> np.ndarray:
     raise TypeError("Unsupported bond_orders type; use ndarray, sparse-per-frame list, or provide sum_bond_orders.")
 
 
-@register_task("coordination", label="Coordination")
+@register_task("get_coordination", label="Coordination")
 class CoordinationStatusTask(AnalysisTask):
     """Per-atom coordination status over selected frames."""
 

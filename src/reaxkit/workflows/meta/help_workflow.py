@@ -10,6 +10,9 @@ from __future__ import annotations
 
 import argparse
 
+ALL_COMMANDS = ("help",)
+ALL_LEGACY_COMMANDS = ()
+
 
 def build_parser(p: argparse.ArgumentParser) -> None:
     """Define CLI arguments for `reaxkit help`."""

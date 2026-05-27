@@ -18,9 +18,17 @@ from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
-from reaxkit.workflows.result_bundle import bundle_canonical_and_tract_tables
+from reaxkit.core.result_bundle import bundle_canonical_and_tract_tables
 
-ACTIVE_SITE_COMMANDS = ("active_site_structural", "active_site_events")
+ALL_COMMANDS = ("get_active_site_structural", "get_active_site_events")
+ALL_LEGACY_COMMANDS = (
+    "active_site_structural",
+    "active_site_events",
+    "get-active-site-structural",
+    "get-active-site-events",
+    "active-site-structural",
+    "active-site-events",
+)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -91,29 +99,40 @@ def _build_active_site_events_request(args: argparse.Namespace) -> ActiveSiteEve
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "active_site_structural": _build_active_site_structural_request,
-    "active_site_events": _build_active_site_events_request,
+    "get_active_site_structural": _build_active_site_structural_request,
+    "get_active_site_events": _build_active_site_events_request,
+}
+
+TASK_KEY_BY_COMMAND = {
+    "get_active_site_structural": "active_site_structural",
+    "get_active_site_events": "active_site_events",
 }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=ACTIVE_SITE_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
     _add_presentation_arguments(parser)
 
-    if canonical == "active_site_structural":
+    if canonical == "get_active_site_structural":
         parser.description = (
-            "Compute per-atom active-site structural descriptors on one frame.\n\n"
+            "Compute per-atom active-site structural descriptors on a selected frame.\n"
+            "Use this command when you need atom-resolved structural labels and geometry metrics\n"
+            "around active sites from connectivity trajectory data.\n"
+            "This command analyzes prepared analysis inputs and does not run a simulation.\n\n"
             "Examples:\n"
-            "  reaxkit active_site_structural --frame 0 --bo-threshold 0.3\n"
-            "  reaxkit active_site_structural --frame 100 --no-include-noncarbon --strict-tract\n"
-            "  reaxkit active_site_structural --plot single --save active_site_structural.png"
+            "  1. Baseline structural analysis on frame 0:\n"
+            "   reaxkit get_active_site_structural --frame 0 --bo-threshold 0.3\n\n"
+            "  2. Strict carbon-focused analysis on a later frame:\n"
+            "   reaxkit get_active_site_structural --frame 100 --no-include-noncarbon --strict-tract\n\n"
+            "  3. Render and save a structural plot:\n"
+            "   reaxkit get_active_site_structural --plot single --save active_site_structural.png"
         )
-        parser.add_argument("--frame", type=int, default=0, help="Frame index for structural analysis")
-        parser.add_argument("--bo-threshold", type=float, default=0.3, help="Bond-order threshold for connectivity graph")
+        parser.add_argument("--frame", type=int, default=0, help="Frame index used for structural analysis. Example: --frame 100, which runs the descriptor extraction on frame 100.")
+        parser.add_argument("--bo-threshold", type=float, default=0.3, help="Bond-order threshold used to build connectivity. Example: --bo-threshold 0.4, which requires stronger bonds to count as connected.")
         parser.add_argument(
             "--bond-mode",
             choices=["bo", "distance"],
@@ -147,13 +166,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--soap-n-max", type=int, default=9, help="SOAP radial basis size.")
         parser.add_argument("--soap-l-max", type=int, default=9, help="SOAP angular basis size.")
         parser.add_argument("--soap-zeta", type=int, default=2, help="SOAP kernel exponent for reference similarity.")
-    elif canonical == "active_site_events":
+    elif canonical == "get_active_site_events":
         parser.description = (
-            "Extract persistent active-site C-O and C-Si events across frames.\n\n"
+            "Extract persistent active-site C-O and C-Si events across trajectory frames.\n"
+            "Use this command to detect bond-forming or bond-breaking event patterns over time\n"
+            "from connectivity-aware data.\n"
+            "This command analyzes existing data and does not generate force-field input templates.\n\n"
             "Examples:\n"
-            "  reaxkit active_site_events --mode auto --persist 5\n"
-            "  reaxkit active_site_events --frames 0:500:5 --mode bo --bo-threshold 0.8\n"
-            "  reaxkit active_site_events --mode dist --r-co 1.65 --r-csi 2.10 --strict-tract"
+            "  1. Automatic mode for persistent events:\n"
+            "   reaxkit get_active_site_events --mode auto --persist 5\n\n"
+            "  2. Bond-order mode on a sampled frame range:\n"
+            "   reaxkit get_active_site_events --frames 0:500:5 --mode bo --bo-threshold 0.8\n\n"
+            "  3. Distance mode with custom cutoffs:\n"
+            "   reaxkit get_active_site_events --mode dist --r-co 1.65 --r-csi 2.10 --strict-tract"
         )
         parser.add_argument(
             "--frames",
@@ -187,7 +212,7 @@ def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, 
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
 
-    if command == "active_site_structural":
+    if command == "get_active_site_structural":
         if {"x", "y", "label"}.issubset(table.columns):
             series = []
             for lbl, group in table.groupby("label", sort=True):
@@ -221,7 +246,7 @@ def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, 
             "title": "Pyramidalization by Atom",
         }
 
-    if command == "active_site_events":
+    if command == "get_active_site_events":
         if not {"atom_id", "n_events_O", "n_events_Si"}.issubset(table.columns):
             return None
         ordered = table.sort_values("atom_id")
@@ -241,8 +266,8 @@ def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, 
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=ACTIVE_SITE_COMMANDS)
-    task_cls = TASK_REGISTRY[canonical]
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    task_cls = TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]]
     request = REQUEST_BUILDERS[canonical](args)
 
     executor = AnalysisExecutor()

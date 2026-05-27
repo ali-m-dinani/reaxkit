@@ -96,7 +96,7 @@ class AtomicKinematicsResult(BaseResult):
     request: AtomicKinematicsRequest
 
 
-@register_task("atomic_kinematics", label="Atomic Kinematics")
+@register_task("get_kinematics", label="Atomic Kinematics")
 class AtomicKinematicsTask(AnalysisTask):
     """Return metadata or a selected atomic-kinematics table from vels-style files."""
 

@@ -110,6 +110,8 @@ from reaxkit.engine.reaxff.generators.control_generator import (
 from reaxkit.presentation.plot.registry import plot as render_plot
 
 STUDY_COMMAND = "study"
+ALL_COMMANDS = (STUDY_COMMAND,)
+ALL_LEGACY_COMMANDS = ()
 CONTROL_PARAMETER_ALIASES = {
     "temperature": "mdtemp",
 }

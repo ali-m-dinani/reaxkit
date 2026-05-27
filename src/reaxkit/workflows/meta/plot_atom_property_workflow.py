@@ -19,7 +19,8 @@ from reaxkit.domain.data_models import ChargeData, ConnectivityData, TrajectoryD
 from reaxkit.presentation.dispatcher import export_result_csv
 from reaxkit.presentation.plot import plot as render_plot
 
-SPATIAL_PROPERTY_COMMANDS = ("atom_property_plot3d", "atom_property_heatmap2d")
+ALL_COMMANDS = ("plot_atom_property",)
+ALL_LEGACY_COMMANDS = ("atom_property_plot3d", "atom_property_heatmap2d", "plot-atom-property")
 
 _PROPERTY_ALIASES = {
     "charge": "charge",
@@ -283,55 +284,37 @@ def _render_frame_payloads(table: pd.DataFrame, args: argparse.Namespace, *, mod
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=SPATIAL_PROPERTY_COMMANDS)
-    parser.set_defaults(command=canonical)
+    _ = command
+    parser.set_defaults(command="plot_atom_property")
     parser.formatter_class = argparse.RawTextHelpFormatter
-
+    parser.description = (
+        "Plot per-atom properties in 2D heatmap or 3D scatter mode.\n"
+        "Use --type to select the plot style while keeping one unified command.\n\n"
+        "Examples:\n"
+        "  1. 3D scatter of charges:\n"
+        "   reaxkit plot_atom_property --type scatter3d --property charge --frames 0 10 20 --save plots3d\n\n"
+        "  2. 2D heatmap of connectivity values:\n"
+        "   reaxkit plot_atom_property --type heatmap2d --property sum_BOs --plane xz --bins 60 --save heatmaps\n\n"
+        "  3. Export table without plotting:\n"
+        "   reaxkit plot_atom_property --type scatter3d --property q --export atom_charge_coords.csv"
+    )
     _add_runtime_arguments(parser)
     _add_common_arguments(parser)
-
-    if canonical == "atom_property_plot3d":
-        parser.description = (
-            "Render 3D scatter plots of per-atom properties on trajectory coordinates.\n"
-            "This command maps a chosen property (for example charge or connectivity sum_BOs)\n"
-            "to atom colors and generates frame-wise 3D visualizations.\n\n"
-            "Examples:\n"
-            "  1. Save 3D charge plots for selected frames:\n"
-            "   reaxkit atom_property_plot3d --property charge --frames 0 10 20 --save plots3d\n\n"
-            "  2. Show 3D connectivity plots for selected atom types:\n"
-            "   reaxkit atom_property_plot3d --property sum_BOs --atom-types O H --show\n\n"
-            "  3. Export assembled charge-coordinate table:\n"
-            "   reaxkit atom_property_plot3d --property q --export atom_charge_coords.csv"
-        )
-        parser.add_argument("--size", type=float, default=8.0, help="Marker size. Example: --size 12, which renders larger point markers.")
-        parser.add_argument("--alpha", type=float, default=0.9, help="Marker transparency. Example: --alpha 0.6, which makes points more transparent.")
-        parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation. Example: --elev 30, which raises the camera tilt angle.")
-        parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth. Example: --azim 120, which rotates camera around the scene.")
-    elif canonical == "atom_property_heatmap2d":
-        parser.description = (
-            "Render 2D projected heatmaps of per-atom properties.\n"
-            "This command projects atom coordinates onto a selected plane and aggregates mapped\n"
-            "property values into heatmap bins.\n\n"
-            "Examples:\n"
-            "  1. Save charge heatmaps on XZ projection:\n"
-            "   reaxkit atom_property_heatmap2d --property charge --plane xz --bins 60 --save heatmaps\n\n"
-            "  2. Use max aggregation for connectivity values on selected frames:\n"
-            "   reaxkit atom_property_heatmap2d --property sum_BOs --agg max --frames 0 50 100\n\n"
-            "  3. Export assembled count-based coordinate table:\n"
-            "   reaxkit atom_property_heatmap2d --plane xy --export atom_count_coords.csv"
-        )
-        parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane. Example: --plane xz, which projects points onto XZ before binning.")
-        parser.add_argument("--bins", default="40", help='Grid bins: "N" or "Nx,Ny". Example: --bins 80,60, which sets non-square grid resolution.')
-        parser.add_argument("--agg", default="mean", help="Aggregation: mean|max|min|sum|count. Example: --agg max, which stores the maximum value in each bin.")
-    else:
-        raise KeyError(f"Unsupported spatial property command '{canonical}'.")
-
+    parser.add_argument("--type", required=True, choices=["heatmap2d", "scatter3d"], help="Plot type selector. Example: --type heatmap2d, which projects atom data and aggregates it on a 2D grid.")
+    parser.add_argument("--size", type=float, default=8.0, help="Marker size for scatter3d. Example: --size 12, which renders larger point markers.")
+    parser.add_argument("--alpha", type=float, default=0.9, help="Marker transparency for scatter3d. Example: --alpha 0.6, which makes points more transparent.")
+    parser.add_argument("--elev", type=float, default=22.0, help="3D view elevation for scatter3d. Example: --elev 30, which raises the camera tilt angle.")
+    parser.add_argument("--azim", type=float, default=38.0, help="3D view azimuth for scatter3d. Example: --azim 120, which rotates camera around the scene.")
+    parser.add_argument("--plane", default="xy", choices=["xy", "xz", "yz"], help="Projection plane for heatmap2d. Example: --plane xz, which projects points onto XZ before binning.")
+    parser.add_argument("--bins", default="40", help='Grid bins for heatmap2d: "N" or "Nx,Ny". Example: --bins 80,60, which sets non-square grid resolution.')
+    parser.add_argument("--agg", default="mean", help="Aggregation for heatmap2d: mean|max|min|sum|count. Example: --agg max, which stores the maximum value in each bin.")
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=SPATIAL_PROPERTY_COMMANDS)
-    property_name = _canonical_property(getattr(args, "property", None), allow_count=(canonical == "atom_property_heatmap2d"))
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    mode = str(args.type)
+    property_name = _canonical_property(getattr(args, "property", None), allow_count=(mode == "heatmap2d"))
 
     trajectory, charges, connectivity = _load_domain_data(args, property_name=property_name)
     table = _assemble_table(
@@ -367,7 +350,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         args.save = str(out_save)
 
     if not table.empty:
-        _render_frame_payloads(table, args, mode="plot3d" if canonical == "atom_property_plot3d" else "heatmap2d")
+        _render_frame_payloads(table, args, mode="plot3d" if mode == "scatter3d" else "heatmap2d")
         if args.save:
             print(f"[Done] Saved plots in {args.save}")
     else:

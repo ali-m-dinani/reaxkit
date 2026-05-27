@@ -585,7 +585,7 @@ def _run_voronoi_geometry(data: TrajectoryData, request: VoronoiRequest, *, back
     return VoronoiGeometryResult(table=table, request=request)
 
 
-@register_task("voronoi_scipy", label="Voronoi (SciPy)")
+@register_task("get_voronoi_scipy", label="Voronoi (SciPy)")
 class VoronoiScipyTask(AnalysisTask):
     """Compute per-atom Voronoi metrics using SciPy.
 
@@ -601,7 +601,7 @@ class VoronoiScipyTask(AnalysisTask):
         return _run_voronoi(data, request, backend="scipy", reporter=reporter)
 
 
-@register_task("voronoi_pyvoro", label="Voronoi (pyvoro)")
+@register_task("get_voronoi_pyvoro", label="Voronoi (pyvoro)")
 class VoronoiPyvoroTask(AnalysisTask):
     """Compute per-atom Voronoi metrics using pyvoro.
 
@@ -618,7 +618,7 @@ class VoronoiPyvoroTask(AnalysisTask):
         return _run_voronoi(data, request, backend="pyvoro", reporter=reporter)
 
 
-@register_task("voronoi_geometry_scipy", label="Voronoi Geometry (SciPy)")
+@register_task("get_voronoi_geometry_scipy", label="Voronoi Geometry (SciPy)")
 class VoronoiGeometryScipyTask(AnalysisTask):
     """Compute per-atom Voronoi geometry using SciPy.
 
@@ -633,7 +633,7 @@ class VoronoiGeometryScipyTask(AnalysisTask):
         return _run_voronoi_geometry(data, request, backend="scipy", reporter=reporter)
 
 
-@register_task("voronoi_geometry_pyvoro", label="Voronoi Geometry (pyvoro)")
+@register_task("get_voronoi_geometry_pyvoro", label="Voronoi Geometry (pyvoro)")
 class VoronoiGeometryPyvoroTask(AnalysisTask):
     """Compute per-atom Voronoi geometry using pyvoro native cell outputs."""
 

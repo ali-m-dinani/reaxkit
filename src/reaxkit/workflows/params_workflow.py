@@ -13,7 +13,8 @@ from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 
-PARAMS_COMMANDS = ("get-params",)
+ALL_COMMANDS = ("get-params",)
+ALL_LEGACY_COMMANDS = ("get_params",)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -52,7 +53,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=PARAMS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -145,7 +146,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=PARAMS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     task_cls = TASK_REGISTRY["force_field_optimization_parameters"]
     request = REQUEST_BUILDERS[canonical](args)
 

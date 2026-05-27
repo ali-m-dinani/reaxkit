@@ -26,7 +26,7 @@ from reaxkit.engine.reaxff.generators.trainset_yaml import (
 )
 from reaxkit.presentation.dispatcher import present_result
 
-TRAINSET_FILE_COMMANDS = (
+ALL_COMMANDS = (
     "gen_template_yaml_for_elastic_settings",
     "gen_template_yaml_for_heatfo_settings",
     "gen_elastic_trainset",
@@ -35,14 +35,15 @@ TRAINSET_FILE_COMMANDS = (
     "make-trainset-settings-heatfo",
     "make-trainset-elastic",
     "make-trainset-heatfo",
+    "get_trainset_data",
+    "get_trainset_group_comments",
 )
 
 TRAINSET_ANALYSIS_COMMANDS = (
     "get_trainset_data",
     "get_trainset_group_comments",
 )
-
-ALL_TRAINSET_COMMANDS = TRAINSET_FILE_COMMANDS + TRAINSET_ANALYSIS_COMMANDS
+ALL_LEGACY_COMMANDS = ()
 
 WORKFLOW_TASK_NAME_MAP: dict[str, str] = {
     "get_trainset_data": "trainset_data",

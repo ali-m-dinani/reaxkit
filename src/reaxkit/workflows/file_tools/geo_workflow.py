@@ -12,6 +12,7 @@ from reaxkit.core.generator_runtime import (
     prepare_generator_output,
     print_saved_dirs,
 )
+from reaxkit.core.command_alias_resolver import resolve_command_name
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.common.generators.structure_transformers import (
@@ -27,17 +28,35 @@ from reaxkit.engine.reaxff.generators.geo_generator import (
     xtob,
 )
 
-GEO_FILE_TOOL_COMMANDS = (
+ALL_COMMANDS = (
     "xtob",
     "make-geo",
     "sort_geo",
     "orthogonalize-geo",
     "place-geo",
     "add_restraints_to_geo",
-    "add-geo-restraint",
     "add_molcharge_to_geo",
-    "add-geo-molcharge",
 )
+ALL_LEGACY_COMMANDS = (
+    "make_geo",
+    "sort-geo",
+    "orthogonalize_geo",
+    "place_geo",
+    "add-geo-restraint",
+    "add-restraints-to-geo",
+    "add_geo_restraint",
+    "add-geo-molcharge",
+    "add-molcharge-to-geo",
+    "add_geo_molcharge",
+)
+COMMAND_ALIASES = {
+    "make-geo": ["make_geo"],
+    "sort_geo": ["sort-geo"],
+    "orthogonalize-geo": ["orthogonalize_geo"],
+    "place-geo": ["place_geo"],
+    "add_restraints_to_geo": ["add-geo-restraint", "add-restraints-to-geo", "add_geo_restraint"],
+    "add_molcharge_to_geo": ["add-geo-molcharge", "add-molcharge-to-geo", "add_geo_molcharge"],
+}
 
 
 def _parse_csv_floats(value: str, expected: int, name: str) -> list[float]:
@@ -263,17 +282,16 @@ RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "orthogonalize-geo": _run_orthogonalize_geo,
     "place-geo": _run_place_geo,
     "add_restraints_to_geo": _run_add_geo_restraint,
-    "add-geo-restraint": _run_add_geo_restraint,
     "add_molcharge_to_geo": _run_add_geo_molcharge,
-    "add-geo-molcharge": _run_add_geo_molcharge,
 }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    parser.set_defaults(command=command)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
+    parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
-    if command == "xtob":
+    if canonical == "xtob":
         parser.description = (
             "Convert an XYZ file to ReaxFF GEO format.\n\n"
             "Examples:\n"
@@ -288,7 +306,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--output", default="geo", help="Output GEO file")
         parser.add_argument("--sort", choices=["x", "y", "z", "atom_type"], help="Sort atoms before writing")
         parser.add_argument("--descending", action="store_true", help="Sort in descending order")
-    elif command == "make-geo":
+    elif canonical == "make-geo":
         parser.description = (
             "Build a surface slab from a bulk structure and write it to an ASE-supported format.\n\n"
             "Examples:\n"
@@ -300,7 +318,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--surface", required=True, help="Miller indices h,k,l")
         parser.add_argument("--expand", required=True, help="Supercell and layers nx,ny,layers")
         parser.add_argument("--vacuum", required=True, help="Vacuum thickness in angstrom")
-    elif command == "sort_geo":
+    elif canonical == "sort_geo":
         parser.description = (
             "Sort atoms in a GEO file and write a new GEO file.\n\n"
             "Examples:\n"
@@ -313,7 +331,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--output", required=True, help="Output GEO file")
         parser.add_argument("--sort", required=True, choices=["m", "x", "y", "z", "atom_type"], help="Sort key")
         parser.add_argument("--descending", action="store_true", help="Sort in descending order")
-    elif command == "orthogonalize-geo":
+    elif canonical == "orthogonalize-geo":
         parser.description = (
             "Convert a hexagonal cell into an orthorhombic cell.\n"
             "In other words, change the angles from 90,90,120 to 90,90,90.\n\n"
@@ -322,7 +340,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--file", required=True, help="Input structure file")
         parser.add_argument("--output", required=True, help="Output structure file")
-    elif command == "place-geo":
+    elif canonical == "place-geo":
         parser.description = (
             "Randomly place copies of a molecule into an empty box, optionally around a base structure.\n\n"
             "Examples:\n"
@@ -344,7 +362,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--baseplace", default="as-is", choices=["as-is", "center", "origin"], help="Base placement mode")
         parser.add_argument("--maxattempt", default=50000, help="Maximum placement attempts per copy")
         parser.add_argument("--randomseed", default=None, help="Random seed")
-    elif command in {"add_restraints_to_geo", "add-geo-restraint"}:
+    elif canonical == "add_restraints_to_geo":
         parser.description = (
             "Insert sample or explicit (i.e., settings are defined) restraint blocks into a GEO file.\n\n"
             "Examples:\n"
@@ -359,7 +377,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--angle", nargs="?", const="", default=None, help="Add one angle restraint")
         parser.add_argument("--torsion", nargs="?", const="", default=None, help="Add one torsion restraint")
         parser.add_argument("--mascen", nargs="?", const="", default=None, help="Add one mass-center restraint")
-    elif command in {"add_molcharge_to_geo", "add-geo-molcharge"}:
+    elif canonical == "add_molcharge_to_geo":
         parser.description = (
             "Use this command if you want to fix charges for specific atoms or parts of your system."
             "This command inserts MOLCHARGE lines into your GEO file.\n\n"
@@ -396,7 +414,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--per-type", action="append", dest="per_atom_type", help=argparse.SUPPRESS)
         parser.add_argument("--together-charge", dest="rest", help=argparse.SUPPRESS)
     else:
-        raise KeyError(f"Unsupported GEO file-tool command {command!r}.")
+        raise KeyError(f"Unsupported GEO file-tool command {canonical!r}.")
 
     parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
     add_storage_cli_arguments(parser)
@@ -404,21 +422,22 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     output_value = getattr(args, "output", None)
-    if command in {"add_restraints_to_geo", "add-geo-restraint"} and not output_value:
+    if canonical == "add_restraints_to_geo" and not output_value:
         output_value = f"{Path(args.file).name}_with_restraints"
-    if command in {"add_molcharge_to_geo", "add-geo-molcharge"} and not output_value:
+    if canonical == "add_molcharge_to_geo" and not output_value:
         output_value = f"{Path(args.file).name}_with_molcharge"
     if not output_value:
-        output_value = command
-    out_path, layout = prepare_generator_output(args, command=command, output_value=str(output_value))
+        output_value = canonical
+    out_path, layout = prepare_generator_output(args, command=canonical, output_value=str(output_value))
     args.output = str(out_path)
-    code = RUNNERS[command](args)
+    code = RUNNERS[canonical](args)
     if code != 0:
         return code
     persist_generator_metadata(
         args,
-        command=command,
+        command=canonical,
         output_path=out_path,
         layout=layout,
         copy_to_dot=bool(getattr(args, "copy_to_dot", False)),

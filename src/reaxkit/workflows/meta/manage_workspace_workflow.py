@@ -11,6 +11,8 @@ from reaxkit.core.storage_layout import default_project_root
 
 MANAGE_WORKSPACE_COMMAND = "manage-workspace"
 FREE_UP_COMMAND = "free-up"
+ALL_COMMANDS = (MANAGE_WORKSPACE_COMMAND,)
+ALL_LEGACY_COMMANDS = (FREE_UP_COMMAND, "manage_workspace", "free_up")
 DEFAULT_ALT_WORKSPACE = Path("reaxkit_workspace")
 
 

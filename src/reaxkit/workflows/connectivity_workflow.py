@@ -32,7 +32,16 @@ from reaxkit.domain.data_models import ConnectivityTrajectoryData
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 
-CONNECTIVITY_COMMANDS = (
+ALL_COMMANDS = (
+    "get_connection_list",
+    "get_connection_table",
+    "get_connection_stats",
+    "get_bond_events",
+    "get_coordination",
+    "relabel_traj_using_coordination",
+    "get_hybridization",
+)
+ALL_LEGACY_COMMANDS = (
     "connection_list",
     "connection_table",
     "connection_stats",
@@ -40,6 +49,13 @@ CONNECTIVITY_COMMANDS = (
     "coordination",
     "coordination_relabel",
     "hybridization",
+    "get-connection-list",
+    "get-connection-table",
+    "get-connection-stats",
+    "get-bond-events",
+    "get-coordination",
+    "get-hybridization",
+    "relabel-traj-using-coordination",
 )
 
 
@@ -215,12 +231,12 @@ def _build_coordination_relabel_request(
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "connection_list": _build_connection_list_request,
-    "connection_table": _build_connection_table_request,
-    "connection_stats": _build_connection_stats_request,
-    "bond_events": _build_bond_events_request,
-    "coordination": _build_coordination_request,
-    "hybridization": _build_hybridization_request,
+    "get_connection_list": _build_connection_list_request,
+    "get_connection_table": _build_connection_table_request,
+    "get_connection_stats": _build_connection_stats_request,
+    "get_bond_events": _build_bond_events_request,
+    "get_coordination": _build_coordination_request,
+    "get_hybridization": _build_hybridization_request,
 }
 
 
@@ -233,7 +249,7 @@ def _selected_connection_table_frames(args: argparse.Namespace) -> list[int]:
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=CONNECTIVITY_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -241,68 +257,68 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _add_runtime_arguments(parser)
     _add_presentation_arguments(parser)
 
-    if canonical == "connection_list":
+    if canonical == "get_connection_list":
         parser.description = (
             "List atom-to-atom connections extracted from bond-order frames.\n"
             "Use this command to inspect which atom pairs are connected at selected frames,\n"
             "with optional bond-order thresholding and direction collapsing.\n\n"
             "Examples:\n"
             "  1. Export connections for selected frames:\n"
-            "   reaxkit connection_list --fort7 fort.7 --frames 0 1 2 --export connections.csv\n\n"
+            "   reaxkit get_connection_list --fort7 fort.7 --frames 0 1 2 --export connections.csv\n\n"
             "  2. Keep only edges above a BO threshold and collapse i-j/j-i duplicates:\n"
-            "   reaxkit connection_list --fort7 fort.7 --min-bo 0.3 --undirected\n\n"
+            "   reaxkit get_connection_list --fort7 fort.7 --min-bo 0.3 --undirected\n\n"
             "  3. Include self-connections in output:\n"
-            "   reaxkit connection_list --fort7 fort.7 --include-self"
+            "   reaxkit get_connection_list --fort7 fort.7 --include-self"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which filters out weaker bonds below 0.3.")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps directed pair ordering.")
         parser.add_argument("--include-self", action="store_true", help="Include self connections. Example: --include-self, which keeps i->i entries when present.")
-    elif canonical == "connection_table":
+    elif canonical == "get_connection_table":
         parser.description = (
             "Build frame-wise connectivity matrices from bond-order data.\n"
             "For one frame, the command returns a single matrix. For multiple frames, export mode\n"
             "writes one CSV per frame.\n\n"
             "Examples:\n"
             "  1. Export a single-frame connectivity table:\n"
-            "   reaxkit connection_table --fort7 fort.7 --frames 0 --export connection_table.csv\n\n"
+            "   reaxkit get_connection_table --fort7 fort.7 --frames 0 --export connection_table.csv\n\n"
             "  2. Export connectivity tables for multiple frames:\n"
-            "   reaxkit connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n\n"
+            "   reaxkit get_connection_table --fort7 fort.7 --frames 0 10 20 --export connection_table.csv\n\n"
             "  3. Apply bond-order threshold and custom fill value:\n"
-            "   reaxkit connection_table --fort7 fort.7 --frames 5 --min-bo 0.3 --fill-value -1"
+            "   reaxkit get_connection_table --fort7 fort.7 --frames 5 --min-bo 0.3 --fill-value -1"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which keeps only stronger connections.")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps direction-specific matrix entries.")
         parser.add_argument("--fill-value", type=float, default=0.0, help="Fill value for missing entries. Example: --fill-value -1, which marks absent entries explicitly as -1.")
-    elif canonical == "connection_stats":
+    elif canonical == "get_connection_stats":
         parser.description = (
             "Aggregate connectivity statistics across selected frames.\n"
             "Use this command to summarize connectivity behavior with mean/max/count aggregations.\n\n"
             "Examples:\n"
             "  1. Export mean connectivity statistics:\n"
-            "   reaxkit connection_stats --fort7 fort.7 --how mean --export connection_stats.csv\n\n"
+            "   reaxkit get_connection_stats --fort7 fort.7 --how mean --export connection_stats.csv\n\n"
             "  2. Compute edge counts on specific frames:\n"
-            "   reaxkit connection_stats --fort7 fort.7 --frames 0 10 20 --how count\n\n"
+            "   reaxkit get_connection_stats --fort7 fort.7 --frames 0 10 20 --how count\n\n"
             "  3. Use thresholded max aggregation:\n"
-            "   reaxkit connection_stats --fort7 fort.7 --min-bo 0.3 --how max"
+            "   reaxkit get_connection_stats --fort7 fort.7 --min-bo 0.3 --how max"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--min-bo", type=float, default=0.0, help="Minimum bond order. Example: --min-bo 0.3, which removes weak edges before statistics.")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which treats reverse directions separately.")
         parser.add_argument("--how", choices=["mean", "max", "count"], default="mean", help="Statistic to compute. Example: --how count, which reports occurrence counts instead of mean/max BO.")
-    elif canonical == "bond_events":
+    elif canonical == "get_bond_events":
         parser.description = (
             "Detect bond formation and breakage events over time.\n"
             "The command applies threshold/hysteresis logic and optional smoothing to bond-order\n"
             "signals, then reports event points.\n\n"
             "Examples:\n"
             "  1. Detect events for one atom pair and export:\n"
-            "   reaxkit bond_events --fort7 fort.7 --src 1 --dst 2 --export bond_events.csv\n\n"
+            "   reaxkit get_bond_events --fort7 fort.7 --src 1 --dst 2 --export bond_events.csv\n\n"
             "  2. Tune threshold/hysteresis and plot events:\n"
-            "   reaxkit bond_events --fort7 fort.7 --threshold 0.35 --hysteresis 0.05 --plot single\n\n"
+            "   reaxkit get_bond_events --fort7 fort.7 --threshold 0.35 --hysteresis 0.05 --plot single\n\n"
             "  3. Use EMA smoothing and frame axis for plotting:\n"
-            "   reaxkit bond_events --fort7 fort.7 --smooth ema --window 9 --xaxis frame"
+            "   reaxkit get_bond_events --fort7 fort.7 --smooth ema --window 9 --xaxis frame"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--src", type=int, default=None, help="Source atom-id filter. Example: --src 1, which keeps events where source atom id is 1.")
@@ -314,36 +330,36 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--ema-alpha", type=float, default=None, help="Optional EMA alpha. Example: --ema-alpha 0.3, which controls EMA responsiveness.")
         parser.add_argument("--min-run", type=int, default=3, help="Minimum run length after flicker cleanup. Example: --min-run 5, which suppresses short-lived toggles.")
         parser.add_argument("--undirected", action=argparse.BooleanOptionalAction, default=True, help="Collapse i-j and j-i. Example: --no-undirected, which keeps direction-specific events.")
-    elif canonical == "coordination":
+    elif canonical == "get_coordination":
         parser.description = (
             "Classify atoms as under-, coordinated-, or over-coordinated.\n"
             "Classification compares bond-order totals against target valences from explicit maps\n"
             "or inferred values.\n\n"
             "Examples:\n"
             "  1. Classify using explicit valence map and export:\n"
-            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --valences Mg=2,O=2 --export coordination.csv\n\n"
+            "   reaxkit get_coordination --fort7 fort.7 --xmolout xmolout --valences Mg=2,O=2 --export coordination.csv\n\n"
             "  2. Classify using valences inferred from force field:\n"
-            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --ffield ffield --frames 0 10 20\n\n"
+            "   reaxkit get_coordination --fort7 fort.7 --xmolout xmolout --ffield ffield --frames 0 10 20\n\n"
             "  3. Adjust tolerance and plot results:\n"
-            "   reaxkit coordination --fort7 fort.7 --xmolout xmolout --threshold 0.2 --plot single"
+            "   reaxkit get_coordination --fort7 fort.7 --xmolout xmolout --threshold 0.2 --plot single"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2. Example: --valences Mg=2,O=2, which sets target valences directly.")
         parser.add_argument("--ffield", default=None, help="Optional force-field file to infer valences. Example: --ffield ffield, which derives valence targets from that force field.")
         parser.add_argument("--threshold", type=float, default=0.9, help="Tolerance around target valence. Example: --threshold 0.2, which tightens classification around target BO sums.")
         parser.add_argument("--allow-missing-valences", action="store_true", help="Do not fail on missing valences. Example: --allow-missing-valences, which skips strict failure when some mappings are absent.")
-    elif canonical == "coordination_relabel":
+    elif canonical == "relabel_traj_using_coordination":
         parser.description = (
             "Relabel trajectory atom labels based on coordination status.\n"
             "This command computes coordination classes and writes a relabeled trajectory using\n"
             "engine-specific output formatting.\n\n"
             "Examples:\n"
             "  1. Relabel using defaults and write output trajectory:\n"
-            "   reaxkit coordination_relabel --fort7 fort.7 --xmolout xmolout --output xmolout_relabeled\n\n"
+            "   reaxkit relabel_traj_using_coordination --fort7 fort.7 --xmolout xmolout --output xmolout_relabeled\n\n"
             "  2. Use explicit valences and type-aware relabeling:\n"
-            "   reaxkit coordination_relabel --valences Mg=2,O=2 --mode by_type --keep-coord-original --output relabeled.xyz\n\n"
+            "   reaxkit relabel_traj_using_coordination --valences Mg=2,O=2 --mode by_type --keep-coord-original --output relabeled.xyz\n\n"
             "  3. Use inferred valences, custom status labels, and export status table:\n"
-            "   reaxkit coordination_relabel --ffield ffield --frames 0 10 20 --labels=-1=U,0=C,1=O --export coordination.csv --output relabeled.xmolout"
+            "   reaxkit relabel_traj_using_coordination --ffield ffield --frames 0 10 20 --labels=-1=U,0=C,1=O --export coordination.csv --output relabeled.xmolout"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--valences", default=None, help="Explicit valence map like Mg=2,O=2. Example: --valences Mg=2,O=2, which sets coordination targets directly.")
@@ -356,18 +372,18 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--keep-coord-original", action="store_true", help="Keep original label when status is coordinated in by_type mode. Example: --keep-coord-original, which preserves original labels for coordinated atoms.")
         parser.add_argument("--precision", type=int, default=6, help="Writer precision when supported by the engine. Example: --precision 8, which writes numeric coordinates with higher decimal precision.")
         parser.add_argument("--simulation", default=None, help="Optional trajectory writer simulation label. Example: --simulation run_01, which tags output with that simulation name when supported.")
-    elif canonical == "hybridization":
+    elif canonical == "get_hybridization":
         parser.description = (
             "Classify atoms against target hybridization bond-order sums.\n"
             "You can define global hybridization targets or per-element target maps, then restrict\n"
             "classification to specific elements or atom ids.\n\n"
             "Examples:\n"
             "  1. Use global hybridization targets and export:\n"
-            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --hybridizations sp=1,sp2=2,sp3=3 --export hyb.csv\n\n"
+            "   reaxkit get_hybridization --fort7 fort.7 --xmolout xmolout --hybridizations sp=1,sp2=2,sp3=3 --export hyb.csv\n\n"
             "  2. Use element-specific hybridization targets:\n"
-            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --element-hybridizations \"C:sp=1,sp2=2,sp3=3;N:sp2=2,sp3=3\"\n\n"
+            "   reaxkit get_hybridization --fort7 fort.7 --xmolout xmolout --element-hybridizations \"C:sp=1,sp2=2,sp3=3;N:sp2=2,sp3=3\"\n\n"
             "  3. Restrict to selected elements and tighten tolerance:\n"
-            "   reaxkit hybridization --fort7 fort.7 --xmolout xmolout --target-elements C O --threshold 0.2"
+            "   reaxkit get_hybridization --fort7 fort.7 --xmolout xmolout --target-elements C O --threshold 0.2"
         )
         _add_frame_arguments(parser)
         parser.add_argument("--hybridizations", default=None, help="Global map like sp=1,sp2=2,sp3=3. Example: --hybridizations sp=1,sp2=2,sp3=3, which applies one map to all elements.")
@@ -383,7 +399,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _prepare_result_table(command: str, result, args: argparse.Namespace) -> None:
-    if command in {"connection_table"} and isinstance(result.table, pd.DataFrame):
+    if command in {"get_connection_table"} and isinstance(result.table, pd.DataFrame):
         if not isinstance(result.table.index, pd.RangeIndex):
             result.table = result.table.reset_index()
 
@@ -393,7 +409,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
 
-    if command == "connection_list":
+    if command == "get_connection_list":
         count_col = "frame_idx" if "frame_idx" in table.columns else ("frame_index" if "frame_index" in table.columns else None)
         if count_col is None:
             return None
@@ -424,7 +440,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Connection Count Per Frame",
         }
 
-    if command == "bond_events":
+    if command == "get_bond_events":
         series = []
         for event_name, group in table.groupby("event", sort=True):
             if args.xaxis == "time" and "iter" in group.columns:
@@ -453,7 +469,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "plot_type_style": "scatter",
         }
 
-    if command in {"coordination", "hybridization"} and "frame_index" in table.columns:
+    if command in {"get_coordination", "get_hybridization"} and "frame_index" in table.columns:
         label_col = "status_label" if "status_label" in table.columns else None
         if label_col is None:
             return None
@@ -478,8 +494,8 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=CONNECTIVITY_COMMANDS)
-    if canonical == "coordination_relabel":
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    if canonical == "relabel_traj_using_coordination":
         normalized = normalize_storage_args(vars(args))
         adapter = resolve_engine(
             normalized.get("input") or normalized.get("run_dir") or normalized.get("xmolout") or ".",
@@ -505,11 +521,11 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Wrote relabeled trajectory to {out_path}")
         return 0
 
-    if canonical == "connection_table":
+    if canonical == "get_connection_table":
         frames = _selected_connection_table_frames(args)
         if len(frames) > 1:
             if getattr(args, "plot", None) or getattr(args, "save", None) or getattr(args, "show", False):
-                raise ValueError("Plotting for connection_table with multiple frames is not supported. Export CSVs instead.")
+                raise ValueError("Plotting for get_connection_table with multiple frames is not supported. Export CSVs instead.")
             if not getattr(args, "export", None):
                 raise ValueError("Multiple frames require --export so one CSV per frame can be written.")
 

@@ -30,6 +30,9 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import present_result
 
+ALL_COMMANDS = ("timeseries",)
+ALL_LEGACY_COMMANDS = ()
+
 _ATOM_FIELD_RE = re.compile(r"^atom\[(?P<ids>[0-9,\s]+)\]\.(?P<axis>[xyzXYZ])$")
 _CHARGE_FIELD_RE = re.compile(r"^(?:charge|q)\[(?P<ids>[0-9,\s]+)\]$")
 _CELL_FIELD_RE = re.compile(r"^(?:cell(?:_dimensions)?|lattice)\[(?P<fields>[A-Za-z0-9_,\s]+)\]$")

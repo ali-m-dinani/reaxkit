@@ -22,7 +22,21 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
-TRAJECTORY_COMMANDS = ("dihedral", "diffusivity", "msd", "rdf", "rdf_property", "voronoi")
+ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi")
+ALL_LEGACY_COMMANDS = (
+    "dihedral",
+    "diffusivity",
+    "msd",
+    "rdf",
+    "rdf_property",
+    "voronoi",
+    "get-diffusivity",
+    "get-msd",
+    "get-rdf",
+    "get-rdf-property",
+    "get-voronoi",
+    "get-dihedral",
+)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -127,18 +141,18 @@ def _build_voronoi_request(args: argparse.Namespace) -> VoronoiRequest:
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "dihedral": _build_dihedral_request,
-    "diffusivity": _build_diffusivity_request,
-    "msd": _build_msd_request,
-    "rdf": _build_rdf_request,
-    "rdf_property": _build_rdf_property_request,
-    "voronoi": _build_voronoi_request,
+    "get_dihedral": _build_dihedral_request,
+    "get_diffusivity": _build_diffusivity_request,
+    "get_msd": _build_msd_request,
+    "get_rdf": _build_rdf_request,
+    "get_rdf_property": _build_rdf_property_request,
+    "get_voronoi": _build_voronoi_request,
 }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     """Build the parser for a direct trajectory command."""
-    canonical = resolve_command_name(command, task_names=TRAJECTORY_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -147,32 +161,32 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _add_presentation_arguments(parser)
     _add_common_arguments(parser)
 
-    if canonical == "dihedral":
+    if canonical == "get_dihedral":
         parser.description = (
             "Compute a dihedral angle (atom1-atom2-atom3-atom4) over selected frames.\n"
             "Use this command to track torsional evolution for a specific four-atom tuple.\n\n"
             "Examples:\n"
             "  1. Plot dihedral trajectory for one atom tuple:\n"
-            "   reaxkit dihedral --atom-ids 1 2 3 4 --plot single\n\n"
+            "   reaxkit get_dihedral --atom-ids 1 2 3 4 --plot single\n\n"
             "  2. Export sampled frames in radians:\n"
-            "   reaxkit dihedral --atom-ids 8 3 4 9 --frames 0:500:10 --units rad --export dih.csv\n\n"
+            "   reaxkit get_dihedral --atom-ids 8 3 4 9 --frames 0:500:10 --units rad --export dih.csv\n\n"
             "  3. Save dihedral plot on iteration axis:\n"
-            "   reaxkit dihedral --atom-ids 5 7 9 11 --xaxis iter --save dihedral_iter.png"
+            "   reaxkit get_dihedral --atom-ids 5 7 9 11 --xaxis iter --save dihedral_iter.png"
         )
         parser.add_argument("--atom-ids", type=int, nargs=4, required=True, help="Exactly four 1-based atom ids. Example: --atom-ids 1 2 3 4, which defines the torsion tuple order.")
         parser.add_argument("--units", choices=["deg", "rad"], default="deg", help="Output angle units. Example: --units rad, which reports dihedral values in radians.")
         parser.add_argument("--backend", choices=["numpy", "mdanalysis"], default="numpy", help="Dihedral backend. Example: --backend mdanalysis, which uses MDAnalysis implementation.")
-    elif canonical == "msd":
+    elif canonical == "get_msd":
         parser.description = (
             "Compute mean-squared displacement (MSD) for selected atoms.\n"
             "MSD is computed over selected frames and can be filtered by atom ids or atom types.\n\n"
             "Examples:\n"
             "  1. Plot MSD for selected atom ids:\n"
-            "   reaxkit msd --atom-ids 1 2 3 --plot single\n\n"
+            "   reaxkit get_msd --atom-ids 1 2 3 --plot single\n\n"
             "  2. Save oxygen-only MSD on time axis:\n"
-            "   reaxkit msd --atom-types O --xaxis time --save msd_oxygen.png\n\n"
+            "   reaxkit get_msd --atom-types O --xaxis time --save msd_oxygen.png\n\n"
             "  3. Export MSD for one atom on selected frames:\n"
-            "   reaxkit msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
+            "   reaxkit get_msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts MSD to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which computes MSD for oxygen atoms only.")
@@ -184,17 +198,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             default=True,
             help="Unwrap coordinates across periodic boundaries when cell data exists. Example: --no-unwrap, which keeps wrapped coordinates.",
         )
-    elif canonical == "diffusivity":
+    elif canonical == "get_diffusivity":
         parser.description = (
             "Estimate per-atom diffusivity from Einstein relation `MSD = 2*d*D*t`.\n"
             "This command fits/derives diffusivity using selected dimensions, atoms, and frame windows.\n\n"
             "Examples:\n"
             "  1. Plot diffusivity for selected atom ids:\n"
-            "   reaxkit diffusivity --atom-ids 1 2 3 --plot single\n\n"
+            "   reaxkit get_diffusivity --atom-ids 1 2 3 --plot single\n\n"
             "  2. Export oxygen diffusivity using 3D Einstein dimensionality:\n"
-            "   reaxkit diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n\n"
+            "   reaxkit get_diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n\n"
             "  3. Save atom-specific diffusivity with frame sampling:\n"
-            "   reaxkit diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
+            "   reaxkit get_diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts diffusivity estimates to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which limits analysis to oxygen atoms.")
@@ -207,17 +221,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             default=True,
             help="Unwrap coordinates across periodic boundaries when cell data exists. Example: --no-unwrap, which keeps wrapped coordinates.",
         )
-    elif canonical == "rdf":
+    elif canonical == "get_rdf":
         parser.description = (
             "Compute radial distribution functions (RDF) for selected atom groups.\n"
             "Group A and B can be defined by atom ids or atom types, with configurable bins/radius.\n\n"
             "Examples:\n"
             "  1. Plot O-H RDF using type selectors:\n"
-            "   reaxkit rdf --atom-types-a O --atom-types-b H --plot single\n\n"
+            "   reaxkit get_rdf --atom-types-a O --atom-types-b H --plot single\n\n"
             "  2. Save RDF for specific atom-id groups with higher resolution bins:\n"
-            "   reaxkit rdf --atom-ids-a 1 2 --atom-ids-b 10 11 --bins 300 --save rdf_pairs.png\n\n"
+            "   reaxkit get_rdf --atom-ids-a 1 2 --atom-ids-b 10 11 --bins 300 --save rdf_pairs.png\n\n"
             "  3. Plot frame-wise RDF subplots for Al-O:\n"
-            "   reaxkit rdf --atom-types-a Al --atom-types-b O --frames 0 50 100 --plot subplot"
+            "   reaxkit get_rdf --atom-types-a Al --atom-types-b O --frames 0 50 100 --plot subplot"
         )
         parser.add_argument("--atom-ids-a", type=int, nargs="*", default=None, help="1-based atom ids for group A. Example: --atom-ids-a 1 2, which defines source RDF group.")
         parser.add_argument("--atom-ids-b", type=int, nargs="*", default=None, help="1-based atom ids for group B. Example: --atom-ids-b 10 11, which defines target RDF group.")
@@ -226,17 +240,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins. Example: --bins 300, which increases radial histogram resolution.")
         parser.add_argument("--r-max", type=float, default=None, help="Maximum radius. Example: --r-max 8.0, which truncates RDF computation at radius 8.0.")
         parser.add_argument("--backend", choices=["freud", "ovito"], default="freud", help="RDF backend. Example: --backend ovito, which computes RDF using OVITO backend.")
-    elif canonical == "rdf_property":
+    elif canonical == "get_rdf_property":
         parser.description = (
             "Compute RDF-derived properties across selected frames.\n"
             "Supported properties include first peak, dominant peak, area, and excess area.\n\n"
             "Examples:\n"
             "  1. Plot first-peak position for O-H pairs:\n"
-            "   reaxkit rdf_property --property first_peak --atom-types-a O --atom-types-b H --plot single\n\n"
+            "   reaxkit get_rdf_property --property first_peak --atom-types-a O --atom-types-b H --plot single\n\n"
             "  2. Save RDF area series using legacy alias flag:\n"
-            "   reaxkit rdf_property --prop area --atom-types-a Al --atom-types-b O --xaxis iter --save rdf_area.png\n\n"
+            "   reaxkit get_rdf_property --prop area --atom-types-a Al --atom-types-b O --xaxis iter --save rdf_area.png\n\n"
             "  3. Export dominant-peak series on selected frames:\n"
-            "   reaxkit rdf_property --property dominant_peak --frames 0 20 40 --export rdf_peak.csv"
+            "   reaxkit get_rdf_property --property dominant_peak --frames 0 20 40 --export rdf_peak.csv"
         )
         parser.add_argument("--property", default=None, help="RDF property to extract. Example: --property first_peak, which returns first-peak position series.")
         parser.add_argument("--prop", choices=["first_peak", "dominant_peak", "area", "excess_area"], default=None, help="Legacy alias for --property. Example: --prop area, which requests integrated RDF area series.")
@@ -247,19 +261,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--bins", type=int, default=200, help="Number of RDF bins. Example: --bins 250, which refines radial resolution.")
         parser.add_argument("--r-max", type=float, default=None, help="Maximum radius. Example: --r-max 10.0, which sets RDF cutoff radius.")
         parser.add_argument("--backend", choices=["freud", "ovito"], default="freud", help="RDF backend. Example: --backend freud, which uses freud-based RDF implementation.")
-    elif canonical == "voronoi":
+    elif canonical == "get_voronoi":
         parser.description = (
             "Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.\n"
             "Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geometry visualization.\n\n"
             "Examples:\n"
             "  1. Export Voronoi metrics table:\n"
-            "   reaxkit voronoi --frames 0 10 20 --export voronoi.csv\n\n"
+            "   reaxkit get_voronoi --frames 0 10 20 --export voronoi.csv\n\n"
             "  2. Plot Voronoi metric series for selected atom types:\n"
-            "   reaxkit voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n\n"
+            "   reaxkit get_voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n\n"
             "  3. Plot a 2D Voronoi diagram projection:\n"
-            "   reaxkit voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n\n"
+            "   reaxkit get_voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n\n"
             "  4. Plot 3D Voronoi diagrams as subplots over frame samples:\n"
-            "   reaxkit voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
+            "   reaxkit get_voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which limits Voronoi analysis to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which restricts analysis to oxygen atoms.")
@@ -470,7 +484,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     if table.empty:
         return None
 
-    if command == "msd":
+    if command == "get_msd":
         grouped = table.groupby(["frame_index", "iter", "atom_id"], as_index=False)["msd"].mean()
         frame_values = np.sort(grouped["frame_index"].unique())
         xvals, xlabel = convert_xaxis(frame_values, getattr(args, "xaxis", "frame"))
@@ -508,8 +522,8 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "diffusivity":
-        if "atom_id" not in table.columns or "diffusivity" not in table.columns:
+    if command == "get_diffusivity":
+        if "atom_id" not in table.columns or "get_diffusivity" not in table.columns:
             return None
         work = table.sort_values("atom_id")
         return {
@@ -521,7 +535,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Diffusivity by Atom",
         }
 
-    if command == "dihedral":
+    if command == "get_dihedral":
         x_col = "frame_index"
         xlabel = "Frame Index"
         if getattr(args, "xaxis", "frame") == "iter" and "iter" in table.columns:
@@ -544,7 +558,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Dihedral Angle",
         }
 
-    if command == "rdf":
+    if command == "get_rdf":
         if "frame_index" not in table.columns or "iter" not in table.columns:
             return {
                 "plot_type": "single_plot",
@@ -588,7 +602,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "rdf_property":
+    if command == "get_rdf_property":
         property_name = getattr(args, "property", None) or getattr(args, "prop", None) or "first_peak"
         property_name = str(property_name).strip().lower()
         x_col = "frame_index"
@@ -615,7 +629,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": title,
         }
 
-    if command == "voronoi":
+    if command == "get_voronoi":
         if getattr(args, "plot_target", "metrics") == "diagram":
             if "vertices" not in table.columns or "faces" not in table.columns:
                 return None
@@ -701,15 +715,15 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct trajectory command."""
-    canonical = resolve_command_name(command, task_names=TRAJECTORY_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     task_key = canonical
-    if canonical == "voronoi":
+    if canonical == "get_voronoi":
         backend = str(getattr(args, "backend", "scipy")).strip().lower()
         plot_target = str(getattr(args, "plot_target", "metrics")).strip().lower()
         if plot_target == "diagram":
-            backend_to_task = {"scipy": "voronoi_geometry_scipy", "pyvoro": "voronoi_geometry_pyvoro"}
+            backend_to_task = {"scipy": "get_voronoi_geometry_scipy", "pyvoro": "get_voronoi_geometry_pyvoro"}
         else:
-            backend_to_task = {"scipy": "voronoi_scipy", "pyvoro": "voronoi_pyvoro"}
+            backend_to_task = {"scipy": "get_voronoi_scipy", "pyvoro": "get_voronoi_pyvoro"}
         if backend not in backend_to_task:
             raise ValueError("voronoi backend must be 'scipy' or 'pyvoro'")
         task_key = backend_to_task[backend]

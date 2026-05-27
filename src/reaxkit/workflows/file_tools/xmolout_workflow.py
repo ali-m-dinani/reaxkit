@@ -13,6 +13,9 @@ from reaxkit.core.generator_runtime import (
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.xmolout_generator import trim_xmolout
 
+ALL_COMMANDS = ("trim-xmolout",)
+ALL_LEGACY_COMMANDS = ("trim_xmolout",)
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command

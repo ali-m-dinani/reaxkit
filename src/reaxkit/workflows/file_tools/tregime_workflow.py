@@ -13,6 +13,9 @@ from reaxkit.core.generator_runtime import (
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.tregime_generator import gen_template_tregime
 
+ALL_COMMANDS = ("gen_template_tregime",)
+ALL_LEGACY_COMMANDS = ("make-tregime", "make_tregime")
+
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     _ = command

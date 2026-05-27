@@ -22,11 +22,21 @@ from reaxkit.core.frame_utils import parse_frame_indices
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 
-MOLECULAR_ANALYSIS_COMMANDS = (
+ALL_COMMANDS = (
+    "get_dominant_species",
+    "get_largest_molecule_by_mass",
+    "get_largest_molecule_composition",
+    "get_molecule_lifetime",
+)
+ALL_LEGACY_COMMANDS = (
     "dominant_species",
     "largest_molecule_by_mass",
     "largest_molecule_composition",
     "molecule_lifetime",
+    "get-dominant-species",
+    "get-largest-molecule-by-mass",
+    "get-largest-molecule-composition",
+    "get-molecule-lifetime",
 )
 
 
@@ -91,15 +101,15 @@ def _build_molecule_lifetime_request(args: argparse.Namespace) -> MoleculeLifeti
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "dominant_species": _build_dominant_species_request,
-    "largest_molecule_by_mass": _build_largest_molecule_by_mass_request,
-    "largest_molecule_composition": _build_largest_molecule_composition_request,
-    "molecule_lifetime": _build_molecule_lifetime_request,
+    "get_dominant_species": _build_dominant_species_request,
+    "get_largest_molecule_by_mass": _build_largest_molecule_by_mass_request,
+    "get_largest_molecule_composition": _build_largest_molecule_composition_request,
+    "get_molecule_lifetime": _build_molecule_lifetime_request,
 }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=MOLECULAR_ANALYSIS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -108,58 +118,58 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     _add_presentation_arguments(parser)
     _add_common_arguments(parser)
 
-    if canonical == "dominant_species":
+    if canonical == "get_dominant_species":
         parser.description = (
             "Return dominant molecular species for selected frames.\n"
             "This command ranks species by frequency per frame and can return multiple top ranks,\n"
             "with optional frequency threshold filtering.\n\n"
             "Examples:\n"
             "  1. Export top 3 species per frame:\n"
-            "   reaxkit dominant_species --top-n 3 --export dominant_species.csv\n\n"
+            "   reaxkit get_dominant_species --top-n 3 --export dominant_species.csv\n\n"
             "  2. Analyze selected frames with minimum frequency and plot:\n"
-            "   reaxkit dominant_species --frames 0 10 20 --min-freq 2 --plot single\n\n"
+            "   reaxkit get_dominant_species --frames 0 10 20 --min-freq 2 --plot single\n\n"
             "  3. Use frame stride and iteration axis in saved figure:\n"
-            "   reaxkit dominant_species --every 5 --xaxis iter --save dominant_species.png"
+            "   reaxkit get_dominant_species --every 5 --xaxis iter --save dominant_species.png"
         )
         parser.add_argument("--top-n", type=int, default=1, help="Number of ranked species per frame. Example: --top-n 3, which returns first/second/third dominant species.")
         parser.add_argument("--min-freq", type=float, default=0.0, help="Minimum species frequency to include. Example: --min-freq 2, which filters out low-frequency species.")
-    elif canonical == "largest_molecule_by_mass":
+    elif canonical == "get_largest_molecule_by_mass":
         parser.description = (
             "Return the heaviest molecular species for selected frames.\n"
             "Use this command to track how the maximum molecular mass evolves over trajectory frames.\n\n"
             "Examples:\n"
             "  1. Export largest-mass species table:\n"
-            "   reaxkit largest_molecule_by_mass --export largest_mass.csv\n\n"
+            "   reaxkit get_largest_molecule_by_mass --export largest_mass.csv\n\n"
             "  2. Plot largest-mass trend on selected frames:\n"
-            "   reaxkit largest_molecule_by_mass --frames 0 20 40 --plot single\n\n"
+            "   reaxkit get_largest_molecule_by_mass --frames 0 20 40 --plot single\n\n"
             "  3. Subsample frames and save iteration-axis plot:\n"
-            "   reaxkit largest_molecule_by_mass --every 10 --xaxis iter --save largest_mass.png"
+            "   reaxkit get_largest_molecule_by_mass --every 10 --xaxis iter --save largest_mass.png"
         )
-    elif canonical == "largest_molecule_composition":
+    elif canonical == "get_largest_molecule_composition":
         parser.description = (
             "Return elemental composition of the heaviest molecular species per frame.\n"
             "This command reports element counts for the dominant-by-mass molecule in each frame,\n"
             "which helps track composition shifts over time.\n\n"
             "Examples:\n"
             "  1. Export composition table:\n"
-            "   reaxkit largest_molecule_composition --export composition.csv\n\n"
+            "   reaxkit get_largest_molecule_composition --export composition.csv\n\n"
             "  2. Plot selected frames with subplot layout:\n"
-            "   reaxkit largest_molecule_composition --frames 0 10 20 --plot subplot\n\n"
+            "   reaxkit get_largest_molecule_composition --frames 0 10 20 --plot subplot\n\n"
             "  3. Subsample frames and save iteration-axis plot:\n"
-            "   reaxkit largest_molecule_composition --every 5 --xaxis iter --save composition.png"
+            "   reaxkit get_largest_molecule_composition --every 5 --xaxis iter --save composition.png"
         )
-    elif canonical == "molecule_lifetime":
+    elif canonical == "get_molecule_lifetime":
         parser.description = (
             "Compute lifetimes of molecular species across selected frames.\n"
             "You can restrict to target formulas and filter by minimum activity frequency before\n"
             "lifetime statistics are reported.\n\n"
             "Examples:\n"
             "  1. Compute lifetimes for selected molecules and export:\n"
-            "   reaxkit molecule_lifetime --molecules H2O OH --export lifetimes.csv\n\n"
+            "   reaxkit get_molecule_lifetime --molecules H2O OH --export lifetimes.csv\n\n"
             "  2. Compute and plot lifetimes for all detected molecules:\n"
-            "   reaxkit molecule_lifetime --plot single\n\n"
+            "   reaxkit get_molecule_lifetime --plot single\n\n"
             "  3. Apply frequency threshold on selected frames and save plot:\n"
-            "   reaxkit molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png"
+            "   reaxkit get_molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png"
         )
         parser.add_argument("--molecules", nargs="*", default=None, help="Restrict to selected molecular formulae. Example: --molecules H2O OH, which limits analysis to water and hydroxyl.")
         parser.add_argument("--min-freq", type=float, default=1.0, help="Minimum frequency for an active molecule. Example: --min-freq 2, which treats only sufficiently frequent molecules as active.")
@@ -181,7 +191,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     x_col = "iter" if getattr(args, "xaxis", "frame") == "iter" and "iter" in table.columns else "frame_index"
     xlabel = "Iteration" if x_col == "iter" else "Frame Index"
 
-    if command == "dominant_species":
+    if command == "get_dominant_species":
         series = []
         subplots = []
         for label, group in table.groupby("molecular_formula", sort=True):
@@ -212,7 +222,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "largest_molecule_by_mass":
+    if command == "get_largest_molecule_by_mass":
         return {
             "plot_type": "single_plot",
             "x": table[x_col].tolist(),
@@ -222,7 +232,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Largest Molecule By Mass",
         }
 
-    if command == "largest_molecule_composition":
+    if command == "get_largest_molecule_composition":
         series = []
         subplots = []
         for element, group in table.groupby("element", sort=True):
@@ -253,7 +263,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": True,
         }
 
-    if command == "molecule_lifetime":
+    if command == "get_molecule_lifetime":
         return {
             "plot_type": "single_plot",
             "x": table[x_col.replace("frame_index", "start_frame_index").replace("iter", "start_iter")].tolist(),
@@ -267,7 +277,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=MOLECULAR_ANALYSIS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     task_cls = TASK_REGISTRY[canonical]
     request = REQUEST_BUILDERS[canonical](args)
 

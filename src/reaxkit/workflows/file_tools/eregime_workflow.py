@@ -14,7 +14,8 @@ from reaxkit.core.generator_runtime import (
 from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.eregime_generator import gen_eregime
 
-EREGIME_FILE_TOOL_COMMANDS = ("gen_eregime", "make-eregime")
+ALL_COMMANDS = ("gen_eregime",)
+ALL_LEGACY_COMMANDS = ("gen-eregime", "make-eregime", "make_eregime")
 
 
 def _safe_build_func(expr: str) -> Callable[[float], float]:

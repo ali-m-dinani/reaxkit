@@ -118,7 +118,7 @@ class DihedralResult(BaseResult):
     request: DihedralRequest
 
 
-@register_task("dihedral", label="Dihedral")
+@register_task("get_dihedral", label="Dihedral")
 class DihedralTask(AnalysisTask):
     """Compute the signed dihedral angle for one atom quadruplet over time."""
 

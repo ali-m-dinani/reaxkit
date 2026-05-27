@@ -6,7 +6,7 @@ _meta:
   last_updated: '2026-05-21'
 workflows:
   active_site_workflow:
-    implementation_module: 'reaxkit.workflows.active_site_workflow: active_site_events'
+    implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
     description: Direct command workflow for active-site analyses.
     related_commands:
       analysis:
@@ -18,7 +18,8 @@ workflows:
     - connectivity trajectory
     - analysis workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be active_site_events, active_site_structural'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_active_site_events,
+      get_active_site_structural'
     aliases:
     - active site workflow
     - active site analysis
@@ -26,7 +27,7 @@ workflows:
     - reaxkit help "active site workflow"
     - run active site workflow
   connectivity_workflow:
-    implementation_module: 'reaxkit.workflows.connectivity_workflow: bond_events'
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_bond_events'
     description: Direct command workflow for connectivity analyses.
     related_commands:
       analysis:
@@ -40,7 +41,9 @@ workflows:
     - bond order
     - analysis workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be bond_events, connection_list, connection_stats, connection_table, coordination, coordination_relabel, hybridization'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_bond_events, get_connection_list,
+      get_connection_stats, get_connection_table, get_coordination, relabel_traj_using_coordination,
+      get_hybridization'
     aliases:
     - connectivity workflow
     - bond order analysis
@@ -60,7 +63,8 @@ workflows:
     - charges
     - polarization
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be charge-table, dipole, polarization, polarization_field'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be charge-table, dipole,
+      polarization, polarization_field'
     aliases:
     - electrostatics workflow
     - charge analysis workflow
@@ -68,7 +72,7 @@ workflows:
     - reaxkit help "electrostatics workflow"
     - run electrostatics workflow
   kinematics_workflow:
-    implementation_module: 'reaxkit.workflows.kinematics_workflow: kinematics'
+    implementation_module: 'reaxkit.workflows.kinematics_workflow: get_kinematics'
     description: Direct command workflow for atomic-kinematics analyses.
     related_commands:
       analysis:
@@ -79,7 +83,8 @@ workflows:
     - velocity
     - acceleration
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be kinematics, kinematics_heatmap2d, kinematics_plot3d'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_kinematics, kinematics_heatmap2d,
+      kinematics_plot3d'
     aliases:
     - atomic kinematics workflow
     - kinematics workflow
@@ -87,7 +92,7 @@ workflows:
     - reaxkit help "atomic kinematics workflow"
     - run atomic kinematics workflow
   molecular_analysis_workflow:
-    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: dominant_species'
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: get_dominant_species'
     description: Direct command workflow for molecular analysis tasks.
     related_commands:
       analysis:
@@ -98,7 +103,8 @@ workflows:
     - species
     - molecule lifetime
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be dominant_species, largest_molecule_by_mass, largest_molecule_composition, molecule_lifetime'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_dominant_species,
+      get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime'
     aliases:
     - molecular analysis workflow
     - molecule analysis workflow
@@ -123,21 +129,21 @@ workflows:
     help_search_examples:
     - reaxkit help "optimization parameters workflow"
     - get optimization parameters workflow
-  spatial_property_workflow:
-    implementation_module: 'reaxkit.workflows.spatial_property_workflow: atom_property_heatmap2d'
+  plot_atom_property_workflow:
+    implementation_module: 'reaxkit.workflows.meta.plot_atom_property_workflow: plot_atom_property'
     description: Direct command workflow for spatial per-atom property plots.
     related_commands:
       analysis:
-      - reaxkit.workflows.spatial_property_workflow
+      - reaxkit.workflows.meta.plot_atom_property_workflow
       generator: []
     tags:
     - spatial property
     - heatmap2d
     - plot3d
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be atom_property_heatmap2d, atom_property_plot3d'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be plot_atom_property'
     aliases:
-    - spatial property workflow
+    - plot atom property workflow
     - atom property workflow
     help_search_examples:
     - reaxkit help "spatial property workflow"
@@ -168,7 +174,7 @@ workflows:
     - get trajectory series
     - get or plot restraint time series
   trajectory_workflow:
-    implementation_module: 'reaxkit.workflows.trajectory_workflow: diffusivity'
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_diffusivity'
     description: Direct command workflow for trajectory analyses.
     related_commands:
       analysis:
@@ -182,7 +188,8 @@ workflows:
     - diffusivity
     - radial distribution function
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be dihedral, msd, diffusivity, rdf, rdf-property, voronoi'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_dihedral, get_msd,
+      get_diffusivity, get_rdf, get_rdf_property, get_voronoi'
     aliases:
     - trajectory workflow
     - trajectory analysis
@@ -202,7 +209,8 @@ workflows:
     - molecule insertion
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_addmol, make-addmol'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_addmol,
+      make-addmol'
     aliases:
     - addmol workflow
     - molecule insertion workflow
@@ -221,7 +229,8 @@ workflows:
     - template
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_charges, make-charges'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_charges,
+      make-charges'
     aliases:
     - charges workflow
     - charges generator workflow
@@ -229,7 +238,7 @@ workflows:
     - reaxkit help "make charges"
     - make charges workflow
   control_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: gen_control'
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: gen_template_control'
     description: Task-oriented workflow for control-file analyses and utilities.
     related_commands:
       analysis: []
@@ -241,7 +250,8 @@ workflows:
     - control parameters
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_control, get-control, make-control, write-control'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_control,
+      get-control_data, make-control, gen-control'
     aliases:
     - control workflow
     - control file workflow
@@ -268,7 +278,7 @@ workflows:
     - reaxkit help "make electric field regime"
     - make electric field regime workflow
   fort83_workflow:
-    implementation_module: 'reaxkit.workflows.file_tools.fort83_workflow: extract-optimized-ffield'
+    implementation_module: 'reaxkit.workflows.file_tools.fort83_workflow: get-optimized-ffield'
     description: Direct command workflow for extracting optimized force fields from
       fort.83.
     related_commands:
@@ -280,7 +290,7 @@ workflows:
     - fort83
     - optimized force field
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be extract-optimized-ffield'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get-optimized-ffield'
     aliases:
     - fort83 workflow
     - optimized force field workflow
@@ -329,7 +339,9 @@ workflows:
     - optimization
     - training set
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results, ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield,
+      add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results,
+      ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data'
     aliases:
     - ffield workflow
     - force field file workflow
@@ -349,7 +361,8 @@ workflows:
     - geo
     - structure conversion
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be add_molcharge_to_geo, add_restraints_to_geo, make-geo, orthogonalize-geo, place-geo, sort-geo, xtob'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be add_molcharge_to_geo,
+      add_restraints_to_geo, make-geo, orthogonalize-geo, place-geo, sort-geo, xtob'
     aliases:
     - geometry file workflow
     - geo workflow
@@ -368,7 +381,8 @@ workflows:
     - coupling template
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_kopple2, make-kopple2'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_kopple2,
+      make-kopple2'
     aliases:
     - kopple2 workflow
     - coupling template workflow
@@ -391,7 +405,9 @@ workflows:
     - heat of formation
     - elastic
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_trainset_data, get_trainset_group_comments, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_trainset_data,
+      get_trainset_group_comments, gen_template_yaml_for_elastic_settings, make-trainset-elastic,
+      make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
     aliases:
     - training set workflow
     - trainset workflow
@@ -410,7 +426,8 @@ workflows:
     - temperature schedule
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_tregime, make-tregime'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_tregime,
+      make-tregime'
     aliases:
     - temperature regime workflow
     - tregime workflow
@@ -429,7 +446,8 @@ workflows:
     - cell schedule
     - generator workflow
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_vregime, make-vregime'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be gen_template_vregime,
+      make-vregime'
     aliases:
     - volume regime workflow
     - vregime workflow
@@ -531,7 +549,7 @@ workflows:
     - reaxkit help "introspection workflow"
     - run introspection workflow
   make_video_workflow:
-    implementation_module: 'reaxkit.workflows.meta.make_video_workflow: video'
+    implementation_module: 'reaxkit.workflows.meta.gen_video_workflow: gen-video'
     description: Video generation workflow for ReaxKit.
     dispatch_mode: task_subcommands
     related_commands:
@@ -549,7 +567,7 @@ workflows:
     - reaxkit help "video workflow"
     - run video workflow
   plotter_workflow:
-    implementation_module: 'reaxkit.workflows.meta.plotter_workflow: plotter'
+    implementation_module: 'reaxkit.workflows.meta.gen_plot_workflow: gen-plot'
     description: General-purpose plotting workflow for ReaxKit.
     dispatch_mode: task_subcommands
     related_commands:
@@ -586,20 +604,19 @@ workflows:
     help_search_examples:
     - reaxkit help "study planning workflow"
     - create study planning workflow
-  workspace_management_workflow:
-    implementation_module: 'reaxkit.workflows.meta.workspace_management_workflow:
-      free-up'
+  manage_workspace:
+    implementation_module: 'reaxkit.workflows.meta.manage_workspace_workflow: manage-workspace'
     description: Workspace cleanup and archiving commands.
     related_commands:
       analysis: []
       generator:
-      - reaxkit.workflows.meta.workspace_management_workflow
+      - reaxkit.workflows.meta.manage_workspace_workflow
     tags:
     - workspace
     - cleanup
     - archive
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be free-up, manage-workspace'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be manage-workspace'
     aliases:
     - workspace management workflow
     - workspace cleanup workflow
@@ -651,8 +668,8 @@ dataclass_usage:
   - timeseries_workflow
   - trajectory_workflow
 command_to_workflow_module:
-  active_site_events: reaxkit.workflows.active_site_workflow
-  active_site_structural: reaxkit.workflows.active_site_workflow
+  get_active_site_events: reaxkit.workflows.active_site_workflow
+  get_active_site_structural: reaxkit.workflows.active_site_workflow
   add-alias: reaxkit.workflows.meta.command_alias_workflow
   add-element-to-ffield: reaxkit.workflows.file_tools.ffield_workflow
   add_element_to_ffield: reaxkit.workflows.file_tools.ffield_workflow
@@ -660,37 +677,21 @@ command_to_workflow_module:
   add_term_to_ffield: reaxkit.workflows.file_tools.ffield_workflow
   add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
   add_molcharge_to_geo: reaxkit.workflows.file_tools.geo_workflow
-  atom_property_heatmap2d: reaxkit.workflows.spatial_property_workflow
-  atom_property_plot3d: reaxkit.workflows.spatial_property_workflow
-  bond_events: reaxkit.workflows.connectivity_workflow
+  plot_atom_property: reaxkit.workflows.meta.plot_atom_property_workflow
   charge-table: reaxkit.workflows.electrostatics_workflow
-  connection_list: reaxkit.workflows.connectivity_workflow
-  connection_stats: reaxkit.workflows.connectivity_workflow
-  connection_table: reaxkit.workflows.connectivity_workflow
-  coordination: reaxkit.workflows.connectivity_workflow
-  coordination_relabel: reaxkit.workflows.connectivity_workflow
-  diffusivity: reaxkit.workflows.trajectory_workflow
   dipole: reaxkit.workflows.electrostatics_workflow
-  dominant_species: reaxkit.workflows.molecular_analysis_workflow
-  extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
   get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_progress_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_results: reaxkit.workflows.file_tools.ffield_workflow
   ffield_opt_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_eos: reaxkit.workflows.file_tools.ffield_workflow
-  free-up: reaxkit.workflows.meta.workspace_management_workflow
-  get-control: reaxkit.workflows.file_tools.control_workflow
   get-params: reaxkit.workflows.params_workflow
   gui: reaxkit.workflows.meta.gui_workflow
   help: reaxkit.workflows.meta.help_workflow
-  hybridization: reaxkit.workflows.connectivity_workflow
   intspec: reaxkit.workflows.meta.introspection_workflow
-  kinematics: reaxkit.workflows.kinematics_workflow
   kinematics_heatmap2d: reaxkit.workflows.kinematics_workflow
   kinematics_plot3d: reaxkit.workflows.kinematics_workflow
-  largest_molecule_by_mass: reaxkit.workflows.molecular_analysis_workflow
-  largest_molecule_composition: reaxkit.workflows.molecular_analysis_workflow
   make-addmol: reaxkit.workflows.file_tools.addmol_workflow
   make-charges: reaxkit.workflows.file_tools.charges_workflow
   make-control: reaxkit.workflows.file_tools.control_workflow
@@ -704,17 +705,12 @@ command_to_workflow_module:
   make-trainset-settings-heatfo: reaxkit.workflows.file_tools.trainset_workflow
   make-tregime: reaxkit.workflows.file_tools.tregime_workflow
   make-vregime: reaxkit.workflows.file_tools.vregime_workflow
-  manage-workspace: reaxkit.workflows.meta.workspace_management_workflow
-  molecule_lifetime: reaxkit.workflows.molecular_analysis_workflow
-  msd: reaxkit.workflows.trajectory_workflow
+  manage-workspace: reaxkit.workflows.meta.manage_workspace_workflow
   orthogonalize-geo: reaxkit.workflows.file_tools.geo_workflow
   get_ffield_diagnostic_data: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
-  plotter: reaxkit.workflows.meta.plotter_workflow
   polarization: reaxkit.workflows.electrostatics_workflow
   polarization_field: reaxkit.workflows.electrostatics_workflow
-  rdf: reaxkit.workflows.trajectory_workflow
-  rdf_property: reaxkit.workflows.trajectory_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.meta.study_workflow
@@ -722,15 +718,103 @@ command_to_workflow_module:
   get_trainset_data: reaxkit.workflows.file_tools.trainset_workflow
   get_trainset_group_comments: reaxkit.workflows.file_tools.trainset_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
-  video: reaxkit.workflows.meta.make_video_workflow
-  voronoi: reaxkit.workflows.trajectory_workflow
-  write-control: reaxkit.workflows.file_tools.control_workflow
   xtob: reaxkit.workflows.file_tools.geo_workflow
   gen_eregime: reaxkit.workflows.file_tools.eregime_workflow
   gen_template_charges: reaxkit.workflows.file_tools.charges_workflow
-  gen_control: reaxkit.workflows.file_tools.control_workflow
   gen_template_addmol: reaxkit.workflows.file_tools.addmol_workflow
   gen_template_kopple2: reaxkit.workflows.file_tools.kopple2_workflow
   gen_template_tregime: reaxkit.workflows.file_tools.tregime_workflow
   gen_template_vregime: reaxkit.workflows.file_tools.vregime_workflow
   gen_template_yaml_for_elastic_settings: reaxkit.workflows.file_tools.trainset_workflow
+  gen-video: reaxkit.workflows.meta.gen_video_workflow
+  gen-plot: reaxkit.workflows.meta.gen_plot_workflow
+  gen_template_control: reaxkit.workflows.file_tools.control_workflow
+  gen-control: reaxkit.workflows.file_tools.control_workflow
+  get-control_data: reaxkit.workflows.file_tools.control_workflow
+  get-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
+  get_bond_events: reaxkit.workflows.connectivity_workflow
+  get_connection_list: reaxkit.workflows.connectivity_workflow
+  get_connection_stats: reaxkit.workflows.connectivity_workflow
+  get_connection_table: reaxkit.workflows.connectivity_workflow
+  get_coordination: reaxkit.workflows.connectivity_workflow
+  relabel_traj_using_coordination: reaxkit.workflows.connectivity_workflow
+  get_hybridization: reaxkit.workflows.connectivity_workflow
+  get_kinematics: reaxkit.workflows.kinematics_workflow
+  get_dominant_species: reaxkit.workflows.molecular_analysis_workflow
+  get_largest_molecule_by_mass: reaxkit.workflows.molecular_analysis_workflow
+  get_largest_molecule_composition: reaxkit.workflows.molecular_analysis_workflow
+  get_molecule_lifetime: reaxkit.workflows.molecular_analysis_workflow
+  get_diffusivity: reaxkit.workflows.trajectory_workflow
+  get_msd: reaxkit.workflows.trajectory_workflow
+  get_rdf: reaxkit.workflows.trajectory_workflow
+  get_rdf_property: reaxkit.workflows.trajectory_workflow
+  get_voronoi: reaxkit.workflows.trajectory_workflow
+  get-active-site-events: reaxkit.workflows.active_site_workflow
+  get-active-site-structural: reaxkit.workflows.active_site_workflow
+  add_alias: reaxkit.workflows.meta.command_alias_workflow
+  add-restraints-to-geo: reaxkit.workflows.file_tools.geo_workflow
+  add-molcharge-to-geo: reaxkit.workflows.file_tools.geo_workflow
+  plot-atom-property: reaxkit.workflows.meta.plot_atom_property_workflow
+  charge_table: reaxkit.workflows.electrostatics_workflow
+  repair-fort7: reaxkit.workflows.file_tools.fort7_workflow
+  get-ffield-data: reaxkit.workflows.file_tools.ffield_workflow
+  get-ffield-opt-progress-data: reaxkit.workflows.file_tools.ffield_workflow
+  get-ffield-opt-results: reaxkit.workflows.file_tools.ffield_workflow
+  ffield-opt-bulk-modulus: reaxkit.workflows.file_tools.ffield_workflow
+  get-ffield-opt-eos: reaxkit.workflows.file_tools.ffield_workflow
+  get_params: reaxkit.workflows.params_workflow
+  kinematics-heatmap2d: reaxkit.workflows.kinematics_workflow
+  kinematics-plot3d: reaxkit.workflows.kinematics_workflow
+  make_addmol: reaxkit.workflows.file_tools.addmol_workflow
+  make_charges: reaxkit.workflows.file_tools.charges_workflow
+  make_control: reaxkit.workflows.file_tools.control_workflow
+  make_eregime: reaxkit.workflows.file_tools.eregime_workflow
+  make_geo: reaxkit.workflows.file_tools.geo_workflow
+  make_kopple2: reaxkit.workflows.file_tools.kopple2_workflow
+  merge_ffield: reaxkit.workflows.file_tools.ffield_workflow
+  make_trainset_elastic: reaxkit.workflows.file_tools.trainset_workflow
+  make_trainset_heatfo: reaxkit.workflows.file_tools.trainset_workflow
+  make_trainset_settings: reaxkit.workflows.file_tools.trainset_workflow
+  make_trainset_settings_heatfo: reaxkit.workflows.file_tools.trainset_workflow
+  make_tregime: reaxkit.workflows.file_tools.tregime_workflow
+  make_vregime: reaxkit.workflows.file_tools.vregime_workflow
+  manage_workspace: reaxkit.workflows.meta.manage_workspace_workflow
+  orthogonalize_geo: reaxkit.workflows.file_tools.geo_workflow
+  get-ffield-diagnostic-data: reaxkit.workflows.file_tools.ffield_workflow
+  place_geo: reaxkit.workflows.file_tools.geo_workflow
+  polarization-field: reaxkit.workflows.electrostatics_workflow
+  sort_geo: reaxkit.workflows.file_tools.geo_workflow
+  get-energy-min-summary-data: reaxkit.workflows.file_tools.ffield_workflow
+  get-trainset-data: reaxkit.workflows.file_tools.trainset_workflow
+  get-trainset-group-comments: reaxkit.workflows.file_tools.trainset_workflow
+  trim_xmolout: reaxkit.workflows.file_tools.xmolout_workflow
+  gen-eregime: reaxkit.workflows.file_tools.eregime_workflow
+  gen-template-charges: reaxkit.workflows.file_tools.charges_workflow
+  gen-template-addmol: reaxkit.workflows.file_tools.addmol_workflow
+  gen-template-kopple2: reaxkit.workflows.file_tools.kopple2_workflow
+  gen-template-tregime: reaxkit.workflows.file_tools.tregime_workflow
+  gen-template-vregime: reaxkit.workflows.file_tools.vregime_workflow
+  gen-template-yaml-for-elastic-settings: reaxkit.workflows.file_tools.trainset_workflow
+  gen_video: reaxkit.workflows.meta.gen_video_workflow
+  gen_plot: reaxkit.workflows.meta.gen_plot_workflow
+  gen-template-control: reaxkit.workflows.file_tools.control_workflow
+  gen_control: reaxkit.workflows.file_tools.control_workflow
+  get_control_data: reaxkit.workflows.file_tools.control_workflow
+  get_optimized_ffield: reaxkit.workflows.file_tools.fort83_workflow
+  get-bond-events: reaxkit.workflows.connectivity_workflow
+  get-connection-list: reaxkit.workflows.connectivity_workflow
+  get-connection-stats: reaxkit.workflows.connectivity_workflow
+  get-connection-table: reaxkit.workflows.connectivity_workflow
+  get-coordination: reaxkit.workflows.connectivity_workflow
+  relabel-traj-using-coordination: reaxkit.workflows.connectivity_workflow
+  get-hybridization: reaxkit.workflows.connectivity_workflow
+  get-kinematics: reaxkit.workflows.kinematics_workflow
+  get-dominant-species: reaxkit.workflows.molecular_analysis_workflow
+  get-largest-molecule-by-mass: reaxkit.workflows.molecular_analysis_workflow
+  get-largest-molecule-composition: reaxkit.workflows.molecular_analysis_workflow
+  get-molecule-lifetime: reaxkit.workflows.molecular_analysis_workflow
+  get-diffusivity: reaxkit.workflows.trajectory_workflow
+  get-msd: reaxkit.workflows.trajectory_workflow
+  get-rdf: reaxkit.workflows.trajectory_workflow
+  get-rdf-property: reaxkit.workflows.trajectory_workflow
+  get-voronoi: reaxkit.workflows.trajectory_workflow

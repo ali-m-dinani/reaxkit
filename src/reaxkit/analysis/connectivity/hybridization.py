@@ -203,7 +203,7 @@ def _selected_atom_indices(
     return idx
 
 
-@register_task("hybridization", label="Hybridization")
+@register_task("get_hybridization", label="Hybridization")
 class HybridizationStatusTask(AnalysisTask):
     """Per-atom hybridization status over selected frames."""
 

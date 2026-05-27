@@ -18,7 +18,8 @@ from reaxkit.core.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.plot import heatmap2d_from_3d, scatter3d_points
 
-KINEMATICS_COMMANDS = ("kinematics", "kinematics_plot3d", "kinematics_heatmap2d")
+ALL_COMMANDS = ("get_kinematics", "kinematics_plot3d", "kinematics_heatmap2d")
+ALL_LEGACY_COMMANDS = ("kinematics", "get-kinematics", "kinematics-plot3d", "kinematics-heatmap2d")
 KINEMATICS_KEYS = ("metadata", "coordinates", "velocities", "accelerations", "prev_accelerations")
 
 
@@ -77,19 +78,19 @@ def _build_atomic_kinematics_request(args: argparse.Namespace) -> AtomicKinemati
 
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
-    "kinematics": _build_atomic_kinematics_request,
+    "get_kinematics": _build_atomic_kinematics_request,
 }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=KINEMATICS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
 
-    if canonical == "kinematics":
+    if canonical == "get_kinematics":
         _add_presentation_arguments(parser)
         parser.description = (
             "Extract kinematics datasets from atomic kinematics files.\n"
@@ -97,11 +98,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "accelerations, optionally filtered to selected atoms.\n\n"
             "Examples:\n"
             "  1. Export selected-atom velocities:\n"
-            "   reaxkit kinematics --key velocities --atoms 1 3 7 --export velocities.csv\n\n"
+            "   reaxkit get_kinematics --key velocities --atoms 1 3 7 --export velocities.csv\n\n"
             "  2. Read metadata from a specific kinematics file:\n"
-            "   reaxkit kinematics --key metadata --vels moldyn.vel\n\n"
+            "   reaxkit get_kinematics --key metadata --vels moldyn.vel\n\n"
             "  3. Plot accelerations using subplot layout:\n"
-            "   reaxkit kinematics --key accelerations --plot subplot --save accelerations.png"
+            "   reaxkit get_kinematics --key accelerations --plot subplot --save accelerations.png"
         )
         parser.add_argument("--key", choices=KINEMATICS_KEYS, required=True, help="Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom.")
         parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms.")
@@ -115,7 +116,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
-    if command != "kinematics" or getattr(args, "key", None) == "metadata":
+    if command != "get_kinematics" or getattr(args, "key", None) == "metadata":
         return None
     if "atom_index" not in table.columns:
         return None
@@ -153,7 +154,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 def _run_spatial(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
-    task_cls = TASK_REGISTRY["atomic_kinematics"]
+    task_cls = TASK_REGISTRY["get_kinematics"]
 
     coords_result = executor.run(task_cls(), AtomicKinematicsRequest(key="coordinates", atoms=args.atoms), vars(args))
     key, col = _value_column_to_key(args.value)
@@ -241,11 +242,11 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
-    canonical = resolve_command_name(command, task_names=KINEMATICS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     if canonical in {"kinematics_plot3d", "kinematics_heatmap2d"}:
         return _run_spatial(canonical, args)
 
-    task_cls = TASK_REGISTRY["atomic_kinematics"]
+    task_cls = TASK_REGISTRY["get_kinematics"]
     request = REQUEST_BUILDERS[canonical](args)
 
     executor = AnalysisExecutor()

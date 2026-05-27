@@ -34,7 +34,8 @@ from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 from reaxkit.presentation.plot import plot as render_plot
 
-ELECTROSTATICS_COMMANDS = ("charge_table", "dipole", "polarization", "polarization_field")
+ALL_COMMANDS = ("charge_table", "dipole", "polarization", "polarization_field")
+ALL_LEGACY_COMMANDS = ("charge-table",)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -412,7 +413,7 @@ def _iter_local_plot_payloads(command: str, table: pd.DataFrame, args: argparse.
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
-    canonical = resolve_command_name(command, task_names=ELECTROSTATICS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -506,7 +507,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct electrostatics command."""
-    canonical = resolve_command_name(command, task_names=ELECTROSTATICS_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     if canonical in {"dipole", "polarization"} and not getattr(args, "frames", None):
         raise ValueError("Provide --frames selector (for example --frames 0:20:2).")
 
