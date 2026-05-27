@@ -222,7 +222,7 @@ generators:
     - generator
     - merge
     - reaxff
-    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: merge_ffields'
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: merge_ffields'
     related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
     aliases:
     - merge ffield
@@ -242,7 +242,7 @@ generators:
     - add element
     - extrapolation
     - reaxff
-    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: add_element_to_ffield'
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: add_element_to_ffield'
     related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-element-to-ffield'
     aliases:
     - add element to ffield
@@ -263,7 +263,7 @@ generators:
     - bond
     - torsion
     - reaxff
-    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: add_term_to_ffield'
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: add_term_to_ffield'
     related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-term-to-ffield'
     aliases:
     - add term to ffield

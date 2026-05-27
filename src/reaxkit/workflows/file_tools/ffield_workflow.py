@@ -13,7 +13,7 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.ffielld_generator import (
+from reaxkit.engine.reaxff.generators.ffield_generator import (
     add_element_to_ffield,
     add_term_to_ffield,
     merge_ffields,

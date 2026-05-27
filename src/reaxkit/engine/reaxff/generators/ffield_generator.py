@@ -566,6 +566,55 @@ def _atom_tuple_exists(df: pd.DataFrame, atom_cols: tuple[str, ...], atom_values
     return df.loc[mask]
 
 
+def _canonical_atom_tuple(section: str, atoms: list[int]) -> list[int]:
+    if section in {"bond", "off_diagonal"} and len(atoms) == 2:
+        a, b = int(atoms[0]), int(atoms[1])
+        return [a, b] if a <= b else [b, a]
+    if section in {"angle", "hbond"} and len(atoms) == 3:
+        i, j, k = int(atoms[0]), int(atoms[1]), int(atoms[2])
+        return [i, j, k] if i <= k else [k, j, i]
+    if section == "torsion" and len(atoms) == 4:
+        fwd = tuple(int(v) for v in atoms)
+        rev = (fwd[3], fwd[2], fwd[1], fwd[0])
+        return list(fwd if fwd <= rev else rev)
+    return [int(v) for v in atoms]
+
+
+def _equivalent_atom_tuples(section: str, atoms: list[int]) -> list[list[int]]:
+    canonical = _canonical_atom_tuple(section, atoms)
+    out = [canonical]
+    if section in {"bond", "off_diagonal"} and len(canonical) == 2:
+        rev = [canonical[1], canonical[0]]
+        if rev != canonical:
+            out.append(rev)
+    elif section in {"angle", "hbond"} and len(canonical) == 3:
+        rev = [canonical[2], canonical[1], canonical[0]]
+        if rev != canonical:
+            out.append(rev)
+    elif section == "torsion" and len(canonical) == 4:
+        rev = [canonical[3], canonical[2], canonical[1], canonical[0]]
+        if rev != canonical:
+            out.append(rev)
+    return out
+
+
+def _atom_tuple_exists_equivalent(
+    section: str,
+    df: pd.DataFrame,
+    atom_cols: tuple[str, ...],
+    atom_values: list[int],
+) -> pd.DataFrame:
+    candidates = _equivalent_atom_tuples(section, atom_values)
+    hits: list[pd.DataFrame] = []
+    for candidate in candidates:
+        found = _atom_tuple_exists(df, atom_cols, candidate)
+        if not found.empty:
+            hits.append(found)
+    if not hits:
+        return df.iloc[0:0]
+    return pd.concat(hits).loc[lambda x: ~x.index.duplicated(keep="first")]
+
+
 def _replacement_variants(
     atoms: list[int],
     *,
@@ -708,11 +757,9 @@ def merge_ffields(
             if not compatible:
                 skipped_incompatible[section] += 1
                 continue
+            mapped_atoms = _canonical_atom_tuple(section, mapped_atoms)
 
-            existing_mask = pd.Series([True] * len(dst_df), index=dst_df.index)
-            for col, mapped in zip(atom_cols, mapped_atoms):
-                existing_mask &= (pd.to_numeric(dst_df[col], errors="coerce").astype("Int64") == int(mapped))
-            existing_rows = dst_df.loc[existing_mask]
+            existing_rows = _atom_tuple_exists_equivalent(section, dst_df, atom_cols, mapped_atoms)
 
             if not existing_rows.empty:
                 if replace_existing:
@@ -778,8 +825,9 @@ def merge_ffields(
                         continue
 
                     for mapped_atoms in variants:
+                        mapped_atoms = _canonical_atom_tuple(section, mapped_atoms)
                         row_payload = _mapped_row_for_destination(tpl_row, atom_cols, mapped_atoms, param_cols)
-                        existing_rows = _atom_tuple_exists(dst_df, atom_cols, mapped_atoms)
+                        existing_rows = _atom_tuple_exists_equivalent(section, dst_df, atom_cols, mapped_atoms)
                         if not existing_rows.empty:
                             skipped_rows_projected[section].append(row_payload)
                             continue
@@ -995,7 +1043,8 @@ def add_element_to_ffield(
                 continue
 
             for mapped_atoms in variants:
-                existing_rows = _atom_tuple_exists(dst_df, atom_cols, mapped_atoms)
+                mapped_atoms = _canonical_atom_tuple(section, mapped_atoms)
+                existing_rows = _atom_tuple_exists_equivalent(section, dst_df, atom_cols, mapped_atoms)
                 if not existing_rows.empty:
                     if replace_existing:
                         target_row = existing_rows.index[0]
@@ -1108,8 +1157,8 @@ def add_term_to_ffield(
             f"All term atoms must exist in destination ffield. Missing: {', '.join(sorted(set(missing)))}"
         )
 
-    requested_idxs = [int(sym_to_idx[s]) for s in requested_atoms]
-    existing = _atom_tuple_exists(section_df, atom_cols, requested_idxs)
+    requested_idxs = _canonical_atom_tuple(wanted_field, [int(sym_to_idx[s]) for s in requested_atoms])
+    existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, requested_idxs)
 
     manual_map = {str(k).strip(): str(v).strip() for k, v in (template_atom_map or {}).items() if str(k).strip()}
     unique_atoms = sorted(set(requested_atoms))
@@ -1138,8 +1187,8 @@ def add_term_to_ffield(
         if isinstance(similarity_details["atoms"], dict):
             similarity_details["atoms"][symbol] = details
 
-    template_idxs = [int(sym_to_idx[atom_template_map[s]]) for s in requested_atoms]
-    template_existing = _atom_tuple_exists(section_df, atom_cols, template_idxs)
+    template_idxs = _canonical_atom_tuple(wanted_field, [int(sym_to_idx[atom_template_map[s]]) for s in requested_atoms])
+    template_existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, template_idxs)
     if template_existing.empty:
         raise ValueError(
             "No template term was found for the selected mapping. "

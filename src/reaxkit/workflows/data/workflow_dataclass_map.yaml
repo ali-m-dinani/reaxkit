@@ -336,7 +336,7 @@ workflows:
     related_commands:
       analysis: []
       generator:
-      - reaxkit.engine.reaxff.generators.ffielld_generator
+      - reaxkit.engine.reaxff.generators.ffield_generator
     tags:
     - ffield
     - force field
