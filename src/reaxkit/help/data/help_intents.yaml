@@ -191,7 +191,6 @@ intents:
     workflows: []
     generators:
     - extract-optimized-ffield
-    - export-trainset
     - gen_template_yaml_for_elastic_settings
     - make-trainset-settings
     - make-trainset-settings-heatfo

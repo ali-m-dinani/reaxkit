@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import List
 
 from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
 from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
@@ -17,8 +16,6 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
-from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.engine.reaxff.generators.trainset_heatfo import (
     gen_heatfo_trainset,
 )
@@ -30,7 +27,6 @@ from reaxkit.engine.reaxff.generators.trainset_yaml import (
 from reaxkit.presentation.dispatcher import present_result
 
 TRAINSET_FILE_COMMANDS = (
-    "export-trainset",
     "gen_template_yaml_for_elastic_settings",
     "gen_template_yaml_for_heatfo_settings",
     "gen_elastic_trainset",
@@ -48,24 +44,10 @@ TRAINSET_ANALYSIS_COMMANDS = (
 
 ALL_TRAINSET_COMMANDS = TRAINSET_FILE_COMMANDS + TRAINSET_ANALYSIS_COMMANDS
 
-WORKFLOW_TASK_NAME_MAP = {
+WORKFLOW_TASK_NAME_MAP: dict[str, str] = {
     "get_trainset_data": "trainset_data",
     "get_trainset_group_comments": "trainset_group_comments",
 }
-
-
-def _load_trainset_tables(path: str) -> dict[str, object]:
-    data = ReaxFFAdapter().load(
-        ForceFieldOptimizationTrainingSetData,
-        {"trainset": path, "input": path},
-    )
-    return {
-        "CHARGE": data.charge,
-        "HEATFO": data.heatfo,
-        "GEOMETRY": data.geometry,
-        "CELL_PARAMETERS": data.cell_parameters,
-        "ENERGY": data.energy,
-    }
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
@@ -121,58 +103,92 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         add_storage_cli_arguments(parser)
         return parser
 
-    if command == "export-trainset":
+    if command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:
         parser.description = (
-            "Export trainset sections to CSV files.\n\n"
+            "Write a sample trainset settings YAML for generating elastic-based training set (i.e., EOS).\n"
+            "This command only writes the template YAML file but does not generate any trainset data. Once you have the YAML file, "
+            "you can edit it to specify what materials/systems you want to generate elastic training data for and then run 'gen_elastic_trainset' "
+            "with '--input-mode yaml' to generate the trainset based on the YAML config.\n\n"
             "Examples:\n"
-            "  reaxkit export-trainset --section all --output trainset_export\n"
-            "  reaxkit export-trainset --section energy --trainset trainset.in --output energy_export"
-        )
-        parser.add_argument("--trainset", "--file", dest="trainset", default="trainset.in", help="Path to trainset.in")
-        parser.add_argument("--section", default="all", help="Section: all, charge, heatfo, geometry, cell_parameters, energy")
-        parser.add_argument("--output", default="trainset_export", help="Output directory for exported CSV files")
-        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
-    elif command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:
-        parser.description = (
-            "Write a sample trainset settings YAML.\n\n"
-            "Examples:\n"
-            "  reaxkit gen_template_yaml_for_elastic_settings\n"
-            "  reaxkit gen_template_yaml_for_elastic_settings --output trainset_settings.yaml"
+            "  1. Generate a template YAML with default name 'trainset_settings.yaml':\n"
+            "  reaxkit gen_template_yaml_for_elastic_settings\n\n"
+            "  2. Generate a template YAML with a custom name:\n"
+            "  reaxkit gen_template_yaml_for_elastic_settings --output trainset_settings.yaml\n\n"
         )
         parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+
     elif command in {"gen_template_yaml_for_heatfo_settings", "make-trainset-settings-heatfo"}:
         parser.description = (
-            "Write a sample heatfo trainset settings YAML.\n\n"
+            "Write a sample trainset settings YAML for generating heat-of-formation-based-training data.\n"
+            "This command only writes the template YAML file but does not generate any trainset data. Once you have the YAML file, "
+            "you can edit it to specify what materials/systems you want to generate heatfo (i.e., heat of formation) training "
+            "data for and then run 'gen_heatfo_trainset' "
+            "with '--input-mode yaml' to generate the trainset based on the YAML config.\n\n"
             "Example:\n"
-            "  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml"
+            "  1. Generate a template YAML with default name 'trainset_heatfo_settings.yaml':\n"
+            "  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml\n\n"
         )
         parser.add_argument("--output", default="trainset_heatfo_settings.yaml", help="Output YAML path")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+
     elif command in {"gen_elastic_trainset", "make-trainset-elastic"}:
         parser.description = (
-            "Generate elastic trainsets.\n\n"
-            "input-mode options:\n"
-            "  yaml: use existing trainset YAML\n"
-            "  material-id: fetch one source material id\n"
-            "  batch: fetch many source systems by elements"
+            "Generate elastic trainsets (i.e., EOS data).\n"
+            "This comamnd supports 3 input-mode options:\n"
+            "  1. yaml: which needs an existing trainset YAML. "
+            "           This trainset YAML can be generated using command 'gen_template_yaml_for_elastic_settings' \n"
+            "  2. material-id: fetch one source material id (i.e., material ID [mp-1234] from material's project website)\n"
+            "  3. batch: fetch many source systems by elements (i.e., all materials with Ba, B, and O)\n\n"
+            "[NOTE] To use the source-backed modes (material-id or batch), you need to provide the your API key "
+            "and specify the source (MP (material's project) or Jarvis, where default is MP). You API-key can be obtained from the source website. For "
+            "example, for MP, you can: \n"
+            " 1. login to your account on MP website\n"
+            " 2. on the top right of the page, near your account logo, click on the API access page link,\n"
+            " 3. this brings you to https://next-gen.materialsproject.org/api"
+            " 4. you can now copy your personal API key, which you will provide it to this command using --api-key flag "
+            "or set it as an environment variable MP_API_KEY. \n\n"
+            
+            "Examples:\n"
+            "  1. YAML mode:\n"
+            "    reaxkit gen_elastic_trainset --input-mode yaml --yaml trainset_settings.yaml --output trainset_elastic_generated\n\n"
+            "  2. Material-id mode:\n"
+            "    reaxkit gen_elastic_trainset --input-mode material-id --mat-id mp-1234 --output trainset_elastic_mp-1234 --api-key YOUR_KEY\n\n"
+            "  3. Batch mode:\n"
+            "    - for materials containing only and exactly Ba, B, O elements as in Ba2B2O5:\n"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY"
+            "    - for materials any or all of Ba, B, O elements (now, BaO10 is also acceptable):\n"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --element-count-scope up-to --api-key YOUR_KEY"
+            "    - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:\n"
+            "       reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --element-count-scope up-to --max-materials 100 --api-key YOUR_KEY\n\n"
+            
+            "[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  "
+            "retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles than"
+            "that of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). "
+            "For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure "
+            "setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, "
+            "but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.\n\n"
+
+            "[Note] As you may know, the trainset generator for elastic data is developed only for orthogonal systems (i.e., with alpha=beta=gamma=90). "
+            "If you use the source-backed modes to fetch structures from sources like MP, you may encounter some non-orthogonal structures. "
+            "If you want to skip those non-orthogonal structures, you can use the flag --skip-not-orthogonal to automatically skip them and only generate training data for orthogonal structures. \n\n"
+            
+            ""
         )
-        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source.")
         parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="yaml")
+        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source.")
         parser.add_argument("--yaml", default=None, help="Existing trainset_settings.yaml file (yaml mode).")
         parser.add_argument("--mat-id", "--mp-id", dest="mat_id", default=None, help="Material id (material-id mode).")
         parser.add_argument("--elements", default=None, help="Comma-separated elements for batch mode, for example Ba,B,O")
         parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact")
         parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode.")
-        parser.add_argument("--api-key", default=None, help="Source API key (MP uses --api-key or MP_API_KEY).")
+        parser.add_argument("--api-key", required=True, help="Source API key (MP uses --api-key or MP_API_KEY).")
         parser.add_argument("--bulk-mode", default="voigt", choices=["voigt", "reuss", "vrh"], help="Bulk modulus mode for supported sources.")
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
             default="to-primitive",
-            help="Convert fetched crystal structure setting before generating files. For more information, "
-                 "see the article on material's project website "
-                 "https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project",
+            help="Convert fetched crystal structure setting before generating files",
         )
         parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes.")
         parser.add_argument("--structure-dir", default=None, help="Directory for downloaded source structures.")
@@ -184,6 +200,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
         parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs.")
         parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+
+
     elif command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
         parser.description = (
             "Generate heat-of-formation trainsets.\n\n"
@@ -228,43 +246,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     add_storage_cli_arguments(parser)
     return parser
-
-
-def _run_export_trainset(args: argparse.Namespace) -> int:
-    outdir, layout = prepare_generator_output(args, command="export-trainset", output_value=str(args.output))
-    tables = _load_trainset_tables(args.trainset)
-    section = str(args.section).strip().lower()
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    if section == "all":
-        items = [(name, df) for name, df in tables.items() if df is not None and not df.empty]
-    else:
-        section_key = section.upper()
-        if section_key in {"CELL", "CELL PARAMETERS"}:
-            section_key = "CELL_PARAMETERS"
-        df = tables.get(section_key)
-        if df is None:
-            raise ValueError(f"Unknown trainset section {args.section!r}.")
-        items = [(section_key, df)]
-
-    stem = Path(args.trainset).stem
-    for sec_name, df in items:
-        outpath = outdir / f"{stem}_{sec_name.lower()}.csv"
-        df.to_csv(outpath, index=False)
-        print(f"[Done] Exported section {sec_name} to {outpath}")
-    persist_generator_metadata(
-        args,
-        command="export-trainset",
-        output_path=outdir,
-        layout=layout,
-        copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
-    )
-    copied = maybe_copy_output_to_dot(outdir, enabled=bool(getattr(args, "copy_to_dot", False)))
-    dirs = [outdir]
-    if copied is not None:
-        dirs.append(copied.parent)
-    print_saved_dirs(dirs)
-    return 0
 
 
 def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) -> int:
@@ -416,8 +397,6 @@ def _run_trainset_analysis_main(command: str, args: argparse.Namespace) -> int:
 def run_main(command: str, args: argparse.Namespace) -> int:
     if command in TRAINSET_ANALYSIS_COMMANDS:
         return _run_trainset_analysis_main(command, args)
-    if command == "export-trainset":
-        return _run_export_trainset(args)
     if command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:
         return _run_make_trainset_settings(args, command_name=command)
     if command in {"gen_template_yaml_for_heatfo_settings", "make-trainset-settings-heatfo"}:

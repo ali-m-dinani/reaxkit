@@ -377,7 +377,7 @@ workflows:
     - make coupling template workflow
   trainset_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_elastic_settings'
-    description: Direct command workflows for trainset export and generation utilities.
+    description: Direct command workflows for trainset analysis and generation utilities.
     related_commands:
       analysis:
       - reaxkit.analysis.force_field.trainset
@@ -391,7 +391,7 @@ workflows:
     - heat of formation
     - elastic
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be export-trainset, get_trainset_data, get_trainset_group_comments, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_trainset_data, get_trainset_group_comments, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
     aliases:
     - training set workflow
     - trainset workflow
@@ -672,7 +672,6 @@ command_to_workflow_module:
   diffusivity: reaxkit.workflows.trajectory_workflow
   dipole: reaxkit.workflows.electrostatics_workflow
   dominant_species: reaxkit.workflows.molecular_analysis_workflow
-  export-trainset: reaxkit.workflows.file_tools.trainset_workflow
   extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
   get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow

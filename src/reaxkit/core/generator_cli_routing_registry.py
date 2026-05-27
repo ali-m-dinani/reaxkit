@@ -60,7 +60,6 @@ register_generator("add-element-to-ffield", module_path="reaxkit.workflows.file_
 register_generator("add_element_to_ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_generator("add-term-to-ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_generator("add_term_to_ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_generator("export-trainset", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_generator("gen_template_yaml_for_elastic_settings", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_generator("gen_template_yaml_for_heatfo_settings", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_generator("gen_elastic_trainset", module_path="reaxkit.workflows.file_tools.trainset_workflow")
