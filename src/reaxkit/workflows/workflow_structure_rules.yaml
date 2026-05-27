@@ -1,0 +1,124 @@
+version: 1
+title: "Workflow Structure Rules"
+purpose: >
+  Standard rules for organizing ReaxKit workflow modules so command registration,
+  parser behavior, execution flow, and presentation hooks stay consistent across
+  analysis and generator workflows.
+
+scope:
+  applies_to:
+    - "all files matching *_workflow.py under workflows/"
+    - "analysis workflows (request/task/executor pattern)"
+    - "generator workflows (file/template/action pattern)"
+    - "meta workflows that expose CLI commands"
+  does_not_force:
+    - "identical business logic across different workflow domains"
+    - "plot support for workflows that do not produce plot-friendly tables"
+
+module_level_rules:
+  - "Keep a short module docstring that states command intent."
+  - "Define public command tuples near the top of the file, after imports."
+  - "Use ALL_COMMANDS for canonical command names handled by the workflow."
+  - "If legacy aliases exist, define ALL_LEGACY_COMMANDS immediately after ALL_COMMANDS."
+  - "When no legacy aliases exist, set ALL_LEGACY_COMMANDS to an empty tuple."
+  - "Canonical command names should represent current preferred CLI names."
+  - "Legacy names should remain callable for backward compatibility when feasible."
+
+command_name_rules:
+  - "If a command contains multiple words, support both '-' and '_' forms."
+  - "Prefer one canonical form in ALL_COMMANDS; map alternates through alias resolution."
+  - "For renamed commands, keep old forms in ALL_LEGACY_COMMANDS until deprecation is intentional."
+  - "Use resolve_command_name(...) where workflows dispatch multiple commands."
+
+required_public_constants:
+  ALL_COMMANDS:
+    required: true
+    description: "Tuple of canonical commands this workflow owns."
+    examples:
+      - "ALL_COMMANDS = (\"get_msd\", \"get_rdf\")"
+      - "ALL_COMMANDS = (\"gen-plot\",)"
+  ALL_LEGACY_COMMANDS:
+    required: true
+    description: "Tuple of legacy/alias command names accepted for compatibility."
+    examples:
+      - "ALL_LEGACY_COMMANDS = (\"msd\", \"rdf\")"
+      - "ALL_LEGACY_COMMANDS = ()"
+
+analysis_workflow_rules:
+  request_builders:
+    required_when: "workflow maps CLI arguments into typed analysis requests"
+    rules:
+      - "Use REQUEST_BUILDERS dict keyed by canonical command names."
+      - "Each builder should return one typed request object."
+      - "Keep request parsing close to domain meaning (frames, filters, thresholds)."
+      - "Avoid embedding heavy execution logic in request builders."
+  task_mapping:
+    required_when: "command name differs from registered analysis task key"
+    rules:
+      - "Use an explicit command->task mapping (for example TASK_KEY_BY_COMMAND)."
+      - "Do not rely on implicit string equality when names intentionally differ."
+
+build_parser_rules:
+  required: true
+  signature: "build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser"
+  rules:
+    - "Set parser formatter class explicitly (typically RawTextHelpFormatter)."
+    - "Resolve canonical command early when workflow has multiple commands."
+    - "Set parser.set_defaults(command=<canonical>) consistently."
+    - "Attach only arguments relevant to the resolved command."
+    - "Raise KeyError for unsupported commands instead of silently falling through."
+    - "Reuse shared helpers (_add_runtime_arguments, _add_presentation_arguments, etc.) where possible."
+
+plot_payload_rules:
+  required_when: "workflow supports --plot or structured plotting"
+  preferred_name: "_plot_payload"
+  signature: "_plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None"
+  rules:
+    - "Return None when plotting is not possible (empty table, missing columns, unsupported mode)."
+    - "Keep payload assembly deterministic and column-validated."
+    - "Separate payload building from execution side effects."
+    - "Use command-specific branches only where schemas differ."
+
+run_main_rules:
+  required: true
+  signature: "run_main(command: str, args: argparse.Namespace) -> int"
+  rules:
+    - "Resolve command to canonical form before dispatch."
+    - "Build request from REQUEST_BUILDERS (or equivalent) before execution."
+    - "Run through AnalysisExecutor for analysis workflows."
+    - "Run generator functions and metadata persistence for generator workflows."
+    - "Call present_result(...) when standardized output handling is expected."
+    - "Return integer exit code (0 success, non-zero failure path)."
+    - "Raise explicit errors for unsupported canonical commands."
+
+generator_workflow_rules:
+  rules:
+    - "Normalize output paths through prepare_generator_output(...) when writing files."
+    - "Persist run metadata with persist_generator_metadata(...)."
+    - "Support optional copy-to-dot behavior consistently when relevant."
+    - "Print saved directories using print_saved_dirs(...) for predictable UX."
+
+shared_helper_rules:
+  - "Use small focused helpers for runtime args, presentation args, and command-specific args."
+  - "Keep side-effecting operations in run_main or dedicated runner helpers."
+  - "Prefer explicit dict dispatch (for example RUNNERS / REQUEST_BUILDERS) over long repeated conditionals when practical."
+  - "Use typed conversion at boundaries (argparse values -> request model fields)."
+
+compatibility_policy:
+  - "Legacy command support should be explicit (ALL_LEGACY_COMMANDS and/or alias map)."
+  - "When introducing a new canonical name, map old names without changing behavior."
+  - "When removing legacy names, update workflow maps and user-facing docs together."
+
+quality_checklist:
+  - "Does the file define ALL_COMMANDS and ALL_LEGACY_COMMANDS near the top?"
+  - "Are command names canonicalized before parser branching and run dispatch?"
+  - "If REQUEST_BUILDERS exists, are all canonical commands covered?"
+  - "If plotting is supported, does _plot_payload return None safely on invalid data?"
+  - "Does run_main return explicit exit codes and avoid silent no-op paths?"
+  - "Are parser defaults and command mappings consistent with workflow routing maps?"
+  - "Are '_' and '-' command variants supported for multi-word commands?"
+
+maintenance_notes:
+  - "Apply this file when creating new workflows before adding workflow-specific logic."
+  - "Keep command tuples and routing YAML maps aligned after renames."
+  - "If this file moves to docs later, keep a lightweight pointer copy in workflows/."

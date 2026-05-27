@@ -1995,6 +1995,17 @@ def _iter_analyzer_sources() -> List[str]:
     return _unique_strs(out)
 
 
+def _iter_utility_sources() -> List[str]:
+    """Return utility-level metadata sources."""
+    src = load_help_information_sources()
+    rows = (((src.get("source_files_by_layer") or {}).get("utility_level")) or [])
+    out: List[str] = []
+    for item in rows:
+        if isinstance(item, dict) and item.get("file"):
+            out.append(str(item["file"]))
+    return _unique_strs(out)
+
+
 def _iter_workflow_sources() -> List[str]:
     """Return workflow-level mapping sources."""
     src = load_help_information_sources()
@@ -2372,7 +2383,38 @@ def build_help_relationship_report(
                     out.append(f"  • writer::{ref_name}")
                     _append_all_fields_bulleted(out, writers.get(ref_name) or {}, base_indent="    ")
 
-    # 3) analyzer level
+    # 3) utility level
+    utility_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
+    for rel_path in _iter_utility_sources():
+        utility_hits.extend(
+            _search_named_section(
+                rel_path,
+                "utilities",
+                q,
+                q_toks,
+                top_k=top_k,
+                min_score=min_score,
+                exact_match=exact_match,
+                exact_query=q_exact,
+            )
+        )
+    utility_hits.sort(key=lambda x: x[1], reverse=True)
+    utility_hits = utility_hits[:top_k]
+
+    if utility_hits:
+        _append_section_header(out, "UTILITY LEVEL")
+        for name, score, entry, _ in utility_hits:
+            score_label = _search_score_label(score)
+            if all_info:
+                out.append(f"o (search score: {score_label}) {name} (score={score:.1f})")
+                _append_all_fields_bulleted(out, entry, base_indent="  ")
+            else:
+                out.append(f"o (search score: {score_label}) {name}")
+                out.append(f"  o description: {str(entry.get('description') or '').strip()}")
+                out.append(f"  o implementation_module: {str(entry.get('implementation_module') or '').strip()}")
+                _append_notes_lines(out, entry.get("notes"), indent="  o ")
+
+    # 4) analyzer level
     analyzer_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
     for rel_path in _iter_analyzer_sources():
         analyzer_hits.extend(
@@ -2407,7 +2449,7 @@ def build_help_relationship_report(
                     workflow_cmd = str(name)
                 out.append(f"  • How to use the workflow: reaxkit {workflow_cmd} -h")
 
-    # 4) workflow level
+    # 5) workflow level
     workflow_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
     for rel_path in _iter_workflow_sources():
         workflow_hits.extend(

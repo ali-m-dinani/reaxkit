@@ -38,6 +38,10 @@ source_files_by_layer:
         - file: reaxkit/engine/lammps/data/lammps_io_dataclass_map.yaml
           role: "Loader/writer map used to connect files <-> dataclasses and expose source/target file relationships."
 
+  utility_level:
+    - file: reaxkit/utils/data/utils_functions_contents.yaml
+      role: "Searchable descriptions and tags for utility functions exposed by `reaxkit.utils.*`."
+
   analyzer_level:
     - file: reaxkit/analysis/data/analysis_task_dataclass_map.yaml
       role: "Task -> dataclass -> module mapping for analyzer discovery and workflow links."
@@ -73,6 +77,7 @@ runtime_usage:
         - reaxff_output_files_contents.yaml
         - reaxff_generator_capabilities.yaml
         - common_generator_capabilities.yaml
+        - utils_functions_contents.yaml
         - analysis_task_dataclass_map.yaml
         - workflow_dataclass_map.yaml
         - reaxff_io_dataclass_map.yaml
@@ -116,6 +121,21 @@ Search_mechanism:
     all_info_output_fields:
       - all file fields from io file entry
       - all loader/writer usage fields from mapping file
+  utility_level:
+    searched_fields_in_descending_importance_order:
+      - title (yaml item key)
+      - aliases
+      - help_search_examples
+      - tags
+      - description
+      - notes
+    default_output_fields:
+      - title
+      - description
+      - notes
+      - implementation_module
+    all_info_output_fields:
+      - all utility fields
   analyzer_level:
     searched_fields_in_descending_importance_order:
       - title (yaml item key)

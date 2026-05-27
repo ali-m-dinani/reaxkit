@@ -22,6 +22,11 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "Use this command to search ReaxKit concepts (for example analyses or generators) and\n"
         "ReaxFF-related files by keyword. You can narrow results, enforce exact matching, and\n"
         "request detailed mapping information.\n\n"
+        
+        "For more information, you can see:\n"
+        " ReaxKit code: https://github.com/ali-m-dinani/reaxkit\n"
+        " ReaxFF documentation: https://ali-m-dinani.github.io/reaxkit/\n\n"
+        
         "Examples:\n"
         "  1. Basic keyword search:\n"
         "   reaxkit help \"msd\"\n\n"
