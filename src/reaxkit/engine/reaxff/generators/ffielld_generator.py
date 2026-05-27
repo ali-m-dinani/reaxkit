@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 import pandas as pd
 
@@ -115,6 +115,22 @@ class FFieldAddElementSummary:
     similarity_details: dict[str, object]
 
 
+@dataclass(frozen=True)
+class FFieldAddTermSummary:
+    """Summary of a single explicit-term add operation."""
+
+    output_path: Path
+    field: str
+    term: str
+    template_term: str | None
+    template_atoms: dict[str, str]
+    similarity_mode: str
+    appended: int
+    updated: int
+    skipped_existing: int
+    similarity_details: dict[str, object]
+
+
 def _normalize_fields(fields: Iterable[str] | None) -> tuple[str, ...]:
     if fields is None:
         return SUPPORTED_FIELDS
@@ -131,6 +147,19 @@ def _normalize_fields(fields: Iterable[str] | None) -> tuple[str, ...]:
     if not out:
         raise ValueError("No valid fields were provided.")
     return tuple(out)
+
+
+def _parse_term_atoms(term: str) -> tuple[str, ...]:
+    parts = [p.strip() for p in str(term).replace(",", "-").split("-") if p.strip()]
+    if not parts:
+        raise ValueError("Term must include atom symbols separated by '-'; for example: Al-N-Al")
+    return tuple(parts)
+
+
+def _field_for_term_size(field: str, n_atoms: int) -> None:
+    expected = len(SECTION_ATOM_COLS[field])
+    if n_atoms != expected:
+        raise ValueError(f"Field {field!r} expects {expected} atoms, got {n_atoms}.")
 
 
 def _normalize_atom_types(atom_types: Iterable[str]) -> tuple[str, ...]:
@@ -1036,5 +1065,126 @@ def add_element_to_ffield(
         template_blocks=template_blocks,
         destination_labels=destination_labels,
         destination_blocks=destination_blocks,
+        similarity_details=similarity_details,
+    )
+
+
+def add_term_to_ffield(
+    destination: str | Path,
+    output: str | Path,
+    *,
+    field: str,
+    term: str,
+    template_atom_map: Mapping[str, str] | None = None,
+    similarity_mode: str = "group",
+    radius_metrics: Iterable[str] | None = None,
+    replace_existing: bool = False,
+) -> FFieldAddTermSummary:
+    """
+    Add one explicit missing term to an existing ffield using a nearest-template row.
+
+    Example:
+      field='angle', term='Al-N-Al'
+    """
+    wanted_field = _normalize_fields([field])[0]
+    if wanted_field == "atom":
+        raise ValueError("add_term_to_ffield does not support 'atom'. Use add_element_to_ffield instead.")
+    mode = _normalize_similarity_mode(similarity_mode)
+    chosen_radius_metrics = _normalize_radius_metrics(radius_metrics)
+    requested_atoms = _parse_term_atoms(term)
+    _field_for_term_size(wanted_field, len(requested_atoms))
+
+    dst_handler = FFieldHandler(destination)
+    dst_sections = {name: df.copy() for name, df in dst_handler.sections.items()}
+    atom_df = dst_sections["atom"]
+    _, sym_to_idx = _atom_maps(atom_df)
+    atom_cols = SECTION_ATOM_COLS[wanted_field]
+    section_df = dst_sections[wanted_field].copy()
+    param_cols = [col for col in section_df.columns if col not in atom_cols]
+
+    missing = [s for s in requested_atoms if s not in sym_to_idx]
+    if missing:
+        raise ValueError(
+            f"All term atoms must exist in destination ffield. Missing: {', '.join(sorted(set(missing)))}"
+        )
+
+    requested_idxs = [int(sym_to_idx[s]) for s in requested_atoms]
+    existing = _atom_tuple_exists(section_df, atom_cols, requested_idxs)
+
+    manual_map = {str(k).strip(): str(v).strip() for k, v in (template_atom_map or {}).items() if str(k).strip()}
+    unique_atoms = sorted(set(requested_atoms))
+    atom_template_map: dict[str, str] = {}
+    similarity_details: dict[str, object] = {"mode": "manual" if manual_map else mode, "atoms": {}}
+    destination_symbols = list(sym_to_idx.keys())
+    for symbol in unique_atoms:
+        manual = manual_map.get(symbol)
+        if manual:
+            if manual not in sym_to_idx:
+                raise ValueError(f"Template atom {manual!r} for {symbol!r} is not in destination ffield.")
+            chosen = manual
+            details = {"mode": "manual", "target": {"symbol": symbol}, "chosen": {"symbol": chosen}, "candidates": []}
+        else:
+            available = [s for s in destination_symbols if s != symbol]
+            if not available:
+                raise ValueError(f"No candidate template atoms available for {symbol!r}.")
+            chosen, details = _pick_template_atom(
+                target_symbol=symbol,
+                available_symbols=available,
+                mode=mode,
+                manual_template=None,
+                radius_metrics=chosen_radius_metrics,
+            )
+        atom_template_map[symbol] = chosen
+        if isinstance(similarity_details["atoms"], dict):
+            similarity_details["atoms"][symbol] = details
+
+    template_idxs = [int(sym_to_idx[atom_template_map[s]]) for s in requested_atoms]
+    template_existing = _atom_tuple_exists(section_df, atom_cols, template_idxs)
+    if template_existing.empty:
+        raise ValueError(
+            "No template term was found for the selected mapping. "
+            f"Requested term: {'-'.join(requested_atoms)} ; template term: "
+            f"{'-'.join(atom_template_map[s] for s in requested_atoms)}"
+        )
+    template_row = section_df.loc[template_existing.index[0]]
+    row_payload = _mapped_row_for_destination(template_row, atom_cols, requested_idxs, param_cols)
+
+    appended = 0
+    updated = 0
+    skipped_existing = 0
+    if not existing.empty and not replace_existing:
+        skipped_existing = 1
+    elif not existing.empty:
+        target_idx = existing.index[0]
+        for col in param_cols:
+            if col in row_payload:
+                section_df.loc[target_idx, col] = row_payload[col]
+        updated = 1
+    else:
+        new_idx = int(max(section_df.index.tolist())) + 1 if len(section_df.index) else 1
+        section_df.loc[new_idx] = row_payload
+        appended = 1
+    dst_sections[wanted_field] = section_df.sort_index()
+
+    out_path = _write_ffield_sections(
+        output,
+        dst_sections,
+        dst_handler,
+        description=(
+            "Force field with explicit term added/generated by reaxkit. "
+            f"field={wanted_field}, term={'-'.join(requested_atoms)}"
+        ),
+    )
+    similarity_details["template_term"] = "-".join(atom_template_map[s] for s in requested_atoms)
+    return FFieldAddTermSummary(
+        output_path=out_path,
+        field=wanted_field,
+        term="-".join(requested_atoms),
+        template_term=str(similarity_details["template_term"]),
+        template_atoms=atom_template_map,
+        similarity_mode="manual" if manual_map else mode,
+        appended=appended,
+        updated=updated,
+        skipped_existing=skipped_existing,
         similarity_details=similarity_details,
     )

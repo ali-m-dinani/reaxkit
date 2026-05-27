@@ -330,6 +330,28 @@ workflows:
     help_search_examples:
     - reaxkit help "fix fort7"
     - repair fort.7 workflow
+  ffield_workflow:
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
+    description: Direct command workflow for merging ffields and adding missing element/term entries.
+    related_commands:
+      analysis: []
+      generator:
+      - reaxkit.engine.reaxff.generators.ffielld_generator
+    tags:
+    - ffield
+    - force field
+    - generator workflow
+    - merge
+    - add element
+    - add term
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield'
+    aliases:
+    - ffield workflow
+    - force field file workflow
+    help_search_examples:
+    - reaxkit help "merge ffield"
+    - reaxkit help "add term to ffield"
   geo_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
     description: Direct command workflows for GEO and structure file utilities.
@@ -647,6 +669,10 @@ command_to_workflow_module:
   active_site_events: reaxkit.workflows.active_site_workflow
   active_site_structural: reaxkit.workflows.active_site_workflow
   add-alias: reaxkit.workflows.meta.command_alias_workflow
+  add-element-to-ffield: reaxkit.workflows.file_tools.ffield_workflow
+  add_element_to_ffield: reaxkit.workflows.file_tools.ffield_workflow
+  add-term-to-ffield: reaxkit.workflows.file_tools.ffield_workflow
+  add_term_to_ffield: reaxkit.workflows.file_tools.ffield_workflow
   add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
   atom_property_heatmap2d: reaxkit.workflows.spatial_property_workflow
   atom_property_plot3d: reaxkit.workflows.spatial_property_workflow
@@ -686,6 +712,7 @@ command_to_workflow_module:
   make-eregime: reaxkit.workflows.file_tools.eregime_workflow
   make-geo: reaxkit.workflows.file_tools.geo_workflow
   make-kopple2: reaxkit.workflows.file_tools.kopple2_workflow
+  merge-ffield: reaxkit.workflows.file_tools.ffield_workflow
   make-trainset-elastic: reaxkit.workflows.file_tools.trainset_workflow
   make-trainset-heatfo: reaxkit.workflows.file_tools.trainset_workflow
   make-trainset-settings: reaxkit.workflows.file_tools.trainset_workflow

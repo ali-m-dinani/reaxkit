@@ -13,7 +13,11 @@ from reaxkit.core.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield, merge_ffields
+from reaxkit.engine.reaxff.generators.ffielld_generator import (
+    add_element_to_ffield,
+    add_term_to_ffield,
+    merge_ffields,
+)
 
 
 def _parse_csv_items(value: str) -> list[str]:
@@ -207,6 +211,51 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             action="store_true",
             help="Replace destination rows when the same atom tuple already exists.",
         )
+    elif command in {"add-term-to-ffield", "add_term_to_ffield"}:
+        parser.description = (
+            "Add one specific missing term (bond/off_diagonal/angle/torsion/hbond) to an existing ffield by "
+            "copying parameters from a similar existing template term.\n\n"
+            "Examples:\n"
+            "  reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --output ffield_with_term\n"
+            "  reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --template-map Al:B"
+        )
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
+        parser.add_argument("--output", default="ffield_with_term", help="Output expanded ffield path")
+        parser.add_argument(
+            "--field",
+            required=True,
+            choices=["bond", "off_diagonal", "angle", "torsion", "hbond"],
+            help="Target section for the term.",
+        )
+        parser.add_argument(
+            "--term",
+            required=True,
+            help="Hyphen-separated atom symbols, for example: Al-N-Al",
+        )
+        parser.add_argument(
+            "--template-map",
+            default="",
+            help="Optional per-atom manual template mapping CSV, for example: Al:B,N:N",
+        )
+        parser.add_argument(
+            "--similarity",
+            default="group",
+            choices=["family", "group", "radius"],
+            help="Automatic similarity rule for template-atom selection.",
+        )
+        parser.add_argument(
+            "--radius-metrics",
+            default="atomic_radius,covalent_radius,van_der_waals_radius",
+            help=(
+                "Comma-separated radius metrics used when --similarity radius is selected. "
+                "Use 'all' to include every supported metric."
+            ),
+        )
+        parser.add_argument(
+            "--replace-existing",
+            action="store_true",
+            help="Replace destination row when the same atom tuple already exists.",
+        )
     else:
         parser.description = (
             "Merge selected atom-type parameter blocks from one ffield into another.\n\n"
@@ -353,6 +402,58 @@ def run_main(command: str, args: argparse.Namespace) -> int:
                 "updated": summary.updated,
                 "skipped_existing": summary.skipped_existing,
                 "skipped_incompatible": summary.skipped_incompatible,
+            },
+            copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
+        )
+    elif command in {"add-term-to-ffield", "add_term_to_ffield"}:
+        template_map: dict[str, str] = {}
+        for item in _parse_csv_items(getattr(args, "template_map", "")):
+            if ":" not in item:
+                continue
+            key, value = item.split(":", 1)
+            k = key.strip()
+            v = value.strip()
+            if k and v:
+                template_map[k] = v
+
+        summary = add_term_to_ffield(
+            destination=args.destination,
+            output=out_path,
+            field=str(args.field),
+            term=str(args.term),
+            template_atom_map=template_map if template_map else None,
+            similarity_mode=str(args.similarity),
+            radius_metrics=_parse_csv_items(args.radius_metrics),
+            replace_existing=bool(args.replace_existing),
+        )
+        print(f"[Done] Updated ffield written to {summary.output_path}")
+        print(f"  field: {summary.field}")
+        print(f"  term: {summary.term}")
+        print(f"  template term: {summary.template_term}")
+        print(f"  similarity: {summary.similarity_mode}")
+        print(f"  template atoms: {summary.template_atoms}")
+        print(f"  appended: {summary.appended}")
+        if summary.updated:
+            print(f"  updated: {summary.updated}")
+        if summary.skipped_existing:
+            print(f"  skipped_existing: {summary.skipped_existing}")
+
+        persist_generator_metadata(
+            args,
+            command=command,
+            output_path=summary.output_path,
+            layout=layout,
+            extra={
+                "destination": str(args.destination),
+                "field": summary.field,
+                "term": summary.term,
+                "template_term": summary.template_term,
+                "template_atoms": summary.template_atoms,
+                "similarity_mode": summary.similarity_mode,
+                "similarity_details": summary.similarity_details,
+                "appended": summary.appended,
+                "updated": summary.updated,
+                "skipped_existing": summary.skipped_existing,
             },
             copy_to_dot=bool(getattr(args, "copy_to_dot", False)),
         )

@@ -252,6 +252,27 @@ generators:
     help_search_examples:
     - reaxkit help "add element to ffield"
     - add Al to existing force field using closest atom template
+  add_term_to_ffield:
+    description: Add one explicit missing bond/off-diagonal/angle/torsion/hbond term to an existing ffield by templating from similar existing atom types.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - add term
+    - angle
+    - bond
+    - torsion
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffielld_generator: add_term_to_ffield'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-term-to-ffield'
+    aliases:
+    - add term to ffield
+    - add-term-to-ffield
+    - add_term_to_ffield
+    - add missing angle term
+    help_search_examples:
+    - reaxkit help "add term to ffield"
+    - add Al-N-Al angle term to existing force field
   trim_xmolout:
     description: Create a lightweight xmolout file containing atom type and xyz coordinates.
     tags:
