@@ -5,6 +5,26 @@ _meta:
     links.
   last_updated: '2026-05-21'
 generators:
+  add_molcharge_to_geo:
+    description: Add MOLCHARGE directives to GEO files with EACH (atom-number range or atom type) and TOGETHER charge rules.
+    tags:
+    - geo
+    - generator
+    - molcharge
+    - charge assignment
+    - ereaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: add_molcharge_to_geo'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: add_molcharge_to_geo'
+    notes:
+    - Exposed via reaxkit add_molcharge_to_geo.
+    - Supports atom re-ordering when EACH + TOGETHER(rest) requires one contiguous rest range.
+    aliases:
+    - add molcharge to geo
+    - add_molcharge_to_geo
+    - add-geo-molcharge
+    help_search_examples:
+    - reaxkit help "add molcharge to geo"
+    - run add geo molcharge
   add_restraints_to_geo:
     description: Add bond/angle/torsion/mass-center restraint blocks to GEO files.
     tags:

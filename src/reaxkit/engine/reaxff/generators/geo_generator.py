@@ -31,6 +31,7 @@ __all__ = [
     "xtob",
     "sort_geo",
     "add_restraints_to_geo",
+    "add_molcharge_to_geo",
     "_format_crystx",
     "_format_hetatm_line",
     "read_structure",
@@ -40,6 +41,18 @@ __all__ = [
     "orthogonalize_hexagonal_cell",
     "place2",
 ]
+
+
+def _find_geo_insert_index(lines: Sequence[str]) -> int:
+    triggers = ("CRYSTX", "FORMAT ATOM", "HETATM")
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if any(stripped.startswith(trigger) for trigger in triggers):
+            return i
+    for i, line in enumerate(lines):
+        if line.strip() == "END":
+            return i
+    return len(lines)
 
 
 def _read_xyz(xyz_path: str | Path) -> Tuple[str, pd.DataFrame]:
@@ -440,4 +453,159 @@ def add_restraints_to_geo(
     new_lines = lines[:insert_idx] + block + lines[insert_idx:]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return out_path
+
+
+def add_molcharge_to_geo(
+    geo_file: str | Path,
+    *,
+    out_file: str | Path | None = None,
+    each_atom_ranges: Optional[Sequence[tuple[int, int, float]]] = None,
+    each_atom_types: Optional[Sequence[tuple[str, float]]] = None,
+    together_charge: float | None = None,
+) -> Path:
+    """
+    Insert MOLCHARGE lines into a GEO file.
+
+    Rules:
+    - EACH rules can target explicit atom-number ranges and/or atom types.
+    - TOGETHER (via together_charge) always targets the complement of
+      EACH-selected atoms ("rest").
+    - If needed, selected EACH atoms are moved to the end so the rest can be
+      represented by one continuous atom range.
+    """
+    geo_file = Path(geo_file)
+    if not geo_file.is_file():
+        raise FileNotFoundError(f"Input GEO file not found: {geo_file}")
+
+    each_atom_ranges = list(each_atom_ranges or [])
+    each_atom_types = [(str(sym).strip(), float(chg)) for sym, chg in (each_atom_types or []) if str(sym).strip()]
+    if not each_atom_ranges and not each_atom_types and together_charge is None:
+        raise ValueError("No MOLCHARGE directives provided.")
+
+    out_path = Path(out_file) if out_file is not None else geo_file
+    handler = GeoHandler(geo_file)
+    df = handler.dataframe().copy()
+    n_atoms = len(df)
+    if n_atoms == 0:
+        raise ValueError(f"No atoms found in GEO file: {geo_file}")
+
+    selected_charge_by_old_id: Dict[int, float] = {}
+
+    def _register_each(atom_id: int, charge: float) -> None:
+        prev = selected_charge_by_old_id.get(atom_id)
+        if prev is not None and abs(prev - charge) > 1e-12:
+            raise ValueError(
+                f"Conflicting EACH charge definitions for atom {atom_id}: {prev} vs {charge}"
+            )
+        selected_charge_by_old_id[atom_id] = charge
+
+    for start, end, charge in each_atom_ranges:
+        s = int(start)
+        e = int(end)
+        if s <= 0 or e <= 0:
+            raise ValueError("Atom indices in each_atom_ranges must be positive.")
+        if s > e:
+            raise ValueError(f"Invalid each_atom_ranges entry ({s}, {e}, {charge}): start > end.")
+        if e > n_atoms:
+            raise ValueError(f"Atom range [{s}-{e}] exceeds atom count ({n_atoms}).")
+        for atom_id in range(s, e + 1):
+            _register_each(atom_id, float(charge))
+
+    if each_atom_types:
+        atom_type_by_old_id = dict(zip(df["atom_id"].astype(int), df["atom_type"].astype(str)))
+        for atom_symbol, charge in each_atom_types:
+            matched = [aid for aid, atype in atom_type_by_old_id.items() if atype == atom_symbol]
+            if not matched:
+                raise ValueError(f"No atoms found with atom_type={atom_symbol!r}.")
+            for atom_id in matched:
+                _register_each(int(atom_id), float(charge))
+
+    selected_old_ids = sorted(selected_charge_by_old_id.keys())
+    selected_set = set(selected_old_ids)
+    n_selected = len(selected_old_ids)
+    has_rest = together_charge is not None
+    coverage_count = n_atoms if has_rest else n_selected
+    if coverage_count != n_atoms:
+        raise ValueError(
+            "MOLCHARGE coverage incomplete: provided directives do not cover all atoms in the system."
+        )
+
+    needs_reorder = False
+    if together_charge is not None and n_selected > 0:
+        expected_suffix = list(range(n_atoms - n_selected + 1, n_atoms + 1))
+        needs_reorder = selected_old_ids != expected_suffix
+
+    id_map_old_to_new: Dict[int, int] = {}
+    if needs_reorder:
+        df_unselected = df[~df["atom_id"].isin(selected_set)].copy()
+        df_selected = df[df["atom_id"].isin(selected_set)].copy()
+        df_new = pd.concat([df_unselected, df_selected], ignore_index=True)
+        old_ids_in_new_order = [int(v) for v in df_new["atom_id"].tolist()]
+        for new_id, old_id in enumerate(old_ids_in_new_order, start=1):
+            id_map_old_to_new[old_id] = new_id
+        df_new["atom_id"] = list(range(1, n_atoms + 1))
+        print(
+            "[Info] Atom numbers re-arranged for contiguous TOGETHER(rest): "
+            f"EACH-selected atoms moved to range [{n_atoms - n_selected + 1}-{n_atoms}]."
+        )
+    else:
+        df_new = df.copy()
+        for atom_id in range(1, n_atoms + 1):
+            id_map_old_to_new[atom_id] = atom_id
+
+    each_lines: List[str] = []
+    if selected_old_ids:
+        for old_atom_id in selected_old_ids:
+            new_atom_id = id_map_old_to_new[old_atom_id]
+            charge = selected_charge_by_old_id[old_atom_id]
+            each_lines.append(f"MOLCHARGE {new_atom_id:5d} {new_atom_id:5d} {charge:8.4f}")
+
+    together_lines: List[str] = []
+    if together_charge is not None:
+        n_rest = n_atoms - n_selected
+        if n_rest > 0:
+            together_lines.append(f"MOLCHARGE {1:5d} {n_rest:5d} {float(together_charge):8.4f}")
+
+    molcharge_lines = together_lines + each_lines
+    if not molcharge_lines:
+        raise ValueError("No MOLCHARGE lines were generated.")
+
+    original_lines = geo_file.read_text(encoding="utf-8").splitlines()
+    insert_idx = _find_geo_insert_index(original_lines)
+
+    block = ["REMARK MOLCHARGE added by ReaxKit"] + molcharge_lines
+
+    if not needs_reorder:
+        new_lines = original_lines[:insert_idx] + block + original_lines[insert_idx:]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+        return out_path
+
+    descriptor = (handler.metadata().get("descriptor") or "").strip()
+    remark = handler.metadata().get("remark")
+    cell_lengths = handler.metadata().get("cell_lengths")
+    cell_angles = handler.metadata().get("cell_angles")
+
+    lines_out: List[str] = ["XTLGRF 200"]
+    if descriptor:
+        lines_out.append(f"DESCRP  {descriptor}")
+    if remark:
+        lines_out.append(f"REMARK {remark}")
+    lines_out.extend(block)
+    if cell_lengths and cell_angles:
+        try:
+            lengths = [cell_lengths.get(k) for k in ("a", "b", "c")]
+            angles = [cell_angles.get(k) for k in ("alpha", "beta", "gamma")]
+            if all(v is not None for v in lengths + angles):
+                lines_out.append(_format_crystx(lengths, angles))
+        except Exception:
+            pass
+    lines_out.append("FORMAT ATOM   (a6,1x,i5,1x,a5,1x,a3,1x,a1,1x,a5,3f10.5,1x,a5,i3,i2,1x,f8.5)")
+    for row in df_new.itertuples(index=False):
+        lines_out.append(_format_hetatm_line(int(row.atom_id), str(row.atom_type), float(row.x), float(row.y), float(row.z)))
+    lines_out.append("END")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text("\n".join(lines_out) + "\n", encoding="utf-8")
     return out_path

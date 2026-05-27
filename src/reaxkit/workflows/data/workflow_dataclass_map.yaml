@@ -365,7 +365,7 @@ workflows:
     - geo
     - structure conversion
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be add_restraints_to_geo, make-geo, orthogonalize-geo, place-geo, sort-geo, xtob'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be add_molcharge_to_geo, add_restraints_to_geo, make-geo, orthogonalize-geo, place-geo, sort-geo, xtob'
     aliases:
     - geometry file workflow
     - geo workflow
@@ -674,6 +674,7 @@ command_to_workflow_module:
   add-term-to-ffield: reaxkit.workflows.file_tools.ffield_workflow
   add_term_to_ffield: reaxkit.workflows.file_tools.ffield_workflow
   add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
+  add_molcharge_to_geo: reaxkit.workflows.file_tools.geo_workflow
   atom_property_heatmap2d: reaxkit.workflows.spatial_property_workflow
   atom_property_plot3d: reaxkit.workflows.spatial_property_workflow
   bond_events: reaxkit.workflows.connectivity_workflow

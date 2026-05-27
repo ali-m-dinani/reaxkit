@@ -21,6 +21,7 @@ from reaxkit.engine.common.generators.structure_transformers import (
     place2,
 )
 from reaxkit.engine.reaxff.generators.geo_generator import (
+    add_molcharge_to_geo,
     add_restraints_to_geo,
     sort_geo,
     xtob,
@@ -34,6 +35,8 @@ GEO_FILE_TOOL_COMMANDS = (
     "place-geo",
     "add_restraints_to_geo",
     "add-geo-restraint",
+    "add_molcharge_to_geo",
+    "add-geo-molcharge",
 )
 
 
@@ -59,6 +62,37 @@ def _parse_csv_ints(value: str, expected: int, name: str) -> list[int]:
         return [int(v) for v in parts]
     except ValueError as exc:
         raise argparse.ArgumentTypeError(f"{name} must be integers, could not parse {value!r}.") from exc
+
+
+def _parse_each_range_rule(value: str) -> tuple[int, int, float]:
+    parts = [v.strip() for v in value.split(":")]
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(
+            f"--each-range must be 'start:end:charge', got {value!r}."
+        )
+    try:
+        start = int(parts[0])
+        end = int(parts[1])
+        charge = float(parts[2])
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Could not parse --each-range value {value!r}.") from exc
+    return start, end, charge
+
+
+def _parse_each_type_rule(value: str) -> tuple[str, float]:
+    parts = [v.strip() for v in value.split(":")]
+    if len(parts) != 2:
+        raise argparse.ArgumentTypeError(
+            f"--each-type must be 'atom_type:charge', got {value!r}."
+        )
+    atom_type = parts[0]
+    if not atom_type:
+        raise argparse.ArgumentTypeError("--each-type atom_type cannot be empty.")
+    try:
+        charge = float(parts[1])
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"Could not parse --each-type value {value!r}.") from exc
+    return atom_type, charge
 
 
 def _run_xtob(args: argparse.Namespace) -> int:
@@ -202,6 +236,26 @@ def _run_add_geo_restraint(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_add_geo_molcharge(args: argparse.Namespace) -> int:
+    in_path = Path(args.file)
+    if not in_path.is_file():
+        raise FileNotFoundError(f"Input GEO file not found: {in_path}")
+
+    each_ranges = [_parse_each_range_rule(v) for v in (args.per_atom or [])]
+    each_types = [_parse_each_type_rule(v) for v in (args.per_atom_type or [])]
+    together_charge = None if args.rest is None else float(args.rest)
+
+    out_written = add_molcharge_to_geo(
+        in_path,
+        out_file=args.output,
+        each_atom_ranges=each_ranges,
+        each_atom_types=each_types,
+        together_charge=together_charge,
+    )
+    print(f"[Done] Added MOLCHARGE lines to {in_path} and exported {out_written}")
+    return 0
+
+
 RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "xtob": _run_xtob,
     "make-geo": _run_make_geo,
@@ -210,6 +264,8 @@ RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "place-geo": _run_place_geo,
     "add_restraints_to_geo": _run_add_geo_restraint,
     "add-geo-restraint": _run_add_geo_restraint,
+    "add_molcharge_to_geo": _run_add_geo_molcharge,
+    "add-geo-molcharge": _run_add_geo_molcharge,
 }
 
 
@@ -290,6 +346,39 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--angle", nargs="?", const="", default=None, help="Add one angle restraint")
         parser.add_argument("--torsion", nargs="?", const="", default=None, help="Add one torsion restraint")
         parser.add_argument("--mascen", nargs="?", const="", default=None, help="Add one mass-center restraint")
+    elif command in {"add_molcharge_to_geo", "add-geo-molcharge"}:
+        parser.description = (
+            "Insert MOLCHARGE lines into a GEO file.\n\n"
+            "Examples:\n"
+            "  reaxkit add_molcharge_to_geo --file geo --per-atom 20481:20589:1 --rest 0 --output geo_m\n"
+            "  reaxkit add_molcharge_to_geo --file geo --per-atom-type e:-1 --rest 0 --output geo_m"
+        )
+        parser.add_argument("--file", default="geo", help="Input GEO file")
+        parser.add_argument("--output", default=None, help="Output GEO file")
+        parser.add_argument(
+            "--per-atom",
+            action="append",
+            dest="per_atom",
+            default=[],
+            help="Per-atom charge by atom range using start:end:charge (repeatable)",
+        )
+        parser.add_argument(
+            "--per-atom-type",
+            action="append",
+            dest="per_atom_type",
+            default=[],
+            help="Per-atom charge by atom type using atom_type:charge (repeatable)",
+        )
+        parser.add_argument(
+            "--rest",
+            default=None,
+            help="Total charge for remaining atoms (outside per-atom selections)",
+        )
+        # Backward-compatible hidden aliases
+        parser.add_argument("--each-range", action="append", dest="per_atom", help=argparse.SUPPRESS)
+        parser.add_argument("--each-type", action="append", dest="per_atom_type", help=argparse.SUPPRESS)
+        parser.add_argument("--per-type", action="append", dest="per_atom_type", help=argparse.SUPPRESS)
+        parser.add_argument("--together-charge", dest="rest", help=argparse.SUPPRESS)
     else:
         raise KeyError(f"Unsupported GEO file-tool command {command!r}.")
 
@@ -302,6 +391,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output_value = getattr(args, "output", None)
     if command in {"add_restraints_to_geo", "add-geo-restraint"} and not output_value:
         output_value = f"{Path(args.file).name}_with_restraints"
+    if command in {"add_molcharge_to_geo", "add-geo-molcharge"} and not output_value:
+        output_value = f"{Path(args.file).name}_with_molcharge"
     if not output_value:
         output_value = command
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(output_value))
