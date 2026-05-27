@@ -210,12 +210,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
                 "Use 'all' to include every supported metric. \n"
                 "Options: \n"
                 " 1. atomic_radius (empirical neutral-atom radius), \n"
-                "2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), \n"
-                "3. van_der_waals_radius (non-bonded contact radius), \n"
-                "4. atomic_radius_calculated (theoretical neutral-atom radius), \n"
-                "5. average_ionic_radius (mean ionic radius over known oxidation states), \n"
-                "6. average_cationic_radius (mean radius over positive oxidation states), \n"
-                "7. average_anionic_radius (mean radius over negative oxidation states).\n"
+                " 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), \n"
+                " 3. van_der_waals_radius (non-bonded contact radius), \n"
+                " 4. atomic_radius_calculated (theoretical neutral-atom radius), \n"
+                " 5. average_ionic_radius (mean ionic radius over known oxidation states), \n"
+                " 6. average_cationic_radius (mean radius over positive oxidation states), \n"
+                " 7. average_anionic_radius (mean radius over negative oxidation states).\n"
             ),
         )
         parser.add_argument(
@@ -278,7 +278,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--similarity",
             default="group",
             choices=["family", "group", "radius"],
-            help="Automatic similarity rule for template-atom selection.",
+            help=(
+                "Similarity rule for template-atom selection: \n"
+                " 1. 'family' = chemical family match "
+                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
+                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
+                " 2. 'group' = same periodic-table group number (column),\n"
+                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
+                "Priority order for selecting the single template atom is:\n"
+                " 1. manual override by --closest-atom,\n"
+                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
+                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
+                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
+                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
+            ),
         )
         parser.add_argument(
             "--radius-metrics",
@@ -303,10 +316,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
     else:
         parser.description = (
-            "Merge selected atom-type parameter blocks from one ffield into another.\n\n"
+            "Merge selected atom-type parameter blocks from one ffield into another.\n"
+            "For eaxmple, if ffield 1 contains 'C,H,O,N,S' elements and ffield 2 contains 'C,H,O,N,Al,He' elements, "
+            "then merging Al from ffield 2 into ffield 1 leads to adding all C-Al, H-Al, O-Al, N-Al, and Al-Al bond terms "
+            "(and same for other fields like angle, etc.) but not S-Al by default.\n\n"
+            
             "Examples:\n"
-            "  reaxkit merge-ffield --src ffield_src --dest ffield_dst --output ffield_merged --atom-types W\n"
-            "  reaxkit merge-ffield --source f_src --destination f_dst --output merged --atom-types W,Mo --fields atom,bond,angle,torsion"
+            " 1. Merging all blocks for atom type W from ffield_src into ffield_dst:\n"
+            "   reaxkit merge-ffield --src ffield_src --dest ffield_dst --output ffield_merged --atom-types W\n\n"
+            " 2. Merging all blocks for atom types W and Mo from ffield_src into ffield_dst, but only for selected fields:\n"
+            "  reaxkit merge-ffield --source f_src --destination f_dst --output merged --atom-types W,Mo --fields atom,bond,angle,torsion\n\n"
+            " 3. Same as above, but with automatic filling of missing terms for the merged atom types by templating from "
+            "the most similar atom in destination, where similarity is defined by belonging to the same chemical family "
+            "(for example, transition metal, halogen, noble gas, etc. See --template-similarity options for more details):\n"
+            "  reaxkit merge-ffield --source f_src --destination f_dst --output ffield_merged --atom-types W,Mo --fields atom,bond,angle,torsion --fill-missing-with-template --template-similarity family\n\n"
         )
         parser.add_argument("--source", "--src", required=True, dest="source", help="Source ffield path")
         parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
@@ -330,7 +353,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--template-similarity",
             default="group",
             choices=["family", "group", "radius"],
-            help="Similarity rule for selecting destination template atom when --fill-missing-with-template is enabled.",
+            help=(
+                "Similarity rule for template-atom selection: \n"
+                " 1. 'family' = chemical family match "
+                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
+                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
+                " 2. 'group' = same periodic-table group number (column),\n"
+                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
+                "Priority order for selecting the single template atom is:\n"
+                " 1. manual override by --closest-atom,\n"
+                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
+                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
+                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
+                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
+            ),
         )
         parser.add_argument(
             "--template-closest-atom",

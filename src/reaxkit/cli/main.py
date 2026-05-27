@@ -10,7 +10,9 @@ to either:
 from __future__ import annotations
 
 import argparse
+import shutil
 import sys
+import textwrap
 from importlib import import_module
 
 from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
@@ -28,6 +30,156 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         super().__init__(*args, **kwargs)
         self._selected_command = selected_command
         self._known_commands = known_commands or set()
+
+    @staticmethod
+    def _term_width() -> int:
+        return max(100, min(shutil.get_terminal_size(fallback=(120, 40)).columns, 180))
+
+    @staticmethod
+    def _normalize(text: str) -> str:
+        return " ".join(str(text or "").split())
+
+    @staticmethod
+    def _format_flags(action: argparse.Action) -> str:
+        flags = ", ".join(action.option_strings)
+        if action.nargs == 0:
+            return flags
+        metavar = action.metavar or action.dest.upper()
+        if isinstance(metavar, tuple):
+            metavar = " ".join(str(v) for v in metavar)
+        return f"{flags} {metavar}"
+
+    @staticmethod
+    def _format_default(action: argparse.Action) -> str:
+        default = action.default
+        if default in (None, argparse.SUPPRESS):
+            return "-"
+        if isinstance(default, bool):
+            return "true" if default else "false"
+        txt = str(default)
+        return txt if txt else "-"
+
+    @staticmethod
+    def _format_choices(action: argparse.Action) -> str:
+        choices = getattr(action, "choices", None)
+        if not choices:
+            return "-"
+        return ", ".join(str(v) for v in choices)
+
+    def _commands_rows(self) -> list[tuple[str, str]]:
+        for action in self._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                rows: list[tuple[str, str]] = []
+                choice_actions = getattr(action, "_choices_actions", [])
+                for name, subparser in sorted(action.choices.items()):
+                    help_text = "-"
+                    if isinstance(choice_actions, list):
+                        for choice_action in choice_actions:
+                            if getattr(choice_action, "dest", None) == name:
+                                help_text = self._normalize(getattr(choice_action, "help", "") or "")
+                                break
+                    if not help_text:
+                        help_text = "-"
+                    rows.append((name, help_text))
+                return rows
+        return []
+
+    @staticmethod
+    def _render_table(headers: list[str], rows: list[list[str]], width: int, wrap_cols: set[int]) -> str:
+        if not rows:
+            return ""
+        n = len(headers)
+        max_col = [len(h) for h in headers]
+        for row in rows:
+            for i in range(n):
+                max_col[i] = max(max_col[i], len(row[i]))
+
+        sep_size = 3 * (n - 1)
+        natural = sum(max_col) + sep_size
+        col_widths = list(max_col)
+
+        if natural > width:
+            fixed_cols = [i for i in range(n) if i not in wrap_cols]
+            fixed_total = sum(col_widths[i] for i in fixed_cols)
+            wrap_total_min = sum(16 for _ in wrap_cols)
+            budget = max(width - sep_size - fixed_total, wrap_total_min)
+            current_wrap_total = sum(col_widths[i] for i in wrap_cols)
+            for i in wrap_cols:
+                if current_wrap_total <= 0:
+                    col_widths[i] = 16
+                else:
+                    share = int(budget * (col_widths[i] / current_wrap_total))
+                    col_widths[i] = max(16, share)
+
+        def _wrap_cell(text: str, col: int) -> list[str]:
+            if col not in wrap_cols:
+                return [text]
+            return textwrap.wrap(text, width=col_widths[col], break_long_words=False, break_on_hyphens=False) or [""]
+
+        lines: list[str] = []
+        lines.append(" | ".join(headers[i].ljust(col_widths[i]) for i in range(n)))
+        row_sep = "-+-".join("-" * col_widths[i] for i in range(n))
+        lines.append(row_sep)
+
+        for row in rows:
+            wrapped = [_wrap_cell(row[i], i) for i in range(n)]
+            max_lines = max(len(cell_lines) for cell_lines in wrapped)
+            for ln in range(max_lines):
+                parts: list[str] = []
+                for i in range(n):
+                    cell = wrapped[i][ln] if ln < len(wrapped[i]) else ""
+                    parts.append(cell.ljust(col_widths[i]))
+                lines.append(" | ".join(parts))
+            lines.append(row_sep)
+        return "\n".join(lines)
+
+    def format_help(self) -> str:
+        width = self._term_width()
+        out: list[str] = [""]
+
+        if self.description:
+            out.append(self.description.rstrip())
+            out.append("")
+
+        commands = self._commands_rows()
+        if commands:
+            out.append("Commands")
+            cmd_table = self._render_table(
+                headers=["Command", "Help"],
+                rows=[[self._normalize(cmd), self._normalize(help_text)] for cmd, help_text in commands],
+                width=width,
+                wrap_cols={1},
+            )
+            if cmd_table:
+                out.append(cmd_table)
+                out.append("")
+
+        option_rows: list[list[str]] = []
+        for action in self._actions:
+            if not action.option_strings:
+                continue
+            option_rows.append(
+                [
+                    self._normalize(self._format_flags(action)),
+                    "yes" if bool(getattr(action, "required", False)) else "no",
+                    self._normalize(self._format_default(action)),
+                    self._normalize(action.help or "-"),
+                    self._normalize(self._format_choices(action)),
+                ]
+            )
+        if option_rows:
+            out.append("Options")
+            opt_table = self._render_table(
+                headers=["Flag", "Required", "Default", "Help", "Choices"],
+                rows=option_rows,
+                width=width,
+                wrap_cols={3, 4},
+            )
+            if opt_table:
+                out.append(opt_table)
+                out.append("")
+
+        return "\n".join(out)
 
     def error(self, message: str) -> None:
         if message.startswith("argument command: invalid choice: "):
