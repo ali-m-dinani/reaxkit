@@ -206,7 +206,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     elif command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
         parser.description = (
             "Generate heat-of-formation training sets.\n"
-            "This command gets the heat of formation data and balances the equation element-wise.\n\n"
+            "It gets the heat of formation data and balances the equation element-wise.\n\n"
             
             "This comamnd supports 3 input-mode options:\n"
             "  1. yaml: which needs an existing heatfo trainset YAML. \n"
@@ -233,11 +233,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY\n"
             "    - for materials any or all of Ba, B, O elements (now, BaO10 is also acceptable):\n"
             "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to\n"
-            "     - same as the first one but this time passing reference list:\n"
-            "       This means that for balancing the heat of formation equation, the reference geo files will be geo file Babcc_opt with 2 atoms for Ba, "
-            "       geo file B_alp with 12 atoms for B, and the geo file O2 with 2 atoms for O. "
-            "       If you don't provide the reference list, the command will automatically find the most stable structure of elemnts from the source"
-            "       website and uses them for balancing purposes:\n"
+            "     - same as the first one but this time passing reference list. "
+                    "This means that for balancing the heat of formation equation, the reference geo files will be geo file Babcc_opt with 2 atoms for Ba, "
+                    "geo file B_alp with 12 atoms for B, and the geo file O2 with 2 atoms for O. "
+                    "If you don't provide the reference list, the command will automatically find the most stable structure of elemnts from the source"
+                    "website and uses them for balancing purposes:\n"
             "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --references Ba=Babcc_opt:2,B=B_alp:12,O=O2:2\n"
             "    - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:\n"
             "       reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100 \n\n"
