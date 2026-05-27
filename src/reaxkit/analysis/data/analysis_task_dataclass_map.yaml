@@ -284,13 +284,13 @@ tasks:
     - electric field regime
     - eregime
     notes: []
-  force_field_data:
+  ffield_data:
     consumes_dataclass: ForceFieldParametersData
     implementation_module: 'reaxkit.analysis.force_field.force_field: force_field_data'
     description: Extracts and structures force-field parameter sections from ffield-style
       data. Use it to inspect atom, bond, angle, torsion, and other ReaxFF parameter
       groups in a table-friendly form.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_data'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_data'
     tags:
     - force field
     - force field parameters
@@ -301,13 +301,13 @@ tasks:
     help_search_examples:
     - reaxkit help "force field data"
     - run force field data
-  force_field_optimization:
+  ffield_optimization:
     consumes_dataclass: ForceFieldOptimizationProgressData
     implementation_module: 'reaxkit.analysis.force_field.optimization: force_field_optimization'
     description: Analyzes force-field optimization progress across iterations using
       parsed training or optimization output. It helps evaluate convergence, objective
       changes, and the progression of fitted parameter sets.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_optimization'
     tags:
     - force field
     - force field optimization progress
@@ -337,13 +337,13 @@ tasks:
     help_search_examples:
     - reaxkit help "get optimization parameters"
     - get optimization parameters
-  force_field_optimization_report:
+  ffield_optimization_report:
     consumes_dataclass: ForceFieldOptimizationReportData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report'
     description: Builds report tables from final optimization outputs, including target
       comparisons, reference values, predicted values, and errors. It supports review
       of final force-field training quality.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_optimization_report'
     tags:
     - force field
     - force field optimization report
@@ -354,13 +354,13 @@ tasks:
     help_search_examples:
     - reaxkit help "force field optimization report"
     - run force field optimization report
-  force_field_optimization_report_bulk_modulus:
+  ffield_optimization_report_bulk_modulus:
     consumes_dataclass: ForceFieldOptimizationReportData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_bulk_modulus'
     description: Derives bulk-modulus metrics from optimization report data. Use it
       when training or validation includes elastic response, equation-of-state points,
       or pressure-volume behavior.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report_bulk_modulus'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_optimization_report_bulk_modulus'
     tags:
     - force field
     - bulk modulus
@@ -372,13 +372,13 @@ tasks:
     help_search_examples:
     - reaxkit help "force field optimization report bulk modulus"
     - run force field optimization report bulk modulus
-  force_field_optimization_report_eos:
+  ffield_optimization_report_eos:
     consumes_dataclass: ForceFieldOptimizationReportData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_eos'
     description: Derives equation-of-state relationships from force-field optimization
       report data. It is intended for energy-volume, pressure-volume, and related
       property curves in fitted force fields.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: force_field_optimization_report_eos'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_optimization_report_eos'
     tags:
     - force field
     - equation of state
@@ -532,7 +532,7 @@ tasks:
     description: Summarizes per-parameter optimization diagnostics from force-field
       fitting output. It helps explain trial values, sensitivity behavior, fitted
       curves, and error changes for individual parameters.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: parameter_optimization_diagnostic'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: parameter_optimization_diagnostic'
     tags:
     - force field
     - diagnostics
@@ -662,7 +662,7 @@ tasks:
     description: Extracts structure-level summary quantities from optimization outputs,
       including energy, heat of formation, volume, density, or related structural
       metrics. Use it to compare training-set structures.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: structure_summary_data'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: structure_summary_data'
     tags:
     - force field
     - structure summary
@@ -680,7 +680,7 @@ tasks:
     description: Extracts and groups comments or category labels from training-set
       definitions. It helps understand how force-field training targets are organized
       by system, property, or reference-data source.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: trainset_group_comments'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: trainset_group_comments'
     tags:
     - force field
     - training set
@@ -699,7 +699,7 @@ tasks:
     description: Returns trainset rows for one selected section or all sections.
       Use it to inspect CHARGE, HEATFO, GEOMETRY, CELL_PARAMETERS, and ENERGY entries
       from training-set definitions in a table form.
-    related_workflow_module: 'reaxkit.workflows.force_field_workflow: trainset_data'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: trainset_data'
     tags:
     - force field
     - training set
@@ -892,16 +892,16 @@ dataclass_usage_across_tasks:
   ForceFieldOptimizationParameterData:
   - force_field_optimization_parameters
   ForceFieldOptimizationProgressData:
-  - force_field_optimization
+  - ffield_optimization
   ForceFieldOptimizationReportData:
-  - force_field_optimization_report
-  - force_field_optimization_report_bulk_modulus
-  - force_field_optimization_report_eos
+  - ffield_optimization_report
+  - ffield_optimization_report_bulk_modulus
+  - ffield_optimization_report_eos
   ForceFieldOptimizationTrainingSetData:
   - trainset_data
   - trainset_group_comments
   ForceFieldParametersData:
-  - force_field_data
+  - ffield_data
   GeometryData:
   - molecule_isomer_detection
   GeometryOptimizationProgressData:

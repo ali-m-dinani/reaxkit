@@ -67,30 +67,6 @@ workflows:
     help_search_examples:
     - reaxkit help "electrostatics workflow"
     - run electrostatics workflow
-  force_field_workflow:
-    implementation_module: 'reaxkit.workflows.force_field_workflow: force_field_data'
-    description: Direct command workflow for force-field analyses.
-    related_commands:
-      analysis:
-      - reaxkit.analysis.force_field.force_field
-      - reaxkit.analysis.force_field.optimization
-      - reaxkit.analysis.force_field.report
-      - reaxkit.analysis.force_field.diagnostics
-      - reaxkit.analysis.force_field.structure_summary
-      - reaxkit.analysis.force_field.trainset
-      generator: []
-    tags:
-    - force field
-    - optimization
-    - training set
-    notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be force_field_data, force_field_optimization, force_field_optimization_report, force_field_optimization_report_bulk_modulus, force_field_optimization_report_eos, parameter_optimization_diagnostic, parameter_optimization_most_sensitive, parameter_optimization_tornado, structure_summary_data, trainset_data, trainset_group_comments'
-    aliases:
-    - force field workflow
-    - force field analysis
-    help_search_examples:
-    - reaxkit help "force field workflow"
-    - run force field workflow
   kinematics_workflow:
     implementation_module: 'reaxkit.workflows.kinematics_workflow: kinematics'
     description: Direct command workflow for atomic-kinematics analyses.
@@ -332,9 +308,15 @@ workflows:
     - repair fort.7 workflow
   ffield_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
-    description: Direct command workflow for merging ffields and adding missing element/term entries.
+    description: Direct command workflow for ffield file tools and force-field analyses.
     related_commands:
-      analysis: []
+      analysis:
+      - reaxkit.analysis.force_field.force_field
+      - reaxkit.analysis.force_field.optimization
+      - reaxkit.analysis.force_field.report
+      - reaxkit.analysis.force_field.diagnostics
+      - reaxkit.analysis.force_field.structure_summary
+      - reaxkit.analysis.force_field.trainset
       generator:
       - reaxkit.engine.reaxff.generators.ffield_generator
     tags:
@@ -344,8 +326,11 @@ workflows:
     - merge
     - add element
     - add term
+    - analysis workflow
+    - optimization
+    - training set
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, ffield_data, ffield_optimization, ffield_optimization_report, ffield_optimization_report_bulk_modulus, ffield_optimization_report_eos, parameter_optimization_diagnostic, parameter_optimization_most_sensitive, parameter_optimization_tornado, structure_summary_data, trainset_data, trainset_group_comments'
     aliases:
     - ffield workflow
     - force field file workflow
@@ -638,21 +623,21 @@ dataclass_usage:
   ElectrostaticsData:
   - electrostatics_workflow
   ForceFieldOptimizationDiagnosticData:
-  - force_field_workflow
+  - ffield_workflow
   ForceFieldOptimizationParameterData:
   - params_workflow
   ForceFieldOptimizationProgressData:
-  - force_field_workflow
+  - ffield_workflow
   ForceFieldOptimizationReportData:
-  - force_field_workflow
+  - ffield_workflow
   ForceFieldOptimizationTrainingSetData:
-  - force_field_workflow
+  - ffield_workflow
   ForceFieldParametersData:
-  - force_field_workflow
+  - ffield_workflow
   GeometryOptimizationProgressData:
   - timeseries_workflow
   GeometrySummaryData:
-  - force_field_workflow
+  - ffield_workflow
   MolecularAnalysisData:
   - molecular_analysis_workflow
   - timeseries_workflow
@@ -690,11 +675,11 @@ command_to_workflow_module:
   export-trainset: reaxkit.workflows.file_tools.trainset_workflow
   extract-optimized-ffield: reaxkit.workflows.file_tools.fort83_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
-  force_field_data: reaxkit.workflows.force_field_workflow
-  force_field_optimization: reaxkit.workflows.force_field_workflow
-  force_field_optimization_report: reaxkit.workflows.force_field_workflow
-  force_field_optimization_report_bulk_modulus: reaxkit.workflows.force_field_workflow
-  force_field_optimization_report_eos: reaxkit.workflows.force_field_workflow
+  ffield_data: reaxkit.workflows.file_tools.ffield_workflow
+  ffield_optimization: reaxkit.workflows.file_tools.ffield_workflow
+  ffield_optimization_report: reaxkit.workflows.file_tools.ffield_workflow
+  ffield_optimization_report_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
+  ffield_optimization_report_eos: reaxkit.workflows.file_tools.ffield_workflow
   free-up: reaxkit.workflows.meta.workspace_management_workflow
   get-control: reaxkit.workflows.file_tools.control_workflow
   get-params: reaxkit.workflows.params_workflow
@@ -724,9 +709,9 @@ command_to_workflow_module:
   molecule_lifetime: reaxkit.workflows.molecular_analysis_workflow
   msd: reaxkit.workflows.trajectory_workflow
   orthogonalize-geo: reaxkit.workflows.file_tools.geo_workflow
-  parameter_optimization_diagnostic: reaxkit.workflows.force_field_workflow
-  parameter_optimization_most_sensitive: reaxkit.workflows.force_field_workflow
-  parameter_optimization_tornado: reaxkit.workflows.force_field_workflow
+  parameter_optimization_diagnostic: reaxkit.workflows.file_tools.ffield_workflow
+  parameter_optimization_most_sensitive: reaxkit.workflows.file_tools.ffield_workflow
+  parameter_optimization_tornado: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
   plotter: reaxkit.workflows.meta.plotter_workflow
   polarization: reaxkit.workflows.electrostatics_workflow
@@ -734,11 +719,11 @@ command_to_workflow_module:
   rdf: reaxkit.workflows.trajectory_workflow
   rdf_property: reaxkit.workflows.trajectory_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
-  structure_summary_data: reaxkit.workflows.force_field_workflow
+  structure_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.meta.study_workflow
   timeseries: reaxkit.workflows.timeseries_workflow
-  trainset_data: reaxkit.workflows.force_field_workflow
-  trainset_group_comments: reaxkit.workflows.force_field_workflow
+  trainset_data: reaxkit.workflows.file_tools.ffield_workflow
+  trainset_group_comments: reaxkit.workflows.file_tools.ffield_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
   video: reaxkit.workflows.meta.make_video_workflow
   voronoi: reaxkit.workflows.trajectory_workflow
