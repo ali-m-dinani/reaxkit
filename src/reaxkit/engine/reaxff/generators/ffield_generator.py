@@ -7,6 +7,7 @@ destination ``ffield`` and writes a merged output file.
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -615,6 +616,61 @@ def _atom_tuple_exists_equivalent(
     return pd.concat(hits).loc[lambda x: ~x.index.duplicated(keep="first")]
 
 
+def _equality_pattern(atoms: tuple[str, ...]) -> tuple[tuple[int, int], ...]:
+    pairs: list[tuple[int, int]] = []
+    for i in range(len(atoms)):
+        for j in range(i + 1, len(atoms)):
+            pairs.append((1 if atoms[i] == atoms[j] else 0, j - i))
+    return tuple(pairs)
+
+
+def _atom_similarity_vector(target_symbol: str, candidate_symbol: str, mode: str, radius_metrics: tuple[str, ...]) -> tuple[float, float, float, float]:
+    tmd = _element_metadata(target_symbol, strict=True)
+    cmd = _element_metadata(candidate_symbol, strict=True)
+    same_family = 0.0 if (tmd.get("family") is not None and tmd.get("family") == cmd.get("family")) else 1.0
+    tgrp = _safe_int(tmd.get("group"))
+    cgrp = _safe_int(cmd.get("group"))
+    same_group = 0.0 if (tgrp is not None and cgrp is not None and tgrp == cgrp) else 1.0
+    group_gap = float(abs(tgrp - cgrp)) if (tgrp is not None and cgrp is not None) else 999.0
+    rdist = float(_radius_distance(tmd, cmd, radius_metrics))
+    if mode == "family":
+        return same_family, same_group, group_gap, rdist
+    if mode == "group":
+        return same_group, group_gap, same_family, rdist
+    return rdist, same_group, group_gap, same_family
+
+
+def _best_unique_mapping_score(
+    target_unique: tuple[str, ...],
+    candidate_unique: tuple[str, ...],
+    mode: str,
+    radius_metrics: tuple[str, ...],
+) -> tuple[tuple[float, ...], dict[str, str]]:
+    if not target_unique or not candidate_unique:
+        raise ValueError("Target/candidate unique atom symbol lists must be non-empty.")
+    n = len(target_unique)
+    m = len(candidate_unique)
+    best_score: tuple[float, ...] | None = None
+    best_map: dict[str, str] = {}
+    if m >= n:
+        iter_maps = itertools.permutations(candidate_unique, n)
+    else:
+        iter_maps = itertools.product(candidate_unique, repeat=n)
+    for assigned in iter_maps:
+        comp = [0.0, 0.0, 0.0, 0.0]
+        local_map: dict[str, str] = {}
+        for src, dst in zip(target_unique, assigned):
+            local_map[src] = dst
+            v = _atom_similarity_vector(src, dst, mode, radius_metrics)
+            comp = [comp[i] + float(v[i]) for i in range(4)]
+        size_gap = float(abs(m - n))
+        score = (size_gap, *comp)
+        if best_score is None or score < best_score:
+            best_score = score
+            best_map = local_map
+    return (best_score if best_score is not None else (9999.0, 9999.0, 9999.0, 9999.0, 9999.0)), best_map
+
+
 def _replacement_variants(
     atoms: list[int],
     *,
@@ -1124,9 +1180,11 @@ def add_term_to_ffield(
     *,
     field: str,
     term: str,
+    closest_term: str | None = None,
     template_atom_map: Mapping[str, str] | None = None,
     similarity_mode: str = "group",
     radius_metrics: Iterable[str] | None = None,
+    same_general_order: bool = False,
     replace_existing: bool = False,
 ) -> FFieldAddTermSummary:
     """
@@ -1161,41 +1219,96 @@ def add_term_to_ffield(
     existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, requested_idxs)
 
     manual_map = {str(k).strip(): str(v).strip() for k, v in (template_atom_map or {}).items() if str(k).strip()}
-    unique_atoms = sorted(set(requested_atoms))
+    requested_pattern = _equality_pattern(requested_atoms)
+    requested_unique = tuple(sorted(set(requested_atoms)))
     atom_template_map: dict[str, str] = {}
-    similarity_details: dict[str, object] = {"mode": "manual" if manual_map else mode, "atoms": {}}
-    destination_symbols = list(sym_to_idx.keys())
-    for symbol in unique_atoms:
-        manual = manual_map.get(symbol)
-        if manual:
-            if manual not in sym_to_idx:
-                raise ValueError(f"Template atom {manual!r} for {symbol!r} is not in destination ffield.")
-            chosen = manual
-            details = {"mode": "manual", "target": {"symbol": symbol}, "chosen": {"symbol": chosen}, "candidates": []}
-        else:
-            available = [s for s in destination_symbols if s != symbol]
-            if not available:
-                raise ValueError(f"No candidate template atoms available for {symbol!r}.")
-            chosen, details = _pick_template_atom(
-                target_symbol=symbol,
-                available_symbols=available,
-                mode=mode,
-                manual_template=None,
-                radius_metrics=chosen_radius_metrics,
-            )
-        atom_template_map[symbol] = chosen
-        if isinstance(similarity_details["atoms"], dict):
-            similarity_details["atoms"][symbol] = details
+    similarity_details: dict[str, object] = {
+        "mode": "manual_term" if closest_term else ("manual" if manual_map else mode),
+        "same_general_order": bool(same_general_order),
+        "candidate_count": int(len(section_df)),
+        "ranked_candidates": [],
+    }
 
-    template_idxs = _canonical_atom_tuple(wanted_field, [int(sym_to_idx[atom_template_map[s]]) for s in requested_atoms])
-    template_existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, template_idxs)
-    if template_existing.empty:
-        raise ValueError(
-            "No template term was found for the selected mapping. "
-            f"Requested term: {'-'.join(requested_atoms)} ; template term: "
-            f"{'-'.join(atom_template_map[s] for s in requested_atoms)}"
+    template_row = None
+    template_term_symbols: tuple[str, ...] | None = None
+    if closest_term:
+        closest_atoms = _parse_term_atoms(closest_term)
+        _field_for_term_size(wanted_field, len(closest_atoms))
+        missing_closest = [s for s in closest_atoms if s not in sym_to_idx]
+        if missing_closest:
+            raise ValueError(
+                f"All --closest-term atoms must exist in destination ffield. Missing: "
+                f"{', '.join(sorted(set(missing_closest)))}"
+            )
+        closest_idxs = _canonical_atom_tuple(wanted_field, [int(sym_to_idx[s]) for s in closest_atoms])
+        closest_existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, closest_idxs)
+        if closest_existing.empty:
+            raise ValueError(
+                f"Requested --closest-term {closest_term!r} was not found in destination field section {wanted_field!r}."
+            )
+        template_row = section_df.loc[closest_existing.index[0]]
+        template_term_symbols = tuple(closest_atoms)
+        for src, dst in zip(requested_atoms, closest_atoms):
+            atom_template_map[src] = dst
+    elif manual_map:
+        for symbol, mapped in manual_map.items():
+            if symbol not in set(requested_atoms):
+                continue
+            if mapped not in sym_to_idx:
+                raise ValueError(f"Template atom {mapped!r} for {symbol!r} is not in destination ffield.")
+        atom_template_map = dict(manual_map)
+        template_idxs = _canonical_atom_tuple(
+            wanted_field,
+            [int(sym_to_idx[atom_template_map.get(s, s)]) for s in requested_atoms],
         )
-    template_row = section_df.loc[template_existing.index[0]]
+        template_existing = _atom_tuple_exists_equivalent(wanted_field, section_df, atom_cols, template_idxs)
+        if template_existing.empty:
+            raise ValueError(
+                "No template term was found for the selected manual mapping. "
+                f"Requested term: {'-'.join(requested_atoms)} ; template term: "
+                f"{'-'.join(atom_template_map.get(s, s) for s in requested_atoms)}"
+            )
+        template_row = section_df.loc[template_existing.index[0]]
+        template_term_symbols = tuple(atom_template_map.get(s, s) for s in requested_atoms)
+    else:
+        if section_df.empty:
+            raise ValueError(f"Destination field section {wanted_field!r} has no rows to use as template.")
+        idx_to_sym, _ = _atom_maps(atom_df)
+        ranked: list[tuple[tuple[float, ...], int, tuple[str, ...], dict[str, str]]] = []
+        for ridx, row in section_df.iterrows():
+            raw_atoms = [_safe_int(row[c]) for c in atom_cols]
+            if any(v is None for v in raw_atoms):
+                continue
+            cand_idxs = _canonical_atom_tuple(wanted_field, [int(v) for v in raw_atoms if v is not None])
+            cand_symbols = tuple(idx_to_sym.get(v, str(v)) for v in cand_idxs)
+            cand_pattern = _equality_pattern(cand_symbols)
+            if same_general_order and cand_pattern != requested_pattern:
+                continue
+            pattern_penalty = 0.0 if cand_pattern == requested_pattern else 1.0
+            cand_unique = tuple(sorted(set(cand_symbols)))
+            sim_score, map_unique = _best_unique_mapping_score(requested_unique, cand_unique, mode, chosen_radius_metrics)
+            tuple_score = (pattern_penalty, *sim_score)
+            ranked.append((tuple_score, int(ridx), cand_symbols, map_unique))
+            similarity_details["ranked_candidates"].append(
+                {
+                    "row_index": int(ridx),
+                    "term": "-".join(cand_symbols),
+                    "pattern_match": bool(cand_pattern == requested_pattern),
+                    "score": list(tuple_score),
+                }
+            )
+        if not ranked:
+            if same_general_order:
+                raise ValueError("No candidate terms satisfy --same-general-order in the selected field section.")
+            raise ValueError("No candidate terms available for similarity-based term templating.")
+        ranked.sort(key=lambda x: (x[0], "-".join(x[2])))
+        best_score, best_idx, best_symbols, best_map = ranked[0]
+        template_row = section_df.loc[best_idx]
+        template_term_symbols = best_symbols
+        atom_template_map = best_map
+        similarity_details["selected_score"] = list(best_score)
+        similarity_details["selected_row_index"] = int(best_idx)
+
     row_payload = _mapped_row_for_destination(template_row, atom_cols, requested_idxs, param_cols)
 
     appended = 0
@@ -1224,12 +1337,12 @@ def add_term_to_ffield(
             f"field={wanted_field}, term={'-'.join(requested_atoms)}"
         ),
     )
-    similarity_details["template_term"] = "-".join(atom_template_map[s] for s in requested_atoms)
+    similarity_details["template_term"] = "-".join(template_term_symbols or ())
     return FFieldAddTermSummary(
         output_path=out_path,
         field=wanted_field,
         term="-".join(requested_atoms),
-        template_term=str(similarity_details["template_term"]),
+        template_term=str(similarity_details["template_term"] or ""),
         template_atoms=atom_template_map,
         similarity_mode="manual" if manual_map else mode,
         appended=appended,

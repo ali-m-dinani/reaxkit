@@ -277,8 +277,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Convert an XYZ file to ReaxFF GEO format.\n\n"
             "Examples:\n"
-            "  reaxkit xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output geo\n"
-            "  reaxkit xtob --file slab.xyz --dims 11,12,100 --angles 90,90,90 --sort z --output slab_geo"
+            " 1. Convert slab.xyz to geo with box dimensions 11.0,12.0,100.0 and angles 90,90,90:\n"
+            "   reaxkit xtob --file slab.xyz --dims 11.0,12.0,100.0 --angles 90,90,90 --output geo\n\n"
+            " 2. Same as above but sort atoms by z-coordinate in descending order and write to slab_geo:\n"
+            "   reaxkit xtob --file slab.xyz --dims 11,12,100 --angles 90,90,90 --sort z --output slab_geo"
         )
         parser.add_argument("--file", required=True, help="Input XYZ file")
         parser.add_argument("--dims", required=True, help="Box dimensions a,b,c")
@@ -290,7 +292,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Build a surface slab from a bulk structure and write it to an ASE-supported format.\n\n"
             "Examples:\n"
-            "  reaxkit make-geo --file AlN.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
+            " 1. Build a slab with surface normal (1,0,0), 4x4 supercell expansion in the surface plane, 6 layers in the normal direction, and 15 angstrom vacuum, from AlN.cif and write to slab.xyz:\n"
+            "   reaxkit make-geo --file AlN.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
         )
         parser.add_argument("--file", required=True, help="Input bulk structure file")
         parser.add_argument("--output", required=True, help="Output file")
@@ -301,8 +304,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Sort atoms in a GEO file and write a new GEO file.\n\n"
             "Examples:\n"
-            "  reaxkit sort_geo --file geo --output sorted_geo --sort x\n"
-            "  reaxkit sort_geo --file geo --output sorted_geo --sort atom_type --descending"
+            " 1. Sort atoms in geo by x-coordinate in ascending order and write to sorted_geo:\n"
+            "   reaxkit sort_geo --file geo --output sorted_geo --sort x\n\n"
+            " 2. Sort atoms in geo by atom type in descending order and write to sorted_geo:\n"
+            "   reaxkit sort_geo --file geo --output sorted_geo --sort atom_type --descending"
         )
         parser.add_argument("--file", required=True, help="Input GEO file")
         parser.add_argument("--output", required=True, help="Output GEO file")
@@ -310,7 +315,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--descending", action="store_true", help="Sort in descending order")
     elif command == "orthogonalize-geo":
         parser.description = (
-            "Convert a hexagonal cell into an orthorhombic cell.\n\n"
+            "Convert a hexagonal cell into an orthorhombic cell.\n"
+            "In other words, change the angles from 90,90,120 to 90,90,90.\n\n"
             "Examples:\n"
             "  reaxkit orthogonalize-geo --file AlN.cif --output AlN_ortho.cif"
         )
@@ -318,10 +324,15 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--output", required=True, help="Output structure file")
     elif command == "place-geo":
         parser.description = (
-            "Randomly place copies of a molecule into a box, optionally around a base structure.\n\n"
+            "Randomly place copies of a molecule into an empty box, optionally around a base structure.\n\n"
             "Examples:\n"
-            "  reaxkit place-geo --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --output placed.xyz\n"
-            "  reaxkit place-geo --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --base slab.xyz --output placed_geo"
+            " 1. Place 40 copies of template.xyz into an empty box of dimensions 28.8,33.27,60 with angles 90,90,90 and write to placed.xyz:\n"
+            "   reaxkit place-geo --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --output placed.xyz\n\n"
+            " 2. Place 40 copies of template.xyz into a box of dimensions 28.8,33.27,60 with angles 90,90,90 around the structure in slab.xyz (i.e., "
+            "slab.xyz is already in place and we want to add template.xyz to it, as used when adding adsorbates to a surface) and write to placed_geo:\n"
+            "   reaxkit place-geo --insert template.xyz --ncopy 40 --dims 28.8,33.27,60 --angles 90,90,90 --base slab.xyz --output placed_geo\n\n"
+            "[Note] Flag --baseplace is sometimes used to control how the base structure is placed in the box. "
+            "By default, it is 'as-is', meaning the base structure is not changed and is placed in the box according to its own coordinates.\n\n"
         )
         parser.add_argument("--insert", required=True, help="Insert molecule")
         parser.add_argument("--ncopy", required=True, help="Number of copies to place")
@@ -335,10 +346,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--randomseed", default=None, help="Random seed")
     elif command in {"add_restraints_to_geo", "add-geo-restraint"}:
         parser.description = (
-            "Insert sample or explicit restraint blocks into a GEO file.\n\n"
+            "Insert sample or explicit (i.e., settings are defined) restraint blocks into a GEO file.\n\n"
             "Examples:\n"
-            "  reaxkit add_restraints_to_geo --file geo --bond --output geo_r\n"
-            "  reaxkit add_restraints_to_geo --file geo --angle '1 2 3 109.5000 600.00 0.25000 0.0000000' --output geo_r"
+            " 1. Adding a sample bond restraint to a geo file:\n"
+            "   reaxkit add_restraints_to_geo --file geo --bond --output geo_r\n\n"
+            " 2. Adding an explicit angle restraint to a geo file:\n"
+            "   reaxkit add_restraints_to_geo --file geo --angle '1 2 3 109.5000 600.00 0.25000 0.0000000' --output geo_r"
         )
         parser.add_argument("--file", default="geo", help="Input GEO file")
         parser.add_argument("--output", default=None, help="Output GEO file")
@@ -348,10 +361,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--mascen", nargs="?", const="", default=None, help="Add one mass-center restraint")
     elif command in {"add_molcharge_to_geo", "add-geo-molcharge"}:
         parser.description = (
-            "Insert MOLCHARGE lines into a GEO file.\n\n"
+            "Use this command if you want to fix charges for specific atoms or parts of your system."
+            "This command inserts MOLCHARGE lines into your GEO file.\n\n"
             "Examples:\n"
-            "  reaxkit add_molcharge_to_geo --file geo --per-atom 20481:20589:1 --rest 0 --output geo_m\n"
-            "  reaxkit add_molcharge_to_geo --file geo --per-atom-type e:-1 --rest 0 --output geo_m"
+            " 1. Set charge 1 on atoms 20481 to 20589 and charge 0 on all other atoms:\n"
+            "   reaxkit add_molcharge_to_geo --file geo --per-atom 20481:20589:1 --rest 0 --output geo_m\n\n"
+            " 2. Set charge -1 on all atoms of type 'e' (electrons in the system) and charge 0 on all other atoms:\n"
+            "   reaxkit add_molcharge_to_geo --file geo --per-atom-type e:-1 --rest 0 --output geo_m"
         )
         parser.add_argument("--file", default="geo", help="Input GEO file")
         parser.add_argument("--output", default=None, help="Output GEO file")

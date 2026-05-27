@@ -163,12 +163,22 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if command in {"add-element-to-ffield", "add_element_to_ffield"}:
         parser.description = (
-            "Add one atom type to an existing ffield and assigning parameters of a very similar atom in the "
-            "ffield as a template. This is intended as a quick way to expand coverage of an existing ffield "
+            "Add one atom type to an existing ffield and assign parameters of a very similar atom in the "
+            "ffield as template parameters. This is intended as a quick way to expand coverage of an existing ffield "
             "by cloning the most similar existing atom terms.\n\n"
             "Examples:\n"
-            "  reaxkit add-element-to-ffield --dest ffield --element Al --output ffield_al\n"
-            "  reaxkit add-element-to-ffield --dest ffield --element Al --similarity group --closest-atom B --fields atom,bond,angle"
+            " 1. Adding element 'Al' to a ffield by copying parameters of the most similar existing atom, automatically selected by group/family/radius similarity:\n"
+            "   reaxkit add-element-to-ffield --dest ffield --element Al --output ffield_al\n\n"
+            
+            " 2. Same as above, but this time the similarity measure is explicitly passed using --similarity flag. "
+            "Now, the most similar atom is the one with the same periodic-table group (column):\n"
+            "   reaxkit add-element-to-ffield --dest ffield --element Al --similarity group --fields atom,bond,angle\n\n"
+            
+            " 3. This time, not all fields are selected to get copied for the new element:\n"
+            "   reaxkit add-element-to-ffield --dest ffield --element Al --fields atom,bond,angle\n\n"
+            
+            " 4. the most similar atom is explicitly selected using --closest-atom flag\n"
+            "   reaxkit add-element-to-ffield --dest ffield --element Al --closest-atom B\n\n"
         )
         parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
         parser.add_argument("--output", default="ffield_with_element", help="Output expanded ffield path")
@@ -176,14 +186,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--similarity",
             default="group",
-            choices=["family", "group", "radius"],
+            choices=["group", "family", "radius"],
             help=(
-                "Similarity rule for template-atom selection: "
-                "'family' = chemical family match "
+                "Similarity rule for template-atom selection: \n"
+                " 1. 'family' = chemical family match "
                 "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
-                "halogen, noble_gas, metalloid, post_transition_metal, other), "
-                "'group' = same periodic-table group number (column), "
-                "'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance."
+                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
+                " 2. 'group' = same periodic-table group number (column),\n"
+                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
+                "Priority order for selecting the single template atom is:\n"
+                " 1. manual override by --closest-atom,\n"
+                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
+                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
+                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
+                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
             ),
         )
         parser.add_argument(
@@ -191,14 +207,15 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             default="atomic_radius,covalent_radius,van_der_waals_radius",
             help=(
                 "Comma-separated radius metrics used when --similarity radius is selected. "
-                "Use 'all' to include every supported metric. "
-                "Options: atomic_radius (empirical neutral-atom radius), "
-                "covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), "
-                "van_der_waals_radius (non-bonded contact radius), "
-                "atomic_radius_calculated (theoretical neutral-atom radius), "
-                "average_ionic_radius (mean ionic radius over known oxidation states), "
-                "average_cationic_radius (mean radius over positive oxidation states), "
-                "average_anionic_radius (mean radius over negative oxidation states)."
+                "Use 'all' to include every supported metric. \n"
+                "Options: \n"
+                " 1. atomic_radius (empirical neutral-atom radius), \n"
+                "2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), \n"
+                "3. van_der_waals_radius (non-bonded contact radius), \n"
+                "4. atomic_radius_calculated (theoretical neutral-atom radius), \n"
+                "5. average_ionic_radius (mean ionic radius over known oxidation states), \n"
+                "6. average_cationic_radius (mean radius over positive oxidation states), \n"
+                "7. average_anionic_radius (mean radius over negative oxidation states).\n"
             ),
         )
         parser.add_argument(
@@ -216,8 +233,21 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Add one specific missing term (bond/off_diagonal/angle/torsion/hbond) to an existing ffield by "
             "copying parameters from a similar existing template term.\n\n"
             "Examples:\n"
-            "  reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --output ffield_with_term\n"
-            "  reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --template-map Al:B"
+            " 1. Adding angle term 'Al-N-Al' to a ffield by copying parameters of the most similar existing angle, automatically selected by similarity:\n"
+            "   reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --output ffield_with_term\n\n"
+            
+            " 2. Same as above, but this time manual mapping for Al atom is done to B:\n"
+            "   reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --template-map Al:B\n\n"
+            
+            " 3. This time, the most similar template term is explicitly selected using --closest-term flag\n"
+            "   reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --closest-term B-N-B\n\n"
+            
+            " 4. Restrict candidate template terms to those with the same general order pattern (X-Y-X vs X-Y-Z), "
+            "which can be important for angle and torsion terms. "
+            "For example, if --same-general-order is selected, then the template term for Al-N-Al will be restricted to "
+            "angle terms of the form X-Y-X, and angle terms of the form X-Y-Z will not be considered as templates even "
+            "if they are similar by other criteria.\n"
+            "   reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --same-general-order --output ffield_with_term\n\n"
         )
         parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
         parser.add_argument("--output", default="ffield_with_term", help="Output expanded ffield path")
@@ -231,6 +261,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--term",
             required=True,
             help="Hyphen-separated atom symbols, for example: Al-N-Al",
+        )
+        parser.add_argument(
+            "--closest-term",
+            "--closest_term",
+            dest="closest_term",
+            default=None,
+            help="Explicit template term override, for example: B-N-B",
         )
         parser.add_argument(
             "--template-map",
@@ -255,6 +292,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--replace-existing",
             action="store_true",
             help="Replace destination row when the same atom tuple already exists.",
+        )
+        parser.add_argument(
+            "--same-general-order",
+            action="store_true",
+            help=(
+                "Restrict candidate template terms to those with the same equality/order pattern as --term "
+                "(example for angle: X-Y-X vs X-Y-Y)."
+            ),
         )
     else:
         parser.description = (
@@ -421,9 +466,11 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             output=out_path,
             field=str(args.field),
             term=str(args.term),
+            closest_term=getattr(args, "closest_term", None),
             template_atom_map=template_map if template_map else None,
             similarity_mode=str(args.similarity),
             radius_metrics=_parse_csv_items(args.radius_metrics),
+            same_general_order=bool(getattr(args, "same_general_order", False)),
             replace_existing=bool(args.replace_existing),
         )
         print(f"[Done] Updated ffield written to {summary.output_path}")
@@ -447,10 +494,12 @@ def run_main(command: str, args: argparse.Namespace) -> int:
                 "destination": str(args.destination),
                 "field": summary.field,
                 "term": summary.term,
+                "closest_term": str(getattr(args, "closest_term", "") or ""),
                 "template_term": summary.template_term,
                 "template_atoms": summary.template_atoms,
                 "similarity_mode": summary.similarity_mode,
                 "similarity_details": summary.similarity_details,
+                "same_general_order": bool(getattr(args, "same_general_order", False)),
                 "appended": summary.appended,
                 "updated": summary.updated,
                 "skipped_existing": summary.skipped_existing,
