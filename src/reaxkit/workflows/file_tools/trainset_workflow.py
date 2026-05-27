@@ -271,9 +271,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
             default="to-primitive",
-            help="Convert fetched crystal structure setting before generating files. For more information, "
-                 "see the article on material's project website "
-                 "https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project",
+            help="Convert fetched crystal structure setting before generating files.",
         )
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set.")
         parser.add_argument("--trainset-file", default="trainset_heatfo.in", help="Output trainset filename.")
