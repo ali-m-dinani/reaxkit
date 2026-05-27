@@ -19,7 +19,6 @@ from reaxkit.analysis.force_field.report import (
     ForceFieldOptimizationReportRequest,
 )
 from reaxkit.analysis.force_field.structure_summary import StructureSummaryRequest
-from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.analysis_executor import AnalysisExecutor
@@ -199,8 +198,6 @@ FFIELD_ANALYSIS_COMMANDS = (
     "get_ffield_opt_results",
     "get_ffield_opt_eos",
     "ffield_opt_bulk_modulus",
-    "get_trainset_data",
-    "get_trainset_group_comments",
 )
 
 LEGACY_FORCE_FIELD_ALIASES = {
@@ -216,8 +213,6 @@ LEGACY_FORCE_FIELD_ALIASES = {
     "ffield_optimization_report": "get_ffield_opt_results",
     "ffield_optimization_report_eos": "get_ffield_opt_eos",
     "ffield_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
-    "trainset_data": "get_trainset_data",
-    "trainset_group_comments": "get_trainset_group_comments",
     "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
     "parameter_optimization_tornado": "get_ffield_diagnostic_data",
 }
@@ -230,8 +225,6 @@ WORKFLOW_TASK_NAME_MAP = {
     "get_ffield_opt_results": "force_field_optimization_report",
     "get_ffield_opt_eos": "force_field_optimization_report_eos",
     "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
-    "get_trainset_data": "trainset_data",
-    "get_trainset_group_comments": "trainset_group_comments",
 }
 
 ALL_FFIELD_COMMANDS = FFIELD_TOOL_COMMANDS + FFIELD_ANALYSIS_COMMANDS
@@ -449,30 +442,6 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 type=int,
                 default=6,
                 help="Minimum number of finite points required per base identifier.",
-            )
-        elif command == "get_trainset_data":
-            parser.description = (
-                "Return trainset rows for one section or all sections.\n\n"
-                "Examples:\n"
-                "  1. reaxkit get_trainset_data --section all --export trainset_all.csv\n"
-                "  2. reaxkit get_trainset_data --section energy --export trainset_energy.csv"
-            )
-            parser.add_argument(
-                "--section",
-                default="all",
-                help="Trainset section: all, charge, heatfo, geometry, cell_parameters, or energy.",
-            )
-        elif command == "get_trainset_group_comments":
-            parser.description = (
-                "Return unique trainset group comments by section.\n\n"
-                "Examples:\n"
-                "  1. reaxkit get_trainset_group_comments --section all --export group_comments.csv\n"
-                "  2. reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
-            )
-            parser.add_argument(
-                "--section",
-                default="all",
-                help="Trainset section: all, charge, heatfo, geometry, cell_parameters, or energy.",
             )
         else:
             raise KeyError(f"Unsupported ffield command '{command}'.")
@@ -1212,14 +1181,6 @@ def _build_force_field_optimization_report_bulk_modulus_request(
     )
 
 
-def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:
-    return TrainsetGroupCommentsRequest(section=str(getattr(args, "section", "all")))
-
-
-def _build_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
-    return GetTrainsetDataRequest(section=str(getattr(args, "section", "all")))
-
-
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "get_ffield_data": _build_force_field_data_request,
     "get_ffield_opt_progress_data": _build_force_field_optimization_request,
@@ -1228,8 +1189,6 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "get_ffield_opt_results": _build_force_field_optimization_report_request,
     "get_ffield_opt_eos": _build_force_field_optimization_report_eos_request,
     "ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
-    "get_trainset_data": _build_trainset_data_request,
-    "get_trainset_group_comments": _build_trainset_group_comments_request,
 }
 
 def _prepare_result(command: str, result) -> object:

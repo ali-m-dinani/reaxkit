@@ -6,6 +6,10 @@ import argparse
 from pathlib import Path
 from typing import List
 
+from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
+from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
+from reaxkit.core.analysis_executor import AnalysisExecutor
+from reaxkit.core.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.generator_runtime import (
     maybe_copy_output_to_dot,
     persist_generator_metadata,
@@ -23,6 +27,7 @@ from reaxkit.engine.reaxff.generators.trainset_yaml import (
     gen_template_yaml_for_elastic_settings,
     gen_template_yaml_for_heatfo_settings,
 )
+from reaxkit.presentation.dispatcher import present_result
 
 TRAINSET_FILE_COMMANDS = (
     "export-trainset",
@@ -35,6 +40,18 @@ TRAINSET_FILE_COMMANDS = (
     "make-trainset-elastic",
     "make-trainset-heatfo",
 )
+
+TRAINSET_ANALYSIS_COMMANDS = (
+    "get_trainset_data",
+    "get_trainset_group_comments",
+)
+
+ALL_TRAINSET_COMMANDS = TRAINSET_FILE_COMMANDS + TRAINSET_ANALYSIS_COMMANDS
+
+WORKFLOW_TASK_NAME_MAP = {
+    "get_trainset_data": "trainset_data",
+    "get_trainset_group_comments": "trainset_group_comments",
+}
 
 
 def _load_trainset_tables(path: str) -> dict[str, object]:
@@ -53,6 +70,46 @@ def _load_trainset_tables(path: str) -> dict[str, object]:
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     parser.formatter_class = argparse.RawTextHelpFormatter
+
+    if command == "get_trainset_data":
+        parser.description = (
+            "Read trainset entries from one section or all sections and return them as a table.\n\n"
+            "Examples:\n"
+            "  reaxkit get_trainset_data --section all --export trainset_data.csv\n"
+            "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data.csv"
+        )
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
+        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
+        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
+        parser.add_argument("--show", action="store_true", help="Show the generated plot window")
+        parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
+        parser.add_argument("--export", default=None, help="Write the result table to CSV")
+        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
+        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
+        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy.")
+        add_storage_cli_arguments(parser)
+        return parser
+
+    if command == "get_trainset_group_comments":
+        parser.description = (
+            "Read grouped/comment metadata from trainset sections.\n\n"
+            "Examples:\n"
+            "  reaxkit get_trainset_group_comments --section all --export trainset_group_comments.csv\n"
+            "  reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
+        )
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
+        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
+        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
+        parser.add_argument("--show", action="store_true", help="Show the generated plot window")
+        parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
+        parser.add_argument("--export", default=None, help="Write the result table to CSV")
+        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
+        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
+        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy.")
+        add_storage_cli_arguments(parser)
+        return parser
 
     if command == "export-trainset":
         parser.description = (
@@ -319,7 +376,36 @@ def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) ->
     return 0
 
 
+def _task_name_for_command(command: str) -> str:
+    return WORKFLOW_TASK_NAME_MAP.get(command, command)
+
+
+def _build_get_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
+    return GetTrainsetDataRequest(section=str(getattr(args, "section", "all")))
+
+
+def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:
+    return TrainsetGroupCommentsRequest(section=str(getattr(args, "section", "all")))
+
+
+REQUEST_BUILDERS = {
+    "get_trainset_data": _build_get_trainset_data_request,
+    "get_trainset_group_comments": _build_trainset_group_comments_request,
+}
+
+
+def _run_trainset_analysis_main(command: str, args: argparse.Namespace) -> int:
+    task_cls = TASK_REGISTRY[_task_name_for_command(command)]
+    request = REQUEST_BUILDERS[command](args)
+    executor = AnalysisExecutor()
+    result = executor.run(task_cls(), request, vars(args))
+    present_result(command, result, args)
+    return 0
+
+
 def run_main(command: str, args: argparse.Namespace) -> int:
+    if command in TRAINSET_ANALYSIS_COMMANDS:
+        return _run_trainset_analysis_main(command, args)
     if command == "export-trainset":
         return _run_export_trainset(args)
     if command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:

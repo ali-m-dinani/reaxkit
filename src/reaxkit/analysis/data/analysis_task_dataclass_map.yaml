@@ -680,7 +680,7 @@ tasks:
     description: Extracts and groups comments or category labels from training-set
       definitions. It helps understand how force-field training targets are organized
       by system, property, or reference-data source.
-    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_trainset_group_comments'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_group_comments'
     tags:
     - force field
     - training set
@@ -699,7 +699,7 @@ tasks:
     description: Returns trainset rows for one selected section or all sections.
       Use it to inspect CHARGE, HEATFO, GEOMETRY, CELL_PARAMETERS, and ENERGY entries
       from training-set definitions in a table form.
-    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_trainset_data'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_data'
     tags:
     - force field
     - training set

@@ -316,7 +316,6 @@ workflows:
       - reaxkit.analysis.force_field.report
       - reaxkit.analysis.force_field.diagnostics
       - reaxkit.analysis.force_field.structure_summary
-      - reaxkit.analysis.force_field.trainset
       generator:
       - reaxkit.engine.reaxff.generators.ffield_generator
     tags:
@@ -330,7 +329,7 @@ workflows:
     - optimization
     - training set
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results, ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data, get_trainset_data, get_trainset_group_comments'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield, add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results, ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data'
     aliases:
     - ffield workflow
     - force field file workflow
@@ -380,7 +379,8 @@ workflows:
     implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_elastic_settings'
     description: Direct command workflows for trainset export and generation utilities.
     related_commands:
-      analysis: []
+      analysis:
+      - reaxkit.analysis.force_field.trainset
       generator:
       - reaxkit.workflows.file_tools.trainset_workflow
       - reaxkit.engine.reaxff.generators.trainset_elastic_energy
@@ -391,7 +391,7 @@ workflows:
     - heat of formation
     - elastic
     notes:
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be export-trainset, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be export-trainset, get_trainset_data, get_trainset_group_comments, gen_template_yaml_for_elastic_settings, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo'
     aliases:
     - training set workflow
     - trainset workflow
@@ -720,8 +720,8 @@ command_to_workflow_module:
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.meta.study_workflow
   timeseries: reaxkit.workflows.timeseries_workflow
-  get_trainset_data: reaxkit.workflows.file_tools.ffield_workflow
-  get_trainset_group_comments: reaxkit.workflows.file_tools.ffield_workflow
+  get_trainset_data: reaxkit.workflows.file_tools.trainset_workflow
+  get_trainset_group_comments: reaxkit.workflows.file_tools.trainset_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
   video: reaxkit.workflows.meta.make_video_workflow
   voronoi: reaxkit.workflows.trajectory_workflow

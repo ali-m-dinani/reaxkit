@@ -60,8 +60,8 @@ register_analysis_command(
     "ffield_opt_bulk_modulus",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
-register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.ffield_workflow")
-register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.ffield_workflow")
+register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
+register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
 register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
