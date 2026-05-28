@@ -732,6 +732,24 @@ tasks:
     help_search_examples:
     - show coordinates over time
     - extract coordinates over trajectory
+  trajectory_displacement_series:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.timeseries.timeseries: trajectory_displacement_series'
+    description: Returns displacement trajectories for selected atoms and axes from
+      trajectory data using a reference frame. Use it to track dx/dy/dz or vector-magnitude
+      displacement as time-series output.
+    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    tags:
+    - time series
+    - trajectory displacement
+    - trajectory
+    notes: []
+    aliases:
+    - displacement series
+    - atom displacement
+    help_search_examples:
+    - show displacement over time
+    - extract atom displacement trajectory
   trajectory_relabel_by_coordination:
     consumes_dataclass: ConnectivityTrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.relabel: trajectory_relabel_by_coordination'
@@ -913,6 +931,7 @@ dataclass_usage_across_tasks:
   - get_rdf
   - get_rdf_property
   - trajectory_coordinate_series
+  - trajectory_displacement_series
   - voronoi_scipy
   - voronoi_pyvoro
   - voronoi_geometry_scipy

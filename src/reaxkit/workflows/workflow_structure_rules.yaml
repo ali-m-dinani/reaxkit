@@ -30,6 +30,16 @@ command_name_rules:
   - "For renamed commands, keep old forms in ALL_LEGACY_COMMANDS until deprecation is intentional."
   - "Use resolve_command_name(...) where workflows dispatch multiple commands."
 
+flag_naming_rules:
+  reference_file: "reaxkit/workflows/data/workflow_dataclass_map.yaml"
+  reference_section: "flags_across_all_workflows"
+  rules:
+    - "Before adding any new CLI flag, check flags_across_all_workflows in workflow_dataclass_map.yaml."
+    - "If the same functionality already exists, reuse the existing flag name instead of introducing a new synonym."
+    - "When a new name is required, add it intentionally and document why it differs from existing patterns."
+    - "Keep canonical flags in long kebab-case form (for example --run-dir, --trainset-file)."
+    - "If backward compatibility is needed, keep old flag forms as aliases in argparse while documenting the canonical flag in help text."
+
 required_public_constants:
   ALL_COMMANDS:
     required: true
@@ -112,6 +122,8 @@ compatibility_policy:
 quality_checklist:
   - "Does the file define ALL_COMMANDS and ALL_LEGACY_COMMANDS near the top?"
   - "Are command names canonicalized before parser branching and run dispatch?"
+  - "Before adding flags, was workflow_dataclass_map.yaml -> flags_across_all_workflows reviewed?"
+  - "Do new flags reuse existing naming patterns for equivalent functionality?"
   - "If REQUEST_BUILDERS exists, are all canonical commands covered?"
   - "If plotting is supported, does _plot_payload return None safely on invalid data?"
   - "Does run_main return explicit exit codes and avoid silent no-op paths?"

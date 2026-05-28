@@ -1,4 +1,4 @@
-_meta:
+﻿_meta:
   version: '1.0'
   source: workflow registries + analysis task dataclass map + workflow module docstrings
   purpose: Maps workflow modules to related analysis and generator implementation
@@ -818,3 +818,798 @@ command_to_workflow_module:
   get-rdf: reaxkit.workflows.trajectory_workflow
   get-rdf-property: reaxkit.workflows.trajectory_workflow
   get-voronoi: reaxkit.workflows.trajectory_workflow
+flags_across_all_workflows:
+  "--action":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+    - study_workflow: study
+  "--agg":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--aggregate":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - study_workflow: study
+  "--aggregate-title":
+    - study_workflow: study
+  "--all-info":
+    - help_workflow: help
+  "--allow-missing-valences":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--allow-undefined-hybridization":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--alpha":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--alpha-radius":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--amplitude":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--analysis":
+    - study_workflow: study
+  "--analysis-title":
+    - study_workflow: study
+  "--analyze":
+    - study_workflow: study
+  "--angle":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--angles":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--any-order":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--api-key":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--artifact-transfer":
+    - study_workflow: study
+  "--atom-ids":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--atom-ids-a":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--atom-ids-b":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--atoms":
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - timeseries_workflow: timeseries
+  "--atom-types":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--atom-types-a":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--atom-types-b":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--azim":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--backend":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--base":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--baseline":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--baseplace":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--bins":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - gen_plot_workflow: gen_plot, gen-plot
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--bond":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--bond-mode":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--bond-scale":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--bo-threshold":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--boxdims":
+    - timeseries_workflow: timeseries
+  "--bulk-mode":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--carbon-element":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--case":
+    - study_workflow: study
+  "--cell-fields":
+    - timeseries_workflow: timeseries
+  "--closest_term":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--closest-atom":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--closest-term":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--cmap":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--col":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--component":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+  "--compress":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--control":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - timeseries_workflow: timeseries
+  "--copy-to-dot":
+    - addmol_workflow: gen_template_addmol, gen-template-addmol, make_addmol, make-addmol
+    - charges_workflow: gen_template_charges, gen-template-charges, make_charges, make-charges
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - fort7_workflow: repair_fort7, repair-fort7
+    - fort83_workflow: get_optimized_ffield, get-optimized-ffield
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+    - kopple2_workflow: gen_template_kopple2, gen-template-kopple2, make_kopple2, make-kopple2
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - tregime_workflow: gen_template_tregime, gen-template-tregime, make_tregime, make-tregime
+    - vregime_workflow: gen_template_vregime, gen-template-vregime, make_vregime, make-vregime
+    - xmolout_workflow: trim_xmolout, trim-xmolout
+  "--core":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+  "--crystallographic-setting-conversion":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--d":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--dc-offset":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--default":
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+  "--descending":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--dest":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--destination":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--diagram-dim":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--dims":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--dir":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--direction":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--disallow-torsion-wildcard":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--dropna-rows":
+    - timeseries_workflow: timeseries
+  "--dry-run":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+    - study_workflow: study
+  "--dst":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--dt":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--each-range":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--each-type":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--element":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--element-count-scope":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--element-hybridizations":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--elements":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--elev":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--ema-alpha":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--engine":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - help_workflow: help
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--epochs":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--eregime":
+    - timeseries_workflow: timeseries
+  "--every":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--exact-match":
+    - help_workflow: help
+  "--expand":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--export":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--export-all":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--expr":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--ext":
+    - gen_video_workflow: gen_video, gen-video
+  "--ffield":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - params_workflow: get_params, get-params
+  "--field":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - timeseries_workflow: timeseries
+  "--field-kind":
+    - timeseries_workflow: timeseries
+  "--fields":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--file":
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - fort7_workflow: repair_fort7, repair-fort7
+    - gen_plot_workflow: gen_plot, gen-plot
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+    - introspection_workflow: intspec
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - xmolout_workflow: trim_xmolout, trim-xmolout
+  "--fill-missing-with-template":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--fill-value":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--flip-sign":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--folder":
+    - gen_video_workflow: gen_video, gen-video
+    - introspection_workflow: intspec
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--force":
+    - study_workflow: study
+  "--format":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+    - timeseries_workflow: timeseries
+  "--fort13":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--fort57":
+    - timeseries_workflow: timeseries
+  "--fort7":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+  "--fort73":
+    - timeseries_workflow: timeseries
+  "--fort74":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--fort76":
+    - timeseries_workflow: timeseries
+  "--fort78":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - timeseries_workflow: timeseries
+  "--fort79":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--fort83":
+    - fort83_workflow: get_optimized_ffield, get-optimized-ffield
+  "--fort99":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--fps":
+    - gen_video_workflow: gen_video, gen-video
+  "--frame":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--frames":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--gap-deg":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--gen-yaml":
+    - study_workflow: study
+  "--geo-file":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--grid":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--how":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--hybridizations":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--hysteresis":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--iden":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--include-geo-descriptor":
+    - timeseries_workflow: timeseries
+  "--include-noncarbon":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--include-self":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--init":
+    - study_workflow: study
+  "--input":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+  "--input-mode":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--insert":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--interpret":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - params_workflow: get_params, get-params
+  "--iteration-step":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--keep-coord-original":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--keep-duplicates":
+    - params_workflow: get_params, get-params
+  "--key":
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+  "--label":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--labels":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--last":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--log":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--make-yaml":
+    - study_workflow: study
+  "--manage":
+    - study_workflow: study
+  "--mascen":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--mat-id":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--max":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--maxattempt":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--max-magnitude":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--max-materials":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--median":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--min":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--min-bo":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--mindist":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--min-freq":
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+  "--min-points":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--min-run":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--mode":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--molecules":
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+  "--molfra":
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - timeseries_workflow: timeseries
+  "--mp-id":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--ncopy":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--no-shift-min-to-zero":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--no-undirected":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--no-unwrap":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--number":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--num-cycles":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--older-than":
+    - study_workflow: study
+  "--ordered-2body":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--origin":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--outdir":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--output":
+    - addmol_workflow: gen_template_addmol, gen-template-addmol, make_addmol, make-addmol
+    - charges_workflow: gen_template_charges, gen-template-charges, make_charges, make-charges
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - fort7_workflow: repair_fort7, repair-fort7
+    - fort83_workflow: get_optimized_ffield, get-optimized-ffield
+    - gen_video_workflow: gen_video, gen-video
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+    - kopple2_workflow: gen_template_kopple2, gen-template-kopple2, make_kopple2, make-kopple2
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - tregime_workflow: gen_template_tregime, gen-template-tregime, make_tregime, make-tregime
+    - vregime_workflow: gen_template_vregime, gen-template-vregime, make_vregime, make-vregime
+    - xmolout_workflow: trim_xmolout, trim-xmolout
+  "--out-yaml":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--oxygen-element":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--parallel-workers":
+    - study_workflow: study
+  "--parameter":
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+  "--params":
+    - params_workflow: get_params, get-params
+  "--per-atom":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--per-atom-type":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--period":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--persist":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--per-type":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--phase":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--plane":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - gen_plot_workflow: gen_plot, gen-plot
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--plot":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - gen_plot_workflow: gen_plot, gen-plot
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - study_workflow: study
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--plot-frames":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+  "--plot-target":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--precision":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--present":
+    - study_workflow: study
+  "--progress-every":
+    - fort7_workflow: repair_fort7, repair-fort7
+  "--projection":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--prop":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--property":
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--radius-metrics":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--randomseed":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--raw-root":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--r-co":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--r-csi":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--references":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--reference-frame":
+    - timeseries_workflow: timeseries
+  "--replace-existing":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--replicate":
+    - study_workflow: study
+  "--report":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--report-format":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--report-most-sensitive":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--rerun-failed":
+    - study_workflow: study
+  "--rest":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--r-max":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--root":
+    - study_workflow: study
+  "--roots":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+  "--rows":
+    - tregime_workflow: gen_template_tregime, gen-template-tregime, make_tregime, make-tregime
+    - vregime_workflow: gen_template_vregime, gen-template-vregime, make_vregime, make-vregime
+  "--run":
+    - study_workflow: study
+  "--run-dir":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--run-geometry-generator":
+    - study_workflow: study
+  "--same-general-order":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--save":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - gen_plot_workflow: gen_plot, gen-plot
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--scatter":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--scope":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+  "--section":
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--show":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--silicon-element":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--similarity":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--simulation":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--size":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--skip-not-orthogonal":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--slope":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--smooth":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--soap":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--soap-l-max":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--soap-n-max":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--soap-r-cut":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--soap-ref-path":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--soap-zeta":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--sort":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--source":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--src":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--stage":
+    - study_workflow: study
+  "--start-iter":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--step-angle":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--step-size":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--strict-actions":
+    - study_workflow: study
+  "--strict-tract":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+  "--structure-dir":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--summary":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+  "--surface":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--target":
+    - study_workflow: study
+  "--target-atom-ids":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--target-elements":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--template-closest-atom":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--template-map":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--template-radius-metrics":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--template-similarity":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--t-end":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--term":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+  "--threshold":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--title":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--together-charge":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--top":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - gen_plot_workflow: gen_plot, gen-plot
+    - help_workflow: help
+  "--top-n":
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+  "--torsion":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--trainset":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--trainset-file":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--type":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+    - gen_plot_workflow: gen_plot, gen-plot
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--undirected":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--units":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--unwrap":
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--V":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--vacuum":
+    - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--valences":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--value":
+    - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
+    - gen_plot_workflow: gen_plot, gen-plot
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+  "--value-column":
+    - study_workflow: study
+  "--vels":
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+  "--verbose":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--vline":
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--vmax":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--vmin":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--weight":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--width":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
+  "--window":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+  "--workspace-root":
+    - manage_workspace_workflow: manage_workspace, manage-workspace
+  "--x":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--xaxis":
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
+    - gen_plot_workflow: gen_plot, gen-plot
+    - kinematics_workflow: get_kinematics, get-kinematics, kinematics_heatmap2d, kinematics_plot3d, kinematics-heatmap2d, kinematics-plot3d
+    - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+    - params_workflow: get_params, get-params
+    - timeseries_workflow: timeseries
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--xlabel":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--xmolout":
+    - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
+    - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+    - timeseries_workflow: timeseries
+    - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--y":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--y1":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--y2":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--yaml":
+    - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
+  "--yaxis":
+    - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--ylabel":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--ylabel1":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--ylabel2":
+    - gen_plot_workflow: gen_plot, gen-plot
+  "--z":
+    - gen_plot_workflow: gen_plot, gen-plot
+

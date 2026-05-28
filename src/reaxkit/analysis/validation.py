@@ -214,7 +214,7 @@ def _validate_task_specific(task: Any, data: Any, request: Any) -> None:
             _validate_trajectory_selection_finite(task_name, data, request)
         return
 
-    if task_name in {"TrajectoryCoordinateSeriesTask"} and isinstance(data, TrajectoryData):
+    if task_name in {"TrajectoryCoordinateSeriesTask", "TrajectoryDisplacementSeriesTask"} and isinstance(data, TrajectoryData):
         _validate_trajectory_like(task_name, request)
         _validate_trajectory_selection_finite(task_name, data, request)
         return

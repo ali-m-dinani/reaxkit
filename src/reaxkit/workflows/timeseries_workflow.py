@@ -22,6 +22,7 @@ from reaxkit.analysis.timeseries.timeseries import (
     SimulationScalarSeriesRequest,
     TimeSeriesResult,
     TrajectoryCoordinateSeriesRequest,
+    TrajectoryDisplacementSeriesRequest,
 )
 from reaxkit.core.analysis_executor import AnalysisExecutor
 from reaxkit.core.frame_utils import parse_frame_indices
@@ -33,7 +34,9 @@ from reaxkit.presentation.dispatcher import present_result
 ALL_COMMANDS = ("timeseries",)
 ALL_LEGACY_COMMANDS = ()
 
-_ATOM_FIELD_RE = re.compile(r"^atom\[(?P<ids>[0-9,\s]+)\]\.(?P<axis>[xyzXYZ])$")
+_TRAJECTORY_FIELD_RE = re.compile(
+    r"^(?P<kind>trajectory|atom|displacement)(?:\[(?P<ids>[^\]]*)\])?(?:\.(?P<component>[xyzXYZ]{1,3}))?$"
+)
 _CHARGE_FIELD_RE = re.compile(r"^(?:charge|q)\[(?P<ids>[0-9,\s]+)\]$")
 _CELL_FIELD_RE = re.compile(r"^(?:cell(?:_dimensions)?|lattice)\[(?P<fields>[A-Za-z0-9_,\s]+)\]$")
 _EFIELD_FIELD_RE = re.compile(r"^(?:electric_field|efield)\[(?P<components>[A-Za-z0-9_,\s]+)\]$")
@@ -93,6 +96,34 @@ def _parse_int_tokens(spec: str) -> list[int]:
     return [int(token) for token in _split_csv_tokens(spec)]
 
 
+def _parse_atom_selector(spec: str | None) -> tuple[int, ...] | None:
+    if spec is None:
+        return None
+    text = str(spec).strip()
+    if not text:
+        return None
+    values = parse_frame_indices(text)
+    if values is None:
+        return None
+    out = [int(v) for v in values]
+    for v in out:
+        if v <= 0:
+            raise ValueError("Atom selectors are 1-based and must be positive integers.")
+    return tuple(out)
+
+
+def _normalize_trajectory_components(component: str | None) -> tuple[str, ...]:
+    if component is None or not str(component).strip():
+        return ("xyz",)
+    token = str(component).strip().lower()
+    if any(ch not in {"x", "y", "z"} for ch in token):
+        raise ValueError(f"Unsupported trajectory/displacement component {component!r}.")
+    if len(set(token)) != len(token):
+        raise ValueError(f"Duplicate axes are not allowed in component {component!r}.")
+    canonical = "".join(ch for ch in "xyz" if ch in token)
+    return (canonical,)
+
+
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--field", default=None, help="Dispatcher field expression. Example: --field temperature, which selects simulation temperature time series.")
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific loaders.")
@@ -133,6 +164,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--atoms", default=None, help='Legacy trajectory atom selector. Example: --atoms "1,5,12", which limits trajectory-series extraction to those atom ids.')
     parser.add_argument("--atom-types", nargs="*", default=None, help="Legacy trajectory atom-type selector. Example: --atom-types O H, which limits trajectory-series extraction to oxygen/hydrogen.")
     parser.add_argument("--dims", nargs="*", default=None, choices=["x", "y", "z"], help="Legacy trajectory coordinate dimensions. Example: --dims z, which extracts only z-coordinate series.")
+    parser.add_argument("--reference-frame", type=int, default=0, help="Reference frame index used by displacement fields. Example: --reference-frame 10, which subtracts frame 10 coordinates from each selected frame.")
     parser.add_argument("--boxdims", action="store_true", help="Legacy shortcut for cell-dimension extraction from xmolout. Example: --boxdims, which switches to lattice-parameter series mode.")
     parser.add_argument("--cell-fields", nargs="*", default=None, help="Legacy cell-dimension fields. Example: --cell-fields a b c alpha beta gamma, which selects listed lattice fields.")
     parser.add_argument("--field-kind", choices=["applied", "energy", "auto"], default="auto", help="Electric-field group. Example: --field-kind applied, which selects externally applied field channels.")
@@ -144,7 +176,8 @@ def _coerce_atom_ids(value) -> tuple[int, ...] | None:
     if value is None:
         return None
     if isinstance(value, str):
-        return tuple(_parse_int_tokens(value))
+        parsed = _parse_atom_selector(value)
+        return parsed
     return tuple(int(v) for v in value)
 
 
@@ -192,13 +225,27 @@ def _resolve_task_and_request(args: argparse.Namespace):
     frames = _parse_frame_selector(args.frames)
     field_key = field.lower()
 
-    match = _ATOM_FIELD_RE.match(field)
+    match = _TRAJECTORY_FIELD_RE.match(field)
     if match:
+        atom_ids = _parse_atom_selector(match.group("ids"))
+        components = _normalize_trajectory_components(match.group("component"))
+        kind = str(match.group("kind")).lower()
+        if kind == "displacement":
+            return (
+                "trajectory_displacement_series",
+                TrajectoryDisplacementSeriesRequest(
+                    atom_ids=atom_ids,
+                    dims=components,
+                    reference_frame=int(args.reference_frame),
+                    frames=frames,
+                    every=int(args.every),
+                ),
+            )
         return (
             "trajectory_coordinate_series",
             TrajectoryCoordinateSeriesRequest(
-                atom_ids=_parse_int_tokens(match.group("ids")),
-                dims=(match.group("axis").lower(),),
+                atom_ids=atom_ids,
+                dims=components,
                 frames=frames,
                 every=int(args.every),
             ),
@@ -398,7 +445,7 @@ def _resolve_task_and_request(args: argparse.Namespace):
 
     raise ValueError(
         f"Unsupported field {field!r}. "
-        "Examples: temperature, potential_energy, atom[1].x, charge[1], "
+        "Examples: temperature, potential_energy, trajectory[1].x, displacement[1:20].xy, charge[1], "
         "field_z, eregime.field, energy[E_bond], restraint[1], "
         "molecule[H2O], total_molecules, geo_opt.E_pot"
     )
@@ -412,21 +459,31 @@ def build_parser(p: argparse.ArgumentParser) -> None:
         "This command routes `--field` expressions to the appropriate analysis backend\n"
         "for simulation scalars, trajectory coordinates, charges, fields, energies, restraints,\n"
         "molecular frequencies/totals, and geometry-optimization data.\n\n"
+        
         "Examples:\n"
-        "  1. Plot simulation scalar series:\n"
+        "  1. Plot simulation scalar series such as temperature:\n"
         "   reaxkit timeseries --field temperature --summary summary.txt --plot single\n\n"
-        "  2. Plot atom-coordinate series on time axis:\n"
-        "   reaxkit timeseries --field atom[1,2].z --xaxis time --save atom_z.png\n\n"
-        "  3. Export charge series for selected atom:\n"
+        
+        "  2. Plot trajectory/displacement series on time axis:\n"
+        "   - getting the trajectory of atoms 1 and 2 in z dimension:\n"
+        "       reaxkit timeseries --field trajectory[1,2].z --xaxis time --save atom_z.png\n"
+        "   - getting the displacement of atoms 1 to 20 in x and y dimensions with reference frame 0:\n"
+        "     [Note] when more than 1 dimension is selected, it finds the magnitude of the combined components (i.e., sqrt(dx^2 + dy^2) in the example below).\n"
+        "       reaxkit timeseries --field displacement[1:20].xy --reference-frame 0 --xaxis time --plot single\n\n"
+        
+        "  3. Export charge series for atom 1:\n"
         "   reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv\n\n"
+        
         "  4. Plot molecular frequency/totals series:\n"
         "   reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single\n"
         "   reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot\n\n"
+        
         "  5. Plot restraint/electric-field/energy series:\n"
         "   reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single\n"
         "   reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single\n"
         "   reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n\n"
-        "  6. Plot geometry-optimization fields:\n"
+        
+        "  6. Plot geometry-optimization results (i.e., energy vs iter):\n"
         "   reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single\n"
         "   reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n\n"
     )
@@ -545,7 +602,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": len(series) > 1,
         }
 
-    if command == "trajectory_coordinate_series":
+    if command in {"trajectory_coordinate_series", "trajectory_displacement_series"}:
         table = getattr(result, "table", None)
         if table is None or not isinstance(table, pd.DataFrame) or table.empty:
             return None
@@ -577,13 +634,16 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
         if not series_payload:
             return None
+        is_displacement = command == "trajectory_displacement_series"
+        ylabel = "displacement" if is_displacement else "coord"
+        title = "Trajectory Displacement Series" if is_displacement else "Trajectory Coordinate Series"
         if getattr(args, "plot", None) == "subplot":
             return {
                 "plot_type": "multi_subplots",
                 "subplots": [[s] for s in series_payload],
                 "xlabel": xlabel,
-                "ylabel": "coord",
-                "title": "Trajectory Coordinate Series",
+                "ylabel": ylabel,
+                "title": title,
                 "legend": False,
                 "grid": getattr(args, "grid", None),
             }
@@ -591,8 +651,8 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "plot_type": "single_plot",
             "series": series_payload,
             "xlabel": xlabel,
-            "ylabel": "coord",
-            "title": "Trajectory Coordinate Series",
+            "ylabel": ylabel,
+            "title": title,
             "legend": len(series_payload) > 1,
         }
 

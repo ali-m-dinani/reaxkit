@@ -172,6 +172,14 @@ class TrajectoryCoordinateSeriesResult(BaseResult):
 
 
 @dataclass
+class TrajectoryDisplacementSeriesResult(BaseResult):
+    """Trajectory displacement-series result."""
+
+    request: TrajectoryDisplacementSeriesRequest
+    table: pd.DataFrame
+
+
+@dataclass
 class CellDimensionsResult(BaseResult):
     """Cell-dimensions result.
 
@@ -382,7 +390,7 @@ class TrajectoryCoordinateSeriesRequest(BaseRequest):
         metadata={
             "label": "Dims",
             "help": "Coordinate dimensions to include.",
-            "choices": ["x", "y", "z"],
+            "choices": ["x", "y", "z", "xy", "xz", "yz", "xyz"],
         },
     )
     frames: Optional[Sequence[int]] = dc_field(
@@ -392,6 +400,38 @@ class TrajectoryCoordinateSeriesRequest(BaseRequest):
     every: int = dc_field(
         default=1,
         metadata={'label': 'Every', 'help': 'Every parameter for TrajectoryCoordinateSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
+
+
+@dataclass
+class TrajectoryDisplacementSeriesRequest(BaseRequest):
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for TrajectoryDisplacementSeriesRequest.', 'units': 'index'},
+    )
+    atom_types: Optional[Sequence[str]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Types', 'help': 'Atom Types parameter for TrajectoryDisplacementSeriesRequest.'},
+    )
+    dims: Sequence[str] = dc_field(
+        default=("xyz",),
+        metadata={
+            "label": "Dims",
+            "help": "Displacement dimensions to include.",
+            "choices": ["x", "y", "z", "xy", "xz", "yz", "xyz"],
+        },
+    )
+    reference_frame: int = dc_field(
+        default=0,
+        metadata={'label': 'Reference Frame', 'help': 'Reference frame index used for displacement.', 'min': 0, 'units': 'frame_index'},
+    )
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Frames', 'help': 'Frames parameter for TrajectoryDisplacementSeriesRequest.', 'units': 'frame_index'},
+    )
+    every: int = dc_field(
+        default=1,
+        metadata={'label': 'Every', 'help': 'Every parameter for TrajectoryDisplacementSeriesRequest.', 'min': 1, 'units': 'frames'},
     )
 
 
@@ -683,6 +723,81 @@ class SimulationScalarSeriesTask(AnalysisTask):
         )
 
 
+def _trajectory_coord_like_table(
+    data: TrajectoryData,
+    *,
+    atom_ids_req: Optional[Sequence[int]],
+    atom_types_req: Optional[Sequence[str]],
+    dims_req: Sequence[str],
+    frames_req: Optional[Sequence[int]],
+    every_req: int,
+    displacement: bool,
+    reference_frame: int,
+    reporter=None,
+) -> pd.DataFrame:
+    dims = tuple(str(d).lower() for d in dims_req)
+    valid = {"x", "y", "z", "xy", "xz", "yz", "xyz"}
+    if not dims or any(d not in valid for d in dims):
+        raise ValueError("dims must contain x/y/z/xy/xz/yz/xyz.")
+    positions = np.asarray(data.positions, dtype=float)
+    n_frames, n_atoms = positions.shape[:2]
+    frame_idx = _frame_indices(n_frames, frames_req, every_req)
+    iterations = np.asarray(data.iterations, dtype=int) if data.iterations is not None else np.arange(n_frames, dtype=int)
+    if iterations.shape[0] != n_frames:
+        raise ValueError("TrajectoryData.iterations length must match number of frames.")
+    if displacement:
+        ref = int(reference_frame)
+        if not (0 <= ref < n_frames):
+            raise ValueError(f"reference_frame {ref} out of range 0..{max(n_frames - 1, 0)}.")
+        positions = positions - positions[ref : ref + 1, :, :]
+
+    if atom_ids_req is not None:
+        atom_ids = [int(a) for a in atom_ids_req]
+        atom_indices = []
+        for atom_id in atom_ids:
+            atom_idx = int(atom_id) - 1
+            if not (0 <= atom_idx < n_atoms):
+                raise ValueError(f"atom_id {atom_id} out of range 1..{n_atoms}.")
+            atom_indices.append(atom_idx)
+    elif atom_types_req:
+        chosen = {str(t) for t in atom_types_req}
+        atom_indices = [i for i, elem in enumerate(data.elements) if str(elem) in chosen]
+        atom_ids = [int(data.atom_ids[i]) for i in atom_indices]
+    else:
+        atom_indices = list(range(n_atoms))
+        atom_ids = [int(a) for a in data.atom_ids]
+
+    rows: list[dict[str, object]] = []
+    dim_to_cols = {"x": (0,), "y": (1,), "z": (2,), "xy": (0, 1), "xz": (0, 2), "yz": (1, 2), "xyz": (0, 1, 2)}
+    total_groups = max(1, len(atom_indices) * len(dims))
+    done_groups = 0
+    for atom_id, atom_idx in zip(atom_ids, atom_indices):
+        atom_type = str(data.elements[atom_idx])
+        for dim in dims:
+            cols = dim_to_cols[dim]
+            vec = positions[frame_idx, atom_idx][:, cols]
+            values = vec[:, 0] if len(cols) == 1 else np.sqrt(np.sum(np.square(vec), axis=1))
+            for rel_i, fi in enumerate(frame_idx):
+                rows.append(
+                    {
+                        "frame_index": int(fi),
+                        "iter": int(iterations[fi]),
+                        "atom_id": int(atom_id),
+                        "atom_type": atom_type,
+                        "dim": str(dim),
+                        "coord": float(values[rel_i]),
+                    }
+                )
+            done_groups += 1
+            if callable(reporter):
+                msg = "Building trajectory displacement series" if displacement else "Building trajectory coordinate series"
+                reporter("analyze", done_groups, total_groups, msg)
+    table = pd.DataFrame(rows)
+    if not table.empty:
+        table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
+    return table
+
+
 @register_task("trajectory_coordinate_series", label="Trajectory Coordinate Series")
 class TrajectoryCoordinateSeriesTask(AnalysisTask):
     """Build coordinate time series for one or more atoms."""
@@ -721,65 +836,44 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TrajectoryCoordinateSeriesResult:
-        dims = tuple(str(d).lower() for d in request.dims if str(d).lower() in {"x", "y", "z"})
-        if not dims:
-            raise ValueError("TrajectoryCoordinateSeriesRequest.dims must include at least one of: x, y, z.")
-        positions = np.asarray(data.positions, dtype=float)
-        n_frames, n_atoms = positions.shape[:2]
-        frame_idx = _frame_indices(n_frames, request.frames, request.every)
-        iterations = (
-            np.asarray(data.iterations, dtype=int)
-            if data.iterations is not None
-            else np.arange(n_frames, dtype=int)
+        table = _trajectory_coord_like_table(
+            data,
+            atom_ids_req=request.atom_ids,
+            atom_types_req=request.atom_types,
+            dims_req=request.dims,
+            frames_req=request.frames,
+            every_req=request.every,
+            displacement=False,
+            reference_frame=0,
+            reporter=reporter,
         )
-        if iterations.shape[0] != n_frames:
-            raise ValueError("TrajectoryData.iterations length must match number of frames.")
-
-        if request.atom_ids is not None:
-            atom_ids = [int(a) for a in request.atom_ids]
-            atom_indices = []
-            for atom_id in atom_ids:
-                atom_idx = int(atom_id) - 1
-                if not (0 <= atom_idx < n_atoms):
-                    raise ValueError(f"atom_id {atom_id} out of range 1..{n_atoms}.")
-                atom_indices.append(atom_idx)
-        elif request.atom_types:
-            chosen = {str(t) for t in request.atom_types}
-            atom_indices = [i for i, elem in enumerate(data.elements) if str(elem) in chosen]
-            atom_ids = [int(data.atom_ids[i]) for i in atom_indices]
-        else:
-            atom_indices = list(range(n_atoms))
-            atom_ids = [int(a) for a in data.atom_ids]
-
-        rows: list[dict[str, object]] = []
-        dim_to_col = {"x": 0, "y": 1, "z": 2}
-        total_groups = max(1, len(atom_indices) * len(dims))
-        done_groups = 0
-        for atom_id, atom_idx in zip(atom_ids, atom_indices):
-            atom_type = str(data.elements[atom_idx])
-            for dim in dims:
-                col = dim_to_col[dim]
-                values = positions[frame_idx, atom_idx, col]
-                for rel_i, fi in enumerate(frame_idx):
-                    rows.append(
-                        {
-                            "frame_index": int(fi),
-                            "iter": int(iterations[fi]),
-                            "atom_id": int(atom_id),
-                            "atom_type": atom_type,
-                            "dim": str(dim),
-                            "coord": float(values[rel_i]),
-                        }
-                    )
-                done_groups += 1
-                if callable(reporter):
-                    reporter("analyze", done_groups, total_groups, "Building trajectory coordinate series")
-
-        table = pd.DataFrame(rows)
-        if not table.empty:
-            table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
-
         return TrajectoryCoordinateSeriesResult(table=table, request=request)
+
+
+@register_task("trajectory_displacement_series", label="Trajectory Displacement Series")
+class TrajectoryDisplacementSeriesTask(AnalysisTask):
+    """Build displacement time series for one or more atoms."""
+
+    required_data = TrajectoryData
+    VERSION = "1"
+
+    @staticmethod
+    def recommended_presentations(_result: TrajectoryDisplacementSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        return TrajectoryCoordinateSeriesTask.recommended_presentations(_result, payload)
+
+    def run(self, data: TrajectoryData, request: TrajectoryDisplacementSeriesRequest, reporter=None) -> TrajectoryDisplacementSeriesResult:
+        table = _trajectory_coord_like_table(
+            data,
+            atom_ids_req=request.atom_ids,
+            atom_types_req=request.atom_types,
+            dims_req=request.dims,
+            frames_req=request.frames,
+            every_req=request.every,
+            displacement=True,
+            reference_frame=request.reference_frame,
+            reporter=reporter,
+        )
+        return TrajectoryDisplacementSeriesResult(table=table, request=request)
 
 
 @register_task("cell_dimensions", label="Cell Dimensions")
@@ -1545,6 +1639,7 @@ __all__ = [
     "TimeSeriesResult",
     "SimulationScalarSeriesResult",
     "TrajectoryCoordinateSeriesResult",
+    "TrajectoryDisplacementSeriesResult",
     "CellDimensionsResult",
     "ChargeSeriesResult",
     "ElectricFieldSeriesResult",
@@ -1557,6 +1652,8 @@ __all__ = [
     "SimulationScalarSeriesTask",
     "TrajectoryCoordinateSeriesRequest",
     "TrajectoryCoordinateSeriesTask",
+    "TrajectoryDisplacementSeriesRequest",
+    "TrajectoryDisplacementSeriesTask",
     "CellDimensionsRequest",
     "CellDimensionsTask",
     "ChargeSeriesRequest",
