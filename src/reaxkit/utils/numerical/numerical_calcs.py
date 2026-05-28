@@ -1,15 +1,14 @@
-"""
-Numerical analysis helper utilities.
+"""Provide lightweight numerical calculations for 1D analysis workflows.
 
 This module provides lightweight numerical tools for analyzing one-dimensional
 data series, such as detecting zero crossings or sign changes in curves
 produced by ReaxFF simulations.
 
-Typical use cases include:
+**Usage context**
 
-- locating x-axis crossings in energy or force curves
-- identifying switching points in polarization or field-response signals
-- detecting sign changes in derived observables
+- Curve analysis: Locate x-axis crossings in sampled functions.
+- Response detection: Identify switching points in driven signals.
+- Derived metrics: Detect sign changes in transformed observables.
 """
 
 
@@ -21,27 +20,26 @@ from scipy.optimize import brentq
 
 
 def find_zero_crossings(x: Sequence[float], y: Sequence[float]) -> List[float]:
-    """
-    Find x-values where a 1D function crosses zero.
+    """Find x-values where a 1D function crosses zero.
 
     Zero crossings are identified by detecting sign changes between consecutive
     data points and estimating the root location using interpolation and
     numerical bracketing. Exact zeros at sampled points are also included.
 
     Parameters
-    ----------
+    -----
     x : sequence of float
         Monotonically ordered x-values (e.g., time, iteration index).
     y : sequence of float
         Function values corresponding to ``x``.
 
     Returns
-    -------
+    -----
     list of float
         Sorted x-values at which ``y(x) = 0``.
 
     Examples
-    --------
+    -----
     >>> find_zero_crossings(time, polarization)
     >>> find_zero_crossings(iters, energy - energy.mean())
     """

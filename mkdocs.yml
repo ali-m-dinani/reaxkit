@@ -50,6 +50,14 @@ plugins:
           show_source: false
           show_submodules: false
 
+hooks:
+- docs/hooks.py
+
+watch:
+- src
+- docs
+- mkdocs.yml
+
 nav:
 - Home: index.md
 - Installation: installation.md
@@ -91,6 +99,7 @@ nav:
     - Xmolout: api/io/handlers/xmolout_handler_doc.md
 - Analysis:
   - 🔎 Overview: api/analysis/index.md
+  - msd: api/analysis/alaki_analysis.md
   - Composed:
     - 🔎 Overview: api/analysis/composed/index.md
     - Connectivity: api/analysis/composed/connectivity_analyzer_doc.md
@@ -119,10 +128,10 @@ nav:
     - Xmolout: api/analysis/per_file/xmolout_analyzer_doc.md
 - Utils:
   - 🔎 Overview: api/utils/index.md
+  - Equation Of States: api/utils/equation_of_states.md
   - Alias: api/utils/alias_doc.md
   - Cache: api/utils/cache_doc.md
   - Constants: api/utils/constants_doc.md
-  - Equation Of States: api/utils/equation_of_states_doc.md
   - Exceptions: api/utils/exceptions_doc.md
   - Frame Utils: api/utils/frame_utils_doc.md
   - Log: api/utils/log_doc.md
@@ -141,6 +150,7 @@ nav:
     - Signal Ops: api/utils/numerical/signal_ops_doc.md
 - Workflows:
   - 🔎 Overview: api/workflows/index.md
+  - trajectory: api/workflows/alaki_workflow.md
   - Composed:
     - 🔎 Overview: api/workflows/composed/index.md
     - Coordination: api/workflows/composed/coordination_doc.md

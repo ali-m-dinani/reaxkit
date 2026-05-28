@@ -1,4 +1,15 @@
-"""Engine-agnostic coordination analysis task."""
+"""Classify per-atom coordination states from connectivity-domain inputs.
+
+This module evaluates coordination status by comparing observed bond-order
+coordination against expected valence targets. It is scoped to coordination
+label assignment and tabular output, and it does not infer hybridization states.
+
+**Usage context**
+
+- Coordination auditing: Label atoms as under/over/coordinated per frame.
+- Quality control: Compare observed coordination against force-field valences.
+- Relabeling support: Supply coordination tags for downstream trajectory tasks.
+"""
 
 from __future__ import annotations
 
@@ -20,22 +31,29 @@ from reaxkit.presentation.specs import PresentationSpec
 class CoordinationStatusRequest(BaseRequest):
     """Request for per-atom coordination-status classification.
 
-    Parameters
-    ----------
-    valences
+    Fields
+    -----
+    valences : Optional[Mapping[str, float]]
         Optional element-to-valence map used for classification.
-        Example: ``{"C": 4.0, "O": 2.0, "H": 1.0}``.
-    threshold
-        Absolute tolerance around the target valence for assigning ``coord``.
-        Example: ``0.9``.
-    frames
-        Optional frame indices to analyze. If omitted, all frames are used.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after frame selection. Example: ``every=5``.
-    require_all_valences
-        If ``True``, fail when a selected atom type has no valence mapping.
-        If ``False``, those rows are kept with NaN-derived status.
+    threshold : float
+        Absolute tolerance around target valence for assigning coordinated state.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to analyze. `None` means all frames.
+    every : int
+        Frame stride after frame selection. Must be `>= 1`.
+    require_all_valences : bool
+        If `True`, missing valence mappings raise; otherwise rows may be emitted
+        with undefined status values.
+
+    Examples
+    -----
+    ```python
+    req = CoordinationStatusRequest(valences={"C": 4.0, "O": 2.0}, threshold=0.9)
+    ```
+    Sample output:
+    `CoordinationStatusRequest(...)`
+    Meaning:
+    The request defines valence targets and tolerance for status labeling.
     """
 
     valences: Optional[Mapping[str, float]] = dc_field(
@@ -90,20 +108,25 @@ class CoordinationStatusRequest(BaseRequest):
 class CoordinationStatusResult(BaseResult):
     """Coordination-status analysis result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`CoordinationStatusRequest` used for this run.
-    - ``table``: pandas.DataFrame with one row per atom per analyzed frame.
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with one row per atom per analyzed frame. Typical columns:
+        `frame_index`, `iter`, `atom_id`, `atom_type`, `sum_BOs`, `valence`,
+        `delta`, `status`, `status_label`.
+    request : CoordinationStatusRequest
+        Request object used for this analysis run.
 
-    Typical columns
-    ---------------
-    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
-    ``valence``, ``delta``, ``status``, ``status_label``.
-
-    Example
-    -------
-    A representative row:
-    ``frame_index=12, atom_id=7, atom_type='C', sum_BOs=3.95, valence=4.0, status_label='coord'``.
+    Examples
+    -----
+    ```python
+    result = CoordinationStatusTask().run(bundle, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame rows labeled as `under`, `coord`, or `over`.
+    Meaning:
+    Each row is one atom-frame coordination classification.
     """
 
     table: pd.DataFrame
@@ -243,6 +266,34 @@ class CoordinationStatusTask(AnalysisTask):
         _result: CoordinationStatusResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for coordination outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : CoordinationStatusResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and trend plotting.
+
+        Examples
+        -----
+        ```python
+        specs = CoordinationStatusTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A table view plus a delta/sum_BOs-vs-frame plot view when columns exist.
+        Meaning:
+        Coordination outputs can be rendered with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -279,6 +330,36 @@ class CoordinationStatusTask(AnalysisTask):
         request: CoordinationStatusRequest,
         reporter=None,
     ) -> CoordinationStatusResult:
+        """Compute per-atom coordination status across selected frames.
+
+        Works on
+        -----
+        `CoordinationStatusBundleData` plus `CoordinationStatusRequest` inputs
+
+        Parameters
+        -----
+        data : CoordinationStatusBundleData
+            Bundle containing connectivity and force-field parameter data.
+        request : CoordinationStatusRequest
+            Selection, valence mapping, and tolerance configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during frame processing.
+
+        Returns
+        -----
+        CoordinationStatusResult
+            Coordination status table with one row per atom-frame.
+
+        Examples
+        -----
+        ```python
+        result = CoordinationStatusTask().run(bundle, req)
+        ```
+        Sample output:
+        `result.table` with `status` and `status_label` columns.
+        Meaning:
+        Atom coordination is classified using BO sums versus valence targets.
+        """
         connectivity = data.connectivity
         force_field = data.force_field_parameters
         sum_bos_m = _sum_bond_orders_matrix(connectivity)

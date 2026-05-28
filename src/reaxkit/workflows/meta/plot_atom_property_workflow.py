@@ -1,4 +1,13 @@
-"""Direct command workflow for spatial per-atom property plots."""
+"""Direct command workflow for spatial per-atom property plots.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -38,6 +47,7 @@ _PROPERTY_ALIASES = {
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific loading rules.")
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets base context for file discovery.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path.")
@@ -49,6 +59,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common arguments."""
     parser.add_argument("--property", default=None, help="Property to map: charge, q, partial_charge, sum_BOs, connectivity. Example: --property charge, which colors atoms by partial charge.")
     parser.add_argument(
         "--frames",
@@ -68,6 +79,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _parse_bins(spec: str) -> int | tuple[int, int]:
+    """Parse bins."""
     if "," in spec:
         nx, ny = [int(token.strip()) for token in spec.split(",", maxsplit=1)]
         return (nx, ny)
@@ -75,6 +87,7 @@ def _parse_bins(spec: str) -> int | tuple[int, int]:
 
 
 def _canonical_property(spec: str | None, *, allow_count: bool = False) -> str:
+    """Canonical property."""
     if not spec:
         if allow_count:
             return "count"
@@ -88,11 +101,13 @@ def _canonical_property(spec: str | None, *, allow_count: bool = False) -> str:
 
 
 def _selected_frames(n_frames: int, frames: list[int] | None, every: int) -> list[int]:
+    """Selected frames."""
     idx = list(range(n_frames)) if frames is None else [int(i) for i in frames]
     return [i for i in idx if 0 <= i < n_frames][:: max(1, int(every))]
 
 
 def _normalized_args(args: argparse.Namespace) -> dict:
+    """Normalized args."""
     normalized = normalize_storage_args(vars(args))
     for key, value in normalized.items():
         setattr(args, key, value)
@@ -100,6 +115,7 @@ def _normalized_args(args: argparse.Namespace) -> dict:
 
 
 def _detection_path(args_map: dict) -> str:
+    """Detection path."""
     for key in ("input", "xmolout", "fort7", "run_dir"):
         value = args_map.get(key)
         if value:
@@ -108,6 +124,7 @@ def _detection_path(args_map: dict) -> str:
 
 
 def _resolve_adapter(args: argparse.Namespace):
+    """Resolve adapter."""
     args_map = _normalized_args(args)
     return resolve_engine(_detection_path(args_map), engine=getattr(args, "engine", None))
 
@@ -117,6 +134,7 @@ def _load_domain_data(
     *,
     property_name: str,
 ) -> tuple[TrajectoryData, ChargeData | None, ConnectivityData | None]:
+    """Load domain data."""
     adapter = _resolve_adapter(args)
     load_args = _normalized_args(args)
     trajectory = adapter.load(TrajectoryData, load_args)
@@ -133,6 +151,7 @@ def _value_matrix(
     n_frames: int,
     n_atoms: int,
 ) -> np.ndarray:
+    """Value matrix."""
     if canonical_property == "charge":
         if charges is None:
             raise ValueError("ChargeData is required for charge plots.")
@@ -165,6 +184,7 @@ def _assemble_table(
     atom_ids: list[int] | None,
     atom_types: list[str] | None,
 ) -> pd.DataFrame:
+    """Assemble table."""
     positions = np.asarray(trajectory.positions, dtype=float)
     if positions.ndim != 3:
         raise ValueError("TrajectoryData.positions must have shape (n_frames, n_atoms, 3).")
@@ -228,6 +248,7 @@ def _assemble_table(
 
 
 def _render_frame_payloads(table: pd.DataFrame, args: argparse.Namespace, *, mode: str) -> None:
+    """Render frame payloads."""
     save_dir = Path(args.save) if args.save else None
     if save_dir:
         save_dir.mkdir(parents=True, exist_ok=True)
@@ -284,6 +305,27 @@ def _render_frame_payloads(table: pd.DataFrame, args: argparse.Namespace, *, mod
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
     parser.set_defaults(command="plot_atom_property")
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -312,6 +354,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     mode = str(args.type)
     property_name = _canonical_property(getattr(args, "property", None), allow_count=(mode == "heatmap2d"))

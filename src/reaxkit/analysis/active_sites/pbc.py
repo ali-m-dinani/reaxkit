@@ -1,4 +1,15 @@
-"""Periodic-cell helpers for active-site analysis."""
+"""Provide periodic-cell helpers for active-site trajectory analyses.
+
+This module implements cell-matrix conversion and minimum-image operations used
+by active-site structural and event analyzers. It is scoped to geometric/PBC
+utilities and does not execute analyzer task workflows directly.
+
+**Usage context**
+
+- Cell handling: Build Cartesian cell matrices from lengths/angles per frame.
+- PBC distances: Evaluate minimum-image vectors and pair distances.
+- Active-site tasks: Reuse shared periodic geometry logic across modules.
+"""
 
 from __future__ import annotations
 
@@ -13,11 +24,26 @@ def cell_matrix_from_lengths_angles(lengths: np.ndarray, angles_deg: np.ndarray)
     """Build a 3x3 cell matrix from lengths and angles.
 
     Parameters
-    ----------
-    lengths
-        Array-like [a, b, c].
-    angles_deg
-        Array-like [alpha, beta, gamma] in degrees.
+    -----
+    lengths : np.ndarray
+        Lattice lengths `[a, b, c]`.
+    angles_deg : np.ndarray
+        Lattice angles `[alpha, beta, gamma]` in degrees.
+
+    Returns
+    -----
+    np.ndarray
+        `3x3` Cartesian cell matrix with lattice vectors as rows.
+
+    Examples
+    -----
+    ```python
+    h = cell_matrix_from_lengths_angles(np.array([10.0, 10.0, 20.0]), np.array([90.0, 90.0, 120.0]))
+    ```
+    Sample output:
+    `array([[...], [...], [...]])`
+    Meaning:
+    The matrix maps fractional vectors into Cartesian coordinates.
     """
     a, b, c = [float(v) for v in np.asarray(lengths, dtype=float).reshape(3)]
     alpha, beta, gamma = np.radians(np.asarray(angles_deg, dtype=float).reshape(3))
@@ -61,7 +87,30 @@ def _cell_from_simulation(simulation: Optional[SimulationData], frame_index: int
 
 
 def frame_cell_matrix(data: ConnectivityTrajectoryData | TrajectoryData, frame_index: int) -> Optional[np.ndarray]:
-    """Return frame cell matrix when available, else None."""
+    """Return the frame-specific cell matrix when simulation metadata is present.
+
+    Parameters
+    -----
+    data : ConnectivityTrajectoryData | TrajectoryData
+        Input trajectory container with optional simulation cell arrays.
+    frame_index : int
+        Frame index for which the cell matrix is requested.
+
+    Returns
+    -----
+    Optional[np.ndarray]
+        `3x3` cell matrix for the frame, or `None` if unavailable/invalid.
+
+    Examples
+    -----
+    ```python
+    cell = frame_cell_matrix(data, 0)
+    ```
+    Sample output:
+    `array([[...], [...], [...]])` or `None`
+    Meaning:
+    Active-site analyzers can branch between periodic and non-periodic logic.
+    """
     if isinstance(data, ConnectivityTrajectoryData):
         cell = _cell_from_simulation(data.trajectory.simulation, frame_index)
         if cell is not None:
@@ -71,7 +120,30 @@ def frame_cell_matrix(data: ConnectivityTrajectoryData | TrajectoryData, frame_i
 
 
 def minimum_image_vectors(delta: np.ndarray, cell: Optional[np.ndarray]) -> np.ndarray:
-    """Apply minimum-image convention to displacement vectors."""
+    """Apply minimum-image convention to one or more displacement vectors.
+
+    Parameters
+    -----
+    delta : np.ndarray
+        Displacement vectors, shape `(n, 3)` or broadcast-compatible.
+    cell : Optional[np.ndarray]
+        `3x3` cell matrix. If `None`, vectors are returned unchanged.
+
+    Returns
+    -----
+    np.ndarray
+        Minimum-image-adjusted displacement vectors in Cartesian space.
+
+    Examples
+    -----
+    ```python
+    adj = minimum_image_vectors(delta, cell)
+    ```
+    Sample output:
+    `array([...])`
+    Meaning:
+    Distances computed from `adj` respect periodic wrapping.
+    """
     if cell is None:
         return np.asarray(delta, dtype=float)
     delta = np.asarray(delta, dtype=float)
@@ -85,12 +157,60 @@ def minimum_image_vectors(delta: np.ndarray, cell: Optional[np.ndarray]) -> np.n
 
 
 def minimum_image_vector(delta: np.ndarray, cell: Optional[np.ndarray]) -> np.ndarray:
-    """Apply minimum-image convention to one vector."""
+    """Apply minimum-image convention to a single displacement vector.
+
+    Parameters
+    -----
+    delta : np.ndarray
+        Single Cartesian displacement vector, shape `(3,)`.
+    cell : Optional[np.ndarray]
+        `3x3` cell matrix. If `None`, the input vector is returned.
+
+    Returns
+    -----
+    np.ndarray
+        Minimum-image-adjusted single displacement vector.
+
+    Examples
+    -----
+    ```python
+    v = minimum_image_vector(np.array([9.5, 0.0, 0.0]), cell)
+    ```
+    Sample output:
+    `array([-0.5, 0.0, 0.0])`
+    Meaning:
+    The vector is wrapped to the shortest periodic image.
+    """
     return minimum_image_vectors(np.asarray(delta, dtype=float).reshape(1, 3), cell)[0]
 
 
 def pairwise_min_image_distances(a: np.ndarray, b: np.ndarray, cell: Optional[np.ndarray]) -> np.ndarray:
-    """Pairwise distances between points in `a` and `b` with optional PBC."""
+    """Compute pairwise distances between point sets with optional PBC.
+
+    Parameters
+    -----
+    a : np.ndarray
+        First point set, shape `(na, 3)`.
+    b : np.ndarray
+        Second point set, shape `(nb, 3)`.
+    cell : Optional[np.ndarray]
+        `3x3` cell matrix. If provided, minimum-image distances are used.
+
+    Returns
+    -----
+    np.ndarray
+        Distance matrix of shape `(na, nb)`.
+
+    Examples
+    -----
+    ```python
+    d = pairwise_min_image_distances(c_positions, o_positions, cell)
+    ```
+    Sample output:
+    `array([[...], [...]])`
+    Meaning:
+    Each entry is the shortest periodic distance between one `a` point and one `b` point.
+    """
     if a.size == 0 or b.size == 0:
         return np.empty((a.shape[0], b.shape[0]), dtype=float)
     delta = a[:, np.newaxis, :] - b[np.newaxis, :, :]

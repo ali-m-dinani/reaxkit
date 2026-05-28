@@ -1,4 +1,13 @@
-"""Study planning workflow: generate sweep/replicate folder structures from YAML."""
+"""Study planning workflow: generate sweep/replicate folder structures from YAML.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -232,6 +241,7 @@ def _write_study_run_status(
     rows: list[dict[str, Any]],
     summary: dict[str, Any],
 ) -> tuple[Path, Path]:
+    """Write study run status."""
     return _io_write_study_run_status(
         study_root=study_root,
         rows=rows,
@@ -249,6 +259,7 @@ def _write_named_status(
     csv_name: str,
     json_name: str,
 ) -> tuple[Path, Path]:
+    """Write named status."""
     return _io_write_named_status(
         study_root=study_root,
         rows=rows,
@@ -259,16 +270,19 @@ def _write_named_status(
 
 
 def _resolve_existing_file(primary: Path, *fallbacks: str) -> Path:
+    """Resolve existing file."""
     return _io_resolve_existing_file(primary, *fallbacks)
 
 
 def _run_stage_manifest_path(stage_dir: Path) -> Path:
+    """Run stage manifest path."""
     return _io_run_stage_manifest_path(
         stage_dir, run_stage_manifest_file=RUN_STAGE_MANIFEST_FILE, legacy_stage_manifest_file=LEGACY_STAGE_MANIFEST_FILE
     )
 
 
 def _run_replicate_manifest_path(rep_dir: Path) -> Path:
+    """Run replicate manifest path."""
     return _io_run_replicate_manifest_path(
         rep_dir,
         run_replicate_manifest_file=RUN_REPLICATE_MANIFEST_FILE,
@@ -277,18 +291,21 @@ def _run_replicate_manifest_path(rep_dir: Path) -> Path:
 
 
 def _run_case_manifest_path(case_dir: Path) -> Path:
+    """Run case manifest path."""
     return _io_run_case_manifest_path(
         case_dir, run_case_manifest_file=RUN_CASE_MANIFEST_FILE, legacy_case_manifest_file=LEGACY_CASE_MANIFEST_FILE
     )
 
 
 def _run_status_csv_path(study_root: Path) -> Path:
+    """Run status csv path."""
     return _io_run_status_csv_path(
         study_root, run_status_csv_file=RUN_STATUS_CSV_FILE, legacy_run_status_csv_file=LEGACY_RUN_STATUS_CSV_FILE
     )
 
 
 def _analysis_status_csv_path(study_root: Path) -> Path:
+    """Analysis status csv path."""
     return _io_analysis_status_csv_path(
         study_root,
         analysis_status_csv_file=ANALYSIS_STATUS_CSV_FILE,
@@ -297,6 +314,7 @@ def _analysis_status_csv_path(study_root: Path) -> Path:
 
 
 def _load_study_run_status_rows(study_root: Path) -> list[dict[str, str]]:
+    """Load study run status rows."""
     csv_path = _run_status_csv_path(study_root)
     return _io_load_status_rows(
         csv_path,
@@ -308,6 +326,7 @@ def _load_study_run_status_rows(study_root: Path) -> list[dict[str, str]]:
 
 
 def _load_analysis_status_rows(study_root: Path) -> list[dict[str, str]]:
+    """Load analysis status rows."""
     csv_path = _analysis_status_csv_path(study_root)
     return _io_load_status_rows(
         csv_path,
@@ -319,6 +338,7 @@ def _load_analysis_status_rows(study_root: Path) -> list[dict[str, str]]:
 
 
 def _to_int(value: Any) -> int:
+    """To int."""
     try:
         return int(value)
     except Exception:
@@ -326,6 +346,7 @@ def _to_int(value: Any) -> int:
 
 
 def _cleanup_stage_artifacts(stage_dir: Path) -> int:
+    """Cleanup stage artifacts."""
     removed = 0
     for pattern in RR_CLEANUP_PATTERNS:
         for target in stage_dir.glob(pattern):
@@ -343,26 +364,32 @@ def _cleanup_stage_artifacts(stage_dir: Path) -> int:
 
 
 def _render_value(value: Any, context: dict[str, Any]) -> Any:
+    """Render value."""
     return _init_render_value(value, context)
 
 
 def _enumerate_cases(parameters: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    """Enumerate cases."""
     return _init_enumerate_cases(parameters)
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write json."""
     _io_write_json(path, payload)
 
 
 def _resolve_template_path(template_value: str, *, study_dir: Path) -> Path:
+    """Resolve template path."""
     return _init_resolve_template_path(template_value, study_dir=study_dir)
 
 
 def _copy_template_into_replicate(*, template_root: Path, replicate_dir: Path) -> None:
+    """Copy template into replicate."""
     _init_copy_template_into_replicate(template_root=template_root, replicate_dir=replicate_dir)
 
 
 def _apply_stage_slurm_job_name(*, stage_dir: Path, case_number: int, replicate_number: int, stage_name: str) -> None:
+    """Apply stage slurm job name."""
     _init_apply_stage_slurm_job_name(
         stage_dir=stage_dir,
         case_number=case_number,
@@ -372,10 +399,12 @@ def _apply_stage_slurm_job_name(*, stage_dir: Path, case_number: int, replicate_
 
 
 def _collect_template_stage_relpaths(*, template_root: Path, stage_names: list[str]) -> dict[str, Path]:
+    """Collect template stage relpaths."""
     return _init_collect_template_stage_relpaths(template_root=template_root, stage_names=stage_names)
 
 
 def _normalize_control_overrides(overrides: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Normalize control overrides."""
     if overrides is None:
         return None
     out: dict[str, Any] = {}
@@ -387,6 +416,7 @@ def _normalize_control_overrides(overrides: dict[str, Any] | None) -> dict[str, 
 
 
 def _as_stage_artifact_ref(value: str) -> ArtifactRef:
+    """As stage artifact ref."""
     text = str(value).strip()
     if "." not in text:
         raise ValueError(f"Artifact reference must be '<stage>.<artifact>', got: {text!r}")
@@ -399,6 +429,7 @@ def _as_stage_artifact_ref(value: str) -> ArtifactRef:
 
 
 def _collect_stage_produces(rendered_stage: dict[str, Any]) -> dict[str, str]:
+    """Collect stage produces."""
     produced: dict[str, str] = {}
     produces = rendered_stage.get("produces")
     if isinstance(produces, dict):
@@ -420,6 +451,7 @@ def _collect_stage_produces(rendered_stage: dict[str, Any]) -> dict[str, str]:
 
 
 def _normalize_stage_consumes(rendered_stage: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Normalize stage consumes."""
     consumes: dict[str, dict[str, Any]] = {}
     raw = rendered_stage.get("consumes")
     if isinstance(raw, dict):
@@ -443,6 +475,7 @@ def _normalize_stage_consumes(rendered_stage: dict[str, Any]) -> dict[str, dict[
 
 
 def _resolve_cli_script_path(script_value: str, *, study_dir: Path) -> str:
+    """Resolve cli script path."""
     script_path = Path(str(script_value))
     if script_path.is_absolute():
         return str(script_path)
@@ -456,6 +489,7 @@ def _run_geometry_generation_if_needed(
     study_dir: Path,
     enabled: bool,
 ) -> dict[str, Any] | None:
+    """Run geometry generation if needed."""
     cfg = rendered_stage.get("geometry_generator")
     if not isinstance(cfg, dict):
         return None
@@ -501,6 +535,7 @@ def _run_geometry_generation_if_needed(
 
 
 def _default_consume_destination(stage_dir: Path, *, local_artifact: str, source: Path) -> Path:
+    """Default consume destination."""
     suffix = source.suffix if source.suffix else ".dat"
     return stage_dir / "inputs" / f"{local_artifact}{suffix}"
 
@@ -511,6 +546,7 @@ def _transfer_artifact(
     *,
     transfer_mode: str,
 ) -> dict[str, Any]:
+    """Transfer artifact."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() or destination.is_symlink():
         if destination.is_dir() and not destination.is_symlink():
@@ -541,6 +577,7 @@ def _propagate_stage_consumes(
     produced_artifacts: dict[tuple[str, str], Path],
     transfer_mode: str,
 ) -> list[dict[str, Any]]:
+    """Propagate stage consumes."""
     consumes = _normalize_stage_consumes(rendered_stage)
     if not consumes:
         return []
@@ -594,6 +631,7 @@ def _write_stage_control_if_needed(
     rendered_stage: dict[str, Any],
     study_dir: Path,
 ) -> tuple[Path | None, str | None]:
+    """Write stage control if needed."""
     control_cfg = rendered_stage.get("control")
     if not isinstance(control_cfg, dict):
         return None, None
@@ -647,6 +685,7 @@ def _init_study(
     artifact_transfer: str,
     strict_actions: bool,
 ) -> Path:
+    """Init study."""
     if artifact_transfer not in SUPPORTED_ARTIFACT_TRANSFER:
         raise ValueError(
             f"Unsupported artifact transfer mode: {artifact_transfer}. "
@@ -890,6 +929,7 @@ def _init_study(
 
 
 def _write_study_template(path: Path, *, force: bool) -> Path:
+    """Write study template."""
     if path.exists() and not force:
         raise FileExistsError(f"Refusing to overwrite existing file: {path}. Use --force.")
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -898,6 +938,7 @@ def _write_study_template(path: Path, *, force: bool) -> Path:
 
 
 def _read_json(path: Path) -> dict[str, Any]:
+    """Read json."""
     return _io_read_json(path)
 
 
@@ -907,6 +948,7 @@ def _rename_case_directories(
     case_filter: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Rename case directories."""
     return _manage_rename_case_directories(
         study_root=study_root,
         case_filter=case_filter,
@@ -916,6 +958,7 @@ def _rename_case_directories(
 
 
 def _prompt_with_default(label: str, default: str | None) -> str | None:
+    """Prompt with default."""
     base = (default or "").strip()
     msg = f"{label} [{base}]: " if base else f"{label}: "
     entered = input(msg).strip()
@@ -931,6 +974,7 @@ def _update_study_directory_paths(
     replicate_filter: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Update study directory paths."""
     return _manage_update_study_directory_paths(
         study_root=study_root,
         case_filter=case_filter,
@@ -942,42 +986,52 @@ def _update_study_directory_paths(
 
 
 def _stage_status_path(stage_dir: Path) -> Path:
+    """Stage status path."""
     return _io_stage_status_path(stage_dir, stage_status_file=STAGE_STATUS_FILE)
 
 
 def _load_stage_status(stage_dir: Path) -> dict[str, Any]:
+    """Load stage status."""
     return _io_load_stage_status(stage_dir, stage_status_file=STAGE_STATUS_FILE)
 
 
 def _write_stage_status(stage_dir: Path, status: dict[str, Any]) -> None:
+    """Write stage status."""
     _io_write_stage_status(stage_dir, status, stage_status_file=STAGE_STATUS_FILE)
 
 
 def _analysis_status_path(stage_dir: Path) -> Path:
+    """Analysis status path."""
     return _io_analysis_status_path(stage_dir, analysis_status_file=ANALYSIS_STATUS_FILE)
 
 
 def _load_analysis_status(stage_dir: Path) -> dict[str, Any]:
+    """Load analysis status."""
     return _io_load_analysis_status(stage_dir, analysis_status_file=ANALYSIS_STATUS_FILE)
 
 
 def _write_analysis_status(stage_dir: Path, status: dict[str, Any]) -> None:
+    """Write analysis status."""
     _io_write_analysis_status(stage_dir, status, analysis_status_file=ANALYSIS_STATUS_FILE)
 
 
 def _analysis_manifest_path(stage_dir: Path) -> Path:
+    """Analysis manifest path."""
     return _io_analysis_manifest_path(stage_dir, analysis_manifest_file=ANALYSIS_MANIFEST_FILE)
 
 
 def _load_analysis_manifest(stage_dir: Path) -> dict[str, Any]:
+    """Load analysis manifest."""
     return _io_load_analysis_manifest(stage_dir, analysis_manifest_file=ANALYSIS_MANIFEST_FILE)
 
 
 def _write_analysis_manifest(stage_dir: Path, payload: dict[str, Any]) -> None:
+    """Write analysis manifest."""
     _io_write_analysis_manifest(stage_dir, payload, analysis_manifest_file=ANALYSIS_MANIFEST_FILE)
 
 
 def _extract_result_dirs_from_text(text: str) -> list[str]:
+    """Extract result dirs from text."""
     lines = str(text or "").splitlines()
     out: list[str] = []
     in_block = False
@@ -1002,6 +1056,7 @@ def _extract_result_dirs_from_text(text: str) -> list[str]:
 
 
 def _collect_result_dirs_from_step_records(step_records: list[dict[str, Any]]) -> list[str]:
+    """Collect result dirs from step records."""
     dirs: list[str] = []
     for rec in step_records:
         if not isinstance(rec, dict):
@@ -1023,6 +1078,7 @@ def _collect_result_dirs_from_step_records(step_records: list[dict[str, Any]]) -
 
 
 def _case_matches_selector(case_entry: dict[str, Any], selector: str | None) -> bool:
+    """Case matches selector."""
     if not selector:
         return True
     needle = _canonical_token(selector)
@@ -1042,6 +1098,7 @@ def _case_matches_selector(case_entry: dict[str, Any], selector: str | None) -> 
 
 
 def _replicate_variants(value: str | None) -> set[str]:
+    """Replicate variants."""
     base = str(value or "").strip()
     if not base:
         return set()
@@ -1054,6 +1111,7 @@ def _replicate_variants(value: str | None) -> set[str]:
 
 
 def _replicate_matches_selector(replicate_id: str, selector: str | None) -> bool:
+    """Replicate matches selector."""
     if not selector:
         return True
     rep_tokens = {_canonical_token(v) for v in _replicate_variants(replicate_id)}
@@ -1066,6 +1124,7 @@ def _replicate_matches_selector(replicate_id: str, selector: str | None) -> bool
 
 
 def _build_declared_produced_map(replicate_manifest: dict[str, Any]) -> dict[tuple[str, str], Path]:
+    """Build declared produced map."""
     produced: dict[tuple[str, str], Path] = {}
     for stage_entry in replicate_manifest.get("stages") or []:
         if not isinstance(stage_entry, dict):
@@ -1091,6 +1150,7 @@ def _is_stage_ready(
     status_by_stage: dict[str, str],
     produced_artifacts: dict[tuple[str, str], Path],
 ) -> tuple[bool, str]:
+    """Is stage ready."""
     stage_name = str(stage_manifest.get("stage") or "")
     depends_on = str(stage_manifest.get("depends_on") or "").strip()
     if depends_on and status_by_stage.get(depends_on) != "completed":
@@ -1117,6 +1177,7 @@ def _submit_stage_job(
     *,
     study_dir: Path,
 ) -> dict[str, Any] | None:
+    """Submit stage job."""
     submit_cfg = rendered_stage.get("submit")
     if not isinstance(submit_cfg, dict):
         return None
@@ -1155,6 +1216,7 @@ def _submit_stage_job(
 
 
 def _rewrite_python_script_tokens(command: str, *, study_dir: Path) -> str:
+    """Rewrite python script tokens."""
     rewritten = str(command)
     for token in str(command).split():
         raw = token.strip().strip("'\"")
@@ -1173,6 +1235,7 @@ def _run_single_step_command(
     command: str,
     workdir: str | None = None,
 ) -> dict[str, Any]:
+    """Run single step command."""
     command_tokens = str(command).strip().split()
     if command_tokens and command_tokens[0].lower() == "sbatch" and "--wait" not in command_tokens:
         command = "sbatch --wait " + " ".join(command_tokens[1:])
@@ -1206,6 +1269,7 @@ def _execute_stage_steps_if_any(
     rendered_stage: dict[str, Any],
     study_dir: Path,
 ) -> list[dict[str, Any]] | None:
+    """Execute stage steps if any."""
     raw_steps = rendered_stage.get("steps")
     if raw_steps is None:
         return None
@@ -1259,6 +1323,7 @@ def _execute_stage_run(
     run_geometry_generator: bool,
     strict_actions: bool,
 ) -> dict[str, Any]:
+    """Execute stage run."""
     rendered_stage = stage_manifest.get("rendered_stage") or {}
     if not isinstance(rendered_stage, dict):
         raise ValueError(f"Invalid rendered_stage in {stage_dir}")
@@ -1357,6 +1422,7 @@ def _run_single_replicate_pipeline(
     strict_actions: bool,
     cleanup_before_stage: bool,
 ) -> dict[str, Any]:
+    """Run single replicate pipeline."""
     counts = {"completed": 0, "skipped": 0, "failed": 0, "not_ready": 0}
     started_at = _local_now()
     rep_id = str(rep.get("replicate_id") or "")
@@ -1513,6 +1579,7 @@ def _run_study(
     parallel_workers: int,
     rerun_failed: bool,
 ) -> dict[str, int]:
+    """Run study."""
     return _engine_run_study(
         study_root=study_root,
         stage_filter=stage_filter,
@@ -1535,6 +1602,7 @@ def _run_study(
 
 
 def _normalize_analysis_variables(payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Normalize analysis variables."""
     variables: dict[str, dict[str, str]] = {}
     raw = payload.get("variables")
     if not isinstance(raw, dict):
@@ -1559,6 +1627,7 @@ def _run_analysis_steps(
     rendered_analysis: dict[str, Any],
     study_dir: Path,
 ) -> list[dict[str, Any]]:
+    """Run analysis steps."""
     raw_steps = rendered_analysis.get("steps")
     command = str(rendered_analysis.get("command") or "").strip()
     if raw_steps is None:
@@ -1609,6 +1678,7 @@ def _analyze_study(
     strict_actions: bool,
     rerun_failed: bool,
 ) -> dict[str, Any]:
+    """Analyze study."""
     return _engine_analyze_study(
         study_root=study_root,
         analysis_filter=analysis_filter,
@@ -1645,14 +1715,17 @@ def _analyze_study(
 
 
 def _safe_float(value: Any) -> float | None:
+    """Safe float."""
     return _agg_safe_float(value)
 
 
 def _stat_value(row: dict[str, Any], key: str) -> Any:
+    """Stat value."""
     return _agg_stat_value(row, key)
 
 
 def _load_csv_rows(path: Path) -> list[dict[str, str]]:
+    """Load csv rows."""
     return _agg_load_csv_rows(path)
 
 
@@ -1661,10 +1734,12 @@ def _extract_scalar_from_csv(
     *,
     value_column: str | None,
 ) -> tuple[float | None, str | None]:
+    """Extract scalar from csv."""
     return _agg_extract_scalar_from_csv(csv_path, value_column=value_column)
 
 
 def _load_column_values(csv_path: Path, column: str) -> list[Any]:
+    """Load column values."""
     return _agg_load_column_values(csv_path, column)
 
 
@@ -1674,6 +1749,7 @@ def _resolve_variable_file_for_run(
     spec: dict[str, str],
     result_dirs: list[str] | None,
 ) -> Path | None:
+    """Resolve variable file for run."""
     return _agg_resolve_variable_file_for_run(stage_dir=stage_dir, spec=spec, result_dirs=result_dirs)
 
 
@@ -1682,26 +1758,32 @@ def _apply_reducer_to_series(
     pairs: list[tuple[Any, Any]],
     reducer: str,
 ) -> list[tuple[Any, float]]:
+    """Apply reducer to series."""
     return _agg_apply_reducer_to_series(pairs=pairs, reducer=reducer)
 
 
 def _compute_stats(values: list[float], wanted: list[str]) -> dict[str, float]:
+    """Compute stats."""
     return _agg_compute_stats(values, wanted)
 
 
 def _normalize_stage_variables(rendered_stage: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Normalize stage variables."""
     return _agg_normalize_stage_variables(rendered_stage)
 
 
 def _resolve_variable_csv_path(*, stage_dir: Path, spec: dict[str, str]) -> Path | None:
+    """Resolve variable csv path."""
     return _agg_resolve_variable_csv_path(stage_dir=stage_dir, spec=spec)
 
 
 def _sort_values(values: list[Any]) -> list[Any]:
+    """Sort values."""
     return _agg_sort_values(values)
 
 
 def _to_plot_value(v: Any):
+    """To plot value."""
     return _agg_to_plot_value(v)
 
 
@@ -1713,6 +1795,7 @@ def _make_aggregate_plot(
     metric_std_col: str,
     out_path: Path,
 ) -> tuple[bool, str]:
+    """Make aggregate plot."""
     try:
         import matplotlib.pyplot as plt
     except Exception as exc:
@@ -1768,6 +1851,7 @@ def _aggregate_from_definition(
     analysis_def: AnalysisDef,
     stage_filter: str | None,
 ) -> dict[str, Any]:
+    """Aggregate from definition."""
     if stage_filter and analysis_def.run_stage != stage_filter:
         raise ValueError(
             f"Aggregate '{aggregate_def.title}' targets run_stage '{analysis_def.run_stage}', "
@@ -2051,6 +2135,7 @@ def _iter_replicate_variable_records(
     stage_filter: str | None,
     value_column_override: str | None,
 ) -> tuple[list[dict[str, Any]], str | None]:
+    """Iter replicate variable records."""
     analysis_defs_raw = study_manifest.get("analysis") or []
     source_yaml = Path(str(study_manifest.get("source_yaml") or "")).resolve()
     if source_yaml.exists():
@@ -2207,6 +2292,7 @@ def _aggregate_study_analysis(
     value_column: str | None,
     stage_filter: str | None,
 ) -> dict[str, Any]:
+    """Aggregate study analysis."""
     return _engine_aggregate_study_analysis(
         study_root=study_root,
         analysis_name=analysis_name,
@@ -2233,6 +2319,7 @@ def _aggregate_study_all(
     value_column: str | None,
     legacy_analysis_name: str | None,
 ) -> list[dict[str, Any]]:
+    """Aggregate study all."""
     return _engine_aggregate_study_all(
         study_root=study_root,
         aggregate_title_filter=aggregate_title_filter,
@@ -2254,10 +2341,12 @@ def _aggregate_study_all(
 
 
 def _sort_plot_x(values: list[Any]) -> list[Any]:
+    """Sort plot x."""
     return _present_sort_plot_x(values, sort_values_fn=_sort_values)
 
 
 def _make_errorbar_plots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: str) -> list[Path]:
+    """Make errorbar plots for case aggregate."""
     return _present_make_errorbar_plots_for_case_aggregate(
         case_agg_dir,
         aggregate_title=aggregate_title,
@@ -2270,6 +2359,7 @@ def _make_errorbar_plots_for_case_aggregate(case_agg_dir: Path, *, aggregate_tit
 
 
 def _make_boxplots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: str) -> list[Path]:
+    """Make boxplots for case aggregate."""
     return _present_make_boxplots_for_case_aggregate(
         case_agg_dir,
         aggregate_title=aggregate_title,
@@ -2282,14 +2372,17 @@ def _make_boxplots_for_case_aggregate(case_agg_dir: Path, *, aggregate_title: st
 
 
 def _row_key_from_params(row: dict[str, str], param_cols: list[str]) -> str:
+    """Row key from params."""
     return _present_row_key_from_params(row, param_cols)
 
 
 def _find_param_columns(rows: list[dict[str, str]]) -> list[str]:
+    """Find param columns."""
     return _present_find_param_columns(rows)
 
 
 def _make_all_cases_errorbar_plots(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    """Make all cases errorbar plots."""
     return _present_make_all_cases_errorbar_plots(
         across_dir,
         aggregate_title=aggregate_title,
@@ -2313,6 +2406,7 @@ def _make_heatmap_from_rows(
     out_path: Path,
     title: str,
 ) -> Path | None:
+    """Make heatmap from rows."""
     return _present_make_heatmap_from_rows(
         rows=rows,
         x_param=x_param,
@@ -2327,6 +2421,7 @@ def _make_heatmap_from_rows(
 
 
 def _make_all_cases_heatmaps(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    """Make all cases heatmaps."""
     return _present_make_all_cases_heatmaps(
         across_dir,
         aggregate_title=aggregate_title,
@@ -2339,6 +2434,7 @@ def _make_all_cases_heatmaps(across_dir: Path, *, aggregate_title: str) -> list[
 
 
 def _make_all_cases_per_iter_boxplots(across_dir: Path, *, aggregate_title: str) -> list[Path]:
+    """Make all cases per iter boxplots."""
     return _present_make_all_cases_per_iter_boxplots(
         across_dir,
         aggregate_title=aggregate_title,
@@ -2358,6 +2454,7 @@ def _plot_study_aggregates(
     aggregate_title_filter: str | None,
     case_filter: str | None,
 ) -> dict[str, Any]:
+    """Plot study aggregates."""
     return _engine_plot_study_aggregates(
         study_root=study_root,
         aggregate_title_filter=aggregate_title_filter,
@@ -2388,6 +2485,7 @@ def _remove_analysis_outputs(
     replicate_filter: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Remove analysis outputs."""
     study_manifest = _read_json(study_root / "study_manifest.json")
     doc = _load_source_study_doc(study_manifest)
     analysis_defs = _analysis_defs_from_doc(doc)
@@ -2495,6 +2593,7 @@ def _remove_aggregate_outputs(
     case_filter: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Remove aggregate outputs."""
     study_manifest = _read_json(study_root / "study_manifest.json")
     doc = _load_source_study_doc(study_manifest)
     aggregate_defs = _aggregate_defs_from_doc(doc)
@@ -2556,6 +2655,7 @@ def _remove_cache_outputs(
     older_than_days: int | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Remove cache outputs."""
     study_manifest = _read_json(study_root / "study_manifest.json")
     cutoff_ts: float | None = None
     if older_than_days is not None and older_than_days >= 0:
@@ -2610,6 +2710,7 @@ def _remove_status_outputs(
     target: str,
     dry_run: bool = False,
 ) -> dict[str, Any]:
+    """Remove status outputs."""
     target_map: dict[str, list[Path]] = {
         "run-status": [study_root / RUN_STATUS_CSV_FILE, study_root / RUN_STATUS_JSON_FILE],
         "analysis-status": [study_root / ANALYSIS_STATUS_CSV_FILE, study_root / ANALYSIS_STATUS_JSON_FILE],
@@ -2642,6 +2743,7 @@ def _manage_study(
     older_than_days: int | None,
     dry_run: bool,
 ) -> dict[str, Any]:
+    """Manage study."""
     action_norm = str(action or "").strip().lower()
     if action_norm not in {"update-paths", "rename-cases", "remove"}:
         raise ValueError("--manage requires --action update-paths|rename-cases|remove.")
@@ -2762,6 +2864,27 @@ def _manage_study(
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
     parser.set_defaults(command=STUDY_COMMAND)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -2956,9 +3079,31 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
 
     def _clean_opt(value: Any) -> str | None:
+        """Clean opt."""
         if value is None:
             return None
         text = str(value).strip()

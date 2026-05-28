@@ -1,4 +1,13 @@
-"""Direct command workflow for active-site analyses."""
+"""Direct command workflow for active-site analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -32,6 +41,7 @@ ALL_LEGACY_COMMANDS = (
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
@@ -43,6 +53,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
@@ -63,6 +74,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_active_site_structural_request(args: argparse.Namespace) -> ActiveSiteStructuralRequest:
+    """Build active site structural request."""
     return ActiveSiteStructuralRequest(
         frame=int(args.frame),
         bo_threshold=float(args.bo_threshold),
@@ -83,6 +95,7 @@ def _build_active_site_structural_request(args: argparse.Namespace) -> ActiveSit
 
 
 def _build_active_site_events_request(args: argparse.Namespace) -> ActiveSiteEventsRequest:
+    """Build active site events request."""
     return ActiveSiteEventsRequest(
         frames=parse_frame_indices(args.frames),
         every=int(args.every),
@@ -110,6 +123,27 @@ TASK_KEY_BY_COMMAND = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -208,6 +242,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -266,6 +301,27 @@ def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, 
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     task_cls = TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]]
     request = REQUEST_BUILDERS[canonical](args)

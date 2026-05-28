@@ -1,4 +1,15 @@
-"""TRACT-compatible table formatters for active-site analysis outputs."""
+"""Format active-site outputs into TRACT-compatible table schemas.
+
+This module reshapes structural and event tables into canonical TRACT column
+sets with optional strict required-column validation. It is scoped to table
+projection/validation and does not run active-site analyses.
+
+**Usage context**
+
+- Output normalization: Convert analyzer tables to TRACT column conventions.
+- Validation mode: Enforce strict required-column presence for QA pipelines.
+- Export preparation: Provide stable table layouts for downstream tooling.
+"""
 
 from __future__ import annotations
 
@@ -108,6 +119,29 @@ def to_tract_structural_table(table: pd.DataFrame, *, strict: bool = False) -> p
     """Return a TRACT-column-compatible structural table view.
 
     This function is a pure data-shaping adapter: it does not write files.
+
+    Parameters
+    -----
+    table : pd.DataFrame
+        Input structural descriptor table from active-site structural analysis.
+    strict : bool, optional
+        If `True`, validate required TRACT structural columns and non-empty
+        required values before formatting.
+
+    Returns
+    -----
+    pd.DataFrame
+        Structural table containing TRACT structural columns in canonical order.
+
+    Examples
+    -----
+    ```python
+    tract_df = to_tract_structural_table(structural_df, strict=False)
+    ```
+    Sample output:
+    `pd.DataFrame` with columns from `TRACT_STRUCTURAL_COLUMNS`.
+    Meaning:
+    Missing optional fields are filled with defaults and column order is fixed.
     """
     if strict:
         _validate_strict_required_columns(
@@ -156,6 +190,29 @@ def to_tract_events_table(table: pd.DataFrame, *, strict: bool = False) -> pd.Da
     """Return a TRACT-column-compatible events table view.
 
     This function is a pure data-shaping adapter: it does not write files.
+
+    Parameters
+    -----
+    table : pd.DataFrame
+        Input events table from active-site event extraction.
+    strict : bool, optional
+        If `True`, validate required TRACT events columns and non-empty required
+        values before formatting.
+
+    Returns
+    -----
+    pd.DataFrame
+        Events table containing TRACT event columns in canonical order.
+
+    Examples
+    -----
+    ```python
+    tract_df = to_tract_events_table(events_df, strict=True)
+    ```
+    Sample output:
+    `pd.DataFrame` with columns from `TRACT_EVENTS_COLUMNS`.
+    Meaning:
+    Event rows are normalized to TRACT naming, defaults, and column ordering.
     """
     if strict:
         _validate_strict_required_columns(

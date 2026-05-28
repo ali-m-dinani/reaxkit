@@ -1,4 +1,13 @@
-"""Workspace cleanup and archiving commands."""
+"""Workspace cleanup and archiving commands.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +26,7 @@ DEFAULT_ALT_WORKSPACE = Path("reaxkit_workspace")
 
 
 def _positive_int(value: str) -> int:
+    """Positive int."""
     try:
         parsed = int(value)
     except ValueError as exc:
@@ -27,11 +37,13 @@ def _positive_int(value: str) -> int:
 
 
 def _is_archive(path: Path) -> bool:
+    """Is archive."""
     name = path.name.lower()
     return name.endswith(".tar.gz") or name.endswith(".tar.zst") or name.endswith(".gz") or name.endswith(".zst")
 
 
 def _human_size(num_bytes: int) -> str:
+    """Human size."""
     value = float(max(0, int(num_bytes)))
     units = ["B", "KB", "MB", "GB", "TB"]
     idx = 0
@@ -42,6 +54,7 @@ def _human_size(num_bytes: int) -> str:
 
 
 def _entry_size(path: Path) -> int:
+    """Entry size."""
     if path.is_file():
         return int(path.stat().st_size)
     total = 0
@@ -52,6 +65,7 @@ def _entry_size(path: Path) -> int:
 
 
 def _resolve_workspace_root(workspace_root: str | None) -> Path:
+    """Resolve workspace root."""
     if workspace_root:
         root = Path(workspace_root)
         return root
@@ -69,6 +83,7 @@ def _resolve_workspace_root(workspace_root: str | None) -> Path:
 
 
 def _resolve_target_folder(*, workspace_root: Path, folder: str) -> Path:
+    """Resolve target folder."""
     raw = Path(str(folder).strip())
     if raw.is_absolute():
         return raw
@@ -76,6 +91,7 @@ def _resolve_target_folder(*, workspace_root: Path, folder: str) -> Path:
 
 
 def _collect_entries(target: Path, *, include_archives: bool = False) -> list[Path]:
+    """Collect entries."""
     if not target.exists() or not target.is_dir():
         return []
     entries: list[Path] = []
@@ -91,6 +107,7 @@ def _collect_entries(target: Path, *, include_archives: bool = False) -> list[Pa
 
 
 def _delete_entry(path: Path, *, dry_run: bool) -> None:
+    """Delete entry."""
     if dry_run:
         return
     if path.is_dir():
@@ -100,11 +117,13 @@ def _delete_entry(path: Path, *, dry_run: bool) -> None:
 
 
 def _archive_path(path: Path, compression: str) -> Path:
+    """Archive path."""
     suffix = ".tar.gz" if compression == "gz" else ".tar.zst"
     return path.with_name(f"{path.name}{suffix}")
 
 
 def _compress_to_archive(source: Path, archive: Path, *, compression: str) -> None:
+    """Compress to archive."""
     if compression == "gz":
         with tarfile.open(archive, mode="w:gz") as tar:
             tar.add(source, arcname=source.name)
@@ -126,6 +145,7 @@ def _compress_to_archive(source: Path, archive: Path, *, compression: str) -> No
 
 
 def _print_list(target: Path) -> int:
+    """Print list."""
     entries = _collect_entries(target, include_archives=True)
     if not entries:
         print(f"[Info] No entries found under {target}")
@@ -142,12 +162,14 @@ def _print_list(target: Path) -> int:
 
 
 def _delete_policy(entries: list[Path], keep_last: int) -> list[Path]:
+    """Delete policy."""
     if keep_last <= 0:
         return list(entries)
     return entries[keep_last:]
 
 
 def _run_manage_workspace(args: argparse.Namespace) -> int:
+    """Run manage workspace."""
     workspace_root = _resolve_workspace_root(args.workspace_root)
     target = _resolve_target_folder(workspace_root=workspace_root, folder=args.folder)
     if not target.exists():
@@ -208,6 +230,7 @@ def _run_manage_workspace(args: argparse.Namespace) -> int:
 
 
 def _run_free_up_legacy(args: argparse.Namespace) -> int:
+    """Run free up legacy."""
     workspace_root = _resolve_workspace_root(args.workspace_root)
     if args.raw_root:
         target = Path(args.raw_root)
@@ -258,6 +281,27 @@ def _run_free_up_legacy(args: argparse.Namespace) -> int:
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     if command == MANAGE_WORKSPACE_COMMAND:
@@ -363,6 +407,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     if command == MANAGE_WORKSPACE_COMMAND:
         return _run_manage_workspace(args)
     if command == FREE_UP_COMMAND:

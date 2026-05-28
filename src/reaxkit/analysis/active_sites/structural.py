@@ -1,4 +1,15 @@
-"""Active-site structural analysis task with phase-2 edge-typing parity."""
+"""Run active-site structural analysis with phase-2 edge-typing parity outputs.
+
+This module computes local structural descriptors, neighborhood features, and
+site-label artifacts used by the active-sites analysis flow. It is scoped to
+structural characterization and table export, not event chronology detection.
+
+**Usage context**
+
+- Site typing: Classify local environments around candidate active atoms.
+- Defect-aware analysis: Combine ring/defect cues with connectivity metadata.
+- TrACT parity runs: Produce structural outputs aligned with TrACT conventions.
+"""
 
 from __future__ import annotations
 
@@ -507,6 +518,34 @@ class ActiveSiteStructuralTask(AnalysisTask):
     required_data = ConnectivityTrajectoryData
 
     def required_data_for(self, request: object, args: dict | None = None):
+        """Resolve required input type for structural task execution mode.
+
+        Works on
+        -----
+        Active-site structural request objects and optional executor arguments
+
+        Parameters
+        -----
+        request : object
+            Request object that may specify `bond_mode`.
+        args : dict | None, optional
+            Optional execution-time argument map used by workflow dispatch.
+
+        Returns
+        -----
+        Any
+            Required input type (single type or tuple) for current mode.
+
+        Examples
+        -----
+        ```python
+        required = task.required_data_for(request, args)
+        ```
+        Sample output:
+        `ConnectivityTrajectoryData` or `TrajectoryData` (or tuple fallback).
+        Meaning:
+        Data requirements adapt to bond graph source mode.
+        """
         bond_mode = str(getattr(request, "bond_mode", "bo")).strip().lower()
         if bond_mode == "distance":
             # Validation wrappers call without executor args; accept both direct and executor-fed inputs there.
@@ -520,6 +559,34 @@ class ActiveSiteStructuralTask(AnalysisTask):
         _result: ActiveSiteStructuralResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for structural task output.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ActiveSiteStructuralResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and `d_pyr` profile views.
+
+        Examples
+        -----
+        ```python
+        specs = ActiveSiteStructuralTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list with table and `d_pyr vs atom_id` plot views.
+        Meaning:
+        Structural outputs can be rendered without custom plotting metadata.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -543,6 +610,42 @@ class ActiveSiteStructuralTask(AnalysisTask):
         request: ActiveSiteStructuralRequest,
         reporter=None,
     ) -> ActiveSiteStructuralResult:
+        """Compute frame-level active-site structural descriptors and labels.
+
+        Builds a bond graph (BO- or distance-based), derives geometric/ring
+        descriptors, assigns TRACT-parity labels, and returns detailed plus
+        TRACT-compatible structural tables.
+
+        Works on
+        -----
+        `ConnectivityTrajectoryData` or `TrajectoryData` plus structural request
+
+        Parameters
+        -----
+        data : ConnectivityTrajectoryData | TrajectoryData
+            Input trajectory (and optional connectivity) data for selected frame.
+        request : ActiveSiteStructuralRequest
+            Structural analysis configuration for frame and descriptor options.
+        reporter : Any, optional
+            Optional progress callback invoked near completion.
+
+        Returns
+        -----
+        ActiveSiteStructuralResult
+            Structural descriptor table, TRACT projection, summary metrics, and
+            optional SOAP descriptors.
+
+        Examples
+        -----
+        ```python
+        req = ActiveSiteStructuralRequest(frame=0, bond_mode="bo")
+        result = ActiveSiteStructuralTask().run(bundle, req)
+        ```
+        Sample output:
+        `result.table` with per-atom descriptors and labels.
+        Meaning:
+        One analyzed frame is transformed into rich structural site features.
+        """
         if isinstance(data, ConnectivityTrajectoryData):
             trajectory = data.trajectory
             connectivity_data = data

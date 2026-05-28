@@ -2,46 +2,59 @@
 Equation of state (EOS) utilities.
 
 This module centralizes common equation-of-state formulas used across ReaxKit.
-Currently includes Vinet EOS in two forms:
+It is responsible for reusable EOS computations and is not tied to a single
+workflow implementation.
 
-1) Energy–volume form in eV (used for fitting E(V) from fort.99/fort.74).
-2) Legacy "trainset" form matching the translated Fortran elastic_energy_v2 generator.
+**Usage context**
+
+- fitting energy-volume relationships from parsed simulation outputs
+- computing legacy trainset-style energies for translated generator logic
 
 Notes
 -----
-- The two Vinet implementations use different parameterizations/units, so they are
-  *conceptually related* but not drop-in replacements for each other.
-- Explanation for the Rose–Vinet equation of state can be found here:
+- The two Vinet implementations use different parameterizations/units, so they
+  are conceptually related but not drop-in replacements for each other.
+- Explanation for the Rose-Vinet equation of state can be found here:
     doi:10.1029/JB092iB09p09319
 """
 
 from __future__ import annotations
 
-from typing import Union
 import numpy as np
 
 
 def vinet_energy_ev(V: np.ndarray, E0: float, K0_eV_A3: float, V0: float, C: float) -> np.ndarray:
     """
-    Vinet EOS: energy–volume form (eV, eV/Å^3).
+    Compute Vinet EOS energy from volume in eV units.
+
+    This evaluates the energy-volume form used for fitting E(V) data in
+    ReaxKit workflows, with bulk modulus expressed in eV/Angstrom^3.
 
     Parameters
     ----------
     V : numpy.ndarray
-        Volume(s) (Å^3).
+        Volume(s) (Angstrom^3).
     E0 : float
         Equilibrium energy (eV).
     K0_eV_A3 : float
-        Bulk modulus at equilibrium (eV/Å^3).
+        Bulk modulus at equilibrium (eV/Angstrom^3).
     V0 : float
-        Equilibrium volume (Å^3).
+        Equilibrium volume (Angstrom^3).
     C : float
         Vinet shape parameter (dimensionless).
 
     Returns
     -------
     numpy.ndarray
-        Energy at each volume V (eV).
+        Energy at each volume `V` (eV).
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> V = np.array([15.0, 16.0, 17.0])
+    >>> E = vinet_energy_ev(V, E0=-10.2, K0_eV_A3=0.75, V0=16.0, C=4.0)
+    >>> E.shape
+    (3,)
     """
     nu = V / V0
     eta = nu ** (1.0 / 3.0)
@@ -59,30 +72,44 @@ def vinet_energy_trainset(
     energy_conversion_factor: float,
 ) -> float:
     """
-    Vinet EOS: legacy trainset-generator form.
+    Compute legacy trainset-style EOS energy from scalar volume input.
 
-    This matches your translated Fortran elastic_energy_v2 bulk block logic.
-    It returns energies in the generator's legacy energy units.
+    This matches the translated Fortran `elastic_energy_v2` bulk-block logic.
+    It returns energies in the generator's legacy energy units and preserves
+    the existing conversion convention through `energy_conversion_factor`.
 
     Parameters
     ----------
     volume : float
-        Current volume V (Å^3).
+        Current volume `V` (Angstrom^3).
     reference_volume : float
-        Reference volume V0 (Å^3).
+        Reference volume `V0` (Angstrom^3).
     bulk_modulus_gpa : float
-        Bulk modulus B0 (GPa).
+        Bulk modulus `B0` (GPa).
     bulk_modulus_pressure_derivative : float
-        Pressure derivative B0' (dimensionless).
+        Pressure derivative `B0'` (dimensionless).
     reference_energy : float, optional
-        Reference energy offset E0 (legacy units).
+        Reference energy offset `E0` (legacy units).
     energy_conversion_factor : float
-        The generator's conversion factor (the one you currently call ENERGY_CONVERSION_FACTOR).
+        Generator conversion factor currently used in trainset workflows.
 
     Returns
     -------
     float
         EOS energy in the generator's legacy energy units.
+
+    Examples
+    --------
+    >>> e = vinet_energy_trainset(
+    ...     volume=16.0,
+    ...     reference_volume=16.2,
+    ...     bulk_modulus_gpa=180.0,
+    ...     bulk_modulus_pressure_derivative=4.2,
+    ...     reference_energy=0.0,
+    ...     energy_conversion_factor=160.21766208,
+    ... )
+    >>> isinstance(e, float)
+    True
     """
     converted_bulk_modulus = bulk_modulus_gpa / energy_conversion_factor
     eos_prefactor = 9.0 * converted_bulk_modulus * reference_volume / 16.0

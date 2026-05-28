@@ -1,4 +1,15 @@
-"""Trajectory relabeling tasks."""
+"""Relabel trajectory atom types using analyzer-derived classification signals.
+
+This module rewrites trajectory-facing atom labels based on coordination status
+or related analyzer outputs while preserving framewise coordinate alignment.
+It is scoped to relabeling transformations and does not recompute raw dynamics.
+
+**Usage context**
+
+- State-aware relabeling: Convert raw atom labels into context-specific labels.
+- Pipeline preparation: Produce relabeled trajectories for downstream analyses.
+- Comparative workflows: Align labeling conventions across simulation runs.
+"""
 
 from __future__ import annotations
 
@@ -58,33 +69,42 @@ def _subset_simulation(simulation: SimulationData | None, frame_idx: np.ndarray,
 class TrajectoryRelabelByCoordinationRequest(BaseRequest):
     """Request to relabel trajectory atom labels from coordination status.
 
-    Parameters
-    ----------
-    labels
-        Optional mapping from status code to tag string.
-        Defaults are ``{-1: "U", 0: "C", 1: "O"}``.
-        Example: ``{-1: "UN", 0: "OK", 1: "OV"}``.
-    mode
-        Relabeling style:
-        - ``global``: replace labels with status tags only
-        - ``by_type``: append status tag to original atom type
-        Example: ``mode="by_type"``.
-    keep_coord_original
-        Used only with ``mode="by_type"``. If ``True``, atoms with status ``0``
-        keep original labels instead of adding the coordinated tag.
-    frames
-        Optional frame indices to relabel. If omitted, all frames are used.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after selection. Example: ``every=5``.
-    valences
+    Fields
+    -----
+    labels : Optional[Mapping[int, str]]
+        Mapping from coordination status code to tag text. Defaults to
+        `{-1: "U", 0: "C", 1: "O"}` when not provided.
+    mode : str
+        Relabeling mode:
+        - `"global"`: replace labels with status tags only
+        - `"by_type"`: append status tag to original atom type
+    keep_coord_original : bool
+        Only used with `"by_type"`. If `True`, status `0` keeps the original
+        atom type label (no suffix).
+    frames : Optional[Sequence[int]]
+        Frame indices to relabel. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`.
+    valences : Optional[Mapping[str, float]]
         Optional element-to-valence map passed to coordination classification.
-        Example: ``{"C": 4.0, "O": 2.0, "H": 1.0}``.
-    threshold
-        Absolute tolerance around valence used for coordination classification.
-        Example: ``0.9``.
-    require_all_valences
-        If ``True``, fail when selected atom types have no valence mapping.
+    threshold : float
+        Absolute tolerance used in coordination-status classification.
+    require_all_valences : bool
+        If `True`, fail when selected atom types have no valence mapping.
+
+    Examples
+    -----
+    ```python
+    req = TrajectoryRelabelByCoordinationRequest(
+        mode="by_type",
+        labels={-1: "UN", 0: "OK", 1: "OV"},
+        frames=[0, 10, 20],
+    )
+    ```
+    Sample output:
+    `TrajectoryRelabelByCoordinationRequest(...)`
+    Meaning:
+    The request configures coordination-driven relabeling on sampled frames.
     """
 
     labels: Optional[Mapping[int, str]] = dc_field(
@@ -156,22 +176,32 @@ class TrajectoryRelabelByCoordinationRequest(BaseRequest):
 class TrajectoryRelabelByCoordinationResult(BaseResult):
     """Relabeled trajectory generated from computed coordination status.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`TrajectoryRelabelByCoordinationRequest` used.
-    - ``trajectory``: trajectory subset with relabeled ``atom_labels`` per frame.
-    - ``table``: coordination-status table used for relabeling.
+    Fields
+    -----
+    trajectory : TrajectoryData
+        Relabeled trajectory subset whose `atom_labels` contains frame-wise
+        relabel outputs.
+    table : pd.DataFrame
+        Coordination-status table used as the relabel source.
+    request : TrajectoryRelabelByCoordinationRequest
+        Request object used for this analysis execution.
 
-    Table columns
-    -------------
-    Typical columns include:
-    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
-    ``valence``, ``delta``, ``status``, ``status_label``.
+    Notes
+    -----
+    The `table` usually includes columns such as `frame_index`, `iter`,
+    `atom_id`, `atom_type`, `sum_BOs`, `valence`, `delta`, `status`,
+    and `status_label`.
 
-    Example
-    -------
-    With ``mode='by_type'`` and default labels, an oxygen atom with status ``1``
-    is relabeled from ``O`` to ``OO`` in that frame.
+    Examples
+    -----
+    ```python
+    result = TrajectoryRelabelByCoordinationTask().run(data, req)
+    result.trajectory.atom_labels.shape
+    ```
+    Sample output:
+    `(n_selected_frames, n_atoms)`
+    Meaning:
+    Relabeled atom labels are stored per selected frame and atom.
     """
 
     trajectory: TrajectoryData
@@ -221,6 +251,34 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
         _result: TrajectoryRelabelByCoordinationResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default presentations for relabel-by-coordination outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : TrajectoryRelabelByCoordinationResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Table-only presentation configuration.
+
+        Examples
+        -----
+        ```python
+        specs = TrajectoryRelabelByCoordinationTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        `[PresentationSpec(renderer="table", ...)]`
+        Meaning:
+        The primary default representation is the coordination/relabel table.
+        """
         return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
     def run(
@@ -229,6 +287,42 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
         request: TrajectoryRelabelByCoordinationRequest,
         reporter=None,
     ) -> TrajectoryRelabelByCoordinationResult:
+        """Relabel trajectory atom labels using coordination-status analysis.
+
+        Computes coordination status from connectivity + valence information and
+        applies requested relabeling mode to produce a relabeled trajectory
+        subset aligned to selected frames.
+
+        Works on
+        -----
+        `ConnectivityTrajectoryData` plus `TrajectoryRelabelByCoordinationRequest`
+
+        Parameters
+        -----
+        data : ConnectivityTrajectoryData
+            Bundle containing trajectory coordinates, connectivity, and optional
+            force-field parameter data for valence lookup.
+        request : TrajectoryRelabelByCoordinationRequest
+            Relabeling configuration, frame sampling, and coordination options.
+        reporter : Any, optional
+            Optional progress callback passed through downstream operations.
+
+        Returns
+        -----
+        TrajectoryRelabelByCoordinationResult
+            Result containing relabeled trajectory subset and coordination table.
+
+        Examples
+        -----
+        ```python
+        req = TrajectoryRelabelByCoordinationRequest(mode="global")
+        result = TrajectoryRelabelByCoordinationTask().run(bundle, req)
+        ```
+        Sample output:
+        A result with `trajectory.atom_labels` and a coordination `table`.
+        Meaning:
+        Labels are transformed according to coordination status on sampled frames.
+        """
         trajectory = data.trajectory
         positions = np.asarray(trajectory.positions, dtype=float)
         if positions.ndim != 3:

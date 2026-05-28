@@ -1,4 +1,13 @@
-"""Direct command workflow for extracting optimized force fields from fort.83."""
+"""Direct command workflow for extracting optimized force fields from fort.83.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -18,6 +27,27 @@ ALL_LEGACY_COMMANDS = ("get_optimized_ffield", "extract-optimized-ffield", "extr
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
@@ -51,6 +81,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
     fort83_path = Path(args.fort83)
     lines = fort83_path.read_text(encoding="utf-8").splitlines(keepends=True)

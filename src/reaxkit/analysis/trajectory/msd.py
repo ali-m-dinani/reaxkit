@@ -1,4 +1,21 @@
-"""Engine-agnostic MSD analysis task."""
+"""Compute mean-squared displacement (MSD) from trajectory coordinates.
+
+This module implements an engine-agnostic analyzer task that computes per-atom
+MSD over selected frames and coordinate dimensions, with optional periodic
+boundary unwrapping before displacement evaluation. It is scoped to displacement
+series generation and does not estimate diffusion coefficients directly.
+
+**Usage context**
+
+- Trajectory analysis: Quantify per-atom displacement growth over time.
+- Diffusion workflows: Export MSD tables for downstream fitting and plotting.
+- Comparative studies: Filter by atom IDs or atom types within one run.
+
+Notes
+-----
+Diffusivity estimation is implemented in `reaxkit.analysis.trajectory.diffusivity`
+and reuses this module's MSD outputs.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +36,40 @@ from reaxkit.presentation.specs import PresentationSpec
 
 @dataclass
 class MSDRequest(BaseRequest):
-    """Request for MSD analysis."""
+    """Request payload for MSD analysis.
+
+    Defines frame, atom-selection, dimensionality, and unwrapping controls used
+    by the MSD task to compute displacement values from trajectory data.
+
+    Fields
+    -----
+    atom_ids : Optional[list[int]]
+        Atom IDs to include. When set, this selection takes precedence over
+        `atom_types`. Default is `None` (not explicitly selected).
+    atom_types : Optional[list[str]]
+        Atom type/element filters used when `atom_ids` is empty. Default is
+        `None`.
+    dims : Sequence[str]
+        Coordinate axes included in MSD (`x`, `y`, `z`). Default is
+        `("x", "y", "z")`.
+    origin : Union[str, int]
+        Reference frame selector. Use `"first"` for the first selected frame,
+        or provide an explicit frame index. Default is `"first"`.
+    frames : Optional[Sequence[int]]
+        Frame indices to evaluate. `None` means all frames in trajectory order.
+    every : int
+        Stride over selected frames; must be >= 1. Default is `1`.
+    unwrap : bool
+        Whether to unwrap coordinates across periodic boundaries when cell data
+        is available. Default is `True`.
+
+    Examples
+    -----
+    Sample request payload/object:
+    `MSDRequest(atom_types=["O"], dims=("x", "y", "z"), frames=[0, 10, 20], every=1, origin="first", unwrap=True)`
+    This sample computes oxygen-atom MSD on selected frames using full 3D
+    displacement from the first selected frame as reference.
+    """
 
     atom_ids: Optional[list[int]] = dc_field(
         default=None,
@@ -53,20 +103,36 @@ class MSDRequest(BaseRequest):
 
 @dataclass
 class MSDResult(BaseResult):
-    """Result of MSD analysis.
+    """Result payload for MSD analysis.
 
-    Output structure:
-    - table: pandas.DataFrame with columns
-      ['frame_index', 'iter', 'atom_id', 'atom_type', 'dim', 'msd']
-      - frame_index: source frame index
-      - iter: iteration for that frame
-      - atom_id: atom identifier
-      - atom_type: element/type label for the atom
-      - dim: dimension selection label used for MSD (for example 'x,y,z')
-        Note: when multiple dimensions are selected (for example x,y,z),
-        MSD is the summed squared displacement across those dimensions.
-      - msd: mean-squared displacement value
-    - request: MSDRequest used to produce this result
+    Stores the computed MSD table together with the request used to generate
+    it, so downstream consumers can preserve analysis provenance.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with columns `["frame_index", "iter", "atom_id",
+        "atom_type", "dim", "msd"]`.
+        - `frame_index`: source frame index.
+        - `iter`: simulation iteration for that frame.
+        - `atom_id`: atom identifier.
+        - `atom_type`: element/type label for the atom.
+        - `dim`: dimension selection label (for example `"x,y,z"`).
+        - `msd`: mean-squared displacement value.
+    request : MSDRequest
+        Request object used for this analysis run.
+
+    Notes
+    -----
+    When multiple dimensions are selected (for example `x,y,z`), `msd` is the
+    summed squared displacement across those dimensions.
+
+    Examples
+    -----
+    Sample output payload/object:
+    `MSDResult(table=<DataFrame rows with frame_index/iter/atom_id/atom_type/dim/msd>, request=<MSDRequest ...>)`
+    The output table represents per-atom MSD values at each evaluated frame,
+    with `dim` indicating which coordinate components were included.
     """
 
     table: pd.DataFrame
@@ -86,7 +152,35 @@ class MSDTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: MSDResult, payload: dict[str, Any]) -> list[PresentationSpec]:
-        """Common/default typed presentation specs for MSD."""
+        """Build default presentation specs for MSD outputs.
+
+        Selects a table view and a 2D plot mapping based on available payload
+        columns, preferring `iter` as x-axis when present.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : MSDResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended table and plot presentation specifications.
+
+        Examples
+        -----
+        >>> specs = MSDTask.recommended_presentations(result, payload)
+        >>> len(specs) >= 1
+        True
+        Sample output meaning: returned specs describe how MSD results should be
+        rendered (table view and, when possible, an MSD-vs-time plot).
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -115,6 +209,45 @@ class MSDTask(AnalysisTask):
         return views
 
     def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:
+        """Run MSD analysis for selected atoms, frames, and dimensions.
+
+        Computes per-atom squared displacement relative to a reference frame and
+        returns one row per `(frame, atom)` in the output table.
+
+        Works on
+        -----
+        TrajectoryData plus MSDRequest analyzer inputs
+
+        Notes
+        -----
+        - Requires `TrajectoryData.simulation.cell_lengths` for optional
+          unwrapping support.
+        - When `origin="first"`, the first selected frame is used as the
+          displacement reference.
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory bundle containing positions, atom metadata, and optional
+            iteration values.
+        request : MSDRequest
+            Analysis configuration and selection controls.
+        reporter : Any
+            Optional progress callback invoked during analysis steps.
+
+        Returns
+        -----
+        MSDResult
+            Result object containing per-atom MSD table and original request.
+
+        Examples
+        -----
+        >>> result = task.run(data, MSDRequest(dims=("x", "y", "z"), origin="first"))
+        >>> list(result.table.columns)
+        ['frame_index', 'iter', 'atom_id', 'atom_type', 'dim', 'msd']
+        Sample output meaning: each row reports one atom's MSD at one frame for
+        the selected dimension set (`dim`).
+        """
         out_cols = ["frame_index", "iter", "atom_id", "atom_type", "dim", "msd"]
         if data.simulation is None or data.simulation.cell_lengths is None:
             raise ValueError("MSD requires TrajectoryData.simulation.cell_lengths.")

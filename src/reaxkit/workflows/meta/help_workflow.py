@@ -1,9 +1,14 @@
-"""
-Interactive help and discovery workflow for ReaxKit.
+"""Interactive help and discovery workflow for ReaxKit.
 
 This workflow supports two complementary help modes:
 1) capability discovery (intent -> responsible analysis tasks/workflows/generators)
 2) ReaxFF file discovery (query -> relevant input/output files)
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
 """
 
 from __future__ import annotations

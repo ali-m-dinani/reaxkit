@@ -1,4 +1,13 @@
-"""Direct command workflow for molecular analysis tasks."""
+"""Direct command workflow for molecular analysis tasks.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -41,6 +50,7 @@ ALL_LEGACY_COMMANDS = (
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior.")
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path.")
@@ -50,6 +60,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which draws one combined chart.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the plot interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image.")
@@ -59,6 +70,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common arguments."""
     parser.add_argument(
         "--frames",
         nargs="*",
@@ -69,6 +81,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_dominant_species_request(args: argparse.Namespace) -> DominantSpeciesRequest:
+    """Build dominant species request."""
     return DominantSpeciesRequest(
         frames=parse_frame_indices(args.frames),
         every=args.every,
@@ -78,6 +91,7 @@ def _build_dominant_species_request(args: argparse.Namespace) -> DominantSpecies
 
 
 def _build_largest_molecule_by_mass_request(args: argparse.Namespace) -> LargestMoleculeByMassRequest:
+    """Build largest molecule by mass request."""
     return LargestMoleculeByMassRequest(
         frames=parse_frame_indices(args.frames),
         every=args.every,
@@ -85,6 +99,7 @@ def _build_largest_molecule_by_mass_request(args: argparse.Namespace) -> Largest
 
 
 def _build_largest_molecule_composition_request(args: argparse.Namespace) -> LargestMoleculeCompositionRequest:
+    """Build largest molecule composition request."""
     return LargestMoleculeCompositionRequest(
         frames=parse_frame_indices(args.frames),
         every=args.every,
@@ -92,6 +107,7 @@ def _build_largest_molecule_composition_request(args: argparse.Namespace) -> Lar
 
 
 def _build_molecule_lifetime_request(args: argparse.Namespace) -> MoleculeLifetimeRequest:
+    """Build molecule lifetime request."""
     return MoleculeLifetimeRequest(
         molecules=args.molecules,
         frames=parse_frame_indices(args.frames),
@@ -109,6 +125,27 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
@@ -180,10 +217,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _selected_table(command: str, result, args: argparse.Namespace) -> pd.DataFrame:
+    """Selected table."""
     return result.table
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = _selected_table(command, result, args)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -277,6 +316,27 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     task_cls = TASK_REGISTRY[canonical]
     request = REQUEST_BUILDERS[canonical](args)

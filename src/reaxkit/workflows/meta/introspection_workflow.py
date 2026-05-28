@@ -1,5 +1,4 @@
-"""
-CLI workflow for introspecting ReaxKit modules and folders.
+"""CLI workflow for introspecting ReaxKit modules and folders.
 
 This workflow powers the `reaxkit intspec` command, allowing users to:
 - Inspect a single Python module and view its top-level docstring summary
@@ -10,6 +9,12 @@ This workflow powers the `reaxkit intspec` command, allowing users to:
 It is designed as a lightweight discovery and navigation tool to help users
 understand what functionality exists inside ReaxKit without opening files
 manually.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
 """
 
 
@@ -65,23 +70,23 @@ def _print_table(rows: List[Tuple[str, str]], headers: Tuple[str, str]) -> int:
     Print table.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     rows : List[Tuple[str, str]]
         Parameter description.
     headers : Tuple[str, str]
         Parameter description.
 
     Returns
-    -------
+    -----
     int
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     if not rows:
@@ -96,21 +101,21 @@ def _resolve_pkg_dir_from_module_name(modname: str) -> Optional[str]:
     Resolve pkg dir from module name.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     modname : str
         Parameter description.
 
     Returns
-    -------
+    -----
     Optional[str]
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     try:
@@ -127,21 +132,21 @@ def _looks_like_path(hint: str) -> bool:
     Looks like path.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     hint : str
         Parameter description.
 
     Returns
-    -------
+    -----
     bool
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     return hint.endswith(".py") or ("/" in hint) or ("\\" in hint) or (os.sep in hint)
@@ -198,16 +203,16 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     Build parser.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     p : argparse.ArgumentParser
         Parameter description.
 
     Examples
-    --------
+    -----
     >>>
     """
     p.formatter_class = argparse.RawTextHelpFormatter
@@ -293,21 +298,21 @@ def run_folder(folder_hint: str) -> int:
     Run folder.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     folder_hint : str
         Parameter description.
 
     Returns
-    -------
+    -----
     int
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     pkg_dir = _resolve_folder_hint_to_dir(folder_hint)

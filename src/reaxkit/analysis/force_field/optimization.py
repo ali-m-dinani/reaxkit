@@ -1,4 +1,15 @@
-"""Force-field optimization analysis tasks."""
+"""Provide analyzer tasks for force-field optimization progress data.
+
+This module extracts epoch-level optimization metrics and structured progress
+tables from optimization logs. It is scoped to progress/error-series analysis
+and does not generate final optimization reports.
+
+**Usage context**
+
+- Training monitoring: Track optimization error across epochs.
+- Subset analysis: Slice progress by selected epoch ranges.
+- Plotting/reporting: Feed normalized progress tables into visual summaries.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +45,24 @@ def _optimization_progress_table(
 
 @dataclass
 class ForceFieldOptimizationRequest(BaseRequest):
-    """Request for force-field optimization progress data."""
+    """Request payload for optimization-progress extraction.
+
+    This request optionally filters the optimization progression table to a
+    selected subset of epochs while preserving epoch ordering.
+
+    Fields
+    -----
+    epochs : Optional[Sequence[int]]
+        Optional set/list/sequence of epoch indices to include. If omitted,
+        all available epochs from the parsed optimization data are returned.
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldOptimizationRequest(epochs=[1, 5, 10])
+    ```
+    The request keeps only epochs 1, 5, and 10 in the output table.
+    """
 
     epochs: Optional[Sequence[int]] = dc_field(
         default=None,
@@ -50,18 +78,27 @@ class ForceFieldOptimizationRequest(BaseRequest):
 
 @dataclass
 class ForceFieldOptimizationResult(BaseResult):
-    """Force-field optimization progress result.
+    """Result payload for optimization-progress analysis.
 
-    Output structure:
-    - request: ForceFieldOptimizationRequest used to generate this result.
-    - table: pandas.DataFrame with columns:
-      ['epoch', 'total_ff_error']
-      - epoch: optimization step index.
-      - total_ff_error: total model error at that epoch.
+    The analyzer returns an epoch-indexed error trajectory suitable for trend
+    inspection, convergence diagnostics, and downstream plotting.
 
-    Example:
-    - epoch=1, total_ff_error=15324.4
-    - epoch=2, total_ff_error=14980.1
+    Fields
+    -----
+    request : ForceFieldOptimizationRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``epoch`` and ``total_ff_error``.
+
+    Examples
+    -----
+    ```python
+    rows = [
+        {"epoch": 1, "total_ff_error": 15324.4},
+        {"epoch": 2, "total_ff_error": 14980.1},
+    ]
+    ```
+    Each row records model error at one optimization epoch.
     """
 
     table: pd.DataFrame
@@ -78,6 +115,36 @@ class ForceFieldOptimizationTask(AnalysisTask):
     def recommended_presentations(
         _result: ForceFieldOptimizationResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Suggest default table/plot renderers for optimization progress output.
+
+        Returns a tabular view for all outputs and adds an error-vs-epoch plot
+        when the serialized table contains the expected numeric columns.
+
+        Works on
+        Analyzer task output for ``force_field_optimization``.
+
+        Parameters
+        -----
+        _result : ForceFieldOptimizationResult
+            Typed analyzer result instance (unused by current logic).
+        payload : dict[str, Any]
+            Serialized analyzer payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs appropriate for UI rendering.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldOptimizationTask.recommended_presentations(
+            _result,
+            {"table": [{"epoch": 1, "total_ff_error": 15324.4}]},
+        )
+        ```
+        The returned specs include a table and a ``total_ff_error`` vs ``epoch`` plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -106,6 +173,36 @@ class ForceFieldOptimizationTask(AnalysisTask):
         request: ForceFieldOptimizationRequest,
         reporter=None,
     ) -> ForceFieldOptimizationResult:
+        """Run the optimization-progress analyzer task.
+
+        Extracts epoch/error rows from parsed optimization progress data,
+        applies optional epoch filtering, and returns a typed result payload.
+
+        Works on
+        ``ForceFieldOptimizationProgressData`` parsed from optimization logs.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationProgressData
+            Parsed optimization progress record source.
+        request : ForceFieldOptimizationRequest
+            Request containing optional epoch filters.
+        reporter : Any, optional
+            Progress callback accepted by the task interface; unused here.
+
+        Returns
+        -----
+        ForceFieldOptimizationResult
+            Analyzer result with the normalized progress table.
+
+        Examples
+        -----
+        ```python
+        task = ForceFieldOptimizationTask()
+        result = task.run(data, ForceFieldOptimizationRequest(epochs=[1, 2, 3]))
+        ```
+        The output table contains only the requested epochs when available.
+        """
         table = _optimization_progress_table(data, epochs=request.epochs)
         return ForceFieldOptimizationResult(table=table, request=request)
 

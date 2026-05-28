@@ -1,4 +1,13 @@
-"""Direct command workflow for atomic-kinematics analyses."""
+"""Direct command workflow for atomic-kinematics analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +33,7 @@ KINEMATICS_KEYS = ("metadata", "coordinates", "velocities", "accelerations", "pr
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior.")
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context.")
@@ -33,6 +43,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot subplot, which creates one panel per value column.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save accelerations.png, which writes the figure image.")
@@ -42,6 +53,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_spatial_plot_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add spatial plot arguments."""
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the rendered spatial plot.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save vx_3d.png, which writes the spatial figure to disk.")
     parser.add_argument("--export", default=None, help="Write the merged coordinate/value table to CSV. Example: --export merged.csv, which saves plotted coordinates and values.")
@@ -53,6 +65,7 @@ def _add_spatial_plot_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _parse_bins(bins: str):
+    """Parse bins."""
     if "," in bins:
         nx, ny = [int(x) for x in bins.split(",")]
         return (nx, ny)
@@ -60,6 +73,7 @@ def _parse_bins(bins: str):
 
 
 def _value_column_to_key(value_col: str) -> tuple[str, str]:
+    """Value column to key."""
     value = value_col.strip().lower()
     if value in {"vx", "vy", "vz"}:
         return ("velocities", value)
@@ -71,6 +85,7 @@ def _value_column_to_key(value_col: str) -> tuple[str, str]:
 
 
 def _build_atomic_kinematics_request(args: argparse.Namespace) -> AtomicKinematicsRequest:
+    """Build atomic kinematics request."""
     return AtomicKinematicsRequest(
         key=args.key,
         atoms=args.atoms,
@@ -83,6 +98,27 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
@@ -113,6 +149,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -153,6 +190,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def _run_spatial(command: str, args: argparse.Namespace) -> int:
+    """Run spatial."""
     executor = AnalysisExecutor()
     task_cls = TASK_REGISTRY["get_kinematics"]
 
@@ -242,6 +280,27 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     if canonical in {"kinematics_plot3d", "kinematics_heatmap2d"}:
         return _run_spatial(canonical, args)

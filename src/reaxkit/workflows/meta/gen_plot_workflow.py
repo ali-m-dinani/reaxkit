@@ -1,5 +1,4 @@
-"""
-General-purpose plotting workflow for ReaxKit.
+"""General-purpose plotting workflow for ReaxKit.
 
 This workflow provides flexible plotting utilities for arbitrary tabular data
 (text, CSV, TSV, or whitespace-delimited files), without assuming any specific
@@ -16,6 +15,12 @@ It supports multiple plot types, including:
 Columns are selected using simple 1-based column tokens (e.g. c1, c2, c3),
 making the workflow suitable for rapid visualization of simulation outputs,
 summaries, and post-processed analysis tables.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
 """
 
 from __future__ import annotations
@@ -43,6 +48,7 @@ ALL_LEGACY_COMMANDS = ("gen_plot", "plotter")
 # ---------- Helpers ----------
 
 def _normalize_save_path(args: argparse.Namespace) -> None:
+    """Normalize save path."""
     if not getattr(args, "save", None):
         return
     out = resolve_output_path(str(args.save), workflow="plotter")
@@ -53,21 +59,21 @@ def _load_table(path: str | Path) -> pd.DataFrame:
     Load table.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     path : str | Path
         Parameter description.
 
     Returns
-    -------
+    -----
     pd.DataFrame
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     path = Path(path)
@@ -127,21 +133,21 @@ def _parse_col_list(spec: str) -> List[int]:
     Parse col list.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     spec : str
         Parameter description.
 
     Returns
-    -------
+    -----
     List[int]
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     tokens = [s for s in spec.split(",") if s.strip()]
@@ -198,6 +204,25 @@ def _plotter_single_task(args: argparse.Namespace) -> int:
     series: List[Dict[str, Any]] = []
 
     def col_name(idx: int) -> str:
+        """Col name.
+
+        Execute the workflow function for this command path and return the
+        computed result for downstream CLI handling.
+
+        Parameters
+        -----
+        idx : Any
+            Function argument.
+
+        Returns
+        -----
+        str
+            Function return value.
+
+        Examples
+        -----
+        >>> # See workflow CLI usage for concrete examples.
+        """
         return f"c{idx + 1}"
 
     x_names = [col_name(i) for i in x_indices]
@@ -265,21 +290,21 @@ def _plotter_directed_task(args: argparse.Namespace) -> int:
     Plotter directed task.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     args : argparse.Namespace
         Parameter description.
 
     Returns
-    -------
+    -----
     int
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     _normalize_save_path(args)
@@ -321,21 +346,21 @@ def _plotter_dual_task(args: argparse.Namespace) -> int:
     Plotter dual task.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     args : argparse.Namespace
         Parameter description.
 
     Returns
-    -------
+    -----
     int
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     _normalize_save_path(args)
@@ -457,21 +482,21 @@ def _plotter_scatter3d_task(args: argparse.Namespace) -> int:
     Plotter scatter3d task.
 
     Works on
-    --------
+    -----
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     args : argparse.Namespace
         Parameter description.
 
     Returns
-    -------
+    -----
     int
         Return value description.
 
     Examples
-    --------
+    -----
     >>>
     """
     _normalize_save_path(args)
@@ -584,12 +609,12 @@ def _add_common_io_args(p: argparse.ArgumentParser) -> None:
     CLI workflow task arguments and helper utilities
 
     Parameters
-    ----------
+    -----
     p : argparse.ArgumentParser
         Parameter description.
 
     Examples
-    --------
+    -----
     >>>
     """
     p.add_argument(
@@ -615,6 +640,27 @@ def _add_common_io_args(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
     parser.set_defaults(command="gen-plot")
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -656,6 +702,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = command
     dispatch = {
         "single": _plotter_single_task,

@@ -1,4 +1,15 @@
-"""Engine-agnostic Voronoi analysis tasks."""
+"""Compute Voronoi-based geometric analyzers from trajectory snapshots.
+
+This module performs Voronoi tessellation over selected trajectory frames and
+exports geometric metrics and optional cell geometry summaries. It is limited
+to Voronoi-derived descriptors and does not compute bond-order connectivity.
+
+**Usage context**
+
+- Spatial partitioning: Quantify local free volume and neighborhood geometry.
+- Frame diagnostics: Track Voronoi metrics over selected simulation steps.
+- Structural reporting: Export tessellation-derived tables for analysis UIs.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +33,29 @@ class VoronoiRequest(BaseRequest):
     """Request for Voronoi tessellation analysis.
 
     This request is shared by metric-only and geometry-producing Voronoi tasks.
+
+    Fields
+    -----
+    atom_ids : Optional[Sequence[int]]
+        Atom IDs to include. When set, takes precedence over `atom_types`.
+    atom_types : Optional[Sequence[str]]
+        Atom types/elements used for selection when `atom_ids` is not set.
+    frames : Optional[Sequence[int]]
+        Frame indices to evaluate. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`.
+    backend : str
+        Voronoi backend identifier, `"scipy"` or `"pyvoro"`.
+
+    Examples
+    -----
+    ```python
+    req = VoronoiRequest(atom_types=["O"], frames=[0, 50, 100], backend="scipy")
+    ```
+    Sample output:
+    `VoronoiRequest(...)`
+    Meaning:
+    The request selects atoms/frames and backend for Voronoi evaluation.
     """
 
     atom_ids: Optional[Sequence[int]] = dc_field(
@@ -50,19 +84,25 @@ class VoronoiRequest(BaseRequest):
 class VoronoiResult(BaseResult):
     """Result of Voronoi metric analysis.
 
-    Output structure:
-    - table: pandas.DataFrame with columns
-      ['frame_index', 'iter', 'atom_id', 'atom_type', 'voronoi_volume',
-       'num_faces', 'is_bounded', 'backend']
-      - frame_index: source frame index
-      - iter: iteration for that frame
-      - atom_id: atom identifier
-      - atom_type: element/type label for the atom
-      - voronoi_volume: Voronoi-cell volume (NaN when unbounded/degenerate)
-      - num_faces: number of neighbor faces for that cell
-      - is_bounded: whether the Voronoi cell is finite/bounded
-      - backend: backend used ('scipy' or 'pyvoro')
-    - request: VoronoiRequest used to produce this result
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with columns
+        `["frame_index", "iter", "atom_id", "atom_type", "voronoi_volume", "num_faces", "is_bounded", "backend"]`.
+        `voronoi_volume` can be `NaN` for unbounded/degenerate cells.
+    request : VoronoiRequest
+        Request object used for this analysis execution.
+
+    Examples
+    -----
+    ```python
+    result = VoronoiScipyTask().run(data, req)
+    result.table[["atom_id", "voronoi_volume"]].head()
+    ```
+    Sample output:
+    DataFrame rows with one Voronoi metric record per selected atom/frame.
+    Meaning:
+    The table summarizes per-atom Voronoi cell properties.
     """
 
     table: pd.DataFrame
@@ -73,24 +113,29 @@ class VoronoiResult(BaseResult):
 class VoronoiGeometryResult(BaseResult):
     """Result of Voronoi geometry analysis for 2D/3D visualization.
 
-    Output structure:
-    - table: pandas.DataFrame with columns
-      ['frame_index', 'iter', 'atom_id', 'atom_type', 'site_position',
-       'vertices', 'faces', 'neighbor_atom_ids', 'voronoi_volume',
-       'num_faces', 'is_bounded', 'backend']
-      - frame_index: source frame index
-      - iter: iteration for that frame
-      - atom_id: atom identifier
-      - atom_type: element/type label for the atom
-      - site_position: atom XYZ coordinate [x, y, z]
-      - vertices: Voronoi-cell vertices as [[x, y, z], ...]
-      - faces: per-face records containing local vertex indices and neighbor info
-      - neighbor_atom_ids: neighboring atom ids inferred from Voronoi adjacency
-      - voronoi_volume: Voronoi-cell volume (NaN when unbounded/degenerate)
-      - num_faces: number of faces for that cell
-      - is_bounded: whether the Voronoi cell is finite/bounded
-      - backend: backend used ('scipy' or 'pyvoro')
-    - request: VoronoiRequest used to produce this result
+    Fields
+    -----
+    table : pd.DataFrame
+        Output geometry table with columns
+        `["frame_index", "iter", "atom_id", "atom_type", "site_position", "vertices", "faces", "neighbor_atom_ids", "voronoi_volume", "num_faces", "is_bounded", "backend"]`.
+        Geometry fields contain JSON-serializable list/dict structures.
+    request : VoronoiRequest
+        Request object used for this analysis execution.
+
+    Notes
+    -----
+    `faces` entries include local vertex indices and neighbor references.
+
+    Examples
+    -----
+    ```python
+    result = VoronoiGeometryScipyTask().run(data, req)
+    result.table[["atom_id", "vertices", "faces"]].head(1)
+    ```
+    Sample output:
+    One-row DataFrame containing full cell geometry for a selected atom.
+    Meaning:
+    The result can drive 2D/3D Voronoi visualization pipelines.
     """
 
     table: pd.DataFrame
@@ -598,6 +643,36 @@ class VoronoiScipyTask(AnalysisTask):
     recommended_presentations = staticmethod(_recommended_presentations)
 
     def run(self, data: TrajectoryData, request: VoronoiRequest, reporter=None) -> VoronoiResult:
+        """Compute Voronoi metric table using the SciPy backend.
+
+        Works on
+        -----
+        `TrajectoryData` plus `VoronoiRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates, atom metadata, and optional iterations.
+        request : VoronoiRequest
+            Atom/frame selection and backend configuration.
+        reporter : Any, optional
+            Optional progress callback for frame-wise processing.
+
+        Returns
+        -----
+        VoronoiResult
+            Metric-only Voronoi table and request echo.
+
+        Examples
+        -----
+        ```python
+        result = VoronoiScipyTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with `voronoi_volume`, `num_faces`, `is_bounded`.
+        Meaning:
+        One row is produced per selected atom and frame.
+        """
         return _run_voronoi(data, request, backend="scipy", reporter=reporter)
 
 
@@ -615,6 +690,36 @@ class VoronoiPyvoroTask(AnalysisTask):
     recommended_presentations = staticmethod(_recommended_presentations)
 
     def run(self, data: TrajectoryData, request: VoronoiRequest, reporter=None) -> VoronoiResult:
+        """Compute Voronoi metric table using the pyvoro backend.
+
+        Works on
+        -----
+        `TrajectoryData` plus `VoronoiRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates, atom metadata, and optional iterations.
+        request : VoronoiRequest
+            Atom/frame selection and backend configuration.
+        reporter : Any, optional
+            Optional progress callback for frame-wise processing.
+
+        Returns
+        -----
+        VoronoiResult
+            Metric-only Voronoi table and request echo.
+
+        Examples
+        -----
+        ```python
+        result = VoronoiPyvoroTask().run(data, req)
+        ```
+        Sample output:
+        Table rows with `backend="pyvoro"` and per-cell metrics.
+        Meaning:
+        The task returns pyvoro-derived Voronoi metrics per selected atom/frame.
+        """
         return _run_voronoi(data, request, backend="pyvoro", reporter=reporter)
 
 
@@ -630,6 +735,36 @@ class VoronoiGeometryScipyTask(AnalysisTask):
     recommended_presentations = staticmethod(_recommended_presentations)
 
     def run(self, data: TrajectoryData, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
+        """Compute Voronoi geometry table using the SciPy backend.
+
+        Works on
+        -----
+        `TrajectoryData` plus `VoronoiRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates, atom metadata, and optional iterations.
+        request : VoronoiRequest
+            Atom/frame selection and backend configuration.
+        reporter : Any, optional
+            Optional progress callback for frame-wise processing.
+
+        Returns
+        -----
+        VoronoiGeometryResult
+            Geometry-rich Voronoi table and request echo.
+
+        Examples
+        -----
+        ```python
+        result = VoronoiGeometryScipyTask().run(data, req)
+        ```
+        Sample output:
+        Rows containing `vertices`, `faces`, and neighbor atom IDs per cell.
+        Meaning:
+        Each row captures full geometric context for one Voronoi cell.
+        """
         return _run_voronoi_geometry(data, request, backend="scipy", reporter=reporter)
 
 
@@ -641,6 +776,36 @@ class VoronoiGeometryPyvoroTask(AnalysisTask):
     recommended_presentations = staticmethod(_recommended_presentations)
 
     def run(self, data: TrajectoryData, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
+        """Compute Voronoi geometry table using the pyvoro backend.
+
+        Works on
+        -----
+        `TrajectoryData` plus `VoronoiRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates, atom metadata, and optional iterations.
+        request : VoronoiRequest
+            Atom/frame selection and backend configuration.
+        reporter : Any, optional
+            Optional progress callback for frame-wise processing.
+
+        Returns
+        -----
+        VoronoiGeometryResult
+            Geometry-rich Voronoi table and request echo.
+
+        Examples
+        -----
+        ```python
+        result = VoronoiGeometryPyvoroTask().run(data, req)
+        ```
+        Sample output:
+        Rows containing pyvoro-native cell geometry fields.
+        Meaning:
+        The output is suitable for geometry-aware Voronoi visualization.
+        """
         return _run_voronoi_geometry(data, request, backend="pyvoro", reporter=reporter)
 
 

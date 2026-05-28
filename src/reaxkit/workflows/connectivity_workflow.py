@@ -1,4 +1,13 @@
-"""Direct command workflow for connectivity analyses."""
+"""Direct command workflow for connectivity analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -60,10 +69,12 @@ ALL_LEGACY_COMMANDS = (
 
 
 def _parse_frames(values) -> list[int] | None:
+    """Parse frames."""
     return parse_frame_indices(values)
 
 
 def _parse_kv_map(spec: str | None, *, value_cast=float) -> dict[str, float]:
+    """Parse kv map."""
     if not spec:
         return {}
     out: dict[str, float] = {}
@@ -79,6 +90,7 @@ def _parse_kv_map(spec: str | None, *, value_cast=float) -> dict[str, float]:
 
 
 def _parse_element_hybridizations(spec: str | None) -> dict[str, dict[str, float]]:
+    """Parse element hybridizations."""
     if not spec:
         return {}
     out: dict[str, dict[str, float]] = {}
@@ -94,6 +106,7 @@ def _parse_element_hybridizations(spec: str | None) -> dict[str, dict[str, float
 
 
 def _parse_status_labels(spec: str | None) -> dict[int, str]:
+    """Parse status labels."""
     out = {-1: "U", 0: "C", 1: "O"}
     if not spec:
         return out
@@ -112,6 +125,7 @@ def _parse_status_labels(spec: str | None) -> dict[int, str]:
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which forces ReaxFF file parsing rules.")
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which points loader context to that run.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup search location.")
@@ -123,6 +137,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which generates a single-panel figure.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save figures/conn.png, which writes the plot image to that path.")
@@ -133,6 +148,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_frame_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add frame arguments."""
     parser.add_argument(
         "--frames",
         nargs="*",
@@ -143,6 +159,7 @@ def _add_frame_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_connection_list_request(args: argparse.Namespace) -> ConnectionListRequest:
+    """Build connection list request."""
     return ConnectionListRequest(
         frames=_parse_frames(args.frames),
         every=args.every,
@@ -153,6 +170,7 @@ def _build_connection_list_request(args: argparse.Namespace) -> ConnectionListRe
 
 
 def _build_connection_table_request(args: argparse.Namespace) -> ConnectionTableRequest:
+    """Build connection table request."""
     selected = _selected_connection_table_frames(args)
     return ConnectionTableRequest(
         frame=int(selected[0]),
@@ -163,6 +181,7 @@ def _build_connection_table_request(args: argparse.Namespace) -> ConnectionTable
 
 
 def _build_connection_stats_request(args: argparse.Namespace) -> ConnectionStatsRequest:
+    """Build connection stats request."""
     return ConnectionStatsRequest(
         frames=_parse_frames(args.frames),
         every=args.every,
@@ -173,6 +192,7 @@ def _build_connection_stats_request(args: argparse.Namespace) -> ConnectionStats
 
 
 def _build_bond_events_request(args: argparse.Namespace) -> BondEventsRequest:
+    """Build bond events request."""
     return BondEventsRequest(
         frames=_parse_frames(args.frames),
         every=args.every,
@@ -189,6 +209,7 @@ def _build_bond_events_request(args: argparse.Namespace) -> BondEventsRequest:
 
 
 def _build_coordination_request(args: argparse.Namespace) -> CoordinationStatusRequest:
+    """Build coordination request."""
     valences = _parse_kv_map(args.valences, value_cast=float) if args.valences else None
     return CoordinationStatusRequest(
         valences=valences,
@@ -200,6 +221,7 @@ def _build_coordination_request(args: argparse.Namespace) -> CoordinationStatusR
 
 
 def _build_hybridization_request(args: argparse.Namespace) -> HybridizationStatusRequest:
+    """Build hybridization request."""
     global_map = _parse_kv_map(args.hybridizations, value_cast=float) if args.hybridizations else None
     element_map = _parse_element_hybridizations(args.element_hybridizations) if args.element_hybridizations else None
     return HybridizationStatusRequest(
@@ -217,6 +239,7 @@ def _build_hybridization_request(args: argparse.Namespace) -> HybridizationStatu
 def _build_coordination_relabel_request(
     args: argparse.Namespace,
 ) -> TrajectoryRelabelByCoordinationRequest:
+    """Build coordination relabel request."""
     valences = _parse_kv_map(args.valences, value_cast=float) if args.valences else None
     return TrajectoryRelabelByCoordinationRequest(
         labels=_parse_status_labels(args.labels),
@@ -241,6 +264,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def _selected_connection_table_frames(args: argparse.Namespace) -> list[int]:
+    """Selected connection table frames."""
     raw_frames = _parse_frames(getattr(args, "frames", None))
     if raw_frames is None or len(raw_frames) == 0:
         return [0]
@@ -249,6 +273,27 @@ def _selected_connection_table_frames(args: argparse.Namespace) -> list[int]:
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
@@ -399,12 +444,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _prepare_result_table(command: str, result, args: argparse.Namespace) -> None:
+    """Prepare result table."""
     if command in {"get_connection_table"} and isinstance(result.table, pd.DataFrame):
         if not isinstance(result.table.index, pd.RangeIndex):
             result.table = result.table.reset_index()
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -494,6 +541,27 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     if canonical == "relabel_traj_using_coordination":
         normalized = normalize_storage_args(vars(args))

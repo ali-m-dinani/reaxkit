@@ -1,4 +1,15 @@
-"""Generic time-series analysis tasks."""
+"""Expose generic analyzer tasks for domain-specific time-series extraction.
+
+This module centralizes reusable time-series analyzers across simulation,
+trajectory, electrostatics, restraint, and molecular datasets. It is scoped to
+series construction and normalization rather than higher-level event logic.
+
+**Usage context**
+
+- Unified series APIs: Query scalar and vector-like series with a common shape.
+- Multi-domain plotting: Produce normalized tables across heterogeneous inputs.
+- Workflow composition: Provide shared series outputs for UI and reporting tasks.
+"""
 
 from __future__ import annotations
 
@@ -27,11 +38,13 @@ from reaxkit.presentation.specs import PresentationSpec
 
 
 def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -> list[int]:
+    """Resolve valid frame indices after optional filtering and stride."""
     idx = list(range(n_frames)) if frames is None else [int(i) for i in frames]
     return [i for i in idx if 0 <= i < n_frames][:: max(1, int(every))]
 
 
 def _rows_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract normalized row dictionaries from a serialized payload table."""
     rows = payload.get("table")
     if not isinstance(rows, list):
         return []
@@ -39,6 +52,7 @@ def _rows_from_payload(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _table_only_presentation() -> list[PresentationSpec]:
+    """Return a single default table presentation specification."""
     return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
 
@@ -49,6 +63,7 @@ def _single_plot_presentation(
     label: str,
     group_col: str = "",
 ) -> PresentationSpec:
+    """Build a single 2D plot presentation specification."""
     return PresentationSpec(
         renderer="single_plot",
         label=label,
@@ -71,6 +86,7 @@ def _value_series_presentations(
     label: str | None = None,
     x_candidates: Sequence[str] = ("iter", "frame_index"),
 ) -> list[PresentationSpec]:
+    """Build table+plot presentations for long-form value series payloads."""
     rows = _rows_from_payload(payload)
     if not rows:
         return _table_only_presentation()
@@ -96,6 +112,7 @@ def _wide_series_presentations(
     label_prefix: str = "",
     x_candidates: Sequence[str] = ("iter", "frame_index"),
 ) -> list[PresentationSpec]:
+    """Build table+multi-plot presentations for wide-form series payloads."""
     rows = _rows_from_payload(payload)
     if not rows:
         return _table_only_presentation()
@@ -114,6 +131,7 @@ def _wide_series_presentations(
 
 @dataclass
 class Series:
+    """Container for one in-memory ``x``/``y`` series with display label."""
     x: np.ndarray
     y: np.ndarray
     label: str
@@ -121,6 +139,26 @@ class Series:
 
 @dataclass
 class TimeSeriesResult(BaseResult):
+    """Generic result container for in-memory time-series representations.
+
+    This base-style result supports reusable analyzers that produce both table
+    outputs and optional in-memory ``Series`` vectors.
+
+    Fields
+    -----
+    series : list[Series]
+        Optional list of in-memory series objects.
+    x_label : str
+        Axis label for x-series values.
+    y_label : str
+        Axis label for y-series values.
+    request : BaseRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Tabular representation of the same series data.
+    metadata : dict | None
+        Optional auxiliary metadata dictionary.
+    """
     series: list[Series]
     x_label: str
     y_label: str
@@ -173,7 +211,19 @@ class TrajectoryCoordinateSeriesResult(BaseResult):
 
 @dataclass
 class TrajectoryDisplacementSeriesResult(BaseResult):
-    """Trajectory displacement-series result."""
+    """Trajectory displacement-series result.
+
+    The analyzer returns displacement magnitude or component values by atom and
+    sampled frame relative to a configured reference frame.
+
+    Fields
+    -----
+    request : TrajectoryDisplacementSeriesRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``frame_index``, ``iter``, ``atom_id``,
+        ``atom_type``, ``dim``, and ``coord`` (displacement value).
+    """
 
     request: TrajectoryDisplacementSeriesRequest
     table: pd.DataFrame
@@ -344,6 +394,17 @@ class MolecularTotalsSeriesResult(BaseResult):
 
 @dataclass
 class SimulationScalarSeriesRequest(BaseRequest):
+    """Request payload for simulation scalar time-series extraction.
+
+    Fields
+    -----
+    field : str
+        Scalar simulation field name to extract.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all frames.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     field: str = dc_field(
         metadata={
             "label": "Field",
@@ -377,6 +438,21 @@ class SimulationScalarSeriesRequest(BaseRequest):
 
 @dataclass
 class TrajectoryCoordinateSeriesRequest(BaseRequest):
+    """Request payload for trajectory coordinate-series extraction.
+
+    Fields
+    -----
+    atom_ids : Optional[Sequence[int]]
+        Optional 1-based atom IDs to include.
+    atom_types : Optional[Sequence[str]]
+        Optional atom-type filters used when ``atom_ids`` is omitted.
+    dims : Sequence[str]
+        Requested coordinate dimensions or norms (for example ``x``, ``xy``).
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all frames.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
         metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for TrajectoryCoordinateSeriesRequest.', 'units': 'index'},
@@ -405,6 +481,23 @@ class TrajectoryCoordinateSeriesRequest(BaseRequest):
 
 @dataclass
 class TrajectoryDisplacementSeriesRequest(BaseRequest):
+    """Request payload for trajectory displacement-series extraction.
+
+    Fields
+    -----
+    atom_ids : Optional[Sequence[int]]
+        Optional 1-based atom IDs to include.
+    atom_types : Optional[Sequence[str]]
+        Optional atom-type filters used when ``atom_ids`` is omitted.
+    dims : Sequence[str]
+        Requested displacement dimensions or norms.
+    reference_frame : int
+        Zero-based frame index used as displacement origin.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all frames.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     atom_ids: Optional[Sequence[int]] = dc_field(
         default=None,
         metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for TrajectoryDisplacementSeriesRequest.', 'units': 'index'},
@@ -437,6 +530,17 @@ class TrajectoryDisplacementSeriesRequest(BaseRequest):
 
 @dataclass
 class CellDimensionsRequest(BaseRequest):
+    """Request payload for cell-dimension time-series extraction.
+
+    Fields
+    -----
+    fields : Sequence[str]
+        Cell fields to extract (lengths and/or angles).
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all frames.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     fields: Sequence[str] = dc_field(
         default=("a", "b", "c"),
         metadata={
@@ -457,6 +561,17 @@ class CellDimensionsRequest(BaseRequest):
 
 @dataclass
 class ChargeSeriesRequest(BaseRequest):
+    """Request payload for per-atom charge time-series extraction.
+
+    Fields
+    -----
+    atom_ids : Sequence[int]
+        1-based atom IDs to include in output.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all frames.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     atom_ids: Sequence[int] = dc_field(
         metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for ChargeSeriesRequest.', 'units': 'index'},
     )
@@ -472,6 +587,19 @@ class ChargeSeriesRequest(BaseRequest):
 
 @dataclass
 class ElectricFieldSeriesRequest(BaseRequest):
+    """Request payload for electric-field component time-series extraction.
+
+    Fields
+    -----
+    components : Sequence[str]
+        Requested electric-field component names.
+    field_kind : Literal["applied", "energy", "auto"]
+        Field group selection mode.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all samples.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     components: Sequence[str] = dc_field(
         metadata={
             "label": "Components",
@@ -499,6 +627,17 @@ class ElectricFieldSeriesRequest(BaseRequest):
 
 @dataclass
 class EregimeSeriesRequest(BaseRequest):
+    """Request payload for eregime field-column series extraction.
+
+    Fields
+    -----
+    field : str
+        Eregime column name or alias to extract.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all rows.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     field: str = dc_field(
         metadata={
             "label": "Field",
@@ -518,6 +657,17 @@ class EregimeSeriesRequest(BaseRequest):
 
 @dataclass
 class PartialEnergySeriesRequest(BaseRequest):
+    """Request payload for partial-energy component series extraction.
+
+    Fields
+    -----
+    components : Optional[Sequence[str]]
+        Optional components to include; defaults to all available components.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all rows.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     components: Optional[Sequence[str]] = dc_field(
         default=None,
         metadata={
@@ -551,6 +701,21 @@ class PartialEnergySeriesRequest(BaseRequest):
 
 @dataclass
 class RestraintSeriesRequest(BaseRequest):
+    """Request payload for restraint-series extraction and reshaping.
+
+    Fields
+    -----
+    fields : Optional[Sequence[str]]
+        Requested restraint fields or aliases.
+    restraint_index : Optional[Union[int, Sequence[int]]]
+        Optional 1-based restraint indices used with target/actual aliases.
+    dropna_rows : bool
+        Whether to drop rows where all selected value columns are missing.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all rows.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     fields: Optional[Sequence[str]] = dc_field(
         default=None,
         metadata={
@@ -589,6 +754,17 @@ class RestraintSeriesRequest(BaseRequest):
 
 @dataclass
 class MolecularFrequencySeriesRequest(BaseRequest):
+    """Request payload for molecular-frequency series extraction.
+
+    Fields
+    -----
+    molecules : Sequence[str]
+        Molecular formulas to track.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all rows.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     molecules: Sequence[str] = dc_field(
         metadata={'label': 'Molecules', 'help': 'Molecules parameter for MolecularFrequencySeriesRequest.'},
     )
@@ -604,6 +780,17 @@ class MolecularFrequencySeriesRequest(BaseRequest):
 
 @dataclass
 class MolecularTotalsSeriesRequest(BaseRequest):
+    """Request payload for molecular totals-series extraction.
+
+    Fields
+    -----
+    quantities : Sequence[str]
+        Total-quantity columns to include.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to sample; defaults to all rows.
+    every : int
+        Sampling stride applied after frame selection.
+    """
     quantities: Sequence[str] = dc_field(
         default=("total_molecules", "total_atoms", "total_molecular_mass"),
         metadata={
@@ -623,6 +810,7 @@ class MolecularTotalsSeriesRequest(BaseRequest):
 
 
 def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarray, str]:
+    """Resolve a simulation scalar field into numeric values and canonical label."""
     key = str(field).strip()
     if key == "potential_energy":
         arr = data.potential_energy
@@ -678,6 +866,23 @@ class SimulationScalarSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: SimulationScalarSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for simulation scalar series.
+
+        Works on
+        Analyzer task output for ``simulation_series``.
+
+        Parameters
+        -----
+        _result : SimulationScalarSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for table and scalar plot rendering.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -698,6 +903,25 @@ class SimulationScalarSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: SimulationData, request: SimulationScalarSeriesRequest, reporter=None) -> SimulationScalarSeriesResult:
+        """Run scalar simulation-series extraction.
+
+        Works on
+        ``SimulationData``.
+
+        Parameters
+        -----
+        data : SimulationData
+            Parsed simulation scalar dataset.
+        request : SimulationScalarSeriesRequest
+            Field and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        SimulationScalarSeriesResult
+            Scalar series rows with frame and iteration axes.
+        """
         values, label = _simulation_field_array(data, request.field)
         n_frames = int(values.shape[0])
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
@@ -735,6 +959,7 @@ def _trajectory_coord_like_table(
     reference_frame: int,
     reporter=None,
 ) -> pd.DataFrame:
+    """Build coordinate/displacement long-form rows for selected atoms and dims."""
     dims = tuple(str(d).lower() for d in dims_req)
     valid = {"x", "y", "z", "xy", "xz", "yz", "xyz"}
     if not dims or any(d not in valid for d in dims):
@@ -807,6 +1032,23 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: TrajectoryCoordinateSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for trajectory coordinate series.
+
+        Works on
+        Analyzer task output for ``trajectory_coordinate_series``.
+
+        Parameters
+        -----
+        _result : TrajectoryCoordinateSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for coordinate tables and traces.
+        """
         rows = _rows_from_payload(payload)
         if not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -836,6 +1078,25 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TrajectoryCoordinateSeriesResult:
+        """Run trajectory coordinate-series extraction.
+
+        Works on
+        ``TrajectoryData``.
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Parsed trajectory coordinates and metadata.
+        request : TrajectoryCoordinateSeriesRequest
+            Atom, dimension, and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        TrajectoryCoordinateSeriesResult
+            Long-form coordinate series rows.
+        """
         table = _trajectory_coord_like_table(
             data,
             atom_ids_req=request.atom_ids,
@@ -859,9 +1120,45 @@ class TrajectoryDisplacementSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: TrajectoryDisplacementSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for displacement series.
+
+        Works on
+        Analyzer task output for ``trajectory_displacement_series``.
+
+        Parameters
+        -----
+        _result : TrajectoryDisplacementSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs reused from coordinate-series logic.
+        """
         return TrajectoryCoordinateSeriesTask.recommended_presentations(_result, payload)
 
     def run(self, data: TrajectoryData, request: TrajectoryDisplacementSeriesRequest, reporter=None) -> TrajectoryDisplacementSeriesResult:
+        """Run trajectory displacement-series extraction.
+
+        Works on
+        ``TrajectoryData``.
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Parsed trajectory coordinates and metadata.
+        request : TrajectoryDisplacementSeriesRequest
+            Atom, reference-frame, dimension, and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        TrajectoryDisplacementSeriesResult
+            Long-form displacement series rows.
+        """
         table = _trajectory_coord_like_table(
             data,
             atom_ids_req=request.atom_ids,
@@ -884,6 +1181,23 @@ class CellDimensionsTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: CellDimensionsResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for cell-dimension series.
+
+        Works on
+        Analyzer task output for ``cell_dimensions``.
+
+        Parameters
+        -----
+        _result : CellDimensionsResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for cell-dimension tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -904,6 +1218,25 @@ class CellDimensionsTask(AnalysisTask):
         ]
 
     def run(self, data: SimulationData, request: CellDimensionsRequest, reporter=None) -> CellDimensionsResult:
+        """Run cell-dimension series extraction from simulation data.
+
+        Works on
+        ``SimulationData``.
+
+        Parameters
+        -----
+        data : SimulationData
+            Parsed simulation dataset with cell and/or iteration arrays.
+        request : CellDimensionsRequest
+            Cell field and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        CellDimensionsResult
+            Long-form cell dimension rows.
+        """
         if data.cell_lengths is not None:
             n_frames = len(data.cell_lengths)
         elif data.cell_angles is not None:
@@ -951,6 +1284,23 @@ class ChargeSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: ChargeSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for charge series.
+
+        Works on
+        Analyzer task output for ``charge_series``.
+
+        Parameters
+        -----
+        _result : ChargeSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for charge tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -971,6 +1321,25 @@ class ChargeSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: ChargeData, request: ChargeSeriesRequest, reporter=None) -> ChargeSeriesResult:
+        """Run per-atom charge series extraction.
+
+        Works on
+        ``ChargeData``.
+
+        Parameters
+        -----
+        data : ChargeData
+            Parsed charge matrix and optional simulation metadata.
+        request : ChargeSeriesRequest
+            Atom and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        ChargeSeriesResult
+            Long-form per-atom charge rows.
+        """
         charges = np.asarray(data.charges, dtype=float)
         if charges.ndim != 2:
             raise ValueError("ChargeData.charges must have shape (n_frames, n_atoms).")
@@ -1031,6 +1400,7 @@ def _electric_field_group(
     data: ElectricFieldData,
     field_kind: str,
 ) -> tuple[np.ndarray, list[str], str]:
+    """Return electric-field values/components for one field group selector."""
     kind = str(field_kind).lower()
     if kind == "applied":
         return (
@@ -1048,6 +1418,7 @@ def _electric_field_group(
 
 
 def _resolve_eregime_dc_field(df: pd.DataFrame, name: str) -> str:
+    """Resolve an eregime column request against aliases and available columns."""
     if not name:
         raise ValueError("Column name is empty.")
 
@@ -1070,6 +1441,7 @@ def _resolve_eregime_dc_field(df: pd.DataFrame, name: str) -> str:
 
 
 def _partial_energy_frame(data: PartialEnergyData) -> pd.DataFrame:
+    """Build a partial-energy DataFrame with ``iter`` plus component columns."""
     df = pd.DataFrame({"iter": pd.Series(data.iterations, dtype=int)})
     if data.components:
         df = pd.concat([df, pd.DataFrame(data.values, columns=list(data.components))], axis=1)
@@ -1080,6 +1452,7 @@ def _resolve_partial_energy_components(
     df: pd.DataFrame,
     components: Optional[Sequence[str]],
 ) -> list[str]:
+    """Resolve requested partial-energy components to actual DataFrame columns."""
     available = [str(c) for c in df.columns if str(c) != "iter"]
     if components is None or len(components) == 0:
         return available
@@ -1099,6 +1472,7 @@ def _resolve_partial_energy_components(
 
 
 def _restraint_frame(data: RestraintData) -> pd.DataFrame:
+    """Build a normalized restraint DataFrame from parsed restraint arrays."""
     df = pd.DataFrame({"iter": pd.Series(data.iterations, dtype=int)})
     n_restraints = int(data.metadata.get("n_restraints", 0)) if data.metadata else 0
     if data.restraint_energy is not None:
@@ -1124,6 +1498,7 @@ def _restraint_frame(data: RestraintData) -> pd.DataFrame:
 
 
 def _resolve_restraint_dc_field(df: pd.DataFrame, requested: str) -> str:
+    """Resolve one restraint field request into an existing DataFrame column."""
     cols = [str(c) for c in df.columns]
     key = str(requested).strip().lower()
     if not key:
@@ -1163,6 +1538,7 @@ def _resolve_restraint_dc_field(df: pd.DataFrame, requested: str) -> str:
 
 
 def _resolve_restraint_fields(df: pd.DataFrame, request: RestraintSeriesRequest) -> list[str]:
+    """Resolve all restraint fields requested for long-form output expansion."""
     idx_values: list[int] = []
     if request.restraint_index is not None:
         raw_idx = request.restraint_index
@@ -1212,6 +1588,23 @@ class ElectricFieldSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: ElectricFieldSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for electric-field series.
+
+        Works on
+        Analyzer task output for ``electric_field_series``.
+
+        Parameters
+        -----
+        _result : ElectricFieldSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for field-component tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1232,6 +1625,25 @@ class ElectricFieldSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: ElectricFieldData, request: ElectricFieldSeriesRequest, reporter=None) -> ElectricFieldSeriesResult:
+        """Run electric-field component series extraction.
+
+        Works on
+        ``ElectricFieldData``.
+
+        Parameters
+        -----
+        data : ElectricFieldData
+            Parsed electric-field samples and component metadata.
+        request : ElectricFieldSeriesRequest
+            Component, field-group, and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        ElectricFieldSeriesResult
+            Long-form electric-field component rows.
+        """
         frame_values: np.ndarray
         component_names: list[str]
         y_label: str
@@ -1303,6 +1715,23 @@ class EregimeSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: EregimeSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for eregime series.
+
+        Works on
+        Analyzer task output for ``eregime_series``.
+
+        Parameters
+        -----
+        _result : EregimeSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for eregime tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1323,6 +1752,25 @@ class EregimeSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: EregimeData, request: EregimeSeriesRequest, reporter=None) -> EregimeSeriesResult:
+        """Run eregime field-column series extraction.
+
+        Works on
+        ``EregimeData``.
+
+        Parameters
+        -----
+        data : EregimeData
+            Parsed eregime arrays.
+        request : EregimeSeriesRequest
+            Field-column and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        EregimeSeriesResult
+            Long-form field/value rows for sampled iterations.
+        """
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         field_zones = np.asarray(data.field_zones, dtype=int).reshape(-1)
         field_dir = np.asarray(data.field_dir, dtype=object).reshape(-1)
@@ -1361,6 +1809,23 @@ class PartialEnergySeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: PartialEnergySeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for partial-energy series.
+
+        Works on
+        Analyzer task output for ``partial_energy_series``.
+
+        Parameters
+        -----
+        _result : PartialEnergySeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for component/value tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1381,6 +1846,25 @@ class PartialEnergySeriesTask(AnalysisTask):
         ]
 
     def run(self, data: PartialEnergyData, request: PartialEnergySeriesRequest, reporter=None) -> PartialEnergySeriesResult:
+        """Run partial-energy component series extraction.
+
+        Works on
+        ``PartialEnergyData``.
+
+        Parameters
+        -----
+        data : PartialEnergyData
+            Parsed partial-energy arrays.
+        request : PartialEnergySeriesRequest
+            Component and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        PartialEnergySeriesResult
+            Long-form component/value rows.
+        """
         df = _partial_energy_frame(data)
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -1421,6 +1905,23 @@ class RestraintSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: RestraintSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for restraint series.
+
+        Works on
+        Analyzer task output for ``restraint_series``.
+
+        Parameters
+        -----
+        _result : RestraintSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for restraint tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1441,6 +1942,25 @@ class RestraintSeriesTask(AnalysisTask):
         ]
 
     def run(self, data: RestraintData, request: RestraintSeriesRequest, reporter=None) -> RestraintSeriesResult:
+        """Run restraint series extraction and long-form reshaping.
+
+        Works on
+        ``RestraintData``.
+
+        Parameters
+        -----
+        data : RestraintData
+            Parsed restraint arrays and metadata.
+        request : RestraintSeriesRequest
+            Field, restraint-index, and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        RestraintSeriesResult
+            Long-form restraint rows with field labels and values.
+        """
         df = _restraint_frame(data)
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -1499,6 +2019,23 @@ class MolecularFrequencySeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: MolecularFrequencySeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for molecular-frequency series.
+
+        Works on
+        Analyzer task output for ``molecular_frequency_series``.
+
+        Parameters
+        -----
+        _result : MolecularFrequencySeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for molecular-frequency tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1524,6 +2061,25 @@ class MolecularFrequencySeriesTask(AnalysisTask):
         request: MolecularFrequencySeriesRequest,
         reporter=None,
     ) -> MolecularFrequencySeriesResult:
+        """Run molecular-frequency series extraction for selected formulas.
+
+        Works on
+        ``MolecularAnalysisData``.
+
+        Parameters
+        -----
+        data : MolecularAnalysisData
+            Parsed molecular-species frequency data.
+        request : MolecularFrequencySeriesRequest
+            Molecule and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        MolecularFrequencySeriesResult
+            Long-form molecular frequency rows.
+        """
         df = data.molecular_species.copy()
         iterations = np.asarray(data.iterations, dtype=int).reshape(-1)
         n_frames = iterations.shape[0]
@@ -1569,6 +2125,23 @@ class MolecularTotalsSeriesTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: MolecularTotalsSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table/plot views for molecular totals series.
+
+        Works on
+        Analyzer task output for ``molecular_totals_series``.
+
+        Parameters
+        -----
+        _result : MolecularTotalsSeriesResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload with ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for totals tables and traces.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -1594,6 +2167,25 @@ class MolecularTotalsSeriesTask(AnalysisTask):
         request: MolecularTotalsSeriesRequest,
         reporter=None,
     ) -> MolecularTotalsSeriesResult:
+        """Run molecular totals-series extraction for selected quantities.
+
+        Works on
+        ``MolecularAnalysisData.totals``.
+
+        Parameters
+        -----
+        data : MolecularAnalysisData
+            Parsed molecular totals dataset.
+        request : MolecularTotalsSeriesRequest
+            Quantity and sampling configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        MolecularTotalsSeriesResult
+            Long-form totals quantity/value rows.
+        """
         df = data.totals.copy()
         if df.empty:
             return MolecularTotalsSeriesResult(

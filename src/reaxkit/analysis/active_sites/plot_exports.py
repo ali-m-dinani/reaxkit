@@ -1,4 +1,15 @@
-"""TRACT-style figure exports for active-site structural outputs."""
+"""Export TRACT-style diagnostic figures for active-site structural outputs.
+
+This module renders PNG maps/histograms from active-site structural tables for
+reporting and visual QA. It is scoped to plotting/export and does not compute
+structural descriptors.
+
+**Usage context**
+
+- Figure generation: Create TRACT-style structural maps and distributions.
+- Report assembly: Produce image assets consumed by report payload builders.
+- QA workflows: Visualize labels, grains, and pyramidalization patterns.
+"""
 
 from __future__ import annotations
 
@@ -126,7 +137,32 @@ def save_structural_figures_tract_style(
     *,
     stem: str,
 ) -> list[str]:
-    """Write TRACT-style structural PNG figures and return written filenames."""
+    """Write TRACT-style structural PNG figures and return written filenames.
+
+    Parameters
+    -----
+    table : pd.DataFrame
+        Active-site structural table containing required plotting columns.
+    out_dir : Path
+        Output directory where figures will be written.
+    stem : str
+        File stem prefix used to build output PNG names.
+
+    Returns
+    -----
+    list[str]
+        Filenames successfully written into `out_dir`.
+
+    Examples
+    -----
+    ```python
+    files = save_structural_figures_tract_style(table, Path("analysis"), stem="frame0000")
+    ```
+    Sample output:
+    `["frame0000_dpyr_map.png", "frame0000_label_map.png", ...]`
+    Meaning:
+    Generated figures are available for embedding in structural reports.
+    """
     if not isinstance(table, pd.DataFrame) or table.empty:
         return []
     required = ["x", "y", "d_pyr", "is_undercoord", "label", "grain_id"]

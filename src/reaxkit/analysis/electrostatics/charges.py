@@ -1,4 +1,15 @@
-"""Charge extraction tasks built on top of ``ChargeData``."""
+"""Extract per-atom charge series and tables from `ChargeData`.
+
+This module implements charge-domain analyzer tasks that slice by atom and
+frame, returning normalized tabular outputs for inspection and plotting. It is
+scoped to charge values and does not compute dipoles or polarization metrics.
+
+**Usage context**
+
+- Charge tracking: Follow charge evolution for selected atoms over time.
+- Snapshot analysis: Build frame-specific charge tables for diagnostics.
+- Electrostatics pipelines: Provide charge tables to downstream analyzers.
+"""
 
 from __future__ import annotations
 
@@ -25,20 +36,26 @@ def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -
 class ChargeTableRequest(BaseRequest):
     """Request for per-atom charge extraction across frames.
 
-    Parameters
-    ----------
-    atom_ids
+    Fields
+    -----
+    atom_ids : Optional[Sequence[int]]
         Optional atom-id filter. If provided, only these atoms are included.
-        Example: ``[1, 5, 9]``.
-    atom_types
-        Optional element/type filter. Used only when ``atom_ids`` is not set.
-        Example: ``["O", "H"]``.
-    frames
-        Optional frame indices to include. If omitted, all frames are included.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after selection. Example: ``every=5`` keeps every fifth
-        selected frame.
+    atom_types : Optional[Sequence[str]]
+        Optional element/type filter used when `atom_ids` is not set.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+
+    Examples
+    -----
+    ```python
+    req = ChargeTableRequest(atom_ids=[1, 5, 9], every=5)
+    ```
+    Sample output:
+    `ChargeTableRequest(...)`
+    Meaning:
+    The request configures atom and frame filtering for charge extraction.
     """
 
     atom_ids: Optional[Sequence[int]] = dc_field(
@@ -79,24 +96,24 @@ class ChargeTableRequest(BaseRequest):
 class ChargeTableResult(BaseResult):
     """Charge-table extraction result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`ChargeTableRequest` used to generate this result.
-    - ``table``: pandas.DataFrame with columns:
-      ``['frame_index', 'iter', 'atom_id', 'atom_type', 'charge']``.
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with columns
+        `["frame_index", "iter", "atom_id", "atom_type", "charge"]`.
+    request : ChargeTableRequest
+        Request object used for this analysis run.
 
-    Column meanings
-    ---------------
-    - ``frame_index``: source frame index in the charge trajectory.
-    - ``iter``: simulation iteration mapped to the frame.
-    - ``atom_id``: atom identifier.
-    - ``atom_type``: atom element/type label when available.
-    - ``charge``: per-atom charge value at that frame.
-
-    Example
-    -------
-    A row ``frame_index=12, iter=1200, atom_id=7, atom_type='O', charge=-0.52``
-    means atom 7 had charge -0.52 at frame 12.
+    Examples
+    -----
+    ```python
+    result = ChargeTableTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame rows containing per-atom charge values at selected frames.
+    Meaning:
+    Each row is one `(frame, atom)` charge sample.
     """
 
     table: pd.DataFrame
@@ -114,6 +131,34 @@ class ChargeTableTask(AnalysisTask):
         _result: ChargeTableResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for charge-table outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ChargeTableResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and charge-vs-iteration plot.
+
+        Examples
+        -----
+        ```python
+        specs = ChargeTableTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list with table and grouped charge trend plot views.
+        Meaning:
+        Charge outputs can be rendered with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -137,6 +182,36 @@ class ChargeTableTask(AnalysisTask):
         ]
 
     def run(self, data: ChargeData, request: ChargeTableRequest, reporter=None) -> ChargeTableResult:
+        """Extract per-atom charges across selected frames as a tidy table.
+
+        Works on
+        -----
+        `ChargeData` plus `ChargeTableRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ChargeData
+            Charge trajectory bundle with per-frame/per-atom charge values.
+        request : ChargeTableRequest
+            Atom and frame filtering configuration.
+        reporter : Any, optional
+            Unused progress callback parameter for task API compatibility.
+
+        Returns
+        -----
+        ChargeTableResult
+            Result table containing selected charge samples.
+
+        Examples
+        -----
+        ```python
+        result = ChargeTableTask().run(data, ChargeTableRequest(atom_types=["O"]))
+        ```
+        Sample output:
+        `result.table` with columns `frame_index`, `iter`, `atom_id`, `charge`.
+        Meaning:
+        Charges are normalized into one row per selected frame and atom.
+        """
         charges = np.asarray(data.charges, dtype=float)
         if charges.ndim != 2:
             raise ValueError("ChargeData.charges must have shape (n_frames, n_atoms).")

@@ -1,4 +1,15 @@
-"""Ring and defect helpers for active-site analysis."""
+"""Provide ring and defect classification helpers for active-site analyzers.
+
+This module includes primitive-ring detection, ring-membership summaries, and
+defect motif classification utilities used by active-site structural analysis.
+It is scoped to graph/ring-defect logic and does not perform trajectory parsing.
+
+**Usage context**
+
+- Ring analysis: Enumerate primitive rings from bond graphs.
+- Defect typing: Classify ring-cluster motifs into TRACT-aligned defect labels.
+- Per-atom mapping: Project ring-cluster labels onto atom-level defect types.
+"""
 
 from __future__ import annotations
 
@@ -31,14 +42,59 @@ DEFECT_TYPE_SCHEMA: tuple[str, ...] = DEFECT_TYPE_PRIORITY + ("none",)
 
 
 def normalize_defect_type(label: str) -> str:
-    """Normalize arbitrary defect labels to TRACT schema values."""
+    """Normalize arbitrary defect labels to the supported TRACT schema.
+
+    Parameters
+    -----
+    label : str
+        Candidate defect label.
+
+    Returns
+    -----
+    str
+        Canonical defect label from `DEFECT_TYPE_SCHEMA`, defaulting to
+        `"non6_cluster"` when unknown.
+
+    Examples
+    -----
+    ```python
+    normalize_defect_type("DV_5_8_5")
+    ```
+    Sample output:
+    `"DV_5_8_5"`
+    Meaning:
+    Known labels pass through unchanged; unknown labels are canonicalized.
+    """
     if label in DEFECT_TYPE_SCHEMA:
         return str(label)
     return "non6_cluster"
 
 
 def prefer_defect_type(current: str, incoming: str) -> str:
-    """Resolve defect-type conflicts by TRACT priority ordering."""
+    """Resolve competing defect labels using TRACT priority ordering.
+
+    Parameters
+    -----
+    current : str
+        Existing defect label.
+    incoming : str
+        New candidate defect label.
+
+    Returns
+    -----
+    str
+        Higher-priority canonical label according to `DEFECT_TYPE_PRIORITY`.
+
+    Examples
+    -----
+    ```python
+    prefer_defect_type("non6_cluster", "SW_5775")
+    ```
+    Sample output:
+    `"SW_5775"`
+    Meaning:
+    Higher-priority motif labels replace weaker/unknown assignments.
+    """
     cur = normalize_defect_type(current)
     new = normalize_defect_type(incoming)
     if cur == "none":
@@ -62,7 +118,28 @@ def _canonical_cycle(nodes: list[int]) -> tuple[int, ...]:
 
 
 def find_primitive_rings(graph: nx.Graph) -> list[tuple[int, ...]]:
-    """Franzblau-like primitive rings by edge-removal shortest paths."""
+    """Find primitive rings using shortest-path Franzblau-style logic.
+
+    Parameters
+    -----
+    graph : nx.Graph
+        Undirected bond graph.
+
+    Returns
+    -----
+    list[tuple[int, ...]]
+        Canonical primitive ring node cycles.
+
+    Examples
+    -----
+    ```python
+    rings = find_primitive_rings(graph)
+    ```
+    Sample output:
+    `[(0, 1, 2, 3, 4, 5), ...]`
+    Meaning:
+    Each tuple encodes one primitive ring with canonicalized node ordering.
+    """
     if _HAS_IGRAPH:
         return _sp_primitive_rings_igraph(graph)
     return _sp_primitive_rings_networkx(graph)
@@ -128,7 +205,30 @@ def _sp_primitive_rings_networkx(graph: nx.Graph) -> list[tuple[int, ...]]:
 
 
 def ring_membership(n_atoms: int, rings: list[tuple[int, ...]]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Return per-atom ring min/max sizes and non-hex membership."""
+    """Compute per-atom ring-size extrema and non-hex membership flags.
+
+    Parameters
+    -----
+    n_atoms : int
+        Number of atoms in analyzed graph.
+    rings : list[tuple[int, ...]]
+        Primitive ring cycles.
+
+    Returns
+    -----
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        `(min_size, max_size, in_non6)` arrays per atom.
+
+    Examples
+    -----
+    ```python
+    min_size, max_size, in_non6 = ring_membership(n_atoms, rings)
+    ```
+    Sample output:
+    Arrays of length `n_atoms`.
+    Meaning:
+    Atoms receive ring-size summary bounds and non-hex membership status.
+    """
     min_size = np.full(n_atoms, -1, dtype=int)
     max_size = np.full(n_atoms, -1, dtype=int)
     in_non6 = np.zeros(n_atoms, dtype=bool)
@@ -198,7 +298,34 @@ def classify_defect_clusters(
     boundary_frac: list[float],
     min_gb_len: int = 4,
 ) -> dict[int, str]:
-    """Classify ring clusters into canonical defect motif labels."""
+    """Classify connected non-hex ring clusters into canonical defect motifs.
+
+    Parameters
+    -----
+    ring_sizes : list[int]
+        Ring size per ring index.
+    ring_adj : nx.Graph
+        Ring adjacency graph (rings are nodes; shared edges define adjacency).
+    boundary_frac : list[float]
+        Boundary participation fraction per ring.
+    min_gb_len : int, optional
+        Minimum alternating 5-7 chain length for grain-boundary labeling.
+
+    Returns
+    -----
+    dict[int, str]
+        Mapping from ring index to canonical defect motif label.
+
+    Examples
+    -----
+    ```python
+    labels = classify_defect_clusters(ring_sizes, ring_adj, boundary_frac)
+    ```
+    Sample output:
+    `{0: "SW_5775", 3: "GB_chain_5_7"}`
+    Meaning:
+    Defect motifs are assigned at ring-cluster resolution.
+    """
     non6 = [i for i, s in enumerate(ring_sizes) if s != 6]
     h = ring_adj.subgraph(non6).copy()
     labels: dict[int, str] = {}
@@ -289,7 +416,32 @@ def per_atom_defect_types(
     rings: list[tuple[int, ...]],
     boundary_nodes: Optional[set[int]] = None,
 ) -> np.ndarray:
-    """Map ring-cluster defect labels to per-atom labels."""
+    """Project ring-cluster defect labels to per-atom defect types.
+
+    Parameters
+    -----
+    n_atoms : int
+        Number of atoms in analyzed graph.
+    rings : list[tuple[int, ...]]
+        Primitive rings used for defect classification.
+    boundary_nodes : Optional[set[int]], optional
+        Optional boundary-node set used by edge-related motif logic.
+
+    Returns
+    -----
+    np.ndarray
+        Per-atom defect label array following `DEFECT_TYPE_SCHEMA`.
+
+    Examples
+    -----
+    ```python
+    labels = per_atom_defect_types(n_atoms, rings, boundary_nodes=boundary_nodes)
+    ```
+    Sample output:
+    `array(["none", "SW_5775", ...], dtype=object)`
+    Meaning:
+    Each atom receives one canonical defect label for downstream labeling.
+    """
     out = np.full(n_atoms, "none", dtype=object)
     if not rings:
         return out

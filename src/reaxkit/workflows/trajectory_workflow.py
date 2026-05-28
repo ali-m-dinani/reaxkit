@@ -1,4 +1,13 @@
-"""Direct command workflow for trajectory analyses."""
+"""Direct command workflow for trajectory analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -40,6 +49,7 @@ ALL_LEGACY_COMMANDS = (
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific trajectory loading behavior.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory (fallback for detection). Example: --run-dir runs/job1, which sets backup path for file discovery.")
     parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Trajectory file path. Example: --xmolout runs/job1/xmolout, which provides coordinate trajectory input.")
@@ -48,6 +58,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined figure.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save msd.png, which writes the figure image to disk.")
@@ -57,6 +68,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common arguments."""
     parser.add_argument(
         "--frames",
         nargs="*",
@@ -67,6 +79,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
+    """Build msd request."""
     return MSDRequest(
         atom_ids=args.atom_ids,
         atom_types=args.atom_types,
@@ -79,6 +92,7 @@ def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
 
 
 def _build_diffusivity_request(args: argparse.Namespace) -> DiffusivityRequest:
+    """Build diffusivity request."""
     return DiffusivityRequest(
         atom_ids=args.atom_ids,
         atom_types=args.atom_types,
@@ -92,6 +106,7 @@ def _build_diffusivity_request(args: argparse.Namespace) -> DiffusivityRequest:
 
 
 def _build_dihedral_request(args: argparse.Namespace) -> DihedralRequest:
+    """Build dihedral request."""
     return DihedralRequest(
         atom_ids=args.atom_ids,
         frames=parse_frame_indices(args.frames),
@@ -102,6 +117,7 @@ def _build_dihedral_request(args: argparse.Namespace) -> DihedralRequest:
 
 
 def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
+    """Build rdf request."""
     return RDFRequest(
         atom_ids_a=args.atom_ids_a,
         atom_ids_b=args.atom_ids_b,
@@ -116,6 +132,7 @@ def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
 
 
 def _build_rdf_property_request(args: argparse.Namespace) -> RDFPropertyRequest:
+    """Build rdf property request."""
     return RDFPropertyRequest(
         property=args.property or args.prop or "first_peak",
         atom_ids_a=args.atom_ids_a,
@@ -131,6 +148,7 @@ def _build_rdf_property_request(args: argparse.Namespace) -> RDFPropertyRequest:
 
 
 def _build_voronoi_request(args: argparse.Namespace) -> VoronoiRequest:
+    """Build voronoi request."""
     return VoronoiRequest(
         atom_ids=args.atom_ids,
         atom_types=args.atom_types,
@@ -288,6 +306,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _safe_obj(value):
+    """Safe obj."""
     if isinstance(value, (list, tuple, dict)):
         return value
     if isinstance(value, str):
@@ -301,6 +320,7 @@ def _safe_obj(value):
 
 
 def _project_xyz(point: Sequence[float], plane: str) -> tuple[float, float]:
+    """Project xyz."""
     x, y, z = float(point[0]), float(point[1]), float(point[2])
     if plane == "xz":
         return x, z
@@ -310,6 +330,7 @@ def _project_xyz(point: Sequence[float], plane: str) -> tuple[float, float]:
 
 
 def _collect_cell_edges(vertices, faces) -> list[tuple[int, int]]:
+    """Collect cell edges."""
     verts = _safe_obj(vertices)
     face_rows = _safe_obj(faces)
     if not isinstance(verts, list) or not isinstance(face_rows, list):
@@ -338,12 +359,32 @@ def _collect_cell_edges(vertices, faces) -> list[tuple[int, int]]:
 
 
 def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
+    """Voronoi diagram payload 2d."""
     frame_groups = list(table.groupby("frame_index", sort=True))
     if not frame_groups:
         return None
     plane = str(getattr(args, "projection", "xy")).strip().lower()
 
     def frame_series(dfi: pd.DataFrame) -> list[dict[str, object]]:
+        """Frame series.
+
+        Execute the workflow function for this command path and return the
+        computed result for downstream CLI handling.
+
+        Parameters
+        -----
+        dfi : Any
+            Function argument.
+
+        Returns
+        -----
+        list[dict[str, object]]
+            Function return value.
+
+        Examples
+        -----
+        >>> # See workflow CLI usage for concrete examples.
+        """
         series: list[dict[str, object]] = []
         for _, row in dfi.iterrows():
             vertices = _safe_obj(row.get("vertices"))
@@ -416,11 +457,33 @@ def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -
 
 
 def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
+    """Voronoi diagram payload 3d."""
     frame_groups = list(table.groupby("frame_index", sort=True))
     if not frame_groups:
         return None
 
     def frame_payload(frame_index: int, dfi: pd.DataFrame) -> dict[str, object] | None:
+        """Frame payload.
+
+        Execute the workflow function for this command path and return the
+        computed result for downstream CLI handling.
+
+        Parameters
+        -----
+        frame_index : Any
+            Function argument.
+        dfi : Any
+            Function argument.
+
+        Returns
+        -----
+        dict[str, object] | None
+            Function return value.
+
+        Examples
+        -----
+        >>> # See workflow CLI usage for concrete examples.
+        """
         segments: list[list[list[float]]] = []
         points: list[list[float]] = []
         values: list[float] = []
@@ -480,6 +543,7 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = result.table
     if table.empty:
         return None

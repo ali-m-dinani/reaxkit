@@ -1,4 +1,15 @@
-"""Engine-agnostic RDF analysis tasks."""
+"""Compute radial-distribution-function analyzers from trajectory data.
+
+This module generates RDF curves and derived RDF properties for selected atom
+groups across chosen frame ranges. It is scoped to pair-distribution analysis
+and does not perform broader structural classification.
+
+**Usage context**
+
+- Local-structure analysis: Quantify pair correlations via `g(r)` curves.
+- Peak/area metrics: Extract first-peak and integral-style RDF descriptors.
+- Comparative studies: Compare RDF behavior across atom-group selections.
+"""
 
 from __future__ import annotations
 
@@ -20,7 +31,44 @@ _RDF_PROPERTY_CHOICES = ("first_peak", "dominant_peak", "area", "excess_area")
 
 @dataclass
 class RDFRequest(BaseRequest):
-    """Request for RDF curve analysis."""
+    """Request payload for RDF curve analysis.
+
+    Captures atom-group selection, frame sampling, radial discretization, and
+    backend options for radial distribution function evaluation.
+
+    Fields
+    -----
+    atom_ids_a : Optional[Sequence[int]]
+        Atom IDs defining group A. If `None`, group A may be selected by types
+        or default to all atoms.
+    atom_ids_b : Optional[Sequence[int]]
+        Atom IDs defining group B. If `None`, group B may be selected by types
+        or default to all atoms.
+    atom_types_a : Optional[Sequence[str]]
+        Atom types for group A when `atom_ids_a` is not provided.
+    atom_types_b : Optional[Sequence[str]]
+        Atom types for group B when `atom_ids_b` is not provided.
+    frames : Optional[Sequence[int]]
+        Frame indices to include. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`. Default is `1`.
+    bins : int
+        Number of radial bins. Must be positive. Default is `200`.
+    r_max : Optional[float]
+        Maximum RDF radius. `None` uses backend-specific default logic.
+    backend : str
+        RDF backend name, `"freud"` or `"ovito"`.
+
+    Examples
+    -----
+    ```python
+    req = RDFRequest(atom_types_a=["O"], atom_types_b=["H"], bins=300, backend="freud")
+    ```
+    Sample output:
+    `RDFRequest(...)`
+    Meaning:
+    The request configures an O-H partial RDF with selected discretization.
+    """
 
     atom_ids_a: Optional[Sequence[int]] = dc_field(
         default=None,
@@ -68,15 +116,28 @@ class RDFRequest(BaseRequest):
 
 @dataclass
 class RDFResult(BaseResult):
-    """Result of RDF curve analysis.
+    """Result payload for RDF curve analysis.
 
-    Output structure:
-    - table: pandas.DataFrame with columns ['frame_index', 'iter', 'r', 'g']
-      - frame_index: source frame index
-      - iter: iteration for that frame
-      - r: radial distance grid
-      - g: RDF value g(r) for that frame
-    - request: RDFRequest used to produce this result
+    Stores per-frame RDF samples and the originating request configuration.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with columns `["frame_index", "iter", "r", "g"]` where
+        `r` is radial position and `g` is RDF value.
+    request : RDFRequest
+        Request object used for this RDF analysis run.
+
+    Examples
+    -----
+    ```python
+    result = RDFTask().run(data, req)
+    print(result.table.head())
+    ```
+    Sample output:
+    DataFrame rows with one `g(r)` sample per radial bin and frame.
+    Meaning:
+    The table contains the discretized RDF curve(s) for selected frames.
     """
 
     table: pd.DataFrame
@@ -85,7 +146,45 @@ class RDFResult(BaseResult):
 
 @dataclass
 class RDFPropertyRequest(BaseRequest):
-    """Request for RDF-derived property analysis."""
+    """Request payload for RDF-derived property extraction.
+
+    Configures which single RDF property to extract and reuses RDF selection/
+    discretization controls for per-frame property computation.
+
+    Fields
+    -----
+    property : str
+        RDF property name: `"first_peak"`, `"dominant_peak"`, `"area"`, or
+        `"excess_area"`.
+    atom_ids_a : Optional[Sequence[int]]
+        Atom IDs for RDF group A.
+    atom_ids_b : Optional[Sequence[int]]
+        Atom IDs for RDF group B.
+    atom_types_a : Optional[Sequence[str]]
+        Atom types for group A when `atom_ids_a` is not provided.
+    atom_types_b : Optional[Sequence[str]]
+        Atom types for group B when `atom_ids_b` is not provided.
+    frames : Optional[Sequence[int]]
+        Frame indices to include. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`. Default is `1`.
+    bins : int
+        Number of radial bins used for RDF calculation.
+    r_max : Optional[float]
+        Maximum RDF radius. `None` uses backend-specific default logic.
+    backend : str
+        RDF backend name, `"freud"` or `"ovito"`.
+
+    Examples
+    -----
+    ```python
+    req = RDFPropertyRequest(property="first_peak", atom_types_a=["O"], atom_types_b=["O"])
+    ```
+    Sample output:
+    `RDFPropertyRequest(...)`
+    Meaning:
+    The request asks for frame-resolved first-peak properties for O-O RDF.
+    """
 
     property: str = dc_field(
         default="first_peak",
@@ -141,17 +240,33 @@ class RDFPropertyRequest(BaseRequest):
 
 @dataclass
 class RDFPropertyResult(BaseResult):
-    """Result of RDF-derived property analysis.
+    """Result payload for RDF-derived property analysis.
 
-    Output structure:
-    - table: pandas.DataFrame with columns:
-      - always: ['frame_index', 'iter']
-      - plus property-specific columns:
-        - first_peak: ['r_first_peak', 'g_first_peak']
-        - dominant_peak: ['r_peak', 'g_peak']
-        - area: ['area']
-        - excess_area: ['excess_area']
-    - request: RDFPropertyRequest used to produce this result
+    Stores frame-wise derived RDF properties and the request used to compute
+    them.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table always includes `["frame_index", "iter"]` plus
+        property-specific columns:
+        - `first_peak` -> `["r_first_peak", "g_first_peak"]`
+        - `dominant_peak` -> `["r_peak", "g_peak"]`
+        - `area` -> `["area"]`
+        - `excess_area` -> `["excess_area"]`
+    request : RDFPropertyRequest
+        Request object used for this property analysis run.
+
+    Examples
+    -----
+    ```python
+    result = RDFPropertyTask().run(data, req)
+    result.table.columns
+    ```
+    Sample output:
+    Index with `frame_index`, `iter`, and selected property columns.
+    Meaning:
+    Rows map each analyzed frame to its derived RDF property value(s).
     """
 
     table: pd.DataFrame
@@ -485,6 +600,34 @@ class RDFTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: RDFResult, payload: dict[str, object]) -> list[PresentationSpec]:
+        """Build default table/plot presentations for RDF curve outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : RDFResult
+            Analysis result object for the executed task.
+        payload : dict[str, object]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and `g(r)` plotting.
+
+        Examples
+        -----
+        ```python
+        specs = RDFTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A table view and an RDF line-plot view.
+        Meaning:
+        The payload can be rendered as numeric table and radial profile plot.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -504,6 +647,37 @@ class RDFTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: RDFRequest, reporter=None) -> RDFResult:
+        """Compute RDF curves for selected atom groups across sampled frames.
+
+        Works on
+        -----
+        `TrajectoryData` plus `RDFRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates, atom metadata, and periodic-cell metadata.
+        request : RDFRequest
+            RDF configuration including groups, bins, radius, and backend.
+        reporter : Any, optional
+            Optional progress callback invoked during frame processing.
+
+        Returns
+        -----
+        RDFResult
+            Result object containing per-frame RDF sample rows.
+
+        Examples
+        -----
+        ```python
+        req = RDFRequest(atom_types_a=["O"], atom_types_b=["H"], backend="freud")
+        result = RDFTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with columns `frame_index`, `iter`, `r`, `g`.
+        Meaning:
+        Each frame contributes one discretized `g(r)` curve to the table.
+        """
         r_ref, stack, frame_idx = _compute_rdfs(
             data,
             atom_ids_a=request.atom_ids_a,
@@ -545,6 +719,34 @@ class RDFPropertyTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: RDFPropertyResult, payload: dict[str, object]) -> list[PresentationSpec]:
+        """Build default table/plot presentations for RDF property outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : RDFPropertyResult
+            Analysis result object for the executed task.
+        payload : dict[str, object]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for property tables and line plots.
+
+        Examples
+        -----
+        ```python
+        specs = RDFPropertyTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list containing table view and one property-vs-time plot view.
+        Meaning:
+        The selected property can be visualized directly over frames/iterations.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -568,6 +770,37 @@ class RDFPropertyTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
+        """Compute one selected RDF-derived property per sampled frame.
+
+        Works on
+        -----
+        `TrajectoryData` plus `RDFPropertyRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory coordinates and metadata used to generate RDF curves.
+        request : RDFPropertyRequest
+            Property selection and RDF computation configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during RDF evaluation.
+
+        Returns
+        -----
+        RDFPropertyResult
+            Result object containing frame-wise derived RDF property rows.
+
+        Examples
+        -----
+        ```python
+        req = RDFPropertyRequest(property="dominant_peak")
+        result = RDFPropertyTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with columns such as `r_peak` and `g_peak`.
+        Meaning:
+        Each row summarizes the selected RDF property for one analyzed frame.
+        """
         prop = _normalize_property_selection([request.property])[0]
         r_ref, stack, frame_idx = _compute_rdfs(
             data,

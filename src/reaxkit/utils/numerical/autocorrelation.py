@@ -1,8 +1,14 @@
-"""
-Autocorrelation utility helpers.
+"""Compute autocorrelation metrics for one-dimensional numerical signals.
 
 This module provides reusable autocorrelation functions for one-dimensional
-signals used in analysis tasks and workflows.
+signals used in analysis tasks and workflows. It focuses on normalized lag
+correlation outputs that can be used directly in downstream analysis and plots.
+
+**Usage context**
+
+- Signal analysis: Estimate lag-dependent self-similarity of trajectories.
+- Time-series workflows: Compute ACF in index space or physical-time space.
+- Feature extraction: Derive correlation decay behavior for model inputs.
 """
 
 from __future__ import annotations
@@ -16,6 +22,7 @@ NormalizeMode = Literal["none", "biased", "unbiased", "coeff"]
 
 
 def _as_1d_float(signal: ArrayLike) -> np.ndarray:
+    """Validate and convert input data to a finite 1D float array."""
     arr = np.asarray(signal, dtype=float)
     if arr.ndim != 1:
         raise ValueError(f"signal must be 1D; got shape={arr.shape}")
@@ -33,11 +40,13 @@ def autocorrelation(
     normalize: NormalizeMode = "coeff",
     center: bool = True,
 ) -> dict[str, np.ndarray]:
-    """
-    Compute autocorrelation for non-negative lags.
+    """Compute autocorrelation for non-negative lags.
+
+    Computes lag-0 through lag-`max_lag` autocorrelation values with optional
+    centering and selectable normalization strategies.
 
     Parameters
-    ----------
+    -----
     signal : array-like
         Input 1D signal.
     max_lag : int, optional
@@ -52,11 +61,15 @@ def autocorrelation(
         If True, subtract signal mean before correlation.
 
     Returns
-    -------
+    -----
     dict[str, numpy.ndarray]
         Dictionary with keys:
         - 'lag': integer lag indices
         - 'acf': autocorrelation values for each lag
+    Examples
+    -----
+    >>> autocorrelation([1.0, 2.0, 3.0], normalize="coeff")
+    {'lag': array([0, 1, 2]), 'acf': array([ 1. ,  0. , -0.5])}
     """
     y = _as_1d_float(signal)
     if center:
@@ -102,16 +115,35 @@ def autocorrelation_time(
     normalize: NormalizeMode = "coeff",
     center: bool = True,
 ) -> dict[str, np.ndarray]:
-    """
-    Compute autocorrelation vs physical time lag.
+    """Compute autocorrelation against physical lag time.
+
+    Calls :func:`autocorrelation` and maps lag indices to physical lag values
+    using `tau = lag * dt`.
+
+    Parameters
+    -----
+    signal : array-like
+        Input 1D signal.
+    dt : float, optional
+        Sampling interval. Must be greater than zero.
+    max_lag : int, optional
+        Maximum lag to return. Default returns all lags ``0..N-1``.
+    normalize : {'none', 'biased', 'unbiased', 'coeff'}, optional
+        Normalization mode used by :func:`autocorrelation`.
+    center : bool, optional
+        If True, subtract signal mean before correlation.
 
     Returns
-    -------
+    -----
     dict[str, numpy.ndarray]
         Dictionary with keys:
         - 'lag': lag index
         - 'tau': lag time (lag * dt)
         - 'acf': autocorrelation values
+    Examples
+    -----
+    >>> autocorrelation_time([1.0, 0.0, -1.0], dt=0.5)
+    {'lag': array([0, 1, 2]), 'tau': array([0. , 0.5, 1. ]), 'acf': ...}
     """
     if float(dt) <= 0.0:
         raise ValueError("dt must be > 0.")
@@ -126,4 +158,3 @@ __all__ = [
     "autocorrelation",
     "autocorrelation_time",
 ]
-

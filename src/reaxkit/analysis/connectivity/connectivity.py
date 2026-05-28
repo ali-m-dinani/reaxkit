@@ -1,4 +1,16 @@
-"""Engine-agnostic connectivity and bond-event analysis tasks."""
+"""Provide engine-agnostic connectivity and bond-event analyzer tasks.
+
+This module extracts connection lists, connection matrices, aggregated
+connectivity statistics, and bond formation/breakage events from bond-order
+trajectories. It is limited to connectivity-domain signals and does not compute
+geometric descriptors outside bond-order-derived relationships.
+
+**Usage context**
+
+- Bond-network inspection: Build edge tables and per-frame connectivity matrices.
+- Aggregation workflows: Compute pairwise connectivity statistics over time.
+- Reaction-event tracking: Detect bond formation/breakage with hysteresis logic.
+"""
 
 from __future__ import annotations
 
@@ -81,21 +93,28 @@ def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -
 class ConnectionListRequest(BaseRequest):
     """Request for extracting frame-resolved bond connections.
 
-    Parameters
-    ----------
-    frames
-        Optional frame indices to include. If omitted, all frames are considered.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after selection. Example: ``every=5`` keeps every fifth
-        selected frame.
-    min_bo
+    Fields
+    -----
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    min_bo : float
         Minimum bond-order threshold for including an edge.
-        Example: ``min_bo=0.3``.
-    undirected
-        If ``True``, treat ``i-j`` and ``j-i`` as the same edge.
-    include_self
-        If ``True``, include self-edges (``i == j``).
+    undirected : bool
+        If `True`, treat `i-j` and `j-i` as one undirected edge.
+    include_self : bool
+        If `True`, include self-edges (`i == j`).
+
+    Examples
+    -----
+    ```python
+    req = ConnectionListRequest(frames=[0, 10, 20], min_bo=0.3, undirected=True)
+    ```
+    Sample output:
+    `ConnectionListRequest(...)`
+    Meaning:
+    The request configures frame sampling and edge-threshold extraction rules.
     """
 
     frames: Optional[Sequence[int]] = dc_field(
@@ -145,25 +164,24 @@ class ConnectionListRequest(BaseRequest):
 class ConnectionListResult(BaseResult):
     """Connection-list extraction result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`ConnectionListRequest` used for extraction.
-    - ``table``: pandas.DataFrame with columns:
-      ``['frame_idx', 'iteration', 'source', 'source_type',
-      'destination', 'destination_type', 'BO']``.
+    Fields
+    -----
+    table : pd.DataFrame
+        Edge table with columns `frame_idx`, `iteration`, `source`,
+        `source_type`, `destination`, `destination_type`, `BO`.
+    request : ConnectionListRequest
+        Request object used for this analysis run.
 
-    Column meanings
-    ---------------
-    - ``frame_idx``: source frame index in the connectivity trajectory.
-    - ``iteration``: simulation iteration mapped to that frame.
-    - ``source`` / ``destination``: atom ids for the edge.
-    - ``source_type`` / ``destination_type``: atom element/type labels.
-    - ``BO``: bond order for the edge in that frame.
-
-    Example
-    -------
-    One row may look like:
-    ``frame_idx=12, iteration=1200, source=3, source_type='C', destination=7, destination_type='O', BO=0.84``.
+    Examples
+    -----
+    ```python
+    result = ConnectionListTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame rows for each selected edge occurrence.
+    Meaning:
+    Each row is one bond edge record at one frame.
     """
 
     table: pd.DataFrame
@@ -179,6 +197,34 @@ class ConnectionListTask(AnalysisTask):
         _result: ConnectionListResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for connection-list outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ConnectionListResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and BO trend plot.
+
+        Examples
+        -----
+        ```python
+        specs = ConnectionListTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view plus `BO vs frame_idx` plot view.
+        Meaning:
+        Connection-list outputs can be rendered with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -202,6 +248,36 @@ class ConnectionListTask(AnalysisTask):
         ]
 
     def run(self, data: ConnectivityData, request: ConnectionListRequest, reporter=None) -> ConnectionListResult:
+        """Extract frame-resolved connectivity edges from bond-order matrices.
+
+        Works on
+        -----
+        `ConnectivityData` plus `ConnectionListRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ConnectivityData
+            Connectivity series containing bond-order matrices and metadata.
+        request : ConnectionListRequest
+            Selection and threshold configuration for edge extraction.
+        reporter : Any, optional
+            Optional progress callback invoked during frame processing.
+
+        Returns
+        -----
+        ConnectionListResult
+            Edge table with one row per qualifying bond occurrence.
+
+        Examples
+        -----
+        ```python
+        result = ConnectionListTask().run(data, ConnectionListRequest(min_bo=0.2))
+        ```
+        Sample output:
+        `result.table` with columns including `source`, `destination`, and `BO`.
+        Meaning:
+        Qualifying bond-order edges are emitted per selected frame.
+        """
         frames = _bond_order_frames(data)
         if not frames:
             return ConnectionListResult(
@@ -293,19 +369,26 @@ class ConnectionListTask(AnalysisTask):
 class ConnectionTableRequest(BaseRequest):
     """Request for a single-frame connectivity matrix.
 
-    Parameters
-    ----------
-    frame
-        Frame index to extract from the connectivity trajectory.
-        Example: ``frame=0``.
-    min_bo
-        Minimum bond-order threshold for retaining edges in the matrix.
-        Example: ``min_bo=0.3``.
-    undirected
-        If ``True``, combine directional edges ``i->j`` and ``j->i``.
-    fill_value
-        Value used for missing matrix entries after pivoting.
-        Example: ``fill_value=0.0``.
+    Fields
+    -----
+    frame : int
+        Frame index to extract from connectivity trajectory.
+    min_bo : float
+        Minimum bond-order threshold for retaining matrix edges.
+    undirected : bool
+        If `True`, combine directional edges `i->j` and `j->i`.
+    fill_value : float
+        Fill value for missing pivoted matrix entries.
+
+    Examples
+    -----
+    ```python
+    req = ConnectionTableRequest(frame=0, min_bo=0.3, undirected=True)
+    ```
+    Sample output:
+    `ConnectionTableRequest(...)`
+    Meaning:
+    The request configures one-frame connectivity-matrix extraction.
     """
 
     frame: int = dc_field(
@@ -344,21 +427,23 @@ class ConnectionTableRequest(BaseRequest):
 class ConnectionTableResult(BaseResult):
     """Connection-table extraction result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`ConnectionTableRequest` used to generate this result.
-    - ``table``: pandas.DataFrame matrix for one frame, where rows are source atom
-      ids and columns are destination atom ids.
+    Fields
+    -----
+    table : pd.DataFrame
+        One-frame connectivity matrix with source IDs on rows and destination
+        IDs on columns; values are bond orders.
+    request : ConnectionTableRequest
+        Request object used for this analysis run.
 
-    Matrix semantics
-    ----------------
-    - Cell value is bond order for ``source -> destination`` at the selected frame.
-    - Missing edges are filled with ``request.fill_value``.
-
-    Example
-    -------
-    A matrix entry like ``table.loc[3, 7] = 0.84`` means atom 3 is connected to
-    atom 7 with bond order 0.84 in the selected frame.
+    Examples
+    -----
+    ```python
+    result = ConnectionTableTask().run(data, req)
+    ```
+    Sample output:
+    Matrix-like DataFrame where `table.loc[src, dst]` is bond order.
+    Meaning:
+    Missing edges are filled using `request.fill_value`.
     """
 
     table: pd.DataFrame
@@ -374,6 +459,34 @@ class ConnectionTableTask(AnalysisTask):
         _result: ConnectionTableResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for connection-table outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ConnectionTableResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and optional numeric projection.
+
+        Examples
+        -----
+        ```python
+        specs = ConnectionTableTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view and optionally one simple plot mapping.
+        Meaning:
+        Matrix outputs get at least a tabular default view.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -409,6 +522,36 @@ class ConnectionTableTask(AnalysisTask):
         ]
 
     def run(self, data: ConnectivityData, request: ConnectionTableRequest, reporter=None) -> ConnectionTableResult:
+        """Build a one-frame connectivity matrix from extracted edge list.
+
+        Works on
+        -----
+        `ConnectivityData` plus `ConnectionTableRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ConnectivityData
+            Connectivity series containing bond-order matrices and metadata.
+        request : ConnectionTableRequest
+            One-frame matrix extraction configuration.
+        reporter : Any, optional
+            Optional progress callback forwarded to edge extraction.
+
+        Returns
+        -----
+        ConnectionTableResult
+            Pivoted connectivity matrix result for selected frame.
+
+        Examples
+        -----
+        ```python
+        result = ConnectionTableTask().run(data, ConnectionTableRequest(frame=0))
+        ```
+        Sample output:
+        `result.table` as a source-by-destination bond-order matrix.
+        Meaning:
+        Edges are thresholded/normalized before matrix pivot.
+        """
         edges = ConnectionListTask().run(
             data,
             ConnectionListRequest(
@@ -437,23 +580,28 @@ class ConnectionTableTask(AnalysisTask):
 class ConnectionStatsRequest(BaseRequest):
     """Request for aggregated connectivity statistics across frames.
 
-    Parameters
-    ----------
-    frames
-        Optional frame indices to include. If omitted, all frames are considered.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after selection. Example: ``every=5``.
-    min_bo
-        Minimum bond-order threshold for including edges before aggregation.
-        Example: ``min_bo=0.3``.
-    undirected
-        If ``True``, treat ``i-j`` and ``j-i`` as the same edge.
-    how
-        Aggregation statistic for each pair:
-        - ``mean``: average BO over selected frames
-        - ``max``: maximum BO over selected frames
-        - ``count``: number of occurrences over selected frames
+    Fields
+    -----
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    min_bo : float
+        Minimum bond-order threshold applied before aggregation.
+    undirected : bool
+        If `True`, treat `i-j` and `j-i` as one edge pair.
+    how : Literal["mean", "max", "count"]
+        Aggregation method for pairwise edge statistics.
+
+    Examples
+    -----
+    ```python
+    req = ConnectionStatsRequest(how="mean", min_bo=0.3)
+    ```
+    Sample output:
+    `ConnectionStatsRequest(...)`
+    Meaning:
+    The request configures pairwise connectivity aggregation behavior.
     """
 
     frames: Optional[Sequence[int]] = dc_field(
@@ -503,24 +651,27 @@ class ConnectionStatsRequest(BaseRequest):
 class ConnectionStatsResult(BaseResult):
     """Connection-statistics aggregation result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`ConnectionStatsRequest` used for aggregation.
-    - ``table``: pandas.DataFrame with columns:
-      ``['source', 'source_type', 'destination', 'destination_type', 'value']``.
+    Fields
+    -----
+    table : pd.DataFrame
+        Aggregated pair table with columns `source`, `source_type`,
+        `destination`, `destination_type`, and `value`.
+    request : ConnectionStatsRequest
+        Request object used for this analysis run.
 
-    Column meanings
-    ---------------
-    - ``source`` / ``destination``: aggregated atom-id pair key.
-    - ``source_type`` / ``destination_type``: atom element/type labels.
-    - ``value``: aggregated statistic selected by ``request.how``.
-      - for ``mean``/``max``: bond-order value
-      - for ``count``: number of edge observations
+    Notes
+    -----
+    `value` semantics depend on `request.how` (`mean`, `max`, or `count`).
 
-    Example
-    -------
-    One row may look like:
-    ``source=3, source_type='C', destination=7, destination_type='O', value=0.84``.
+    Examples
+    -----
+    ```python
+    result = ConnectionStatsTask().run(data, req)
+    ```
+    Sample output:
+    Aggregated rows per atom pair with statistic in `value`.
+    Meaning:
+    Pairwise connectivity behavior is condensed across selected frames.
     """
 
     table: pd.DataFrame
@@ -536,6 +687,34 @@ class ConnectionStatsTask(AnalysisTask):
         _result: ConnectionStatsResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for connection-stats outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ConnectionStatsResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and stats plot view.
+
+        Examples
+        -----
+        ```python
+        specs = ConnectionStatsTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view plus `value vs source` grouped plot.
+        Meaning:
+        Aggregated connectivity stats have default visual mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -559,6 +738,36 @@ class ConnectionStatsTask(AnalysisTask):
         ]
 
     def run(self, data: ConnectivityData, request: ConnectionStatsRequest, reporter=None) -> ConnectionStatsResult:
+        """Aggregate connectivity edges across frames into pairwise statistics.
+
+        Works on
+        -----
+        `ConnectivityData` plus `ConnectionStatsRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ConnectivityData
+            Connectivity series containing bond-order matrices and metadata.
+        request : ConnectionStatsRequest
+            Aggregation configuration (`how`, thresholds, and frame selection).
+        reporter : Any, optional
+            Optional progress callback forwarded to edge extraction.
+
+        Returns
+        -----
+        ConnectionStatsResult
+            Pairwise aggregated connectivity statistic table.
+
+        Examples
+        -----
+        ```python
+        result = ConnectionStatsTask().run(data, ConnectionStatsRequest(how="count"))
+        ```
+        Sample output:
+        `result.table` with one row per source-destination pair.
+        Meaning:
+        Edge behavior is summarized according to the selected aggregation method.
+        """
         edges = ConnectionListTask().run(
             data,
             ConnectionListRequest(
@@ -597,6 +806,46 @@ class ConnectionStatsTask(AnalysisTask):
 @dataclass
 class BondEventsRequest(BaseRequest):
     """Request for bond formation/breakage event detection.
+
+    Fields
+    -----
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    src : Optional[int]
+        Optional source atom-id filter.
+    dst : Optional[int]
+        Optional destination atom-id filter.
+    threshold : float
+        Schmitt-trigger center threshold for bonded/unbonded transitions.
+    hysteresis : float
+        Schmitt-trigger hysteresis half-width around `threshold`.
+    smooth : Optional[Literal["ma", "ema"]]
+        Optional prefilter for BO traces before transition detection.
+    window : int
+        Smoothing window size used by moving-average or EMA heuristics.
+    ema_alpha : Optional[float]
+        Optional explicit EMA alpha (otherwise inferred from window).
+    min_run : int
+        Minimum consecutive-state run length after hysteresis cleanup.
+    undirected : bool
+        If `True`, treat `i-j` and `j-i` as one bond.
+
+    Notes
+    -----
+    Upstream `min_bo` controls which BO entries exist, while `threshold` and
+    `hysteresis` govern event transition detection on those traces.
+
+    Examples
+    -----
+    ```python
+    req = BondEventsRequest(threshold=0.35, hysteresis=0.05, smooth="ma")
+    ```
+    Sample output:
+    `BondEventsRequest(...)`
+    Meaning:
+    The request configures bond event detection and optional smoothing logic.
 
     Parameters
     ----------
@@ -726,6 +975,26 @@ class BondEventsRequest(BaseRequest):
 class BondEventsResult(BaseResult):
     """Bond-event detection result.
 
+    Fields
+    -----
+    table : pd.DataFrame
+        Event table with columns `source`, `source_type`, `destination`,
+        `destination_type`, `event`, `frame_idx`, `iter`, `bo_at_event`,
+        `threshold`, and `hysteresis`.
+    request : BondEventsRequest
+        Request object used for this analysis run.
+
+    Examples
+    -----
+    ```python
+    result = BondEventsTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    Event rows labeled as `formation` or `breakage`.
+    Meaning:
+    Each row marks one detected bond-state transition.
+
     Output structure
     ----------------
     - ``request``: the :class:`BondEventsRequest` used for event detection.
@@ -762,6 +1031,34 @@ class BondEventsTask(AnalysisTask):
         _result: BondEventsResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for bond-event outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : BondEventsResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for event table and event trace plot.
+
+        Examples
+        -----
+        ```python
+        specs = BondEventsTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view plus `bo_at_event vs iter` grouped by event type.
+        Meaning:
+        Detected events can be visualized with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -785,6 +1082,36 @@ class BondEventsTask(AnalysisTask):
         ]
 
     def run(self, data: ConnectivityData, request: BondEventsRequest, reporter=None) -> BondEventsResult:
+        """Detect bond formation and breakage transitions from BO time series.
+
+        Works on
+        -----
+        `ConnectivityData` plus `BondEventsRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ConnectivityData
+            Connectivity series containing bond-order matrices and metadata.
+        request : BondEventsRequest
+            Event detection, smoothing, and filtering configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during grouped event detection.
+
+        Returns
+        -----
+        BondEventsResult
+            Event transition table for selected bond pairs.
+
+        Examples
+        -----
+        ```python
+        result = BondEventsTask().run(data, BondEventsRequest(src=1, dst=2))
+        ```
+        Sample output:
+        `result.table` rows with `event`, `frame_idx`, and `bo_at_event`.
+        Meaning:
+        Bond-state transitions are extracted using hysteresis logic.
+        """
         ts = ConnectionListTask().run(
             data,
             ConnectionListRequest(

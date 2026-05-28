@@ -1,4 +1,16 @@
-"""Molecule/isomer detection from single-structure geometry connectivity."""
+"""Detect molecular formulas and isomer groups from structure connectivity.
+
+This module identifies molecules, groups them by formula, and derives isomer
+partitions from single-structure connectivity representations. It is scoped to
+graph-based molecule/isomer detection and does not perform time-resolved
+molecular tracking.
+
+**Usage context**
+
+- Structure decomposition: Enumerate molecules present in one geometry.
+- Isomer counting: Split molecules into isomer classes per formula.
+- Topology summaries: Export formula/isomer tables for structural reports.
+"""
 
 from __future__ import annotations
 
@@ -18,10 +30,12 @@ from reaxkit.presentation.specs import PresentationSpec
 
 
 def _empty_formula_table() -> pd.DataFrame:
+    """Return an empty formula summary table with stable output columns."""
     return pd.DataFrame(columns=["formula", "molecule_count", "isomer_count"])
 
 
 def _empty_isomer_table() -> pd.DataFrame:
+    """Return an empty isomer summary table with stable output columns."""
     return pd.DataFrame(
         columns=[
             "formula",
@@ -34,6 +48,7 @@ def _empty_isomer_table() -> pd.DataFrame:
 
 
 def _empty_molecule_table() -> pd.DataFrame:
+    """Return an empty per-molecule assignment table with stable columns."""
     return pd.DataFrame(
         columns=[
             "molecule_id",
@@ -46,6 +61,7 @@ def _empty_molecule_table() -> pd.DataFrame:
 
 
 def _coordinates_table(data: GeometryData) -> pd.DataFrame:
+    """Normalize geometry coordinate rows into unique ``atom_id``/``atom_type`` pairs."""
     coordinates = data.coordinates.copy()
     if coordinates.empty:
         return pd.DataFrame(columns=["atom_id", "atom_type"])
@@ -63,6 +79,7 @@ def _coordinates_table(data: GeometryData) -> pd.DataFrame:
 
 
 def _connectivity_table(data: GeometryData) -> pd.DataFrame:
+    """Normalize geometry connectivity rows into integer source/target edges."""
     connectivity = data.connectivity.copy()
     if connectivity.empty:
         return pd.DataFrame(columns=["source_atom_id", "target_atom_id"])
@@ -80,6 +97,7 @@ def _connectivity_table(data: GeometryData) -> pd.DataFrame:
 
 
 def _adjacency_from_edges(atom_ids: list[int], connectivity: pd.DataFrame) -> dict[int, set[int]]:
+    """Build an undirected adjacency map from connectivity edge rows."""
     atom_set = set(atom_ids)
     adjacency: dict[int, set[int]] = {atom_id: set() for atom_id in atom_ids}
 
@@ -96,6 +114,7 @@ def _adjacency_from_edges(atom_ids: list[int], connectivity: pd.DataFrame) -> di
 
 
 def _connected_components(atom_ids: list[int], adjacency: dict[int, set[int]]) -> list[tuple[int, ...]]:
+    """Compute connected components over atom ids using breadth-first traversal."""
     visited: set[int] = set()
     components: list[tuple[int, ...]] = []
 
@@ -118,6 +137,7 @@ def _connected_components(atom_ids: list[int], adjacency: dict[int, set[int]]) -
 
 
 def _formula(atom_ids: tuple[int, ...], element_by_atom_id: dict[int, str]) -> str:
+    """Build a canonical alphabetical formula string for a molecule component."""
     counts: dict[str, int] = {}
     for atom_id in atom_ids:
         element = element_by_atom_id[atom_id]
@@ -126,6 +146,7 @@ def _formula(atom_ids: tuple[int, ...], element_by_atom_id: dict[int, str]) -> s
 
 
 def _component_adjacency(component: tuple[int, ...], adjacency: dict[int, set[int]]) -> dict[int, set[int]]:
+    """Restrict full adjacency to nodes belonging to one connected component."""
     component_set = set(component)
     return {
         atom_id: {neighbor for neighbor in adjacency.get(atom_id, set()) if neighbor in component_set}
@@ -134,6 +155,7 @@ def _component_adjacency(component: tuple[int, ...], adjacency: dict[int, set[in
 
 
 def _element_counts(atom_ids: tuple[int, ...], element_by_atom_id: dict[int, str]) -> dict[str, int]:
+    """Count per-element atom occurrences for one molecule component."""
     counts: dict[str, int] = {}
     for atom_id in atom_ids:
         element = element_by_atom_id[atom_id]
@@ -142,6 +164,7 @@ def _element_counts(atom_ids: tuple[int, ...], element_by_atom_id: dict[int, str
 
 
 def _normalize_element_symbol(value: str) -> str:
+    """Normalize an element token to standard symbol capitalization."""
     token = str(value).strip()
     if not token:
         return ""
@@ -156,6 +179,7 @@ _MOTIF_ALIASES: dict[str, str] = {
 
 
 def _parse_motif(motif: str) -> dict[str, Any]:
+    """Parse a motif filter expression into normalized matching constraints."""
     raw = str(motif).strip()
     if not raw:
         raise ValueError("Motif cannot be empty.")
@@ -194,6 +218,7 @@ def _parse_motif(motif: str) -> dict[str, Any]:
 
 
 def _motif_matches(counts: dict[str, int], parsed_motif: dict[str, Any]) -> bool:
+    """Check whether per-element counts satisfy a parsed motif definition."""
     only = parsed_motif["only"]
     if only is not None and set(counts.keys()) != set(only):
         return False
@@ -217,6 +242,7 @@ def _isomorphic_component(
     molecule_a: dict[str, Any],
     molecule_b: dict[str, Any],
 ) -> bool:
+    """Determine graph isomorphism between two same-formula molecule components."""
     nodes_a = tuple(molecule_a["atom_ids"])
     nodes_b = tuple(molecule_b["atom_ids"])
     if len(nodes_a) != len(nodes_b):
@@ -286,6 +312,7 @@ def _isomorphic_component(
 
 
 def _build_tables(molecules: list[dict[str, Any]]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Build formula-, isomer-, and molecule-level summary tables."""
     if not molecules:
         return _empty_formula_table(), _empty_isomer_table(), _empty_molecule_table()
 
@@ -357,6 +384,37 @@ def _build_tables(molecules: list[dict[str, Any]]) -> tuple[pd.DataFrame, pd.Dat
 
 @dataclass
 class MoleculeIsomerDetectionRequest(BaseRequest):
+    """Request payload for single-structure molecule/isomer detection.
+
+    This request controls component-size thresholds and optional element/motif
+    inclusion or exclusion filters applied before formula/isomer grouping.
+
+    Fields
+    -----
+    min_atoms_per_molecule : int
+        Minimum connected-component atom count to retain as a molecule.
+    include_any_elements : tuple[str, ...] | None
+        Keep molecules containing at least one listed element.
+    include_all_elements : tuple[str, ...] | None
+        Keep molecules containing all listed elements.
+    exclude_any_elements : tuple[str, ...] | None
+        Exclude molecules containing any listed element.
+    include_motifs : tuple[str, ...] | None
+        Keep molecules that match at least one motif expression.
+    exclude_motifs : tuple[str, ...] | None
+        Exclude molecules that match any motif expression.
+
+    Examples
+    -----
+    ```python
+    request = MoleculeIsomerDetectionRequest(
+        min_atoms_per_molecule=2,
+        include_motifs=("SFx",),
+        exclude_any_elements=("H",),
+    )
+    ```
+    The request keeps sulfur/fluorine motif matches while excluding hydrogen-containing molecules.
+    """
     min_atoms_per_molecule: int = dc_field(
         default=1,
         metadata={
@@ -404,17 +462,41 @@ class MoleculeIsomerDetectionRequest(BaseRequest):
 
 @dataclass
 class MoleculeIsomerDetectionResult(BaseResult):
-    """Molecule/isomer detection output.
+    """Result payload for molecule and isomer detection outputs.
 
-    Output structure:
-    - request: MoleculeIsomerDetectionRequest used for this run
-    - table: same as ``isomer_table`` for default presentation/export compatibility
-    - formula_table: tidy formula-level counts
-      columns = ['formula', 'molecule_count', 'isomer_count']
-    - isomer_table: tidy formula+isomer counts
-      columns = ['formula', 'isomer_id', 'molecule_count', 'atom_count', 'representative_molecule_id']
-    - molecule_table: tidy per-molecule assignments
-      columns = ['molecule_id', 'formula', 'isomer_id', 'atom_count', 'atom_ids']
+    The analyzer returns three related summary tables over one geometry:
+    formula-level counts, isomer-level groupings, and per-molecule assignments.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Default table alias equal to ``isomer_table`` for compatibility with
+        table-oriented analyzers and exporters.
+    formula_table : pd.DataFrame
+        Formula-level counts with columns ``formula``, ``molecule_count``,
+        and ``isomer_count``.
+    isomer_table : pd.DataFrame
+        Isomer-level summary with columns ``formula``, ``isomer_id``,
+        ``molecule_count``, ``atom_count``, and
+        ``representative_molecule_id``.
+    molecule_table : pd.DataFrame
+        Per-molecule assignments with columns ``molecule_id``, ``formula``,
+        ``isomer_id``, ``atom_count``, and ``atom_ids``.
+    request : MoleculeIsomerDetectionRequest
+        Request object used to generate this result.
+
+    Examples
+    -----
+    ```python
+    isomer_row = {
+        "formula": "C2H6O1",
+        "isomer_id": 1,
+        "molecule_count": 2,
+        "atom_count": 9,
+        "representative_molecule_id": 3,
+    }
+    ```
+    The sample row summarizes one detected isomer class for a formula.
     """
 
     table: pd.DataFrame
@@ -435,6 +517,33 @@ class MoleculeIsomerDetectionTask(AnalysisTask):
         _result: MoleculeIsomerDetectionResult,
         _payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Recommend the default isomer summary table presentation.
+
+        The isomer table is the canonical human-readable summary and is exposed
+        as the default view for this analyzer.
+
+        Works on
+        Analyzer task output for ``molecule_isomer_detection``.
+
+        Parameters
+        -----
+        _result : MoleculeIsomerDetectionResult
+            Typed analyzer result instance (unused by current logic).
+        _payload : dict[str, Any]
+            Serialized payload (unused for this fixed recommendation).
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Single table presentation specification.
+
+        Examples
+        -----
+        ```python
+        specs = MoleculeIsomerDetectionTask.recommended_presentations(_result, {})
+        ```
+        The returned list contains one table presentation spec.
+        """
         return [
             PresentationSpec(renderer="table", label="Isomer Table", view_type="table"),
         ]
@@ -445,6 +554,39 @@ class MoleculeIsomerDetectionTask(AnalysisTask):
         request: MoleculeIsomerDetectionRequest,
         reporter=None,
     ) -> MoleculeIsomerDetectionResult:
+        """Run molecule detection, formula grouping, and isomer partitioning.
+
+        Builds molecular connected components from geometry connectivity, applies
+        request filters, groups molecules by formula, and splits each formula
+        into graph-isomorphic isomer classes.
+
+        Works on
+        ``GeometryData`` representing one structure with coordinates and connectivity.
+
+        Parameters
+        -----
+        data : GeometryData
+            Parsed geometry model containing atom and connectivity tables.
+        request : MoleculeIsomerDetectionRequest
+            Component threshold and element/motif filter configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        MoleculeIsomerDetectionResult
+            Result containing formula, isomer, and molecule summary tables.
+
+        Examples
+        -----
+        ```python
+        result = MoleculeIsomerDetectionTask().run(
+            data,
+            MoleculeIsomerDetectionRequest(min_atoms_per_molecule=2),
+        )
+        ```
+        ``result.isomer_table`` contains grouped isomer classes for retained molecules.
+        """
         if reporter:
             reporter("analyze", 0, 4, "Preparing molecule/isomer detection")
 

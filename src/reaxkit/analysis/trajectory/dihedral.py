@@ -1,4 +1,15 @@
-"""Engine-agnostic dihedral angle analysis task."""
+"""Compute dihedral-angle analyzer outputs from trajectory coordinates.
+
+This module evaluates signed dihedral angles for requested atom quartets across
+trajectory frames and returns normalized tables for downstream visualization.
+It is limited to geometric dihedral calculations and does not infer bonding.
+
+**Usage context**
+
+- Conformational analysis: Track torsional motion over simulation time.
+- Targeted probes: Evaluate specific atom-quartet torsions frame by frame.
+- Reporting workflows: Export angle series for plots and summary stats.
+"""
 
 from __future__ import annotations
 
@@ -24,7 +35,46 @@ def calculate_dihedral_numpy(
     *,
     degrees: bool = True,
 ) -> np.ndarray:
-    """Compute signed dihedral angles from four points using NumPy."""
+    """Compute signed dihedral angles from four point arrays using NumPy.
+
+    Uses vector cross products and `atan2` to produce a signed torsion angle
+    for each sample in the input arrays.
+
+    Parameters
+    -----
+    p0 : np.ndarray
+        Coordinates for atom 1, shape `(n, 3)` or broadcast-compatible.
+    p1 : np.ndarray
+        Coordinates for atom 2, shape `(n, 3)` or broadcast-compatible.
+    p2 : np.ndarray
+        Coordinates for atom 3, shape `(n, 3)` or broadcast-compatible.
+    p3 : np.ndarray
+        Coordinates for atom 4, shape `(n, 3)` or broadcast-compatible.
+    degrees : bool, optional
+        If `True`, return degrees; otherwise return radians.
+
+    Returns
+    -----
+    np.ndarray
+        Signed dihedral angles per sample. Invalid geometries produce `NaN`.
+
+    Examples
+    -----
+    ```python
+    import numpy as np
+    from reaxkit.analysis.trajectory.dihedral import calculate_dihedral_numpy
+
+    p0 = np.array([[0.0, 0.0, 0.0]])
+    p1 = np.array([[1.0, 0.0, 0.0]])
+    p2 = np.array([[1.0, 1.0, 0.0]])
+    p3 = np.array([[2.0, 1.0, 1.0]])
+    ang = calculate_dihedral_numpy(p0, p1, p2, p3, degrees=True)
+    ```
+    Sample output:
+    `array([45.0])` (value depends on geometry)
+    Meaning:
+    Each array element is the signed torsion for one atom quadruplet sample.
+    """
 
     a0 = np.asarray(p0, dtype=float)
     a1 = np.asarray(p1, dtype=float)
@@ -65,7 +115,40 @@ def calculate_dihedral_mdanalysis(
     *,
     degrees: bool = True,
 ) -> np.ndarray:
-    """Compute signed dihedral angles using MDAnalysis if available."""
+    """Compute signed dihedral angles using the MDAnalysis backend.
+
+    Delegates dihedral computation to `MDAnalysis.lib.distances.calc_dihedrals`
+    and optionally converts output to degrees.
+
+    Parameters
+    -----
+    p0 : np.ndarray
+        Coordinates for atom 1, shape `(n, 3)` or broadcast-compatible.
+    p1 : np.ndarray
+        Coordinates for atom 2, shape `(n, 3)` or broadcast-compatible.
+    p2 : np.ndarray
+        Coordinates for atom 3, shape `(n, 3)` or broadcast-compatible.
+    p3 : np.ndarray
+        Coordinates for atom 4, shape `(n, 3)` or broadcast-compatible.
+    degrees : bool, optional
+        If `True`, return degrees; otherwise return radians.
+
+    Returns
+    -----
+    np.ndarray
+        Signed dihedral angles per sample.
+
+    Examples
+    -----
+    ```python
+    # Requires MDAnalysis installed
+    angles = calculate_dihedral_mdanalysis(p0, p1, p2, p3, degrees=False)
+    ```
+    Sample output:
+    `array([...])`
+    Meaning:
+    Returned values are signed torsions in the requested unit system.
+    """
 
     try:
         from MDAnalysis.lib.distances import calc_dihedrals
@@ -86,7 +169,36 @@ def calculate_dihedral_mdanalysis(
 
 @dataclass
 class DihedralRequest(BaseRequest):
-    """Request for trajectory dihedral-angle analysis."""
+    """Request payload for trajectory dihedral-angle analysis.
+
+    Carries atom-quadruplet selection, frame sampling, unit selection, and
+    backend choice for dihedral computation.
+
+    Fields
+    -----
+    atom_ids : Sequence[int]
+        Exactly four atom IDs defining the torsion `(a1, a2, a3, a4)`.
+        Default is `(1, 2, 3, 4)`.
+    frames : Optional[Sequence[int]]
+        Frame indices to evaluate. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`. Default is `1`.
+    units : str
+        Output angle units: `"deg"` or `"rad"`. Default is `"deg"`.
+    backend : str
+        Computation backend: `"numpy"` or `"mdanalysis"`. Default is `"numpy"`.
+
+    Examples
+    -----
+    ```python
+    req = DihedralRequest(atom_ids=[4, 7, 12, 20], frames=[0, 50, 100], units="deg")
+    ```
+    Sample output:
+    `DihedralRequest(...)`
+    Meaning:
+    The request selects one atom quadruplet and sampled frames for torsion
+    extraction.
+    """
 
     atom_ids: Sequence[int] = dc_field(
         default=(1, 2, 3, 4),
@@ -112,7 +224,29 @@ class DihedralRequest(BaseRequest):
 
 @dataclass
 class DihedralResult(BaseResult):
-    """Result of dihedral-angle analysis."""
+    """Result payload for dihedral-angle analysis.
+
+    Stores the per-frame torsion table and the request used to generate it.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with columns
+        `["frame_index", "iter", "atom1_id", "atom2_id", "atom3_id", "atom4_id", "dihedral", "units", "backend"]`.
+    request : DihedralRequest
+        Request object used for this analysis execution.
+
+    Examples
+    -----
+    ```python
+    result = task.run(data, req)
+    print(result.table.head())
+    ```
+    Sample output:
+    DataFrame rows containing one torsion value per selected frame.
+    Meaning:
+    The table is directly usable for time-series plotting or export.
+    """
 
     table: pd.DataFrame
     request: DihedralRequest
@@ -126,6 +260,34 @@ class DihedralTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: DihedralResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Build default table/plot presentations for dihedral task output.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : DihedralResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specifications for table and line plot views.
+
+        Examples
+        -----
+        ```python
+        specs = DihedralTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list containing a table view and a dihedral-vs-time plot view.
+        Meaning:
+        UIs can render dihedral outputs without custom mapping logic.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -143,6 +305,41 @@ class DihedralTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: DihedralRequest, reporter=None) -> DihedralResult:
+        """Compute a dihedral-angle series for one atom quadruplet.
+
+        Evaluates the requested four-atom torsion on selected frames and returns
+        one row per frame in the result table.
+
+        Works on
+        -----
+        `TrajectoryData` plus `DihedralRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory positions, atom IDs/types, and optional iteration values.
+        request : DihedralRequest
+            Analysis configuration including atom IDs, frame selection, and
+            backend/unit options.
+        reporter : Any, optional
+            Optional progress callback invoked during processing.
+
+        Returns
+        -----
+        DihedralResult
+            Result object containing dihedral time-series rows and request echo.
+
+        Examples
+        -----
+        ```python
+        req = DihedralRequest(atom_ids=[1, 2, 3, 4], units="deg")
+        result = DihedralTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with columns including `iter` and `dihedral`.
+        Meaning:
+        Each row is the torsion value for the selected quadruplet at one frame.
+        """
         out_cols = ["frame_index", "iter", "atom1_id", "atom2_id", "atom3_id", "atom4_id", "dihedral", "units", "backend"]
         atom_ids = [int(aid) for aid in request.atom_ids]
         if len(atom_ids) != 4:

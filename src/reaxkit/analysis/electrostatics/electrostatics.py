@@ -1,4 +1,16 @@
-"""Engine-agnostic electrostatics analysis tasks."""
+"""Run engine-agnostic electrostatics analyzers for dipole and polarization data.
+
+This module computes dipole moments, polarization metrics, and related
+field-aligned summaries from electrostatics and connectivity inputs. It is
+bounded to electrostatics-domain calculations and does not handle generic
+trajectory geometry analyses outside those computations.
+
+**Usage context**
+
+- Dipole characterization: Compute local/total dipole vectors and magnitudes.
+- Polarization analysis: Evaluate polarization trends and derived descriptors.
+- Field studies: Relate electrostatic response to configured field directions.
+"""
 
 from __future__ import annotations
 
@@ -34,6 +46,29 @@ DipoleOrPolarizationDirection = Literal["mu_x", "mu_y", "mu_z", "p_x", "p_y", "p
 @dataclass
 class DipoleRequest(BaseRequest):
     """Request for dipole analysis.
+
+    Fields
+    -----
+    scope : Scope
+        Evaluation mode: `"total"` (whole-system) or `"local"` (per core atom).
+    atom_ids : Optional[Sequence[int]]
+        Optional core atom-id filter for local mode.
+    atom_types : Optional[Sequence[str]]
+        Optional core atom-type filter for local mode when `atom_ids` is unset.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+
+    Examples
+    -----
+    ```python
+    req = DipoleRequest(scope="local", atom_types=["O"], every=5)
+    ```
+    Sample output:
+    `DipoleRequest(...)`
+    Meaning:
+    The request configures dipole extraction mode and frame/atom selection.
 
     Parameters
     ----------
@@ -101,6 +136,25 @@ class DipoleRequest(BaseRequest):
 class DipoleResult(BaseResult):
     """Dipole analysis result.
 
+    Fields
+    -----
+    table : pd.DataFrame
+        Dipole output rows per selected frame (total mode) or per core atom and
+        frame (local mode), including dipole components.
+    request : DipoleRequest
+        Request object used for this analysis run.
+
+    Examples
+    -----
+    ```python
+    result = DipoleTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame with `mu_x/y/z (debye)` columns.
+    Meaning:
+    The table stores dipole vectors sampled across selected frames/atoms.
+
     Output structure
     ----------------
     - ``request``: the :class:`DipoleRequest` used to compute this result.
@@ -131,6 +185,31 @@ class DipoleResult(BaseResult):
 @dataclass
 class PolarizationRequest(BaseRequest):
     """Request for polarization analysis.
+
+    Fields
+    -----
+    scope : Scope
+        Evaluation mode: `"total"` or `"local"`.
+    atom_ids : Optional[Sequence[int]]
+        Optional core atom-id filter for local mode.
+    atom_types : Optional[Sequence[str]]
+        Optional core atom-type filter for local mode when `atom_ids` is unset.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    volume_method : Optional[VolumeMethod]
+        Volume estimator used for polarization normalization.
+
+    Examples
+    -----
+    ```python
+    req = PolarizationRequest(scope="total", volume_method="hull")
+    ```
+    Sample output:
+    `PolarizationRequest(...)`
+    Meaning:
+    The request configures polarization mode, sampling, and normalization.
 
     Parameters
     ----------
@@ -210,6 +289,25 @@ class PolarizationRequest(BaseRequest):
 class PolarizationResult(BaseResult):
     """Polarization analysis result.
 
+    Fields
+    -----
+    table : pd.DataFrame
+        Polarization output rows with dipole/polarization components and volume
+        terms per selected frame (and core atom in local mode).
+    request : PolarizationRequest
+        Request object used for this analysis run.
+
+    Examples
+    -----
+    ```python
+    result = PolarizationTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame including `P_x/y/z (uC/cm^2)` columns.
+    Meaning:
+    The table stores normalized polarization responses over selected data.
+
     Output structure
     ----------------
     - ``request``: the :class:`PolarizationRequest` used for computation.
@@ -243,6 +341,29 @@ class PolarizationResult(BaseResult):
 @dataclass
 class PolarizationFieldRequest(BaseRequest):
     """Request for polarization/dipole versus electric-field hysteresis analysis.
+
+    Fields
+    -----
+    frames : Optional[Sequence[int]]
+        Optional frame indices to include. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    aggregate : AggregateKind
+        Optional grouping aggregation over identical field values.
+    field_direction : FieldDirection
+        Electric-field axis used for hysteresis x-axis (`x`, `y`, or `z`).
+    dipole_or_polaization_direction : DipoleOrPolarizationDirection
+        Response axis key used for hysteresis y-axis.
+
+    Examples
+    -----
+    ```python
+    req = PolarizationFieldRequest(field_direction="z", dipole_or_polaization_direction="p_z")
+    ```
+    Sample output:
+    `PolarizationFieldRequest(...)`
+    Meaning:
+    The request defines field-response pairing and aggregation behavior.
 
     Parameters
     ----------
@@ -315,6 +436,30 @@ class PolarizationFieldRequest(BaseRequest):
 @dataclass
 class PolarizationFieldResult(BaseResult):
     """Hysteresis analysis result for field-response curves.
+
+    Fields
+    -----
+    full_table : pd.DataFrame
+        Per-frame joined table containing field and response values.
+    aggregated_table : pd.DataFrame
+        Optional grouped table after aggregation by field value.
+    polarization_zero_crossings : list[float]
+        X-axis values where response crosses zero.
+    field_zero_crossings : list[float]
+        Y-axis values where field crosses zero.
+    request : PolarizationFieldRequest
+        Request object used for this analysis run.
+
+    Examples
+    -----
+    ```python
+    result = PolarizationFieldTask().run(data, req)
+    result.aggregated_table.head()
+    ```
+    Sample output:
+    Aggregated field-response table plus zero-crossing lists.
+    Meaning:
+    The result packages hysteresis-ready data and derived crossing metrics.
 
     Output structure
     ----------------
@@ -769,6 +914,34 @@ class DipoleTask(AnalysisTask):
         _result: DipoleResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for dipole outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : DipoleResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and dipole trend plot.
+
+        Examples
+        -----
+        ```python
+        specs = DipoleTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view plus `mu_z (debye) vs iter` plot view.
+        Meaning:
+        Dipole outputs can be rendered with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -793,6 +966,36 @@ class DipoleTask(AnalysisTask):
         ]
 
     def run(self, data: ElectrostaticsData, request: DipoleRequest, reporter=None) -> DipoleResult:
+        """Compute dipole series in total or local scope.
+
+        Works on
+        -----
+        `ElectrostaticsData` plus `DipoleRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ElectrostaticsData
+            Electrostatics bundle with trajectory, charges, and connectivity.
+        request : DipoleRequest
+            Dipole mode and selection configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during local-series processing.
+
+        Returns
+        -----
+        DipoleResult
+            Dipole table result with selected rows/components.
+
+        Examples
+        -----
+        ```python
+        result = DipoleTask().run(data, DipoleRequest(scope="total"))
+        ```
+        Sample output:
+        `result.table` with dipole component columns.
+        Meaning:
+        Dipole vectors are computed per selected frame or core atom.
+        """
         out = _run_electrostatics(
             data,
             mode="dipole",
@@ -818,6 +1021,34 @@ class PolarizationTask(AnalysisTask):
         _result: PolarizationResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for polarization outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : PolarizationResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and polarization trend plot.
+
+        Examples
+        -----
+        ```python
+        specs = PolarizationTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Table view plus `P_z (uC/cm^2) vs iter` plot view.
+        Meaning:
+        Polarization outputs can be rendered with default mappings.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -842,6 +1073,36 @@ class PolarizationTask(AnalysisTask):
         ]
 
     def run(self, data: ElectrostaticsData, request: PolarizationRequest, reporter=None) -> PolarizationResult:
+        """Compute polarization series in total or local scope.
+
+        Works on
+        -----
+        `ElectrostaticsData` plus `PolarizationRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ElectrostaticsData
+            Electrostatics bundle with trajectory, charges, and connectivity.
+        request : PolarizationRequest
+            Polarization mode, selection, and normalization configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during local-series processing.
+
+        Returns
+        -----
+        PolarizationResult
+            Polarization table result with selected rows/components.
+
+        Examples
+        -----
+        ```python
+        result = PolarizationTask().run(data, PolarizationRequest(scope="total"))
+        ```
+        Sample output:
+        `result.table` including `P_x/y/z (uC/cm^2)` columns.
+        Meaning:
+        Polarization vectors are computed and normalized per selected scope.
+        """
         out = _run_electrostatics(
             data,
             mode="polarization",
@@ -867,6 +1128,35 @@ class PolarizationFieldTask(AnalysisTask):
         _result: PolarizationFieldResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default presentations for polarization-field hysteresis outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : PolarizationFieldResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Table presentations for full/aggregated tables plus optional
+            hysteresis plot presentation.
+
+        Examples
+        -----
+        ```python
+        specs = PolarizationFieldTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        Full table view, aggregated table view, and optional hysteresis plot.
+        Meaning:
+        Field-response outputs are rendered with source-key-aware views.
+        """
         views: list[PresentationSpec] = [
             PresentationSpec(
                 renderer="table",
@@ -921,6 +1211,34 @@ class PolarizationFieldTask(AnalysisTask):
         return views
 
     def run(self, data: ElectrostaticsData, request: PolarizationFieldRequest) -> PolarizationFieldResult:
+        """Compute field-response hysteresis tables and zero-crossing metrics.
+
+        Works on
+        -----
+        `ElectrostaticsData` plus `PolarizationFieldRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ElectrostaticsData
+            Electrostatics bundle including polarization inputs and electric field.
+        request : PolarizationFieldRequest
+            Hysteresis pairing, frame sampling, and aggregation configuration.
+
+        Returns
+        -----
+        PolarizationFieldResult
+            Full/aggregated tables and computed zero-crossing lists.
+
+        Examples
+        -----
+        ```python
+        result = PolarizationFieldTask().run(data, PolarizationFieldRequest())
+        ```
+        Sample output:
+        Aggregated hysteresis table with crossing metrics.
+        Meaning:
+        Electric-field and polarization/dipole series are paired for hysteresis analysis.
+        """
         if data.electric_field is None:
             raise ValueError("Polarization field analysis requires ElectrostaticsData.electric_field.")
 

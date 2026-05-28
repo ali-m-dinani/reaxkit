@@ -1,4 +1,15 @@
-"""Shared request/result models for active-site analysis tasks."""
+"""Define shared request/result dataclasses for active-site analyzer tasks.
+
+This module centralizes task request and result schemas for active-site
+structural and event extraction analyzers. It is scoped to typed payload models
+and does not implement analysis computation.
+
+**Usage context**
+
+- Task contracts: Provide stable input/output shapes for active-site tasks.
+- Serialization support: Keep result payloads consistent for presentation/reporting.
+- Cross-module reuse: Share request/result models across structural/event modules.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +25,59 @@ from reaxkit.domain.base_result import BaseResult
 
 @dataclass
 class ActiveSiteStructuralRequest(BaseRequest):
-    """Request for frame-level active-site structural descriptors."""
+    """Request payload for frame-level active-site structural analysis.
+
+    Carries frame selection and descriptor configuration for structural active-
+    site characterization, including bonding mode and optional SOAP settings.
+
+    Fields
+    -----
+    frame : int
+        Frame index to analyze. Must be non-negative.
+    bo_threshold : float
+        Bond-order threshold used when `bond_mode="bo"`.
+    bond_mode : str
+        Bond graph source mode: `"bo"` or `"distance"`.
+    bond_scale : float
+        Covalent-radii scale factor for distance-mode bond detection.
+    alpha_radius : float
+        Alpha-shape radius used for non-periodic boundary detection.
+    gap_deg : float
+        Angular-gap threshold for boundary fallback heuristics.
+    carbon_element : str
+        Element symbol treated as carbon substrate.
+    include_noncarbon : bool
+        Whether non-carbon atoms are retained in output table.
+    strict_tract : bool
+        If `True`, enforce strict TRACT required-column compatibility.
+    soap : bool
+        Enable optional SOAP descriptor computation for carbon atoms.
+    soap_ref_path : Optional[str]
+        Optional `.npy` path containing SOAP reference vectors.
+    soap_r_cut : float
+        SOAP cutoff radius in angstrom.
+    soap_n_max : int
+        SOAP radial basis size.
+    soap_l_max : int
+        SOAP angular basis size.
+    soap_zeta : int
+        Exponent used for SOAP-kernel scoring against reference vectors.
+
+    Examples
+    -----
+    ```python
+    req = ActiveSiteStructuralRequest(
+        frame=0,
+        bond_mode="bo",
+        bo_threshold=0.3,
+        soap=False,
+    )
+    ```
+    Sample output:
+    `ActiveSiteStructuralRequest(...)`
+    Meaning:
+    The request configures one-frame structural descriptor extraction.
+    """
 
     frame: int = dc_field(
         default=0,
@@ -140,7 +203,34 @@ class ActiveSiteStructuralRequest(BaseRequest):
 
 @dataclass
 class ActiveSiteStructuralResult(BaseResult):
-    """Frame-level active-site structural descriptors."""
+    """Result payload for frame-level active-site structural analysis.
+
+    Stores raw structural descriptors, TRACT-compatible projection, summary
+    statistics, and optional SOAP descriptor matrix.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Full per-atom descriptor table for analyzed frame.
+    tract_table : pd.DataFrame
+        TRACT-compatible structural table view.
+    summary : dict[str, Any]
+        Aggregate metrics and counts for report generation.
+    request : ActiveSiteStructuralRequest
+        Request used to produce this result.
+    soap_descriptors : Optional[np.ndarray]
+        Optional SOAP descriptor matrix for selected carbon atoms.
+
+    Examples
+    -----
+    ```python
+    result = ActiveSiteStructuralResult(table=df, tract_table=tract_df, summary={}, request=req)
+    ```
+    Sample output:
+    `ActiveSiteStructuralResult(...)`
+    Meaning:
+    The result packages detailed and report-ready structural outputs.
+    """
 
     table: pd.DataFrame
     tract_table: pd.DataFrame
@@ -151,7 +241,46 @@ class ActiveSiteStructuralResult(BaseResult):
 
 @dataclass
 class ActiveSiteEventsRequest(BaseRequest):
-    """Request for trajectory-level active-site event extraction."""
+    """Request payload for trajectory-level active-site event extraction.
+
+    Configures frame sampling, detection mode, species definitions, and event
+    persistence criteria for extracting C-O and C-Si event summaries.
+
+    Fields
+    -----
+    frames : Optional[Sequence[int]]
+        Frame indices to evaluate. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`.
+    mode : str
+        Event mode selector: `"auto"`, `"bo"`, or `"dist"`.
+    bo_threshold : float
+        BO threshold used to define bound contacts in `"bo"` mode.
+    r_CO : float
+        Carbon-oxygen cutoff distance (angstrom) for `"dist"` mode.
+    r_CSi : float
+        Carbon-silicon cutoff distance (angstrom) for `"dist"` mode.
+    persist : int
+        Minimum consecutive analyzed frames to confirm an event.
+    carbon_element : str
+        Element symbol used as substrate carbon type.
+    oxygen_element : str
+        Element symbol treated as oxygen target type.
+    silicon_element : str
+        Element symbol treated as silicon target type.
+    strict_tract : bool
+        If `True`, enforce strict TRACT required-column compatibility.
+
+    Examples
+    -----
+    ```python
+    req = ActiveSiteEventsRequest(mode="auto", every=10, persist=50)
+    ```
+    Sample output:
+    `ActiveSiteEventsRequest(...)`
+    Meaning:
+    The request controls trajectory windowing and event confirmation logic.
+    """
 
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
@@ -245,7 +374,32 @@ class ActiveSiteEventsRequest(BaseRequest):
 
 @dataclass
 class ActiveSiteEventsResult(BaseResult):
-    """Per-carbon event table from trajectory-level active-site extraction."""
+    """Result payload for trajectory-level active-site event extraction.
+
+    Stores per-carbon event descriptors, TRACT-compatible table projection, and
+    run-level event summary metadata.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Per-carbon event table with counts, reactivity flags, and contact stats.
+    tract_table : pd.DataFrame
+        TRACT-compatible events table view.
+    summary : dict[str, Any]
+        Aggregate metrics such as reactive counts and analyzed frame window.
+    request : ActiveSiteEventsRequest
+        Request used to produce this result.
+
+    Examples
+    -----
+    ```python
+    result = ActiveSiteEventsResult(table=df, tract_table=tract_df, summary={}, request=req)
+    ```
+    Sample output:
+    `ActiveSiteEventsResult(...)`
+    Meaning:
+    The result bundles event rows and summary/report metadata.
+    """
 
     table: pd.DataFrame
     tract_table: pd.DataFrame

@@ -1,4 +1,15 @@
-"""Geometry-optimization data extraction tasks."""
+"""Extract geometry-optimization progress series for analyzer consumption.
+
+This module converts geometry-optimization progress records into normalized
+time-series tables with selectable components and frame subsets. It focuses on
+optimization-progress streams and does not compute trajectory-based observables.
+
+**Usage context**
+
+- Convergence monitoring: Track potential energy and optimizer diagnostics.
+- Component slicing: Extract selected progress columns for plotting.
+- Report inputs: Feed geometry-optimization series into summary dashboards.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +31,7 @@ _GEOMETRY_OPT_COMPONENT_CHOICES = ("E_pot", "T", "T_set", "RMSG", "nfc")
 
 
 def _geometry_optimization_frame(data: GeometryOptimizationProgressData) -> pd.DataFrame:
+    """Build a normalized geometry-optimization progress DataFrame."""
     return pd.DataFrame(
         {
             "iter": pd.Series(data.optimization_iterations, dtype=int),
@@ -101,7 +113,29 @@ def _build_geometry_optimization_table(
 
 @dataclass
 class GeometryOptimizationRequest(BaseRequest):
-    """Request for selected fort.57 geometry-optimization components."""
+    """Request payload for geometry-optimization series extraction.
+
+    This request selects optimization components and whether to include the
+    geometry descriptor in every output row.
+
+    Fields
+    -----
+    component : Sequence[str] | None
+        Optional component names to include. If omitted, default optimization
+        components are used.
+    include_geo_descriptor : bool
+        Whether to include ``geo_descriptor`` in output rows.
+
+    Examples
+    -----
+    ```python
+    request = GeometryOptimizationRequest(
+        component=["E_pot", "RMSG"],
+        include_geo_descriptor=True,
+    )
+    ```
+    The request selects two components and includes the geometry label per row.
+    """
 
     component: Sequence[str] | None = dc_field(
         default=None,
@@ -123,16 +157,25 @@ class GeometryOptimizationRequest(BaseRequest):
 
 @dataclass
 class GeometryOptimizationResult(BaseResult):
-    """Geometry-optimization extraction result.
+    """Result payload for geometry-optimization series extraction.
 
-    Output structure:
-    - request: GeometryOptimizationRequest used to generate this result
-    - table: pandas.DataFrame with columns
-      ['iter', 'component', 'value'] plus optional ['geo_descriptor']
-      - iter: optimization iteration index from fort.57
-      - component: selected component name ('E_pot', 'T', 'T_set', 'RMSG', 'nfc')
-      - value: component value at that iteration
-      - geo_descriptor: optional descriptor copied from parsed fort.57 metadata
+    The analyzer returns long-form iteration/component/value rows suitable for
+    table inspection and component-wise plotting.
+
+    Fields
+    -----
+    table : pandas.DataFrame
+        Output table with ``iter``, ``component``, ``value``, and optional
+        ``geo_descriptor``.
+    request : GeometryOptimizationRequest
+        Request object used to generate this result.
+
+    Examples
+    -----
+    ```python
+    row = {"iter": 120, "component": "RMSG", "value": 0.0123}
+    ```
+    The sample row captures one optimization component value at one iteration.
     """
 
     table: pd.DataFrame
@@ -149,6 +192,33 @@ class GeometryOptimizationTask(AnalysisTask):
     def recommended_presentations(
         _result: GeometryOptimizationResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend default table/plot views for geometry-optimization output.
+
+        Works on
+        Analyzer task output for ``geometry_optimization_data``.
+
+        Parameters
+        -----
+        _result : GeometryOptimizationResult
+            Typed analyzer result instance.
+        payload : dict[str, Any]
+            Serialized payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs for table and component-value plots.
+
+        Examples
+        -----
+        ```python
+        specs = GeometryOptimizationTask.recommended_presentations(
+            _result,
+            {"table": [{"iter": 10, "component": "RMSG", "value": 0.2}]},
+        )
+        ```
+        The returned list includes a table and a ``value`` vs ``iter`` plot.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -182,6 +252,35 @@ class GeometryOptimizationTask(AnalysisTask):
         request: GeometryOptimizationRequest,
         reporter=None,
     ) -> GeometryOptimizationResult:
+        """Run geometry-optimization component series extraction.
+
+        Works on
+        ``GeometryOptimizationProgressData`` parsed from fort.57-like artifacts.
+
+        Parameters
+        -----
+        data : GeometryOptimizationProgressData
+            Parsed optimization progress arrays.
+        request : GeometryOptimizationRequest
+            Component and descriptor inclusion configuration.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks.
+
+        Returns
+        -----
+        GeometryOptimizationResult
+            Long-form geometry-optimization rows.
+
+        Examples
+        -----
+        ```python
+        result = GeometryOptimizationTask().run(
+            data,
+            GeometryOptimizationRequest(component=["E_pot"]),
+        )
+        ```
+        ``result.table`` contains iteration/value rows for requested components.
+        """
         table = _build_geometry_optimization_table(
             data=data,
             components=request.component,

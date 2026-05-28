@@ -1,4 +1,15 @@
-"""Force-field analysis tasks."""
+"""Expose analyzer tasks for structured force-field parameter content.
+
+This module provides section-oriented extraction and filtering over parsed
+force-field parameter data. It focuses on parameter-table retrieval and
+normalization, and does not run optimization or diagnostic computations.
+
+**Usage context**
+
+- Parameter inspection: Query specific parameter sections for review.
+- Data export: Build normalized parameter tables for external tooling.
+- Workflow composition: Feed section slices into optimization/report analyzers.
+"""
 
 from __future__ import annotations
 
@@ -44,6 +55,7 @@ _SECTION_ALIASES = {
 
 
 def _normalize_section_name(section: str) -> str:
+    """Normalize a section alias into a canonical force-field section key."""
     norm = section.strip().lower().replace("-", "_").replace(" ", "_")
     if norm not in _SECTION_ALIASES:
         raise KeyError(f"Unknown force-field section {section!r}. Valid options: {sorted(_SECTION_ALIASES)}")
@@ -51,6 +63,7 @@ def _normalize_section_name(section: str) -> str:
 
 
 def _atom_index_to_symbol_map(data: ForceFieldParametersData) -> dict[int, str]:
+    """Map atom-parameter row indices to element symbols."""
     atom_df = data.atom_parameters
     if atom_df.empty:
         raise ValueError("ForceFieldParametersData.atom_parameters is empty.")
@@ -78,6 +91,7 @@ def _add_symbols_for_columns(
     term_col: str = "term",
     sep: str = "-",
 ) -> pd.DataFrame:
+    """Attach per-index symbol columns and a joined ``term`` label."""
     out = df.copy()
     symbol_cols: list[str] = []
     for col in cols:
@@ -103,6 +117,7 @@ def _add_symbols_for_columns(
 
 
 def _interpret_section(data: ForceFieldParametersData, section: str, sep: str = "-") -> pd.DataFrame:
+    """Interpret index-based section rows into symbol-based labeled rows."""
     idx_to_sym = _atom_index_to_symbol_map(data)
     attr = _SECTION_TO_ATTR[section]
     df = getattr(data, attr).copy()
@@ -117,6 +132,7 @@ def _interpret_section(data: ForceFieldParametersData, section: str, sep: str = 
 
 
 def _section_frame(data: ForceFieldParametersData, section: str, interpret: bool) -> pd.DataFrame:
+    """Return one section table, optionally with interpreted symbolic terms."""
     attr = _SECTION_TO_ATTR[section]
     raw_df = getattr(data, attr).copy()
     if not interpret:
@@ -128,7 +144,29 @@ def _section_frame(data: ForceFieldParametersData, section: str, interpret: bool
 
 @dataclass
 class ForceFieldDataRequest(BaseRequest):
-    """Request for raw or interpreted force-field section output."""
+    """Request payload for force-field section extraction.
+
+    This request controls section selection and whether bonded/multi-body rows
+    are returned as raw atom-index values or augmented with symbolic ``term``
+    labels derived from atom parameters.
+
+    Fields
+    -----
+    section : Optional[str]
+        Optional canonical/alias section selector. Allowed values map to
+        ``general``, ``atom``, ``bond``, ``off_diagonal``, ``angle``,
+        ``torsion``, and ``hbond``. If omitted, all sections are returned.
+    interpret : bool
+        If ``True``, bonded sections include interpreted symbol columns and a
+        joined ``term`` string; if ``False``, rows remain index-based.
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldDataRequest(section="bond", interpret=True)
+    ```
+    The request returns only the bond section with symbolic term labels.
+    """
 
     section: Optional[str] = dc_field(
         default=None,
@@ -156,16 +194,31 @@ class ForceFieldDataRequest(BaseRequest):
 
 @dataclass
 class ForceFieldDataResult(BaseResult):
-    """Force-field section extraction result.
+    """Result payload for force-field section table analysis.
 
-    Output structure:
-    - request: ForceFieldDataRequest used to generate this result.
-    - table: pandas.DataFrame with section rows in tabular form.
-      - If one section is requested, rows are returned directly for that section.
-      - If multiple sections are requested, rows are concatenated and include a
-        leading 'section' column indicating the source section.
-      - In interpreted mode for bonded sections, a 'term' column is included
-        (for example 'C-H' or 'C-C-H') alongside numeric parameters.
+    The analyzer returns one normalized DataFrame containing either a single
+    section or a concatenated multi-section table based on request scope.
+
+    Fields
+    -----
+    request : ForceFieldDataRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Output table for the requested section scope. Multi-section outputs
+        include a leading ``section`` column; interpreted bonded outputs may
+        include symbol columns and ``term`` labels.
+
+    Notes
+    -----
+    Column schemas vary by section because each force-field block has its own
+    parameter layout.
+
+    Examples
+    -----
+    ```python
+    row = {"section": "bond", "i": 1, "j": 2, "term": "C-H"}
+    ```
+    The sample row shows one interpreted bonded parameter entry.
     """
 
     table: pd.DataFrame
@@ -180,6 +233,36 @@ class ForceFieldDataTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: ForceFieldDataResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Recommend default table and quick-look plot presentations.
+
+        Selects a table view in all cases and adds a simple plot when at least
+        one numeric column can be paired with a suitable categorical/index axis.
+
+        Works on
+        Analyzer task output for ``force_field_data``.
+
+        Parameters
+        -----
+        _result : ForceFieldDataResult
+            Typed analyzer result instance (unused by selection logic).
+        payload : dict[str, Any]
+            Serialized result payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended presentation specifications for rendering.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldDataTask.recommended_presentations(
+            _result,
+            {"table": [{"section": "bond", "term": "C-H", "De": 78.2}]},
+        )
+        ```
+        The output includes a table and a one-series plot when numeric data exists.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -221,6 +304,38 @@ class ForceFieldDataTask(AnalysisTask):
         request: ForceFieldDataRequest,
         reporter=None,
     ) -> ForceFieldDataResult:
+        """Run section-oriented extraction over parsed force-field parameters.
+
+        Resolves the requested section scope, materializes section tables in raw
+        or interpreted mode, and returns the assembled DataFrame result.
+
+        Works on
+        ``ForceFieldParametersData`` parsed from force-field parameter sources.
+
+        Parameters
+        -----
+        data : ForceFieldParametersData
+            Parsed force-field parameter bundle.
+        request : ForceFieldDataRequest
+            Section and interpretation options for extraction.
+        reporter : Any, optional
+            Optional progress callback invoked per processed section.
+
+        Returns
+        -----
+        ForceFieldDataResult
+            Result containing one extracted/combined section table.
+
+        Examples
+        -----
+        ```python
+        result = ForceFieldDataTask().run(
+            data,
+            ForceFieldDataRequest(section="angle", interpret=True),
+        )
+        ```
+        The returned table contains only interpreted angle-parameter rows.
+        """
         if request.section is not None:
             targets = [_normalize_section_name(request.section)]
         else:

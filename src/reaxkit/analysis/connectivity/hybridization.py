@@ -1,4 +1,16 @@
-"""Engine-agnostic hybridization status analysis task."""
+"""Assign per-atom hybridization status from connectivity-derived metrics.
+
+This module classifies atoms into configured hybridization states using
+bond-order-sum targets and tolerances, optionally with element-specific rules.
+It focuses on hybridization labels and summary tables rather than coordination
+or event-detection logic.
+
+**Usage context**
+
+- Hybridization tagging: Label atoms as `sp`, `sp2`, `sp3`, or custom states.
+- Force-field validation: Compare expected hybridization against trajectories.
+- Chemistry post-processing: Feed state labels into reporting or filtering flows.
+"""
 
 from __future__ import annotations
 
@@ -20,33 +32,41 @@ from reaxkit.presentation.specs import PresentationSpec
 class HybridizationStatusRequest(BaseRequest):
     """Request for per-atom hybridization-status classification.
 
-    Parameters
-    ----------
-    hybridizations
-        Global hybridization targets used when an element-specific mapping is not
+    Fields
+    -----
+    hybridizations : Optional[Mapping[str, float]]
+        Global hybridization targets used when element-specific mappings are not
         provided. Keys are state labels and values are target BO sums.
-        Example: ``{"sp": 1.0, "sp2": 2.0, "sp3": 3.0}``.
-    element_hybridizations
-        Per-element mapping that overrides ``hybridizations`` for specific atom
-        types. Example:
-        ``{"C": {"sp": 1.0, "sp2": 2.0, "sp3": 3.0}, "N": {"sp2": 2.0, "sp3": 3.0}}``.
-    target_elements
-        Optional element filter. If provided, only these atom types are classified.
-        Example: ``["C", "O"]``.
-    target_atom_ids
-        Optional atom-id filter (1-based ids). Example: ``[1, 2, 5]``.
-    threshold
-        Absolute tolerance for deciding whether an atom matches the closest
-        hybridization target. Example: ``0.2``.
-    frames
-        Optional frame indices to evaluate. If omitted, all frames are considered.
-        Example: ``[0, 10, 20]``.
-    every
-        Frame stride after frame selection. Example: ``every=5`` keeps every fifth
-        selected frame.
-    require_defined_hybridization
-        If ``True``, missing element mappings raise an error. If ``False``, rows are
-        emitted with ``status_label='undefined'``.
+    element_hybridizations : Optional[Mapping[str, Mapping[str, float]]]
+        Per-element hybridization map overriding global targets.
+    target_elements : Optional[Sequence[str]]
+        Optional element filter; only matching atom types are classified.
+    target_atom_ids : Optional[Sequence[int]]
+        Optional atom-id filter (1-based IDs).
+    threshold : float
+        Absolute tolerance used to classify closest target as matched/unmatched.
+    frames : Optional[Sequence[int]]
+        Optional frame indices to evaluate. `None` means all frames.
+    every : int
+        Frame stride after selection. Must be `>= 1`.
+    require_defined_hybridization : bool
+        If `True`, missing element mappings raise; otherwise rows are emitted as
+        `status_label="undefined"`.
+
+    Examples
+    -----
+    ```python
+    req = HybridizationStatusRequest(
+        hybridizations={"sp": 1.0, "sp2": 2.0, "sp3": 3.0},
+        target_elements=["C"],
+        threshold=0.2,
+    )
+    ```
+    Sample output:
+    `HybridizationStatusRequest(...)`
+    Meaning:
+    The request configures atom selection and matching tolerance for
+    hybridization classification.
     """
 
     hybridizations: Optional[Mapping[str, float]] = dc_field(
@@ -125,21 +145,26 @@ class HybridizationStatusRequest(BaseRequest):
 class HybridizationStatusResult(BaseResult):
     """Hybridization-status analysis result.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`HybridizationStatusRequest` used for this run.
-    - ``table``: pandas.DataFrame containing one row per selected atom per frame.
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table with one row per selected atom per analyzed frame.
+        Typical columns include `frame_index`, `iter`, `atom_id`, `atom_type`,
+        `sum_BOs`, `hybridization`, `expected_sum_BOs`, `delta`,
+        `within_threshold`, and `status_label`.
+    request : HybridizationStatusRequest
+        Request object used for this analysis run.
 
-    Typical columns
-    ---------------
-    ``frame_index``, ``iter``, ``atom_id``, ``atom_type``, ``sum_BOs``,
-    ``hybridization``, ``expected_sum_BOs``, ``delta``, ``within_threshold``,
-    ``status_label``.
-
-    Example
-    -------
-    A matched row may look like:
-    ``frame_index=10, atom_id=4, atom_type='C', sum_BOs=2.03, hybridization='sp2', status_label='matched'``.
+    Examples
+    -----
+    ```python
+    result = HybridizationStatusTask().run(data, req)
+    result.table.head()
+    ```
+    Sample output:
+    DataFrame rows with matched/unmatched hybridization assignments.
+    Meaning:
+    Each row captures one atom-frame classification decision.
     """
 
     table: pd.DataFrame
@@ -214,6 +239,34 @@ class HybridizationStatusTask(AnalysisTask):
         _result: HybridizationStatusResult,
         _payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Return default table presentation for hybridization outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : HybridizationStatusResult
+            Analysis result object for the executed task.
+        _payload : dict[str, Any]
+            Serialized result payload.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Table presentation specification.
+
+        Examples
+        -----
+        ```python
+        specs = HybridizationStatusTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        `[PresentationSpec(renderer="table", ...)]`
+        Meaning:
+        Hybridization results default to tabular rendering.
+        """
         return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
     def run(
@@ -222,6 +275,36 @@ class HybridizationStatusTask(AnalysisTask):
         request: HybridizationStatusRequest,
         reporter=None,
     ) -> HybridizationStatusResult:
+        """Classify per-atom hybridization status across selected frames.
+
+        Works on
+        -----
+        `ConnectivityData` plus `HybridizationStatusRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : ConnectivityData
+            Connectivity input containing sum bond orders or bond-order matrices.
+        request : HybridizationStatusRequest
+            Selection and hybridization-target configuration.
+        reporter : Any, optional
+            Optional progress callback invoked during frame processing.
+
+        Returns
+        -----
+        HybridizationStatusResult
+            Result table with matched/unmatched hybridization assignments.
+
+        Examples
+        -----
+        ```python
+        result = HybridizationStatusTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with `status_label` and `hybridization` columns.
+        Meaning:
+        One row is produced per selected atom per selected frame.
+        """
         sum_bos_m = _sum_bond_orders_matrix(data)
         if sum_bos_m.size == 0:
             return HybridizationStatusResult(table=pd.DataFrame(), request=request)

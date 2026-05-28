@@ -1,4 +1,16 @@
-"""Control-parameter analysis tasks."""
+"""Extract and filter parsed control-parameter sections as analyzer outputs.
+
+This module exposes analyzer tasks over parsed `control` configuration blocks,
+including section-level selection and key/value filtering for reporting.
+It is intentionally limited to control-parameter content and does not read
+raw files directly.
+
+**Usage context**
+
+- Input auditing: Inspect effective control settings used for a run.
+- Section-level review: Pull only `general`, `md`, `mm`, `ff`, or `outdated`.
+- Reproducibility logs: Export normalized control tables for reports.
+"""
 
 from __future__ import annotations
 
@@ -88,15 +100,23 @@ def _resolve_key_section(data: ControlParametersData, key: str, section: Optiona
 class ControlParametersTaskRequest(BaseRequest):
     """Request for extracting a control parameter as a table row.
 
-    Parameters
-    ----------
-    key
+    Fields
+    -----
+    key : str
         Control key to query (case-insensitive).
-        Examples: ``"nmdit"``, ``"iout2"``, ``"imetho"``.
-    section
-        Optional section to search in. If omitted, sections are searched in order:
-        ``general -> md -> mm -> ff -> outdated``.
-        Example: ``section="md"``.
+    section : Optional[str]
+        Optional section to search. If `None`, sections are searched in default
+        order: `general -> md -> mm -> ff -> outdated`.
+
+    Examples
+    -----
+    ```python
+    req = ControlParametersTaskRequest(key="nmdit", section="md")
+    ```
+    Sample output:
+    `ControlParametersTaskRequest(...)`
+    Meaning:
+    The request asks for one control key lookup in a selected section.
     """
 
     key: str = dc_field(
@@ -126,23 +146,23 @@ class ControlParametersTaskRequest(BaseRequest):
 class ControlParametersTaskResult(BaseResult):
     """Result for a control-parameter table extraction.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`ControlParametersTaskRequest` used for lookup.
-    - ``table``: pandas.DataFrame with one row and columns:
-      ``['key', 'value', 'section', 'found']``.
+    Fields
+    -----
+    table : pd.DataFrame
+        One-row table with columns `key`, `value`, `section`, and `found`.
+    request : ControlParametersTaskRequest
+        Request object used for this lookup.
 
-    Column meanings
-    ---------------
-    - ``key``: normalized control key string that was requested.
-    - ``value``: resolved control value, or ``None`` when not found.
-    - ``section``: section where the key was resolved (or requested section).
-    - ``found``: ``True`` when the key exists in the control data, else ``False``.
-
-    Example
-    -------
-    A successful lookup may return:
-    ``key='iout2', value=20, section='md', found=True``.
+    Examples
+    -----
+    ```python
+    result = ControlParametersTask().run(data, req)
+    result.table
+    ```
+    Sample output:
+    One-row DataFrame (for example: `key='iout2', value=20, section='md', found=True`).
+    Meaning:
+    The result captures resolved value and provenance for one key lookup.
     """
 
     table: pd.DataFrame
@@ -160,6 +180,34 @@ class ControlParametersTask(AnalysisTask):
         _result: ControlParametersTaskResult,
         _payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Return default table presentation for control lookup outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ControlParametersTaskResult
+            Analysis result object for the executed task.
+        _payload : dict[str, Any]
+            Serialized result payload.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Table presentation specification.
+
+        Examples
+        -----
+        ```python
+        specs = ControlParametersTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        `[PresentationSpec(renderer="table", ...)]`
+        Meaning:
+        Control lookup outputs default to tabular rendering.
+        """
         return [PresentationSpec(renderer="table", label="Table", view_type="table")]
 
     def run(
@@ -168,6 +216,36 @@ class ControlParametersTask(AnalysisTask):
         request: ControlParametersTaskRequest,
         reporter=None,
     ) -> ControlParametersTaskResult:
+        """Resolve one control key and return a one-row result table.
+
+        Works on
+        -----
+        `ControlParametersData` plus `ControlParametersTaskRequest` inputs
+
+        Parameters
+        -----
+        data : ControlParametersData
+            Parsed control-parameter sections.
+        request : ControlParametersTaskRequest
+            Key/section lookup configuration.
+        reporter : Any, optional
+            Unused progress callback parameter for task API compatibility.
+
+        Returns
+        -----
+        ControlParametersTaskResult
+            One-row lookup result with value, section, and found flag.
+
+        Examples
+        -----
+        ```python
+        result = ControlParametersTask().run(data, ControlParametersTaskRequest(key="iout2"))
+        ```
+        Sample output:
+        `result.table` with columns `key`, `value`, `section`, `found`.
+        Meaning:
+        A single control entry is normalized into table form.
+        """
         missing = object()
         value = _get_control_data(
             data,

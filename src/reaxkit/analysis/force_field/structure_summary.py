@@ -1,4 +1,15 @@
-"""Structure-summary data extraction tasks."""
+"""Extract structure-summary analyzer tables from geometry summary bundles.
+
+This module converts parsed geometry-summary records into typed, sortable
+tabular outputs used in force-field analysis workflows. It is bounded to
+summary extraction and does not perform additional structural computations.
+
+**Usage context**
+
+- Structure QA: Review minima, iteration counts, and summary diagnostics.
+- Training artifacts: Inspect geometry-summary data used in fitting cycles.
+- Report pipelines: Export structure-summary tables for post-processing.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +27,7 @@ from reaxkit.presentation.specs import PresentationSpec
 
 
 def _fort74_frame(data: GeometrySummaryData) -> pd.DataFrame:
+    """Build the base structure-summary table from geometry summary fields."""
     n_rows = len(data.identifiers)
     return pd.DataFrame(
         {
@@ -56,27 +68,54 @@ def _get_fort74_data(*, data: GeometrySummaryData) -> pd.DataFrame:
 
 @dataclass
 class StructureSummaryRequest(BaseRequest):
-    """Request for structure-summary data."""
+    """Request payload for structure-summary extraction.
+
+    This request configures the structure-summary analyzer task. The task
+    currently exposes no request-time filters and always returns the full
+    normalized structure-summary table for the loaded geometry bundle.
+
+    Fields
+    -----
+    None.
+
+    Examples
+    -----
+    ```python
+    request = StructureSummaryRequest()
+    ```
+    The request asks for the full available structure-summary table.
+    """
 
 
 @dataclass
 class StructureSummaryResult(BaseResult):
-    """Structure-summary analysis result.
+    """Result payload containing normalized structure-summary records.
 
-    Output structure:
-    - request: StructureSummaryRequest used to generate this result.
-    - table: pandas.DataFrame with columns:
-      ['identifier', 'Emin', 'iteration', 'enthalpy', 'volume', 'density']
-      - identifier: structure label
-      - Emin: minimum energy
-      - iteration: iteration/step index if available
-      - enthalpy: formation energy
-      - volume: volume
-      - density: density
+    The analyzer returns one tabular view over parsed geometry summary entries,
+    preserving identifiers and thermodynamic descriptors used downstream in
+    force-field reporting workflows.
 
-    Example:
-    A row like ('bulk_0', -243.1, 90, -12.8, 11.2, 2.45) is one
-    structure-summary record with energy and thermodynamic descriptors.
+    Fields
+    -----
+    request : StructureSummaryRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``identifier``, ``Emin``, ``iteration``,
+        ``enthalpy``, ``volume``, and ``density``.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "identifier": "bulk_0",
+        "Emin": -243.1,
+        "iteration": 90,
+        "enthalpy": -12.8,
+        "volume": 11.2,
+        "density": 2.45,
+    }
+    ```
+    The sample row represents one structure with energy and state descriptors.
     """
 
     table: pd.DataFrame
@@ -93,6 +132,36 @@ class StructureSummaryTask(AnalysisTask):
     def recommended_presentations(
         _result: StructureSummaryResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Suggest table and plot views for structure-summary results.
+
+        Chooses a table view by default and adds a simple line/scatter-style
+        plot when suitable ``x``/``y`` fields are present in serialized rows.
+
+        Works on
+        Analyzer task output for ``structure_summary_data``.
+
+        Parameters
+        -----
+        _result : StructureSummaryResult
+            Typed analyzer result instance (unused for current selection logic).
+        payload : dict[str, Any]
+            Serialized analyzer payload expected to include a ``table`` key.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended presentation specs for UI renderers.
+
+        Examples
+        -----
+        ```python
+        specs = StructureSummaryTask.recommended_presentations(
+            _result,
+            {"table": [{"identifier": "bulk_0", "Emin": -243.1}]},
+        )
+        ```
+        The returned list includes at least a table view and may include one plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -123,6 +192,36 @@ class StructureSummaryTask(AnalysisTask):
         request: StructureSummaryRequest,
         reporter=None,
     ) -> StructureSummaryResult:
+        """Execute structure-summary extraction for the provided geometry data.
+
+        Builds a normalized DataFrame from parsed geometry summary fields and
+        wraps it in a typed analyzer result object.
+
+        Works on
+        ``GeometrySummaryData`` parsed from geometry summary artifacts.
+
+        Parameters
+        -----
+        data : GeometrySummaryData
+            Parsed geometry summary model with identifiers and optional metrics.
+        request : StructureSummaryRequest
+            Analyzer request configuration.
+        reporter : Any, optional
+            Progress reporter accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        StructureSummaryResult
+            Result containing the normalized structure-summary table.
+
+        Examples
+        -----
+        ```python
+        result = StructureSummaryTask().run(data, StructureSummaryRequest())
+        table = result.table
+        ```
+        ``table`` contains one row per structure identifier.
+        """
         table = _get_fort74_data(
             data=data,
         )

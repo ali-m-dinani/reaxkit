@@ -1,4 +1,16 @@
-"""Engine-agnostic parameter-optimization diagnostic analysis tasks."""
+"""Analyze parameter-optimization diagnostics in an engine-agnostic format.
+
+This module extracts and normalizes optimization-diagnostic records, including
+parameter-change signals and section-aware summaries used during force-field
+tuning. It is scoped to diagnostic artifacts and does not mutate force-field
+parameters.
+
+**Usage context**
+
+- Optimization debugging: Inspect parameter update behavior across iterations.
+- Section diagnostics: Break down signals by force-field parameter sections.
+- QA reporting: Export normalized diagnostic tables for review dashboards.
+"""
 
 from __future__ import annotations
 
@@ -43,6 +55,7 @@ _SECTION_INDEX_COLS: dict[str, list[str]] = {
 
 
 def _diagnostic_frame(data: ForceFieldOptimizationDiagnosticData) -> pd.DataFrame:
+    """Build the base diagnostics table from parsed optimization diagnostics."""
     return pd.DataFrame(
         {
             "identifier": pd.Series(data.identifiers, dtype=object),
@@ -80,11 +93,13 @@ def _diagnostic_sensitivity_table(
 
 
 def _param_columns_for_section(sec_df: pd.DataFrame, section_key: str) -> list[str]:
+    """Return parameter columns that are not section index/identity fields."""
     idx_cols = set(_SECTION_INDEX_COLS.get(section_key, []))
     return [c for c in sec_df.columns if c not in idx_cols]
 
 
 def _parse_identifier_triplet(identifier: Any) -> tuple[int, int, int] | None:
+    """Parse ``(section, line, parameter)`` integers from an identifier string."""
     text = str(identifier).strip()
     nums = [int(x) for x in re.findall(r"-?\d+", text)]
     if len(nums) < 3:
@@ -98,6 +113,7 @@ def _interpret_identifier_details(
     force_field: ForceFieldParametersData,
     cache: dict[str, pd.DataFrame],
 ) -> dict[str, Any]:
+    """Resolve identifier triplets into force-field section/parameter metadata."""
     out: dict[str, Any] = {
         "ff_section": pd.NA,
         "ff_section_line": pd.NA,
@@ -152,6 +168,7 @@ def _with_interpreted_identifiers(
     *,
     force_field: ForceFieldParametersData,
 ) -> pd.DataFrame:
+    """Insert interpreted identifier metadata columns into a diagnostics table."""
     out = table.copy()
     sec_cache: dict[str, pd.DataFrame] = {}
     details = out["identifier"].map(
@@ -177,10 +194,24 @@ def _with_interpreted_identifiers(
 
 @dataclass
 class ParameterOptimizationDiagnosticRequest(BaseRequest):
-    """Request for parameter-optimization diagnostics.
+    """Request payload for optimization diagnostics analysis.
 
-    This task has no request-time filters currently; it returns the full
-    diagnostic sensitivity table derived from the loaded diagnostic data model.
+    This request controls whether parsed diagnostic identifiers are returned as
+    raw values or interpreted into section/parameter metadata using force-field
+    parameter tables from the same analysis bundle.
+
+    Fields
+    -----
+    interpret : bool
+        If ``True``, decode identifier triplets into descriptive columns such as
+        section name, parameter component, and interpreted term labels.
+
+    Examples
+    -----
+    ```python
+    request = ParameterOptimizationDiagnosticRequest(interpret=True)
+    ```
+    The request asks for interpreted identifier metadata in the output table.
     """
 
     interpret: bool = dc_field(
@@ -198,27 +229,38 @@ class ParameterOptimizationDiagnosticRequest(BaseRequest):
 
 @dataclass
 class ParameterOptimizationDiagnosticResult(BaseResult):
-    """Parameter-optimization diagnostic result.
+    """Result payload for parameter-optimization diagnostics.
 
-    Output structure:
-    - request: ParameterOptimizationDiagnosticRequest used to generate this result
-    - table: pandas.DataFrame with raw diagnostic columns plus derived columns:
-      raw columns:
-      ['identifier', 'value1', 'value2', 'value3', 'diff1', 'diff2', 'diff3',
-       'a', 'b', 'c', 'parabol_min', 'parabol_min_diff', 'value4', 'diff4']
-      derived columns:
-      ['sensitivity1/3', 'sensitivity2/3', 'sensitivity4/3',
-       'min_sensitivity', 'max_sensitivity']
-      - identifier: parameter/entry label from diagnostic data
-        (or interpreted label when request.interpret=True)
-      - sensitivity1/3, sensitivity2/3, sensitivity4/3:
-        relative sensitivities computed as diff1/diff3, diff2/diff3, diff4/diff3
-      - min_sensitivity: row-wise minimum across the three sensitivity ratios
-      - max_sensitivity: row-wise maximum across the three sensitivity ratios
+    The analyzer returns raw diagnostic values plus derived sensitivity ratios,
+    with optional interpreted force-field identifier metadata when requested.
 
-    Example:
-    If one row has sensitivities [0.8, 1.2, 0.5], then
-    min_sensitivity = 0.5 and max_sensitivity = 1.2.
+    Fields
+    -----
+    request : ParameterOptimizationDiagnosticRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table containing raw diagnostic columns, derived sensitivity columns,
+        and optional interpreted identifier metadata columns.
+
+    Notes
+    -----
+    Sensitivity ratios are computed as ``diff1/diff3``, ``diff2/diff3``, and
+    ``diff4/diff3`` after coercion to numeric values; zero ``diff3`` values are
+    treated as missing to avoid division-by-zero artifacts.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "identifier": "3 12 4",
+        "sensitivity1/3": 0.8,
+        "sensitivity2/3": 1.2,
+        "sensitivity4/3": 0.5,
+        "min_sensitivity": 0.5,
+        "max_sensitivity": 1.2,
+    }
+    ```
+    ``min_sensitivity`` and ``max_sensitivity`` summarize each row's ratio span.
     """
 
     table: pd.DataFrame
@@ -235,6 +277,36 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
     def recommended_presentations(
         _result: ParameterOptimizationDiagnosticResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and sensitivity plot views for diagnostics output.
+
+        Produces a table view for all outputs and adds a default
+        ``min_sensitivity`` vs ``identifier`` plot when required columns exist.
+
+        Works on
+        Analyzer task output for ``parameter_optimization_diagnostic``.
+
+        Parameters
+        -----
+        _result : ParameterOptimizationDiagnosticResult
+            Typed analyzer result instance (unused for current selection logic).
+        payload : dict[str, Any]
+            Serialized analyzer payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specifications for diagnostics outputs.
+
+        Examples
+        -----
+        ```python
+        specs = ParameterOptimizationDiagnosticTask.recommended_presentations(
+            _result,
+            {"table": [{"identifier": "3 12 4", "min_sensitivity": 0.5}]},
+        )
+        ```
+        The returned list includes a table and a one-series sensitivity plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -263,6 +335,39 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
         request: ParameterOptimizationDiagnosticRequest,
         reporter=None,
     ) -> ParameterOptimizationDiagnosticResult:
+        """Run diagnostics analysis and optional identifier interpretation.
+
+        Builds the sensitivity-augmented diagnostics table from parsed
+        optimization diagnostics and, when requested, enriches identifiers using
+        parsed force-field parameter data from the same bundle.
+
+        Works on
+        ``ForceFieldOptimizationDiagnosticBundleData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationDiagnosticBundleData
+            Bundle containing diagnostics and force-field parameter records.
+        request : ParameterOptimizationDiagnosticRequest
+            Request controlling identifier interpretation.
+        reporter : Any, optional
+            Progress callback accepted by the analyzer interface; unused here.
+
+        Returns
+        -----
+        ParameterOptimizationDiagnosticResult
+            Result containing raw/derived diagnostics and optional metadata.
+
+        Examples
+        -----
+        ```python
+        result = ParameterOptimizationDiagnosticTask().run(
+            data,
+            ParameterOptimizationDiagnosticRequest(interpret=False),
+        )
+        ```
+        The output contains sensitivity columns for each diagnostics row.
+        """
         diagnostic_data = data.diagnostics
         if diagnostic_data is None:
             raise ValueError("ForceFieldOptimizationDiagnosticBundleData.diagnostics is required.")

@@ -1,4 +1,13 @@
-"""Dispatcher workflow for time-series analyses."""
+"""Dispatcher workflow for time-series analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -85,18 +94,22 @@ _GEO_OPT_ALL_COLUMNS = ("iter", "E_pot", "T", "T_set", "RMSG", "nfc")
 
 
 def _parse_frame_selector(spec) -> list[int] | None:
+    """Parse frame selector."""
     return parse_frame_indices(spec)
 
 
 def _split_csv_tokens(spec: str) -> list[str]:
+    """Split csv tokens."""
     return [token.strip() for token in re.split(r"[\s,]+", spec.strip()) if token.strip()]
 
 
 def _parse_int_tokens(spec: str) -> list[int]:
+    """Parse int tokens."""
     return [int(token) for token in _split_csv_tokens(spec)]
 
 
 def _parse_atom_selector(spec: str | None) -> tuple[int, ...] | None:
+    """Parse atom selector."""
     if spec is None:
         return None
     text = str(spec).strip()
@@ -113,6 +126,7 @@ def _parse_atom_selector(spec: str | None) -> tuple[int, ...] | None:
 
 
 def _normalize_trajectory_components(component: str | None) -> tuple[str, ...]:
+    """Normalize trajectory components."""
     if component is None or not str(component).strip():
         return ("xyz",)
     token = str(component).strip().lower()
@@ -125,6 +139,7 @@ def _normalize_trajectory_components(component: str | None) -> tuple[str, ...]:
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--field", default=None, help="Dispatcher field expression. Example: --field temperature, which selects simulation temperature time series.")
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF-specific loaders.")
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/job1, which sets base context for file detection.")
@@ -144,6 +159,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined chart.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save temperature.png, which writes the plot image.")
@@ -153,6 +169,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add common arguments."""
     parser.add_argument(
         "--frames",
         nargs="*",
@@ -173,6 +190,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _coerce_atom_ids(value) -> tuple[int, ...] | None:
+    """Coerce atom ids."""
     if value is None:
         return None
     if isinstance(value, str):
@@ -182,6 +200,7 @@ def _coerce_atom_ids(value) -> tuple[int, ...] | None:
 
 
 def _resolve_legacy_xmolout_request(args: argparse.Namespace):
+    """Resolve legacy xmolout request."""
     frames = _parse_frame_selector(args.frames)
     if bool(args.boxdims) or bool(args.cell_fields):
         fields = tuple(args.cell_fields or ("a", "b", "c", "alpha", "beta", "gamma"))
@@ -212,6 +231,7 @@ def _resolve_legacy_xmolout_request(args: argparse.Namespace):
 
 
 def _resolve_task_and_request(args: argparse.Namespace):
+    """Resolve task and request."""
     if args.field is None:
         legacy = _resolve_legacy_xmolout_request(args)
         if legacy is not None:
@@ -452,6 +472,25 @@ def _resolve_task_and_request(args: argparse.Namespace):
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    p : Any
+        Function argument.
+
+    Returns
+    -----
+    None
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     p.set_defaults(progress=True)
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
@@ -493,6 +532,7 @@ def build_parser(p: argparse.ArgumentParser) -> None:
 
 
 def _series_with_xaxis(command: str, result: TimeSeriesResult, args: argparse.Namespace):
+    """Series with xaxis."""
     if command == "molecular_totals_series":
         xlabel = str(result.x_label)
         out = []
@@ -518,6 +558,7 @@ def _series_with_xaxis(command: str, result: TimeSeriesResult, args: argparse.Na
 
 
 def _result_to_frame(result: TimeSeriesResult, xlabel: str, plot_series: list[dict[str, object]]) -> pd.DataFrame:
+    """Result to frame."""
     if not result.series:
         return pd.DataFrame(columns=[xlabel])
 
@@ -541,12 +582,14 @@ def _result_to_frame(result: TimeSeriesResult, xlabel: str, plot_series: list[di
 
 
 def _prepare_result_table(command: str, result, args: argparse.Namespace):
+    """Prepare result table."""
     if isinstance(result, TimeSeriesResult) and result.table is None:
         plot_series, xlabel = _series_with_xaxis(command, result, args)
         result.table = _result_to_frame(result, xlabel, plot_series)
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     if isinstance(result, TimeSeriesResult):
         if not result.series:
             return None
@@ -660,6 +703,25 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def run_main(args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     command, request = _resolve_task_and_request(args)
     task_cls = TASK_REGISTRY[command]
 
@@ -671,5 +733,24 @@ def run_main(args: argparse.Namespace) -> int:
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """Register tasks.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    subparsers : Any
+        Function argument.
+
+    Returns
+    -----
+    None
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     _ = subparsers
     return

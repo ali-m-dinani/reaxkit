@@ -1,4 +1,20 @@
-"""Base interfaces for analysis layer."""
+"""Define base interfaces and presentation defaults for analysis tasks.
+
+This module provides the abstract analysis-task contract and a default
+presentation-spec builder used across analyzer outputs. It is scoped to shared
+analysis-layer infrastructure and does not implement domain-specific analysis.
+
+**Usage context**
+
+- Task foundation: Subclass `AnalysisTask` to implement analyzer execution.
+- Validation wiring: Auto-wrap `run` with shared input validation.
+- UI defaults: Build fallback table/plot presentation specs from payloads.
+
+Notes
+-----
+- `AnalysisTask.__init_subclass__` injects validation into subclass `run`
+  implementations unless already wrapped.
+"""
 
 from __future__ import annotations
 
@@ -137,7 +153,41 @@ def default_recommended_presentations(
     *,
     task_name: str = "",
 ) -> list[PresentationSpec]:
-    """Build default typed presentation specs for an analysis payload."""
+    """Build default presentation specs for serialized analysis payload tables.
+
+    Infers candidate x/y/group columns from task-specific hints and sample row
+    content, always returning at least a table presentation.
+
+    Works on
+    -----
+    Analyzer task payload dictionaries containing a serialized `table` field
+
+    Parameters
+    -----
+    payload : dict[str, Any]
+        Serialized analysis payload, usually produced from a `BaseResult`.
+    task_name : str, optional
+        Registered task name used to apply task-specific plot-column hints.
+
+    Returns
+    -----
+    list[PresentationSpec]
+        Ordered presentation specs containing a table view and, when possible,
+        a single-plot view inferred from available columns.
+
+    Examples
+    -----
+    ```python
+    from reaxkit.analysis.base import default_recommended_presentations
+
+    payload = {"table": [{"iter": 0, "atom_id": 1, "msd": 0.0}]}
+    views = default_recommended_presentations(payload, task_name="get_msd")
+    ```
+    Sample output:
+    `[PresentationSpec(renderer='table', ...), PresentationSpec(renderer='single_plot', ...)]`
+    Meaning:
+    The payload supports both tabular and inferred 2D-plot representations.
+    """
     table_rows = payload.get("table")
     if not isinstance(table_rows, list) or not table_rows:
         return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -177,7 +227,11 @@ def default_recommended_presentations(
 
 
 class AnalysisTask(ABC):
-    """Abstract analysis task with declarative data requirement."""
+    """Abstract base class for all analysis tasks.
+
+    Defines the `run` execution contract, required-data resolution, and default
+    presentation recommendation behavior for analyzer tasks.
+    """
 
     required_data = None
 
@@ -199,19 +253,113 @@ class AnalysisTask(ABC):
 
     @abstractmethod
     def run(self, data, request, reporter=None):
-        """Run scientific analysis on normalized domain data."""
+        """Run analyzer logic on normalized domain data and request configuration.
+
+        Subclasses must implement this method and return a task-specific result
+        object derived from `BaseResult`.
+
+        Works on
+        -----
+        Analyzer task domain data objects and their corresponding request objects
+
+        Parameters
+        -----
+        data : Any
+            Domain data object required by the concrete task implementation.
+        request : Any
+            Request/configuration object controlling analysis behavior.
+        reporter : Any, optional
+            Optional progress callback accepted by task implementations.
+
+        Returns
+        -----
+        Any
+            Task-specific analysis result object (typically a `BaseResult`
+            subclass).
+
+        Examples
+        -----
+        ```python
+        class MyTask(AnalysisTask):
+            required_data = MyData
+            def run(self, data, request, reporter=None):
+                return MyResult(...)
+        ```
+        Sample output:
+        `MyResult(...)`
+        Meaning:
+        A concrete analyzer returns a structured result payload for downstream
+        serialization and presentation.
+        """
 
     def required_data_for(self, request: object, args: dict | None = None):
-        """Resolve required input dataclass for this run.
+        """Resolve the required input data type for a specific run request.
 
-        Default behavior keeps existing static ``required_data`` semantics.
+        Default behavior preserves static `required_data` semantics. Subclasses
+        can override this to select data requirements dynamically.
+
+        Works on
+        -----
+        Analyzer task request objects and optional invocation argument maps
+
+        Parameters
+        -----
+        request : object
+            Request object used to determine data requirements.
+        args : dict | None, optional
+            Optional invocation arguments that may influence type resolution.
+
+        Returns
+        -----
+        Any
+            Required input type (or tuple of types) expected by the task.
+
+        Examples
+        -----
+        ```python
+        required = task.required_data_for(request)
+        ```
+        Sample output:
+        `<class 'reaxkit.domain.data_models.TrajectoryData'>`
+        Meaning:
+        The task expects trajectory-domain input for the given request.
         """
         _ = (request, args)
         return self.required_data
 
     @classmethod
     def recommended_presentations(cls, _result: object, payload: dict[str, Any]) -> list[PresentationSpec]:
-        """Default typed presentation specs for analysis results."""
+        """Return default presentation recommendations for a task result payload.
+
+        Delegates to the shared fallback presenter using the registered task
+        name hint when available.
+
+        Works on
+        -----
+        Analyzer result objects and serialized analyzer payload dictionaries
+
+        Parameters
+        -----
+        _result : object
+            Result object instance; accepted for API consistency.
+        payload : dict[str, Any]
+            Serialized payload, typically containing a `table` list.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs suitable for rendering the task output.
+
+        Examples
+        -----
+        ```python
+        views = MyTask.recommended_presentations(result, {"table": [{"x": 1, "y": 2}]})
+        ```
+        Sample output:
+        `[PresentationSpec(...)]`
+        Meaning:
+        The task exposes renderer-ready view metadata for the provided payload.
+        """
         return default_recommended_presentations(
             payload,
             task_name=str(getattr(cls, "_reaxkit_task_name", "")).strip().lower(),

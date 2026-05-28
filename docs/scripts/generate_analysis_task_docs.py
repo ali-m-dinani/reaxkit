@@ -1,0 +1,464 @@
+"""Generate structured analysis task docs (AST-based) for selected modules."""
+
+from __future__ import annotations
+
+import argparse
+import ast
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+import re
+
+
+@dataclass(frozen=True)
+class AnalysisDocTarget:
+    analysis_file: Path
+    module_import: str
+    output_md: Path
+    title: str
+
+
+@dataclass
+class FieldRow:
+    name: str
+    type_text: str
+    default: str
+    help_text: str
+    choices: str
+
+
+def _find_repo_root(start: Path) -> Path:
+    for candidate in [start, *start.parents]:
+        if (candidate / "src" / "reaxkit").exists():
+            return candidate
+    raise RuntimeError("Could not locate repository root containing src/reaxkit.")
+
+
+def _literal(node: ast.AST) -> Any | None:
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        return None
+
+
+def _as_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(str(v) for v in value)
+    return repr(value)
+
+
+def _doc_sections(doc: str) -> tuple[str, dict[str, str]]:
+    lines = doc.splitlines()
+    summary_lines: list[str] = []
+    sections: dict[str, list[str]] = {}
+
+    i = 0
+    current_section: str | None = None
+    saw_section = False
+    while i < len(lines):
+        line = lines[i]
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if line.strip() and nxt.strip().startswith("-----"):
+            current_section = line.strip()
+            sections[current_section] = []
+            saw_section = True
+            i += 2
+            continue
+        if not saw_section:
+            summary_lines.append(line)
+        else:
+            if current_section is not None:
+                sections[current_section].append(line)
+        i += 1
+
+    cleaned = {k: "\n".join(v).strip() for k, v in sections.items()}
+    return "\n".join(summary_lines).strip(), cleaned
+
+
+def _class_fields(cls: ast.ClassDef) -> list[FieldRow]:
+    rows: list[FieldRow] = []
+    for node in cls.body:
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if not isinstance(node.target, ast.Name):
+            continue
+        name = node.target.id
+        type_text = ast.unparse(node.annotation) if node.annotation is not None else ""
+        default_text = ""
+        help_text = ""
+        choices_text = ""
+
+        if node.value is not None:
+            if isinstance(node.value, ast.Call):
+                # dataclasses field(...) alias path
+                for kw in node.value.keywords:
+                    if kw.arg == "default":
+                        default_text = _as_text(_literal(kw.value))
+                    elif kw.arg == "default_factory":
+                        default_text = f"default_factory={ast.unparse(kw.value)}"
+                    elif kw.arg == "metadata":
+                        metadata = _literal(kw.value)
+                        if isinstance(metadata, dict):
+                            help_text = str(metadata.get("help", "")) if metadata.get("help", "") is not None else ""
+                            choices_text = _as_text(metadata.get("choices", ""))
+            else:
+                default_text = _as_text(_literal(node.value))
+
+        rows.append(
+            FieldRow(
+                name=name,
+                type_text=type_text,
+                default=default_text,
+                help_text=help_text,
+                choices=choices_text,
+            )
+        )
+    return rows
+
+
+def _escape_cell(text: str) -> str:
+    return text.replace("|", "\\|")
+
+
+def _render_field_table(rows: list[FieldRow]) -> list[str]:
+    out = [
+        "| Field | Type | Default | Help | Choices |",
+        "|---|---|---|---|---|",
+    ]
+    for r in rows:
+        out.append(
+            f"| `{_escape_cell(r.name)}` | `{_escape_cell(r.type_text)}` | "
+            f"{_escape_cell(r.default)} | {_escape_cell(r.help_text)} | {_escape_cell(r.choices)} |"
+        )
+    return out
+
+
+def _find_task_class(classes: list[ast.ClassDef]) -> ast.ClassDef | None:
+    for cls in classes:
+        for dec in cls.decorator_list:
+            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == "register_task":
+                return cls
+    for cls in classes:
+        for base in cls.bases:
+            if isinstance(base, ast.Name) and base.id == "AnalysisTask":
+                return cls
+    return None
+
+
+def _format_method_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    params: list[str] = []
+    a = fn.args
+
+    def _fmt_arg(arg: ast.arg, default_node: ast.AST | None = None) -> str:
+        if arg.annotation is not None:
+            base = f"{arg.arg}: {ast.unparse(arg.annotation)}"
+        else:
+            base = arg.arg
+        if default_node is not None:
+            base = f"{base}={ast.unparse(default_node)}"
+        return base
+
+    ordered = list(a.posonlyargs) + list(a.args)
+    defaults = list(a.defaults)
+    defaults_start = len(ordered) - len(defaults)
+    for idx, arg in enumerate(ordered):
+        if idx == 0 and arg.arg in {"self", "cls"}:
+            continue
+        default_node = defaults[idx - defaults_start] if idx >= defaults_start and defaults else None
+        params.append(_fmt_arg(arg, default_node))
+
+    if a.vararg is not None:
+        params.append("*" + _fmt_arg(a.vararg))
+    elif a.kwonlyargs:
+        params.append("*")
+
+    for kwarg, default_node in zip(a.kwonlyargs, a.kw_defaults):
+        params.append(_fmt_arg(kwarg, default_node))
+
+    if a.kwarg is not None:
+        params.append("**" + _fmt_arg(a.kwarg))
+
+    return f"{fn.name}({', '.join(params)})"
+
+
+def _method_doc_body(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    return ast.get_docstring(fn) or ""
+
+
+def _method_sections(doc: str) -> tuple[str, list[tuple[str, str]]]:
+    """Split method docstring into intro + ordered setext sections."""
+    lines = doc.splitlines()
+    intro: list[str] = []
+    sections: list[tuple[str, str]] = []
+    i = 0
+    current_title: str | None = None
+    current_lines: list[str] = []
+    saw_section = False
+    while i < len(lines):
+        line = lines[i]
+        nxt = lines[i + 1] if i + 1 < len(lines) else ""
+        if line.strip() and nxt.strip() and set(nxt.strip()) == {"-"} and len(nxt.strip()) >= 3:
+            if current_title is not None:
+                sections.append((current_title, "\n".join(current_lines).strip()))
+                current_lines = []
+            current_title = line.strip()
+            saw_section = True
+            i += 2
+            continue
+        if saw_section and current_title is not None:
+            current_lines.append(line)
+        else:
+            intro.append(line)
+        i += 1
+
+    if current_title is not None:
+        sections.append((current_title, "\n".join(current_lines).strip()))
+
+    return "\n".join(intro).strip(), sections
+
+
+def _parse_param_like_rows(body: str) -> list[tuple[str, str, str]]:
+    """Parse numpydoc-style `name : type` blocks into rows."""
+    lines = body.splitlines()
+    rows: list[tuple[str, str, str]] = []
+    i = 0
+    pat = re.compile(r"^\s*([^\n:][^:]*)\s*:\s*(.+?)\s*$")
+    while i < len(lines):
+        raw = lines[i]
+        m = pat.match(raw)
+        if not m:
+            i += 1
+            continue
+        name = m.group(1).strip()
+        type_text = m.group(2).strip()
+        desc_lines: list[str] = []
+        i += 1
+        while i < len(lines):
+            nxt = lines[i]
+            if pat.match(nxt):
+                break
+            if nxt.strip():
+                desc_lines.append(nxt.strip())
+            i += 1
+        rows.append((name, type_text, " ".join(desc_lines).strip()))
+    return rows
+
+
+def _parse_returns_rows(body: str) -> list[tuple[str, str]]:
+    """Parse returns section into (type, description) rows."""
+    param_like = _parse_param_like_rows(body)
+    if param_like:
+        return [(f"{name} : {typ}", desc) for name, typ, desc in param_like]
+
+    lines = [ln.rstrip() for ln in body.splitlines()]
+    blocks: list[list[str]] = []
+    cur: list[str] = []
+    for ln in lines:
+        if not ln.strip():
+            if cur:
+                blocks.append(cur)
+                cur = []
+            continue
+        cur.append(ln)
+    if cur:
+        blocks.append(cur)
+
+    out: list[tuple[str, str]] = []
+    for block in blocks:
+        typ = block[0].strip()
+        desc = " ".join(ln.strip() for ln in block[1:]).strip()
+        out.append((typ, desc))
+    return out
+
+
+def _render_method_section(title: str, body: str) -> list[str]:
+    lines: list[str] = [f"#### {title}", ""]
+    normalized = title.strip().lower()
+
+    if normalized == "parameters":
+        rows = _parse_param_like_rows(body)
+        if rows:
+            lines.append("| Name | Type | Description |")
+            lines.append("|---|---|---|")
+            for name, typ, desc in rows:
+                lines.append(
+                    f"| `{name.replace('|', '\\|')}` | `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |"
+                )
+            lines.append("")
+            return lines
+
+    if normalized == "returns":
+        rows = _parse_returns_rows(body)
+        if rows:
+            lines.append("| Type | Description |")
+            lines.append("|---|---|")
+            for typ, desc in rows:
+                lines.append(f"| `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |")
+            lines.append("")
+            return lines
+
+    if normalized == "examples":
+        lines.append("```text")
+        lines.append(body.rstrip())
+        lines.append("```")
+        lines.append("")
+        return lines
+
+    # For Notes / Works on / fallback sections:
+    if body.strip():
+        lines.append(body.strip())
+        lines.append("")
+    else:
+        lines.append("_No details provided._")
+        lines.append("")
+    return lines
+
+
+def _write_page(target: AnalysisDocTarget) -> Path:
+    source = target.analysis_file.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    classes = [n for n in tree.body if isinstance(n, ast.ClassDef)]
+
+    request_cls = next((c for c in classes if c.name.endswith("Request")), None)
+    result_cls = next((c for c in classes if c.name.endswith("Result")), None)
+    task_cls = _find_task_class(classes)
+
+    lines: list[str] = []
+    lines.append("<!-- AUTO-GENERATED by docs/scripts/generate_analysis_task_docs.py -->")
+    lines.append(f"# {target.title}")
+    lines.append("")
+    lines.append(f"::: {target.module_import}")
+    lines.append("    options:")
+    lines.append("      show_root_heading: false")
+    lines.append("      show_root_full_path: false")
+    lines.append("      members: []")
+    lines.append("")
+
+    if request_cls is not None:
+        lines.append(f"## Request: `{request_cls.name}`")
+        lines.append("")
+        lines.append('<div class="analysis-section-indent" markdown="1">')
+        lines.append("")
+        req_doc = ast.get_docstring(request_cls) or ""
+        req_summary, req_sections = _doc_sections(req_doc)
+        if req_summary:
+            lines.append(req_summary)
+            lines.append("")
+        lines.append("### Fields")
+        lines.append("")
+        lines.extend(_render_field_table(_class_fields(request_cls)))
+        lines.append("")
+        for section_name in ("Notes", "Examples"):
+            body = req_sections.get(section_name, "")
+            if body:
+                lines.append(f"### {section_name}")
+                lines.append("")
+                lines.append(body)
+                lines.append("")
+        lines.append("</div>")
+        lines.append("")
+
+    if task_cls is not None:
+        lines.append(f"## Task: `{task_cls.name}`")
+        lines.append("")
+        lines.append('<div class="analysis-section-indent" markdown="1">')
+        lines.append("")
+        task_doc = ast.get_docstring(task_cls) or ""
+        if task_doc:
+            lines.append(task_doc.strip())
+            lines.append("")
+
+        methods = [n for n in task_cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+        wanted = [m for m in methods if m.name in {"recommended_presentations", "run"}]
+        for method in wanted:
+            lines.append(f"### Method: `{_format_method_signature(method)}`")
+            lines.append("")
+            doc_body = _method_doc_body(method).strip()
+            if doc_body:
+                intro, sections = _method_sections(doc_body)
+                if intro:
+                    lines.append(intro)
+                    lines.append("")
+                for sec_title, sec_body in sections:
+                    lines.extend(_render_method_section(sec_title, sec_body))
+            else:
+                lines.append("_No docstring available._")
+            lines.append("")
+        lines.append("</div>")
+        lines.append("")
+
+    if result_cls is not None:
+        lines.append(f"## Result: `{result_cls.name}`")
+        lines.append("")
+        lines.append('<div class="analysis-section-indent" markdown="1">')
+        lines.append("")
+        res_doc = ast.get_docstring(result_cls) or ""
+        res_summary, res_sections = _doc_sections(res_doc)
+        if res_summary:
+            lines.append(res_summary)
+            lines.append("")
+        lines.append("### Fields")
+        lines.append("")
+        lines.extend(_render_field_table(_class_fields(result_cls)))
+        lines.append("")
+        for section_name in ("Notes", "Examples", "References"):
+            body = res_sections.get(section_name, "")
+            if body:
+                lines.append(f"### {section_name}")
+                lines.append("")
+                lines.append(body)
+                lines.append("")
+        lines.append("</div>")
+        lines.append("")
+
+    target.output_md.parent.mkdir(parents=True, exist_ok=True)
+    target.output_md.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return target.output_md
+
+
+def _default_targets(repo_root: Path) -> list[AnalysisDocTarget]:
+    return [
+        AnalysisDocTarget(
+            analysis_file=repo_root / "src" / "reaxkit" / "analysis" / "trajectory" / "msd.py",
+            module_import="reaxkit.analysis.trajectory.msd",
+            output_md=repo_root / "docs" / "api" / "analysis" / "alaki_analysis.md",
+            title="MSD Analysis",
+        )
+    ]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Generate structured analysis task markdown docs from source.")
+    parser.add_argument("--analysis-file", default=None, help="Path to analysis module .py file.")
+    parser.add_argument("--module-import", default=None, help="Python import path for mkdocstrings module directive.")
+    parser.add_argument("--output-md", default=None, help="Output markdown file path.")
+    parser.add_argument("--title", default=None, help="Page title, e.g., 'MSD Analysis'.")
+    args = parser.parse_args()
+
+    repo_root = _find_repo_root(Path(__file__).resolve())
+    if args.analysis_file or args.module_import or args.output_md or args.title:
+        if not (args.analysis_file and args.module_import and args.output_md and args.title):
+            raise SystemExit("If any custom arg is used, provide all: --analysis-file --module-import --output-md --title")
+        targets = [
+            AnalysisDocTarget(
+                analysis_file=Path(args.analysis_file).resolve(),
+                module_import=str(args.module_import),
+                output_md=Path(args.output_md).resolve(),
+                title=str(args.title),
+            )
+        ]
+    else:
+        targets = _default_targets(repo_root)
+
+    for target in targets:
+        out = _write_page(target)
+        print(f"[generated] {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

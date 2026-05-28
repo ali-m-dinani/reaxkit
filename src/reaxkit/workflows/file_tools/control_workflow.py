@@ -1,4 +1,13 @@
-"""Task-oriented workflow for control-file analyses and utilities."""
+"""Task-oriented workflow for control-file analyses and utilities.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -46,6 +55,29 @@ class _LoadControlParametersTask(AnalysisTask):
         request: _LoadControlParametersRequest,
         reporter=None,
     ) -> ControlParametersData:
+        """Run.
+
+        Execute the workflow function for this command path and return the
+        computed result for downstream CLI handling.
+
+        Parameters
+        -----
+        data : Any
+            Function argument.
+        request : Any
+            Function argument.
+        reporter : Any
+            Function argument.
+
+        Returns
+        -----
+        ControlParametersData
+            Function return value.
+
+        Examples
+        -----
+        >>> # See workflow CLI usage for concrete examples.
+        """
         _ = (request, reporter)
         return data
 
@@ -69,6 +101,7 @@ def _format_value(value):
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument(
         "--engine",
         choices=["reaxff", "ams", "lammps"],
@@ -104,6 +137,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_get_request(args: argparse.Namespace) -> ControlParametersTaskRequest:
+    """Build get request."""
     return ControlParametersTaskRequest(
         key=args.key,
         section=args.section,
@@ -116,6 +150,27 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     if command == MAKE_CONTROL_COMMAND:
         parser.set_defaults(command=MAKE_CONTROL_COMMAND)
         parser.set_defaults(progress=True)
@@ -264,6 +319,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _run_get(args: argparse.Namespace) -> int:
+    """Run get."""
     executor = AnalysisExecutor()
     task_cls = TASK_REGISTRY["get_control_data"]
     request = REQUEST_BUILDERS["get-control_data"](args)
@@ -282,6 +338,7 @@ def _run_get(args: argparse.Namespace) -> int:
 
 
 def _run_make(args: argparse.Namespace) -> int:
+    """Run make."""
     output, layout = prepare_generator_output(
         args,
         command=MAKE_CONTROL_COMMAND,
@@ -311,6 +368,7 @@ def _run_make(args: argparse.Namespace) -> int:
 
 
 def _run_write(args: argparse.Namespace) -> int:
+    """Run write."""
     output, layout = prepare_generator_output(
         args,
         command=WRITE_CONTROL_COMMAND,
@@ -354,6 +412,27 @@ def _run_write(args: argparse.Namespace) -> int:
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     if command == MAKE_CONTROL_COMMAND:
         return _run_make(args)
     if command == WRITE_CONTROL_COMMAND:
@@ -368,13 +447,34 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
 
 def _legacy_command_runner(command: str):
+    """Legacy command runner."""
     def _runner(args: argparse.Namespace) -> int:
+        """Runner."""
         return run_main(command, args)
 
     return _runner
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
+    """Register tasks.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    subparsers : Any
+        Function argument.
+
+    Returns
+    -----
+    None
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     for command in ALL_COMMANDS:
         parser = subparsers.add_parser(command, formatter_class=argparse.RawTextHelpFormatter)
         build_parser(parser, command=command)

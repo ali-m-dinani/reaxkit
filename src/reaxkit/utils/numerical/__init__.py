@@ -1,8 +1,14 @@
-"""
-Numerical utility helpers.
+"""Expose reusable numerical utility operations for ReaxKit.
 
 This package provides reusable numerical operations such as filtering, moving
-averages, extrema detection, and signal processing primitives.
+averages, extrema detection, and signal processing primitives. It serves as a
+convenience import surface for common numerical utilities used in workflows.
+
+**Usage context**
+
+- Package imports: Access commonly used numerical helpers from one namespace.
+- Analysis workflows: Reuse shared signal and spectrum computation primitives.
+- Utility composition: Build higher-level analysis steps from stable helpers.
 """
 
 from reaxkit.utils.numerical.fft import (

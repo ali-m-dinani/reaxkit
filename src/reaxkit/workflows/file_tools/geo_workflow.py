@@ -1,4 +1,13 @@
-"""Direct command workflows for GEO and structure file utilities."""
+"""Direct command workflows for GEO and structure file utilities.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -60,6 +69,7 @@ COMMAND_ALIASES = {
 
 
 def _parse_csv_floats(value: str, expected: int, name: str) -> list[float]:
+    """Parse csv floats."""
     parts = [v.strip() for v in value.split(",") if v.strip()]
     if len(parts) != expected:
         raise argparse.ArgumentTypeError(
@@ -72,6 +82,7 @@ def _parse_csv_floats(value: str, expected: int, name: str) -> list[float]:
 
 
 def _parse_csv_ints(value: str, expected: int, name: str) -> list[int]:
+    """Parse csv ints."""
     parts = [v.strip() for v in value.split(",") if v.strip()]
     if len(parts) != expected:
         raise argparse.ArgumentTypeError(
@@ -84,6 +95,7 @@ def _parse_csv_ints(value: str, expected: int, name: str) -> list[int]:
 
 
 def _parse_each_range_rule(value: str) -> tuple[int, int, float]:
+    """Parse each range rule."""
     parts = [v.strip() for v in value.split(":")]
     if len(parts) != 3:
         raise argparse.ArgumentTypeError(
@@ -99,6 +111,7 @@ def _parse_each_range_rule(value: str) -> tuple[int, int, float]:
 
 
 def _parse_each_type_rule(value: str) -> tuple[str, float]:
+    """Parse each type rule."""
     parts = [v.strip() for v in value.split(":")]
     if len(parts) != 2:
         raise argparse.ArgumentTypeError(
@@ -115,6 +128,7 @@ def _parse_each_type_rule(value: str) -> tuple[str, float]:
 
 
 def _run_xtob(args: argparse.Namespace) -> int:
+    """Run xtob."""
     xyz_path = Path(args.file)
     if not xyz_path.is_file():
         raise FileNotFoundError(f"Input XYZ file not found: {xyz_path}")
@@ -132,6 +146,7 @@ def _run_xtob(args: argparse.Namespace) -> int:
 
 
 def _run_make_geo(args: argparse.Namespace) -> int:
+    """Run make geo."""
     in_path = Path(args.file)
     if not in_path.is_file():
         raise FileNotFoundError(f"Input structure file not found: {in_path}")
@@ -155,6 +170,7 @@ def _run_make_geo(args: argparse.Namespace) -> int:
 
 
 def _run_sort_geo(args: argparse.Namespace) -> int:
+    """Run sort geo."""
     out_path = sort_geo(
         input_geo=args.file,
         output_geo=args.output,
@@ -170,6 +186,7 @@ def _run_sort_geo(args: argparse.Namespace) -> int:
 
 
 def _run_orthogonalize_geo(args: argparse.Namespace) -> int:
+    """Run orthogonalize geo."""
     in_path = Path(args.file)
     out_path = Path(args.output)
     if not in_path.is_file():
@@ -183,6 +200,7 @@ def _run_orthogonalize_geo(args: argparse.Namespace) -> int:
 
 
 def _run_place_geo(args: argparse.Namespace) -> int:
+    """Run place geo."""
     insert_path = Path(args.insert)
     if not insert_path.is_file():
         raise FileNotFoundError(f"Insert molecule not found: {insert_path}")
@@ -235,6 +253,7 @@ def _run_place_geo(args: argparse.Namespace) -> int:
 
 
 def _run_add_geo_restraint(args: argparse.Namespace) -> int:
+    """Run add geo restraint."""
     in_path = Path(args.file)
     if not in_path.is_file():
         raise FileNotFoundError(f"Input GEO file not found: {in_path}")
@@ -256,6 +275,7 @@ def _run_add_geo_restraint(args: argparse.Namespace) -> int:
 
 
 def _run_add_geo_molcharge(args: argparse.Namespace) -> int:
+    """Run add geo molcharge."""
     in_path = Path(args.file)
     if not in_path.is_file():
         raise FileNotFoundError(f"Input GEO file not found: {in_path}")
@@ -287,6 +307,27 @@ RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -422,6 +463,27 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     output_value = getattr(args, "output", None)
     if canonical == "add_restraints_to_geo" and not output_value:

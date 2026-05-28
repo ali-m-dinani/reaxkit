@@ -1,4 +1,13 @@
-"""Direct command workflows for trainset export and generation utilities."""
+"""Direct command workflows for trainset export and generation utilities.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -52,6 +61,27 @@ WORKFLOW_TASK_NAME_MAP: dict[str, str] = {
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     if command == "get_trainset_data":
@@ -289,6 +319,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 
 def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) -> int:
+    """Run make trainset settings."""
     out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     gen_template_yaml_for_elastic_settings(out_path=str(out))
     persist_generator_metadata(
@@ -307,6 +338,7 @@ def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) 
 
 
 def _run_make_trainset_settings_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
+    """Run make trainset settings heatfo."""
     out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     gen_template_yaml_for_heatfo_settings(out_path=str(out))
     persist_generator_metadata(
@@ -325,6 +357,7 @@ def _run_make_trainset_settings_heatfo(args: argparse.Namespace, *, command_name
 
 
 def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -> int:
+    """Run make trainset elastic."""
     out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -364,6 +397,7 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
 
 
 def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
+    """Run make trainset heatfo."""
     out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -409,14 +443,17 @@ def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) ->
 
 
 def _task_name_for_command(command: str) -> str:
+    """Task name for command."""
     return WORKFLOW_TASK_NAME_MAP.get(command, command)
 
 
 def _build_get_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
+    """Build get trainset data request."""
     return GetTrainsetDataRequest(section=str(getattr(args, "section", "all")))
 
 
 def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:
+    """Build trainset group comments request."""
     return TrainsetGroupCommentsRequest(section=str(getattr(args, "section", "all")))
 
 
@@ -427,6 +464,7 @@ REQUEST_BUILDERS = {
 
 
 def _run_trainset_analysis_main(command: str, args: argparse.Namespace) -> int:
+    """Run trainset analysis main."""
     task_cls = TASK_REGISTRY[_task_name_for_command(command)]
     request = REQUEST_BUILDERS[command](args)
     executor = AnalysisExecutor()
@@ -436,6 +474,27 @@ def _run_trainset_analysis_main(command: str, args: argparse.Namespace) -> int:
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     if command in TRAINSET_ANALYSIS_COMMANDS:
         return _run_trainset_analysis_main(command, args)
     if command in {"gen_template_yaml_for_elastic_settings", "make-trainset-settings"}:

@@ -1,4 +1,15 @@
-"""Periodic-boundary helpers for trajectory analyses."""
+"""Provide periodic-boundary helpers for trajectory analyzer tasks.
+
+This module implements compact utility functions for building cell matrices and
+performing coordinate unwrapping on selected trajectory subsets. It is scoped
+to PBC-aware coordinate preprocessing and does not execute analyzer tasks.
+
+**Usage context**
+
+- MSD preprocessing: Unwrap selected atom coordinates before displacement math.
+- Trajectory utilities: Reuse consistent cell-matrix construction across tasks.
+- Robust slicing: Apply unwrapping only to selected frames/atoms when possible.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +21,12 @@ from reaxkit.domain.data_models import TrajectoryData
 
 
 def _cell_matrix(lengths: np.ndarray, angles_deg: np.ndarray) -> np.ndarray:
+    """Construct a 3x3 cell matrix from lengths and angles.
+
+    Notes
+    -----
+    Assumes angles are ordered `(alpha, beta, gamma)` in degrees.
+    """
     a, b, c = [float(v) for v in lengths]
     alpha, beta, gamma = np.deg2rad(np.asarray(angles_deg, dtype=float))
 
@@ -32,6 +49,12 @@ def _cell_matrix(lengths: np.ndarray, angles_deg: np.ndarray) -> np.ndarray:
 
 
 def _unwrap_single_atom(coords: np.ndarray, cells: np.ndarray, angles: np.ndarray) -> np.ndarray:
+    """Unwrap one atom trajectory in Cartesian space using per-frame cells.
+
+    Notes
+    -----
+    Uses minimum-image displacement in fractional coordinates between frames.
+    """
     n = coords.shape[0]
     out = np.zeros_like(coords, dtype=float)
     out[0] = coords[0]
@@ -60,7 +83,45 @@ def maybe_unwrap_selected_positions(
     sel_idx: Sequence[int],
     unwrap: bool,
 ) -> np.ndarray:
-    """Return selected coordinates; unwrap across PBC when possible."""
+    """Return selected trajectory coordinates with optional PBC unwrapping.
+
+    Extracts frame/atom subsets from `TrajectoryData.positions` and unwraps each
+    selected atom path when simulation cell metadata is available and valid.
+
+    Parameters
+    -----
+    data : TrajectoryData
+        Trajectory bundle containing positions and optional simulation cell data.
+    frame_idx : Sequence[int]
+        Frame indices to include in output order.
+    sel_idx : Sequence[int]
+        Atom index positions to include from each selected frame.
+    unwrap : bool
+        If `True`, attempt periodic-boundary unwrapping; otherwise return raw
+        sliced coordinates.
+
+    Returns
+    -----
+    np.ndarray
+        Coordinate array of shape `(len(frame_idx), len(sel_idx), 3)`. If
+        unwrapping cannot be applied safely, raw sliced coordinates are returned.
+
+    Examples
+    -----
+    ```python
+    coords = maybe_unwrap_selected_positions(
+        data,
+        frame_idx=[0, 1, 2, 3],
+        sel_idx=[0, 5, 9],
+        unwrap=True,
+    )
+    ```
+    Sample output:
+    `coords.shape == (4, 3, 3)`
+    Meaning:
+    The output contains selected atom coordinates per frame, optionally
+    continuous across periodic boundaries.
+    """
     fi = np.asarray([int(v) for v in frame_idx], dtype=int)
     si = np.asarray([int(v) for v in sel_idx], dtype=int)
     coords = np.asarray(data.positions[fi][:, si, :], dtype=float)
@@ -92,4 +153,3 @@ def maybe_unwrap_selected_positions(
             continue
         out[:, j, :] = _unwrap_single_atom(atom_coords, cell_l, cell_a)
     return out
-

@@ -1,4 +1,15 @@
-"""Engine-agnostic diffusivity analysis task (Einstein relation)."""
+"""Estimate diffusivity from trajectory MSD using Einstein-relation fitting.
+
+This module computes diffusion coefficients by fitting mean-squared
+displacement trends over selected frames and dimensions. It is scoped to
+diffusivity estimation and relies on MSD-derived displacement data.
+
+**Usage context**
+
+- Transport studies: Estimate diffusion constants for selected atom sets.
+- Comparative analysis: Compare diffusivity across atom types or conditions.
+- Kinetic reporting: Export fit-ready diffusivity tables and slopes.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +30,40 @@ from reaxkit.presentation.specs import PresentationSpec
 
 @dataclass
 class DiffusivityRequest(BaseRequest):
-    """Request for diffusivity analysis using Einstein's equation."""
+    """Request payload for diffusivity analysis via Einstein relation.
+
+    Defines atom selection, frame sampling, MSD dimensional setup, and fitting
+    dimensionality used to estimate diffusion coefficients.
+
+    Fields
+    -----
+    atom_ids : Optional[list[int]]
+        Atom IDs to include. When set, takes precedence over `atom_types`.
+    atom_types : Optional[list[str]]
+        Atom types/elements to include when `atom_ids` is not set.
+    dims : Sequence[str]
+        Coordinate axes used in MSD (`x`, `y`, `z`). Default is all three.
+    origin : str | int
+        Reference frame selector for MSD baseline (`"first"` or frame index).
+    frames : Optional[Sequence[int]]
+        Frame indices to evaluate. `None` means all frames.
+    every : int
+        Stride over selected frames. Must be `>= 1`.
+    d : float
+        Dimensionality factor in `MSD = 2*d*D*t`; must be positive.
+    unwrap : bool
+        Whether to unwrap coordinates across periodic boundaries before MSD.
+
+    Examples
+    -----
+    ```python
+    req = DiffusivityRequest(atom_types=["Li"], dims=("x", "y", "z"), d=3.0)
+    ```
+    Sample output:
+    `DiffusivityRequest(...)`
+    Meaning:
+    The request configures per-atom diffusivity estimation for selected atoms.
+    """
 
     atom_ids: Optional[list[int]] = dc_field(
         default=None,
@@ -57,7 +101,31 @@ class DiffusivityRequest(BaseRequest):
 
 @dataclass
 class DiffusivityResult(BaseResult):
-    """Result of diffusivity analysis."""
+    """Result payload for diffusivity estimation.
+
+    Stores fit-derived diffusion metrics per atom together with the request
+    configuration used to produce them.
+
+    Fields
+    -----
+    table : pd.DataFrame
+        Output table containing per-atom fit metadata and diffusivity values.
+        Columns include
+        `["atom_id", "atom_type", "dim", "d", "x_source", "x_start", "x_end", "n_points", "slope_msd_per_x", "intercept", "diffusivity"]`.
+    request : DiffusivityRequest
+        Request object used for this analysis execution.
+
+    Examples
+    -----
+    ```python
+    result = DiffusivityTask().run(data, req)
+    result.table[["atom_id", "diffusivity"]]
+    ```
+    Sample output:
+    DataFrame rows mapping each selected atom to a diffusion coefficient.
+    Meaning:
+    Each row summarizes one linear MSD fit and the resulting `D` estimate.
+    """
 
     table: pd.DataFrame
     request: DiffusivityRequest
@@ -87,6 +155,34 @@ class DiffusivityTask(AnalysisTask):
 
     @staticmethod
     def recommended_presentations(_result: DiffusivityResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+        """Build default table/plot presentations for diffusivity outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : DiffusivityResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended table and grouped atom-diffusivity plot views.
+
+        Examples
+        -----
+        ```python
+        specs = DiffusivityTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list with a table view and a diffusivity-by-atom plot view.
+        Meaning:
+        UIs can render diffusivity results with default mappings.
+        """
         table_rows = payload.get("table")
         if not isinstance(table_rows, list) or not table_rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -102,6 +198,41 @@ class DiffusivityTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: DiffusivityRequest, reporter=None) -> DiffusivityResult:
+        """Estimate per-atom diffusivity from linear MSD trends.
+
+        Computes MSD using `MSDTask`, fits `MSD` versus time/iteration for each
+        atom, and converts slope to diffusivity using `D = slope / (2*d)`.
+
+        Works on
+        -----
+        `TrajectoryData` plus `DiffusivityRequest` analyzer inputs
+
+        Parameters
+        -----
+        data : TrajectoryData
+            Trajectory bundle containing coordinates, atom metadata, and timing
+            axes (simulation time and/or iterations).
+        request : DiffusivityRequest
+            Analysis configuration controlling selection, MSD setup, and `d`.
+        reporter : Any, optional
+            Optional progress callback invoked during atom-wise fitting.
+
+        Returns
+        -----
+        DiffusivityResult
+            Result object containing per-atom fit parameters and diffusivity.
+
+        Examples
+        -----
+        ```python
+        req = DiffusivityRequest(atom_ids=[1, 2], d=3.0)
+        result = DiffusivityTask().run(data, req)
+        ```
+        Sample output:
+        `result.table` with `slope_msd_per_x` and `diffusivity` columns.
+        Meaning:
+        Each row corresponds to one atom's Einstein-relation diffusivity fit.
+        """
         out_cols = [
             "atom_id",
             "atom_type",

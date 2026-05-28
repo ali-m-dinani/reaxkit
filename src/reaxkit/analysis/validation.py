@@ -1,4 +1,20 @@
-"""Shared input validation for analysis tasks."""
+"""Validate analysis-task inputs before task execution.
+
+This module centralizes pre-run validation for analysis tasks, including data
+type checks, request-shape checks, and task-specific argument constraints. It
+is scoped to input validation and raises `AnalysisError` on contract violations;
+it does not execute analysis logic.
+
+**Usage context**
+
+- Task runtime guardrails: Validate `(task, data, request)` before `run`.
+- Error consistency: Emit uniform, task-prefixed validation error messages.
+- Cross-task reuse: Share common validators for trajectory-style selectors.
+
+Notes
+-----
+- Private helper functions in this module use minimal docstrings by convention.
+"""
 
 from __future__ import annotations
 
@@ -251,7 +267,47 @@ def _validate_task_specific(task: Any, data: Any, request: Any) -> None:
 
 
 def validate_task_inputs(task: Any, data: Any, request: Any) -> None:
-    """Validate task data/request before entering task logic."""
+    """Validate task input objects before entering analysis logic.
+
+    Performs required-data type checks, request base-type validation, optional
+    data-model self-validation, and task-specific field constraints.
+
+    Works on
+    -----
+    Analysis task instances plus their input data/request objects
+
+    Parameters
+    -----
+    task : Any
+        Analysis task instance whose class defines validation expectations.
+    data : Any
+        Domain data object supplied to the task's `run` method.
+    request : Any
+        Request object expected to inherit from `BaseRequest`.
+
+    Returns
+    -----
+    None
+        This function returns nothing. It raises `AnalysisError` when
+        validation fails.
+
+    Examples
+    -----
+    ```python
+    from reaxkit.analysis.validation import validate_task_inputs
+    from reaxkit.analysis.trajectory.msd import MSDTask, MSDRequest
+    from reaxkit.domain.data_models import TrajectoryData
+
+    task = MSDTask()
+    data = TrajectoryData(...)  # must satisfy required fields
+    request = MSDRequest(dims=("x", "y", "z"), every=1)
+    validate_task_inputs(task, data, request)
+    ```
+    Sample output:
+    `None` (no exception raised)
+    Meaning:
+    The task inputs satisfy shared and task-specific validation rules.
+    """
     task_name = type(task).__name__
 
     resolver = getattr(task, "required_data_for", None)

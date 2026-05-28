@@ -1,4 +1,16 @@
-"""Force-field training-set analysis tasks."""
+"""Analyze parsed force-field training-set sections as structured task outputs.
+
+This module exposes analyzer tasks for training-set records, including
+section-based extraction and comment grouping for optimization diagnostics.
+It is limited to already-parsed training-set content and does not parse raw
+trainset files directly.
+
+**Usage context**
+
+- Dataset inspection: Extract task-relevant rows from trainset sections.
+- Comment analysis: Group and review training-set annotations.
+- Optimization support: Supply curated trainset tables to report pipelines.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +39,7 @@ _TRAINSET_SECTION_ALIASES = {
 
 
 def _get_trainset_section_tables(data: ForceFieldOptimizationTrainingSetData) -> dict[str, pd.DataFrame]:
+    """Return per-section training-set tables keyed by canonical section names."""
     return {
         "CHARGE": data.charge.copy(),
         "HEATFO": data.heatfo.copy(),
@@ -39,6 +52,7 @@ def _get_trainset_section_tables(data: ForceFieldOptimizationTrainingSetData) ->
 def _get_trainset_group_comments(
     data: ForceFieldOptimizationTrainingSetData,
 ) -> pd.DataFrame:
+    """Collect unique non-empty group comments across trainset sections."""
     tables = _get_trainset_section_tables(data)
     rows: list[dict[str, str]] = []
     for section_name, df in tables.items():
@@ -84,6 +98,7 @@ def _get_trainset_group_comments(
 
 
 def _normalize_trainset_section(section: str) -> str:
+    """Normalize a section alias into a canonical trainset section key."""
     key = str(section).strip().lower().replace("-", "_")
     if key not in _TRAINSET_SECTION_ALIASES:
         raise KeyError(
@@ -97,6 +112,7 @@ def _build_trainset_data_table(
     data: ForceFieldOptimizationTrainingSetData,
     section: str,
 ) -> pd.DataFrame:
+    """Build a trainset table for one section or a concatenated all-section view."""
     tables = _get_trainset_section_tables(data)
     section_key = _normalize_trainset_section(section)
     if section_key == "all":
@@ -118,19 +134,24 @@ def _build_trainset_data_table(
 
 @dataclass
 class GetTrainsetDataRequest(BaseRequest):
-    """Request for trainset row extraction.
+    """Request payload for trainset row extraction.
 
-    Parameters
-    ----------
-    section
-        Trainset section to extract.
+    This request selects a single trainset section or all supported sections
+    from parsed training-set data for tabular output.
 
-        Examples
-        --------
-        - ``"all"``: concatenate all sections into one table and prepend a
-          ``section`` column.
-        - ``"energy"``: return only ENERGY rows.
-        - ``"cell_parameters"``: return only CELL PARAMETERS rows.
+    Fields
+    -----
+    section : str
+        Section selector. Use ``"all"`` to concatenate all sections with a
+        leading ``section`` column, or one of ``"charge"``, ``"heatfo"``,
+        ``"geometry"``, ``"cell_parameters"``, ``"energy"``.
+
+    Examples
+    -----
+    ```python
+    request = GetTrainsetDataRequest(section="energy")
+    ```
+    The request returns only ENERGY-section rows.
     """
 
     section: str = dc_field(
@@ -149,26 +170,37 @@ class GetTrainsetDataRequest(BaseRequest):
 
 @dataclass
 class GetTrainsetDataResult(BaseResult):
-    """Trainset data extraction result.
+    """Result payload for trainset section extraction.
 
-    Output structure
-    ----------------
-    - ``request``: the :class:`GetTrainsetDataRequest` used to generate this result.
-    - ``table``: pandas.DataFrame with trainset rows for the requested section.
+    The analyzer returns trainset rows for the requested scope as a normalized
+    DataFrame suitable for table/plot rendering.
 
-    Returned table behavior
-    -----------------------
-    - If ``request.section == "all"``, the table contains concatenated rows from
-      CHARGE, HEATFO, GEOMETRY, CELL_PARAMETERS, and ENERGY, with a leading
-      ``section`` column (lowercase section name).
-    - For a single section request (for example ``"energy"``), the table
-      contains only that section's native columns (such as ``line_number``,
-      ``weight``, ``lit``, etc.).
+    Fields
+    -----
+    request : GetTrainsetDataRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Extracted trainset rows. For ``section="all"``, includes a leading
+        ``section`` column identifying each source section.
 
-    Example
-    -------
-    A single-row ENERGY output may include:
-    ``section='ENERGY', line_number=142, op1='+', id1='bulk_1', n1=1.0, lit=-15.4``.
+    Notes
+    -----
+    Column schemas vary by section because each trainset block has distinct
+    row fields.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "section": "energy",
+        "line_number": 142,
+        "op1": "+",
+        "id1": "bulk_1",
+        "n1": 1.0,
+        "lit": -15.4,
+    }
+    ```
+    The sample row illustrates one ENERGY entry in an all-sections output.
     """
 
     table: pd.DataFrame
@@ -186,6 +218,36 @@ class GetTrainsetDataTask(AnalysisTask):
         _result: GetTrainsetDataResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Recommend table and fallback plot views for trainset row outputs.
+
+        Always emits a table view and adds a simple plot based on detected
+        numeric columns and standard trainset axis fields.
+
+        Works on
+        Analyzer task output for ``trainset_data``.
+
+        Parameters
+        -----
+        _result : GetTrainsetDataResult
+            Typed analyzer result instance (unused by current logic).
+        payload : dict[str, Any]
+            Serialized payload expected to contain a ``table`` list.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended presentation specs for trainset tables.
+
+        Examples
+        -----
+        ```python
+        specs = GetTrainsetDataTask.recommended_presentations(
+            _result,
+            {"table": [{"section": "energy", "line_number": 142, "lit": -15.4}]},
+        )
+        ```
+        The returned specs include a table and a default numeric plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -224,13 +286,60 @@ class GetTrainsetDataTask(AnalysisTask):
         request: GetTrainsetDataRequest,
         reporter=None,
     ) -> GetTrainsetDataResult:
+        """Run trainset section extraction for the requested scope.
+
+        Resolves the section selector, materializes either one section table or
+        a concatenated all-section table, and returns a typed analyzer result.
+
+        Works on
+        ``ForceFieldOptimizationTrainingSetData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationTrainingSetData
+            Parsed trainset data bundle.
+        request : GetTrainsetDataRequest
+            Request with section selector.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        GetTrainsetDataResult
+            Result containing the extracted trainset table.
+
+        Examples
+        -----
+        ```python
+        result = GetTrainsetDataTask().run(data, GetTrainsetDataRequest(section="all"))
+        ```
+        The returned table contains all supported sections with a ``section`` label.
+        """
         table = _build_trainset_data_table(data, section=request.section)
         return GetTrainsetDataResult(table=table, request=request)
 
 
 @dataclass
 class TrainsetGroupCommentsRequest(BaseRequest):
-    """Request for unique trainset group comments."""
+    """Request payload for unique trainset group-comment extraction.
+
+    This request selects one trainset section or all sections when collecting
+    unique non-empty ``group_comment`` annotations.
+
+    Fields
+    -----
+    section : str
+        Section selector. Use ``"all"`` for every section, or one of
+        ``"charge"``, ``"heatfo"``, ``"geometry"``, ``"cell_parameters"``,
+        ``"energy"`` for section-scoped comment extraction.
+
+    Examples
+    -----
+    ```python
+    request = TrainsetGroupCommentsRequest(section="geometry")
+    ```
+    The request limits comment extraction to GEOMETRY rows.
+    """
 
     section: str = dc_field(
         default="all",
@@ -248,20 +357,30 @@ class TrainsetGroupCommentsRequest(BaseRequest):
 
 @dataclass
 class TrainsetGroupCommentsResult(BaseResult):
-    """Trainset group-comment extraction result.
+    """Result payload containing grouped trainset comments.
 
-    Output structure:
-    - request: TrainsetGroupCommentsRequest used to generate this result.
-    - table: pandas.DataFrame with columns:
-      ['section', 'group_comment', 'line_number', 'count']
-      - section: lower-case training-set section name (for example 'energy', 'charge')
-      - group_comment: unique comment text in that section
-      - line_number: source line number of the first matching entry in the training-set file
-      - count: per-row count placeholder (always 1); useful for counting comments per section in plots
+    The analyzer returns unique per-section comments with earliest line numbers
+    when available, suitable for quality checks and section-level summaries.
 
-    Example:
-    ('energy', 'equation_of_state_reference_set') indicates this comment
-    appeared in the ENERGY section.
+    Fields
+    -----
+    request : TrainsetGroupCommentsRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``section``, ``group_comment``, ``line_number``,
+        and ``count`` (currently set to ``1`` per unique comment row).
+
+    Examples
+    -----
+    ```python
+    row = {
+        "section": "energy",
+        "group_comment": "equation_of_state_reference_set",
+        "line_number": 142,
+        "count": 1,
+    }
+    ```
+    The sample indicates one unique ENERGY comment entry.
     """
 
     table: pd.DataFrame
@@ -278,6 +397,36 @@ class TrainsetGroupCommentsTask(AnalysisTask):
     def recommended_presentations(
         _result: TrainsetGroupCommentsResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and section-count plots for grouped comments output.
+
+        Emits a table view for all outputs and adds a section-count plot when
+        section labels are available in serialized rows.
+
+        Works on
+        Analyzer task output for ``trainset_group_comments``.
+
+        Parameters
+        -----
+        _result : TrainsetGroupCommentsResult
+            Typed analyzer result instance (unused in current selection logic).
+        payload : dict[str, Any]
+            Serialized payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Presentation specs suitable for comments tables and count plots.
+
+        Examples
+        -----
+        ```python
+        specs = TrainsetGroupCommentsTask.recommended_presentations(
+            _result,
+            {"table": [{"section": "energy", "group_comment": "eos", "count": 1}]},
+        )
+        ```
+        The output includes a table and a comment-count-by-section plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -306,6 +455,38 @@ class TrainsetGroupCommentsTask(AnalysisTask):
         request: TrainsetGroupCommentsRequest,
         reporter=None,
     ) -> TrainsetGroupCommentsResult:
+        """Run unique group-comment extraction from parsed trainset data.
+
+        Builds the grouped-comment table across sections, then optionally
+        filters rows to the request-selected section.
+
+        Works on
+        ``ForceFieldOptimizationTrainingSetData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationTrainingSetData
+            Parsed trainset data source.
+        request : TrainsetGroupCommentsRequest
+            Request containing section scope for comment extraction.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        TrainsetGroupCommentsResult
+            Result containing grouped comments and metadata.
+
+        Examples
+        -----
+        ```python
+        result = TrainsetGroupCommentsTask().run(
+            data,
+            TrainsetGroupCommentsRequest(section="all"),
+        )
+        ```
+        The result table contains unique comments from all supported sections.
+        """
         table = _get_trainset_group_comments(data)
         section_key = _normalize_trainset_section(request.section)
         if section_key != "all" and not table.empty and "section" in table.columns:

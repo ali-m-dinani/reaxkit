@@ -1,16 +1,15 @@
-"""
-1D extrema detection utilities.
+"""Identify extrema points in one-dimensional numerical series.
 
 This module provides helper functions for identifying extrema in one-dimensional
 data series commonly produced by ReaxFF simulations, such as energy profiles,
 bond-order trajectories, dipole signals, polarization loops, or field-response
 curves.
 
-Typical use cases include:
+**Usage context**
 
-- locating global or local energy minima and maxima
-- identifying peak responses in field-driven simulations
-- detecting switching or transition points in time-series data
+- Energy profiling: Locate global or local minima and maxima in trajectories.
+- Field-response analysis: Identify peak responses in driven simulations.
+- Transition detection: Capture switching points in time-series signals.
 """
 
 
@@ -19,8 +18,7 @@ import pandas as pd
 
 
 def get_extrema_points(y_series, x_series, mode='max', chunk_size=None):
-    """
-    Identify extrema points in a 1D data series.
+    """Identify extrema points in a 1D data series.
 
     This function extracts global or local extrema by locating maximum and/or
     minimum values of a y-series with respect to a corresponding x-series.
@@ -28,7 +26,7 @@ def get_extrema_points(y_series, x_series, mode='max', chunk_size=None):
     extrema within each segment.
 
     Parameters
-    ----------
+    -----
     y_series : pandas.Series or array-like
         Dependent variable values (e.g., energy, polarization, bond order).
     x_series : pandas.Series or array-like
@@ -43,12 +41,12 @@ def get_extrema_points(y_series, x_series, mode='max', chunk_size=None):
         only global extrema are returned.
 
     Returns
-    -------
+    -----
     list of tuple[float, float]
         List of ``(x, y)`` pairs corresponding to detected extrema points.
 
     Examples
-    --------
+    -----
     >>> get_extrema_points(energy, iters, mode="min")
     >>> get_extrema_points(signal, time, mode="minmax", chunk_size=50)
     """

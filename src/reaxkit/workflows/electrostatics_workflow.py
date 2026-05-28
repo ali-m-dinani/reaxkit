@@ -1,4 +1,13 @@
-"""Command workflow for electrostatics analyses and local visualizations."""
+"""Command workflow for electrostatics analyses and local visualizations.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -39,6 +48,7 @@ ALL_LEGACY_COMMANDS = ("charge-table",)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine override. Example: --engine reaxff, which applies ReaxFF loader/parsing rules.")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for detection. Example: --run-dir runs/job1, which sets the base folder for file lookup.")
     parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout file. Example: --xmolout runs/job1/xmolout, which provides trajectory structure data.")
@@ -47,6 +57,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add scalar presentation arguments."""
     parser.add_argument("--export", default=None, help="Write the analysis table to CSV. Example: --export dipole.csv, which saves computed values for external analysis.")
     parser.add_argument(
         "--plot",
@@ -75,6 +86,7 @@ def _add_scalar_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_table_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add table presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which makes one combined chart.")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the chart interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save charge_series.png, which writes the figure image.")
@@ -84,12 +96,14 @@ def _add_table_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _parse_core_types(spec: str | None) -> tuple[str, ...]:
+    """Parse core types."""
     if not spec:
         return ()
     return tuple(token.strip() for token in spec.split(",") if token.strip())
 
 
 def _parse_bins(spec: str) -> Union[int, tuple[int, int]]:
+    """Parse bins."""
     if "," in spec:
         nx, ny = [int(token.strip()) for token in spec.split(",", maxsplit=1)]
         return (nx, ny)
@@ -97,6 +111,7 @@ def _parse_bins(spec: str) -> Union[int, tuple[int, int]]:
 
 
 def _parse_frame_indices(n_frames: int, spec) -> list[int]:
+    """Parse frame indices."""
     if not spec:
         return list(range(n_frames))
 
@@ -112,10 +127,12 @@ def _parse_frame_indices(n_frames: int, spec) -> list[int]:
 
 
 def _parse_frame_selector(spec) -> list[int] | None:
+    """Parse frame selector."""
     return parse_frame_indices(spec)
 
 
 def _detection_path(args_map: dict) -> str:
+    """Detection path."""
     source_dir = args_map.get("_snapshot_source_dir")
     if source_dir:
         p = Path(str(source_dir))
@@ -129,11 +146,13 @@ def _detection_path(args_map: dict) -> str:
 
 
 def _resolve_adapter(args: argparse.Namespace):
+    """Resolve adapter."""
     args_map = vars(args)
     return resolve_engine(_detection_path(args_map), engine=getattr(args, "engine", None))
 
 
 def _build_dipole_request(args: argparse.Namespace) -> DipoleRequest:
+    """Build dipole request."""
     scope = str(args.scope)
     core_types = _parse_core_types(args.core) if scope == "local" else ()
     if scope == "local" and not core_types:
@@ -147,6 +166,7 @@ def _build_dipole_request(args: argparse.Namespace) -> DipoleRequest:
 
 
 def _build_polarization_request(args: argparse.Namespace) -> PolarizationRequest:
+    """Build polarization request."""
     scope = str(args.scope)
     core_types = _parse_core_types(args.core) if scope == "local" else ()
     if scope == "local" and not core_types:
@@ -161,6 +181,7 @@ def _build_polarization_request(args: argparse.Namespace) -> PolarizationRequest
 
 
 def _build_polarization_field_request(args: argparse.Namespace) -> PolarizationFieldRequest:
+    """Build polarization field request."""
     return PolarizationFieldRequest(
         field_direction="z",
         aggregate=args.aggregate,
@@ -169,6 +190,7 @@ def _build_polarization_field_request(args: argparse.Namespace) -> PolarizationF
 
 
 def _build_charge_table_request(args: argparse.Namespace) -> ChargeTableRequest:
+    """Build charge table request."""
     atom_ids = [int(atom_id) for atom_id in args.atom_ids] if args.atom_ids else None
     atom_types = list(args.atom_types) if args.atom_types else None
     return ChargeTableRequest(
@@ -188,7 +210,9 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 
 def _summary_text(result) -> str:
+    """Summary text."""
     def _fmt(values) -> str:
+        """Fmt."""
         if not values:
             return "None found"
         return ", ".join(f"{value:.6g}" for value in values)
@@ -219,6 +243,7 @@ def _summary_text(result) -> str:
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     if command == "charge_table":
         table = result.table
         if not isinstance(table, pd.DataFrame) or table.empty:
@@ -302,6 +327,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def _default_component_for(command: str) -> str:
+    """Default component for."""
     return "P_z (uC/cm^2)" if command == "polarization" else "mu_z (debye)"
 
 
@@ -310,6 +336,7 @@ def _local_result_with_coords(
     result_table: pd.DataFrame,
     frames_spec: str | None,
 ) -> pd.DataFrame:
+    """Local result with coords."""
     if result_table.empty:
         raise ValueError("No local electrostatics data found for the requested analysis.")
 
@@ -345,6 +372,7 @@ def _local_result_with_coords(
 
 
 def _iter_local_plot_payloads(command: str, table: pd.DataFrame, args: argparse.Namespace) -> list[dict[str, object]]:
+    """Iter local plot payloads."""
     component = args.component or _default_component_for(command)
     col = resolve_alias_from_columns(table.columns, component)
     if col is None:
@@ -413,6 +441,27 @@ def _iter_local_plot_payloads(command: str, table: pd.DataFrame, args: argparse.
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)

@@ -1,4 +1,13 @@
-"""Direct command workflows for ReaxFF ``ffield`` tools and force-field analyses."""
+"""Direct command workflows for ReaxFF ``ffield`` tools and force-field analyses.
+
+This module implements CLI workflow orchestration for its command family, including argument parsing, request construction, execution dispatch, and result presentation handoff.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
+"""
 
 from __future__ import annotations
 
@@ -46,10 +55,12 @@ from reaxkit.presentation.dispatcher import export_result_csv, present_result
 
 
 def _parse_csv_items(value: str) -> list[str]:
+    """Parse csv items."""
     return [token.strip() for token in str(value).replace(";", ",").split(",") if token.strip()]
 
 
 def _write_snapshot_text(path: Path, title: str, labels_by_field: dict[str, list[str]], blocks_by_field: dict[str, list[str]]) -> Path:
+    """Write snapshot text."""
     names = {
         "atom": "Atom",
         "bond": "Bond",
@@ -83,6 +94,7 @@ def _write_snapshot_text(path: Path, title: str, labels_by_field: dict[str, list
 
 
 def _write_snapshot_field_csvs(root: Path, labels_by_field: dict[str, list[str]], blocks_by_field: dict[str, list[str]]) -> list[Path]:
+    """Write snapshot field csvs."""
     files: list[Path] = []
     for field in ("atom", "bond", "off_diagonal", "angle", "torsion", "hbond"):
         out = root / f"{field}_entries.csv"
@@ -101,6 +113,7 @@ def _write_snapshot_field_csvs(root: Path, labels_by_field: dict[str, list[str]]
 
 
 def _write_similarity_summary(path: Path, details: dict[str, object]) -> Path:
+    """Write similarity summary."""
     lines: list[str] = ["Similarity selection", ""]
     lines.append(f"Mode: {details.get('mode', '')}")
     target = details.get("target", {})
@@ -139,6 +152,7 @@ def _write_similarity_summary(path: Path, details: dict[str, object]) -> Path:
 
 
 def _write_similarity_summaries(path: Path, details_by_atom: dict[str, dict[str, object]]) -> Path:
+    """Write similarity summaries."""
     lines: list[str] = ["Similarity selection (merge template fill)", ""]
     if not details_by_atom:
         lines.append("No similarity details available.")
@@ -229,6 +243,7 @@ WORKFLOW_TASK_NAME_MAP = {
 }
 
 def _resolve_workflow_command(command: str) -> str:
+    """Resolve workflow command."""
     canonical = resolve_command_name(
         command,
         task_names=ALL_COMMANDS + ALL_LEGACY_COMMANDS,
@@ -237,10 +252,12 @@ def _resolve_workflow_command(command: str) -> str:
 
 
 def _task_name_for_command(command: str) -> str:
+    """Task name for command."""
     return WORKFLOW_TASK_NAME_MAP.get(command, command)
 
 
 def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser."""
     command = _resolve_workflow_command(command)
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.set_defaults(command=command)
@@ -688,6 +705,7 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
 
 
 def _run_ffield_main(command: str, args: argparse.Namespace) -> int:
+    """Run ffield main."""
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
     fields = _parse_csv_items(args.fields)
 
@@ -966,6 +984,7 @@ _FORCE_FIELD_TERM_SECTIONS = {
 
 
 def _normalize_force_field_format(value: str) -> str:
+    """Normalize force field format."""
     fmt = str(value).strip().lower()
     if fmt == "indices":
         return "raw"
@@ -975,6 +994,7 @@ def _normalize_force_field_format(value: str) -> str:
 
 
 def _split_term_string(term: str) -> list[str]:
+    """Split term string."""
     text = str(term).strip()
     if not text:
         return []
@@ -1002,6 +1022,7 @@ def _split_term_string(term: str) -> list[str]:
 
 
 def _atom_maps_from_data(data: ForceFieldParametersData) -> tuple[dict[int, str], dict[str, int]]:
+    """Atom maps from data."""
     atom_df = data.atom_parameters
     if atom_df.empty or "symbol" not in atom_df.columns:
         raise KeyError("ForceFieldParametersData.atom_parameters must include a non-empty 'symbol' column.")
@@ -1017,6 +1038,7 @@ def _atom_maps_from_data(data: ForceFieldParametersData) -> tuple[dict[int, str]
 
 
 def _make_term_series_indices(df: pd.DataFrame, cols: tuple[str, ...], *, unordered_2body: bool) -> pd.Series:
+    """Make term series indices."""
     if len(cols) == 2 and unordered_2body:
         a = df[cols[0]].astype("Int64")
         b = df[cols[1]].astype("Int64")
@@ -1040,6 +1062,7 @@ def _filter_force_field_table_by_term(
     unordered_2body: bool = True,
     any_order: bool = False,
 ) -> pd.DataFrame:
+    """Filter force field table by term."""
     if section not in _FORCE_FIELD_TERM_SECTIONS:
         raise ValueError(f"--term is only valid for sections: {', '.join(sorted(_FORCE_FIELD_TERM_SECTIONS))}.")
 
@@ -1073,6 +1096,7 @@ def _filter_force_field_table_by_term(
         sub = df.loc[:, list(cols)].astype("Int64")
 
         def _row_matches(row: pd.Series) -> bool:
+            """Row matches."""
             values = [int(value) for value in row.tolist()]
             values.sort()
             return values == wanted_sorted
@@ -1086,6 +1110,7 @@ def _filter_force_field_table_by_term(
 
 
 def _resolve_engine_from_args(normalized: dict, args: argparse.Namespace):
+    """Resolve engine from args."""
     detection_path = (
         normalized.get("_snapshot_source_dir")
         or normalized.get("input")
@@ -1099,12 +1124,14 @@ def _resolve_engine_from_args(normalized: dict, args: argparse.Namespace):
 
 
 def _load_force_field_data(args: argparse.Namespace) -> ForceFieldParametersData:
+    """Load force field data."""
     normalized = normalize_storage_args(vars(args))
     adapter = _resolve_engine_from_args(normalized, args)
     return adapter.load(ForceFieldParametersData, normalized)
 
 
 def _export_force_field_tables(tables: dict[str, pd.DataFrame], outdir: str | Path, *, fmt: str) -> None:
+    """Export force field tables."""
     out_path = Path(outdir)
     out_path.mkdir(parents=True, exist_ok=True)
     suffix = "interpreted" if fmt == "interpreted" else "indices"
@@ -1113,6 +1140,7 @@ def _export_force_field_tables(tables: dict[str, pd.DataFrame], outdir: str | Pa
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add runtime arguments."""
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
@@ -1127,6 +1155,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add presentation arguments."""
     parser.add_argument("--plot", choices=["single", "subplot", "tornado", "beeswarm"], default=None, help="Render a plot")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
@@ -1136,6 +1165,7 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataRequest:
+    """Build force field data request."""
     section = args.field if args.field else None
     fmt = _normalize_force_field_format(args.format)
     return ForceFieldDataRequest(
@@ -1145,24 +1175,29 @@ def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataR
 
 
 def _build_force_field_optimization_request(args: argparse.Namespace) -> ForceFieldOptimizationRequest:
+    """Build force field optimization request."""
     return ForceFieldOptimizationRequest(epochs=args.epochs)
 
 
 def _build_structure_summary_request(args: argparse.Namespace) -> StructureSummaryRequest:
+    """Build structure summary request."""
     return StructureSummaryRequest()
 
 
 def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -> ParameterOptimizationDiagnosticRequest:
+    """Build parameter optimization diagnostic request."""
     return ParameterOptimizationDiagnosticRequest(
         interpret=bool(getattr(args, "interpret", False)),
     )
 
 
 def _build_force_field_optimization_report_request(args: argparse.Namespace) -> ForceFieldOptimizationReportRequest:
+    """Build force field optimization report request."""
     return ForceFieldOptimizationReportRequest()
 
 
 def _build_force_field_optimization_report_eos_request(args: argparse.Namespace) -> ForceFieldOptimizationReportEOSRequest:
+    """Build force field optimization report eos request."""
     return ForceFieldOptimizationReportEOSRequest(
         iden=args.iden,
     )
@@ -1171,6 +1206,7 @@ def _build_force_field_optimization_report_eos_request(args: argparse.Namespace)
 def _build_force_field_optimization_report_bulk_modulus_request(
     args: argparse.Namespace,
 ) -> ForceFieldOptimizationReportBulkModulusRequest:
+    """Build force field optimization report bulk modulus request."""
     return ForceFieldOptimizationReportBulkModulusRequest(
         iden=args.iden,
         shift_min_to_zero=not args.no_shift_min_to_zero,
@@ -1190,6 +1226,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 }
 
 def _prepare_result(command: str, result) -> object:
+    """Prepare result."""
     if command == "get_ffield_data" and getattr(result, "table", None) is None and getattr(result, "tables", None):
         frames = []
         for section, table in result.tables.items():
@@ -1201,6 +1238,7 @@ def _prepare_result(command: str, result) -> object:
 
 
 def _filter_structure_summary_columns(result, requested_col: str) -> None:
+    """Filter structure summary columns."""
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return
@@ -1222,6 +1260,7 @@ def _filter_structure_summary_columns(result, requested_col: str) -> None:
 
 
 def _build_most_sensitive_result(base_result):
+    """Build most sensitive result."""
     table = getattr(base_result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return argparse.Namespace(table=pd.DataFrame(), values={}, metadata={})
@@ -1256,6 +1295,7 @@ def _build_most_sensitive_result(base_result):
 
 
 def _build_tornado_result(base_result, top: int):
+    """Build tornado result."""
     table = getattr(base_result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return argparse.Namespace(table=pd.DataFrame(), values={}, metadata={})
@@ -1283,6 +1323,7 @@ def _build_tornado_result(base_result, top: int):
 
 
 def _prepare_eos_table(result, *, flip_sign: bool) -> None:
+    """Prepare eos table."""
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty or not flip_sign:
         return
@@ -1292,6 +1333,7 @@ def _prepare_eos_table(result, *, flip_sign: bool) -> None:
 
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+    """Plot payload."""
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -1509,6 +1551,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 
 def _run_ffield_data(args: argparse.Namespace) -> int:
+    """Run ffield data."""
     data = _load_force_field_data(args)
     request = REQUEST_BUILDERS["get_ffield_data"](args)
     task = ForceFieldDataTask()
@@ -1554,6 +1597,7 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
 
 
 def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
+    """Run ffield analysis main."""
     canonical = _resolve_workflow_command(command)
     if canonical == "get_ffield_data":
         return _run_ffield_data(args)
@@ -1598,10 +1642,52 @@ def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
+    """Build parser.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    parser : Any
+        Function argument.
+    command : Any
+        Function argument.
+
+    Returns
+    -----
+    argparse.ArgumentParser
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     return _build_parser(parser, command=command)
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    """Run main.
+
+    Execute the workflow function for this command path and return the
+    computed result for downstream CLI handling.
+
+    Parameters
+    -----
+    command : Any
+        Function argument.
+    args : Any
+        Function argument.
+
+    Returns
+    -----
+    int
+        Function return value.
+
+    Examples
+    -----
+    >>> # See workflow CLI usage for concrete examples.
+    """
     canonical = _resolve_workflow_command(command)
     if canonical in FFIELD_ANALYSIS_COMMANDS:
         return _run_ffield_analysis_main(canonical, args)

@@ -1,4 +1,15 @@
-"""Optimization-parameter analysis tasks."""
+"""Analyze optimization-parameter updates in force-field training workflows.
+
+This module extracts and normalizes optimization-parameter change records, with
+section-aware mapping to force-field parameter groups. It is bounded to
+parameter-update analysis and does not execute optimization itself.
+
+**Usage context**
+
+- Parameter change review: Inspect optimization updates by section and key.
+- Cross-check workflows: Compare optimization parameters against base force field.
+- Training diagnostics: Export normalized parameter-update tables for reports.
+"""
 
 from __future__ import annotations
 
@@ -38,7 +49,10 @@ _SECTION_INDEX_COLS: Dict[str, List[str]] = {
     "torsion": ["i", "j", "k", "l"],
     "hbond": ["i", "j", "k"],
 }
+
+
 def _params_frame(data: ForceFieldOptimizationParameterData) -> pd.DataFrame:
+    """Build the base optimization-parameter table from parsed params fields."""
     n_rows = len(data.ff_section)
     return pd.DataFrame(
         {
@@ -54,6 +68,7 @@ def _params_frame(data: ForceFieldOptimizationParameterData) -> pd.DataFrame:
 
 
 def _param_columns_for_section(sec_df: pd.DataFrame, section_key: str) -> List[str]:
+    """Return non-index parameter columns for a force-field section table."""
     idx_cols = set(_SECTION_INDEX_COLS.get(section_key, []))
     return [c for c in sec_df.columns if c not in idx_cols]
 
@@ -63,6 +78,7 @@ def _get_params_data(
     *,
     drop_duplicate: bool = True,
 ) -> pd.DataFrame:
+    """Return raw params rows with optional duplicate suppression."""
     df = _params_frame(data)
     if drop_duplicate:
         df = df.drop_duplicates(
@@ -78,6 +94,7 @@ def _interpret_params(
     *,
     drop_duplicate: bool = True,
 ) -> pd.DataFrame:
+    """Resolve params pointers to named force-field components and values."""
     params_df = _get_params_data(
         data,
         drop_duplicate=drop_duplicate,
@@ -140,6 +157,7 @@ def _interpret_params(
 
 
 def _with_component_column(table: pd.DataFrame) -> pd.DataFrame:
+    """Ensure the output table contains a leading ``component`` label column."""
     out = table.copy()
     if "component" in out.columns:
         return out
@@ -155,7 +173,30 @@ def _with_component_column(table: pd.DataFrame) -> pd.DataFrame:
 
 @dataclass
 class ForceFieldOptimizationParameterRequest(BaseRequest):
-    """Request for raw or interpreted params data."""
+    """Request payload for optimization-parameter extraction and interpretation.
+
+    This request controls duplicate handling and whether params pointer tuples
+    are interpreted into concrete force-field section/component/value metadata.
+
+    Fields
+    -----
+    drop_duplicate : bool
+        If ``True``, deduplicate by ``(ff_section, ff_section_line,
+        ff_parameter)`` keeping the first row.
+    interpret : bool
+        If ``True``, resolve params pointers against force-field parameter
+        tables and include interpreted component/value fields.
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldOptimizationParameterRequest(
+        drop_duplicate=True,
+        interpret=True,
+    )
+    ```
+    The request returns deduplicated rows with interpreted component mappings.
+    """
     drop_duplicate: bool = dc_field(
         default=True,
         metadata={
@@ -176,17 +217,36 @@ class ForceFieldOptimizationParameterRequest(BaseRequest):
 
 @dataclass
 class ForceFieldOptimizationParameterResult(BaseResult):
-    """Optimization-parameter extraction result.
+    """Result payload for optimization-parameter extraction.
 
-    Output structure:
-    - request: ForceFieldOptimizationParameterRequest used to generate this result
-    - table: pandas.DataFrame with a guaranteed 'component' column plus params columns
-      - component: parameter component label
-        - interpreted mode: resolved ffield parameter name
-        - raw mode: synthetic label from ff_parameter (for example p1, p2)
-      - additional columns include params fields such as ff_section, ff_section_line,
-        ff_parameter, search_interval, min_value, max_value, inline_comment, and
-        interpreted columns when interpret=True (including term and section/value mapping).
+    The analyzer returns raw or interpreted parameter-update rows with a stable
+    ``component`` label column for downstream presentation and plotting.
+
+    Fields
+    -----
+    table : pandas.DataFrame
+        Output parameter table containing core params fields and, when
+        interpreted, additional section/component/value mapping columns.
+    request : ForceFieldOptimizationParameterRequest
+        Request object used to generate this result.
+
+    Notes
+    -----
+    The ``component`` column is always present: interpreted outputs use resolved
+    parameter names, while raw outputs use synthetic labels such as ``p1``.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "component": "De_sigma",
+        "ff_section": 3,
+        "ff_section_line": 12,
+        "ff_parameter": 1,
+        "search_interval": 0.2,
+    }
+    ```
+    The sample row represents one optimization parameter target.
     """
 
     table: pd.DataFrame
@@ -203,6 +263,33 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
     def recommended_presentations(
         _result: ForceFieldOptimizationParameterResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend the default tabular presentation for params outputs.
+
+        Parameter definitions are naturally table-oriented, so this analyzer
+        exposes a single stable table recommendation.
+
+        Works on
+        Analyzer task output for ``force_field_optimization_parameters``.
+
+        Parameters
+        -----
+        _result : ForceFieldOptimizationParameterResult
+            Typed analyzer result instance (unused by current logic).
+        payload : dict[str, Any]
+            Serialized payload (unused for fixed recommendations).
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Single table presentation specification.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldOptimizationParameterTask.recommended_presentations(_result, {})
+        ```
+        The returned list contains one table view specification.
+        """
         return [
             PresentationSpec(renderer="table", label="Table", view_type="table"),
         ]
@@ -213,6 +300,40 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
         request: ForceFieldOptimizationParameterRequest,
         reporter=None,
     ) -> ForceFieldOptimizationParameterResult:
+        """Run extraction of optimization parameters in raw or interpreted mode.
+
+        Loads optimization parameter rows from the bundle, optionally resolves
+        them to force-field component/value context, and enforces a stable
+        ``component`` column in the returned table.
+
+        Works on
+        ``ForceFieldOptimizationParameterBundleData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationParameterBundleData
+            Bundle containing optimization parameter rows and optional
+            force-field parameter tables for interpretation.
+        request : ForceFieldOptimizationParameterRequest
+            Request controlling deduplication and interpretation behavior.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        ForceFieldOptimizationParameterResult
+            Result containing normalized parameter-update rows.
+
+        Examples
+        -----
+        ```python
+        result = ForceFieldOptimizationParameterTask().run(
+            data,
+            ForceFieldOptimizationParameterRequest(interpret=False),
+        )
+        ```
+        ``result.table`` contains raw params rows with a stable ``component`` column.
+        """
         params_data = data.optimization_parameters
         if params_data is None:
             raise ValueError("ForceFieldOptimizationParameterBundleData.optimization_parameters is required.")

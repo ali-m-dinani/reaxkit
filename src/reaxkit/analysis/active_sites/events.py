@@ -1,4 +1,16 @@
-"""Active-site event extraction task (phase 1)."""
+"""Extract active-site event descriptors from trajectory and connectivity snapshots.
+
+This module builds frame-resolved active-site event tables from geometry and
+bond-order inputs used by the active-sites pipeline. It focuses on event
+assembly and export, while structural site classification is handled by
+`reaxkit.analysis.active_sites.structural`.
+
+**Usage context**
+
+- Active-site screening: Track likely reactive events over selected frames.
+- TrACT interoperability: Emit tables mapped to TrACT-compatible event schema.
+- Reporting workflows: Provide normalized event rows for plotting and summaries.
+"""
 
 from __future__ import annotations
 
@@ -44,7 +56,33 @@ def merge_active_site_tables(
     structural_table: pd.DataFrame,
     events_table: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Merge phase-1 structural and event outputs on atom_id."""
+    """Merge structural and event active-site tables on `atom_id`.
+
+    Applies left-join semantics from structural rows and normalizes key event
+    columns to deterministic defaults and dtypes.
+
+    Parameters
+    -----
+    structural_table : pd.DataFrame
+        Structural active-site table keyed by `atom_id`.
+    events_table : pd.DataFrame
+        Events active-site table keyed by `atom_id`.
+
+    Returns
+    -----
+    pd.DataFrame
+        Merged table with filled event counts/flags/frame markers.
+
+    Examples
+    -----
+    ```python
+    merged = merge_active_site_tables(structural_df, events_df)
+    ```
+    Sample output:
+    DataFrame with structural columns plus normalized event columns.
+    Meaning:
+    Each structural atom row gains event metrics when available.
+    """
     merged = structural_table.merge(events_table, on="atom_id", how="left")
     for col in ["n_events_O", "n_events_Si", "total_bound_frames_O", "total_bound_frames_Si"]:
         if col in merged.columns:
@@ -105,6 +143,34 @@ class ActiveSiteEventsTask(AnalysisTask):
     required_data = ConnectivityTrajectoryData
 
     def required_data_for(self, request: object, args: dict | None = None):
+        """Resolve required input type for event task execution mode.
+
+        Works on
+        -----
+        Active-site events request objects and optional executor arguments
+
+        Parameters
+        -----
+        request : object
+            Request object that may specify detection `mode`.
+        args : dict | None, optional
+            Optional execution argument map used for auto-mode inference.
+
+        Returns
+        -----
+        Any
+            Required input type (single type or tuple) for current mode.
+
+        Examples
+        -----
+        ```python
+        required = task.required_data_for(request, args)
+        ```
+        Sample output:
+        `ConnectivityTrajectoryData`, `TrajectoryData`, or tuple fallback.
+        Meaning:
+        Required data adapts to BO/distance availability and execution context.
+        """
         mode = str(getattr(request, "mode", "auto")).strip().lower()
         if mode == "dist":
             if args is None:
@@ -130,6 +196,34 @@ class ActiveSiteEventsTask(AnalysisTask):
         _result: ActiveSiteEventsResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
+        """Build default table/plot presentations for event task outputs.
+
+        Works on
+        -----
+        Analyzer task output payloads
+
+        Parameters
+        -----
+        _result : ActiveSiteEventsResult
+            Analysis result object for the executed task.
+        payload : dict[str, Any]
+            Serialized result payload used by presentation dispatch.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specs for table and event-count plot views.
+
+        Examples
+        -----
+        ```python
+        specs = ActiveSiteEventsTask.recommended_presentations(result, payload)
+        ```
+        Sample output:
+        A list with table and `n_events_O vs atom_id` plot specs.
+        Meaning:
+        Event outputs can be rendered with default plotting metadata.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -153,6 +247,42 @@ class ActiveSiteEventsTask(AnalysisTask):
         request: ActiveSiteEventsRequest,
         reporter=None,
     ) -> ActiveSiteEventsResult:
+        """Extract persistent C-O and C-Si event descriptors over sampled frames.
+
+        Selects BO- or distance-based contact mode, applies persistence filtering
+        to suppress flicker, and returns per-carbon event aggregates with
+        TRACT-compatible projection.
+
+        Works on
+        -----
+        `ConnectivityTrajectoryData` or `TrajectoryData` plus events request
+
+        Parameters
+        -----
+        data : ConnectivityTrajectoryData | TrajectoryData
+            Input trajectory (and optional connectivity) for event extraction.
+        request : ActiveSiteEventsRequest
+            Event extraction configuration including mode, thresholds, and frame
+            sampling controls.
+        reporter : Any, optional
+            Optional progress callback invoked during frame iteration.
+
+        Returns
+        -----
+        ActiveSiteEventsResult
+            Per-carbon events table, TRACT projection, and run summary.
+
+        Examples
+        -----
+        ```python
+        req = ActiveSiteEventsRequest(mode="auto", every=10, persist=50)
+        result = ActiveSiteEventsTask().run(bundle, req)
+        ```
+        Sample output:
+        `result.table` with reactive flags and event counts per carbon atom.
+        Meaning:
+        Time-resolved contacts are condensed into persistent event descriptors.
+        """
         if isinstance(data, ConnectivityTrajectoryData):
             trajectory = data.trajectory
             connectivity_data = data

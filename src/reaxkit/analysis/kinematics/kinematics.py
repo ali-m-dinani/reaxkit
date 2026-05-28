@@ -1,4 +1,15 @@
-"""Atomic-kinematics analysis tasks."""
+"""Provide analyzer tasks for atomic kinematics series extraction.
+
+This module slices and normalizes coordinate, velocity, and acceleration
+streams from atomic kinematics data into tabular analyzer outputs. It is scoped
+to kinematics-domain series extraction and does not infer bonding or chemistry.
+
+**Usage context**
+
+- Motion analysis: Inspect per-atom position/velocity/acceleration signals.
+- Frame selection: Extract kinematics series on selected frame subsets.
+- Diagnostics: Export normalized time-series tables for downstream plotting.
+"""
 
 from __future__ import annotations
 
@@ -29,6 +40,7 @@ def _get_vels_data(
     *,
     atoms: Sequence[int] | None = None,
 ) -> pd.DataFrame:
+    """Extract one selected kinematics table (or metadata key/value rows)."""
     if key == "metadata":
         meta = dict(data.metadata or {})
         if data.lattice_parameters is not None:
@@ -56,7 +68,27 @@ def _get_vels_data(
 
 @dataclass
 class AtomicKinematicsRequest(BaseRequest):
-    """Request for selected atomic kinematics data."""
+    """Request payload for atomic kinematics table extraction.
+
+    This request selects one kinematics dataset and optionally restricts output
+    rows to a subset of atom indices.
+
+    Fields
+    -----
+    key : KinematicsKey
+        Kinematics dataset selector: ``metadata``, ``coordinates``,
+        ``velocities``, ``accelerations``, or ``prev_accelerations``.
+    atoms : Optional[Sequence[int]]
+        Optional list/sequence of atom indices to keep. If omitted, all atoms
+        from the selected dataset are returned.
+
+    Examples
+    -----
+    ```python
+    request = AtomicKinematicsRequest(key="velocities", atoms=[1, 3, 7])
+    ```
+    The request returns velocity rows only for atoms 1, 3, and 7.
+    """
 
     key: KinematicsKey = dc_field(
         metadata={
@@ -76,20 +108,25 @@ class AtomicKinematicsRequest(BaseRequest):
 
 @dataclass
 class AtomicKinematicsResult(BaseResult):
-    """Atomic-kinematics extraction result.
+    """Result payload for atomic kinematics extraction.
 
-    Output structure:
-    - request: AtomicKinematicsRequest used to generate this result
-    - table: pandas.DataFrame
-      - key='metadata': columns ['key', 'value'] with one metadata entry per row
-      - key='coordinates': table with atom positions (for example atom_index, x, y, z)
-      - key='velocities': table with per-atom velocity components (vx, vy, vz)
-      - key='accelerations': table with per-atom acceleration components (ax, ay, az)
-      - key='prev_accelerations': table with previous-step acceleration components
+    The analyzer returns a normalized table corresponding to the selected
+    kinematics key and optional atom filtering constraints.
 
-    Example:
-    request.key='velocities', atoms=[1,2] returns only rows for atom_index 1 and 2
-    and includes velocity component columns for those atoms.
+    Fields
+    -----
+    table : pandas.DataFrame
+        Extracted table for the selected dataset key. ``metadata`` returns
+        ``key``/``value`` rows; kinematics arrays return per-atom numeric rows.
+    request : AtomicKinematicsRequest
+        Request object used to generate this result.
+
+    Examples
+    -----
+    ```python
+    row = {"atom_index": 1, "vx": -0.24, "vy": 0.03, "vz": 0.11}
+    ```
+    The sample row represents one velocity record for one atom.
     """
 
     table: pd.DataFrame
@@ -106,6 +143,36 @@ class AtomicKinematicsTask(AnalysisTask):
     def recommended_presentations(
         _result: AtomicKinematicsResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and simple axis plot views for kinematics outputs.
+
+        Always returns a table view and adds a single-series plot when
+        ``atom_index`` and at least one numeric component column are present.
+
+        Works on
+        Analyzer task output for ``get_kinematics``.
+
+        Parameters
+        -----
+        _result : AtomicKinematicsResult
+            Typed analyzer result instance (unused by current logic).
+        payload : dict[str, Any]
+            Serialized payload expected to include a ``table`` key.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended renderer specifications for UI display.
+
+        Examples
+        -----
+        ```python
+        specs = AtomicKinematicsTask.recommended_presentations(
+            _result,
+            {"table": [{"atom_index": 1, "vx": -0.24}]},
+        )
+        ```
+        The returned list includes a table and one component-vs-atom plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -141,6 +208,38 @@ class AtomicKinematicsTask(AnalysisTask):
         request: AtomicKinematicsRequest,
         reporter=None,
     ) -> AtomicKinematicsResult:
+        """Execute atomic kinematics extraction for the selected data key.
+
+        Selects one kinematics table from parsed atomic kinematics data and
+        applies optional atom-index filtering before returning a typed result.
+
+        Works on
+        ``AtomicKinematicsData`` parsed from kinematics/vels-style sources.
+
+        Parameters
+        -----
+        data : AtomicKinematicsData
+            Parsed kinematics data bundle.
+        request : AtomicKinematicsRequest
+            Request with dataset key and optional atom filter.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        AtomicKinematicsResult
+            Result containing the extracted kinematics table.
+
+        Examples
+        -----
+        ```python
+        result = AtomicKinematicsTask().run(
+            data,
+            AtomicKinematicsRequest(key="coordinates"),
+        )
+        ```
+        ``result.table`` contains the selected coordinate rows.
+        """
         table = _get_vels_data(
             data,
             key=request.key,

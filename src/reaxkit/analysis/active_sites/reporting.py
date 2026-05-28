@@ -1,4 +1,15 @@
-"""Report payload builders for active-site analyses."""
+"""Build report payload dictionaries for active-site analysis commands.
+
+This module converts active-site analyzer results into structured report
+payloads consumed by presentation/report rendering layers. It is scoped to
+payload assembly and interpretation text generation, not analysis execution.
+
+**Usage context**
+
+- Structural reporting: Build sectioned report payloads for structural outputs.
+- Event reporting: Summarize reactive-event outputs into report-friendly schema.
+- Registry wiring: Register active-site payload builders with report registry.
+"""
 
 from __future__ import annotations
 
@@ -196,7 +207,35 @@ def build_structural_report_payload(
     *,
     tau_opt: float = 0.229,
 ) -> dict[str, Any] | None:
-    """Build a rich report payload for active_site_structural outputs."""
+    """Build a report payload for `active_site_structural` command outputs.
+
+    Parameters
+    -----
+    result : Any
+        Analyzer result object, expected to expose `table` and optional summary.
+    args : Any
+        Command arguments used for contextual report metadata.
+    analysis_dir : Path
+        Analysis output directory used to discover generated figure assets.
+    tau_opt : float, optional
+        Threshold used for pyramidalization interpretation metrics.
+
+    Returns
+    -----
+    dict[str, Any] | None
+        Structured report payload dictionary, or `None` when no valid table
+        data is available.
+
+    Examples
+    -----
+    ```python
+    payload = build_structural_report_payload(result, args, Path("analysis"))
+    ```
+    Sample output:
+    `{"title": "...", "sections": [...], "figures": [...]}`
+    Meaning:
+    The payload is ready for report renderer consumption.
+    """
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -422,7 +461,33 @@ def build_events_report_payload(
     args: Any,
     analysis_dir: Path,
 ) -> dict[str, Any] | None:
-    """Build a report payload for active_site_events outputs."""
+    """Build a report payload for `active_site_events` command outputs.
+
+    Parameters
+    -----
+    result : Any
+        Analyzer result object expected to expose an events `table`.
+    args : Any
+        Command arguments used for contextual metadata and fallback values.
+    analysis_dir : Path
+        Analysis output directory used to discover generated figure assets.
+
+    Returns
+    -----
+    dict[str, Any] | None
+        Structured report payload dictionary, or `None` when event table data
+        is unavailable.
+
+    Examples
+    -----
+    ```python
+    payload = build_events_report_payload(result, args, Path("analysis"))
+    ```
+    Sample output:
+    `{"title": "...", "sections": [...], "figures": [...]}`
+    Meaning:
+    The payload captures summary metrics and interpretations for events output.
+    """
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame):
         return None
@@ -562,7 +627,34 @@ def build_active_site_report_payload(
     args: Any,
     analysis_dir: Path,
 ) -> dict[str, Any] | None:
-    """Dispatch active-site report payload by command."""
+    """Dispatch active-site report payload construction by command name.
+
+    Parameters
+    -----
+    command : str
+        Command name, typically `active_site_structural` or `active_site_events`.
+    result : Any
+        Analyzer result object to summarize.
+    args : Any
+        Command arguments used for metadata context.
+    analysis_dir : Path
+        Directory containing generated analysis artifacts.
+
+    Returns
+    -----
+    dict[str, Any] | None
+        Command-specific report payload dictionary, or `None` when unsupported.
+
+    Examples
+    -----
+    ```python
+    payload = build_active_site_report_payload("active_site_events", result, args, Path("analysis"))
+    ```
+    Sample output:
+    Report payload dictionary or `None`.
+    Meaning:
+    The function routes to the proper active-site payload builder.
+    """
     cmd = str(command).strip()
     if cmd == "active_site_structural":
         return build_structural_report_payload(result, args, analysis_dir)
@@ -572,7 +664,27 @@ def build_active_site_report_payload(
 
 
 def register_active_site_report_payloads() -> None:
-    """Register active-site report builders in presentation registry."""
+    """Register active-site report payload builders in the report registry.
+
+    Parameters
+    -----
+    None
+
+    Returns
+    -----
+    None
+        Registers command-keyed payload builder callbacks as a side effect.
+
+    Examples
+    -----
+    ```python
+    register_active_site_report_payloads()
+    ```
+    Sample output:
+    `None`
+    Meaning:
+    Active-site commands become discoverable by report payload dispatch.
+    """
     from reaxkit.presentation.report_registry import register_report_payload_builder
 
     register_report_payload_builder("active_site_structural", build_active_site_report_payload)

@@ -1,4 +1,15 @@
-"""Force-field optimization report analysis tasks."""
+"""Analyze force-field optimization report artifacts and derived fit summaries.
+
+This module parses report-oriented optimization outputs, including EOS and
+bulk-modulus related records, into analyzer-ready tables. It is scoped to
+report extraction and derived fit metrics, not parameter optimization itself.
+
+**Usage context**
+
+- Report parsing: Normalize textual optimization-report sections into tables.
+- EOS analysis: Build equation-of-state fit inputs and summary outputs.
+- Materials metrics: Compute report-level bulk-modulus-related diagnostics.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +35,7 @@ from reaxkit.utils.equation_of_states import vinet_energy_ev
 
 
 def _report_frame(data: ForceFieldOptimizationReportData) -> pd.DataFrame:
+    """Build the base optimization-report DataFrame from parsed report fields."""
     df = pd.DataFrame(
         {
             "lineno": pd.Series(data.linenos, dtype=int),
@@ -41,6 +53,7 @@ def _report_frame(data: ForceFieldOptimizationReportData) -> pd.DataFrame:
 
 
 def _geometry_summary_frame(data: GeometrySummaryData) -> pd.DataFrame:
+    """Build an identifier/volume/energy frame from geometry-summary data."""
     n_rows = len(data.identifiers)
     energy_series = None
     if data.minimum_energy is not None:
@@ -65,12 +78,14 @@ def _geometry_summary_frame(data: GeometrySummaryData) -> pd.DataFrame:
 def _get_report_data(
     data: ForceFieldOptimizationReportData,
 ) -> pd.DataFrame:
+    """Return sorted report rows augmented with QM-minus-FF differences."""
     df = _report_frame(data)
     df["qm_ff_difference"] = df["qm_value"] - df["ffield_value"]
     return df.sort_values("lineno", ascending=True).reset_index(drop=True)
 
 
 def _parse_two_body_energy_terms(data: ForceFieldOptimizationReportData) -> pd.DataFrame:
+    """Parse two-body ENERGY titles into structured identifier components."""
     df = _report_frame(data)
     if "section" not in df.columns or "title" not in df.columns:
         raise KeyError("Expected 'section' and 'title' columns in report DataFrame.")
@@ -117,6 +132,7 @@ def _energy_vs_volume(
     report: ForceFieldOptimizationReportData,
     geometry_summary: GeometrySummaryData,
 ) -> pd.DataFrame:
+    """Join repeated two-body report terms with geometry volumes."""
     energy_df = _parse_two_body_energy_terms(report)
     if energy_df.empty:
         return pd.DataFrame(columns=["iden1", "iden2", "ffield_value", "qm_value", "V_iden2"])
@@ -210,6 +226,7 @@ def _fit_vinet_bulk_modulus(
     shift_min_to_zero: bool,
     flip_sign: bool,
 ) -> dict[str, float]:
+    """Fit a Vinet EOS curve and return bulk-modulus-related fit parameters."""
     from scipy.optimize import curve_fit
 
     V = np.asarray(volumes, dtype=float)
@@ -264,6 +281,7 @@ def _bulk_modulus_table_from_eos(
     flip_sign: bool = False,
     min_points: int = 6,
 ) -> pd.DataFrame:
+    """Compute per-base Vinet bulk-modulus fits from an EOS input table."""
     out_cols = ["base_iden", "n_points", "V0_A3", "K0_eV_A3", "K0_GPa", "E0_eV", "C", "success"]
     if eos_table.empty:
         return pd.DataFrame(columns=out_cols)
@@ -310,29 +328,53 @@ def _bulk_modulus_table_from_eos(
 
 @dataclass
 class ForceFieldOptimizationReportRequest(BaseRequest):
-    """Request for optimization-report rows."""
+    """Request payload for optimization-report table extraction.
+
+    This request configures the base optimization-report analyzer. The current
+    task returns all parsed report rows and does not expose request-time
+    filtering parameters.
+
+    Fields
+    -----
+    None.
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldOptimizationReportRequest()
+    ```
+    The request returns the full parsed report table.
+    """
 
 
 @dataclass
 class ForceFieldOptimizationReportResult(BaseResult):
-    """Optimization-report table result.
+    """Result payload containing parsed optimization-report rows.
 
-    Output structure:
-    - request: ForceFieldOptimizationReportRequest used to generate this result.
-    - table: pandas.DataFrame with columns:
-      ['lineno', 'section', 'title', 'ffield_value', 'qm_value',
-       'weight', 'error', 'total_ff_error', 'qm_ff_difference']
-      - lineno: source row index from the optimization report
-      - section: report section label (for example ENERGY, CHARGE)
-      - title: descriptive row text
-      - ffield_value/qm_value: compared model and reference values
-      - weight: weighting factor in the objective
-      - error: row-level weighted error contribution
-      - total_ff_error: aggregate error value at parse time
-      - qm_ff_difference: qm_value - ffield_value
+    The analyzer returns normalized report records and a derived
+    ``qm_ff_difference`` metric to simplify review of model-vs-reference gaps.
 
-    Example:
-    If qm_value=12.4 and ffield_value=11.9, qm_ff_difference is 0.5.
+    Fields
+    -----
+    request : ForceFieldOptimizationReportRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``lineno``, ``section``, ``title``,
+        ``ffield_value``, ``qm_value``, ``weight``, ``error``,
+        ``total_ff_error``, and ``qm_ff_difference``.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "lineno": 12,
+        "section": "ENERGY",
+        "ffield_value": 11.9,
+        "qm_value": 12.4,
+        "qm_ff_difference": 0.5,
+    }
+    ```
+    ``qm_ff_difference`` is computed as ``qm_value - ffield_value``.
     """
 
     table: pd.DataFrame
@@ -341,7 +383,24 @@ class ForceFieldOptimizationReportResult(BaseResult):
 
 @dataclass
 class ForceFieldOptimizationReportEOSRequest(BaseRequest):
-    """Request for ENERGY-vs-volume data derived from report + geometry summary."""
+    """Request payload for EOS table extraction from report artifacts.
+
+    This request optionally filters the derived base/other energy-volume table
+    by one base identifier.
+
+    Fields
+    -----
+    iden : Optional[str]
+        Optional ``base_iden`` selector. Use ``None`` or ``"all"`` to keep all
+        identifiers, or provide one identifier (for example ``"MgO"``).
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldOptimizationReportEOSRequest(iden="bulk_0")
+    ```
+    The request returns EOS rows only for ``base_iden == "bulk_0"``.
+    """
     iden: Optional[str] = dc_field(
         default=None,
         metadata={
@@ -356,22 +415,28 @@ class ForceFieldOptimizationReportEOSRequest(BaseRequest):
 
 @dataclass
 class ForceFieldOptimizationReportEOSResult(BaseResult):
-    """EOS (energy-vs-volume) analysis result.
+    """Result payload containing EOS-compatible energy-volume rows.
 
-    Output structure:
-    - request: ForceFieldOptimizationReportEOSRequest used to generate this result.
-    - table: pandas.DataFrame with columns:
-      ['base_iden', 'other_iden', 'V_other_iden', 'E_other_iden']
-      - base_iden: repeated base identifier used to form an EOS group
-      - other_iden: related identifier connected to the base (including base itself)
-      - V_other_iden: volume of other_iden from geometry summary
-      - E_other_iden: energy of other_iden from geometry summary
+    The analyzer joins repeated report identifiers with geometry summary values
+    to produce per-base equation-of-state inputs.
 
-    Example:
-    If base_iden='bulk_0', rows can include:
-    - (bulk_0, bulk_1, 10.0, -120.0)
-    - (bulk_0, bulk_2, 13.0, -65.0)
-    - (bulk_0, bulk_0, 9.0, -90.0)
+    Fields
+    -----
+    request : ForceFieldOptimizationReportEOSRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``base_iden``, ``other_iden``, ``V_other_iden``,
+        and ``E_other_iden``.
+
+    Examples
+    -----
+    ```python
+    rows = [
+        {"base_iden": "bulk_0", "other_iden": "bulk_1", "V_other_iden": 10.0, "E_other_iden": -120.0},
+        {"base_iden": "bulk_0", "other_iden": "bulk_0", "V_other_iden": 9.0, "E_other_iden": -90.0},
+    ]
+    ```
+    Each row is one point in a base-identifier EOS series.
     """
 
     table: pd.DataFrame
@@ -380,7 +445,35 @@ class ForceFieldOptimizationReportEOSResult(BaseResult):
 
 @dataclass
 class ForceFieldOptimizationReportBulkModulusRequest(BaseRequest):
-    """Request for a Vinet bulk-modulus fit derived from report + geometry summary."""
+    """Request payload for Vinet bulk-modulus fitting from EOS rows.
+
+    This request controls optional base filtering and fitting options used to
+    derive equilibrium and bulk-modulus parameters from energy-volume data.
+
+    Fields
+    -----
+    iden : Optional[str]
+        Optional ``base_iden`` selector. Use ``None`` or ``"all"`` to fit all
+        eligible base identifier groups.
+    shift_min_to_zero : bool
+        Whether to shift each energy series by its minimum before fitting.
+    flip_sign : bool
+        Whether to multiply input energies by ``-1`` before fitting.
+    min_points : int
+        Minimum number of finite ``(V, E)`` points required per base series.
+
+    Examples
+    -----
+    ```python
+    request = ForceFieldOptimizationReportBulkModulusRequest(
+        iden="bulk_0",
+        shift_min_to_zero=True,
+        flip_sign=False,
+        min_points=6,
+    )
+    ```
+    The request fits one selected base EOS series using standard defaults.
+    """
     iden: Optional[str] = dc_field(
         default=None,
         metadata={
@@ -419,23 +512,31 @@ class ForceFieldOptimizationReportBulkModulusRequest(BaseRequest):
 
 @dataclass
 class ForceFieldOptimizationReportBulkModulusResult(BaseResult):
-    """Bulk-modulus fit result from EOS table rows.
+    """Result payload for EOS-derived bulk-modulus fitting.
 
-    Output structure:
-    - request: ForceFieldOptimizationReportBulkModulusRequest used to generate this result.
-    - table: pandas.DataFrame with one row per fitted base_iden and columns:
-      ['base_iden', 'n_points', 'V0_A3', 'K0_eV_A3', 'K0_GPa', 'E0_eV', 'C', 'success']
-      - base_iden: EOS base identifier
-      - n_points: number of finite points used in fit
-      - V0_A3: fitted equilibrium volume
-      - K0_eV_A3/K0_GPa: fitted bulk modulus in two units
-      - E0_eV: fitted minimum energy
-      - C: fitted Vinet shape parameter
-      - success: True when fit succeeded
+    The analyzer returns one row per successfully fitted base identifier,
+    including equilibrium volume and bulk modulus in multiple units.
 
-    Example:
-    A row like (bulk_0, 8, 11.2, 0.48, 76.9, -2.14, 3.8, True)
-    means bulk_0 was fitted with 8 points and produced K0=76.9 GPa.
+    Fields
+    -----
+    request : ForceFieldOptimizationReportBulkModulusRequest
+        Request object used to generate this result.
+    table : pandas.DataFrame
+        Table with columns ``base_iden``, ``n_points``, ``V0_A3``,
+        ``K0_eV_A3``, ``K0_GPa``, ``E0_eV``, ``C``, and ``success``.
+
+    Examples
+    -----
+    ```python
+    row = {
+        "base_iden": "bulk_0",
+        "n_points": 8,
+        "V0_A3": 11.2,
+        "K0_GPa": 76.9,
+        "success": True,
+    }
+    ```
+    The row indicates a successful Vinet fit for one base EOS series.
     """
 
     table: pd.DataFrame
@@ -452,6 +553,36 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
     def recommended_presentations(
         _result: ForceFieldOptimizationReportResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and QM-FF difference plot views for report output.
+
+        Returns a table view by default and adds a line/scatter-style plot when
+        serialized rows expose ``lineno`` and ``qm_ff_difference`` columns.
+
+        Works on
+        Analyzer task output for ``force_field_optimization_report``.
+
+        Parameters
+        -----
+        _result : ForceFieldOptimizationReportResult
+            Typed analyzer result instance (unused by current selection logic).
+        payload : dict[str, Any]
+            Serialized analyzer payload expected to include a ``table`` list.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended presentation specifications for UI rendering.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldOptimizationReportTask.recommended_presentations(
+            _result,
+            {"table": [{"lineno": 12, "qm_ff_difference": 0.5}]},
+        )
+        ```
+        The returned list includes a table and a ``qm_ff_difference`` plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -480,6 +611,38 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
         request: ForceFieldOptimizationReportRequest,
         reporter=None,
     ) -> ForceFieldOptimizationReportResult:
+        """Run base optimization-report extraction and difference computation.
+
+        Converts parsed report rows into a normalized table and augments each
+        row with a QM-minus-force-field difference metric.
+
+        Works on
+        ``ForceFieldOptimizationReportData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationReportData
+            Parsed optimization-report data source.
+        request : ForceFieldOptimizationReportRequest
+            Request object for the analysis task.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        ForceFieldOptimizationReportResult
+            Result containing the normalized report table.
+
+        Examples
+        -----
+        ```python
+        result = ForceFieldOptimizationReportTask().run(
+            data,
+            ForceFieldOptimizationReportRequest(),
+        )
+        ```
+        The result table includes ``qm_ff_difference`` for each report row.
+        """
         table = _get_report_data(data)
         return ForceFieldOptimizationReportResult(table=table, request=request)
 
@@ -494,6 +657,36 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
     def recommended_presentations(
         _result: ForceFieldOptimizationReportEOSResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and energy-vs-volume presentations for EOS output.
+
+        Provides a table for all outputs and adds an EOS plot when
+        ``V_other_iden`` and ``E_other_iden`` columns are available.
+
+        Works on
+        Analyzer task output for ``force_field_optimization_report_eos``.
+
+        Parameters
+        -----
+        _result : ForceFieldOptimizationReportEOSResult
+            Typed analyzer result instance (unused by current logic).
+        payload : dict[str, Any]
+            Serialized payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended specs for EOS table and plot rendering.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldOptimizationReportEOSTask.recommended_presentations(
+            _result,
+            {"table": [{"base_iden": "bulk_0", "V_other_iden": 10.0, "E_other_iden": -120.0}]},
+        )
+        ```
+        The output includes a table and an energy-vs-volume plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -527,6 +720,38 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
         request: ForceFieldOptimizationReportEOSRequest,
         reporter=None,
     ) -> ForceFieldOptimizationReportEOSResult:
+        """Run EOS table extraction from report and geometry summary bundles.
+
+        Builds the base/other energy-volume table and optionally filters it by
+        one base identifier from the request.
+
+        Works on
+        ``ForceFieldOptimizationReportEOSBundleData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationReportEOSBundleData
+            Bundle with parsed report rows and geometry summary values.
+        request : ForceFieldOptimizationReportEOSRequest
+            Optional identifier filter for EOS table scope.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        ForceFieldOptimizationReportEOSResult
+            Result containing EOS-compatible energy-volume rows.
+
+        Examples
+        -----
+        ```python
+        result = ForceFieldOptimizationReportEOSTask().run(
+            data,
+            ForceFieldOptimizationReportEOSRequest(iden="all"),
+        )
+        ```
+        The output table includes all eligible base-identifier EOS rows.
+        """
         table = _base_other_energy_volume_table(data.report, data.geometry_summary)
         if request.iden and str(request.iden).lower() != "all":
             table = table[table["base_iden"] == request.iden].reset_index(drop=True)
@@ -543,6 +768,36 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
     def recommended_presentations(
         _result: ForceFieldOptimizationReportBulkModulusResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
+        """Recommend table and bulk-modulus summary plot presentations.
+
+        Returns a table view by default and adds a ``K0_GPa`` plot keyed by
+        ``base_iden`` when those fields are present in serialized rows.
+
+        Works on
+        Analyzer task output for ``force_field_optimization_report_bulk_modulus``.
+
+        Parameters
+        -----
+        _result : ForceFieldOptimizationReportBulkModulusResult
+            Typed analyzer result instance (unused by current selection logic).
+        payload : dict[str, Any]
+            Serialized payload expected to include ``table`` rows.
+
+        Returns
+        -----
+        list[PresentationSpec]
+            Recommended presentation specifications for fit summaries.
+
+        Examples
+        -----
+        ```python
+        specs = ForceFieldOptimizationReportBulkModulusTask.recommended_presentations(
+            _result,
+            {"table": [{"base_iden": "bulk_0", "K0_GPa": 76.9}]},
+        )
+        ```
+        The returned specs include a table and one bulk-modulus comparison plot.
+        """
         rows = payload.get("table")
         if not isinstance(rows, list) or not rows:
             return [PresentationSpec(renderer="table", label="Table", view_type="table")]
@@ -571,6 +826,38 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
         request: ForceFieldOptimizationReportBulkModulusRequest,
         reporter=None,
     ) -> ForceFieldOptimizationReportBulkModulusResult:
+        """Run bulk-modulus fitting on EOS rows derived from report artifacts.
+
+        Derives EOS rows from report and geometry summary data, applies request
+        fit options, and returns one fit summary row per eligible base series.
+
+        Works on
+        ``ForceFieldOptimizationReportEOSBundleData``.
+
+        Parameters
+        -----
+        data : ForceFieldOptimizationReportEOSBundleData
+            Bundle with report and geometry summary inputs for EOS derivation.
+        request : ForceFieldOptimizationReportBulkModulusRequest
+            Fit configuration and optional identifier filter.
+        reporter : Any, optional
+            Progress callback accepted by analyzer tasks; unused here.
+
+        Returns
+        -----
+        ForceFieldOptimizationReportBulkModulusResult
+            Result containing Vinet fit parameters per base identifier.
+
+        Examples
+        -----
+        ```python
+        result = ForceFieldOptimizationReportBulkModulusTask().run(
+            data,
+            ForceFieldOptimizationReportBulkModulusRequest(min_points=6),
+        )
+        ```
+        The output table includes one row per successful bulk-modulus fit.
+        """
         eos_table = _base_other_energy_volume_table(data.report, data.geometry_summary)
         table = _bulk_modulus_table_from_eos(
             eos_table,

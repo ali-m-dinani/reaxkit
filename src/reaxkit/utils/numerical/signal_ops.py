@@ -1,15 +1,14 @@
-"""
-Signal-processing utilities for binary state detection.
+"""Detect and clean binary states from continuous numerical signals.
 
 This module provides helper functions for applying hysteresis-based
 state detection and post-processing of boolean time-series data,
 commonly encountered in ReaxFF simulations and field-driven analyses.
 
-Typical use cases include:
+**Usage context**
 
-- detecting ON/OFF states in polarization or dipole signals
-- applying Schmitt-trigger hysteresis to noisy response curves
-- removing spurious state flickering in thresholded time series
+- State extraction: Detect ON/OFF states from analog response signals.
+- Hysteresis control: Apply Schmitt-trigger logic to reduce noise switching.
+- Post-processing: Remove short-lived flicker in binary trajectories.
 """
 
 from __future__ import annotations
@@ -17,8 +16,7 @@ import numpy as np
 from typing import Optional
 
 def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[bool] = None) -> np.ndarray:
-    """
-    Apply Schmitt-trigger hysteresis to a 1D signal.
+    """Apply Schmitt-trigger hysteresis to a 1D signal.
 
     This function converts a continuous signal into a boolean state
     using separate ON and OFF thresholds to suppress noise-induced
@@ -29,7 +27,7 @@ def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[b
     - OFF when ``y <= th - hys / 2``
 
     Parameters
-    ----------
+    -----
     y : array-like
         Input signal values (e.g., polarization, dipole moment).
     th : float
@@ -41,12 +39,12 @@ def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[b
         initial state is inferred from the first data point.
 
     Returns
-    -------
+    -----
     numpy.ndarray
         Boolean array representing the ON/OFF state over the signal.
 
     Examples
-    --------
+    -----
     >>> state = schmitt_hysteresis(signal, th=0.0, hys=0.1)
     """
     y = np.asarray(y, dtype=float)
@@ -65,15 +63,14 @@ def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[b
     return state
 
 def clean_flicker(state: np.ndarray, min_run: int) -> np.ndarray:
-    """
-    Remove short-lived state transitions in a boolean sequence.
+    """Remove short-lived state transitions in a boolean sequence.
 
     This function suppresses brief ON or OFF segments shorter than a
     specified minimum run length, producing a cleaner and more
     physically meaningful state trajectory.
 
     Parameters
-    ----------
+    -----
     state : array-like of bool
         Boolean state sequence (e.g., output of ``schmitt_hysteresis``).
     min_run : int
@@ -81,12 +78,12 @@ def clean_flicker(state: np.ndarray, min_run: int) -> np.ndarray:
         state segment.
 
     Returns
-    -------
+    -----
     numpy.ndarray
         Cleaned boolean state array with flicker removed.
 
     Examples
-    --------
+    -----
     >>> clean_state = clean_flicker(state, min_run=5)
     """
     s = np.asarray(state, dtype=bool)

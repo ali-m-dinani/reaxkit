@@ -19,6 +19,7 @@ WindowName = Literal["none", "hann", "hamming", "blackman", "bartlett"]
 
 
 def _as_1d_float(signal: ArrayLike) -> np.ndarray:
+    """Validate and convert input data to a finite 1D float array."""
     arr = np.asarray(signal, dtype=float)
     if arr.ndim != 1:
         raise ValueError(f"signal must be 1D; got shape={arr.shape}")
@@ -30,11 +31,13 @@ def _as_1d_float(signal: ArrayLike) -> np.ndarray:
 
 
 def detrend_signal(signal: ArrayLike, mode: DetrendMode = "mean") -> np.ndarray:
-    """
-    Remove low-order trends from a 1D signal.
+    """Remove low-order trends from a 1D signal.
+
+    Applies one of the supported detrending modes to prepare signal data for
+    frequency-domain analysis.
 
     Parameters
-    ----------
+    -----
     signal : array-like
         Input 1D signal.
     mode : {'none', 'mean', 'linear'}, optional
@@ -44,9 +47,13 @@ def detrend_signal(signal: ArrayLike, mode: DetrendMode = "mean") -> np.ndarray:
         - 'linear': remove best-fit linear trend
 
     Returns
-    -------
+    -----
     numpy.ndarray
         Detrended signal.
+    Examples
+    -----
+    >>> detrend_signal([1.0, 2.0, 3.0], mode="mean")
+    array([-1.,  0.,  1.])
     """
     y = _as_1d_float(signal).copy()
     mode_l = str(mode).strip().lower()
@@ -67,11 +74,13 @@ def window_function(
     *,
     kaiser_beta: Optional[float] = None,
 ) -> np.ndarray:
-    """
-    Build a 1D window function.
+    """Build a 1D window function.
+
+    Constructs standard tapering windows used before FFT computation and also
+    supports an optional Kaiser window path.
 
     Parameters
-    ----------
+    -----
     n : int
         Number of samples.
     name : {'none', 'hann', 'hamming', 'blackman', 'bartlett'}, optional
@@ -81,9 +90,13 @@ def window_function(
         This allows optional tunable windowing without expanding the enum.
 
     Returns
-    -------
+    -----
     numpy.ndarray
         Window values with shape (n,).
+    Examples
+    -----
+    >>> window_function(8, name="hann")
+    array([...])
     """
     if n < 1:
         raise ValueError("n must be >= 1.")
@@ -112,11 +125,13 @@ def fft_spectrum(
     kaiser_beta: Optional[float] = None,
     one_sided: bool = True,
 ) -> dict[str, np.ndarray]:
-    """
-    Compute FFT spectrum for a uniformly sampled 1D signal.
+    """Compute FFT spectrum for a uniformly sampled 1D signal.
+
+    Performs detrending, applies the selected window, computes FFT values, and
+    returns common spectrum components for downstream analysis and plotting.
 
     Parameters
-    ----------
+    -----
     signal : array-like
         Input time-domain signal.
     dt : float
@@ -131,7 +146,7 @@ def fft_spectrum(
         If True, return non-negative frequency part only.
 
     Returns
-    -------
+    -----
     dict[str, numpy.ndarray]
         Dictionary with keys:
         - 'freq': frequency axis
@@ -140,6 +155,10 @@ def fft_spectrum(
         - 'phase': phase angle (radians)
         - 'real': real FFT component
         - 'imag': imaginary FFT component
+    Examples
+    -----
+    >>> fft_spectrum([0.0, 1.0, 0.0, -1.0], dt=0.1)
+    {'freq': array([...]), 'amplitude': array([...]), ...}
     """
     if float(dt) <= 0.0:
         raise ValueError("dt must be > 0.")
@@ -183,8 +202,35 @@ def dominant_frequency(
     kaiser_beta: Optional[float] = None,
     min_freq: float = 0.0,
 ) -> float:
-    """
-    Return dominant (maximum-amplitude) positive frequency of a 1D signal.
+    """Return dominant positive frequency of a 1D signal.
+
+    Computes a one-sided spectrum and selects the frequency with maximum
+    amplitude among frequencies that satisfy `freq >= min_freq`.
+
+    Parameters
+    -----
+    signal : array-like
+        Input time-domain signal.
+    dt : float
+        Sampling interval in time units.
+    detrend : {'none', 'mean', 'linear'}, optional
+        Detrending mode before FFT.
+    window : {'none', 'hann', 'hamming', 'blackman', 'bartlett'}, optional
+        Window function to apply before FFT.
+    kaiser_beta : float, optional
+        Optional Kaiser beta parameter (used when ``window='none'``).
+    min_freq : float, optional
+        Minimum frequency threshold for candidate dominant frequency.
+
+    Returns
+    -----
+    float
+        Dominant frequency value.
+
+    Examples
+    -----
+    >>> dominant_frequency([0.0, 1.0, 0.0, -1.0], dt=0.1)
+    2.5
     """
     spec = fft_spectrum(
         signal,
@@ -214,4 +260,3 @@ __all__ = [
     "fft_spectrum",
     "dominant_frequency",
 ]
-
