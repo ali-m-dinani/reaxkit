@@ -13,9 +13,9 @@ from reaxkit.analysis.active_sites import (
     ActiveSiteEventsRequest,
     ActiveSiteEventsTask,
 )
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.exceptions import AnalysisError
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.platform.exceptions import AnalysisError
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, SimulationData, TrajectoryData
 
 RUN_DIR = Path(

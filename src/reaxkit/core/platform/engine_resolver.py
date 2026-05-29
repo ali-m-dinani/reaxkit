@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List
 
-from reaxkit.core.exceptions import ParseError
+from reaxkit.core.platform.exceptions import ParseError
 
 ENGINE_REGISTRY: dict[str, type] = {}
 

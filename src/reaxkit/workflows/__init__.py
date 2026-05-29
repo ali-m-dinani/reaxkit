@@ -9,7 +9,7 @@ This module defines CLI task wiring and helper routines for ReaxKit workflows.
 - Output handling: Forward results to table, plot, export, or report flows.
 """
 
-from reaxkit.core.result_bundle import (
+from reaxkit.core.results_shaping.result_bundle import (
     DualTableResultBundle,
     bundle_canonical_and_tract_tables,
 )

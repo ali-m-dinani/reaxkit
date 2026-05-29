@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, default_project_root, normalize_storage_args
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, default_project_root, normalize_storage_args
 
 def resolve_output_path(
     user_value: str,

@@ -118,7 +118,7 @@ class PipelineRuntime:
     ) -> tuple[int | None, int | None]:
         """Best-effort probe for frames/atoms from trajectory data."""
         try:
-            from reaxkit.core.engine_registry import resolve_engine
+            from reaxkit.core.platform.engine_resolver import resolve_engine
             from reaxkit.domain.data_models import TrajectoryData
             import reaxkit.engine  # noqa: F401
 
@@ -566,13 +566,13 @@ class PipelineRuntime:
 
     def get_catalog(self) -> dict[str, Any]:
         try:
-            from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY
+            from reaxkit.core.registry.analysis_task_registry import TASK_LABELS, TASK_REGISTRY
             try:
                 import reaxkit.analysis  # noqa: F401  (best-effort registration)
             except Exception:
                 # Fall back to per-module imports to avoid all-or-nothing failures from optional deps.
                 try:
-                    from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+                    from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 
                     for spec in get_registered_analysis_commands().values():
                         module_path = str(getattr(spec, "module_path", "")).strip()
@@ -589,7 +589,7 @@ class PipelineRuntime:
             schemas = self._analysis_schemas({str(k): v for k, v in TASK_REGISTRY.items()})
         except Exception:
             try:
-                from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+                from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 
                 task_names = sorted(str(name) for name in get_registered_analysis_commands().keys())
             except Exception:

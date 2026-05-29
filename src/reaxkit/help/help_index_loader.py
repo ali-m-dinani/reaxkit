@@ -1021,9 +1021,9 @@ def _token_set_fuzzy_ratio(a: str, b: str) -> float:
 def _infer_command_kind(command_name: str) -> str:
     """Infer command kind from routing registries."""
     try:
-        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-        from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-        from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+        from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
     except Exception:
         return ""
 
@@ -1114,9 +1114,9 @@ def _resolve_engine_loader_map(engine: str) -> Dict[str, Any]:
 def _resolve_module_path(command: str, kind: str) -> str:
     """Resolve module path for a command via routing registries."""
     try:
-        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-        from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-        from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+        from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
     except Exception:
         return ""
 
@@ -1137,9 +1137,9 @@ def _related_commands_for_module(module_path: str, kind: str) -> Tuple[str, ...]
     if not module_path:
         return tuple()
     try:
-        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-        from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-        from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+        from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
     except Exception:
         return tuple()
 
@@ -1420,9 +1420,9 @@ def _command_entry(command_name: str) -> Tuple[str, str, str]:
 
     if not kind:
         try:
-            from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-            from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-            from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+            from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+            from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+            from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
             if command_name in get_registered_analysis_commands():
                 kind = "analysis"
             elif command_name in get_registered_generators():
@@ -1644,7 +1644,7 @@ def _workflow_links_for_task(task_name: str, task_module: str) -> Tuple[Tuple[st
     seen: set[Tuple[str, str]] = set()
 
     try:
-        from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
         analysis_routes = get_registered_analysis_commands()
     except Exception:
         analysis_routes = {}

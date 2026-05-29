@@ -15,14 +15,14 @@ import argparse
 from pathlib import Path
 from typing import Callable
 
-from reaxkit.core.generator_runtime import (
+from reaxkit.core.runtime.generator_runtime import (
     maybe_copy_output_to_dot,
     persist_generator_metadata,
     prepare_generator_output,
     print_saved_dirs,
 )
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.common.generators.structure_transformers import (
     build_surface,

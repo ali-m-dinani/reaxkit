@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.connectivity.coordination import CoordinationStatusRequest, CoordinationStatusTask
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.exceptions import AnalysisError
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.platform.exceptions import AnalysisError
 
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"

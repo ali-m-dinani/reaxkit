@@ -1,0 +1,37 @@
+version: 1
+applies_to:
+  - "reaxkit/src/reaxkit/**/README.md"
+goal: >
+  Provide a fast top-level orientation for each package/subpackage:
+  what it owns, what it does not own, how it is organized, and where to extend it.
+
+required_sections:
+  - title: "Folder Name"
+    format: "H1 markdown heading"
+  - title: "Purpose"
+    format: "Short paragraph (1-3 sentences)"
+  - title: "What Belongs Here"
+    format: "Flat bullet list"
+  - title: "What Does Not Belong Here"
+    format: "Flat bullet list"
+  - title: "Structure"
+    format: "Bullets of subfolders/files with one-line role"
+  - title: "Flow"
+    format: "Short paragraph or bullets describing input->output path"
+  - title: "Extension Points"
+    format: "Bullets listing registries, decorators, or entrypoints"
+
+style_rules:
+  max_lines: 60
+  avoid_nested_bullets: true
+  prefer_relative_links: true
+  keep_examples_optional: true
+  include_file_names_when_possible: true
+
+maintenance_rules:
+  update_when:
+    - "new subfolder is added"
+    - "ownership boundary changes"
+    - "new registry/entrypoint is introduced"
+  review_frequency: "per feature PR touching package structure"
+  owner_hint: "module/package maintainers"

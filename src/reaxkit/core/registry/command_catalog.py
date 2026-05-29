@@ -9,10 +9,10 @@ import importlib.resources as ir
 
 import yaml
 
-from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
 
 
 @dataclass(frozen=True)

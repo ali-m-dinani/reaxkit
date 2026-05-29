@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.electrostatics.electrostatics import DipoleRequest, DipoleTask
-from reaxkit.core.engine_registry import resolve_engine
+from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.domain.data_models import ChargeData, ConnectivityData, ElectrostaticsData, TrajectoryData
 
 RUN_DIR = Path(

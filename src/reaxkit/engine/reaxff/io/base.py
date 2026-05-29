@@ -34,7 +34,7 @@ import threading
 import json
 from datetime import datetime, timezone
 import pandas as pd
-from reaxkit.core.exceptions import ParseError
+from reaxkit.core.platform.exceptions import ParseError
 
 try:  # pragma: no cover - optional at runtime
     import h5py  # type: ignore

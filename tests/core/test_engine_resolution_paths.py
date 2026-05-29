@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 
-from reaxkit.core.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
 

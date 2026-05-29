@@ -21,13 +21,13 @@ from reaxkit.analysis.active_sites import (
     ActiveSiteEventsRequest,
     ActiveSiteStructuralRequest,
 )
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.frame_utils import parse_frame_indices
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.utils.frame_utils import parse_frame_indices
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
-from reaxkit.core.result_bundle import bundle_canonical_and_tract_tables
+from reaxkit.core.results_shaping.result_bundle import bundle_canonical_and_tract_tables
 
 ALL_COMMANDS = ("get_active_site_structural", "get_active_site_events")
 ALL_LEGACY_COMMANDS = (

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 from reaxkit.presentation.persist import append_artifacts_to_settings, persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
 from reaxkit.presentation.report_registry import get_report_payload_builder

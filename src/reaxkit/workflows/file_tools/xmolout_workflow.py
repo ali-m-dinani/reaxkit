@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import argparse
 
-from reaxkit.core.generator_runtime import (
+from reaxkit.core.runtime.generator_runtime import (
     maybe_copy_output_to_dot,
     persist_generator_metadata,
     prepare_generator_output,
     print_saved_dirs,
 )
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.generators.xmolout_generator import trim_xmolout
 
 ALL_COMMANDS = ("trim-xmolout",)

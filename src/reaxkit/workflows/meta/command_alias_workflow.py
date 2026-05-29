@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import argparse
 
-from reaxkit.core.command_alias_resolver import (
+from reaxkit.core.resolve.command_alias_resolver import (
     build_command_alias_index,
     normalize_command_token,
     resolve_command_name,
 )
-from reaxkit.core.command_catalog import get_registered_commands
-from reaxkit.core.user_command_aliases import add_user_command_alias, user_command_aliases_path
+from reaxkit.core.registry.command_catalog import get_registered_commands
+from reaxkit.core.resolve.user_command_aliases import add_user_command_alias
 
 ALL_COMMANDS = ("add-alias",)
 ALL_LEGACY_COMMANDS = ("add_alias",)

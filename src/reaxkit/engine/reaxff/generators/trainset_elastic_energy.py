@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 import math
 import warnings
 
-from reaxkit.core.constants import const
+from reaxkit.core.platform.constants import const
 from reaxkit.utils.equation_of_states import vinet_energy_trainset
 
 

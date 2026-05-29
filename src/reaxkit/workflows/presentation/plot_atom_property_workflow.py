@@ -20,10 +20,10 @@ import pandas as pd
 import reaxkit.engine  # noqa: F401
 
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.frame_utils import parse_frame_indices
-from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.utils.frame_utils import parse_frame_indices
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import ChargeData, ConnectivityData, TrajectoryData
 from reaxkit.presentation.dispatcher import export_result_csv
 from reaxkit.presentation.plot import plot as render_plot
@@ -396,7 +396,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             args.export,
             canonical,
             run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
+            project_root=getattr(args, "project_root", "../meta"),
             analysis_id=getattr(args, "analysis_id", None),
         )
         export_result_csv(SimpleNamespace(table=table), str(out_csv))
@@ -407,7 +407,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             args.save,
             canonical,
             run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
+            project_root=getattr(args, "project_root", "../meta"),
             analysis_id=getattr(args, "analysis_id", None),
         )
         args.save = str(out_save)

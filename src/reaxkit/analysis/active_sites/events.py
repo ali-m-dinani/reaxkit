@@ -24,7 +24,7 @@ from reaxkit.analysis.active_sites.models import ActiveSiteEventsRequest, Active
 from reaxkit.analysis.active_sites.pbc import frame_cell_matrix, pairwise_min_image_distances
 from reaxkit.analysis.active_sites.tract_compat import to_tract_events_table
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.core.analysis_task_registry import register_task
+from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, TrajectoryData
 from reaxkit.presentation.specs import PresentationSpec
 

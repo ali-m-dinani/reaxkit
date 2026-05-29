@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 import os
 import re
 
-from reaxkit.core.constants import const
+from reaxkit.core.platform.constants import const
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.geo_generator import xtob
 from reaxkit.engine.reaxff.generators.trainset_mp import (

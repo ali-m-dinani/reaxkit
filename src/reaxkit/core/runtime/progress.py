@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from reaxkit.core.log import get_logger
+from reaxkit.core.platform.log import get_logger
 from tqdm.auto import tqdm
 
 ProgressReporter = Callable[[str, int, int, str | None], None]

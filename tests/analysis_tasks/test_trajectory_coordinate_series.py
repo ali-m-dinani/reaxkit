@@ -10,8 +10,8 @@ from reaxkit.analysis.timeseries.timeseries import (
     TrajectoryCoordinateSeriesRequest,
     TrajectoryCoordinateSeriesTask,
 )
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.engine_registry import resolve_engine
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.platform.engine_resolver import resolve_engine
 
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"

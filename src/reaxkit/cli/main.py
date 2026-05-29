@@ -15,12 +15,12 @@ import sys
 import textwrap
 from importlib import import_module
 
-from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.command_catalog import get_registered_commands
-from reaxkit.core.exceptions import AnalysisError, ParseError
-from reaxkit.core.generator_cli_routing_registry import get_registered_generators
-from reaxkit.core.workflow_cli_routing_registry import get_registered_workflows
+from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.registry.command_catalog import get_registered_commands
+from reaxkit.core.platform.exceptions import AnalysisError, ParseError
+from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
 
 
 class _ReaxKitArgumentParser(argparse.ArgumentParser):

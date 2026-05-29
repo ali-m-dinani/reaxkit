@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from reaxkit.core.engine_registry import register_engine
+from reaxkit.core.platform.engine_resolver import register_engine
 from reaxkit.domain.data_models import (
     AtomicKinematicsData,
     ChargeData,

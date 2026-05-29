@@ -8,7 +8,7 @@ from pathlib import Path
 def detect_engine(path: str, engine_override: str | None = None) -> str:
     """Resolve engine name from path with optional explicit override."""
     try:
-        from reaxkit.core.engine_registry import resolve_engine
+        from reaxkit.core.platform.engine_resolver import resolve_engine
         import reaxkit.engine  # noqa: F401  (register adapters)
 
         adapter = resolve_engine(str(Path(path)), engine=engine_override)

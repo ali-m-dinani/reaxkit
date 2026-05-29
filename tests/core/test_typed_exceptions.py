@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.exceptions import AnalysisError, ParseError
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.platform.exceptions import AnalysisError, ParseError
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
 

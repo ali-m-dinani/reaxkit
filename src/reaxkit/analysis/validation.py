@@ -23,7 +23,7 @@ from typing import Any
 
 import numpy as np
 
-from reaxkit.core.exceptions import AnalysisError
+from reaxkit.core.platform.exceptions import AnalysisError
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.data_models import TrajectoryData
 

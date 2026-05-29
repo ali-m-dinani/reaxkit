@@ -33,10 +33,10 @@ from reaxkit.analysis.timeseries.timeseries import (
     TrajectoryCoordinateSeriesRequest,
     TrajectoryDisplacementSeriesRequest,
 )
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.frame_utils import parse_frame_indices
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.utils.frame_utils import parse_frame_indices
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import present_result
 

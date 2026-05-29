@@ -16,7 +16,7 @@ import shutil
 import tarfile
 from pathlib import Path
 
-from reaxkit.core.storage_layout import default_project_root
+from reaxkit.core.storage.storage_layout import default_project_root
 
 MANAGE_WORKSPACE_COMMAND = "manage-workspace"
 FREE_UP_COMMAND = "free-up"

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
-from reaxkit.core.parsed_store import load_parsed_hdf5, update_parsed_meta, write_parsed_hdf5
+from reaxkit.core.storage.parsed_store import load_parsed_hdf5, update_parsed_meta, write_parsed_hdf5
 
 _DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
     "xmolout",
@@ -112,7 +112,7 @@ def parsed_id_from_raw_and_handler(*, raw_hash: str, handler_version: str) -> st
 
 @dataclass(frozen=True)
 class ReaxkitStorageLayout:
-    project_root: Path = Path(".")
+    project_root: Path = Path("..")
 
     @property
     def inputs_root(self) -> Path:
@@ -384,7 +384,7 @@ def _detect_snapshot_source(out: dict) -> Path:
             chosen = path if path.is_dir() else path.parent
             break
     if chosen is None:
-        chosen = Path(".")
+        chosen = Path("..")
     return chosen
 
 
@@ -469,7 +469,7 @@ def normalize_storage_args(
         path = Path(str(raw))
         if path.is_absolute():
             continue
-        if path.parent != Path("."):
+        if path.parent != Path(".."):
             continue
         if path.name != default_name:
             continue

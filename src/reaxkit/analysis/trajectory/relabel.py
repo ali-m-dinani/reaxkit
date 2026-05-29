@@ -21,7 +21,7 @@ import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.connectivity.coordination import CoordinationStatusRequest, CoordinationStatusTask
-from reaxkit.core.analysis_task_registry import register_task
+from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (

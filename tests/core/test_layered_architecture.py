@@ -4,8 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.engine_registry import resolve_engine
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.task_registry import TASK_REGISTRY
 from reaxkit.domain.data_models import MSDRequest, TrajectoryData
 from reaxkit.analysis.trajectory.msd_task import MSDTask

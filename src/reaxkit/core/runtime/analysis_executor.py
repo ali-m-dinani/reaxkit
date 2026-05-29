@@ -9,13 +9,13 @@ from time import perf_counter
 from datetime import datetime, timezone
 import json
 
-from reaxkit.core.cache_manager import CacheConfig, CacheManager
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.exceptions import ParseError, AnalysisError
-from reaxkit.core.log import get_logger, configure_file_logging
-from reaxkit.core.progress import resolve_reporter
-from reaxkit.core.result_time_enrichment import enrich_result_with_time
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
+from reaxkit.core.storage.cache_manager import CacheConfig, CacheManager
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.platform.exceptions import ParseError, AnalysisError
+from reaxkit.core.platform.log import get_logger, configure_file_logging
+from reaxkit.core.runtime.progress import resolve_reporter
+from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 
 logger = get_logger(__name__)

@@ -16,10 +16,10 @@ import os
 import json
 from pathlib import Path
 
-from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
-from reaxkit.core.analysis_task_registry import TASK_LABELS, TASK_REGISTRY, task_display_label
+from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+from reaxkit.core.registry.analysis_task_registry import TASK_LABELS, TASK_REGISTRY, task_display_label
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_dash_request
-from reaxkit.utils.export_utils import write_figure, write_table
+from reaxkit.presentation.export_utils import write_figure, write_table
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.backend.tabular_payload import extract_tabular_rows, infer_columns, infer_numeric_columns
 from reaxkit.webui.backend.utility_registry import canonical_utility_name, default_utility_request

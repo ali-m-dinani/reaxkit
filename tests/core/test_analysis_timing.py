@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from reaxkit.core.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 
 
 class _DummyTask:

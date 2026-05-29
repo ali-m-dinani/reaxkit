@@ -6,8 +6,8 @@ from difflib import get_close_matches
 import re
 from typing import Iterable, Mapping, Sequence
 
-from reaxkit.core.command_catalog import get_registered_commands
-from reaxkit.core.user_command_aliases import load_user_command_aliases
+from reaxkit.core.registry.command_catalog import get_registered_commands
+from reaxkit.core.resolve.user_command_aliases import load_user_command_aliases
 
 
 def _normalize_command_token(value: str) -> str:

@@ -7,7 +7,7 @@ from typing import Any, Callable
 from dash import ALL, Input, Output, State, dcc, html, no_update
 
 from reaxkit.webui.backend.api import WebUIApiService
-from reaxkit.core.frame_utils import parse_frame_indices
+from reaxkit.core.utils.frame_utils import parse_frame_indices
 from reaxkit.webui.ui.analysis.tasks.form_utils import label_with_help
 from reaxkit.webui.ui.analysis.tasks.ui_hints import field_ui_hint
 

@@ -14,13 +14,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from reaxkit.core.generator_runtime import (
+from reaxkit.core.runtime.generator_runtime import (
     maybe_copy_output_to_dot,
     persist_generator_metadata,
     prepare_generator_output,
     print_saved_dirs,
 )
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 
 ALL_COMMANDS = ("get-optimized-ffield",)
 ALL_LEGACY_COMMANDS = ("get_optimized_ffield", "extract-optimized-ffield", "extract_optimized_ffield")

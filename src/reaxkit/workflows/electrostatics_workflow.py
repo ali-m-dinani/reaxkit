@@ -28,14 +28,14 @@ from reaxkit.analysis.electrostatics.electrostatics import (
     PolarizationRequest,
 )
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.alias import _resolve_alias, normalize_choice, resolve_alias_from_columns
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.frame_utils import parse_frame_indices, parse_frames
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.progress import resolve_reporter
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.resolve.alias import _resolve_alias, normalize_choice, resolve_alias_from_columns
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.utils.frame_utils import parse_frame_indices, parse_frames
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.runtime.progress import resolve_reporter
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.domain.data_models import (
     TrajectoryData,
 )

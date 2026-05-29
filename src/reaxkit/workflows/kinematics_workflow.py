@@ -20,10 +20,10 @@ import pandas as pd
 from reaxkit.analysis import kinematics as _kinematics_tasks  # noqa: F401
 from reaxkit.analysis.kinematics.kinematics import AtomicKinematicsRequest
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.plot import heatmap2d_from_3d, scatter3d_points
 

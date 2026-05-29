@@ -19,7 +19,7 @@ from reaxkit.analysis.active_sites.tract_compat import (
     to_tract_events_table,
     to_tract_structural_table,
 )
-from reaxkit.analysis.active_sites.reporting import register_active_site_report_payloads
+from reaxkit.presentation.active_sites.reporting import register_active_site_report_payloads
 
 register_active_site_report_payloads()
 

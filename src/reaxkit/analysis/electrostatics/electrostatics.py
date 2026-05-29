@@ -22,7 +22,7 @@ import pandas as pd
 from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.core.analysis_task_registry import register_task
+from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
@@ -31,7 +31,7 @@ from reaxkit.engine.reaxff.adapter import (
     _connectivity_from_fort7_handler,
     _trajectory_from_xmolout_handler,
 )
-from reaxkit.core.constants import const
+from reaxkit.core.platform.constants import const
 from reaxkit.presentation.specs import PresentationSpec
 from reaxkit.utils.numerical.numerical_calcs import find_zero_crossings
 

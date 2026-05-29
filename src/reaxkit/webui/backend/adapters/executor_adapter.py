@@ -18,12 +18,12 @@ def _build_request(request_type: type, payload: dict[str, Any]) -> object:
 
 def run_analysis_task(task_name: str, request_payload: dict[str, Any], runtime_args: dict[str, Any]) -> tuple[object, type]:
     """Execute a registered task by name and return (result, task_class)."""
-    from reaxkit.core.analysis_executor import AnalysisExecutor
-    from reaxkit.core.analysis_task_registry import TASK_REGISTRY
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 
     if task_name not in TASK_REGISTRY:
         try:
-            from reaxkit.core.analysis_cli_routing_registry import get_registered_analysis_commands
+            from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 
             spec = get_registered_analysis_commands().get(task_name)
             module_path = str(getattr(spec, "module_path", "")).strip() if spec is not None else ""

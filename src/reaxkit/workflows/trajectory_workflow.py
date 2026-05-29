@@ -23,11 +23,11 @@ from reaxkit.analysis.trajectory.diffusivity import DiffusivityRequest
 from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.analysis.trajectory.rdf import RDFPropertyRequest, RDFRequest
 from reaxkit.analysis.trajectory.voronoi import VoronoiRequest
-from reaxkit.core.analysis_executor import AnalysisExecutor
-from reaxkit.core.analysis_task_registry import TASK_REGISTRY
-from reaxkit.core.command_alias_resolver import resolve_command_name
-from reaxkit.core.frame_utils import parse_frame_indices
-from reaxkit.core.storage_layout import add_storage_cli_arguments
+from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.utils.frame_utils import parse_frame_indices
+from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 

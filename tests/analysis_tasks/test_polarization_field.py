@@ -12,8 +12,8 @@ from reaxkit.analysis.electrostatics.electrostatics import (
     PolarizationFieldRequest,
     PolarizationFieldTask,
 )
-from reaxkit.core.engine_registry import resolve_engine
-from reaxkit.core.exceptions import ParseError
+from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.domain.data_models import (
     ChargeData,
     ConnectivityData,

@@ -8,8 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from reaxkit.core.log import configure_file_logging
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, default_project_root, generate_run_id
+from reaxkit.core.platform.log import configure_file_logging
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, default_project_root, generate_run_id
 
 
 def _json_safe(value: Any) -> Any:
@@ -83,7 +83,7 @@ def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None
     """Copy generated output to current directory when requested."""
     if not enabled:
         return None
-    dst = Path(".") / output_path.name
+    dst = Path("..") / output_path.name
     if output_path.is_dir():
         if dst.exists():
             shutil.rmtree(dst)

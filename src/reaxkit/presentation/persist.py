@@ -10,8 +10,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from reaxkit.core.log import get_logger
-from reaxkit.core.storage_layout import ReaxkitStorageLayout
+from reaxkit.core.platform.log import get_logger
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout
 
 logger = get_logger(__name__)
 
@@ -64,7 +64,7 @@ def _write_figure_artifacts(command: str, out_dir: Path, result: Any, *, analysi
     if not isinstance(table, pd.DataFrame):
         return []
     try:
-        from reaxkit.analysis.active_sites.plot_exports import save_structural_figures_tract_style
+        from reaxkit.presentation.active_sites.plot_exports import save_structural_figures_tract_style
     except Exception as exc:  # pragma: no cover - defensive: plotting deps may be unavailable
         logger.debug("Skipping active-site structural figure export: %s", exc)
         return []

@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from reaxkit.cli.path import resolve_output_path
-from reaxkit.core.storage_layout import ReaxkitStorageLayout, normalize_storage_args
+from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 from reaxkit.presentation.dispatcher import present_result
 
 

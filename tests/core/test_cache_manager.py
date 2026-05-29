@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from reaxkit.core.cache_manager import CacheConfig, CacheManager
+from reaxkit.core.storage.cache_manager import CacheConfig, CacheManager
 
 
 def _new_cache(root: Path, *, memory_maxsize: int = 128) -> CacheManager:
