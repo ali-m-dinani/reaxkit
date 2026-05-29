@@ -10,6 +10,12 @@ Typical use cases include:
 - extracting per-atom bond-order features
 - computing coordination statistics
 - building molecule- and structure-level descriptors
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -102,6 +108,7 @@ class Fort7Handler(BaseHandler):
         warned_large_atom_count = False
 
         def _finalize_iteration() -> None:
+            """Finalize iteration."""
             if cur_num_particles is None or cur_nbonds is None or not cur_atoms_rows:
                 return
             nb = int(cur_nbonds)
@@ -204,17 +211,21 @@ class Fort7Handler(BaseHandler):
         return sim_df, meta
 
     def _count_lines(self) -> int:
+        """Count lines."""
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:
+        """Disk cache dir."""
         return self._cache_root() / key
 
     def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        """Store in disk cache."""
         super()._store_in_disk_cache(key, payload)
 
     def _load_from_disk_cache(self, key: str) -> bytes | None:
+        """Load from disk cache."""
         return super()._load_from_disk_cache(key)
 
     # -------------------------------------------------------

@@ -3,6 +3,12 @@ ReaxFF control file generation utilities.
 
 This module provides deterministic helpers for generating or writing a
 default ReaxFF ``control`` input file from a canonical, aligned template.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -108,14 +114,14 @@ __all__ = [
 
 @dataclass(frozen=True)
 class ControlGeneratorSpec:
-    """
-    Declarative settings for generating a ReaxFF ``control`` file.
+    """Represent ControlGeneratorSpec.
 
-    Parameters
-    ----------
-    template_text : str, optional
-        Fully formatted ``control`` file content. Defaults to the bundled
-        canonical template.
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    template_text : str
+        Dataclass field.
     """
 
     template_text: str = CONTROL_TEMPLATE
@@ -142,6 +148,7 @@ def _gen_control_text(spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC) -> str:
 
 
 def _format_control_value(value: Any) -> str:
+    """Format control value."""
     text = str(value).strip()
     if len(text) > CONTROL_VALUE_WIDTH:
         raise ValueError(
@@ -151,6 +158,7 @@ def _format_control_value(value: Any) -> str:
 
 
 def _format_control_line(value: Any, key: str, comment_tail: str) -> str:
+    """Format control line."""
     key_text = str(key).strip()
     if len(key_text) > CONTROL_KEY_WIDTH:
         raise ValueError(
@@ -164,6 +172,7 @@ def _format_control_line(value: Any, key: str, comment_tail: str) -> str:
 
 
 def _apply_control_overrides(text: str, overrides: dict[str, Any] | None = None) -> str:
+    """Apply control overrides."""
     normalized = {str(k).strip().lower(): v for k, v in (overrides or {}).items() if str(k).strip()}
     out_lines: list[str] = []
     seen: set[str] = set()
@@ -187,10 +196,12 @@ def _apply_control_overrides(text: str, overrides: dict[str, Any] | None = None)
 
 
 def _normalize_overrides(overrides: dict[str, Any] | None = None) -> dict[str, str]:
+    """Normalize overrides."""
     return {str(k).strip().lower(): str(v) for k, v in (overrides or {}).items() if str(k).strip()}
 
 
 def _control_overrides_from_data(data: ControlParametersData) -> dict[str, Any]:
+    """Control overrides from data."""
     overrides: dict[str, Any] = {}
     for section_name in ("general", "md", "mm", "ff", "outdated"):
         section = getattr(data, section_name, {}) or {}
@@ -281,8 +292,28 @@ def gen_control(
     spec: ControlGeneratorSpec = DEFAULT_CONTROL_SPEC,
     overrides: dict[str, Any] | None = None,
 ) -> Path:
-    """
-    Generate template ``control`` file with optional key/value overrides.
+    """Gen control.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    spec : ControlGeneratorSpec, optional
+        Input parameter.
+    overrides : dict[str, Any] | None, optional
+        Input parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_control(...)
+    ```
     """
     return _write_control_template_with_overrides(
         out_path=out_path,

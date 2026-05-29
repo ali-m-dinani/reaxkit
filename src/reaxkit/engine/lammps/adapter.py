@@ -1,4 +1,15 @@
-"""LAMMPS engine adapter (scaffold)."""
+"""Adapt LAMMPS logs/dumps into ReaxKit canonical domain data models.
+
+This adapter resolves LAMMPS run files, parses dump/log content through shared
+handlers, and maps extracted arrays/tables into engine-agnostic models. It
+focuses on ingestion/export wiring rather than analysis logic.
+
+**Usage context**
+
+- Engine resolution: Registered under ``"lammps"`` for adapter detection.
+- Data ingestion: Builds trajectory and simulation models from dump/log files.
+- Export fallback: Writes canonical trajectories to XYZ files.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +31,24 @@ class LAMMPSAdapter(EngineAdapter):
     """Adapter scaffold for LAMMPS trajectory formats."""
 
     def detect(self, path: str | Path) -> float:
+        """Score whether a path likely refers to a LAMMPS run location.
+
+        Parameters
+        ----------
+        path : str | Path
+            Candidate file or directory path.
+
+        Returns
+        -------
+        float
+            Detection score in ``[0.0, 1.0]``.
+
+        Examples
+        --------
+        ```python
+        score = LAMMPSAdapter().detect("dump.lammpstrj")
+        ```
+        """
         p = Path(path)
         if p.is_dir():
             if (p / "log.lammps").exists():
@@ -38,6 +67,26 @@ class LAMMPSAdapter(EngineAdapter):
         return 0.0
 
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
+        """Return likely LAMMPS input files for a requested target data type.
+
+        Parameters
+        ----------
+        data_type : type
+            Requested canonical data-model class.
+        args : dict
+            Adapter runtime arguments (unused in this mapping).
+
+        Returns
+        -------
+        tuple[str, ...] | None
+            Candidate file names or ``None`` if unconstrained.
+
+        Examples
+        --------
+        ```python
+        files = adapter.required_input_files(TrajectoryData, {})
+        ```
+        """
         _ = args
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("dump.xyz", "dump.lammpstrj", "lammpstrj"),
@@ -49,6 +98,7 @@ class LAMMPSAdapter(EngineAdapter):
 
     @staticmethod
     def _resolve_run_path(args: dict, *keys: str, default_name: str) -> Path:
+        """Resolve a path from argument keys, ``run_dir``, or default filename."""
         for key in keys:
             raw = args.get(key)
             if raw:
@@ -72,6 +122,7 @@ class LAMMPSAdapter(EngineAdapter):
 
     @staticmethod
     def _first_dump_in_dir(folder: Path) -> Path | None:
+        """Return first dump-like file in a directory, sorted by name."""
         if not folder.exists() or not folder.is_dir():
             return None
         candidates = sorted(
@@ -81,6 +132,7 @@ class LAMMPSAdapter(EngineAdapter):
         return candidates[0] if candidates else None
 
     def _resolve_dump_path(self, args: dict) -> Path:
+        """Resolve best candidate trajectory dump path from adapter arguments."""
         initial = self._resolve_run_path(args, "dump", "dump_file", "trajectory", default_name="dump.xyz")
         if initial.exists():
             return initial
@@ -95,6 +147,7 @@ class LAMMPSAdapter(EngineAdapter):
         return initial
 
     def _resolve_log_path(self, args: dict) -> Path:
+        """Resolve best candidate ``log.lammps`` path from adapter arguments."""
         initial = self._resolve_run_path(args, "log", "log_file", "simulation", default_name="log.lammps")
         if initial.exists():
             return initial
@@ -109,12 +162,33 @@ class LAMMPSAdapter(EngineAdapter):
 
     @staticmethod
     def _column(data: dict[str, np.ndarray], *names: str) -> np.ndarray | None:
+        """Return first available column from a thermo mapping by preferred names."""
         for name in names:
             if name in data:
                 return np.asarray(data[name])
         return None
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
+        """Load trajectory coordinates/types from a LAMMPS dump file.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter arguments used to resolve dump file location.
+        reporter : callable | None, optional
+            Progress callback passed to dump handler.
+
+        Returns
+        -------
+        TrajectoryData
+            Canonical trajectory payload with positions, labels, and iterations.
+
+        Examples
+        --------
+        ```python
+        traj = LAMMPSAdapter().load_trajectory({"dump": "dump.lammpstrj"})
+        ```
+        """
         dump_path = self._resolve_dump_path(args)
         handler = LAMMPSDumpHandler(dump_path, reporter=reporter)
         sim_df = handler.dataframe()
@@ -182,6 +256,26 @@ class LAMMPSAdapter(EngineAdapter):
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
+        """Load simulation thermo series from ``log.lammps`` content.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter arguments used to resolve log and optional dump paths.
+        reporter : callable | None, optional
+            Reserved for interface consistency (unused here).
+
+        Returns
+        -------
+        SimulationData
+            Canonical simulation-level thermo and scalar time-series payload.
+
+        Examples
+        --------
+        ```python
+        sim = LAMMPSAdapter().load_simulation({"log": "log.lammps"})
+        ```
+        """
         _ = reporter
         log_path = self._resolve_log_path(args)
         payload = LAMMPSLogHandler(log_path).read()
@@ -223,15 +317,77 @@ class LAMMPSAdapter(EngineAdapter):
         )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
+        """Load connectivity payload for LAMMPS runs.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter runtime arguments.
+        reporter : callable | None, optional
+            Progress callback placeholder.
+
+        Returns
+        -------
+        ConnectivityData
+            Placeholder empty connectivity matrix for current scaffold behavior.
+
+        Examples
+        --------
+        ```python
+        conn = LAMMPSAdapter().load_connectivity({})
+        ```
+        """
         _ = (args, reporter)
         return ConnectivityData(connectivity=np.empty((0, 0), dtype=int))
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
+        """Load connectivity and trajectory together as one composite object.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter arguments forwarded to component loaders.
+        reporter : callable | None, optional
+            Progress callback forwarded to component loaders.
+
+        Returns
+        -------
+        ConnectivityTrajectoryData
+            Composite payload containing connectivity and trajectory models.
+
+        Examples
+        --------
+        ```python
+        combo = LAMMPSAdapter().load_connectivity_trajectory({"dump": "dump.xyz"})
+        ```
+        """
         return ConnectivityTrajectoryData(
             connectivity=self.load_connectivity(args, reporter=reporter),
             trajectory=self.load_trajectory(args, reporter=reporter),
         )
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
+        """Write trajectory data to multi-frame XYZ using shared generator.
+
+        Parameters
+        ----------
+        data : TrajectoryData
+            Canonical trajectory payload to export.
+        out_path : str | Path
+            Destination XYZ file path.
+        args : dict | None, optional
+            Optional settings; supports ``precision``.
+
+        Returns
+        -------
+        Any
+            Return value from ``write_xyz_trajectory``.
+
+        Examples
+        --------
+        ```python
+        adapter.write_trajectory(traj, "traj.xyz", {"precision": 8})
+        ```
+        """
         args = args or {}
         return write_xyz_trajectory(data, out_path, precision=int(args.get("precision", 6)))

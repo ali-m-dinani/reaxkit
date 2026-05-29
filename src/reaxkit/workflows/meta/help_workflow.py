@@ -56,7 +56,7 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--top",
         type=int,
-        default=8,
+        default=1,
         help="Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3 hits per category.",
     )
 

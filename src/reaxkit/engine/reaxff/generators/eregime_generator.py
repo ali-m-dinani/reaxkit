@@ -4,6 +4,12 @@ ReaxFF electric-field regime (eregime.in) generators.
 This module provides deterministic utilities for generating ReaxFF
 ``eregime.in`` files, which define time-dependent external electric
 field schedules applied during MD simulations.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -35,11 +41,45 @@ HEADER_LINES: Sequence[str] = (
 
 @dataclass(frozen=True)
 class ExplicitERegimeSpec:
+    """Represent ExplicitERegimeSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    rows : tuple[tuple[int, int, str, float], ...]
+        Dataclass field.
+    """
     rows: tuple[tuple[int, int, str, float], ...]
 
 
 @dataclass(frozen=True)
 class SinusoidalERegimeSpec:
+    """Represent SinusoidalERegimeSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    max_magnitude : float
+        Dataclass field.
+    step_angle : float
+        Dataclass field.
+    iteration_step : int
+        Dataclass field.
+    num_cycles : float
+        Dataclass field.
+    direction : str
+        Dataclass field.
+    voltage_idx : int
+        Dataclass field.
+    phase : float
+        Dataclass field.
+    dc_offset : float
+        Dataclass field.
+    start_iter : int
+        Dataclass field.
+    """
     max_magnitude: float
     step_angle: float
     iteration_step: int
@@ -53,6 +93,35 @@ class SinusoidalERegimeSpec:
 
 @dataclass(frozen=True)
 class SmoothPulseERegimeSpec:
+    """Represent SmoothPulseERegimeSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    amplitude : float
+        Dataclass field.
+    width : float
+        Dataclass field.
+    period : float
+        Dataclass field.
+    slope : float
+        Dataclass field.
+    iteration_step : int
+        Dataclass field.
+    num_of_cycles : int | float
+        Dataclass field.
+    step_size : float
+        Dataclass field.
+    direction : str
+        Dataclass field.
+    voltage_idx : int
+        Dataclass field.
+    baseline : float
+        Dataclass field.
+    start_iter : int
+        Dataclass field.
+    """
     amplitude: float
     width: float
     period: float
@@ -68,6 +137,27 @@ class SmoothPulseERegimeSpec:
 
 @dataclass(frozen=True)
 class FunctionalERegimeSpec:
+    """Represent FunctionalERegimeSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    func : Callable[[float], float]
+        Dataclass field.
+    t_end : float
+        Dataclass field.
+    dt : float
+        Dataclass field.
+    iteration_step : int
+        Dataclass field.
+    direction : str
+        Dataclass field.
+    voltage_idx : int
+        Dataclass field.
+    start_iter : int
+        Dataclass field.
+    """
     func: Callable[[float], float]
     t_end: float
     dt: float
@@ -78,6 +168,7 @@ class FunctionalERegimeSpec:
 
 
 def _normalize_direction(direction: str) -> str:
+    """Normalize direction."""
     d = direction.strip().lower()
     if d not in {"x", "y", "z"}:
         raise ValueError(f"direction must be one of 'x','y','z'; got {direction!r}")
@@ -85,6 +176,7 @@ def _normalize_direction(direction: str) -> str:
 
 
 def _format_eregime_text(rows: Iterable[tuple[int, int, str, float]]) -> str:
+    """Format eregime text."""
     lines = list(HEADER_LINES)
     for it, v, d, mag in rows:
         d = _normalize_direction(d)
@@ -202,6 +294,25 @@ def _generate_eregime_smooth_pulse(spec: SmoothPulseERegimeSpec) -> str:
     half_period = spec.period / 2.0
 
     def half_profile(tin: float) -> float:
+        """Half profile.
+
+        Parameters
+        ----------
+        tin : float
+            Input parameter.
+
+        Returns
+        -------
+        float
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        half_profile(...)
+        ```
+        """
         if tin < spec.slope:
             return (
                 spec.baseline + (spec.amplitude / spec.slope) * tin
@@ -344,8 +455,62 @@ def gen_eregime(
     t_end: float | None = None,
     dt: float | None = None,
 ) -> Path:
-    """
-    Canonical eregime generator entrypoint used by workflow command ``gen_eregime``.
+    """Gen eregime.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    profile_type : str
+        Keyword-only parameter.
+    iteration_step : int
+        Keyword-only parameter.
+    direction : str, optional
+        Keyword-only parameter.
+    voltage_idx : int, optional
+        Keyword-only parameter.
+    start_iter : int, optional
+        Keyword-only parameter.
+    max_magnitude : float | None, optional
+        Keyword-only parameter.
+    step_angle : float | None, optional
+        Keyword-only parameter.
+    num_cycles : float | None, optional
+        Keyword-only parameter.
+    phase : float, optional
+        Keyword-only parameter.
+    dc_offset : float, optional
+        Keyword-only parameter.
+    amplitude : float | None, optional
+        Keyword-only parameter.
+    width : float | None, optional
+        Keyword-only parameter.
+    period : float | None, optional
+        Keyword-only parameter.
+    slope : float | None, optional
+        Keyword-only parameter.
+    step_size : float, optional
+        Keyword-only parameter.
+    baseline : float, optional
+        Keyword-only parameter.
+    func : Callable[[float], float] | None, optional
+        Keyword-only parameter.
+    t_end : float | None, optional
+        Keyword-only parameter.
+    dt : float | None, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_eregime(...)
+    ```
     """
     kind = str(profile_type).strip().lower()
     if kind == "sin":

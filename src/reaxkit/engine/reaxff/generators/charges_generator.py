@@ -3,6 +3,12 @@ ReaxFF charges file generation utilities.
 
 This module provides deterministic helpers for generating or writing a
 default ReaxFF ``charges`` input file from a canonical template.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -42,14 +48,14 @@ __all__ = [
 
 @dataclass(frozen=True)
 class ChargesGeneratorSpec:
-    """
-    Declarative settings for generating a ReaxFF ``charges`` file.
+    """Represent ChargesGeneratorSpec.
 
-    Parameters
-    ----------
-    template_text : str, optional
-        Fully formatted ``charges`` file content. Defaults to the bundled
-        canonical template.
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    template_text : str
+        Dataclass field.
     """
 
     template_text: str = CHARGES_TEMPLATE
@@ -82,8 +88,26 @@ def gen_template_charges(
     out_path: str | Path = "charges",
     spec: ChargesGeneratorSpec = DEFAULT_CHARGES_SPEC,
 ) -> Path:
-    """
-    Generate template ``charges`` file.
+    """Gen template charges.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    spec : ChargesGeneratorSpec, optional
+        Input parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_charges(...)
+    ```
     """
     return _write_charges_template(out_path=out_path, spec=spec)
 

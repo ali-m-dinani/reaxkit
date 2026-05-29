@@ -3,6 +3,12 @@ ReaxFF ``ffield`` merge utilities.
 
 This module merges atom-type parameter blocks from a source ``ffield`` into a
 destination ``ffield`` and writes a merged output file.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -14,7 +20,7 @@ from typing import Iterable, Mapping
 
 import pandas as pd
 
-from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+from reaxkit.engine.common.io.ffield_handler import FFieldHandler
 
 try:
     from pymatgen.core.periodic_table import Element as _PMElement
@@ -74,7 +80,49 @@ RADIUS_KEYS: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class FFieldMergeSummary:
-    """Summary of a merge operation."""
+    """Represent FFieldMergeSummary.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    output_path : Path
+        Dataclass field.
+    atom_types_merged : tuple[str, ...]
+        Dataclass field.
+    fields : tuple[str, ...]
+        Dataclass field.
+    appended : dict[str, int]
+        Dataclass field.
+    updated : dict[str, int]
+        Dataclass field.
+    skipped_existing : dict[str, int]
+        Dataclass field.
+    skipped_incompatible : dict[str, int]
+        Dataclass field.
+    source_labels : dict[str, list[str]]
+        Dataclass field.
+    source_blocks : dict[str, list[str]]
+        Dataclass field.
+    destination_labels : dict[str, list[str]]
+        Dataclass field.
+    destination_blocks : dict[str, list[str]]
+        Dataclass field.
+    skipped_existing_labels : dict[str, list[str]]
+        Dataclass field.
+    skipped_existing_blocks : dict[str, list[str]]
+        Dataclass field.
+    template_labels : dict[str, list[str]]
+        Dataclass field.
+    template_blocks : dict[str, list[str]]
+        Dataclass field.
+    template_generated : dict[str, int]
+        Dataclass field.
+    template_choices : dict[str, str]
+        Dataclass field.
+    template_similarity_details : dict[str, dict[str, object]]
+        Dataclass field.
+    """
 
     output_path: Path
     atom_types_merged: tuple[str, ...]
@@ -98,7 +146,41 @@ class FFieldMergeSummary:
 
 @dataclass(frozen=True)
 class FFieldAddElementSummary:
-    """Summary of a single-element add operation."""
+    """Represent FFieldAddElementSummary.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    output_path : Path
+        Dataclass field.
+    element : str
+        Dataclass field.
+    template_atom : str
+        Dataclass field.
+    similarity_mode : str
+        Dataclass field.
+    fields : tuple[str, ...]
+        Dataclass field.
+    appended : dict[str, int]
+        Dataclass field.
+    updated : dict[str, int]
+        Dataclass field.
+    skipped_existing : dict[str, int]
+        Dataclass field.
+    skipped_incompatible : dict[str, int]
+        Dataclass field.
+    template_labels : dict[str, list[str]]
+        Dataclass field.
+    template_blocks : dict[str, list[str]]
+        Dataclass field.
+    destination_labels : dict[str, list[str]]
+        Dataclass field.
+    destination_blocks : dict[str, list[str]]
+        Dataclass field.
+    similarity_details : dict[str, object]
+        Dataclass field.
+    """
 
     output_path: Path
     element: str
@@ -118,7 +200,33 @@ class FFieldAddElementSummary:
 
 @dataclass(frozen=True)
 class FFieldAddTermSummary:
-    """Summary of a single explicit-term add operation."""
+    """Represent FFieldAddTermSummary.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    output_path : Path
+        Dataclass field.
+    field : str
+        Dataclass field.
+    term : str
+        Dataclass field.
+    template_term : str | None
+        Dataclass field.
+    template_atoms : dict[str, str]
+        Dataclass field.
+    similarity_mode : str
+        Dataclass field.
+    appended : int
+        Dataclass field.
+    updated : int
+        Dataclass field.
+    skipped_existing : int
+        Dataclass field.
+    similarity_details : dict[str, object]
+        Dataclass field.
+    """
 
     output_path: Path
     field: str
@@ -133,6 +241,7 @@ class FFieldAddTermSummary:
 
 
 def _normalize_fields(fields: Iterable[str] | None) -> tuple[str, ...]:
+    """Normalize fields."""
     if fields is None:
         return SUPPORTED_FIELDS
     out: list[str] = []
@@ -151,6 +260,7 @@ def _normalize_fields(fields: Iterable[str] | None) -> tuple[str, ...]:
 
 
 def _parse_term_atoms(term: str) -> tuple[str, ...]:
+    """Parse term atoms."""
     parts = [p.strip() for p in str(term).replace(",", "-").split("-") if p.strip()]
     if not parts:
         raise ValueError("Term must include atom symbols separated by '-'; for example: Al-N-Al")
@@ -158,12 +268,14 @@ def _parse_term_atoms(term: str) -> tuple[str, ...]:
 
 
 def _field_for_term_size(field: str, n_atoms: int) -> None:
+    """Field for term size."""
     expected = len(SECTION_ATOM_COLS[field])
     if n_atoms != expected:
         raise ValueError(f"Field {field!r} expects {expected} atoms, got {n_atoms}.")
 
 
 def _normalize_atom_types(atom_types: Iterable[str]) -> tuple[str, ...]:
+    """Normalize atom types."""
     out: list[str] = []
     for raw in atom_types:
         token = str(raw).strip()
@@ -175,6 +287,7 @@ def _normalize_atom_types(atom_types: Iterable[str]) -> tuple[str, ...]:
 
 
 def _normalize_similarity_mode(mode: str | None) -> str:
+    """Normalize similarity mode."""
     token = str(mode or "group").strip().lower()
     canonical = SIMILARITY_ALIASES.get(token)
     if canonical is None:
@@ -184,6 +297,7 @@ def _normalize_similarity_mode(mode: str | None) -> str:
 
 
 def _normalize_radius_metrics(metrics: Iterable[str] | None) -> tuple[str, ...]:
+    """Normalize radius metrics."""
     if metrics is None:
         return ("atomic_radius", "covalent_radius", "van_der_waals_radius")
     raw_tokens: list[str] = []
@@ -208,6 +322,7 @@ def _normalize_radius_metrics(metrics: Iterable[str] | None) -> tuple[str, ...]:
 
 
 def _safe_int(value) -> int | None:
+    """Safe int."""
     if value is None or pd.isna(value):
         return None
     try:
@@ -217,6 +332,7 @@ def _safe_int(value) -> int | None:
 
 
 def _safe_float(value) -> float | None:
+    """Safe float."""
     if value is None or pd.isna(value):
         return None
     try:
@@ -229,6 +345,7 @@ def _safe_float(value) -> float | None:
 
 
 def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
+    """Atom maps."""
     if atom_df.empty or "symbol" not in atom_df.columns:
         raise ValueError("Atom section must be non-empty and include 'symbol'.")
     idx_to_sym: dict[int, str] = {}
@@ -242,6 +359,7 @@ def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
 
 
 def _format_general(general_df: pd.DataFrame, names: list[str]) -> str:
+    """Format general."""
     lines: list[str] = []
     for idx in general_df.index.tolist():
         value = float(general_df.loc[idx, "value"])
@@ -255,6 +373,7 @@ def _format_general(general_df: pd.DataFrame, names: list[str]) -> str:
 
 
 def _format_atom(atom_df: pd.DataFrame, names: list[str]) -> str:
+    """Format atom."""
     lines: list[str] = []
     for idx in atom_df.index.tolist():
         symbol = str(atom_df.loc[idx, "symbol"]).strip()
@@ -269,6 +388,7 @@ def _format_atom(atom_df: pd.DataFrame, names: list[str]) -> str:
 
 
 def _format_two_line(df: pd.DataFrame, atom_cols: tuple[str, str], param_names: list[str]) -> str:
+    """Format two line."""
     lines: list[str] = []
     for idx in df.index.tolist():
         i_val = int(df.loc[idx, atom_cols[0]])
@@ -280,6 +400,7 @@ def _format_two_line(df: pd.DataFrame, atom_cols: tuple[str, str], param_names: 
 
 
 def _format_one_line(df: pd.DataFrame, atom_cols: tuple[str, ...], param_names: list[str]) -> str:
+    """Format one line."""
     lines: list[str] = []
     for idx in df.index.tolist():
         atom_part = "".join(f"{int(df.loc[idx, col]):3d}" for col in atom_cols)
@@ -289,6 +410,7 @@ def _format_one_line(df: pd.DataFrame, atom_cols: tuple[str, ...], param_names: 
 
 
 def _format_section_rows(section: str, df: pd.DataFrame, row_indices: list[int], handler: FFieldHandler) -> list[str]:
+    """Format section rows."""
     if not row_indices:
         return []
     sub = df.loc[row_indices]
@@ -333,6 +455,7 @@ def _labels_for_rows(
     row_indices: list[int],
     idx_to_sym: dict[int, str],
 ) -> list[str]:
+    """Labels for rows."""
     labels: list[str] = []
     for ridx in row_indices:
         row = df.loc[ridx]
@@ -359,6 +482,7 @@ def _mapped_row_for_destination(
     mapped_atoms: list[int],
     dst_param_cols: list[str],
 ) -> dict[str, object]:
+    """Mapped row for destination."""
     payload: dict[str, object] = {}
     for col, mapped in zip(atom_cols, mapped_atoms):
         payload[col] = mapped
@@ -368,6 +492,7 @@ def _mapped_row_for_destination(
 
 
 def _element_family(symbol: str) -> str | None:
+    """Element family."""
     if _PMElement is None:
         return None
     try:
@@ -396,6 +521,7 @@ def _element_family(symbol: str) -> str | None:
 
 
 def _element_metadata(symbol: str, *, strict: bool = False) -> dict[str, object]:
+    """Element metadata."""
     if _PMElement is None:
         return {"symbol": symbol, "group": None, "family": None, "atomic_radius": None, "covalent_radius": None, "van_der_waals_radius": None}
     try:
@@ -416,6 +542,7 @@ def _element_metadata(symbol: str, *, strict: bool = False) -> dict[str, object]
 
 
 def _radius_distance(a: dict[str, object], b: dict[str, object], radius_metrics: tuple[str, ...]) -> float:
+    """Radius distance."""
     diffs: list[float] = []
     for key in radius_metrics:
         av = _safe_float(a.get(key))
@@ -435,6 +562,7 @@ def _selection_sort_key(
     candidate: dict[str, object],
     radius_metrics: tuple[str, ...],
 ) -> tuple[object, ...]:
+    """Selection sort key."""
     tgt_group = _safe_int(target.get("group"))
     cand_group = _safe_int(candidate.get("group"))
     tgt_family = target.get("family")
@@ -460,6 +588,7 @@ def _pick_template_atom(
     manual_template: str | None,
     radius_metrics: tuple[str, ...],
 ) -> tuple[str, dict[str, object]]:
+    """Pick template atom."""
     candidates = [str(s).strip() for s in available_symbols if str(s).strip()]
     if not candidates:
         raise ValueError("Destination ffield has no atom symbols available for template matching.")
@@ -514,6 +643,7 @@ def _write_ffield_sections(
     *,
     description: str = "Merged force field generated by reaxkit.",
 ) -> Path:
+    """Write ffield sections."""
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -561,6 +691,7 @@ def _write_ffield_sections(
 
 
 def _atom_tuple_exists(df: pd.DataFrame, atom_cols: tuple[str, ...], atom_values: list[int]) -> pd.DataFrame:
+    """Atom tuple exists."""
     mask = pd.Series([True] * len(df), index=df.index)
     for col, value in zip(atom_cols, atom_values):
         mask &= (pd.to_numeric(df[col], errors="coerce").astype("Int64") == int(value))
@@ -568,6 +699,7 @@ def _atom_tuple_exists(df: pd.DataFrame, atom_cols: tuple[str, ...], atom_values
 
 
 def _canonical_atom_tuple(section: str, atoms: list[int]) -> list[int]:
+    """Canonical atom tuple."""
     if section in {"bond", "off_diagonal"} and len(atoms) == 2:
         a, b = int(atoms[0]), int(atoms[1])
         return [a, b] if a <= b else [b, a]
@@ -582,6 +714,7 @@ def _canonical_atom_tuple(section: str, atoms: list[int]) -> list[int]:
 
 
 def _equivalent_atom_tuples(section: str, atoms: list[int]) -> list[list[int]]:
+    """Equivalent atom tuples."""
     canonical = _canonical_atom_tuple(section, atoms)
     out = [canonical]
     if section in {"bond", "off_diagonal"} and len(canonical) == 2:
@@ -605,6 +738,7 @@ def _atom_tuple_exists_equivalent(
     atom_cols: tuple[str, ...],
     atom_values: list[int],
 ) -> pd.DataFrame:
+    """Atom tuple exists equivalent."""
     candidates = _equivalent_atom_tuples(section, atom_values)
     hits: list[pd.DataFrame] = []
     for candidate in candidates:
@@ -617,6 +751,7 @@ def _atom_tuple_exists_equivalent(
 
 
 def _equality_pattern(atoms: tuple[str, ...]) -> tuple[tuple[int, int], ...]:
+    """Equality pattern."""
     pairs: list[tuple[int, int]] = []
     for i in range(len(atoms)):
         for j in range(i + 1, len(atoms)):
@@ -625,6 +760,7 @@ def _equality_pattern(atoms: tuple[str, ...]) -> tuple[tuple[int, int], ...]:
 
 
 def _atom_similarity_vector(target_symbol: str, candidate_symbol: str, mode: str, radius_metrics: tuple[str, ...]) -> tuple[float, float, float, float]:
+    """Atom similarity vector."""
     tmd = _element_metadata(target_symbol, strict=True)
     cmd = _element_metadata(candidate_symbol, strict=True)
     same_family = 0.0 if (tmd.get("family") is not None and tmd.get("family") == cmd.get("family")) else 1.0
@@ -646,6 +782,7 @@ def _best_unique_mapping_score(
     mode: str,
     radius_metrics: tuple[str, ...],
 ) -> tuple[tuple[float, ...], dict[str, str]]:
+    """Best unique mapping score."""
     if not target_unique or not candidate_unique:
         raise ValueError("Target/candidate unique atom symbol lists must be non-empty.")
     n = len(target_unique)
@@ -677,6 +814,7 @@ def _replacement_variants(
     src_atom_idx: int,
     dst_atom_idx: int,
 ) -> list[list[int]]:
+    """Replacement variants."""
     positions = [i for i, val in enumerate(atoms) if int(val) == int(src_atom_idx)]
     if not positions:
         return []
@@ -705,8 +843,44 @@ def merge_ffields(
     template_closest_atom: str | None = None,
     template_radius_metrics: Iterable[str] | None = None,
 ) -> FFieldMergeSummary:
-    """
-    Merge selected atom-type parameters from source ``ffield`` into destination.
+    """Merge ffields.
+
+    Parameters
+    ----------
+    source : str | Path
+        Input parameter.
+    destination : str | Path
+        Input parameter.
+    output : str | Path
+        Input parameter.
+    atom_types : Iterable[str]
+        Input parameter.
+    fields : Iterable[str] | None, optional
+        Keyword-only parameter.
+    replace_existing : bool, optional
+        Keyword-only parameter.
+    allow_torsion_wildcard : bool, optional
+        Keyword-only parameter.
+    fill_missing_with_template : bool, optional
+        Keyword-only parameter.
+    template_similarity_mode : str, optional
+        Keyword-only parameter.
+    template_closest_atom : str | None, optional
+        Keyword-only parameter.
+    template_radius_metrics : Iterable[str] | None, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    FFieldMergeSummary
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    merge_ffields(...)
+    ```
     """
     wanted_atoms = _normalize_atom_types(atom_types)
     wanted_fields = _normalize_fields(fields)
@@ -773,6 +947,7 @@ def merge_ffields(
         dst_sections["atom"] = dst_atom_df
 
     def _map_index(section: str, idx_val: int | None) -> int | None:
+        """Map index."""
         if idx_val is None:
             return None
         if idx_val == 0:
@@ -1010,8 +1185,40 @@ def add_element_to_ffield(
     replace_existing: bool = False,
     allow_torsion_wildcard: bool = True,
 ) -> FFieldAddElementSummary:
-    """
-    Add one element to a destination ``ffield`` by cloning parameters from the closest existing atom type.
+    """Add element to ffield.
+
+    Parameters
+    ----------
+    destination : str | Path
+        Input parameter.
+    output : str | Path
+        Input parameter.
+    element : str
+        Input parameter.
+    fields : Iterable[str] | None, optional
+        Keyword-only parameter.
+    similarity_mode : str, optional
+        Keyword-only parameter.
+    closest_atom : str | None, optional
+        Keyword-only parameter.
+    radius_metrics : Iterable[str] | None, optional
+        Keyword-only parameter.
+    replace_existing : bool, optional
+        Keyword-only parameter.
+    allow_torsion_wildcard : bool, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    FFieldAddElementSummary
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    add_element_to_ffield(...)
+    ```
     """
     target_symbol = str(element).strip()
     if not target_symbol:
@@ -1187,11 +1394,42 @@ def add_term_to_ffield(
     same_general_order: bool = False,
     replace_existing: bool = False,
 ) -> FFieldAddTermSummary:
-    """
-    Add one explicit missing term to an existing ffield using a nearest-template row.
+    """Add term to ffield.
 
-    Example:
-      field='angle', term='Al-N-Al'
+    Parameters
+    ----------
+    destination : str | Path
+        Input parameter.
+    output : str | Path
+        Input parameter.
+    field : str
+        Keyword-only parameter.
+    term : str
+        Keyword-only parameter.
+    closest_term : str | None, optional
+        Keyword-only parameter.
+    template_atom_map : Mapping[str, str] | None, optional
+        Keyword-only parameter.
+    similarity_mode : str, optional
+        Keyword-only parameter.
+    radius_metrics : Iterable[str] | None, optional
+        Keyword-only parameter.
+    same_general_order : bool, optional
+        Keyword-only parameter.
+    replace_existing : bool, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    FFieldAddTermSummary
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    add_term_to_ffield(...)
+    ```
     """
     wanted_field = _normalize_fields([field])[0]
     if wanted_field == "atom":

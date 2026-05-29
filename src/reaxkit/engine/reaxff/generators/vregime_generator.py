@@ -4,6 +4,12 @@ Volume-regime (vregime.in) file generators.
 This module provides utilities for generating ReaxFF ``vregime.in`` files,
 which define how simulation cell dimensions and angles are modified over
 time during molecular dynamics simulations.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -22,10 +28,20 @@ __all__ = [
 
 @dataclass(frozen=True)
 class VRegimeSampleSpec:
+    """Represent VRegimeSampleSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    n_rows : int
+        Dataclass field.
+    """
     n_rows: int = 5
 
 
 def _build_sample_rows() -> list[dict[str, Any]]:
+    """Build sample rows."""
     return [
         {
             "start": 0,
@@ -79,12 +95,15 @@ def _gen_template_vregime_text(spec: VRegimeSampleSpec = VRegimeSampleSpec()) ->
     sep = " "
 
     def _pad(value: str, width: int) -> str:
+        """Pad."""
         return str(value)[:width].ljust(width)
 
     def _fmt_start(value: Any) -> str:
+        """Fmt start."""
         return f"{int(value):04d}"
 
     def _fmt_change(value: Any, decimals: int = 6) -> str:
+        """Fmt change."""
         return f"{float(value):.{decimals}f}"
 
     header1 = "#Volume regimes"
@@ -107,6 +126,25 @@ def _gen_template_vregime_text(spec: VRegimeSampleSpec = VRegimeSampleSpec()) ->
     )
 
     def format_row(row: dict[str, Any]) -> str:
+        """Format row.
+
+        Parameters
+        ----------
+        row : dict[str, Any]
+            Input parameter.
+
+        Returns
+        -------
+        str
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        format_row(...)
+        ```
+        """
         terms = list(row.get("terms", []))
         vcount = len(terms)
         line = _pad(_fmt_start(row.get("start", 0)), width_start) + sep + _pad(str(vcount), width_v)
@@ -145,8 +183,26 @@ def gen_template_vregime(
     *,
     n_rows: int = 5,
 ) -> Path:
-    """
-    Generate sample ``vregime.in`` file.
+    """Gen template vregime.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    n_rows : int, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_vregime(...)
+    ```
     """
     return _write_vregime(out_path=out_path, spec=VRegimeSampleSpec(n_rows=n_rows))
 

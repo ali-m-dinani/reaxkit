@@ -1,4 +1,16 @@
-"""AMS engine adapter with shared KF-file loading primitives."""
+"""Adapt AMS KF/RKF content into ReaxKit canonical data models.
+
+This adapter implements AMS-specific extraction from ``History`` and molecule
+sections and maps those arrays/tables into engine-agnostic domain models.
+It focuses on data loading/writing concerns and delegates analysis behavior
+to downstream tasks and workflows.
+
+**Usage context**
+
+- Engine resolution: Registered under ``"ams"`` for adapter auto-detection.
+- Data ingestion: Produces trajectory/connectivity/simulation and related models.
+- Export workflow: Writes canonical trajectory data to XYZ output.
+"""
 
 from __future__ import annotations
 
@@ -53,6 +65,24 @@ class AMSAdapter(EngineAdapter):
     )
 
     def detect(self, path: str | Path) -> float:
+        """Score whether a path appears to be an AMS run input/output location.
+
+        Parameters
+        ----------
+        path : str | Path
+            Candidate file or directory path.
+
+        Returns
+        -------
+        float
+            Detection score in ``[0.0, 1.0]`` where higher means more likely AMS.
+
+        Examples
+        --------
+        ```python
+        score = AMSAdapter().detect("reaxout.kf")
+        ```
+        """
         p = Path(path)
         if p.is_file() and p.suffix.lower() in {".rkf", ".kf"}:
             # score is 0.90 not 0.95 to be able to handle AMS Standalone
@@ -71,6 +101,7 @@ class AMSAdapter(EngineAdapter):
         source_path: Path | str | None,
         seconds: float,
     ) -> None:
+        """Dispatch load timing metrics to an optional callback."""
         cb = args.get("_load_timing_callback")
         if not callable(cb):
             return
@@ -84,6 +115,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _resolve_kf_path(args: dict) -> Path:
+        """Resolve the effective AMS KF/RKF path from adapter arguments."""
         def _as_candidate(raw) -> Path | None:
             if not raw:
                 return None
@@ -115,6 +147,7 @@ class AMSAdapter(EngineAdapter):
         return Path("reaxout.kf")
 
     def _build_rkf_handler(self, args: dict) -> RKFHandler:
+        """Build an ``RKFHandler`` configured for the resolved KF/RKF path."""
         kf_path = self._resolve_kf_path(args)
         return RKFHandler(
             kf_path,
@@ -128,9 +161,45 @@ class AMSAdapter(EngineAdapter):
 
     @classmethod
     def clear_runtime_cache(cls) -> None:
+        """Clear AMS runtime caches used by RKF handler instances.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        ```python
+        AMSAdapter.clear_runtime_cache()
+        ```
+        """
         RKFHandler.clear_runtime_cache()
 
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
+        """Return expected AMS file names for supported domain data types.
+
+        Parameters
+        ----------
+        data_type : type
+            Requested canonical data-model class.
+        args : dict
+            Adapter runtime arguments (unused for this decision).
+
+        Returns
+        -------
+        tuple[str, ...] | None
+            Candidate AMS file names, or ``None`` when not constrained.
+
+        Examples
+        --------
+        ```python
+        files = adapter.required_input_files(TrajectoryData, {})
+        ```
+        """
         _ = args
         if data_type in {
             AtomicKinematicsData,
@@ -148,11 +217,29 @@ class AMSAdapter(EngineAdapter):
         return None
 
     def load_kf(self, args: dict):
-        """Return a cached AMS KFFile handle for reuse across AMS loaders."""
+        """Return a cached AMS ``KFFile`` handle for downstream loaders.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter arguments containing optional KF/RKF path selectors.
+
+        Returns
+        -------
+        Any
+            AMS ``KFFile`` object from ``RKFHandler``.
+
+        Examples
+        --------
+        ```python
+        kf = adapter.load_kf({"rkf": "reaxout.rkf"})
+        ```
+        """
         return self._build_rkf_handler(args).kf()
 
     @staticmethod
     def _history_entries(history_data: dict, prefix: str, *, dtype=float) -> list[np.ndarray]:
+        """Collect and optionally index-sort ``History`` arrays by key prefix."""
         rows: list[tuple[int | None, np.ndarray]] = []
         for key, values in history_data.items():
             if not str(key).startswith(prefix):
@@ -171,6 +258,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _parse_atom_names(raw_atom_names) -> list[str]:
+        """Parse element symbols from AMS atom-name payload formats."""
         names_arr = np.asarray(raw_atom_names, dtype=object).ravel()
         if names_arr.size == 0:
             return []
@@ -184,6 +272,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _extract_atom_names_raw(kf, history_data: dict):
+        """Fetch raw atom-name data from History keys or direct KF lookup."""
         raw_atom_names = history_data.get("Atom names")
         if raw_atom_names is None:
             for key, value in history_data.items():
@@ -200,6 +289,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _elements_from_history(kf, history_data: dict, n_atoms: int) -> list[str]:
+        """Return per-atom element symbols padded/truncated to ``n_atoms``."""
         raw_atom_names = AMSAdapter._extract_atom_names_raw(kf, history_data)
         if raw_atom_names is None:
             return ["X"] * n_atoms
@@ -211,6 +301,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _atom_name_count(kf, history_data: dict) -> int:
+        """Return parsed atom count from AMS atom-name metadata."""
         raw_atom_names = AMSAdapter._extract_atom_names_raw(kf, history_data)
         if raw_atom_names is None:
             return 0
@@ -218,6 +309,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _iterations_from_general(kf, n_frames: int) -> np.ndarray:
+        """Derive iteration numbers from ``General%Step numbers`` with fallback."""
         try:
             step_numbers = np.asarray(kf["General%Step numbers"], dtype=int).ravel()
         except Exception:
@@ -241,6 +333,7 @@ class AMSAdapter(EngineAdapter):
         value_cols: tuple[str, str, str],
         n_atoms: int | None = None,
     ) -> pd.DataFrame:
+        """Convert flattened XYZ triples into an ``atom_id``-indexed DataFrame."""
         arr = np.asarray(flat, dtype=float).ravel()
         if arr.size == 0:
             return pd.DataFrame(columns=["atom_id", *value_cols])
@@ -260,10 +353,12 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _to_1d_array(values, *, dtype=float) -> np.ndarray:
+        """Normalize values to a flattened NumPy array with target dtype."""
         return np.asarray(values, dtype=dtype).ravel()
 
     @staticmethod
     def _scalar_or_first(values, default="") -> str:
+        """Return scalar text value or first element from an array-like input."""
         arr = np.asarray(values, dtype=object).ravel()
         if arr.size == 0:
             return str(default)
@@ -271,6 +366,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _formula_atom_count(formula: str) -> int:
+        """Count atoms represented by a chemical formula string."""
         pairs = re.findall(r"([A-Z][a-z]*)(\d*)", str(formula))
         if not pairs:
             return 0
@@ -281,6 +377,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _formula_mass(formula: str) -> float:
+        """Compute formula mass using ASE atomic masses when available."""
         pairs = re.findall(r"([A-Z][a-z]*)(\d*)", str(formula))
         if not pairs:
             return np.nan
@@ -299,6 +396,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _read_first_section(kf, names: tuple[str, ...]) -> dict:
+        """Return first non-empty KF section from a list of candidate names."""
         for name in names:
             try:
                 data = kf.read_section(name)
@@ -310,6 +408,7 @@ class AMSAdapter(EngineAdapter):
 
     @staticmethod
     def _read_molecule_sections(kf) -> list[dict]:
+        """Read base and numbered molecule sections from AMS KF content."""
         sections: list[dict] = []
         for base_name in ("Molecule", "Molecules"):
             try:
@@ -343,6 +442,7 @@ class AMSAdapter(EngineAdapter):
         n_atoms: int,
         fill_value: float,
     ) -> np.ndarray:
+        """Stack per-frame 1D arrays into a fixed ``(n_frames, n_atoms)`` matrix."""
         out = np.full((n_frames, n_atoms), fill_value, dtype=float)
         for fi in range(min(n_frames, len(entries))):
             arr = np.asarray(entries[fi], dtype=float).ravel()
@@ -358,6 +458,7 @@ class AMSAdapter(EngineAdapter):
         n_frames: int,
         n_atoms: int,
     ) -> np.ndarray:
+        """Stack flattened six-component per-atom tensors across frames."""
         out = np.full((n_frames, n_atoms, 6), np.nan, dtype=float)
         for fi in range(min(n_frames, len(entries))):
             flat = np.asarray(entries[fi], dtype=float).ravel()
@@ -379,6 +480,7 @@ class AMSAdapter(EngineAdapter):
         dtype,
         fill_value: float | int,
     ) -> list[np.ndarray]:
+        """Reshape flattened connectivity entries into per-frame 2D arrays."""
         frames: list[np.ndarray] = []
         for fi in range(n_frames):
             arr = np.asarray(entries[fi], dtype=dtype).ravel() if fi < len(entries) else np.asarray([], dtype=dtype)
@@ -407,6 +509,7 @@ class AMSAdapter(EngineAdapter):
         dtype,
         fill_value: float | int,
     ) -> list[np.ndarray]:
+        """Reshape connectivity arrays using per-atom neighbor-count vectors."""
         frames: list[np.ndarray] = []
         for fi in range(n_frames):
             nnei_raw = np.asarray(num_neighb_entries[fi], dtype=int).ravel() if fi < len(num_neighb_entries) else np.zeros((0,), dtype=int)
@@ -434,6 +537,26 @@ class AMSAdapter(EngineAdapter):
         return frames
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
+        """Load canonical trajectory data from AMS ``History%Coordinates``.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        TrajectoryData
+            Frame-major positions, inferred elements, atom IDs, and iterations.
+
+        Examples
+        --------
+        ```python
+        traj = AMSAdapter().load_trajectory({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
 
@@ -470,6 +593,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
+        """Load connectivity and bond-order arrays from AMS history records.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        ConnectivityData
+            Canonical connectivity payload with per-frame neighbor and bond data.
+
+        Examples
+        --------
+        ```python
+        conn = AMSAdapter().load_connectivity({"kf": "reaxout.kf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
 
@@ -557,6 +700,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
+        """Load simulation-level scalar series from AMS History sections.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        SimulationData
+            Iterations, energies, thermodynamic series, and cell geometry.
+
+        Examples
+        --------
+        ```python
+        sim = AMSAdapter().load_simulation({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
 
@@ -643,6 +806,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
+        """Load per-frame AMS partial-energy components from History.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        PartialEnergyData
+            Matrix of component energies and associated iteration axis.
+
+        Examples
+        --------
+        ```python
+        pe = AMSAdapter().load_partial_energy({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
         energies_entries = self._history_entries(history_data, "Energies", dtype=float)
@@ -673,6 +856,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
+        """Load per-atom charges and framewise total charge from AMS History.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        ChargeData
+            Charge matrix, summed charge series, and iteration indices.
+
+        Examples
+        --------
+        ```python
+        charges = AMSAdapter().load_charges({"kf": "reaxout.kf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
         charge_entries = self._history_entries(history_data, "Atomic charges", dtype=float)
@@ -701,6 +904,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:
+        """Load latest-frame coordinate/velocity/acceleration tables from AMS.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        AtomicKinematicsData
+            Snapshot data tables for coordinates, velocities, and accelerations.
+
+        Examples
+        --------
+        ```python
+        kin = AMSAdapter().load_atomic_kinematics({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
 
@@ -742,6 +965,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_atom_temperature(self, args: dict, reporter=None) -> AtomTemperatureData:
+        """Load per-atom temperature series from AMS ``History`` entries.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        AtomTemperatureData
+            Temperature matrix indexed by frame and atom.
+
+        Examples
+        --------
+        ```python
+        t = AMSAdapter().load_atom_temperature({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
         atom_temp_entries = self._history_entries(history_data, "Atom temperature", dtype=float)
@@ -766,6 +1009,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_atom_strain_energy(self, args: dict, reporter=None) -> AtomStrainEnergyData:
+        """Load per-atom strain-energy series from AMS ``History`` entries.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        AtomStrainEnergyData
+            Strain-energy matrix indexed by frame and atom.
+
+        Examples
+        --------
+        ```python
+        se = AMSAdapter().load_atom_strain_energy({"kf": "reaxout.kf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
         strain_entries = self._history_entries(history_data, "Strain energy", dtype=float)
@@ -790,6 +1053,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_molecular_analysis(self, args: dict, reporter=None) -> MolecularAnalysisData:
+        """Load molecule counts/species tables from AMS molecule sections.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        MolecularAnalysisData
+            Iteration-indexed totals and molecular species frequency table.
+
+        Examples
+        --------
+        ```python
+        mol = AMSAdapter().load_molecular_analysis({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         mol_sections = self._read_molecule_sections(kf)
         if not mol_sections:
@@ -889,6 +1172,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_stress(self, args: dict, reporter=None) -> StressData:
+        """Load per-atom stress tensor series and derived stress variants.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback ``(phase, done, total, message)``.
+
+        Returns
+        -------
+        StressData
+            Stress tensor arrays and optional averaged/isotropic series.
+
+        Examples
+        --------
+        ```python
+        stress = AMSAdapter().load_stress({"rkf": "reaxout.rkf"})
+        ```
+        """
         kf = self.load_kf(args)
         history_data = kf.read_section("History")
         atomic_entries = self._history_entries(history_data, "Atomic stress", dtype=float)
@@ -957,6 +1260,26 @@ class AMSAdapter(EngineAdapter):
         )
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
+        """Load connectivity and trajectory together as a composite payload.
+
+        Parameters
+        ----------
+        args : dict
+            Adapter options including optional KF/RKF path hints.
+        reporter : callable | None, optional
+            Progress callback passed through to both loaders.
+
+        Returns
+        -------
+        ConnectivityTrajectoryData
+            Combined connectivity and trajectory canonical models.
+
+        Examples
+        --------
+        ```python
+        combo = AMSAdapter().load_connectivity_trajectory({"kf": "reaxout.kf"})
+        ```
+        """
         _ = reporter
         return ConnectivityTrajectoryData(
             connectivity=self.load_connectivity(args, reporter=reporter),
@@ -964,5 +1287,27 @@ class AMSAdapter(EngineAdapter):
         )
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
+        """Write canonical trajectory data to an XYZ trajectory file.
+
+        Parameters
+        ----------
+        data : TrajectoryData
+            Canonical trajectory payload to serialize.
+        out_path : str | Path
+            Destination file path for XYZ output.
+        args : dict | None, optional
+            Optional writer settings. Supports ``precision`` (default ``6``).
+
+        Returns
+        -------
+        Any
+            Return value from ``write_xyz_trajectory``.
+
+        Examples
+        --------
+        ```python
+        adapter.write_trajectory(traj, "traj.xyz", {"precision": 8})
+        ```
+        """
         args = args or {}
         return write_xyz_trajectory(data, out_path, precision=int(args.get("precision", 6)))

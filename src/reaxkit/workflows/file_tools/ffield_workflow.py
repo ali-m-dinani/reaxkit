@@ -42,11 +42,9 @@ from reaxkit.core.generator_runtime import (
 )
 from reaxkit.core.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import (
-    ForceFieldOptimizationReportData as ForceFieldOptimizationResultsData,
     ForceFieldParametersData,
-    GeometrySummaryData as EnergyMinimizationSummaryData,
 )
-from reaxkit.engine.reaxff.generators.ffield_generator import (
+from reaxkit.engine.common.generators.ffield_generator import (
     add_element_to_ffield,
     add_term_to_ffield,
     merge_ffields,

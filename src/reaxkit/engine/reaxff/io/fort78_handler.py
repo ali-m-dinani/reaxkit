@@ -10,6 +10,12 @@ Typical use cases include:
 - analyzing applied electric-field schedules
 - correlating field strength with polarization or dipole response
 - plotting field components versus iteration
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -169,6 +175,7 @@ class Fort78Handler(BaseHandler):
         return df, meta
 
     def _count_lines(self) -> int:
+        """Count lines."""
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 

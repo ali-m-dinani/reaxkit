@@ -11,6 +11,12 @@ Typical use cases include:
 - inspecting parameter update behavior during training
 - analyzing parabolic fits and estimated optima
 - debugging unstable or poorly conditioned parameter updates
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

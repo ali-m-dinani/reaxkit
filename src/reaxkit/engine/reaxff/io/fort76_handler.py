@@ -10,6 +10,12 @@ Typical use cases include:
 - monitoring restraint convergence
 - comparing target vs actual restraint values
 - debugging constrained MD or minimization runs
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -270,10 +276,13 @@ class Fort76Handler(BaseHandler):
 
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:
+        """Disk cache dir."""
         return self._cache_root() / key
 
     def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        """Store in disk cache."""
         super()._store_in_disk_cache(key, payload)
 
     def _load_from_disk_cache(self, key: str) -> bytes | None:
+        """Load from disk cache."""
         return super()._load_from_disk_cache(key)

@@ -1,4 +1,15 @@
-"""LAMMPS dump trajectory handler."""
+"""Parse LAMMPS dump trajectories into per-frame coordinate payloads.
+
+This module supports both xyz-like dumps and native ``ITEM:`` formatted dumps,
+normalizing frame data into table/array forms used by the LAMMPS adapter. It
+focuses on trajectory parsing, frame iteration, and optional progress updates.
+
+**Usage context**
+
+- Trajectory ingestion: Produces frame coordinates/labels for ``TrajectoryData``.
+- Box metadata: Captures box bounds when present in ``ITEM:`` dumps.
+- Streaming workflows: Exposes random-access and iterative frame APIs.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +36,7 @@ class LAMMPSDumpHandler(BaseHandler):
     _TIMESTEP_PATTERN = re.compile(r"timestep\s*:\s*([+-]?\d+)", flags=re.IGNORECASE)
 
     def __init__(self, file_path: str | Path = "dump.xyz", *, reporter=None, progress_every: int = 5000):
+        """Initialize dump parser state and optional progress reporter."""
         super().__init__(file_path)
         self._frames: list[pd.DataFrame] = []
         self._box_bounds: list[list[tuple[float, ...]] | None] = []
@@ -35,6 +47,7 @@ class LAMMPSDumpHandler(BaseHandler):
         self._last_report_line = -1
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """Parse dump content and return simulation index table plus metadata."""
         with open(self.path, "r", encoding="utf-8") as fh:
             lines = fh.readlines()
         non_empty = [ln.strip() for ln in lines if ln.strip()]
@@ -68,6 +81,7 @@ class LAMMPSDumpHandler(BaseHandler):
         return df, meta
 
     def _report_progress(self, lines_read: int, total_lines: int, stage: str, *, force: bool = False) -> None:
+        """Emit throttled progress events to the optional reporter callback."""
         if not callable(self._reporter):
             return
         if not force and lines_read < total_lines:
@@ -79,6 +93,7 @@ class LAMMPSDumpHandler(BaseHandler):
         self._reporter("load", int(lines_read), int(total_lines), msg)
 
     def _parse_xyz_like(self, lines: list[str]) -> pd.DataFrame:
+        """Parse xyz-like dump blocks into frame tables and iteration index rows."""
         rows: list[dict[str, Any]] = []
         i = 0
         n_lines = len(lines)
@@ -115,6 +130,7 @@ class LAMMPSDumpHandler(BaseHandler):
         return pd.DataFrame(rows, columns=["num_of_atoms", "iter"])
 
     def _parse_item_dump(self, lines: list[str]) -> pd.DataFrame:
+        """Parse native ``ITEM:`` dump blocks into frame tables and metadata rows."""
         rows: list[dict[str, Any]] = []
         i = 0
         n_lines = len(lines)
@@ -183,6 +199,7 @@ class LAMMPSDumpHandler(BaseHandler):
         return pd.DataFrame(rows)
 
     def _frame_from_item_rows(self, atom_cols: list[str], atom_rows_raw: list[list[str]]) -> pd.DataFrame:
+        """Build normalized ``atom_type/x/y/z`` frame table from raw ITEM rows."""
         raw = pd.DataFrame(atom_rows_raw, columns=atom_cols)
         x_col = self._pick_coord_col(raw.columns, axis="x")
         y_col = self._pick_coord_col(raw.columns, axis="y")
@@ -207,6 +224,7 @@ class LAMMPSDumpHandler(BaseHandler):
 
     @staticmethod
     def _pick_coord_col(columns: Any, axis: str) -> str:
+        """Select preferred coordinate column name for one axis."""
         preferred = [axis, f"{axis}u", f"{axis}s", f"{axis}su"]
         for name in preferred:
             if name in columns:
@@ -215,20 +233,43 @@ class LAMMPSDumpHandler(BaseHandler):
 
     @classmethod
     def _extract_timestep(cls, header: str, fallback: int) -> int:
+        """Extract timestep from header text or return fallback integer."""
         m = cls._TIMESTEP_PATTERN.search(header)
         if m:
             return int(m.group(1))
         return int(fallback)
 
     def n_frames(self) -> int:
+        """Return the number of parsed frames."""
         return int(self.metadata().get("n_frames", 0))
 
     def n_atoms(self) -> int | None:
+        """Return detected atom count per frame, parsing on first access if needed."""
         if self._n_atoms is None:
             _ = self.dataframe()
         return self._n_atoms
 
     def frame(self, i: int) -> dict[str, Any]:
+        """Return one parsed frame payload by index.
+
+        Parameters
+        ----------
+        i : int
+            Zero-based frame index.
+
+        Returns
+        -------
+        dict[str, Any]
+            Frame payload containing index, iteration, coordinates, atom types,
+            and optional ``box_bounds``.
+
+        Examples
+        --------
+        ```python
+        fr0 = handler.frame(0)
+        coords = fr0["coords"]
+        ```
+        """
         df = self.dataframe()
         if i < 0 or i >= len(self._frames):
             raise IndexError(f"frame index {i} out of range [0, {len(self._frames) - 1}]")
@@ -245,6 +286,25 @@ class LAMMPSDumpHandler(BaseHandler):
         return payload
 
     def iter_frames(self, step: int = 1) -> Iterator[dict[str, Any]]:
+        """Iterate parsed frames with optional stride.
+
+        Parameters
+        ----------
+        step : int, optional
+            Positive stride for frame sampling.
+
+        Returns
+        -------
+        Iterator[dict[str, Any]]
+            Iterator of frame payload dictionaries from ``frame(i)``.
+
+        Examples
+        --------
+        ```python
+        for fr in handler.iter_frames(step=10):
+            ...
+        ```
+        """
         for i in range(0, self.n_frames(), max(1, int(step))):
             yield self.frame(i)
 

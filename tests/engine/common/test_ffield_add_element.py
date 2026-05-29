@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield, merge_ffields
-from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+from reaxkit.engine.common.io.ffield_handler import FFieldHandler
 from reaxkit.workflows.file_tools import ffield_workflow
 
 

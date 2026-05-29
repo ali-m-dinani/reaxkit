@@ -10,6 +10,12 @@ Typical use cases include:
 - extracting formation energies and volumes
 - comparing multiple structures or configurations
 - building datasets for bulk-property analysis
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

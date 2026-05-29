@@ -3,6 +3,12 @@ GEO/XTLGRF file generation utilities.
 
 This module contains GEO-specific text/file generation helpers and re-exports
 general structure I/O and transform helpers from the split geometry modules.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -44,6 +50,7 @@ __all__ = [
 
 
 def _find_geo_insert_index(lines: Sequence[str]) -> int:
+    """Find geo insert index."""
     triggers = ("CRYSTX", "FORMAT ATOM", "HETATM")
     for i, line in enumerate(lines):
         stripped = line.lstrip()
@@ -120,6 +127,7 @@ def _sort_atoms(
     sort_by: Optional[SortKey] = None,
     ascending: bool = True,
 ) -> pd.DataFrame:
+    """Sort atoms."""
     if sort_by is None:
         return atoms
     if sort_by not in atoms.columns:
@@ -131,6 +139,7 @@ def _format_crystx(
     box_lengths: Iterable[float],
     box_angles: Iterable[float],
 ) -> str:
+    """Format crystx."""
     a, b, c = list(box_lengths)
     alpha, beta, gamma = list(box_angles)
     nums = (a, b, c, alpha, beta, gamma)
@@ -138,6 +147,7 @@ def _format_crystx(
 
 
 def _format_hetatm_line(atom_id: int, atom_type: str, x: float, y: float, z: float) -> str:
+    """Format hetatm line."""
     at2 = atom_type.strip()[:2]
     at5 = atom_type.strip()[:5]
     return (
@@ -166,6 +176,7 @@ def _generate_geo_text(
     sort_by: Optional[SortKey] = None,
     ascending: bool = True,
 ) -> str:
+    """Generate geo text."""
     box_lengths = list(box_lengths)
     box_angles = list(box_angles)
     if len(box_lengths) != 3 or len(box_angles) != 3:
@@ -204,8 +215,34 @@ def xtob(
     sort_by: Optional[SortKey] = None,
     ascending: bool = True,
 ) -> Path:
-    """
-    Convert an XYZ file to ReaxFF GEO/XTLGRF format.
+    """Xtob.
+
+    Parameters
+    ----------
+    xyz_file : str | Path
+        Input parameter.
+    geo_file : str | Path, optional
+        Input parameter.
+    box_lengths : Iterable[float], optional
+        Input parameter.
+    box_angles : Iterable[float], optional
+        Input parameter.
+    sort_by : Optional[SortKey], optional
+        Input parameter.
+    ascending : bool, optional
+        Input parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    xtob(...)
+    ```
     """
     descriptor, atoms = _read_xyz(xyz_file)
     text = _generate_geo_text(
@@ -229,8 +266,30 @@ def sort_geo(
     sort_by: GeoSortKey,
     descending: bool = False,
 ) -> Path:
-    """
-    Sort atoms in an existing GEO file and write a new GEO file.
+    """Sort geo.
+
+    Parameters
+    ----------
+    input_geo : str | Path
+        Keyword-only parameter.
+    output_geo : str | Path
+        Keyword-only parameter.
+    sort_by : GeoSortKey
+        Keyword-only parameter.
+    descending : bool, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    sort_geo(...)
+    ```
     """
     in_path = Path(input_geo)
     if not in_path.is_file():
@@ -290,8 +349,30 @@ def add_restraints_to_geo(
     kinds: Sequence[str],
     params: Optional[Dict[str, str]] = None,
 ) -> Path:
-    """
-    Insert sample restraint blocks into a GEO/XTLGRF file.
+    """Add restraints to geo.
+
+    Parameters
+    ----------
+    geo_file : str | Path
+        Input parameter.
+    out_file : str | Path | None, optional
+        Keyword-only parameter.
+    kinds : Sequence[str]
+        Keyword-only parameter.
+    params : Optional[Dict[str, str]], optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    add_restraints_to_geo(...)
+    ```
     """
     geo_file = Path(geo_file)
     if not geo_file.is_file():
@@ -368,6 +449,7 @@ def add_restraints_to_geo(
     }
 
     def _format_value(token: str, fmt: str) -> str:
+        """Format value."""
         if fmt == "i":
             return str(int(float(token)))
         if fmt == "f2":
@@ -385,6 +467,7 @@ def add_restraints_to_geo(
         return token
 
     def _token_starts(guide: str, names: List[str]) -> List[int]:
+        """Token starts."""
         starts: List[int] = []
         cursor = 0
         for name in names:
@@ -396,6 +479,7 @@ def add_restraints_to_geo(
         return starts
 
     def _build_aligned_data_line(kind: str, param_str: str) -> str:
+        """Build aligned data line."""
         guide = guide_lines[kind]
         layout = token_layout[kind]
         names = [item[0] for item in layout]
@@ -464,15 +548,32 @@ def add_molcharge_to_geo(
     each_atom_types: Optional[Sequence[tuple[str, float]]] = None,
     together_charge: float | None = None,
 ) -> Path:
-    """
-    Insert MOLCHARGE lines into a GEO file.
+    """Add molcharge to geo.
 
-    Rules:
-    - EACH rules can target explicit atom-number ranges and/or atom types.
-    - TOGETHER (via together_charge) always targets the complement of
-      EACH-selected atoms ("rest").
-    - If needed, selected EACH atoms are moved to the end so the rest can be
-      represented by one continuous atom range.
+    Parameters
+    ----------
+    geo_file : str | Path
+        Input parameter.
+    out_file : str | Path | None, optional
+        Keyword-only parameter.
+    each_atom_ranges : Optional[Sequence[tuple[int, int, float]]], optional
+        Keyword-only parameter.
+    each_atom_types : Optional[Sequence[tuple[str, float]]], optional
+        Keyword-only parameter.
+    together_charge : float | None, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    add_molcharge_to_geo(...)
+    ```
     """
     geo_file = Path(geo_file)
     if not geo_file.is_file():
@@ -493,6 +594,7 @@ def add_molcharge_to_geo(
     selected_charge_by_old_id: Dict[int, float] = {}
 
     def _register_each(atom_id: int, charge: float) -> None:
+        """Register each."""
         prev = selected_charge_by_old_id.get(atom_id)
         if prev is not None and abs(prev - charge) > 1e-12:
             raise ValueError(

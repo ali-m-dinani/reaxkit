@@ -14,6 +14,12 @@ The base class standardizes how ReaxFF output files are:
 
 All ReaxKit analysis functions rely on ``FileHandler`` subclasses to provide
 a consistent, predictable view of parsed ReaxFF files.
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -211,10 +217,29 @@ class BaseHandler(ABC):
     # ---- shared cache helpers
     @classmethod
     def clear_runtime_cache(cls) -> None:
+        """Clear runtime cache.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        clear_runtime_cache(...)
+        ```
+        """
         with cls._MEMORY_LOCK:
             cls._MEMORY_CACHE.clear()
 
     def _handler_id(self) -> str:
+        """Handler id."""
         identity: dict[str, Any] = {
             "handler": f"{self.__class__.__module__}.{self.__class__.__qualname__}",
             "cache_version": str(self._CACHE_VERSION),
@@ -240,6 +265,7 @@ class BaseHandler(ABC):
 
     @classmethod
     def _normalize_identity_value(cls, value: Any) -> Any:
+        """Normalize identity value."""
         if value is None or isinstance(value, (str, int, float, bool)):
             return value
         if isinstance(value, Path):
@@ -257,6 +283,7 @@ class BaseHandler(ABC):
 
     @staticmethod
     def _file_fingerprint(path: Path) -> dict[str, Any]:
+        """File fingerprint."""
         stat = path.stat()
         digest = sha256()
         with open(path, "rb") as fh:
@@ -273,9 +300,11 @@ class BaseHandler(ABC):
 
     # Backward-compatible alias
     def _cache_key(self) -> str:
+        """Cache key."""
         return self._handler_id()
 
     def _cache_root(self) -> Path:
+        """Cache root."""
         env_root = os.environ.get(self._CACHE_ENV_VAR, "").strip()
         if env_root:
             return Path(env_root)
@@ -285,22 +314,28 @@ class BaseHandler(ABC):
         return Path(".reaxkit_cache") / "handlers"
 
     def _cache_file_path(self, key: str) -> Path:
+        """Cache file path."""
         return self._cache_root() / f"{key}.h5"
 
     def _disk_cache_dir(self, key: str) -> Path:
+        """Disk cache dir."""
         return self._cache_root() / key
 
     def _disk_cache_h5_path(self, key: str) -> Path:
+        """Disk cache h5 path."""
         return self._disk_cache_dir(key) / "cache.h5"
 
     def _cache_index_path(self) -> Path:
+        """Cache index path."""
         return self._cache_root().parent / "index" / "handlers.json"
 
     @staticmethod
     def _utc_now_iso() -> str:
+        """Utc now iso."""
         return datetime.now(timezone.utc).isoformat()
 
     def _update_cache_index(self, key: str) -> None:
+        """Update cache index."""
         index_path = self._cache_index_path()
         index_path.parent.mkdir(parents=True, exist_ok=True)
         payload: dict[str, Any] = {}
@@ -319,6 +354,7 @@ class BaseHandler(ABC):
         index_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
     def _state_snapshot(self) -> dict[str, Any]:
+        """State snapshot."""
         excluded = {"path", "_parsed", "_df", "_meta"}
         snapshot: dict[str, Any] = {}
         for name, value in self.__dict__.items():
@@ -330,6 +366,7 @@ class BaseHandler(ABC):
         return snapshot
 
     def _build_cached_payload(self) -> bytes | None:
+        """Build cached payload."""
         if self._df is None:
             return None
         payload = {"df": self._df, "meta": dict(self._meta), "state": self._state_snapshot()}
@@ -339,6 +376,7 @@ class BaseHandler(ABC):
             return None
 
     def _restore_cached_payload(self, payload: bytes) -> None:
+        """Restore cached payload."""
         obj = pickle.loads(payload)
         self._df = obj.get("df")
         self._meta = dict(obj.get("meta") or {})
@@ -349,15 +387,18 @@ class BaseHandler(ABC):
 
     @classmethod
     def _load_from_memory_cache(cls, key: str) -> bytes | None:
+        """Load from memory cache."""
         with cls._MEMORY_LOCK:
             return cls._MEMORY_CACHE.get(key)
 
     @classmethod
     def _store_in_memory_cache(cls, key: str, payload: bytes) -> None:
+        """Store in memory cache."""
         with cls._MEMORY_LOCK:
             cls._MEMORY_CACHE[key] = payload
 
     def _load_from_disk_cache(self, key: str) -> bytes | None:
+        """Load from disk cache."""
         if h5py is None:
             return None
         path = self._disk_cache_h5_path(key)
@@ -373,6 +414,7 @@ class BaseHandler(ABC):
             return None
 
     def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        """Store in disk cache."""
         if h5py is None:
             return
         tmp_dir: Path | None = None

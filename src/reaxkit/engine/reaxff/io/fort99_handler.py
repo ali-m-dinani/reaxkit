@@ -10,6 +10,12 @@ Typical use cases include:
 - analyzing training set contributions to total error
 - inspecting charge, geometry, and energy fitting quality
 - building diagnostics for force-field parameterization workflows
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

@@ -1,5 +1,11 @@
 """
 Materials Project helpers for trainset generation.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -23,6 +29,27 @@ CrystallographicSettingConversion = Literal["to-conventional", "to-primitive"]
 
 @dataclass(frozen=True)
 class MaterialsProjectTrainsetSpec:
+    """Represent MaterialsProjectTrainsetSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    mp_id : str
+        Dataclass field.
+    out_yaml : str | Path
+        Dataclass field.
+    structure_dir : Optional[str | Path]
+        Dataclass field.
+    bulk_mode : BulkModulusMode
+        Dataclass field.
+    crystallographic_setting_conversion : CrystallographicSettingConversion
+        Dataclass field.
+    api_key : Optional[str]
+        Dataclass field.
+    verbose : bool
+        Dataclass field.
+    """
     mp_id: str
     out_yaml: str | Path
     structure_dir: Optional[str | Path] = None
@@ -34,11 +61,23 @@ class MaterialsProjectTrainsetSpec:
 
 @dataclass(frozen=True)
 class MaterialsProjectHeatFoDocs:
+    """Represent MaterialsProjectHeatFoDocs.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    docs : list[object]
+        Dataclass field.
+    elements : list[str]
+        Dataclass field.
+    """
     docs: list[object]
     elements: list[str]
 
 
 def _mp_to_plain_dict(doc_obj) -> dict:
+    """Mp to plain dict."""
     if hasattr(doc_obj, "model_dump"):
         return dict(doc_obj.model_dump())
     if hasattr(doc_obj, "dict"):
@@ -49,6 +88,7 @@ def _mp_to_plain_dict(doc_obj) -> dict:
 
 
 def _mp_doc_field(doc_obj, key: str, default=None):
+    """Mp doc field."""
     if hasattr(doc_obj, key):
         value = getattr(doc_obj, key)
         if value is not None:
@@ -65,6 +105,7 @@ def _mp_search_summary_docs_by_elements(
     max_materials: Optional[int] = None,
     fields: Optional[list[str]] = None,
 ) -> list[object]:
+    """Mp search summary docs by elements."""
     fields = fields or [
         "material_id",
         "formula_pretty",
@@ -117,6 +158,7 @@ def _mp_fetch_summary_docs_by_material_ids(
     fields: Optional[list[str]] = None,
     log_retrieval: bool = True,
 ) -> list[object]:
+    """Mp fetch summary docs by material ids."""
     fields = fields or [
         "material_id",
         "formula_pretty",
@@ -141,6 +183,7 @@ def _mp_fetch_summary_docs_by_material_ids(
 
 
 def _mp_derive_elements_from_summary_docs(docs: list[object]) -> list[str]:
+    """Mp derive elements from summary docs."""
     ordered: list[str] = []
     seen = set()
     for doc in docs:
@@ -156,6 +199,7 @@ def _mp_derive_elements_from_summary_docs(docs: list[object]) -> list[str]:
 
 
 def _mp_pick_unary_reference_doc(*, mpr: MPRester, element: str) -> object:
+    """Mp pick unary reference doc."""
     fields = [
         "material_id",
         "formula_pretty",
@@ -176,6 +220,7 @@ def _mp_pick_unary_reference_doc(*, mpr: MPRester, element: str) -> object:
         raise ValueError(f"No unary systems found for element {element}.")
 
     def _energy_above_hull(doc_obj) -> float:
+        """Energy above hull."""
         eah = _mp_doc_field(doc_obj, "energy_above_hull", None)
         if eah is not None:
             return float(eah)
@@ -209,6 +254,7 @@ def _mp_search_material_ids_by_elements(
     exact_element_count: bool,
     max_materials: Optional[int] = None,
 ) -> list[str]:
+    """Mp search material ids by elements."""
     with MPRester(api_key, mute_progress_bars=True) as mpr:
         docs = _mp_search_summary_docs_by_elements(
             mpr=mpr,
@@ -236,6 +282,7 @@ def _mp_collect_heatfo_docs(
     exact_element_count: bool = True,
     max_materials: Optional[int] = None,
 ) -> MaterialsProjectHeatFoDocs:
+    """Mp collect heatfo docs."""
     with MPRester(api_key, mute_progress_bars=True) as mpr:
         if material_ids:
             docs = _mp_fetch_summary_docs_by_material_ids(mpr=mpr, material_ids=material_ids)
@@ -258,6 +305,7 @@ def _mp_pick_unary_reference_docs(
     api_key: str,
     elements: list[str],
 ) -> Dict[str, object]:
+    """Mp pick unary reference docs."""
     picked: Dict[str, object] = {}
     with MPRester(api_key, mute_progress_bars=True) as mpr:
         for element in elements:
@@ -266,6 +314,7 @@ def _mp_pick_unary_reference_docs(
 
 
 def _tensor6x6_to_cij_dict(t6: list[list[float]]) -> Dict[str, float]:
+    """Tensor6x6 to cij dict."""
     if t6 is None or len(t6) != 6 or any(len(row) != 6 for row in t6):
         raise ValueError("Elastic tensor must be a 6x6 matrix.")
     f = lambda i, j: float(t6[i][j])
@@ -277,6 +326,7 @@ def _tensor6x6_to_cij_dict(t6: list[list[float]]) -> Dict[str, float]:
 
 
 def _extract_tensor6(elastic_tensor_obj: Any):
+    """Extract tensor6."""
     if elastic_tensor_obj is None:
         return None
     if hasattr(elastic_tensor_obj, "ieee_format") and elastic_tensor_obj.ieee_format is not None:
@@ -289,6 +339,7 @@ def _extract_tensor6(elastic_tensor_obj: Any):
 
 
 def _pick_bulk_modulus(bm: Any, mode: BulkModulusMode) -> Optional[float]:
+    """Pick bulk modulus."""
     if bm is None:
         return None
     value = getattr(bm, mode, None)
@@ -296,6 +347,7 @@ def _pick_bulk_modulus(bm: Any, mode: BulkModulusMode) -> Optional[float]:
 
 
 def _extract_crystal_system(symmetry_obj: Any) -> Optional[str]:
+    """Extract crystal system."""
     if symmetry_obj is None:
         return None
     crystal = getattr(symmetry_obj, "crystal_system", None)
@@ -314,6 +366,7 @@ def _mp_fetch_material_summary_metadata(
     api_key: str,
     material_id: str,
 ) -> Dict[str, str]:
+    """Mp fetch material summary metadata."""
     with MPRester(api_key, mute_progress_bars=True) as mpr:
         doc = _mp_fetch_summary_docs_by_material_ids(
             mpr=mpr,
@@ -329,6 +382,7 @@ def _mp_fetch_material_summary_metadata(
 
 
 def _convert_structure_setting(structure: Any, conversion: str):
+    """Convert structure setting."""
     conversion_mode = str(conversion).strip().lower()
     if conversion_mode not in {"to-conventional", "to-primitive"}:
         raise ValueError(
@@ -344,10 +398,12 @@ def _convert_structure_setting(structure: Any, conversion: str):
 
 
 def _is_close_90(value: float, tol: float = 1e-6) -> bool:
+    """Is close 90."""
     return abs(float(value) - 90.0) <= tol
 
 
 def _normalize_non_orthogonal_angle_to_gamma(structure: Any):
+    """Normalize non orthogonal angle to gamma."""
     lat = structure.lattice
     alpha = float(lat.alpha)
     beta = float(lat.beta)
@@ -382,6 +438,7 @@ def _normalize_non_orthogonal_angle_to_gamma(structure: Any):
 
 
 def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict[str, str]:
+    """Write trainset settings from mp."""
     api_key = spec.api_key or os.getenv("MP_API_KEY")
     if not api_key:
         raise RuntimeError("Set MP_API_KEY env var (or pass api_key=...).")
@@ -474,6 +531,7 @@ def _generate_trainset_settings_yaml_from_mp_simple(
     api_key: Optional[str] = None,
     verbose: bool = True,
 ) -> Dict[str, str]:
+    """Generate trainset settings yaml from mp simple."""
     return _write_trainset_settings_from_mp(
         MaterialsProjectTrainsetSpec(
             mp_id=mp_id,

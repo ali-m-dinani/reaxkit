@@ -10,6 +10,12 @@ Typical use cases include:
 - tracking energy, temperature, pressure, and density versus iteration
 - extracting time-series data for plotting or analysis
 - validating simulation stability and convergence
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

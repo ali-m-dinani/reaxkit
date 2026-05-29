@@ -3,6 +3,12 @@ ReaxFF addmol file generation utilities.
 
 This module provides deterministic helpers for generating or writing default
 ReaxFF ``addmol.bgf`` and ``addmol.vel`` files from canonical templates.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -49,17 +55,16 @@ __all__ = [
 
 @dataclass(frozen=True)
 class AddmolGeneratorSpec:
-    """
-    Declarative settings for generating ``addmol`` files.
+    """Represent AddmolGeneratorSpec.
 
-    Parameters
-    ----------
-    template_text : str, optional
-        Fully formatted ``addmol.bgf`` content. Defaults to the bundled
-        canonical template.
-    vel_template_text : str, optional
-        Fully formatted ``addmol.vel`` content. Defaults to the bundled
-        canonical template.
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    template_text : str
+        Dataclass field.
+    vel_template_text : str
+        Dataclass field.
     """
 
     template_text: str = ADDMOL_TEMPLATE
@@ -113,10 +118,26 @@ def gen_template_addmol(
     out_path: str | Path = "addmol.bgf",
     spec: AddmolGeneratorSpec = DEFAULT_ADDMOL_SPEC,
 ) -> Path:
-    """
-    Backward-compatible wrapper that writes both ``addmol.bgf`` and ``addmol.vel``.
+    """Gen template addmol.
 
-    Returns the path to the written ``addmol.bgf`` file.
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    spec : AddmolGeneratorSpec, optional
+        Input parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_addmol(...)
+    ```
     """
     bgf_path = _write_addmol_bgf(out_path=out_path, spec=spec)
     vel_path = Path(bgf_path).with_name("addmol.vel")

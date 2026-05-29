@@ -1,5 +1,11 @@
 """
 Materials Project heat-of-formation trainset generation utilities.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -29,12 +35,54 @@ _SUBSCRIPT_TRANSLATION = str.maketrans(
 
 @dataclass(frozen=True)
 class HeatFoReferenceSpec:
+    """Represent HeatFoReferenceSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    iden : str
+        Dataclass field.
+    atoms_per_structure : int
+        Dataclass field.
+    """
     iden: str
     atoms_per_structure: int
 
 
 @dataclass(frozen=True)
 class MaterialsProjectHeatFoSpec:
+    """Represent MaterialsProjectHeatFoSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    out_dir : str | Path
+        Dataclass field.
+    elements : List[str]
+        Dataclass field.
+    material_ids : Optional[List[str]]
+        Dataclass field.
+    references_by_element : Dict[str, HeatFoReferenceSpec]
+        Dataclass field.
+    exact_element_count : bool
+        Dataclass field.
+    api_key : Optional[str]
+        Dataclass field.
+    max_materials : Optional[int]
+        Dataclass field.
+    crystallographic_setting_conversion : str
+        Dataclass field.
+    weight : float
+        Dataclass field.
+    trainset_filename : str
+        Dataclass field.
+    concatenated_geo_filename : str
+        Dataclass field.
+    verbose : bool
+        Dataclass field.
+    """
     out_dir: str | Path
     elements: List[str] = field(default_factory=list)
     material_ids: Optional[List[str]] = None
@@ -51,6 +99,25 @@ class MaterialsProjectHeatFoSpec:
 
 @dataclass(frozen=True)
 class MaterialsProjectHeatFoResult:
+    """Represent MaterialsProjectHeatFoResult.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    out_dir : Path
+        Dataclass field.
+    trainset_path : Path
+        Dataclass field.
+    concatenated_geo_path : Path
+        Dataclass field.
+    sources_dir : Path
+        Dataclass field.
+    generated_count : int
+        Dataclass field.
+    identifiers : List[str]
+        Dataclass field.
+    """
     out_dir: Path
     trainset_path: Path
     concatenated_geo_path: Path
@@ -61,12 +128,24 @@ class MaterialsProjectHeatFoResult:
 
 @dataclass(frozen=True)
 class HeatFoTrainsetRunResult:
+    """Represent HeatFoTrainsetRunResult.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    result : MaterialsProjectHeatFoResult
+        Dataclass field.
+    metadata : Dict[str, Any]
+        Dataclass field.
+    """
     result: MaterialsProjectHeatFoResult
     metadata: Dict[str, Any]
 
 
 @dataclass(frozen=True)
 class _WrittenStructure:
+    """Represent WrittenStructure."""
     identifier: str
     geo_path: Path
     composition_counts: Dict[str, int]
@@ -74,6 +153,7 @@ class _WrittenStructure:
 
 
 def _parse_elements_csv(value: str) -> List[str]:
+    """Parse elements csv."""
     elements = [token.strip() for token in re.split(r"[,\s]+", str(value)) if token.strip()]
     if not elements:
         raise ValueError("No elements were provided.")
@@ -88,6 +168,7 @@ def _parse_elements_csv(value: str) -> List[str]:
 
 
 def _parse_mp_ids_csv(value: str) -> List[str]:
+    """Parse mp ids csv."""
     ids = [token.strip() for token in re.split(r"[,\s]+", str(value)) if token.strip()]
     out: List[str] = []
     seen = set()
@@ -104,6 +185,7 @@ def _parse_mp_ids_csv(value: str) -> List[str]:
 
 
 def _parse_heatfo_references(value: str) -> Dict[str, HeatFoReferenceSpec]:
+    """Parse heatfo references."""
     refs: Dict[str, HeatFoReferenceSpec] = {}
     chunks = [token.strip() for token in re.split(r"[;,]", str(value)) if token.strip()]
     if not chunks:
@@ -131,6 +213,7 @@ def _parse_heatfo_references(value: str) -> Dict[str, HeatFoReferenceSpec]:
 
 
 def _parse_heatfo_reference_map(ref_obj) -> Dict[str, HeatFoReferenceSpec]:
+    """Parse heatfo reference map."""
     if ref_obj is None:
         return {}
     if isinstance(ref_obj, str):
@@ -164,6 +247,7 @@ def _parse_heatfo_reference_map(ref_obj) -> Dict[str, HeatFoReferenceSpec]:
 
 
 def _load_heatfo_yaml(path: str | Path) -> dict:
+    """Load heatfo yaml."""
     try:
         import yaml
     except ImportError as exc:
@@ -178,6 +262,7 @@ def _load_heatfo_yaml(path: str | Path) -> dict:
 
 
 def _clean_formula(formula_pretty: str) -> str:
+    """Clean formula."""
     formula_ascii = str(formula_pretty).translate(_SUBSCRIPT_TRANSLATION)
     formula_ascii = formula_ascii.replace(" ", "")
     formula_ascii = formula_ascii.replace("(", "_").replace(")", "_")
@@ -187,6 +272,7 @@ def _clean_formula(formula_pretty: str) -> str:
 
 
 def _extract_crystal_system(doc_obj) -> str:
+    """Extract crystal system."""
     symmetry = _mp_doc_field(doc_obj, "symmetry")
     if symmetry is None:
         return "unknown"
@@ -203,6 +289,7 @@ def _extract_crystal_system(doc_obj) -> str:
 
 
 def _material_id_numeric_part(material_id: str) -> str:
+    """Material id numeric part."""
     text = str(material_id).strip()
     if text.startswith("mp-"):
         text = text[3:]
@@ -211,10 +298,12 @@ def _material_id_numeric_part(material_id: str) -> str:
 
 
 def _build_identifier(*, formula_pretty: str, crystal_system: str, material_id: str) -> str:
+    """Build identifier."""
     return f"{_clean_formula(formula_pretty)}_{crystal_system}_{_material_id_numeric_part(material_id)}"
 
 
 def _format_denominator(value: float) -> str:
+    """Format denominator."""
     rounded = round(float(value))
     if abs(float(value) - rounded) < 1e-10:
         return str(int(rounded))
@@ -222,6 +311,7 @@ def _format_denominator(value: float) -> str:
 
 
 def _extract_integer_composition_counts(structure_obj) -> Dict[str, int]:
+    """Extract integer composition counts."""
     comp = structure_obj.composition.get_el_amt_dict()
     counts: Dict[str, int] = {}
     for element, amount in comp.items():
@@ -245,6 +335,7 @@ def _write_structure_triplet(
     geo_dir: Path,
     crystallographic_setting_conversion: str = "to-primitive",
 ) -> _WrittenStructure:
+    """Write structure triplet."""
     material_id = str(_mp_doc_field(doc_obj, "material_id"))
     formula_pretty = str(_mp_doc_field(doc_obj, "formula_pretty", material_id))
     crystal_system = _extract_crystal_system(doc_obj)
@@ -297,6 +388,7 @@ def _build_energy_line(
     weight: float,
     references_by_element: Dict[str, HeatFoReferenceSpec],
 ) -> str:
+    """Build energy line."""
     terms = [f"+   {identifier}/{_format_denominator(total_atoms)}"]
     for element in element_order:
         if element not in composition_counts:
@@ -315,6 +407,7 @@ def _build_energy_line(
 
 
 def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> MaterialsProjectHeatFoResult:
+    """Generate heatfo trainset from mp."""
     material_ids = _parse_mp_ids_csv(",".join(spec.material_ids)) if spec.material_ids else None
     elements = _parse_elements_csv(",".join(spec.elements)) if spec.elements else []
     references_by_element = {
@@ -477,13 +570,52 @@ def gen_heatfo_trainset(
     api_key: str | None = None,
     verbose: bool = False,
 ) -> HeatFoTrainsetRunResult:
-    """
-    Public entrypoint for heat-of-formation trainset generation.
+    """Gen heatfo trainset.
 
-    Supports:
-    - yaml mode
-    - material-id mode
-    - batch mode
+    Parameters
+    ----------
+    out_dir : str | Path
+        Keyword-only parameter.
+    source : str, optional
+        Keyword-only parameter.
+    input_mode : str, optional
+        Keyword-only parameter.
+    yaml_path : str | Path | None, optional
+        Keyword-only parameter.
+    mat_id : str | None, optional
+        Keyword-only parameter.
+    elements : str | None, optional
+        Keyword-only parameter.
+    references : str | None, optional
+        Keyword-only parameter.
+    element_count_scope : str, optional
+        Keyword-only parameter.
+    max_materials : int | None, optional
+        Keyword-only parameter.
+    crystallographic_setting_conversion : str, optional
+        Keyword-only parameter.
+    weight : float, optional
+        Keyword-only parameter.
+    trainset_file : str, optional
+        Keyword-only parameter.
+    geo_file : str, optional
+        Keyword-only parameter.
+    api_key : str | None, optional
+        Keyword-only parameter.
+    verbose : bool, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    HeatFoTrainsetRunResult
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_heatfo_trainset(...)
+    ```
     """
     from reaxkit.engine.reaxff.generators.trainset_source_adapter import (
         HeatFoTrainsetRequest,

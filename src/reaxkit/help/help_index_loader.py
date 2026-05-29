@@ -2303,7 +2303,7 @@ def build_help_relationship_report(
                 workflow_cmd = _workflow_command_from_ref(str(entry.get("related_workflow_module") or ""))
                 if not workflow_cmd:
                     workflow_cmd = str(name)
-                out.append(f"  • How to use the workflow: reaxkit {workflow_cmd} -h")
+                out.append(f"  • How to use the workflow: reaxkit {workflow_cmd} -h\n")
 
     # 2) file level (io then mapping lookup)
     file_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2382,6 +2382,7 @@ def build_help_relationship_report(
                 if ref_kind == "writer" and isinstance(writers, dict) and ref_name in writers:
                     out.append(f"  • writer::{ref_name}")
                     _append_all_fields_bulleted(out, writers.get(ref_name) or {}, base_indent="    ")
+    out.append(" ")
 
     # 3) utility level
     utility_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2413,6 +2414,7 @@ def build_help_relationship_report(
                 out.append(f"  o description: {str(entry.get('description') or '').strip()}")
                 out.append(f"  o implementation_module: {str(entry.get('implementation_module') or '').strip()}")
                 _append_notes_lines(out, entry.get("notes"), indent="  o ")
+                out.append(" ")
 
     # 4) analyzer level
     analyzer_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2448,6 +2450,7 @@ def build_help_relationship_report(
                 if not workflow_cmd:
                     workflow_cmd = str(name)
                 out.append(f"  • How to use the workflow: reaxkit {workflow_cmd} -h")
+                out.append(" ")
 
     # 5) workflow level
     workflow_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2478,6 +2481,7 @@ def build_help_relationship_report(
                 out.append(f"o (search score: {score_label}) {name}")
                 out.append(f"  • description: {str(entry.get('description') or '').strip()}")
                 _append_notes_lines(out, entry.get("notes"), indent="  • ")
+                out.append(" ")
 
     if len(out) == 1:
         return f"No matches for: {query!r}"

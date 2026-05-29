@@ -3,6 +3,12 @@ Trainset elastic-energy generation utilities.
 
 This module contains pure generation helpers and thin file writers for
 bulk/elastic trainset targets.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -24,6 +30,25 @@ ENERGY_MODE_ORDER = ["c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c6
 
 @dataclass(frozen=True)
 class CellSpec:
+    """Represent CellSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    a : float
+        Dataclass field.
+    b : float
+        Dataclass field.
+    c : float
+        Dataclass field.
+    alpha : float
+        Dataclass field.
+    beta : float
+        Dataclass field.
+    gamma : float
+        Dataclass field.
+    """
     a: float
     b: float
     c: float
@@ -32,6 +57,24 @@ class CellSpec:
     gamma: float
 
     def as_dict(self) -> Dict[str, float]:
+        """As dict.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Dict[str, float]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        as_dict(...)
+        ```
+        """
         return {
             "a": self.a,
             "b": self.b,
@@ -44,6 +87,27 @@ class CellSpec:
 
 @dataclass(frozen=True)
 class BulkEnergySpec:
+    """Represent BulkEnergySpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    bulk_modulus_gpa : float
+        Dataclass field.
+    bulk_modulus_pressure_derivative : float
+        Dataclass field.
+    max_volumetric_strain_percent : float
+        Dataclass field.
+    cell : CellSpec
+        Dataclass field.
+    linear_strain_step : float
+        Dataclass field.
+    reference_energy : float
+        Dataclass field.
+    weight : float
+        Dataclass field.
+    """
     bulk_modulus_gpa: float
     bulk_modulus_pressure_derivative: float
     max_volumetric_strain_percent: float
@@ -55,6 +119,23 @@ class BulkEnergySpec:
 
 @dataclass(frozen=True)
 class ElasticEnergySpec:
+    """Represent ElasticEnergySpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    elastic_constants_gpa : Dict[str, float]
+        Dataclass field.
+    max_strain_percent : float
+        Dataclass field.
+    volume_reference_cell : CellSpec
+        Dataclass field.
+    strain_step : float
+        Dataclass field.
+    weight : float
+        Dataclass field.
+    """
     elastic_constants_gpa: Dict[str, float]
     max_strain_percent: float
     volume_reference_cell: CellSpec
@@ -64,6 +145,21 @@ class ElasticEnergySpec:
 
 @dataclass(frozen=True)
 class TrainsetEnergyResult:
+    """Represent TrainsetEnergyResult.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    trainset_text : str
+        Dataclass field.
+    bulk_table : List[Tuple[float, float]]
+        Dataclass field.
+    elastic_tables : Dict[str, List[Tuple[float, float]]]
+        Dataclass field.
+    warnings : List[str]
+        Dataclass field.
+    """
     trainset_text: str
     bulk_table: List[Tuple[float, float]]
     elastic_tables: Dict[str, List[Tuple[float, float]]]
@@ -71,6 +167,7 @@ class TrainsetEnergyResult:
 
 
 def _fortran_nint(nonnegative_value: float) -> int:
+    """Fortran nint."""
     if nonnegative_value < 0:
         return -_fortran_nint(-nonnegative_value)
     return int(math.floor(nonnegative_value + 0.5))
@@ -85,6 +182,7 @@ def _compute_orthogonal_lattice_cell_volume(
     beta_deg: float,
     gamma_deg: float,
 ) -> float:
+    """Compute orthogonal lattice cell volume."""
     degrees_to_radians = math.pi / 180.0
     alpha_rad = alpha_deg * degrees_to_radians
     beta_rad = beta_deg * degrees_to_radians
@@ -110,6 +208,7 @@ def _compute_orthogonal_lattice_cell_volume(
 
 
 def _build_symmetric_grid(*, max_abs_value: float, step: float, grid_mode: str) -> List[float]:
+    """Build symmetric grid."""
     if step <= 0:
         raise ValueError("step must be positive.")
     rounded_ratio = _fortran_nint(max_abs_value / step)
@@ -120,6 +219,7 @@ def _build_symmetric_grid(*, max_abs_value: float, step: float, grid_mode: str) 
 
 
 def _make_label(prefix: str, signed_index: int) -> str:
+    """Make label."""
     if signed_index == 0:
         return f"{prefix}_0"
     compression_or_expansion = "c" if signed_index < 0 else "e"
@@ -127,12 +227,14 @@ def _make_label(prefix: str, signed_index: int) -> str:
 
 
 def _index_from_grid_value(grid_value: float, step: float) -> int:
+    """Index from grid value."""
     if step == 0:
         return 0
     return int(round(grid_value / step))
 
 
 def _warn_if_nonorthogonal(cell: CellSpec, label: str) -> Optional[str]:
+    """Warn if nonorthogonal."""
     angles = [cell.alpha, cell.beta, cell.gamma]
     tol = 1e-6
     if any(abs(a - 90.0) > tol for a in angles):
@@ -144,6 +246,7 @@ def _warn_if_nonorthogonal(cell: CellSpec, label: str) -> Optional[str]:
 
 
 def _generate_bulk_data(spec: BulkEnergySpec) -> Tuple[List[Tuple[float, float]], List[str]]:
+    """Generate bulk data."""
     cell = spec.cell.as_dict()
     reference_volume = _compute_orthogonal_lattice_cell_volume(
         a_length=cell["a"],
@@ -182,6 +285,7 @@ def _generate_bulk_data(spec: BulkEnergySpec) -> Tuple[List[Tuple[float, float]]
 
 
 def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tuple[float, float]], List[str]]]:
+    """Generate elastic data."""
     cell = spec.volume_reference_cell.as_dict()
     reference_volume = _compute_orthogonal_lattice_cell_volume(
         a_length=cell["a"],
@@ -200,12 +304,73 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
     c = spec.elastic_constants_gpa
 
     def normal_strain_prefactor(cij: float) -> float:
+        """Normal strain prefactor.
+
+        Parameters
+        ----------
+        cij : float
+            Input parameter.
+
+        Returns
+        -------
+        float
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        normal_strain_prefactor(...)
+        ```
+        """
         return cij * reference_volume / (2.0 * ENERGY_CONVERSION_FACTOR)
 
     def shear_strain_prefactor(cij: float) -> float:
+        """Shear strain prefactor.
+
+        Parameters
+        ----------
+        cij : float
+            Input parameter.
+
+        Returns
+        -------
+        float
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        shear_strain_prefactor(...)
+        ```
+        """
         return 2.0 * cij * reference_volume / ENERGY_CONVERSION_FACTOR
 
     def coupling_strain_prefactor(cij: float, cii: float, cjj: float) -> float:
+        """Coupling strain prefactor.
+
+        Parameters
+        ----------
+        cij : float
+            Input parameter.
+        cii : float
+            Input parameter.
+        cjj : float
+            Input parameter.
+
+        Returns
+        -------
+        float
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        coupling_strain_prefactor(...)
+        ```
+        """
         return (-cij + (cii + cjj) / 2.0) * reference_volume / ENERGY_CONVERSION_FACTOR
 
     coeffs = {
@@ -237,6 +402,7 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
 
 
 def _generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEnergySpec) -> TrainsetEnergyResult:
+    """Generate trainset energy."""
     warnings_list: List[str] = []
     for label, cell in (("Elastic", elastic_spec.volume_reference_cell), ("Bulk", bulk_spec.cell)):
         warning_message = _warn_if_nonorthogonal(cell, label)
@@ -267,6 +433,7 @@ def _generate_trainset_energy_with_source_note(
     *,
     source_note: str | None = None,
 ) -> TrainsetEnergyResult:
+    """Generate trainset energy with source note."""
     result = _generate_trainset_energy(bulk_spec, elastic_spec)
     if not source_note:
         return result
@@ -288,12 +455,14 @@ def _write_trainset_energy(
     out_dir: str | Path,
     trainset_filename: str = "trainset_elastic.in",
 ) -> Dict[str, Path]:
+    """Write trainset energy."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     trainset_path = out_dir / trainset_filename
     trainset_path.write_text(result.trainset_text, encoding="utf-8")
 
     def _write_two_column_table(path: Path, header: str, rows: List[Tuple[float, float]]) -> None:
+        """Write two column table."""
         with path.open("w", encoding="utf-8") as fh:
             fh.write(header.rstrip() + "\n")
             for x, y in rows:
@@ -321,6 +490,7 @@ def _generate_all_energy_vs_volume_data(
     elastic_options: Optional[Dict[str, float]] = None,
     trainset_filename: str = "trainset_elastic.in",
 ) -> None:
+    """Generate all energy vs volume data."""
     bulk_options = bulk_options or {}
     elastic_options = elastic_options or {}
     elastic_volume_cell = elastic_volume_cell or bulk_cell

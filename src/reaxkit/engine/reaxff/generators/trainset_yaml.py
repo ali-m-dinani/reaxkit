@@ -1,5 +1,11 @@
 """
 Trainset YAML settings generation and orchestration utilities.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -53,6 +59,7 @@ DEFAULT_TABLES = {
 
 
 def _concat_geo_strained(out_dir: Path) -> Path | None:
+    """Concat geo strained."""
     geo_dir = out_dir / "structures" / "geo_strained"
     all_geo_file = out_dir / "geo"
     if not geo_dir.exists():
@@ -69,6 +76,7 @@ def _concat_geo_strained(out_dir: Path) -> Path | None:
 
 
 def _normalize_formula_for_eos_label(formula: str) -> str:
+    """Normalize formula for eos label."""
     text = str(formula or "").strip()
     if not text:
         return "UnknownFormula"
@@ -91,6 +99,7 @@ def _normalize_formula_for_eos_label(formula: str) -> str:
 
 
 def _build_eos_source_note(cfg: dict) -> str | None:
+    """Build eos source note."""
     metadata = cfg.get("metadata", {}) or {}
     mp_id = str(metadata.get("mp_id", "") or "").strip()
     formula = str(metadata.get("formula_pretty", "") or "").strip()
@@ -103,6 +112,7 @@ def _build_eos_source_note(cfg: dict) -> str | None:
 
 
 def _extract_material_metadata_from_yaml(yaml_path: str | Path) -> Dict[str, str]:
+    """Extract material metadata from yaml."""
     try:
         import yaml
     except ImportError:
@@ -122,6 +132,7 @@ def _extract_material_metadata_from_yaml(yaml_path: str | Path) -> Dict[str, str
 
 
 def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
+    """Collect cell warnings from yaml."""
     try:
         import yaml
     except ImportError:
@@ -162,6 +173,7 @@ def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
 
 
 def _is_orthogonal_cell(cell: CellSpec, *, tol: float = 1e-6) -> bool:
+    """Is orthogonal cell."""
     return (
         abs(float(cell.alpha) - 90.0) <= tol
         and abs(float(cell.beta) - 90.0) <= tol
@@ -171,6 +183,55 @@ def _is_orthogonal_cell(cell: CellSpec, *, tol: float = 1e-6) -> bool:
 
 @dataclass(frozen=True)
 class TrainsetSettingsSpec:
+    """Represent TrainsetSettingsSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    out_path : str
+        Dataclass field.
+    name : str
+        Dataclass field.
+    source : str
+        Dataclass field.
+    mp_id : Optional[str]
+        Dataclass field.
+    formula_pretty : Optional[str]
+        Dataclass field.
+    crystal_system : Optional[str]
+        Dataclass field.
+    elastic_max_strain_percent : float
+        Dataclass field.
+    elastic_dstrain : float
+        Dataclass field.
+    cij_gpa : Dict[str, float]
+        Dataclass field.
+    elastic_cell : CellSpec
+        Dataclass field.
+    B0_gpa : float
+        Dataclass field.
+    B0_prime : float
+        Dataclass field.
+    bulk_max_volumetric_strain_percent : float
+        Dataclass field.
+    bulk_dstrain_linear : float
+        Dataclass field.
+    bulk_cell : CellSpec
+        Dataclass field.
+    trainset_file : str
+        Dataclass field.
+    tables : Dict[str, str]
+        Dataclass field.
+    elastic_xyz : Optional[str | Path]
+        Dataclass field.
+    bulk_xyz : Optional[str | Path]
+        Dataclass field.
+    geo_enable : bool
+        Dataclass field.
+    geo_sort_by : Optional[str]
+        Dataclass field.
+    """
     out_path: str
     name: str = "AlN example"
     source: str = "manual"
@@ -195,12 +256,14 @@ class TrainsetSettingsSpec:
 
 
 def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
+    """Generate trainset settings yaml text."""
     required_cij = ("c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
     missing = [key for key in required_cij if key not in spec.cij_gpa]
     if missing:
         raise ValueError(f"cij_gpa is missing required keys: {missing}")
 
     def _q(value: str) -> str:
+        """Q."""
         escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{escaped}"'
 
@@ -302,11 +365,26 @@ def gen_template_yaml_for_elastic_settings(
     *,
     out_path: str | Path | None = None,
 ) -> str | Path:
-    """
-    Public entrypoint for elastic settings template generation.
+    """Gen template yaml for elastic settings.
 
-    - If `spec` is provided and `out_path` is omitted: returns YAML text.
-    - If `out_path` is provided: writes YAML file and returns the output path.
+    Parameters
+    ----------
+    spec : TrainsetSettingsSpec | None, optional
+        Input parameter.
+    out_path : str | Path | None, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    str | Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_yaml_for_elastic_settings(...)
+    ```
     """
     if spec is not None and out_path is None:
         return _generate_trainset_settings_yaml_text(spec)
@@ -365,6 +443,7 @@ def _write_trainset_settings_yaml(
     geo_enable: bool = True,
     geo_sort_by: Optional[str] = None,
 ) -> None:
+    """Write trainset settings yaml."""
     spec = TrainsetSettingsSpec(
         out_path=out_path,
         name=name,
@@ -394,6 +473,7 @@ def _write_trainset_settings_yaml(
 
 
 def _generate_heatfo_settings_yaml_text() -> str:
+    """Generate heatfo settings yaml text."""
     lines = [
         "# Heatfo trainset settings for `make-trainset-heatfo --input-mode yaml`",
         "# Edit values to match your system.",
@@ -426,6 +506,7 @@ def _generate_heatfo_settings_yaml_text() -> str:
 
 
 def _write_heatfo_settings_yaml(*, out_path: str | Path) -> Path:
+    """Write heatfo settings yaml."""
     out_path_obj = Path(out_path)
     out_path_obj.parent.mkdir(parents=True, exist_ok=True)
     out_path_obj.write_text(_generate_heatfo_settings_yaml_text(), encoding="utf-8")
@@ -433,13 +514,30 @@ def _write_heatfo_settings_yaml(*, out_path: str | Path) -> Path:
 
 
 def gen_template_yaml_for_heatfo_settings(*, out_path: str | Path) -> Path:
-    """
-    Public entrypoint for generating heatfo settings YAML template files.
+    """Gen template yaml for heatfo settings.
+
+    Parameters
+    ----------
+    out_path : str | Path
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_yaml_for_heatfo_settings(...)
+    ```
     """
     return _write_heatfo_settings_yaml(out_path=out_path)
 
 
 def _read_trainset_settings_yaml(yaml_path: str) -> dict:
+    """Read trainset settings yaml."""
     try:
         import yaml
     except ImportError as exc:
@@ -495,6 +593,7 @@ def _generate_trainset_from_yaml(
     skip_no_orthogonal: bool = False,
     weight: float | None = None,
 ):
+    """Generate trainset from yaml."""
     cfg = _read_trainset_settings_yaml(yaml_path)
     yaml_path_p = Path(yaml_path).resolve()
     out_dir_p = Path(out_dir).resolve()
@@ -614,6 +713,7 @@ def _gen_elastic_trainset_from_yaml_mode(
     skip_no_orthogonal: bool = False,
     weight: float | None = None,
 ) -> dict[str, Any]:
+    """Gen elastic trainset from yaml mode."""
     generated = _generate_trainset_from_yaml(
         yaml_path=yaml_path,
         out_dir=str(out_dir),
@@ -644,6 +744,7 @@ def _run_single_material_id_elastic_trainset(
     verbose: bool,
     weight: float | None,
 ) -> tuple[str, bool]:
+    """Run single material id elastic trainset."""
     out_yaml_path = out_dir / Path(str(out_yaml)).name
     structure_dir_path = Path(structure_dir) if structure_dir else (out_dir / "structures" / "downloaded_structures")
     structure_dir_path.mkdir(parents=True, exist_ok=True)
@@ -682,6 +783,7 @@ def _gen_elastic_trainset_from_material_id_mode(
     verbose: bool,
     weight: float | None,
 ) -> dict[str, Any]:
+    """Gen elastic trainset from material id mode."""
     yaml_path, generated = _run_single_material_id_elastic_trainset(
         source_adapter=source_adapter,
         mat_id=mat_id,
@@ -725,6 +827,7 @@ def _gen_elastic_trainset_batch_mode(
     verbose: bool,
     weight: float | None,
 ) -> dict[str, Any]:
+    """Gen elastic trainset batch mode."""
     from reaxkit.engine.reaxff.generators.trainset_heatfo import _parse_elements_csv
     from reaxkit.engine.reaxff.generators.trainset_mp import _mp_fetch_material_summary_metadata
 
@@ -872,13 +975,54 @@ def gen_elastic_trainset(
     verbose: bool = False,
     weight: float | None = None,
 ) -> dict[str, Any]:
-    """
-    Public entrypoint for elastic trainset generation.
+    """Gen elastic trainset.
 
-    Supports:
-    - yaml mode
-    - material-id mode
-    - batch mode
+    Parameters
+    ----------
+    out_dir : str | Path
+        Keyword-only parameter.
+    source : str, optional
+        Keyword-only parameter.
+    input_mode : str, optional
+        Keyword-only parameter.
+    yaml_path : str | None, optional
+        Keyword-only parameter.
+    mat_id : str | None, optional
+        Keyword-only parameter.
+    elements : str | None, optional
+        Keyword-only parameter.
+    element_count_scope : str, optional
+        Keyword-only parameter.
+    max_materials : int | None, optional
+        Keyword-only parameter.
+    api_key : str | None, optional
+        Keyword-only parameter.
+    bulk_mode : str, optional
+        Keyword-only parameter.
+    crystallographic_setting_conversion : str, optional
+        Keyword-only parameter.
+    out_yaml : str, optional
+        Keyword-only parameter.
+    structure_dir : str | Path | None, optional
+        Keyword-only parameter.
+    skip_no_orthogonal : bool, optional
+        Keyword-only parameter.
+    verbose : bool, optional
+        Keyword-only parameter.
+    weight : float | None, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    dict[str, Any]
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_elastic_trainset(...)
+    ```
     """
     from reaxkit.engine.reaxff.generators.trainset_source_adapter import _get_trainset_source_adapter
 

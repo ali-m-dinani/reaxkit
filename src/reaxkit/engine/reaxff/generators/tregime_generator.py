@@ -4,6 +4,12 @@ Temperature-regime (tregime.in) file generators.
 This module provides utilities for generating ReaxFF ``tregime.in`` files,
 which define temperature control zones and thermostat parameters used
 during molecular dynamics simulations.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -22,10 +28,20 @@ __all__ = [
 
 @dataclass(frozen=True)
 class TRegimeSampleSpec:
+    """Represent TRegimeSampleSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    n_rows : int
+        Dataclass field.
+    """
     n_rows: int = 3
 
 
 def _build_sample_rows() -> list[dict[str, Any]]:
+    """Build sample rows."""
     return [
         {
             "#Start": 0,
@@ -79,6 +95,7 @@ def _gen_template_tregime_text(spec: TRegimeSampleSpec = TRegimeSampleSpec()) ->
     sep = "  "
 
     def _fmt_value(value: Any, kind: str) -> str:
+        """Fmt value."""
         if kind == "int":
             return str(int(value))
         if kind == "float1":
@@ -88,14 +105,52 @@ def _gen_template_tregime_text(spec: TRegimeSampleSpec = TRegimeSampleSpec()) ->
         return str(value)
 
     def _pad_left(value: str, width: int) -> str:
+        """Pad left."""
         if len(value) > width:
             return value[:width]
         return value.ljust(width)
 
     def format_header() -> str:
+        """Format header.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        str
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        format_header(...)
+        ```
+        """
         return sep.join(_pad_left(name, width) for name, width, _ in cols)
 
     def format_row(values: dict[str, Any]) -> str:
+        """Format row.
+
+        Parameters
+        ----------
+        values : dict[str, Any]
+            Input parameter.
+
+        Returns
+        -------
+        str
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        format_row(...)
+        ```
+        """
         parts = []
         for name, width, kind in cols:
             raw = _fmt_value(values.get(name, 0), kind)
@@ -126,8 +181,26 @@ def gen_template_tregime(
     *,
     n_rows: int = 3,
 ) -> Path:
-    """
-    Generate sample ``tregime.in`` file.
+    """Gen template tregime.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    n_rows : int, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_tregime(...)
+    ```
     """
     return _write_tregime(out_path=out_path, spec=TRegimeSampleSpec(n_rows=n_rows))
 

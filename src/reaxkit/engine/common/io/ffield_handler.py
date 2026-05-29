@@ -7,6 +7,12 @@ which define all force-field parameters used in ReaxFF simulations.
 Unlike most handlers, ``ffield`` data is inherently sectional rather
 than tabular and is therefore exposed through per-section tables
 instead of a single summary DataFrame.
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -344,6 +350,7 @@ class FFieldHandler(BaseHandler):
         return df, meta
 
     def _count_lines(self) -> int:
+        """Count lines."""
         with open(self.path, "r", encoding="utf-8") as fh:
             return sum(1 for _ in fh)
 

@@ -53,6 +53,7 @@ docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
 src/reaxkit/webui/reaxkit_workspace
+tests/engine/reaxff/io/.reaxkit_cache/
 
 # Generated outputs and temporary folders
 examples_to_test/
@@ -61,11 +62,12 @@ full_sim_examples/
 output/
 plots/
 results/
-tests/artifacts/
+tests/engine/artifacts/
 src/reaxkit/trash/
 src/reaxkit/under_development/
 src/reaxkit/under_dev
 site/
+tests/analysis_tasks/artifacts/
 
 # Project-local files to ignore
 README.txt
@@ -97,4 +99,4 @@ cache/
 Thumbs.db
 /.reaxkit_cache/index/handlers.json
 /src/reaxkit/webui/.reaxkit_cache/index/handlers.json
-/tests/analysis_tasks/artifcats/
+

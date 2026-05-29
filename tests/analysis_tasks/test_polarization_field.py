@@ -25,7 +25,7 @@ from reaxkit.domain.data_models import (
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
 )
-ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifcats"
+ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 
 
 def _run_and_save() -> Path:

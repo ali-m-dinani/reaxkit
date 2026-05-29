@@ -10,6 +10,12 @@ Typical use cases include:
 - reading time step and MD parameters
 - converting iteration indices to physical time
 - inspecting or validating simulation settings
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 from __future__ import annotations
@@ -113,6 +119,25 @@ class ControlHandler(BaseHandler):
         # Helper to map a header line to a normalized section name
         def header_to_section(line: str) -> str | None:
             # remove leading '#' and surrounding whitespace, then lower
+            """Header to section.
+
+            Parameters
+            ----------
+            line : str
+                Input parameter.
+
+            Returns
+            -------
+            str | None
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            header_to_section(...)
+            ```
+            """
             hdr = re.sub(r"^\s*#\s*", "", line).strip().lower()
             if hdr.startswith("general"):
                 return "general"

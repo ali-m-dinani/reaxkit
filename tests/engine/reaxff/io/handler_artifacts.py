@@ -10,7 +10,7 @@ import pandas as pd
 
 from reaxkit.engine.reaxff.io.control_handler import ControlHandler
 from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
-from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+from reaxkit.engine.common.io.ffield_handler import FFieldHandler
 from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
 from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
 from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler

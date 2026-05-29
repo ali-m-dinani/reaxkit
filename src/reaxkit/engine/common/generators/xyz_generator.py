@@ -1,4 +1,16 @@
-"""Simple XYZ trajectory writer for engine-agnostic fallback export."""
+"""Write canonical trajectory data to multi-frame XYZ files.
+
+This module provides a lightweight exporter that converts
+``reaxkit.domain.data_models.TrajectoryData`` into standard XYZ trajectory
+text. It is intended as an engine-agnostic fallback writer for workflows that
+need portable trajectory output without engine-specific dependencies.
+
+**Usage context**
+
+- Workflow export: Save processed trajectories for downstream tools/inspection.
+- Engine fallback: Emit XYZ when native engine writer is unavailable.
+- Diagnostics: Produce human-readable trajectory snapshots over time.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +27,28 @@ def write_xyz_trajectory(
     *,
     precision: int = 6,
 ) -> Path:
-    """Write a ``TrajectoryData`` object as a multi-frame XYZ file."""
+    """Write a ``TrajectoryData`` object as a multi-frame XYZ file.
+
+    Parameters
+    ----------
+    trajectory : TrajectoryData
+        Canonical frame-major trajectory payload.
+    out_path : str | Path
+        Destination path for the generated XYZ trajectory file.
+    precision : int, optional
+        Decimal precision used for coordinate formatting.
+
+    Returns
+    -------
+    Path
+        Output file path written to disk.
+
+    Examples
+    --------
+    ```python
+    out = write_xyz_trajectory(traj, "exports/traj.xyz", precision=8)
+    ```
+    """
     positions = np.asarray(trajectory.positions, dtype=float)
     if positions.ndim != 3:
         raise ValueError("TrajectoryData.positions must have shape (n_frames, n_atoms, 3).")

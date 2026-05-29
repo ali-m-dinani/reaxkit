@@ -3,6 +3,12 @@ Source adapter layer for trainset generation.
 
 This keeps workflow code source-agnostic and routes data fetching/generation
 to source-specific scraper implementations.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -24,6 +30,37 @@ from reaxkit.engine.reaxff.generators.trainset_mp import (
 
 @dataclass(frozen=True)
 class HeatFoTrainsetRequest:
+    """Represent HeatFoTrainsetRequest.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    out_dir : str | Path
+        Dataclass field.
+    elements : list[str]
+        Dataclass field.
+    material_ids : Optional[list[str]]
+        Dataclass field.
+    references_by_element : Dict[str, HeatFoReferenceSpec]
+        Dataclass field.
+    exact_element_count : bool
+        Dataclass field.
+    api_key : Optional[str]
+        Dataclass field.
+    max_materials : Optional[int]
+        Dataclass field.
+    crystallographic_setting_conversion : str
+        Dataclass field.
+    weight : float
+        Dataclass field.
+    trainset_filename : str
+        Dataclass field.
+    concatenated_geo_filename : str
+        Dataclass field.
+    verbose : bool
+        Dataclass field.
+    """
     out_dir: str | Path
     elements: list[str]
     material_ids: Optional[list[str]]
@@ -39,6 +76,10 @@ class HeatFoTrainsetRequest:
 
 
 class TrainsetSourceAdapter(Protocol):
+    """Represent TrainsetSourceAdapter.
+
+    Public class used by ReaxFF generator components.
+    """
     source_name: str
 
     def generate_elastic_settings_yaml_from_material_id(
@@ -52,6 +93,37 @@ class TrainsetSourceAdapter(Protocol):
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
+        """Generate elastic settings yaml from material id.
+
+        Parameters
+        ----------
+        mat_id : str
+            Keyword-only parameter.
+        out_yaml : str | Path
+            Keyword-only parameter.
+        structure_dir : Optional[str | Path]
+            Keyword-only parameter.
+        bulk_mode : str
+            Keyword-only parameter.
+        crystallographic_setting_conversion : str
+            Keyword-only parameter.
+        api_key : Optional[str]
+            Keyword-only parameter.
+        verbose : bool
+            Keyword-only parameter.
+
+        Returns
+        -------
+        Dict[str, str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_elastic_settings_yaml_from_material_id(...)
+        ```
+        """
         ...
 
     def search_material_ids_by_elements(
@@ -62,13 +134,58 @@ class TrainsetSourceAdapter(Protocol):
         exact_element_count: bool,
         max_materials: Optional[int],
     ) -> list[str]:
+        """Search material ids by elements.
+
+        Parameters
+        ----------
+        api_key : str
+            Keyword-only parameter.
+        elements : list[str]
+            Keyword-only parameter.
+        exact_element_count : bool
+            Keyword-only parameter.
+        max_materials : Optional[int]
+            Keyword-only parameter.
+
+        Returns
+        -------
+        list[str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        search_material_ids_by_elements(...)
+        ```
+        """
         ...
 
     def generate_heatfo_trainset(self, request: HeatFoTrainsetRequest):
+        """Generate heatfo trainset.
+
+        Parameters
+        ----------
+        request : HeatFoTrainsetRequest
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_heatfo_trainset(...)
+        ```
+        """
         ...
 
 
 class _MaterialsProjectTrainsetSourceAdapter:
+    """Represent MaterialsProjectTrainsetSourceAdapter."""
     source_name = "mp"
 
     def generate_elastic_settings_yaml_from_material_id(
@@ -82,6 +199,37 @@ class _MaterialsProjectTrainsetSourceAdapter:
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
+        """Generate elastic settings yaml from material id.
+
+        Parameters
+        ----------
+        mat_id : str
+            Keyword-only parameter.
+        out_yaml : str | Path
+            Keyword-only parameter.
+        structure_dir : Optional[str | Path]
+            Keyword-only parameter.
+        bulk_mode : str
+            Keyword-only parameter.
+        crystallographic_setting_conversion : str
+            Keyword-only parameter.
+        api_key : Optional[str]
+            Keyword-only parameter.
+        verbose : bool
+            Keyword-only parameter.
+
+        Returns
+        -------
+        Dict[str, str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_elastic_settings_yaml_from_material_id(...)
+        ```
+        """
         return _generate_trainset_settings_yaml_from_mp_simple(
             mp_id=mat_id,
             out_yaml=out_yaml,
@@ -100,6 +248,31 @@ class _MaterialsProjectTrainsetSourceAdapter:
         exact_element_count: bool,
         max_materials: Optional[int],
     ) -> list[str]:
+        """Search material ids by elements.
+
+        Parameters
+        ----------
+        api_key : str
+            Keyword-only parameter.
+        elements : list[str]
+            Keyword-only parameter.
+        exact_element_count : bool
+            Keyword-only parameter.
+        max_materials : Optional[int]
+            Keyword-only parameter.
+
+        Returns
+        -------
+        list[str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        search_material_ids_by_elements(...)
+        ```
+        """
         return _mp_search_material_ids_by_elements(
             api_key=api_key,
             elements=elements,
@@ -108,6 +281,25 @@ class _MaterialsProjectTrainsetSourceAdapter:
         )
 
     def generate_heatfo_trainset(self, request: HeatFoTrainsetRequest):
+        """Generate heatfo trainset.
+
+        Parameters
+        ----------
+        request : HeatFoTrainsetRequest
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_heatfo_trainset(...)
+        ```
+        """
         return _generate_heatfo_trainset_from_mp(
             MaterialsProjectHeatFoSpec(
                 out_dir=request.out_dir,
@@ -127,10 +319,12 @@ class _MaterialsProjectTrainsetSourceAdapter:
 
 
 class _JarvisTrainsetSourceAdapter:
+    """Represent JarvisTrainsetSourceAdapter."""
     source_name = "jarvis"
 
     @staticmethod
     def _not_implemented() -> None:
+        """Not implemented."""
         raise NotImplementedError(
             "source='jarvis' is not implemented yet for trainset generation. "
             "Add a JARVIS scraper/provider and wire it into trainset_source_adapter."
@@ -147,6 +341,37 @@ class _JarvisTrainsetSourceAdapter:
         api_key: Optional[str],
         verbose: bool,
     ) -> Dict[str, str]:
+        """Generate elastic settings yaml from material id.
+
+        Parameters
+        ----------
+        mat_id : str
+            Keyword-only parameter.
+        out_yaml : str | Path
+            Keyword-only parameter.
+        structure_dir : Optional[str | Path]
+            Keyword-only parameter.
+        bulk_mode : str
+            Keyword-only parameter.
+        crystallographic_setting_conversion : str
+            Keyword-only parameter.
+        api_key : Optional[str]
+            Keyword-only parameter.
+        verbose : bool
+            Keyword-only parameter.
+
+        Returns
+        -------
+        Dict[str, str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_elastic_settings_yaml_from_material_id(...)
+        ```
+        """
         self._not_implemented()
 
     def search_material_ids_by_elements(
@@ -157,13 +382,58 @@ class _JarvisTrainsetSourceAdapter:
         exact_element_count: bool,
         max_materials: Optional[int],
     ) -> list[str]:
+        """Search material ids by elements.
+
+        Parameters
+        ----------
+        api_key : str
+            Keyword-only parameter.
+        elements : list[str]
+            Keyword-only parameter.
+        exact_element_count : bool
+            Keyword-only parameter.
+        max_materials : Optional[int]
+            Keyword-only parameter.
+
+        Returns
+        -------
+        list[str]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        search_material_ids_by_elements(...)
+        ```
+        """
         self._not_implemented()
 
     def generate_heatfo_trainset(self, request: HeatFoTrainsetRequest):
+        """Generate heatfo trainset.
+
+        Parameters
+        ----------
+        request : HeatFoTrainsetRequest
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        generate_heatfo_trainset(...)
+        ```
+        """
         self._not_implemented()
 
 
 def _normalize_trainset_source_name(source: str) -> str:
+    """Normalize trainset source name."""
     value = str(source).strip().lower()
     if not value:
         raise ValueError("Source must be provided.")
@@ -171,6 +441,7 @@ def _normalize_trainset_source_name(source: str) -> str:
 
 
 def _get_trainset_source_adapter(source: str) -> TrainsetSourceAdapter:
+    """Get trainset source adapter."""
     source_name = _normalize_trainset_source_name(source)
     if source_name == "mp":
         return _MaterialsProjectTrainsetSourceAdapter()

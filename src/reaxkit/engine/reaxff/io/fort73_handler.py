@@ -7,6 +7,12 @@ time-series output files that share a common tabular format, including
 
 These files report per-iteration energetic quantities and are commonly
 used to monitor MD stability, energy conservation, and convergence.
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -105,6 +111,7 @@ class Fort73Handler(BaseHandler):
         in_table = False
 
         def _flush_current() -> None:
+            """Flush current."""
             nonlocal current
             if not cols or not current:
                 current = []

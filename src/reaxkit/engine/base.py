@@ -1,4 +1,11 @@
-"""Generic engine adapter API."""
+"""Generic engine adapter API.
+
+**Usage context**
+
+- Engine dispatch: Route typed load/write requests to engine-specific implementations.
+- Data normalization: Convert raw engine files into canonical domain models.
+- Workflow support: Provide reusable adapter entry points for CLI/workflow layers.
+"""
 
 from __future__ import annotations
 
@@ -127,6 +134,7 @@ class EngineAdapter(ABC):
         raise ValueError(f"{self.name} cannot write data object of type: {type(data).__name__}")
 
     def _invoke_loader(self, method_name: str, args: dict, reporter=None):
+        """Invoke loader."""
         method = getattr(self, method_name, None)
         if method is None:
             raise ValueError(f"{self.name} cannot load data type via missing method: {method_name}")
@@ -136,6 +144,7 @@ class EngineAdapter(ABC):
         return method(args)
 
     def _invoke_writer(self, method_name: str, data, out_path, args: dict):
+        """Invoke writer."""
         method = getattr(self, method_name, None)
         if method is None:
             raise ValueError(f"{self.name} cannot write data via missing method: {method_name}")

@@ -3,6 +3,12 @@ ReaxFF kopple2 file generation utilities.
 
 This module provides deterministic helpers for generating or writing a
 default ReaxFF ``kopple2`` input file from a canonical template.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -35,14 +41,14 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Kopple2GeneratorSpec:
-    """
-    Declarative settings for generating a ReaxFF ``kopple2`` file.
+    """Represent Kopple2GeneratorSpec.
 
-    Parameters
-    ----------
-    template_text : str, optional
-        Fully formatted ``kopple2`` file content. Defaults to the bundled
-        canonical template.
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    template_text : str
+        Dataclass field.
     """
 
     template_text: str = KOPPLE2_TEMPLATE
@@ -75,8 +81,26 @@ def gen_template_kopple2(
     out_path: str | Path = "kopple2",
     spec: Kopple2GeneratorSpec = DEFAULT_KOPPLE2_SPEC,
 ) -> Path:
-    """
-    Generate template ``kopple2`` file.
+    """Gen template kopple2.
+
+    Parameters
+    ----------
+    out_path : str | Path, optional
+        Input parameter.
+    spec : Kopple2GeneratorSpec, optional
+        Input parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    gen_template_kopple2(...)
+    ```
     """
     return _write_kopple2_template(out_path=out_path, spec=spec)
 

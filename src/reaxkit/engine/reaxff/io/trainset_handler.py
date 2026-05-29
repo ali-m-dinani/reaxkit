@@ -8,6 +8,12 @@ force-field parameter optimization.
 TRAINSET files are sectioned and heterogeneous by design, containing
 distinct blocks for charges, heats of formation, geometries, cell
 parameters, and energies.
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -597,6 +603,7 @@ class TrainsetHandler(BaseHandler):
     filetype = "trainset"
 
     def __init__(self, file_path: str = "trainset.in", reporter=None):
+        """Init."""
         super().__init__(file_path)
         self._reporter = reporter
 
@@ -616,6 +623,24 @@ class TrainsetHandler(BaseHandler):
         buffer: List[tuple[int, str]] = []
 
         def flush_section():
+            """Flush section.
+
+            Parameters
+            ----------
+            None
+
+            Returns
+            -------
+            Any
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            flush_section(...)
+            ```
+            """
             nonlocal buffer, current_canonical, tables
 
             if not current_canonical or not buffer:

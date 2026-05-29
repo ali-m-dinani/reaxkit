@@ -1,4 +1,11 @@
-"""Utilities to repair corrupted ReaxFF ``fort.7`` atom rows."""
+"""Utilities to repair corrupted ReaxFF ``fort.7`` atom rows.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +22,7 @@ __all__ = ["repair_fort7"]
 
 
 def _first_float_index(parts: list[str]) -> int:
+    """First float index."""
     for i, part in enumerate(parts):
         if "." in part or "e" in part.lower():
             return i
@@ -22,6 +30,7 @@ def _first_float_index(parts: list[str]) -> int:
 
 
 def _is_valid_compact_row(raw_tokens: list[str], n_bonds: int) -> bool:
+    """Is valid compact row."""
     if len(raw_tokens) != n_bonds + 1:
         return False
     neighbors = [int(x) for x in raw_tokens[:-1]]
@@ -38,6 +47,7 @@ def _is_valid_compact_row(raw_tokens: list[str], n_bonds: int) -> bool:
 
 
 def _trailing_zero_count(tokens: list[str]) -> int:
+    """Trailing zero count."""
     zeros = 0
     for token in reversed(tokens):
         if token == "0":
@@ -48,10 +58,12 @@ def _trailing_zero_count(tokens: list[str]) -> int:
 
 
 def _score_seq(seq: tuple[int, ...]) -> int:
+    """Score seq."""
     return sum(0 if len(str(x)) >= 4 else (4 - len(str(x))) * 3 for x in seq)
 
 
 def _parse_positive_prefix(prefix_tokens: list[str], required: int) -> list[int] | None:
+    """Parse positive prefix."""
     if len(prefix_tokens) == required and all(1 <= len(t) <= _MAX_DIGITS for t in prefix_tokens):
         values = [int(t) for t in prefix_tokens]
         valid = True
@@ -73,6 +85,7 @@ def _parse_positive_prefix(prefix_tokens: list[str], required: int) -> list[int]
 
     @lru_cache(None)
     def _rec(position: int, used: int, previous: int) -> list[tuple[int, ...]]:
+        """Rec."""
         if used == required:
             return [()] if position == n_chars else []
         remaining_numbers = required - used
@@ -103,6 +116,7 @@ def _parse_positive_prefix(prefix_tokens: list[str], required: int) -> list[int]
 
 
 def _fix_data_line(line: str, n_bonds: int) -> tuple[str, str]:
+    """Fix data line."""
     parts = line.split()
     float_index = _first_float_index(parts)
     if float_index == -1:
@@ -149,7 +163,29 @@ def repair_fort7(
     *,
     progress_every: int = 5000,
 ) -> dict[str, Any]:
-    """Repair line-format corruption in ``fort.7`` atom rows and write a corrected file."""
+    """Repair fort7.
+
+    Parameters
+    ----------
+    input_file : str | Path, optional
+        Input parameter.
+    output_file : str | Path, optional
+        Input parameter.
+    progress_every : int, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    dict[str, Any]
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    repair_fort7(...)
+    ```
+    """
     input_path = Path(input_file)
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)

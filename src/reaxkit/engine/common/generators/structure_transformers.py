@@ -1,8 +1,15 @@
-"""
-Geometry transformation utilities.
+"""Build and transform structures with ASE-based geometry utilities.
 
-This module contains ASE-based helpers for building and transforming structures
-before they are written to disk or converted into GEO/XTLGRF format.
+This module provides reusable structure-construction and transformation helpers
+for slab generation, supercell/lattice transforms, and random molecular
+placement inside periodic cells. It is focused on geometry preparation and does
+not perform engine-specific simulation logic.
+
+**Usage context**
+
+- Pre-processing: Build slabs/supercells before simulation input generation.
+- Cell transformations: Re-map lattices into alternate simulation-friendly forms.
+- Packing workflows: Place molecules stochastically under distance constraints.
 """
 
 from __future__ import annotations
@@ -38,8 +45,31 @@ def build_surface(
     vacuum: float = 15.0,
     center: bool = True,
 ) -> Atoms:
-    """
-    Build a surface slab from a bulk structure using Miller indices.
+    """Build a surface slab from a bulk structure using Miller indices.
+
+    Parameters
+    ----------
+    bulk : Atoms
+        Input bulk structure.
+    miller : Tuple[int, int, int]
+        Miller index triple defining the surface orientation.
+    layers : int
+        Number of atomic layers to include in the slab.
+    vacuum : float, optional
+        Vacuum padding along the surface normal.
+    center : bool, optional
+        Whether to center slab atoms along ``z`` after slab construction.
+
+    Returns
+    -------
+    Atoms
+        Generated slab structure.
+
+    Examples
+    --------
+    ```python
+    slab = build_surface(bulk, (1, 1, 1), layers=6, vacuum=15.0)
+    ```
     """
     slab = ase_surface(bulk, miller, layers=layers, vacuum=vacuum)
     if center:
@@ -51,8 +81,25 @@ def make_supercell(
     atoms: Atoms,
     transform: Iterable[Iterable[int]] | Tuple[int, int, int],
 ) -> Atoms:
-    """
-    Generate a supercell or apply a lattice transformation.
+    """Generate a supercell or apply a lattice transformation matrix.
+
+    Parameters
+    ----------
+    atoms : Atoms
+        Input structure to transform.
+    transform : Iterable[Iterable[int]] | Tuple[int, int, int]
+        Either repetition counts ``(nx, ny, nz)`` or a ``3x3`` integer matrix.
+
+    Returns
+    -------
+    Atoms
+        Transformed supercell structure.
+
+    Examples
+    --------
+    ```python
+    sc = make_supercell(atoms, (2, 2, 1))
+    ```
     """
     if isinstance(transform, tuple) and len(transform) == 3:
         return atoms * transform
@@ -64,8 +111,23 @@ def make_supercell(
 
 
 def orthogonalize_hexagonal_cell(atoms: Atoms) -> Atoms:
-    """
-    Convert a hexagonal unit cell into an orthorhombic cell.
+    """Convert a hexagonal unit cell into an orthorhombic supercell mapping.
+
+    Parameters
+    ----------
+    atoms : Atoms
+        Input structure with a hexagonal-like cell representation.
+
+    Returns
+    -------
+    Atoms
+        Structure transformed with a fixed integer supercell matrix.
+
+    Examples
+    --------
+    ```python
+    ortho = orthogonalize_hexagonal_cell(hex_atoms)
+    ```
     """
     transform = np.array([
         [1, -1, 0],
@@ -91,8 +153,62 @@ def place2(
     max_placement_attempts_per_copy: int = 50000,
     random_seed: int | None = None,
 ) -> Atoms:
-    """
-    Randomly place multiple copies of a molecule into a simulation cell.
+    """Randomly place molecule copies into a periodic simulation cell.
+
+    Generates random rigid-body rotations/translations for ``n_copies`` of an
+    inserted molecule and accepts placements that satisfy a minimum
+    interatomic-distance constraint under periodic boundary conditions.
+
+    Parameters
+    ----------
+    insert_molecule : str | Path
+        Structure file for the molecule to insert repeatedly.
+    base_structure : Optional[str | Path], optional
+        Optional initial structure preloaded into the target cell.
+    n_copies : int
+        Number of inserted molecule copies to place.
+    box_length_x : float
+        Cell length along ``x``.
+    box_length_y : float
+        Cell length along ``y``.
+    box_length_z : float
+        Cell length along ``z``.
+    alpha : float
+        Cell angle ``alpha`` in degrees.
+    beta : float
+        Cell angle ``beta`` in degrees.
+    gamma : float
+        Cell angle ``gamma`` in degrees.
+    min_interatomic_distance : float
+        Minimum allowed distance between inserted and existing atoms.
+    base_structure_placement_mode : str, optional
+        Placement mode for base structure: ``"as-is"``, ``"center"``, or
+        ``"origin"``.
+    max_placement_attempts_per_copy : int, optional
+        Maximum random attempts before failing one copy placement.
+    random_seed : int | None, optional
+        Seed for deterministic random placement.
+
+    Returns
+    -------
+    Atoms
+        Combined packed structure with periodic boundary conditions enabled.
+
+    Examples
+    --------
+    ```python
+    packed = place2(
+        "h2o.xyz",
+        n_copies=50,
+        box_length_x=30.0,
+        box_length_y=30.0,
+        box_length_z=30.0,
+        alpha=90.0,
+        beta=90.0,
+        gamma=90.0,
+        min_interatomic_distance=1.4,
+    )
+    ```
     """
     rng = np.random.default_rng(random_seed)
     cell = cellpar_to_cell([box_length_x, box_length_y, box_length_z, alpha, beta, gamma])
@@ -128,6 +244,7 @@ def place2(
         system_coords = np.vstack([system_coords, base_coords])
 
     def random_rotation_matrix() -> np.ndarray:
+        """Generate a random 3D rotation matrix from Euler-angle sampling."""
         phi = 2 * np.pi * rng.random()
         theta = 2 * np.pi * rng.random()
         psi = 2 * np.pi * rng.random()
@@ -142,6 +259,7 @@ def place2(
         return rz2 @ ry @ rz1
 
     def min_distance(new: np.ndarray, existing: np.ndarray) -> float:
+        """Compute minimum-image nearest distance between new and existing sets."""
         if existing.size == 0:
             return float("inf")
 

@@ -1,4 +1,11 @@
-"""ReaxFF engine adapter."""
+"""ReaxFF engine adapter.
+
+**Usage context**
+
+- Engine dispatch: Route typed load/write requests to engine-specific implementations.
+- Data normalization: Convert raw engine files into canonical domain models.
+- Workflow support: Provide reusable adapter entry points for CLI/workflow layers.
+"""
 
 from __future__ import annotations
 
@@ -44,7 +51,7 @@ from reaxkit.engine.base import EngineAdapter
 if TYPE_CHECKING:
     from reaxkit.engine.reaxff.io.control_handler import ControlHandler
     from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
-    from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+    from reaxkit.engine.common.io.ffield_handler import FFieldHandler
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
     from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
     from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
@@ -67,6 +74,7 @@ class _SparseFrame:
     """Lightweight sparse frame wrapper compatible with analysis loaders."""
 
     def __init__(self, n_atoms: int, pairs: dict[tuple[int, int], float]):
+        """Init."""
         self.n_atoms = int(n_atoms)
         if pairs:
             ij = np.asarray(list(pairs.keys()), dtype=int)
@@ -80,18 +88,91 @@ class _SparseFrame:
 
     @property
     def shape(self) -> tuple[int, int]:
+        """Shape.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        tuple[int, int]
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        shape(...)
+        ```
+        """
         return (self.n_atoms, self.n_atoms)
 
     def toarray(self) -> np.ndarray:
+        """Toarray.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        np.ndarray
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        toarray(...)
+        ```
+        """
         mat = np.zeros((self.n_atoms, self.n_atoms), dtype=float)
         if self._vals.size:
             mat[self._rows, self._cols] = self._vals
         return mat
 
     def todense(self) -> np.ndarray:
+        """Todense.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        np.ndarray
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        todense(...)
+        ```
+        """
         return self.toarray()
 
     def sum(self, axis=None):
+        """Sum.
+
+        Parameters
+        ----------
+        axis : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        sum(...)
+        ```
+        """
         if axis == 1:
             out = np.zeros((self.n_atoms,), dtype=float)
             if self._vals.size:
@@ -104,12 +185,14 @@ def _merge_simulation_data(
     base: SimulationData | None,
     extra: SimulationData | None,
 ) -> SimulationData | None:
+    """Merge simulation data."""
     def _reindex_to_iterations(
         values: np.ndarray | None,
         *,
         source_iterations: np.ndarray | None,
         target_iterations: np.ndarray | None,
     ) -> np.ndarray | None:
+        """Reindex to iterations."""
         if values is None or source_iterations is None or target_iterations is None:
             return values
         src_it = np.asarray(source_iterations, dtype=int)
@@ -142,6 +225,7 @@ def _merge_simulation_data(
         base_iterations: np.ndarray | None,
         extra_iterations: np.ndarray | None,
     ) -> np.ndarray | None:
+        """Pick."""
         if base_values is not None:
             return base_values
         return _reindex_to_iterations(
@@ -252,6 +336,7 @@ def _union_atom_ids_from_frames(frames_df: list[pd.DataFrame]) -> list[int]:
 
 
 def _merge_atom_id_lists(primary: list[int], secondary: list[int]) -> list[int]:
+    """Merge atom id lists."""
     seen: set[int] = set()
     out: list[int] = []
     for aid in primary + secondary:
@@ -267,6 +352,7 @@ def _fort7_per_atom_arrays(
     frames_df: list[pd.DataFrame],
     atom_ids: list[int],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Fort7 per atom arrays."""
     n_frames = len(frames_df)
     n_atoms = len(atom_ids)
     atom_to_idx = {int(a): i for i, a in enumerate(atom_ids)}
@@ -479,6 +565,7 @@ def _connectivity_trajectory_from_handlers(
     force_field_parameters: ForceFieldParametersData | None = None,
     reporter=None,
 ) -> ConnectivityTrajectoryData:
+    """Connectivity trajectory from handlers."""
     trajectory = _trajectory_from_xmolout_handler(xmolout_handler)
     trajectory.simulation = _merge_simulation_data(trajectory.simulation, summary_simulation)
     connectivity = _connectivity_from_fort7_handler(fort7_handler, reporter=reporter)
@@ -1005,6 +1092,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _resolve_reaxff_path(args: dict, *keys: str, default: str) -> Path:
+        """Resolve reaxff path."""
         for key in keys:
             raw = args.get(key)
             if raw:
@@ -1024,6 +1112,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _resolve_against_run_dir(args: dict, path: Path) -> Path:
+        """Resolve against run dir."""
         run_dir = args.get("run_dir")
         if run_dir and not path.is_absolute():
             candidate = Path(run_dir) / path
@@ -1033,6 +1122,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _quick_n_frames_from_control(control_path: Path) -> int | None:
+        """Quick n frames from control."""
         if not control_path.exists() or not control_path.is_file():
             return None
         nmdit: int | None = None
@@ -1068,6 +1158,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @staticmethod
     def _quick_n_frames_from_geo_xmol(geo_path: Path, xmol_path: Path) -> int | None:
+        """Quick n frames from geo xmol."""
         if not xmol_path.exists() or not xmol_path.is_file():
             return None
         descriptor = ""
@@ -1114,6 +1205,25 @@ class ReaxFFAdapter(EngineAdapter):
         return cls._quick_n_frames_from_geo_xmol(geo_path, xmol_path)
 
     def detect(self, path: str | Path) -> float:
+        """Detect.
+
+        Parameters
+        ----------
+        path : str | Path
+            Input parameter.
+
+        Returns
+        -------
+        float
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        detect(...)
+        ```
+        """
         p = Path(path)
         if p.is_dir():
             if (p / "xmolout").exists() or (p / "fort.7").exists():
@@ -1126,6 +1236,27 @@ class ReaxFFAdapter(EngineAdapter):
         return 0.0
 
     def required_input_files(self, data_type, args: dict) -> tuple[str, ...] | None:
+        """Required input files.
+
+        Parameters
+        ----------
+        data_type : Any
+            Input parameter.
+        args : dict
+            Input parameter.
+
+        Returns
+        -------
+        tuple[str, ...] | None
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        required_input_files(...)
+        ```
+        """
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("xmolout", "summary.txt"),
             GeometryData: ("geo", "fort.90"),
@@ -1167,6 +1298,7 @@ class ReaxFFAdapter(EngineAdapter):
         source_path: Path | str | None,
         seconds: float,
     ) -> None:
+        """Emit load timing."""
         cb = args.get("_load_timing_callback")
         if not callable(cb):
             return
@@ -1187,6 +1319,7 @@ class ReaxFFAdapter(EngineAdapter):
         source_path: Path | str | None,
         factory,
     ):
+        """Build handler."""
         _ = (args, handler_name, source_path)
         return factory()
 
@@ -1199,12 +1332,34 @@ class ReaxFFAdapter(EngineAdapter):
         source_path: Path | str | None,
         loader,
     ):
+        """Time source."""
         t0 = perf_counter()
         out = loader()
         cls._emit_load_timing(args, handler=handler_name, source_path=source_path, seconds=perf_counter() - t0)
         return out
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
+        """Load trajectory.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        TrajectoryData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_trajectory(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
         xmol_path = self._resolve_reaxff_path(args, "xmolout", default="xmolout")
@@ -1227,6 +1382,27 @@ class ReaxFFAdapter(EngineAdapter):
         return trj
 
     def load_geometry(self, args: dict, reporter=None) -> GeometryData:
+        """Load geometry.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        GeometryData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_geometry(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
         if str(args.get("geometry_role") or "").strip().lower() == "final":
@@ -1256,6 +1432,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_final_geometry(self, args: dict, reporter=None) -> GeometryData:
+        """Load final geometry.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        GeometryData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_final_geometry(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
         raw = args.get("final_geometry") or args.get("fort90") or args.get("input") or "fort.90"
@@ -1280,6 +1477,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
+        """Load simulation.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        SimulationData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_simulation(...)
+        ```
+        """
         sim = self._load_simulation_from_xmolout(args, reporter=reporter)
         sim = _merge_simulation_data(sim, self._load_simulation_from_summary(args, reporter=reporter))
         if sim is None:
@@ -1288,6 +1506,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @classmethod
     def _load_simulation_from_xmolout(cls, args: dict, reporter=None) -> SimulationData | None:
+        """Load simulation from xmolout."""
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
         xmol_path = cls._resolve_reaxff_path(args, "xmolout", default="xmolout")
@@ -1309,6 +1528,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     @classmethod
     def _load_simulation_from_summary(cls, args: dict, reporter=None) -> SimulationData | None:
+        """Load simulation from summary."""
         from reaxkit.engine.reaxff.io.summary_handler import SummaryHandler
 
         candidates = [args.get("summary"), args.get("xmolout"), args.get("run_dir"), args.get("input")]
@@ -1342,6 +1562,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
+        """Load connectivity.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ConnectivityData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_connectivity(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 
         raw = args.get("fort7") or args.get("connectivity") or args.get("input") or "fort.7"
@@ -1370,12 +1611,54 @@ class ReaxFFAdapter(EngineAdapter):
         return conn
 
     def load_coordination_status_bundle(self, args: dict, reporter=None) -> CoordinationStatusBundleData:
+        """Load coordination status bundle.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        CoordinationStatusBundleData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_coordination_status_bundle(...)
+        ```
+        """
         return CoordinationStatusBundleData(
             connectivity=self.load_connectivity(args, reporter=reporter),
             force_field_parameters=self.load_force_field(args, reporter=reporter),
         )
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
+        """Load connectivity trajectory.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ConnectivityTrajectoryData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_connectivity_trajectory(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
         from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
@@ -1422,7 +1705,28 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_force_field(self, args: dict, reporter=None) -> ForceFieldParametersData:
-        from reaxkit.engine.reaxff.io.ffield_handler import FFieldHandler
+        """Load force field.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldParametersData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field(...)
+        ```
+        """
+        from reaxkit.engine.common.io.ffield_handler import FFieldHandler
 
         raw = args.get("ffield") or args.get("force_field") or args.get("atom_reference") or args.get("input") or "ffield"
         p = Path(raw)
@@ -1441,6 +1745,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_force_field_optimization(self, args: dict, reporter=None) -> ForceFieldOptimizationProgressData:
+        """Load force field optimization.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationProgressData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort13_handler import Fort13Handler
 
         raw = args.get("fort13") or args.get("force_field_optimization") or args.get("input") or "fort.13"
@@ -1460,6 +1785,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_force_field_optimization_report(self, args: dict, reporter=None) -> ForceFieldOptimizationReportData:
+        """Load force field optimization report.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationReportData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_report(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort99_handler import Fort99Handler
 
         raw = args.get("fort99") or args.get("force_field_optimization_report") or args.get("input") or "fort.99"
@@ -1483,6 +1829,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationTrainingSetData:
+        """Load force field optimization training set.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationTrainingSetData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_training_set(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.trainset_handler import TrainsetHandler
 
         raw = args.get("trainset") or args.get("force_field_optimization_training_set") or args.get("input") or "trainset.in"
@@ -1506,6 +1873,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationParameterData:
+        """Load force field optimization parameters.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationParameterData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_parameters(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.params_handler import ParamsHandler
 
         raw = args.get("params") or args.get("force_field_optimization_parameters") or args.get("input") or "params"
@@ -1529,6 +1917,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationData:
+        """Load force field optimization data.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_data(...)
+        ```
+        """
         return ForceFieldOptimizationData(
             force_field_parameters=self.load_force_field(args, reporter=reporter),
             optimization_parameters=self.load_force_field_optimization_parameters(args, reporter=reporter),
@@ -1539,6 +1948,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationParameterBundleData:
+        """Load force field optimization parameter bundle.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationParameterBundleData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_parameter_bundle(...)
+        ```
+        """
         return ForceFieldOptimizationParameterBundleData(
             optimization_parameters=self.load_force_field_optimization_parameters(args, reporter=reporter),
             force_field_parameters=self.load_force_field(args, reporter=reporter),
@@ -1549,6 +1979,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationDiagnosticData:
+        """Load parameter optimization diagnostic.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationDiagnosticData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_parameter_optimization_diagnostic(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort79_handler import Fort79Handler
 
         raw = args.get("fort79") or args.get("parameter_optimization_diagnostic") or args.get("input") or "fort.79"
@@ -1572,6 +2023,27 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationDiagnosticBundleData:
+        """Load parameter optimization diagnostic bundle.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationDiagnosticBundleData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_parameter_optimization_diagnostic_bundle(...)
+        ```
+        """
         return ForceFieldOptimizationDiagnosticBundleData(
             diagnostics=self.load_parameter_optimization_diagnostic(args, reporter=reporter),
             force_field_parameters=self.load_force_field(args, reporter=reporter),
@@ -1582,12 +2054,54 @@ class ReaxFFAdapter(EngineAdapter):
         args: dict,
         reporter=None,
     ) -> ForceFieldOptimizationReportEOSBundleData:
+        """Load force field optimization report eos bundle.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ForceFieldOptimizationReportEOSBundleData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_force_field_optimization_report_eos_bundle(...)
+        ```
+        """
         return ForceFieldOptimizationReportEOSBundleData(
             report=self.load_force_field_optimization_report(args, reporter=reporter),
             geometry_summary=self.load_structure_summary(args, reporter=reporter),
         )
 
     def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
+        """Load structure summary.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        GeometrySummaryData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_structure_summary(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
 
         raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
@@ -1607,6 +2121,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_partial_energy(self, args: dict, reporter=None) -> PartialEnergyData:
+        """Load partial energy.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        PartialEnergyData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_partial_energy(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
 
         raw = args.get("fort73") or args.get("partial_energy") or args.get("input") or "fort.73"
@@ -1630,6 +2165,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_restraints(self, args: dict, reporter=None) -> RestraintData:
+        """Load restraints.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        RestraintData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_restraints(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
 
         raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
@@ -1649,6 +2205,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_geometry_optimization(self, args: dict, reporter=None) -> GeometryOptimizationProgressData:
+        """Load geometry optimization.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        GeometryOptimizationProgressData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_geometry_optimization(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
 
         raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
@@ -1668,6 +2245,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_control_parameters(self, args: dict, reporter=None) -> ControlParametersData:
+        """Load control parameters.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ControlParametersData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_control_parameters(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.control_handler import ControlHandler
 
         raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
@@ -1687,6 +2285,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_eregime(self, args: dict, reporter=None) -> EregimeData:
+        """Load eregime.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        EregimeData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_eregime(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
 
         raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
@@ -1706,6 +2325,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_charges(self, args: dict, reporter=None) -> ChargeData:
+        """Load charges.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ChargeData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_charges(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 
         raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
@@ -1729,6 +2369,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_electrostatics(self, args: dict, reporter=None) -> ElectrostaticsData:
+        """Load electrostatics.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ElectrostaticsData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_electrostatics(...)
+        ```
+        """
         trajectory = self.load_trajectory(args, reporter=reporter)
         charges = self.load_charges(args, reporter=reporter)
         connectivity = self.load_connectivity(args, reporter=reporter)
@@ -1749,6 +2410,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:
+        """Load atomic kinematics.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        AtomicKinematicsData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_atomic_kinematics(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
 
         raw = args.get("vels") or args.get("kinematics") or args.get("input") or "vels"
@@ -1778,6 +2460,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
+        """Load electric field.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        ElectricFieldData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_electric_field(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
 
         raw = args.get("fort78") or args.get("electric_field") or args.get("input") or "fort.78"
@@ -1799,6 +2502,27 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def load_molecular_analysis(self, args: dict, reporter=None) -> MolecularAnalysisData:
+        """Load molecular analysis.
+
+        Parameters
+        ----------
+        args : dict
+            Input parameter.
+        reporter : Any, optional
+            Input parameter.
+
+        Returns
+        -------
+        MolecularAnalysisData
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        load_molecular_analysis(...)
+        ```
+        """
         from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
 
         raw = args.get("molfra") or args.get("molecular_analysis") or args.get("input") or "molfra.out"
@@ -1831,6 +2555,29 @@ class ReaxFFAdapter(EngineAdapter):
         out_path: str | Path,
         args: dict | None = None,
     ):
+        """Write control.
+
+        Parameters
+        ----------
+        data : ControlParametersData
+            Input parameter.
+        out_path : str | Path
+            Input parameter.
+        args : dict | None, optional
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        write_control(...)
+        ```
+        """
         from reaxkit.engine.reaxff.generators.control_generator import _write_control_from_data
 
         args = args or {}
@@ -1845,6 +2592,29 @@ class ReaxFFAdapter(EngineAdapter):
         )
 
     def write_trajectory(self, data: TrajectoryData, out_path: str | Path, args: dict | None = None):
+        """Write trajectory.
+
+        Parameters
+        ----------
+        data : TrajectoryData
+            Input parameter.
+        out_path : str | Path
+            Input parameter.
+        args : dict | None, optional
+            Input parameter.
+
+        Returns
+        -------
+        Any
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        write_trajectory(...)
+        ```
+        """
         from reaxkit.engine.reaxff.generators.xmolout_generator import _write_xmolout_from_frames
 
         args = args or {}

@@ -4,6 +4,12 @@ XMOL trajectory file generators.
 This module provides utilities for generating new ReaxFF ``xmolout`` files
 from in-memory trajectory data or from an existing ``XmoloutHandler``.
 Generated files are fully compatible with downstream ReaxKit analyses.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -34,6 +40,27 @@ __all__ = [
 
 @dataclass(frozen=True)
 class XmoloutFromHandlerSpec:
+    """Represent XmoloutFromHandlerSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    xh : XmoloutHandler
+        Dataclass field.
+    frames : FrameSel
+        Dataclass field.
+    atoms : AtomSel
+        Dataclass field.
+    atom_types : Optional[Sequence[str]]
+        Dataclass field.
+    simulation_name : Optional[str]
+        Dataclass field.
+    precision : int
+        Dataclass field.
+    include_extras : Union[bool, Sequence[str], str]
+        Dataclass field.
+    """
     xh: XmoloutHandler
     frames: FrameSel = None
     atoms: AtomSel = None
@@ -45,6 +72,21 @@ class XmoloutFromHandlerSpec:
 
 @dataclass(frozen=True)
 class XmoloutFromFramesSpec:
+    """Represent XmoloutFromFramesSpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    frames : tuple[Dict[str, Any], ...]
+        Dataclass field.
+    simulation_name : str
+        Dataclass field.
+    precision : int
+        Dataclass field.
+    defaults : Dict[str, float]
+        Dataclass field.
+    """
     frames: tuple[Dict[str, Any], ...]
     simulation_name: str = "MD"
     precision: int = 6
@@ -62,6 +104,7 @@ class XmoloutFromFramesSpec:
 
 
 def _normalize_frames_for_write(xh: XmoloutHandler, frames: FrameSel) -> list[int]:
+    """Normalize frames for write."""
     n = xh.n_frames()
     if frames is None:
         return list(range(n))
@@ -75,6 +118,7 @@ def _normalize_atoms_for_write(
     atoms: AtomSel,
     atom_types: Optional[Sequence[str]],
 ) -> list[int]:
+    """Normalize atoms for write."""
     n_atoms = frame_dict["coords"].shape[0]
     if atoms is not None:
         if isinstance(atoms, slice):
@@ -98,6 +142,7 @@ def _format_header_line(
     gamma: float,
     precision: int,
 ) -> str:
+    """Format header line."""
     fmt = f"{{:.{precision}f}}"
     return (
         f"{sim_name} {iteration} "
@@ -107,10 +152,12 @@ def _format_header_line(
 
 
 def _safe_get(row: pd.Series, key: str, default: float = 0.0) -> float:
+    """Safe get."""
     return float(row[key]) if (isinstance(row, pd.Series) and key in row and pd.notna(row[key])) else float(default)
 
 
 def _get_frame_table(xh: XmoloutHandler, index: int) -> pd.DataFrame:
+    """Get frame table."""
     if hasattr(xh, "_frames") and index < len(xh._frames):
         return xh._frames[index]
     frame = xh.frame(index)
@@ -125,6 +172,7 @@ def _get_frame_table(xh: XmoloutHandler, index: int) -> pd.DataFrame:
 
 
 def _format_atom_line_extended(row: pd.Series, precision: int, extra_order: list[str] | None) -> str:
+    """Format atom line extended."""
     fmt = f"{{:.{precision}f}}"
     atom_type = str(row["atom_type"])
     x, y, z = float(row["x"]), float(row["y"]), float(row["z"])
@@ -252,8 +300,36 @@ def trim_xmolout(
     simulation_name: Optional[str] = None,
     precision: int = 6,
 ) -> Path:
-    """
-    Generate a lightweight ``xmolout`` file with only atom type and x/y/z columns.
+    """Trim xmolout.
+
+    Parameters
+    ----------
+    input_file : str | Path, optional
+        Input parameter.
+    out_path : str | Path, optional
+        Input parameter.
+    frames : FrameSel, optional
+        Keyword-only parameter.
+    atoms : AtomSel, optional
+        Keyword-only parameter.
+    atom_types : Optional[Sequence[str]], optional
+        Keyword-only parameter.
+    simulation_name : Optional[str], optional
+        Keyword-only parameter.
+    precision : int, optional
+        Keyword-only parameter.
+
+    Returns
+    -------
+    Path
+        Return value.
+
+    Examples
+    --------
+    ```python
+    # Example
+    trim_xmolout(...)
+    ```
     """
     xh = XmoloutHandler(input_file)
     return _write_xmolout_from_handler(

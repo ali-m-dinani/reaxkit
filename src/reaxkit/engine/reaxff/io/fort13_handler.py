@@ -10,6 +10,12 @@ Typical use cases include:
 - tracking optimization convergence
 - comparing force-field parameter sets
 - plotting total error versus optimization epoch
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

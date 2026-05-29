@@ -9,6 +9,12 @@ Typical use cases include:
 - reading electric-field magnitudes and directions
 - mapping field schedules to simulation iterations
 - converting iteration indices to physical time
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 

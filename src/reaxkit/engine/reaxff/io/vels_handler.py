@@ -10,6 +10,12 @@ Typical use cases include:
 - extracting atomic velocities or accelerations for analysis
 - correlating kinematics with structural or energetic data
 - visualizing velocity and acceleration fields
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
 
@@ -151,12 +157,52 @@ class VelsHandler(BaseHandler):
         sections: Dict[str, pd.DataFrame] = {}
 
         def next_nonempty(idx: int) -> int:
+            """Next nonempty.
+
+            Parameters
+            ----------
+            idx : int
+                Input parameter.
+
+            Returns
+            -------
+            int
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            next_nonempty(...)
+            ```
+            """
             while idx < len(lines) and not lines[idx].strip():
                 idx += 1
             return idx
 
         def floats_from_line(s: str, n: int) -> list[float]:
             # IMPORTANT: handle Fortran D exponents like 0.20D+01
+            """Floats from line.
+
+            Parameters
+            ----------
+            s : str
+                Input parameter.
+            n : int
+                Input parameter.
+
+            Returns
+            -------
+            list[float]
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            floats_from_line(...)
+            ```
+            """
             s = s.replace("D", "E").replace("d", "E")
             out: list[float] = []
             for tok in s.replace(",", " ").split():
@@ -170,6 +216,25 @@ class VelsHandler(BaseHandler):
             return out
 
         def first_int_in_line(s: str) -> int | None:
+            """First int in line.
+
+            Parameters
+            ----------
+            s : str
+                Input parameter.
+
+            Returns
+            -------
+            int | None
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            first_int_in_line(...)
+            ```
+            """
             for tok in s.split():
                 try:
                     return int(tok)
@@ -178,6 +243,25 @@ class VelsHandler(BaseHandler):
             return None
 
         def parse_lattice(idx: int) -> tuple[dict[str, float], int]:
+            """Parse lattice.
+
+            Parameters
+            ----------
+            idx : int
+                Input parameter.
+
+            Returns
+            -------
+            tuple[dict[str, float], int]
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            parse_lattice(...)
+            ```
+            """
             idx = next_nonempty(idx)
             abc = floats_from_line(lines[idx], 3)
 
@@ -192,6 +276,29 @@ class VelsHandler(BaseHandler):
             return lat, idx + 1
 
         def parse_coords(idx: int, n_atoms: int, section_name: str) -> tuple[pd.DataFrame, int]:
+            """Parse coords.
+
+            Parameters
+            ----------
+            idx : int
+                Input parameter.
+            n_atoms : int
+                Input parameter.
+            section_name : str
+                Input parameter.
+
+            Returns
+            -------
+            tuple[pd.DataFrame, int]
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            parse_coords(...)
+            ```
+            """
             idx = next_nonempty(idx)
             rows = []
             for a in range(1, n_atoms + 1):
@@ -231,6 +338,35 @@ class VelsHandler(BaseHandler):
 
         def parse_xyz3(idx: int, n_atoms: int, c1: str, c2: str, c3: str, section_name: str) -> tuple[
             pd.DataFrame, int]:
+            """Parse xyz3.
+
+            Parameters
+            ----------
+            idx : int
+                Input parameter.
+            n_atoms : int
+                Input parameter.
+            c1 : str
+                Input parameter.
+            c2 : str
+                Input parameter.
+            c3 : str
+                Input parameter.
+            section_name : str
+                Input parameter.
+
+            Returns
+            -------
+            tuple[pd.DataFrame, int]
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            parse_xyz3(...)
+            ```
+            """
             idx = next_nonempty(idx)
             rows = []
 
@@ -272,6 +408,25 @@ class VelsHandler(BaseHandler):
             return pd.DataFrame(rows), idx
 
         def parse_temperature(idx: int) -> tuple[float, int]:
+            """Parse temperature.
+
+            Parameters
+            ----------
+            idx : int
+                Input parameter.
+
+            Returns
+            -------
+            tuple[float, int]
+                Return value.
+
+            Examples
+            --------
+            ```python
+            # Example
+            parse_temperature(...)
+            ```
+            """
             idx = next_nonempty(idx)
             v = floats_from_line(lines[idx], 1)
             if not v:
@@ -345,15 +500,19 @@ class VelsHandler(BaseHandler):
 
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:
+        """Disk cache dir."""
         return self._cache_root() / key
 
     @staticmethod
     def _section_slug(name: str) -> str:
+        """Section slug."""
         slug = re.sub(r"[^a-z0-9]+", "_", str(name).strip().lower())
         return slug.strip("_") or "section"
 
     def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        """Store in disk cache."""
         super()._store_in_disk_cache(key, payload)
 
     def _load_from_disk_cache(self, key: str) -> bytes | None:
+        """Load from disk cache."""
         return super()._load_from_disk_cache(key)

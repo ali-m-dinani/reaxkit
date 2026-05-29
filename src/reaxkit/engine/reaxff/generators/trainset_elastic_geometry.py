@@ -1,5 +1,11 @@
 """
 Trainset strained-geometry generation utilities.
+
+**Usage context**
+
+- Template generation: Produce canonical text payloads for ReaxFF artifacts.
+- File writing: Persist generated outputs to disk with stable formatting.
+- Workflow integration: Support higher-level ReaxKit workflow commands.
 """
 
 from __future__ import annotations
@@ -22,6 +28,31 @@ GEOMETRY_MODE_ORDER = ["bulk", "c11", "c22", "c33", "c12", "c13", "c23", "c44", 
 
 @dataclass(frozen=True)
 class StrainedGeometrySpec:
+    """Represent StrainedGeometrySpec.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    elastic_xyz : str | Path
+        Dataclass field.
+    bulk_xyz : Optional[str | Path]
+        Dataclass field.
+    elastic_cell : CellSpec
+        Dataclass field.
+    bulk_cell : CellSpec
+        Dataclass field.
+    max_strain_elastic : float
+        Dataclass field.
+    dstrain_elastic : float
+        Dataclass field.
+    max_strain_bulk_linear : float
+        Dataclass field.
+    dstrain_bulk_linear : float
+        Dataclass field.
+    sort_by : Optional[str]
+        Dataclass field.
+    """
     elastic_xyz: str | Path
     bulk_xyz: Optional[str | Path]
     elastic_cell: CellSpec
@@ -35,6 +66,27 @@ class StrainedGeometrySpec:
 
 @dataclass(frozen=True)
 class StrainedGeometryRecord:
+    """Represent StrainedGeometryRecord.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    mode : str
+        Dataclass field.
+    title : str
+        Dataclass field.
+    atoms : Atoms
+        Dataclass field.
+    box_lengths : tuple[float, float, float]
+        Dataclass field.
+    box_angles : tuple[float, float, float]
+        Dataclass field.
+    xyz_filename : str
+        Dataclass field.
+    geo_filename : str
+        Dataclass field.
+    """
     mode: str
     title: str
     atoms: Atoms
@@ -46,10 +98,20 @@ class StrainedGeometryRecord:
 
 @dataclass(frozen=True)
 class StrainedGeometryResult:
+    """Represent StrainedGeometryResult.
+
+    Public class used by ReaxFF generator components.
+
+    Fields
+    ------
+    records_by_mode : Dict[str, List[StrainedGeometryRecord]]
+        Dataclass field.
+    """
     records_by_mode: Dict[str, List[StrainedGeometryRecord]]
 
 
 def _deformation_matrix(mode: str, eps: float) -> np.ndarray:
+    """Deformation matrix."""
     identity = np.eye(3, dtype=float)
     if mode == "bulk":
         return np.diag([1.0 + eps, 1.0 + eps, 1.0 + eps])
@@ -95,6 +157,7 @@ def _deformation_matrix(mode: str, eps: float) -> np.ndarray:
 
 
 def _symmetric_strain_grid(max_abs: float, step: float) -> List[float]:
+    """Symmetric strain grid."""
     n = int(np.ceil(max_abs / step))
     grid = [k * step for k in range(-n, n + 1)]
     grid = [x for x in grid if abs(x) <= max_abs + 1e-12]
@@ -105,12 +168,14 @@ def _symmetric_strain_grid(max_abs: float, step: float) -> List[float]:
 
 
 def _strain_title(prefix: str, eps: float, idx_abs: int) -> str:
+    """Strain title."""
     if abs(eps) < 1e-15:
         return f"{prefix}_0"
     return f"{prefix}_{'c' if eps < 0 else 'e'}{idx_abs:04d}"
 
 
 def _make_base_atoms_from_xyz_and_cell(xyz_path: str | Path, cell: np.ndarray) -> Atoms:
+    """Make base atoms from xyz and cell."""
     atoms = read_structure(xyz_path, format="xyz")
     atoms.set_cell(cell, scale_atoms=False)
     atoms.set_pbc(True)
@@ -118,7 +183,29 @@ def _make_base_atoms_from_xyz_and_cell(xyz_path: str | Path, cell: np.ndarray) -
 
 
 def _generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometryResult:
+    """Generate strained geometries."""
     def idx_abs_from_eps(eps: float, step: float) -> int:
+        """Idx abs from eps.
+
+        Parameters
+        ----------
+        eps : float
+            Input parameter.
+        step : float
+            Input parameter.
+
+        Returns
+        -------
+        int
+            Return value.
+
+        Examples
+        --------
+        ```python
+        # Example
+        idx_abs_from_eps(...)
+        ```
+        """
         if abs(eps) < 1e-15:
             return 0
         return abs(int(round(eps / step)))
@@ -201,6 +288,7 @@ def _write_strained_geometries(
     out_dir: str | Path,
     sort_by: Optional[str] = None,
 ) -> Dict[str, List[Path]]:
+    """Write strained geometries."""
     out_dir = Path(out_dir)
     xyz_dir = out_dir / "xyz_strained"
     geo_dir = out_dir / "geo_strained"
@@ -238,6 +326,7 @@ def _generate_strained_geometries_with_xtob(
     out_dir: str | Path,
     sort_by: Optional[str] = None,
 ) -> Dict[str, List[Path]]:
+    """Generate strained geometries with xtob."""
     spec = StrainedGeometrySpec(
         elastic_xyz=elastic_xyz,
         bulk_xyz=bulk_xyz,

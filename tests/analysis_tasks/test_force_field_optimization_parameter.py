@@ -17,7 +17,7 @@ from reaxkit.core.exceptions import AnalysisError
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
 )
-ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifcats"
+ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 SUMMARY_FILE = "force_field_optimization_parameter_summary.txt"
 CSV_FILE = "force_field_optimization_parameter.csv"
 HEAD_FILE = "force_field_optimization_parameter_head.txt"
