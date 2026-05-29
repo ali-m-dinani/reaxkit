@@ -1,7 +1,5 @@
 ase
 dash
-dash_bootstrap_templates
-docx
 dscribe
 fastapi
 freud-analysis

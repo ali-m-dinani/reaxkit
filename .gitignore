@@ -64,9 +64,9 @@ output/
 plots/
 results/
 tests/engine/artifacts/
-src/reaxkit/trash/
+../other/trash/
 src/reaxkit/under_development/
-src/reaxkit/under_dev
+../other/under_dev
 site/
 tests/analysis_tasks/artifacts/
 

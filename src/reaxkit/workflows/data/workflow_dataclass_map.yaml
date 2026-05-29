@@ -585,13 +585,13 @@ workflows:
     - reaxkit help "plotter workflow"
     - run plotter workflow
   study_workflow:
-    implementation_module: 'reaxkit.workflows.meta.study_workflow: study'
+    implementation_module: 'reaxkit.workflows.study_design.study_workflow: study'
     description: 'Study planning workflow: generate sweep/replicate folder structures
       from YAML.'
     related_commands:
       analysis: []
       generator:
-      - reaxkit.workflows.meta.study_workflow
+      - reaxkit.workflows.study_design.study_workflow
     tags:
     - study planning
     - parameter sweep
@@ -713,7 +713,7 @@ command_to_workflow_module:
   polarization_field: reaxkit.workflows.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
-  study: reaxkit.workflows.meta.study_workflow
+  study: reaxkit.workflows.study_design.study_workflow
   timeseries: reaxkit.workflows.timeseries_workflow
   get_trainset_data: reaxkit.workflows.file_tools.trainset_workflow
   get_trainset_group_comments: reaxkit.workflows.file_tools.trainset_workflow

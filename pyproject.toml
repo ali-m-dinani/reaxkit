@@ -20,39 +20,58 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy",
     "pandas",
-    "matplotlib",
-    "seaborn",
     "scipy",
     "tqdm",
     "rich",
-    "freud-analysis",
-    "ovito",
     "tabulate",
-    "ase",
-    "imageio",
-    "mp_api",
     "PyYAML",
     "rapidfuzz",
-    "h5py",
-    "python-docx",
-    "rapidfuzz",
-    "spacy",
+]
+
+[project.optional-dependencies]
+plot = [
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "imageio",
+]
+webui = [
     "dash",
     "dash_bootstrap_templates",
-    "python-docx",
-    "dscribe",
     "fastapi",
-    "igraph",
-    "lammps",
+]
+trajectory = [
     "MDAnalysis",
-    "networkx",
-    "openpyxl",
-    "plotly",
-    "pymatgen",
+    "freud-analysis",
+    "ovito",
     "pyvoro",
-    "sklearn",
-    "scm",
+]
+materials = [
+    "ase",
+    "mp_api",
+    "pymatgen",
+]
+graph = [
+    "networkx",
+    "igraph",
+]
+ml = [
+    "dscribe",
+    "spacy",
+    "scikit-learn",
+]
+io = [
+    "openpyxl",
+    "h5py",
+    "python-docx",
     "zstandard",
+]
+engines = [
+    "lammps",
+    "scm",
+]
+all = [
+    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines]",
 ]
 
 [project.scripts]

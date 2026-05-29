@@ -24,8 +24,8 @@ This directory is the import root for the ReaxKit Python package. It contains an
 - [data](data/README.md): packaged YAML constants/aliases/units.
 - [utils](utils/README.md): general shared utilities.
 - [webui](webui/README.md): web UI backend and presentation registry.
-- [under_dev](under_dev/README.md): in-progress modules not yet stabilized.
-- [trash](trash/README.md): deprecated or archival modules.
+- [under_dev](../../../other/under_dev/README.md): in-progress modules not yet stabilized.
+- [trash](../../../other/trash/README.md): deprecated or archival modules.
 
 ## Flow
 Typical path: `cli -> workflows -> core runtime/registries -> engine/domain/analysis -> presentation -> webui/outputs`.
