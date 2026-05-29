@@ -13,14 +13,12 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from dash import Input, Output, State, ctx, no_update
+from reaxkit.webui.runtime_paths import default_workspace_dir_for_dataset as _default_ws_for_dataset
 
 
 def default_workspace_dir_for_dataset(dataset_path: str | None) -> str:
     """Build the default workspace path for a dataset directory."""
-    base = Path(str(dataset_path or ".").strip() or ".")
-    if not base.is_absolute():
-        base = (Path.cwd() / base).resolve()
-    return str((base / "reaxkit_workspace").resolve())
+    return str(_default_ws_for_dataset(dataset_path))
 
 
 def _default_repo_slug() -> str:

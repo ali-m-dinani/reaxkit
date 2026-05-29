@@ -9,6 +9,7 @@ import sys
 import typing
 import types
 from dataclasses import MISSING, fields, is_dataclass
+from pathlib import Path
 from typing import Any, get_args, get_origin, get_type_hints
 
 from reaxkit.webui.backend.adapters.engine_probe import detect_engine
@@ -290,6 +291,9 @@ class PipelineRuntime:
             "summary": sources.get("summary"),
             "project_root": node.metadata.get("project_root") or dataset_node.metadata.get("project_root"),
         }
+        project_root = runtime_args.get("project_root")
+        if project_root:
+            runtime_args["cache_dir"] = str((Path(str(project_root)).resolve() / ".reaxkit_cache").resolve())
         task_name = str(node.metadata.get("task_name") or node.name).strip().lower().replace(" ", "_")
         logger.info(
             "runtime._run_analysis_node node_id=%s task=%s run_dir=%s request_keys=%s",

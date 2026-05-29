@@ -10,6 +10,7 @@ from reaxkit.webui.ui.analysis.components import (
     properties_panel,
     visualization_canvas,
 )
+from reaxkit.webui.runtime_paths import default_workspace_dir_for_dataset
 from reaxkit.webui.ui.logs.components import log_page_panel
 from reaxkit.webui.ui.shell.components import topbar
 
@@ -33,7 +34,7 @@ def build_layout() -> html.Div:
                     "manual_roles": [],
                     "role_xmolout": "xmolout",
                     "workspace_default": True,
-                    "workspace_dir": "reaxkit_workspace/",
+                    "workspace_dir": str(default_workspace_dir_for_dataset(".")),
                     "draft_viz_type": "plot2d",
                 },
             ),

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from dash import Input, Output, no_update
+from reaxkit.webui.runtime_paths import default_workspace_dir_for_dataset
 
 
 def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
@@ -20,12 +21,8 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
             candidates.append((Path(__file__).resolve().parents[2] / path).resolve())
     candidates.extend(
         [
-            Path("reaxkit_workspace"),
-            Path("reaxkit_workspace"),
-            Path.cwd() / "reaxkit_workspace",
-            Path.cwd() / "reaxkit_workspace",
-            Path(__file__).resolve().parents[2] / "reaxkit_workspace",
-            Path(__file__).resolve().parents[2] / "reaxkit_workspace",
+            default_workspace_dir_for_dataset(str(Path.cwd())),
+            default_workspace_dir_for_dataset("."),
         ]
     )
     seen: set[str] = set()
@@ -40,7 +37,7 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
         logs = root / "logs"
         if logs.exists() and logs.is_dir():
             return logs
-    return (deduped[0] / "logs") if deduped else (Path.cwd() / "reaxkit_workspace" / "logs")
+    return (deduped[0] / "logs") if deduped else (default_workspace_dir_for_dataset(str(Path.cwd())) / "logs")
 
 
 def _read_tail(path: Path | None, *, max_lines: int = 400, newest_first: bool = True) -> str:

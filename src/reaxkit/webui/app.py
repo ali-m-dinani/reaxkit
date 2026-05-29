@@ -14,6 +14,7 @@ from pathlib import Path
 
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.dash_app import create_dash_app
+from reaxkit.webui.runtime_paths import default_workspace_dir_for_dataset
 
 
 def _console_logging_enabled() -> bool:
@@ -184,7 +185,7 @@ def main() -> None:
     logging.getLogger(__name__).info("WebUI startup pid=%s port=%s", os.getpid(), port)
     _ensure_single_instance(port, logging.getLogger(__name__))
     if ui_trace_startup_enabled:
-        trace_target = Path.cwd() / "reaxkit_workspace" / "log" / "UI" / "ui_trace.log"
+        trace_target = default_workspace_dir_for_dataset(os.getcwd()) / "log" / "UI" / "ui_trace.log"
         try:
             trace_target.parent.mkdir(parents=True, exist_ok=True)
             with trace_target.open("a", encoding="utf-8") as fh:

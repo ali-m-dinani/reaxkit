@@ -53,6 +53,7 @@ docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
 src/reaxkit/webui/reaxkit_workspace
+src/reaxkit/webui/.reaxkit_cache/
 tests/engine/reaxff/io/.reaxkit_cache/
 
 # Generated outputs and temporary folders
@@ -71,7 +72,7 @@ tests/analysis_tasks/artifacts/
 
 # Project-local files to ignore
 README.txt
-README_convert_to_txt.py
+../other/done/README_convert_to_txt.py
 README_full_version.md
 requirements.txt
 requirements_all.txt
@@ -99,4 +100,3 @@ cache/
 Thumbs.db
 /.reaxkit_cache/index/handlers.json
 /src/reaxkit/webui/.reaxkit_cache/index/handlers.json
-
