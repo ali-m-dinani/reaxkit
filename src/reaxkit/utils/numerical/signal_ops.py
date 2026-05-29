@@ -43,6 +43,10 @@ def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[b
     numpy.ndarray
         Boolean array representing the ON/OFF state over the signal.
 
+    Notes
+    -----
+    - An example can be found at: https://www.geeksforgeeks.org/electronics-engineering/schmitt-trigger/
+
     Examples
     -----
     >>> state = schmitt_hysteresis(signal, th=0.0, hys=0.1)

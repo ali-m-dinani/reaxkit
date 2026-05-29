@@ -43,6 +43,12 @@ def simple_moving_average(
     min_periods : int, optional
         Minimum number of observations required to compute a value.
 
+    Notes
+    -----
+    - This function uses pandas.Series.rolling under the hood for SMA computation.
+    - Main documentation for pandas.Series.rolling: https://pandas.pydata.org/docs/reference/api/pandas.Series.rolling.html
+    - An example is at: https://www.geeksforgeeks.org/python/pandas-rolling-mean-by-time-interval/
+
     Returns
     -----
     pandas.Series
@@ -81,6 +87,13 @@ def exponential_moving_average(
         Smoothing factor in the interval ``(0, 1]``.
     adjust : bool, optional
         Whether to use bias-adjusted weights.
+
+    Notes
+    -----
+    - This function uses pandas.Series.ewm under the hood for EMA computation.
+    - Main documentation for pandas.Series.ewm: https://pandas.pydata.org/docs/reference/api/pandas.Series.ewm.html
+    - An example is at: https://aleksandarhaber.com/exponential-moving-average-in-pandas-and-python/
+
 
     Returns
     -----

@@ -27,6 +27,13 @@ class FieldRow:
     choices: str
 
 
+@dataclass
+class PreservedBlock:
+    section_kind: str  # request | task | result
+    context_heading: str  # nearest preceding ###/#### heading or "__section_start__"
+    content: str
+
+
 def _find_repo_root(start: Path) -> Path:
     for candidate in [start, *start.parents]:
         if (candidate / "src" / "reaxkit").exists():
@@ -318,6 +325,125 @@ def _render_method_section(title: str, body: str) -> list[str]:
     return lines
 
 
+def _section_kind_from_heading(line: str) -> str | None:
+    stripped = line.strip()
+    if stripped.startswith("## Request:"):
+        return "request"
+    if stripped.startswith("## Task:"):
+        return "task"
+    if stripped.startswith("## Result:"):
+        return "result"
+    return None
+
+
+def _extract_preserved_blocks(existing_md: str) -> list[PreservedBlock]:
+    """Extract developer-added anchor/figure blocks from an existing generated page.
+
+    The preserved content starts at an anchor line (`<a id="..."></a>`) and
+    captures the surrounding explanatory text + nested div block.
+    """
+    lines = existing_md.splitlines()
+    out: list[PreservedBlock] = []
+
+    i = 0
+    current_section: str | None = None
+    while i < len(lines):
+        line = lines[i]
+        sec = _section_kind_from_heading(line)
+        if sec is not None:
+            current_section = sec
+            i += 1
+            continue
+
+        if current_section is None:
+            i += 1
+            continue
+
+        if line.strip().startswith("<a id="):
+            context = "__section_start__"
+            k = i - 1
+            while k >= 0:
+                prev = lines[k].strip()
+                if prev.startswith("#### ") or prev.startswith("### "):
+                    context = prev
+                    break
+                if prev.startswith("## "):
+                    break
+                k -= 1
+
+            j = i
+            div_depth = 0
+            saw_div = False
+            while j < len(lines):
+                s = lines[j].strip()
+                if s.startswith("## "):
+                    break
+                # Track nested <div> blocks commonly used for figures.
+                if "<div" in s and not s.startswith("</div>"):
+                    div_depth += s.count("<div")
+                    saw_div = True
+                if "</div>" in s:
+                    div_depth -= s.count("</div>")
+                    if div_depth < 0:
+                        div_depth = 0
+
+                if j > i:
+                    next_is_section = (j + 1 < len(lines) and lines[j + 1].strip().startswith("## "))
+                    if saw_div:
+                        if div_depth == 0 and (next_is_section or (j + 1 < len(lines) and lines[j + 1].strip() == "")):
+                            j += 1
+                            break
+                    else:
+                        if s == "" and (j + 1 < len(lines) and lines[j + 1].strip() == ""):
+                            break
+                j += 1
+
+            content = "\n".join(lines[i:j]).strip("\n")
+            if content:
+                out.append(PreservedBlock(section_kind=current_section, context_heading=context, content=content))
+            i = j
+            continue
+
+        i += 1
+
+    return out
+
+
+def _append_preserved_at_context(
+    lines: list[str],
+    blocks: list[PreservedBlock],
+    section_kind: str,
+    context_heading: str,
+    consumed: set[int],
+) -> None:
+    for idx, block in enumerate(blocks):
+        if idx in consumed:
+            continue
+        if block.section_kind != section_kind:
+            continue
+        if block.context_heading != context_heading:
+            continue
+        lines.append(block.content)
+        lines.append("")
+        consumed.add(idx)
+
+
+def _append_remaining_preserved(
+    lines: list[str],
+    blocks: list[PreservedBlock],
+    section_kind: str,
+    consumed: set[int],
+) -> None:
+    for idx, block in enumerate(blocks):
+        if idx in consumed:
+            continue
+        if block.section_kind != section_kind:
+            continue
+        lines.append(block.content)
+        lines.append("")
+        consumed.add(idx)
+
+
 def _write_page(target: AnalysisDocTarget) -> Path:
     source = target.analysis_file.read_text(encoding="utf-8")
     tree = ast.parse(source)
@@ -326,6 +452,11 @@ def _write_page(target: AnalysisDocTarget) -> Path:
     request_cls = next((c for c in classes if c.name.endswith("Request")), None)
     result_cls = next((c for c in classes if c.name.endswith("Result")), None)
     task_cls = _find_task_class(classes)
+
+    preserved_blocks: list[PreservedBlock] = []
+    if target.output_md.exists():
+        preserved_blocks = _extract_preserved_blocks(target.output_md.read_text(encoding="utf-8"))
+    consumed_blocks: set[int] = set()
 
     lines: list[str] = []
     lines.append("<!-- AUTO-GENERATED by docs/scripts/generate_analysis_task_docs.py -->")
@@ -343,6 +474,7 @@ def _write_page(target: AnalysisDocTarget) -> Path:
         lines.append("")
         lines.append('<div class="analysis-section-indent" markdown="1">')
         lines.append("")
+        _append_preserved_at_context(lines, preserved_blocks, "request", "__section_start__", consumed_blocks)
         req_doc = ast.get_docstring(request_cls) or ""
         req_summary, req_sections = _doc_sections(req_doc)
         if req_summary:
@@ -359,6 +491,10 @@ def _write_page(target: AnalysisDocTarget) -> Path:
                 lines.append("")
                 lines.append(body)
                 lines.append("")
+                _append_preserved_at_context(
+                    lines, preserved_blocks, "request", f"### {section_name}", consumed_blocks
+                )
+        _append_remaining_preserved(lines, preserved_blocks, "request", consumed_blocks)
         lines.append("</div>")
         lines.append("")
 
@@ -367,6 +503,7 @@ def _write_page(target: AnalysisDocTarget) -> Path:
         lines.append("")
         lines.append('<div class="analysis-section-indent" markdown="1">')
         lines.append("")
+        _append_preserved_at_context(lines, preserved_blocks, "task", "__section_start__", consumed_blocks)
         task_doc = ast.get_docstring(task_cls) or ""
         if task_doc:
             lines.append(task_doc.strip())
@@ -375,8 +512,12 @@ def _write_page(target: AnalysisDocTarget) -> Path:
         methods = [n for n in task_cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
         wanted = [m for m in methods if m.name in {"recommended_presentations", "run"}]
         for method in wanted:
-            lines.append(f"### Method: `{_format_method_signature(method)}`")
+            method_heading = f"### Method: `{_format_method_signature(method)}`"
+            lines.append(method_heading)
             lines.append("")
+            lines.append('<div class="analysis-method-indent" markdown="1">')
+            lines.append("")
+            _append_preserved_at_context(lines, preserved_blocks, "task", method_heading, consumed_blocks)
             doc_body = _method_doc_body(method).strip()
             if doc_body:
                 intro, sections = _method_sections(doc_body)
@@ -384,10 +525,17 @@ def _write_page(target: AnalysisDocTarget) -> Path:
                     lines.append(intro)
                     lines.append("")
                 for sec_title, sec_body in sections:
-                    lines.extend(_render_method_section(sec_title, sec_body))
+                    rendered = _render_method_section(sec_title, sec_body)
+                    lines.extend(rendered)
+                    _append_preserved_at_context(
+                        lines, preserved_blocks, "task", f"#### {sec_title}", consumed_blocks
+                    )
             else:
                 lines.append("_No docstring available._")
             lines.append("")
+            lines.append("</div>")
+            lines.append("")
+        _append_remaining_preserved(lines, preserved_blocks, "task", consumed_blocks)
         lines.append("</div>")
         lines.append("")
 
@@ -396,6 +544,7 @@ def _write_page(target: AnalysisDocTarget) -> Path:
         lines.append("")
         lines.append('<div class="analysis-section-indent" markdown="1">')
         lines.append("")
+        _append_preserved_at_context(lines, preserved_blocks, "result", "__section_start__", consumed_blocks)
         res_doc = ast.get_docstring(result_cls) or ""
         res_summary, res_sections = _doc_sections(res_doc)
         if res_summary:
@@ -412,6 +561,10 @@ def _write_page(target: AnalysisDocTarget) -> Path:
                 lines.append("")
                 lines.append(body)
                 lines.append("")
+                _append_preserved_at_context(
+                    lines, preserved_blocks, "result", f"### {section_name}", consumed_blocks
+                )
+        _append_remaining_preserved(lines, preserved_blocks, "result", consumed_blocks)
         lines.append("</div>")
         lines.append("")
 
@@ -420,15 +573,78 @@ def _write_page(target: AnalysisDocTarget) -> Path:
     return target.output_md
 
 
+def _is_task_module(py_file: Path) -> bool:
+    source = py_file.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    classes = [n for n in tree.body if isinstance(n, ast.ClassDef)]
+    if not classes:
+        return False
+
+    def _has_dataclass(cls: ast.ClassDef) -> bool:
+        for d in cls.decorator_list:
+            try:
+                s = ast.unparse(d)
+            except Exception:
+                s = ""
+            if "dataclass" in s:
+                return True
+        return False
+
+    has_request_dataclass = any(c.name.endswith("Request") and _has_dataclass(c) for c in classes)
+    has_result_dataclass = any(c.name.endswith("Result") and _has_dataclass(c) for c in classes)
+    has_task_dataclass = any(c.name.endswith("Task") and _has_dataclass(c) for c in classes)
+    has_task_cls = _find_task_class(classes) is not None
+
+    # Keep helper modules out: include only modules that define request/result/task
+    # dataclass payloads, optionally paired with a task class.
+    if has_task_dataclass:
+        return True
+    if has_request_dataclass or has_result_dataclass:
+        return True
+    return has_task_cls and (has_request_dataclass or has_result_dataclass)
+
+
+def _analysis_source_root(repo_root: Path) -> tuple[Path, str]:
+    analyzer_root = repo_root / "src" / "reaxkit" / "analyzer"
+    if analyzer_root.exists():
+        return analyzer_root, "reaxkit.analyzer"
+    # Backward-compatible fallback for repositories that still use "analysis".
+    analysis_root = repo_root / "src" / "reaxkit" / "analysis"
+    if analysis_root.exists():
+        return analysis_root, "reaxkit.analysis"
+    raise FileNotFoundError("Could not find src/reaxkit/analyzer or src/reaxkit/analysis.")
+
+
 def _default_targets(repo_root: Path) -> list[AnalysisDocTarget]:
-    return [
-        AnalysisDocTarget(
-            analysis_file=repo_root / "src" / "reaxkit" / "analysis" / "trajectory" / "msd.py",
-            module_import="reaxkit.analysis.trajectory.msd",
-            output_md=repo_root / "docs" / "api" / "analysis" / "alaki_analysis.md",
-            title="MSD Analysis",
+    source_root, import_root = _analysis_source_root(repo_root)
+    docs_root = repo_root / "docs" / "api" / "analysis"
+    targets: list[AnalysisDocTarget] = []
+
+    for py in sorted(source_root.rglob("*.py")):
+        if py.name == "__init__.py":
+            continue
+        if py.name.startswith("_"):
+            continue
+        if not _is_task_module(py):
+            continue
+
+        rel = py.relative_to(source_root)
+        module_stem = rel.with_suffix("")
+        module_import = f"{import_root}." + ".".join(module_stem.parts)
+
+        out_rel = rel.with_name(f"{rel.stem}_analysis.md")
+        output_md = docs_root / out_rel
+
+        title = f"{' '.join(p.capitalize() for p in rel.stem.split('_'))} Analysis"
+        targets.append(
+            AnalysisDocTarget(
+                analysis_file=py,
+                module_import=module_import,
+                output_md=output_md,
+                title=title,
+            )
         )
-    ]
+    return targets
 
 
 def main() -> int:

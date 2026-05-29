@@ -99,7 +99,7 @@ nav:
     - Xmolout: api/io/handlers/xmolout_handler_doc.md
 - Analysis:
   - 🔎 Overview: api/analysis/index.md
-  - msd: api/analysis/alaki_analysis.md
+  - msd: api/analysis/trajectory/msd_analysis.md
   - Composed:
     - 🔎 Overview: api/analysis/composed/index.md
     - Connectivity: api/analysis/composed/connectivity_analyzer_doc.md
@@ -128,7 +128,8 @@ nav:
     - Xmolout: api/analysis/per_file/xmolout_analyzer_doc.md
 - Utils:
   - 🔎 Overview: api/utils/index.md
-  - Equation Of States: api/utils/equation_of_states.md
+  - Equation Of States: api/utils/equation_of_states_doc.md
+  - autocorrelation: api/utils/numerical/autocorrelation_doc.md
   - Alias: api/utils/alias_doc.md
   - Cache: api/utils/cache_doc.md
   - Constants: api/utils/constants_doc.md
@@ -148,9 +149,15 @@ nav:
     - Moving Average: api/utils/numerical/moving_average_doc.md
     - Numerical Calcs: api/utils/numerical/numerical_calcs_doc.md
     - Signal Ops: api/utils/numerical/signal_ops_doc.md
+- Engine:
+    - alaki: api/engine/reaxff/io/eregime_handler_doc.md
+    - alaki2: api/engine/reaxff/adapter_doc.md
+    - alaki3: api/engine/reaxff/generators/addmol_generator_doc.md
+    - alaki4: api/engine/reaxff/adapter_parts/loaders_dynamics_doc.md
+    - alaki5: api/engine/lammps/dump_handler_doc.md
 - Workflows:
   - 🔎 Overview: api/workflows/index.md
-  - trajectory: api/workflows/alaki_workflow.md
+  - trajectory: api/workflows/trajectory_workflow.md
   - Composed:
     - 🔎 Overview: api/workflows/composed/index.md
     - Coordination: api/workflows/composed/coordination_doc.md
@@ -190,7 +197,6 @@ nav:
   - Contribution: contributing.md
   - Docstrings: file_templates/docstrings.md
   - Template Files: file_templates/index.md
-  - CLI: api/cli.md
 - Resources: resources.md
 - ReaxFF Reference: reaxff_reference/index.md
 

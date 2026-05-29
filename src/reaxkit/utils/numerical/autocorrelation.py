@@ -66,6 +66,17 @@ def autocorrelation(
         Dictionary with keys:
         - 'lag': integer lag indices
         - 'acf': autocorrelation values for each lag
+
+    Notes
+    -----
+    - The autocorrelation is computed using the full convolution method via
+        `numpy.correlate` for efficiency.
+        - Numpy main docmentation for np.correlate can be found at https://numpy.org/doc/2.3/reference/generated/numpy.correlate.html
+        - An example can be found at https://ipython-books.github.io/103-computing-the-autocorrelation-of-a-time-series/
+    - The output lags are non-negative integers up to `max_lag` or `N-1`.
+    - Normalization modes allow for different interpretations of the ACF values
+        depending on the analysis context.
+
     Examples
     -----
     >>> autocorrelation([1.0, 2.0, 3.0], normalize="coeff")

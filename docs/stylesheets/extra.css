@@ -206,3 +206,10 @@
   padding-left: 0.8rem;
   border-left: 2px solid rgba(128, 128, 128, 0.35);
 }
+
+/* Secondary indent for per-method content inside analysis task sections */
+.md-typeset .analysis-method-indent {
+  margin-left: 1.0rem;
+  padding-left: 0.8rem;
+  border-left: 1px solid rgba(128, 128, 128, 0.3);
+}

@@ -47,7 +47,30 @@ if TYPE_CHECKING:
 
 
 def load_structure_summary(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometrySummaryData:
-    """Load geometry summary from fort.74."""
+    """Load structure-summary data.
+
+    Resolves a structure-summary source and parses it through `Fort74Handler`
+    into a normalized `GeometrySummaryData` model. If the ReaxFF engine is
+    used, then this file would usually be `fort.74`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for source resolution and handler creation.
+    args : dict
+        Loader arguments with optional `fort74`, alias, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    GeometrySummaryData
+        Normalized structure-summary record.
+
+    Examples
+    --------
+    >>> summary = adapter.load_structure_summary({"fort74": "run/fort.74"})
+    """
     from reaxkit.engine.reaxff.io.fort74_handler import Fort74Handler
 
     raw = args.get("fort74") or args.get("structure_summary") or args.get("input") or "fort.74"
@@ -68,7 +91,30 @@ def load_structure_summary(adapter: ReaxFFAdapter, args: dict, reporter=None) ->
 
 
 def load_partial_energy(adapter: ReaxFFAdapter, args: dict, reporter=None) -> PartialEnergyData:
-    """Load partial energy stream from fort.73/energylog/fort.58."""
+    """Load partial-energy trajectories from energy output files.
+
+    Resolves partial-energy sources, preferring common run-directory candidates,
+    then parses data through `Fort73Handler`. If the ReaxFF engine is used,
+    then files would commonly include `fort.73`, `energylog`, or `fort.58`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler lifecycle.
+    args : dict
+        Loader arguments with optional `fort73`, alias, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    PartialEnergyData
+        Normalized partial-energy stream data.
+
+    Examples
+    --------
+    >>> pe = adapter.load_partial_energy({"fort73": "run/fort.73"})
+    """
     from reaxkit.engine.reaxff.io.fort73_handler import Fort73Handler
 
     raw = args.get("fort73") or args.get("partial_energy") or args.get("input") or "fort.73"
@@ -93,7 +139,29 @@ def load_partial_energy(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Pa
 
 
 def load_restraints(adapter: ReaxFFAdapter, args: dict, reporter=None) -> RestraintData:
-    """Load restraint trajectory from fort.76."""
+    """Load restraint-trajectory data.
+
+    Resolves a restraint source path and parses it through `Fort76Handler`.
+    If the ReaxFF engine is used, then this file would usually be `fort.76`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler creation.
+    args : dict
+        Loader arguments with optional `fort76`, `restraints`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    RestraintData
+        Normalized restraint trajectory model.
+
+    Examples
+    --------
+    >>> r = adapter.load_restraints({"fort76": "run/fort.76"})
+    """
     from reaxkit.engine.reaxff.io.fort76_handler import Fort76Handler
 
     raw = args.get("fort76") or args.get("restraints") or args.get("input") or "fort.76"
@@ -114,7 +182,30 @@ def load_restraints(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Restra
 
 
 def load_geometry_optimization(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometryOptimizationProgressData:
-    """Load geometry-optimization progress from fort.57."""
+    """Load geometry-optimization progress data.
+
+    Resolves a geometry-optimization source and parses it through
+    `Fort57Handler`. If the ReaxFF engine is used, then this file would usually
+    be `fort.57`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler lifecycle.
+    args : dict
+        Loader arguments with optional `fort57`, alias, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    GeometryOptimizationProgressData
+        Normalized geometry-optimization progress model.
+
+    Examples
+    --------
+    >>> go = adapter.load_geometry_optimization({"fort57": "run/fort.57"})
+    """
     from reaxkit.engine.reaxff.io.fort57_handler import Fort57Handler
 
     raw = args.get("fort57") or args.get("geometry_optimization") or args.get("input") or "fort.57"
@@ -135,7 +226,30 @@ def load_geometry_optimization(adapter: ReaxFFAdapter, args: dict, reporter=None
 
 
 def load_control_parameters(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ControlParametersData:
-    """Load control parameters from control input."""
+    """Load control-parameter data from a control input file.
+
+    Resolves a control source and parses it through `ControlHandler` into a
+    normalized control-parameter model. If the ReaxFF engine is used, then this
+    file would usually be named `control`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler creation.
+    args : dict
+        Loader arguments with optional `control`, `control_file`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    ControlParametersData
+        Normalized control-parameter record.
+
+    Examples
+    --------
+    >>> ctrl = adapter.load_control_parameters({"control": "run/control"})
+    """
     from reaxkit.engine.reaxff.io.control_handler import ControlHandler
 
     raw = args.get("control") or args.get("control_file") or args.get("input") or "control"
@@ -156,7 +270,30 @@ def load_control_parameters(adapter: ReaxFFAdapter, args: dict, reporter=None) -
 
 
 def load_eregime(adapter: ReaxFFAdapter, args: dict, reporter=None) -> EregimeData:
-    """Load electric-regime schedule data from eregime.in."""
+    """Load electric-regime schedule data.
+
+    Resolves an electric-regime source and parses it through `EregimeHandler`
+    into a normalized `EregimeData` model. If the ReaxFF engine is used, then
+    this file would usually be `eregime.in`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for source resolution and handler lifecycle.
+    args : dict
+        Loader arguments with optional `eregime`, `eregime_file`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    EregimeData
+        Normalized electric-regime schedule model.
+
+    Examples
+    --------
+    >>> er = adapter.load_eregime({"eregime": "run/eregime.in"})
+    """
     from reaxkit.engine.reaxff.io.eregime_handler import EregimeHandler
 
     raw = args.get("eregime") or args.get("eregime_file") or args.get("input") or "eregime.in"
@@ -177,7 +314,30 @@ def load_eregime(adapter: ReaxFFAdapter, args: dict, reporter=None) -> EregimeDa
 
 
 def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeData:
-    """Load charge trajectories from fort.7."""
+    """Load atomic-charge trajectories.
+
+    Resolves a charge source, parses it through `Fort7Handler`, and enriches
+    the output with merged simulation metadata when available. If the ReaxFF
+    engine is used, then this file would usually be `fort.7`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for source resolution and handler creation.
+    args : dict
+        Loader arguments with optional `fort7`, `charges`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    ChargeData
+        Normalized charge trajectory data.
+
+    Examples
+    --------
+    >>> charges = adapter.load_charges({"fort7": "run/fort.7"})
+    """
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 
     raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
@@ -202,7 +362,30 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
 
 
 def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ElectrostaticsData:
-    """Load electrostatics bundle for trajectory, charges, and field data."""
+    """Load a combined electrostatics bundle.
+
+    Assembles trajectory, charge, and connectivity data, and conditionally
+    includes electric-field data when requested by command mode or available
+    sources.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance that provides dependent loader methods.
+    args : dict
+        Loader arguments forwarded to dependent loaders.
+    reporter : Any, optional
+        Optional reporter forwarded to dependent loaders.
+
+    Returns
+    -------
+    ElectrostaticsData
+        Bundle containing electrostatics-relevant trajectory data.
+
+    Examples
+    --------
+    >>> es = adapter.load_electrostatics({"run_dir": "run", "command": "hyst"})
+    """
     trajectory = adapter.load_trajectory(args, reporter=reporter)
     charges = adapter.load_charges(args, reporter=reporter)
     connectivity = adapter.load_connectivity(args, reporter=reporter)
@@ -224,7 +407,30 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
 
 
 def load_atomic_kinematics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> AtomicKinematicsData:
-    """Load atomic kinematics from vels-like outputs."""
+    """Load atomic-kinematics trajectories from velocity-like outputs.
+
+    Resolves velocity-source candidates and parses the selected file through
+    `VelsHandler` into a normalized kinematics model. If the ReaxFF engine is
+    used, then files can include `vels`, `moldyn.vel`, or `molsav`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for source resolution and handler construction.
+    args : dict
+        Loader arguments with optional `vels`, `kinematics`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    AtomicKinematicsData
+        Normalized atomic kinematics trajectory model.
+
+    Examples
+    --------
+    >>> kin = adapter.load_atomic_kinematics({"vels": "run/vels"})
+    """
     from reaxkit.engine.reaxff.io.vels_handler import VelsHandler
 
     raw = args.get("vels") or args.get("kinematics") or args.get("input") or "vels"
@@ -255,7 +461,29 @@ def load_atomic_kinematics(adapter: ReaxFFAdapter, args: dict, reporter=None) ->
 
 
 def load_electric_field(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ElectricFieldData:
-    """Load electric-field trajectory from fort.78."""
+    """Load electric-field trajectory data.
+
+    Resolves an electric-field source and parses it through `Fort78Handler`.
+    If the ReaxFF engine is used, then this file would usually be `fort.78`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for source resolution and handler creation.
+    args : dict
+        Loader arguments with optional `fort78`, `electric_field`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    ElectricFieldData
+        Normalized electric-field trajectory model.
+
+    Examples
+    --------
+    >>> ef = adapter.load_electric_field({"fort78": "run/fort.78"})
+    """
     from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
 
     raw = args.get("fort78") or args.get("electric_field") or args.get("input") or "fort.78"
@@ -276,7 +504,31 @@ def load_electric_field(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
 
 
 def load_molecular_analysis(adapter: ReaxFFAdapter, args: dict, reporter=None) -> MolecularAnalysisData:
-    """Load molecular-species analysis from molfra outputs."""
+    """Load molecular-species analysis data.
+
+    Resolves molecular-analysis output candidates and parses the selected source
+    through `MolFraHandler` into a normalized molecular-analysis model. If the
+    ReaxFF engine is used, then files can include `molfra.out` or
+    `molfra_ig.out`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler creation.
+    args : dict
+        Loader arguments with optional `molfra`, alias, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    MolecularAnalysisData
+        Normalized molecular-analysis output model.
+
+    Examples
+    --------
+    >>> ma = adapter.load_molecular_analysis({"molfra": "run/molfra.out"})
+    """
     from reaxkit.engine.reaxff.io.molfra_handler import MolFraHandler
 
     raw = args.get("molfra") or args.get("molecular_analysis") or args.get("input") or "molfra.out"

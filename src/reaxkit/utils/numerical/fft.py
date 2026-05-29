@@ -155,6 +155,12 @@ def fft_spectrum(
         - 'phase': phase angle (radians)
         - 'real': real FFT component
         - 'imag': imaginary FFT component
+
+    Notes
+    -----
+    - For help, see numpy's documentation on `numpy.fft` and `scipy.signal` for windowing and detrending, which can be found at https://numpy.org/doc/2.2/reference/generated/numpy.fft.rfft.html
+    - An example can be found at https://hackmd.io/@cccccccc/S1DE042eO
+
     Examples
     -----
     >>> fft_spectrum([0.0, 1.0, 0.0, -1.0], dt=0.1)

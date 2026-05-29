@@ -38,7 +38,30 @@ if TYPE_CHECKING:
 
 
 def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> TrajectoryData:
-    """Load trajectory data for ReaxFF runs."""
+    """Load trajectory data for ReaxFF runs.
+
+    Resolves the trajectory source (typically `xmolout`), builds the
+    corresponding handler, and normalizes it into `TrajectoryData`. Simulation
+    metadata from `summary.txt` is merged when available.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used to resolve paths and construct handlers.
+    args : dict
+        Loader arguments, including optional path overrides.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    TrajectoryData
+        Normalized trajectory data with merged simulation metadata when present.
+
+    Examples
+    --------
+    >>> data = adapter.load_trajectory({"xmolout": "run/xmolout"})
+    """
     from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
@@ -62,7 +85,30 @@ def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Trajec
 
 
 def load_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometryData:
-    """Load initial geometry data for ReaxFF runs."""
+    """Load initial geometry data for ReaxFF runs.
+
+    Resolves an initial-geometry source and parses it through `GeoHandler`.
+    When `geometry_role="final"` or a final-geometry file is provided, this
+    delegates to `load_final_geometry`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler lifecycle.
+    args : dict
+        Loader arguments with optional `geo`, `geometry`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    GeometryData
+        Normalized initial-geometry record (or final geometry when delegated).
+
+    Examples
+    --------
+    >>> geom = adapter.load_geometry({"geo": "run/geo"})
+    """
     from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
     if str(args.get("geometry_role") or "").strip().lower() == "final":
@@ -93,7 +139,29 @@ def load_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Geometry
 
 
 def load_final_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometryData:
-    """Load final (optimized) geometry data for ReaxFF runs."""
+    """Load final (optimized) geometry data for ReaxFF runs.
+
+    Resolves a final-geometry source and parses it through `GeoHandler`. If
+    the ReaxFF engine is used, then this file would usually be `fort.90`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler lifecycle.
+    args : dict
+        Loader arguments with optional `final_geometry`, `fort90`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    GeometryData
+        Normalized final-geometry record.
+
+    Examples
+    --------
+    >>> final_geom = adapter.load_final_geometry({"final_geometry": "run/fort.90"})
+    """
     from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
     raw = args.get("final_geometry") or args.get("fort90") or args.get("input") or "fort.90"
@@ -119,7 +187,29 @@ def load_final_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Ge
 
 
 def load_simulation(adapter: ReaxFFAdapter, args: dict, reporter=None) -> SimulationData:
-    """Load merged simulation metadata for ReaxFF runs."""
+    """Load merged simulation metadata for ReaxFF runs.
+
+    Attempts to load simulation metadata from trajectory and summary sources,
+    then merges both records. Raises when neither source is available.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance that provides simulation sub-loaders.
+    args : dict
+        Loader arguments containing optional trajectory/summary paths.
+    reporter : Any, optional
+        Optional reporter passed to underlying handlers.
+
+    Returns
+    -------
+    SimulationData
+        Merged simulation metadata.
+
+    Examples
+    --------
+    >>> sim = adapter.load_simulation({"run_dir": "run"})
+    """
     sim = adapter._load_simulation_from_xmolout(args, reporter=reporter)
     sim = _merge_simulation_data(sim, adapter._load_simulation_from_summary(args, reporter=reporter))
     if sim is None:
@@ -185,7 +275,31 @@ def _load_simulation_from_summary(adapter_cls: type[ReaxFFAdapter], args: dict, 
 
 
 def load_connectivity(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ConnectivityData:
-    """Load fort.7 connectivity matrices and merged simulation metadata."""
+    """Load connectivity matrices and merged simulation metadata.
+
+    Resolves connectivity input and parses it via `Fort7Handler`, then merges
+    simulation metadata from trajectory/summary sources into the returned model.
+    If the ReaxFF engine is used, then the connectivity file would usually be
+    `fort.7`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used to resolve paths and build handlers.
+    args : dict
+        Loader arguments with optional `fort7`, `connectivity`, or `input`.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    ConnectivityData
+        Connectivity record with simulation-derived atom metadata when present.
+
+    Examples
+    --------
+    >>> conn = adapter.load_connectivity({"fort7": "run/fort.7"})
+    """
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 
     raw = args.get("fort7") or args.get("connectivity") or args.get("input") or "fort.7"
@@ -215,7 +329,29 @@ def load_connectivity(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Conn
 
 
 def load_coordination_status_bundle(adapter: ReaxFFAdapter, args: dict, reporter=None) -> CoordinationStatusBundleData:
-    """Load coordination bundle with connectivity and force-field parameters."""
+    """Load a coordination-status bundle from connectivity and force-field data.
+
+    Composes a bundle by invoking connectivity and force-field loaders and
+    packaging their normalized outputs into one data model.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance that exposes dependent load methods.
+    args : dict
+        Loader arguments forwarded to dependent loaders.
+    reporter : Any, optional
+        Optional reporter forwarded to dependent loaders.
+
+    Returns
+    -------
+    CoordinationStatusBundleData
+        Bundle containing connectivity and force-field parameter records.
+
+    Examples
+    --------
+    >>> bundle = adapter.load_coordination_status_bundle({"run_dir": "run"})
+    """
     return CoordinationStatusBundleData(
         connectivity=adapter.load_connectivity(args, reporter=reporter),
         force_field_parameters=adapter.load_force_field(args, reporter=reporter),
@@ -223,7 +359,31 @@ def load_coordination_status_bundle(adapter: ReaxFFAdapter, args: dict, reporter
 
 
 def load_connectivity_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ConnectivityTrajectoryData:
-    """Load combined connectivity and trajectory data from fort.7 and xmolout."""
+    """Load combined connectivity and trajectory data.
+
+    Builds connectivity and trajectory handlers, optionally includes summary
+    simulation metadata and force-field parameters, then constructs a unified
+    `ConnectivityTrajectoryData` object. If the ReaxFF engine is used, then
+    the inputs would usually be `fort.7` and `xmolout`.
+
+    Parameters
+    ----------
+    adapter : ReaxFFAdapter
+        Adapter instance used for path resolution and handler construction.
+    args : dict
+        Loader arguments with optional connectivity/trajectory path overrides.
+    reporter : Any, optional
+        Optional reporter passed to handler constructors.
+
+    Returns
+    -------
+    ConnectivityTrajectoryData
+        Combined connectivity and trajectory dataset with optional supplements.
+
+    Examples
+    --------
+    >>> ctd = adapter.load_connectivity_trajectory({"run_dir": "run"})
+    """
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
     from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
