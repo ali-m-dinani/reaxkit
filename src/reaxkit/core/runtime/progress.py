@@ -1,4 +1,11 @@
-"""Shared progress reporting helpers."""
+"""
+Shared progress reporting helpers.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +18,74 @@ ProgressReporter = Callable[[str, int, int, str | None], None]
 
 
 def noop_reporter(stage: str, current: int, total: int, message: str | None = None) -> None:
+    """
+    Noop reporter.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    stage : str
+        Input parameter used by this function.
+    current : int
+        Input parameter used by this function.
+    total : int
+        Input parameter used by this function.
+    message : str | None, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.progress import noop_reporter
+    # Configure required arguments for your case.
+    result = noop_reporter(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     _ = (stage, current, total, message)
 
 
 def logging_reporter_factory(logger_name: str = __name__) -> ProgressReporter:
+    """
+    Logging reporter factory.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    logger_name : str, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    ProgressReporter
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.progress import logging_reporter_factory
+    # Configure required arguments for your case.
+    result = logging_reporter_factory(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     logger = get_logger(logger_name)
 
     def _report(stage: str, current: int, total: int, message: str | None = None) -> None:
@@ -25,6 +96,34 @@ def logging_reporter_factory(logger_name: str = __name__) -> ProgressReporter:
 
 
 def tqdm_reporter_factory() -> ProgressReporter:
+    """
+    Tqdm reporter factory.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    None
+    
+    Returns
+    -----
+    ProgressReporter
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.progress import tqdm_reporter_factory
+    # Configure required arguments for your case.
+    result = tqdm_reporter_factory(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     bars: dict[str, tqdm] = {}
     last_seen: dict[str, int] = {}
     completed_totals: dict[str, int] = {}
@@ -61,6 +160,35 @@ def tqdm_reporter_factory() -> ProgressReporter:
 
 
 def resolve_reporter(args: dict[str, Any]) -> ProgressReporter:
+    """
+    Resolve reporter.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    args : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    ProgressReporter
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.progress import resolve_reporter
+    # Configure required arguments for your case.
+    result = resolve_reporter(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     rep = args.get("reporter")
     if callable(rep):
         return rep

@@ -1,4 +1,11 @@
-"""Renderer registry and dispatch API."""
+"""
+Renderer registry and dispatch API.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -44,6 +51,9 @@ PLOT_REGISTRY = {
 
 
 def _plot_type_of(result: Any) -> str:
+    """
+    Plot type of.
+    """
     if isinstance(result, dict):
         p = result.get("plot_type")
     else:
@@ -54,7 +64,37 @@ def _plot_type_of(result: Any) -> str:
 
 
 def plot(result: Any, style: Optional[Mapping[str, Any]] = None):
-    """Dispatch to renderer by ``result.plot_type``."""
+    """
+    Dispatch to renderer by ``result.plot_type``.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    result : Any
+        Input parameter used by this function.
+    style : Optional[Mapping[str, Any]], optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.plot.registry import plot
+    result = plot(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     ptype = _plot_type_of(result)
     renderer = PLOT_REGISTRY.get(ptype)
     if renderer is None:

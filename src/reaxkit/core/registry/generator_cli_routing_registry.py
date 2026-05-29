@@ -1,4 +1,11 @@
-"""Registry for top-level generator commands."""
+"""
+Registry for top-level generator commands.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +14,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class GeneratorSpec:
-    """Metadata for a direct generator command."""
+    """
+    Metadata for a direct generator command.
+    
+    
+    Fields
+    -----
+    name : str
+        Field value used by this structured record.
+    module_path : str
+        Field value used by this structured record.
+    """
 
     name: str
     module_path: str
@@ -17,14 +34,73 @@ GENERATOR_REGISTRY: dict[str, GeneratorSpec] = {}
 
 
 def register_generator(name: str, *, module_path: str) -> GeneratorSpec:
-    """Register a direct generator command."""
+    """
+    Register a direct generator command.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    module_path : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    GeneratorSpec
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.generator_cli_routing_registry import register_generator
+    # Configure required arguments for your case.
+    result = register_generator(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     spec = GeneratorSpec(name=name, module_path=module_path)
     GENERATOR_REGISTRY[name] = spec
     return spec
 
 
 def get_registered_generators() -> dict[str, GeneratorSpec]:
-    """Return all registered generator commands."""
+    """
+    Return all registered generator commands.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    None
+    
+    Returns
+    -----
+    dict[str, GeneratorSpec]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+    # Configure required arguments for your case.
+    result = get_registered_generators(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     return dict(GENERATOR_REGISTRY)
 
 

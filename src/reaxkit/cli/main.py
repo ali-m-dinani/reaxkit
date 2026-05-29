@@ -1,10 +1,14 @@
 """
-Top-level command-line interface for ReaxKit.
+Top-level command-line dispatcher for ReaxKit.
 
-This module defines the ``reaxkit`` entry point and routes each top-level command
-to either:
-- a direct analysis/generator command module, or
-- a workflow command module (command-level or task-subcommand based).
+This module builds the root ``reaxkit`` parser and routes each top-level command
+to either a direct analysis/generator handler or a workflow handler, including
+workflow task subcommands when applicable.
+
+**Usage context**
+
+- Use this entry point when invoking ReaxKit from terminal scripts or manual CLI sessions.
+- Use the command-dispatch flow here to attach global flags and command-specific parsers.
 """
 
 from __future__ import annotations
@@ -286,11 +290,39 @@ def main() -> int:
     """
     Build and execute the ``reaxkit`` CLI dispatcher.
 
+    This function canonicalizes direct-command aliases, probes the selected
+    command, configures command-specific parsers lazily, and runs the resolved
+    command handler with centralized exception-to-exit-code mapping.
+
+    Parameters
+    -----
+    None
+
+    Returns
+    -----
+    int
+        Process-style exit code for the CLI invocation.
+
     Examples
     --------
-    - reaxkit connection_list --fort7 fort.7 --export connections.csv
-    - reaxkit help "fort.7"
-    - reaxkit intspec --folder workflows
+    ```bash
+    reaxkit connection_list --fort7 fort.7 --export connections.csv
+    ```
+    Sample output:
+    ```text
+    [ReaxKit] Wrote analysis export to .../connections.csv
+    ```
+    The command runs a direct analysis task and writes its export.
+
+    ```bash
+    reaxkit help "fort.7"
+    ```
+    Sample output:
+    ```text
+    Commands
+    ...
+    ```
+    The command lists matching help entries for the query.
     """
     sys_argv = _canonicalize_direct_command(sys.argv)
 

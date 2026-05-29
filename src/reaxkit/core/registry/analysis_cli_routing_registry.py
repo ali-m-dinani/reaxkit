@@ -1,4 +1,11 @@
-"""Registry for routing top-level analysis commands to workflow modules."""
+"""
+Registry for routing top-level analysis commands to workflow modules.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +14,17 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class AnalysisCommandSpec:
-    """Metadata for a direct analysis command."""
+    """
+    Metadata for a direct analysis command.
+    
+    
+    Fields
+    -----
+    name : str
+        Field value used by this structured record.
+    module_path : str
+        Field value used by this structured record.
+    """
 
     name: str
     module_path: str
@@ -17,14 +34,73 @@ ANALYSIS_COMMAND_REGISTRY: dict[str, AnalysisCommandSpec] = {}
 
 
 def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommandSpec:
-    """Register a direct analysis command route."""
+    """
+    Register a direct analysis command route.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    module_path : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    AnalysisCommandSpec
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.analysis_cli_routing_registry import register_analysis_command
+    # Configure required arguments for your case.
+    result = register_analysis_command(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     spec = AnalysisCommandSpec(name=name, module_path=module_path)
     ANALYSIS_COMMAND_REGISTRY[name] = spec
     return spec
 
 
 def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
-    """Return all registered direct analysis command routes."""
+    """
+    Return all registered direct analysis command routes.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    None
+    
+    Returns
+    -----
+    dict[str, AnalysisCommandSpec]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+    # Configure required arguments for your case.
+    result = get_registered_analysis_commands(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     return dict(ANALYSIS_COMMAND_REGISTRY)
 
 

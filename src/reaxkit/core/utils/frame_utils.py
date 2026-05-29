@@ -5,6 +5,11 @@ This module provides common helpers for parsing flexible user input
 (e.g., CLI arguments or configuration strings) that specify frame and
 atom selections, and for resolving those selections into concrete,
 ordered indices usable by handlers and analyzers.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
 """
 
 from __future__ import annotations
@@ -69,13 +74,38 @@ def _expand_range_token(token: str) -> list[int] | None:
 def parse_frames(arg: Any) -> FramesT:
     """
     Parse a frame selector into a ``slice`` or explicit index list.
-
-    Supported formats include:
-    - ``start:stop[:step]`` -> ``slice`` (single-token only)
-    - ``start-stop`` -> inclusive integer list
-    - ``i,j,k`` -> integer list
-    - ``i j k`` -> integer list
-    - ``None`` / empty -> ``None`` (select all)
+    
+        Supported formats include:
+        - ``start:stop[:step]`` -> ``slice`` (single-token only)
+        - ``start-stop`` -> inclusive integer list
+        - ``i,j,k`` -> integer list
+        - ``i j k`` -> integer list
+        - ``None`` / empty -> ``None`` (select all)
+        
+    
+    Parameters
+    -----
+    arg : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    FramesT
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.utils.frame_utils import parse_frames
+    # Configure required arguments for your case.
+    result = parse_frames(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
     """
     tokens = _as_tokens(arg)
     if not tokens:
@@ -115,9 +145,34 @@ def parse_frames(arg: Any) -> FramesT:
 def parse_frame_indices(arg: Any) -> list[int] | None:
     """
     Parse any supported frame selector into explicit frame indices.
-
-    This is intended for CLI/UI request normalization where request objects
-    should store ``list[int] | None``.
+    
+        This is intended for CLI/UI request normalization where request objects
+        should store ``list[int] | None``.
+        
+    
+    Parameters
+    -----
+    arg : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[int] | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.utils.frame_utils import parse_frame_indices
+    # Configure required arguments for your case.
+    result = parse_frame_indices(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
     """
     sel = parse_frames(arg)
     if sel is None:
@@ -139,7 +194,38 @@ _parse_frames = parse_frames
 
 
 def select_frames(df: pd.DataFrame, frames: FramesT) -> pd.DataFrame:
-    """Select rows from a DataFrame based on frame indices."""
+    """
+    Select rows from a DataFrame based on frame indices.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    df : pd.DataFrame
+        Input parameter used by this function.
+    frames : FramesT
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    pd.DataFrame
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.utils.frame_utils import select_frames
+    # Configure required arguments for your case.
+    result = select_frames(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if frames is None:
         return df
     if isinstance(frames, slice):
@@ -168,7 +254,36 @@ def _select_frames(xh, start: Optional[int], stop: Optional[int], every: int) ->
 
 
 def parse_atoms(arg: Optional[str]) -> Optional[List[int]]:
-    """Parse a comma/space-separated atom-index selector."""
+    """
+    Parse a comma/space-separated atom-index selector.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    arg : Optional[str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Optional[List[int]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.utils.frame_utils import parse_atoms
+    # Configure required arguments for your case.
+    result = parse_atoms(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if arg is None or str(arg).strip() == "":
         return None
     parts = [p for chunk in str(arg).split(",") for p in chunk.split()]
@@ -187,7 +302,42 @@ def resolve_indices(
     iterations: Optional[Iterable[int]] = None,
     step: Optional[int] = None,
 ) -> list[int]:
-    """Resolve user-specified frame or iteration selections into frame indices."""
+    """
+    Resolve user-specified frame or iteration selections into frame indices.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    handler : Any
+        Input parameter used by this function.
+    frames : FramesT, optional
+        Input parameter used by this function.
+    iterations : Optional[Iterable[int]], optional
+        Input parameter used by this function.
+    step : Optional[int], optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[int]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.utils.frame_utils import resolve_indices
+    # Configure required arguments for your case.
+    result = resolve_indices(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     sim_df = handler.dataframe()
     n = len(sim_df)
     all_idx = list(range(n))

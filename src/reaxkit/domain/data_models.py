@@ -1,4 +1,14 @@
-"""Engine-agnostic domain data models for analysis tasks."""
+"""Engine-agnostic domain data models for analysis tasks.
+
+This module defines canonical typed containers shared by parsers, analyzers,
+and workflow composition layers. It provides normalized shapes for simulation,
+trajectory, force-field optimization, and composite bundle data.
+
+**Usage context**
+
+- Use these dataclasses as the data contract between parsers and analysis tasks.
+- Use the bundled composite models when an analysis requires multiple canonical sources.
+"""
 
 from __future__ import annotations
 
@@ -38,7 +48,26 @@ def _ensure_int_list(name: str, values: Sequence[int]) -> list[int]:
 
 @dataclass
 class SimulationData:
-    """Shared simulation-level identity data."""
+    """Shared simulation-level identity data.
+
+    This dataclass stores simulation-wide arrays and identifiers that are
+    reused by trajectory, connectivity, and derived analysis models.
+
+    Fields
+    -----
+    atom_ids : Sequence[int]
+        Atom identifiers used as the canonical atom dimension.
+    iterations, time : Optional[np.ndarray]
+        Optional 1D frame-index and physical-time arrays.
+    elements : Optional[list[str]]
+        Optional per-atom element labels aligned to ``atom_ids``.
+    num_of_atoms, potential_energy, volume, temperature, pressure, density, elapsed_time : Optional[np.ndarray]
+        Optional 1D simulation series aligned to frames.
+    atom_type_nums, molecule_nums : Optional[np.ndarray]
+        Optional 2D per-frame/per-atom integer matrices.
+    cell_lengths, cell_angles : Optional[np.ndarray]
+        Optional 2D cell geometry matrices with shape (n_frames, 3).
+    """
 
     atom_ids: Sequence[int]
     iterations: Optional[np.ndarray] = None
@@ -123,7 +152,26 @@ class SimulationData:
 
 @dataclass
 class TrajectoryData:
-    """Canonical trajectory model consumed by analysis tasks."""
+    """Canonical trajectory model consumed by analysis tasks.
+
+    This dataclass stores per-frame atomic positions and identity mappings with
+    optional simulation-level context.
+
+    Fields
+    -----
+    positions : np.ndarray
+        3D array with shape (n_frames, n_atoms, 3).
+    elements : list[str]
+        Per-atom element labels aligned to the atom dimension.
+    atom_ids : list[int]
+        Per-atom identifiers aligned to the atom dimension.
+    simulation : Optional[SimulationData]
+        Optional simulation metadata/series shared with this trajectory.
+    iterations : Optional[np.ndarray]
+        Optional 1D iteration array aligned to frame count.
+    atom_labels : Optional[np.ndarray]
+        Optional 2D per-frame/per-atom labels.
+    """
 
     positions: np.ndarray  # (n_frames, n_atoms_max, 3), padded with NaN when an atom is absent
     elements: list[str]
@@ -165,7 +213,32 @@ class TrajectoryData:
 
 @dataclass
 class GeometryData:
-    """Canonical single-structure geometry model."""
+    """Canonical single-structure geometry model.
+
+    This dataclass stores one geometry snapshot with connectivity and optional
+    lattice/simulation context.
+
+    Fields
+    -----
+    coordinates : pd.DataFrame
+        Per-atom coordinate table.
+    connectivity : pd.DataFrame
+        Connectivity table for the structure.
+    atom_ids : list[int]
+        Atom identifiers for the structure.
+    elements : list[str]
+        Per-atom element labels.
+    descriptor : str
+        Short geometry descriptor.
+    remark : str
+        Optional free-text remark.
+    lattice_parameters : Optional[dict[str, float | None]]
+        Optional lattice parameters for periodic structures.
+    simulation : Optional[SimulationData]
+        Optional simulation-level context.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     coordinates: pd.DataFrame = field(default_factory=pd.DataFrame)
     connectivity: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -181,6 +254,32 @@ class GeometryData:
 @dataclass
 class ConnectivityData:
     """Canonical connectivity model.
+
+    This dataclass stores neighbor and bond-order connectivity arrays with
+    optional simulation context.
+
+    Fields
+    -----
+    connectivity : Any
+        Engine-provided connectivity payload (dense or sparse representation).
+    bond_orders : Any
+        Engine-provided bond-order payload.
+    sum_bond_orders, num_lone_pairs : Optional[np.ndarray]
+        Optional 2D per-frame/per-atom arrays.
+    num_of_bonds : Optional[np.ndarray]
+        Optional 1D per-frame bond-count series.
+    total_bond_order, total_lone_pairs, total_bond_order_uncorrected : Optional[np.ndarray]
+        Optional aggregate bond-order/lone-pair series.
+    atom_ids : Optional[Sequence[int]]
+        Optional atom identifiers aligned to atom dimension.
+    elements : Optional[list[str]]
+        Optional per-atom element labels.
+    simulation : Optional[SimulationData]
+        Optional simulation-level context.
+    iterations : Optional[np.ndarray]
+        Optional 1D frame index array.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
 
     Notes
     -----
@@ -243,7 +342,22 @@ class ConnectivityData:
 
 @dataclass
 class ForceFieldParametersData:
-    """Engine-agnostic force-field reference model."""
+    """Engine-agnostic force-field reference model.
+
+    This dataclass stores normalized force-field parameter tables grouped by
+    section.
+
+    Fields
+    -----
+    general_parameters, atom_parameters, bond_parameters, off_diagonal_parameters : pd.DataFrame
+        Core force-field parameter tables.
+    angle_parameters, torsion_parameters, hydrogen_bond_parameters : pd.DataFrame
+        Angular, torsional, and hydrogen-bond parameter tables.
+    source : str
+        Source descriptor for the parsed parameter set.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     general_parameters: pd.DataFrame
     atom_parameters: pd.DataFrame
@@ -274,7 +388,21 @@ class ForceFieldParametersData:
 
 @dataclass
 class ForceFieldOptimizationProgressData:
-    """Canonical force-field optimization error model parsed from ``fort.13``."""
+    """Canonical force-field optimization error model.
+
+    This dataclass stores epoch-wise optimization error values in an
+    engine-agnostic shape. If you use ReaxFF engine, then the source file would
+    be ``fort.13``.
+
+    Fields
+    -----
+    epochs : np.ndarray
+        1D optimization epoch indices.
+    total_ff_error : np.ndarray
+        1D total force-field error per epoch.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     epochs: np.ndarray
     total_ff_error: np.ndarray
@@ -292,7 +420,29 @@ class ForceFieldOptimizationProgressData:
 
 @dataclass
 class ForceFieldOptimizationDiagnosticData:
-    """Canonical parameter-optimization diagnostic model parsed from ``fort.79``."""
+    """Canonical parameter-optimization diagnostic model.
+
+    This dataclass stores per-row diagnostic arrays used for optimization
+    analysis in a normalized shape. If you use ReaxFF engine, then the source
+    file would be ``fort.79``.
+
+    Fields
+    -----
+    identifiers : np.ndarray
+        1D identifier labels per diagnostic row.
+    value1, value2, value3, value4 : np.ndarray
+        1D sampled optimization values per row.
+    diff1, diff2, diff3, diff4 : np.ndarray
+        1D difference/error arrays aligned with sampled values.
+    a, b, c : np.ndarray
+        1D coefficients for fitted diagnostic curves.
+    parabol_min : np.ndarray
+        1D estimated parabola minima.
+    parabol_min_diff : np.ndarray
+        1D differences associated with estimated minima.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     identifiers: np.ndarray
     value1: np.ndarray
@@ -340,7 +490,33 @@ class ForceFieldOptimizationDiagnosticData:
 
 @dataclass
 class ForceFieldOptimizationReportData:
-    """Canonical force-field optimization report model parsed from ``fort.99``."""
+    """Canonical force-field optimization report model.
+
+    This dataclass stores line-oriented optimization report arrays in a
+    normalized table-like structure. If you use ReaxFF engine, then the source
+    file would be ``fort.99``.
+
+    Fields
+    -----
+    linenos : np.ndarray
+        1D source line numbers.
+    sections : np.ndarray
+        1D logical report sections per line.
+    titles : np.ndarray
+        1D title labels per line.
+    ffield_values : np.ndarray
+        1D force-field predicted values.
+    qm_values : np.ndarray
+        1D QM reference values.
+    weights : np.ndarray
+        1D weighting factors per line.
+    errors : np.ndarray
+        1D error magnitudes per line.
+    total_ff_error : np.ndarray
+        1D cumulative/total error values per line.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     linenos: np.ndarray
     sections: np.ndarray
@@ -367,7 +543,21 @@ class ForceFieldOptimizationReportData:
 
 @dataclass
 class ForceFieldOptimizationTrainingSetData:
-    """Canonical ReaxFF training-set model parsed from ``trainset`` files."""
+    """Canonical optimization training-set model.
+
+    This dataclass stores normalized training-set sections for force-field
+    optimization. If you use ReaxFF engine, then the source file would be
+    ``trainset``.
+
+    Fields
+    -----
+    sections : tuple[str, ...]
+        Ordered section names present in the parsed training set.
+    charge, heatfo, geometry, cell_parameters, energy : pd.DataFrame
+        Section tables keyed by training-set block type.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     sections: tuple[str, ...] = ()
     charge: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -388,7 +578,29 @@ class ForceFieldOptimizationTrainingSetData:
 
 @dataclass
 class ForceFieldOptimizationParameterData:
-    """Canonical optimization-parameter definition model parsed from ``params``."""
+    """Canonical optimization-parameter definition model.
+
+    This dataclass stores parameter-search definitions used by optimization
+    workflows. If you use ReaxFF engine, then the source file would be
+    ``params``.
+
+    Fields
+    -----
+    ff_section : np.ndarray
+        1D force-field section labels for each parameter row.
+    ff_section_line : np.ndarray
+        1D line references inside the section.
+    ff_parameter : np.ndarray
+        1D parameter names/identifiers.
+    search_interval : np.ndarray
+        1D interval descriptors for search.
+    min_value, max_value : np.ndarray
+        1D numeric lower/upper bounds.
+    inline_comment : np.ndarray
+        1D inline comments associated with each row.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     ff_section: np.ndarray
     ff_section_line: np.ndarray
@@ -414,7 +626,20 @@ class ForceFieldOptimizationParameterData:
 
 @dataclass
 class GeometrySummaryData:
-    """Canonical structure-summary model parsed from ``fort.74``."""
+    """Canonical structure-summary model.
+
+    This dataclass stores structure-level summary series aligned by identifier.
+    If you use ReaxFF engine, then the source file would be ``fort.74``.
+
+    Fields
+    -----
+    identifiers : np.ndarray
+        1D structure identifiers.
+    minimum_energy, iterations, formation_energy, volume, density : Optional[np.ndarray]
+        Optional 1D summary arrays aligned to ``identifiers``.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     identifiers: np.ndarray
     minimum_energy: Optional[np.ndarray] = None
@@ -440,7 +665,23 @@ class GeometrySummaryData:
 
 @dataclass
 class PartialEnergyData:
-    """Canonical partial-energy time-series model parsed from ``fort.73``-style files."""
+    """Canonical partial-energy time-series model.
+
+    This dataclass stores iteration-indexed partial energy components in a 2D
+    matrix. If you use ReaxFF engine, then the source file would be
+    ``fort.73``-style output.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D iteration numbers.
+    components : tuple[str, ...]
+        Ordered energy component labels mapped to ``values`` columns.
+    values : np.ndarray
+        2D numeric array with shape (n_frames, n_components).
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     components: tuple[str, ...] = ()
@@ -461,7 +702,26 @@ class PartialEnergyData:
 
 @dataclass
 class StressData:
-    """Canonical per-atom stress tensor time-series model."""
+    """Canonical per-atom stress tensor time-series model.
+
+    This dataclass stores per-frame stress tensor components and optional
+    derived scalar variants.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D frame iteration array.
+    components : tuple[str, ...]
+        Ordered tensor component labels.
+    values : np.ndarray
+        Required 3D stress tensor array with shape (n_frames, n_atoms, n_components).
+    average_values, loavg_values : Optional[np.ndarray]
+        Optional 3D stress arrays aligned to ``values`` shape conventions.
+    iso_values, avg_iso_values, loavg_iso_values : Optional[np.ndarray]
+        Optional 2D scalar-per-atom stress arrays aligned to frames/atoms.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     components: tuple[str, ...] = ("xx", "yy", "zz", "yx", "zx", "zy")
@@ -523,7 +783,19 @@ class StressData:
 
 @dataclass
 class AtomTemperatureData:
-    """Canonical per-atom temperature time-series model."""
+    """Canonical per-atom temperature time-series model.
+
+    This dataclass stores per-frame per-atom temperature arrays.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D frame iteration array.
+    temperatures : np.ndarray
+        2D temperature array with shape (n_frames, n_atoms).
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     temperatures: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
@@ -541,7 +813,19 @@ class AtomTemperatureData:
 
 @dataclass
 class AtomStrainEnergyData:
-    """Canonical per-atom strain-energy time-series model."""
+    """Canonical per-atom strain-energy time-series model.
+
+    This dataclass stores per-frame per-atom strain-energy arrays.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D frame iteration array.
+    strain_energy : np.ndarray
+        2D strain-energy array with shape (n_frames, n_atoms).
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     strain_energy: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
@@ -559,7 +843,26 @@ class AtomStrainEnergyData:
 
 @dataclass
 class RestraintData:
-    """Canonical restraint-monitor model parsed from ``fort.76``."""
+    """Canonical restraint-monitor model.
+
+    This dataclass stores restraint-monitor trajectories and target/actual value
+    tables. If you use ReaxFF engine, then the source file would be ``fort.76``.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D iteration numbers.
+    restraint_energy : Optional[np.ndarray]
+        Optional 1D restraint energy series.
+    potential_energy : Optional[np.ndarray]
+        Optional 1D potential energy series.
+    target_values : np.ndarray
+        2D target value matrix aligned to iterations.
+    actual_values : np.ndarray
+        2D actual value matrix aligned to iterations.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     restraint_energy: Optional[np.ndarray] = None
@@ -586,7 +889,22 @@ class RestraintData:
 
 @dataclass
 class GeometryOptimizationProgressData:
-    """Canonical geometry-optimization summary model parsed from ``fort.57``."""
+    """Canonical geometry-optimization summary model.
+
+    This dataclass stores iteration-indexed geometry optimization progress
+    metrics. If you use ReaxFF engine, then the source file would be ``fort.57``.
+
+    Fields
+    -----
+    optimization_iterations : np.ndarray
+        1D optimization iteration indices.
+    potential_energy, temperature, temperature_setpoint, rms_gradient, n_force_calls : Optional[np.ndarray]
+        Optional 1D progress series aligned to ``optimization_iterations``.
+    geo_descriptor : str
+        Optional geometry descriptor label.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     optimization_iterations: np.ndarray
     potential_energy: Optional[np.ndarray] = None
@@ -614,7 +932,18 @@ class GeometryOptimizationProgressData:
 
 @dataclass
 class ControlParametersData:
-    """Engine-agnostic control-parameter model grouped by normalized sections."""
+    """Engine-agnostic control-parameter model grouped by normalized sections.
+
+    This dataclass stores parsed control-file key/value groups in normalized
+    section dictionaries.
+
+    Fields
+    -----
+    general, md, mm, ff, outdated : dict[str, Any]
+        Section dictionaries for normalized control parameters.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     general: dict[str, Any] = field(default_factory=dict)
     md: dict[str, Any] = field(default_factory=dict)
@@ -634,7 +963,24 @@ class ControlParametersData:
 
 @dataclass
 class ChargeData:
-    """Canonical per-atom charge model."""
+    """Canonical per-atom charge model.
+
+    This dataclass stores frame-aligned atomic charges with optional simulation
+    context.
+
+    Fields
+    -----
+    charges : np.ndarray
+        2D charge array with shape (n_frames, n_atoms).
+    total_charge : Optional[np.ndarray]
+        Optional 1D total charge series aligned to frames.
+    simulation : Optional[SimulationData]
+        Optional simulation-level context.
+    iterations : Optional[np.ndarray]
+        Optional 1D frame iteration array.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     charges: np.ndarray  # (n_frames, n_atoms_max), padded with NaN when an atom is absent
     total_charge: Optional[np.ndarray] = None  # (n_frames,)
@@ -664,7 +1010,26 @@ class ChargeData:
 
 @dataclass
 class ElectricFieldData:
-    """Canonical electric-field model."""
+    """Canonical electric-field model.
+
+    This dataclass stores sampled applied-field values and optional field-energy
+    values with component metadata.
+
+    Fields
+    -----
+    applied_field_values : np.ndarray
+        1D or 2D applied-field value array.
+    applied_field_components : Sequence[str]
+        Component labels for ``applied_field_values`` columns.
+    field_energy_values : np.ndarray
+        1D or 2D field-energy value array.
+    field_energy_components : Sequence[str]
+        Component labels for ``field_energy_values`` columns.
+    sampled_field_iterations : Optional[np.ndarray]
+        Optional 1D iteration array aligned to sample count.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     applied_field_values: np.ndarray
     applied_field_components: Sequence[str] = ()
@@ -709,7 +1074,23 @@ class ElectricFieldData:
 
 @dataclass
 class AtomicKinematicsData:
-    """Canonical single-snapshot atomic kinematics model parsed from ``vels``-style files."""
+    """Canonical single-snapshot atomic kinematics model.
+
+    This dataclass stores coordinate/velocity/acceleration tables for one
+    kinematic snapshot. If you use ReaxFF engine, then the source file would be
+    ``vels``-style output.
+
+    Fields
+    -----
+    coordinates, velocities, accelerations, previous_accelerations : pd.DataFrame
+        Per-atom kinematics tables for the same snapshot.
+    lattice_parameters : Optional[dict[str, float]]
+        Optional lattice parameter dictionary for periodic structures.
+    md_temperature_K : Optional[float]
+        Optional MD temperature value in Kelvin.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     coordinates: pd.DataFrame = field(default_factory=pd.DataFrame)
     velocities: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -730,7 +1111,25 @@ class AtomicKinematicsData:
 
 @dataclass
 class EregimeData:
-    """Canonical electric-field schedule model parsed from ``eregime.in``."""
+    """Canonical electric-field schedule model.
+
+    This dataclass stores scheduled electric-field regime entries indexed by
+    iteration. If you use ReaxFF engine, then the source file would be
+    ``eregime.in``.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D iteration numbers for schedule entries.
+    field_zones : np.ndarray
+        1D field zone labels/indices.
+    field_dir : np.ndarray
+        1D field direction labels/indices.
+    field : np.ndarray
+        1D field magnitude values.
+    metadata : Optional[dict[str, Any]], optional
+        Optional parser/source metadata.
+    """
 
     iterations: np.ndarray
     field_zones: np.ndarray
@@ -753,7 +1152,20 @@ class EregimeData:
 
 @dataclass
 class MolecularAnalysisData:
-    """Canonical molecular-fragment analysis model."""
+    """Canonical molecular-fragment analysis model.
+
+    This dataclass stores frame indices with tabular molecular totals and
+    species-level summaries.
+
+    Fields
+    -----
+    iterations : np.ndarray
+        1D frame iteration array.
+    totals : pd.DataFrame
+        Tabular totals per frame/species grouping.
+    molecular_species : pd.DataFrame
+        Tabular species-level molecular analysis output.
+    """
 
     iterations: np.ndarray
     totals: pd.DataFrame
@@ -776,7 +1188,28 @@ class MolecularAnalysisData:
 
 @dataclass
 class ForceFieldOptimizationData:
-    """Composite force-field optimization view spanning progress and diagnostics."""
+    """Composite force-field optimization view spanning progress and diagnostics.
+
+    This dataclass aggregates the canonical sources used across force-field
+    optimization tasks.
+
+    Fields
+    -----
+    force_field_parameters : Optional[ForceFieldParametersData]
+        Optional normalized force-field parameter tables.
+    optimization_parameters : Optional[ForceFieldOptimizationParameterData]
+        Optional optimization-parameter definition data.
+    training_set : Optional[ForceFieldOptimizationTrainingSetData]
+        Optional optimization training-set data.
+    progress : Optional[ForceFieldOptimizationProgressData]
+        Optional optimization progress/error series.
+    diagnostics : Optional[ForceFieldOptimizationDiagnosticData]
+        Optional optimization diagnostic arrays.
+    report : Optional[ForceFieldOptimizationReportData]
+        Optional optimization report rows.
+    metadata : Optional[dict[str, Any]], optional
+        Optional aggregate metadata.
+    """
 
     force_field_parameters: Optional[ForceFieldParametersData] = None
     optimization_parameters: Optional[ForceFieldOptimizationParameterData] = None
@@ -791,9 +1224,17 @@ class ForceFieldOptimizationData:
 class ForceFieldOptimizationParameterBundleData:
     """Composite data for parameter optimization tasks.
 
-    Contains exactly the two sources needed by parameter tasks:
-    - optimization_parameters: parsed ``params`` data (always required)
-    - force_field_parameters: parsed ``ffield`` data (used when interpretation is requested)
+    This dataclass bundles parameter-definition data with optional force-field
+    parameter tables for interpretation workflows.
+
+    Fields
+    -----
+    optimization_parameters : ForceFieldOptimizationParameterData
+        Required optimization parameter definitions.
+    force_field_parameters : Optional[ForceFieldParametersData]
+        Optional force-field parameter tables used for interpretation.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
     """
 
     optimization_parameters: ForceFieldOptimizationParameterData
@@ -805,8 +1246,17 @@ class ForceFieldOptimizationParameterBundleData:
 class ForceFieldOptimizationDiagnosticBundleData:
     """Composite data for diagnostic optimization tasks.
 
-    - diagnostics: parsed diagnostic data (required)
-    - force_field_parameters: parsed force-field parameter tables (required for identifier interpretation)
+    This dataclass bundles diagnostics with force-field parameter tables
+    required for identifier interpretation.
+
+    Fields
+    -----
+    diagnostics : ForceFieldOptimizationDiagnosticData
+        Required diagnostic data.
+    force_field_parameters : ForceFieldParametersData
+        Required force-field parameter tables.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
     """
 
     diagnostics: ForceFieldOptimizationDiagnosticData
@@ -818,8 +1268,17 @@ class ForceFieldOptimizationDiagnosticBundleData:
 class ForceFieldOptimizationReportEOSBundleData:
     """Composite data for EOS report tasks.
 
-    - report: optimization report data (required)
-    - geometry_summary: structure-summary data with volume mapping (required)
+    This dataclass bundles optimization report rows with geometry summaries used
+    for equation-of-state mapping.
+
+    Fields
+    -----
+    report : ForceFieldOptimizationReportData
+        Required optimization report data.
+    geometry_summary : GeometrySummaryData
+        Required structure summary data with volume mapping.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
     """
 
     report: ForceFieldOptimizationReportData
@@ -831,8 +1290,17 @@ class ForceFieldOptimizationReportEOSBundleData:
 class CoordinationStatusBundleData:
     """Composite data for coordination-status analysis tasks.
 
-    - connectivity: bond-order/neighbor information per frame (required)
-    - force_field_parameters: force-field atom parameters with ``valency`` column (required)
+    This dataclass bundles frame-level connectivity with force-field atom
+    parameters needed for valency-based status interpretation.
+
+    Fields
+    -----
+    connectivity : ConnectivityData
+        Required bond-order/neighbor information per frame.
+    force_field_parameters : ForceFieldParametersData
+        Required force-field atom parameter table with ``valency`` data.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
     """
 
     connectivity: ConnectivityData
@@ -842,7 +1310,22 @@ class CoordinationStatusBundleData:
 
 @dataclass
 class ElectrostaticsData:
-    """Composite electrostatics model for engine-agnostic analyses."""
+    """Composite electrostatics model for engine-agnostic analyses.
+
+    This dataclass bundles trajectory, charge, and optional connectivity/field
+    sources for electrostatics workflows.
+
+    Fields
+    -----
+    trajectory : TrajectoryData
+        Required trajectory source.
+    charges : ChargeData
+        Required charge source.
+    connectivity : Optional[ConnectivityData]
+        Optional connectivity source.
+    electric_field : Optional[ElectricFieldData]
+        Optional external/applied field source.
+    """
 
     trajectory: TrajectoryData
     charges: ChargeData
@@ -852,7 +1335,20 @@ class ElectrostaticsData:
 
 @dataclass
 class ConnectivityTrajectoryData:
-    """Composite connectivity + trajectory model for coupled workflows."""
+    """Composite connectivity + trajectory model for coupled workflows.
+
+    This dataclass bundles connectivity and trajectory sources with optional
+    force-field parameter context.
+
+    Fields
+    -----
+    connectivity : ConnectivityData
+        Required connectivity source.
+    trajectory : TrajectoryData
+        Required trajectory source.
+    force_field_parameters : Optional[ForceFieldParametersData]
+        Optional force-field parameter context.
+    """
 
     connectivity: ConnectivityData
     trajectory: TrajectoryData

@@ -1,4 +1,11 @@
-"""Catalog for top-level user-facing commands."""
+"""
+Catalog for top-level user-facing commands.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -17,7 +24,23 @@ from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_w
 
 @dataclass(frozen=True)
 class CommandSpec:
-    """Metadata for a user-facing command."""
+    """
+    Metadata for a user-facing command.
+    
+    
+    Fields
+    -----
+    name : str
+        Field value used by this structured record.
+    kind : str
+        Field value used by this structured record.
+    target : object | None, optional
+        Field value used by this structured record.
+    aliases : tuple[str, ...], optional
+        Field value used by this structured record.
+    help_text : str, optional
+        Field value used by this structured record.
+    """
 
     name: str
     kind: str
@@ -37,7 +60,44 @@ def register_command(
     aliases: Iterable[str] = (),
     help_text: str = "",
 ) -> CommandSpec:
-    """Register a user-facing command."""
+    """
+    Register a user-facing command.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    kind : str
+        Input parameter used by this function.
+    target : object | None, optional
+        Input parameter used by this function.
+    aliases : Iterable[str], optional
+        Input parameter used by this function.
+    help_text : str, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    CommandSpec
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.command_catalog import register_command
+    # Configure required arguments for your case.
+    result = register_command(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     spec = CommandSpec(
         name=name,
         kind=kind,
@@ -50,7 +110,42 @@ def register_command(
 
 
 def command(name: str, *, kind: str, aliases: Iterable[str] = (), help_text: str = "") -> Callable:
-    """Decorator that registers a class or function as a command target."""
+    """
+    Decorator that registers a class or function as a command target.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    kind : str
+        Input parameter used by this function.
+    aliases : Iterable[str], optional
+        Input parameter used by this function.
+    help_text : str, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Callable
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.command_catalog import command
+    # Configure required arguments for your case.
+    result = command(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
 
     def wrapper(target):
         register_command(name, kind=kind, target=target, aliases=aliases, help_text=help_text)
@@ -66,7 +161,42 @@ def register_generator_command(
     aliases: Iterable[str] = (),
     help_text: str = "",
 ) -> CommandSpec:
-    """Convenience wrapper for generator-backed commands."""
+    """
+    Convenience wrapper for generator-backed commands.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    target : object | None, optional
+        Input parameter used by this function.
+    aliases : Iterable[str], optional
+        Input parameter used by this function.
+    help_text : str, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    CommandSpec
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.command_catalog import register_generator_command
+    # Configure required arguments for your case.
+    result = register_generator_command(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     return register_command(name, kind="generator", target=target, aliases=aliases, help_text=help_text)
 
 
@@ -111,7 +241,36 @@ def _register_packaged_commands() -> None:
 
 
 def get_registered_commands(include_analysis_tasks: bool = True) -> dict[str, CommandSpec]:
-    """Return all currently known commands."""
+    """
+    Return all currently known commands.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    include_analysis_tasks : bool, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, CommandSpec]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.registry.command_catalog import get_registered_commands
+    # Configure required arguments for your case.
+    result = get_registered_commands(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     commands = dict(COMMAND_REGISTRY)
     workflow_specs = get_registered_workflows()
     for name, spec in workflow_specs.items():

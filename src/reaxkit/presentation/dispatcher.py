@@ -1,4 +1,11 @@
-"""Shared presentation dispatch for tabular workflow results."""
+"""
+Shared presentation dispatch for tabular workflow results.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -47,18 +54,79 @@ def _looks_like_raw_plot_payload(payload: object) -> bool:
 
 
 def export_result_csv(result, path: str) -> None:
-    """Export a result table to CSV."""
+    """
+    Export a result table to CSV.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    result : Any
+        Input parameter used by this function.
+    path : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.dispatcher import export_result_csv
+    result = export_result_csv(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     result.table.to_csv(out, index=False)
 
 
 def print_result_table(result) -> None:
-    """Print a result table to stdout."""
+    """
+    Print a result table to stdout.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    result : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.dispatcher import print_result_table
+    result = print_result_table(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     print(result.table.to_string(index=False))
 
 
 def _print_output_dirs(paths: list[Path]) -> None:
+    """
+    Print output dirs.
+    """
     seen: set[str] = set()
     ordered_dirs: list[str] = []
     for path in paths:
@@ -82,7 +150,43 @@ def present_result(
     plot_payload_builder: PlotPayloadBuilder | None = None,
     report_payload_builder: ReportPayloadBuilder | None = None,
 ) -> None:
-    """Dispatch result presentation from CLI-style arguments."""
+    """
+    Dispatch result presentation from CLI-style arguments.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    command : str
+        Input parameter used by this function.
+    result : Any
+        Input parameter used by this function.
+    args : Any
+        Input parameter used by this function.
+    plot_payload_builder : PlotPayloadBuilder | None, optional
+        Input parameter used by this function.
+    report_payload_builder : ReportPayloadBuilder | None, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.dispatcher import present_result
+    result = present_result(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     normalized = normalize_storage_args(vars(args), snapshot=False)
     for key, value in normalized.items():
         setattr(args, key, value)

@@ -1,4 +1,11 @@
-"""Core orchestration components."""
+"""
+Core orchestration components.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands, register_analysis_command

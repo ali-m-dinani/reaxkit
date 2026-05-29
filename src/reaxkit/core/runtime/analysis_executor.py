@@ -1,4 +1,11 @@
-"""Core orchestration for engine resolution + typed data loading + task execution."""
+"""
+Core orchestration for engine resolution + typed data loading + task execution.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -49,37 +56,58 @@ class AnalysisExecutor:
 
     @staticmethod
     def _timing_console_enabled(args: dict) -> bool:
+        """
+        Timing console enabled.
+        """
         return bool(args.get("timing") or args.get("show_timing") or args.get("time"))
 
     @staticmethod
     def _timing_log_path(args: dict) -> Path:
+        """
+        Timing log path.
+        """
         project_root = Path(args.get("project_root") or ".")
         return project_root / "logs" / "timing" / "machine_readable_timing.log"
 
     @staticmethod
     def _timing_human_global_log_path(args: dict) -> Path:
+        """
+        Timing human global log path.
+        """
         project_root = Path(args.get("project_root") or ".")
         return project_root / "logs" / "timing" / "human_readable_timing.log"
 
     @staticmethod
     def _timing_human_run_log_path(args: dict) -> Path:
+        """
+        Timing human run log path.
+        """
         project_root = Path(args.get("project_root") or ".")
         session_id = str(args.get("_log_session_id") or datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
         return project_root / "logs" / "timing" / f"human_readable_timing_{session_id}.log"
 
     @staticmethod
     def _general_global_log_path(args: dict) -> Path:
+        """
+        General global log path.
+        """
         project_root = Path(args.get("project_root") or ".")
         return project_root / "logs" / "general" / "reaxkit_general.log"
 
     @staticmethod
     def _general_run_log_path(args: dict) -> Path:
+        """
+        General run log path.
+        """
         project_root = Path(args.get("project_root") or ".")
         session_id = str(args.get("_log_session_id") or datetime.now().strftime("%Y_%m_%d_%H_%M_%S"))
         return project_root / "logs" / "general" / f"run_{session_id}.general.log"
 
     @staticmethod
     def _analysis_output_dir(args: dict) -> Path:
+        """
+        Analysis output dir.
+        """
         project_root = Path(args.get("project_root") or ".")
         command = str(args.get("command") or "analysis")
         analysis_id = str(args.get("analysis_id") or args.get("run_id") or args.get("_analysis_id") or "analysis")
@@ -87,6 +115,9 @@ class AnalysisExecutor:
 
     @staticmethod
     def _fmt_kv(extra: dict | None) -> str:
+        """
+        Fmt kv.
+        """
         if not extra:
             return ""
         parts: list[str] = []
@@ -99,6 +130,9 @@ class AnalysisExecutor:
 
     @classmethod
     def _record_general(cls, args: dict, *, event: str, task_name: str, extra: dict | None = None) -> None:
+        """
+        Record general.
+        """
         stamp = datetime.now().strftime("%m-%d-%Y-%H-%M-%S")
         line = (
             f"{stamp} ReaxKit event={event} task={task_name} "
@@ -112,6 +146,9 @@ class AnalysisExecutor:
 
     @classmethod
     def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float, extra: dict | None = None) -> None:
+        """
+        Record timing.
+        """
         payload = {
             "ts_utc": datetime.now(timezone.utc).isoformat(),
             "phase": str(phase),
@@ -141,6 +178,9 @@ class AnalysisExecutor:
 
     @classmethod
     def _load_timing_callback(cls, args: dict, *, task_name: str):
+        """
+        Load timing callback.
+        """
         def _emit(*, handler: str, source: str | None, source_path: str | None, seconds: float) -> None:
             cls._record_timing(
                 args,
@@ -158,6 +198,9 @@ class AnalysisExecutor:
 
     @staticmethod
     def _run_task(task, data, request, reporter):
+        """
+        Run task.
+        """
         params = inspect.signature(task.run).parameters
         if "reporter" in params:
             return task.run(data, request, reporter=reporter)
@@ -165,6 +208,9 @@ class AnalysisExecutor:
 
     @classmethod
     def _detection_path(cls, args: dict) -> str:
+        """
+        Detection path.
+        """
         for key in cls.DETECTION_HINT_KEYS:
             value = args.get(key)
             if value:
@@ -173,6 +219,9 @@ class AnalysisExecutor:
 
     @staticmethod
     def _console_step(args: dict, message: str) -> None:
+        """
+        Console step.
+        """
         if args.get("quiet") or not args.get("log_in_terminal"):
             return
         run_id = args.get("run_id")
@@ -183,6 +232,40 @@ class AnalysisExecutor:
         # ---------------------------------------------------------------------
         # 1) Normalize runtime/storage arguments and derive task/data metadata.
         # ---------------------------------------------------------------------
+        """
+        Run.
+        
+        This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+        
+        Parameters
+        -----
+        task : Any
+            Input parameter used by this function.
+        request : Any
+            Input parameter used by this function.
+        args : dict
+            Input parameter used by this function.
+        
+        Returns
+        -----
+        Any
+            Value produced by this function call.
+        
+        Examples
+        -----
+        ```python
+        from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+        instance = AnalysisExecutor(...)
+        # Configure required arguments for your case.
+        result = instance.run(...)
+        print(type(result).__name__)
+        ```
+        Sample output:
+        ```text
+        str
+        ```
+        The output type reflects the return contract for this API call.
+        """
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)

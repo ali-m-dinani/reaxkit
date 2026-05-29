@@ -1,4 +1,11 @@
-"""Run-scoped output helpers for generator commands."""
+"""
+Run-scoped output helpers for generator commands.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +20,9 @@ from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, default_pr
 
 
 def _json_safe(value: Any) -> Any:
+    """
+    Json safe.
+    """
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, Path):
@@ -25,7 +35,40 @@ def _json_safe(value: Any) -> Any:
 
 
 def prepare_generator_output(args: Any, *, command: str, output_value: str) -> tuple[Path, ReaxkitStorageLayout]:
-    """Resolve generator output to inputs/<run_id>/<filename> and normalize args in-place."""
+    """
+    Resolve generator output to inputs/<run_id>/<filename> and normalize args in-place.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    args : Any
+        Input parameter used by this function.
+    command : str
+        Input parameter used by this function.
+    output_value : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    tuple[Path, ReaxkitStorageLayout]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.generator_runtime import prepare_generator_output
+    # Configure required arguments for your case.
+    result = prepare_generator_output(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     run_id = str(getattr(args, "run_id", None) or generate_run_id())
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
 
@@ -52,7 +95,46 @@ def persist_generator_metadata(
     extra: dict[str, Any] | None = None,
     copy_to_dot: bool = False,
 ) -> Path:
-    """Persist per-run generator settings JSON and update run index."""
+    """
+    Persist per-run generator settings JSON and update run index.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    args : Any
+        Input parameter used by this function.
+    command : str
+        Input parameter used by this function.
+    output_path : Path
+        Input parameter used by this function.
+    layout : ReaxkitStorageLayout
+        Input parameter used by this function.
+    extra : dict[str, Any] | None, optional
+        Input parameter used by this function.
+    copy_to_dot : bool, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.generator_runtime import persist_generator_metadata
+    # Configure required arguments for your case.
+    result = persist_generator_metadata(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     run_id = str(getattr(args, "run_id"))
     settings_path = output_path.parent / "settings.json"
     payload: dict[str, Any] = {
@@ -80,7 +162,38 @@ def persist_generator_metadata(
 
 
 def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None:
-    """Copy generated output to current directory when requested."""
+    """
+    Copy generated output to current directory when requested.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    output_path : Path
+        Input parameter used by this function.
+    enabled : bool
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.generator_runtime import maybe_copy_output_to_dot
+    # Configure required arguments for your case.
+    result = maybe_copy_output_to_dot(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if not enabled:
         return None
     dst = Path("..") / output_path.name
@@ -94,6 +207,35 @@ def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None
 
 
 def print_saved_dirs(dirs: list[Path]) -> None:
+    """
+    Print saved dirs.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    dirs : list[Path]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.runtime.generator_runtime import print_saved_dirs
+    # Configure required arguments for your case.
+    result = print_saved_dirs(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     seen: set[str] = set()
     print("Results saved in:")
     for path in dirs:

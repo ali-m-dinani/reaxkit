@@ -4,6 +4,11 @@ Custom exception types used throughout ReaxKit.
 This module defines lightweight, domain-specific exceptions that allow
 ReaxKit workflows to distinguish between parsing failures and analysis
 failures, enabling clearer error reporting and recovery.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
 """
 
 class ParseError(Exception):

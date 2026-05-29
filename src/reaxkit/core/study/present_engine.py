@@ -1,4 +1,11 @@
-"""Presentation orchestration for study aggregate plots."""
+"""
+Presentation orchestration for study aggregate plots.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -7,15 +14,106 @@ from typing import Any, Callable
 
 
 def sort_plot_x(values: list[Any], *, sort_values_fn: Callable[[list[Any]], list[Any]]) -> list[Any]:
+    """
+    Sort plot x.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    values : list[Any]
+        Input parameter used by this function.
+    sort_values_fn : Callable[[list[Any]], list[Any]]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import sort_plot_x
+    # Configure required arguments for your case.
+    result = sort_plot_x(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     return sort_values_fn(list(values))
 
 
 def row_key_from_params(row: dict[str, str], param_cols: list[str]) -> str:
+    """
+    Row key from params.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    row : dict[str, str]
+        Input parameter used by this function.
+    param_cols : list[str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    str
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import row_key_from_params
+    # Configure required arguments for your case.
+    result = row_key_from_params(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     parts = [f"{p}={row.get(p)}" for p in param_cols]
     return ", ".join(parts)
 
 
 def find_param_columns(rows: list[dict[str, str]]) -> list[str]:
+    """
+    Find param columns.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    rows : list[dict[str, str]]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[str]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import find_param_columns
+    # Configure required arguments for your case.
+    result = find_param_columns(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if not rows:
         return []
     known = {"case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"}
@@ -39,6 +137,47 @@ def make_errorbar_plots_for_case_aggregate(
     slug_underscore_fn: Callable[[Any], str],
     render_plot_fn: Callable[[dict[str, Any]], Any],
 ) -> list[Path]:
+    """
+    Make errorbar plots for case aggregate.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    case_agg_dir : Path
+        Input parameter used by this function.
+    aggregate_title : str
+        Input parameter used by this function.
+    load_csv_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    to_plot_value_fn : Callable[[Any], Any]
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    slug_underscore_fn : Callable[[Any], str]
+        Input parameter used by this function.
+    render_plot_fn : Callable[[dict[str, Any]], Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Path]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_errorbar_plots_for_case_aggregate
+    # Configure required arguments for your case.
+    result = make_errorbar_plots_for_case_aggregate(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     per_x_csv = case_agg_dir / "per_x_stats.csv"
     if not per_x_csv.exists():
         return []
@@ -99,6 +238,47 @@ def make_boxplots_for_case_aggregate(
     sort_plot_x_fn: Callable[[list[Any]], list[Any]],
     render_plot_fn: Callable[[dict[str, Any]], Any],
 ) -> list[Path]:
+    """
+    Make boxplots for case aggregate.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    case_agg_dir : Path
+        Input parameter used by this function.
+    aggregate_title : str
+        Input parameter used by this function.
+    load_csv_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    slug_underscore_fn : Callable[[Any], str]
+        Input parameter used by this function.
+    sort_plot_x_fn : Callable[[list[Any]], list[Any]]
+        Input parameter used by this function.
+    render_plot_fn : Callable[[dict[str, Any]], Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Path]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_boxplots_for_case_aggregate
+    # Configure required arguments for your case.
+    result = make_boxplots_for_case_aggregate(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     raw_csv = case_agg_dir / "raw_replicates.csv"
     if not raw_csv.exists():
         return []
@@ -159,6 +339,53 @@ def make_all_cases_errorbar_plots(
     slug_underscore_fn: Callable[[Any], str],
     render_plot_fn: Callable[[dict[str, Any]], Any],
 ) -> list[Path]:
+    """
+    Make all cases errorbar plots.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    across_dir : Path
+        Input parameter used by this function.
+    aggregate_title : str
+        Input parameter used by this function.
+    load_csv_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    find_param_columns_fn : Callable[[list[dict[str, str]]], list[str]]
+        Input parameter used by this function.
+    row_key_from_params_fn : Callable[[dict[str, str], list[str]], str]
+        Input parameter used by this function.
+    to_plot_value_fn : Callable[[Any], Any]
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    stat_value_fn : Callable[[dict[str, Any], str], Any]
+        Input parameter used by this function.
+    slug_underscore_fn : Callable[[Any], str]
+        Input parameter used by this function.
+    render_plot_fn : Callable[[dict[str, Any]], Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Path]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_all_cases_errorbar_plots
+    # Configure required arguments for your case.
+    result = make_all_cases_errorbar_plots(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     src = across_dir / "across_cases_per_x_stats.csv"
     if not src.exists():
         return []
@@ -226,6 +453,51 @@ def make_heatmap_from_rows(
     stat_value_fn: Callable[[dict[str, Any], str], Any],
     render_plot_fn: Callable[[dict[str, Any]], Any],
 ) -> Path | None:
+    """
+    Make heatmap from rows.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    rows : list[dict[str, str]]
+        Input parameter used by this function.
+    x_param : str
+        Input parameter used by this function.
+    y_param : str
+        Input parameter used by this function.
+    value_col : str
+        Input parameter used by this function.
+    out_path : Path
+        Input parameter used by this function.
+    title : str
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    stat_value_fn : Callable[[dict[str, Any], str], Any]
+        Input parameter used by this function.
+    render_plot_fn : Callable[[dict[str, Any]], Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_heatmap_from_rows
+    # Configure required arguments for your case.
+    result = make_heatmap_from_rows(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     stat_key = value_col[2:] if value_col.startswith("y_") else value_col
     coords: list[list[float]] = []
     values: list[float] = []
@@ -266,6 +538,47 @@ def make_all_cases_heatmaps(
     slug_underscore_fn: Callable[[Any], str],
     make_heatmap_from_rows_fn: Callable[..., Path | None],
 ) -> list[Path]:
+    """
+    Make all cases heatmaps.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    across_dir : Path
+        Input parameter used by this function.
+    aggregate_title : str
+        Input parameter used by this function.
+    load_csv_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    find_param_columns_fn : Callable[[list[dict[str, str]]], list[str]]
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    slug_underscore_fn : Callable[[Any], str]
+        Input parameter used by this function.
+    make_heatmap_from_rows_fn : Callable[..., Path | None]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Path]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_all_cases_heatmaps
+    # Configure required arguments for your case.
+    result = make_all_cases_heatmaps(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     outputs: list[Path] = []
     per_x_csv = across_dir / "across_cases_per_x_stats.csv"
     global_csv = across_dir / "across_cases_global_stats.csv"
@@ -340,6 +653,51 @@ def make_all_cases_per_iter_boxplots(
     slug_underscore_fn: Callable[[Any], str],
     render_plot_fn: Callable[[dict[str, Any]], Any],
 ) -> list[Path]:
+    """
+    Make all cases per iter boxplots.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    across_dir : Path
+        Input parameter used by this function.
+    aggregate_title : str
+        Input parameter used by this function.
+    load_csv_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    find_param_columns_fn : Callable[[list[dict[str, str]]], list[str]]
+        Input parameter used by this function.
+    sort_plot_x_fn : Callable[[list[Any]], list[Any]]
+        Input parameter used by this function.
+    row_key_from_params_fn : Callable[[dict[str, str], list[str]], str]
+        Input parameter used by this function.
+    safe_float_fn : Callable[[Any], float | None]
+        Input parameter used by this function.
+    slug_underscore_fn : Callable[[Any], str]
+        Input parameter used by this function.
+    render_plot_fn : Callable[[dict[str, Any]], Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Path]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import make_all_cases_per_iter_boxplots
+    # Configure required arguments for your case.
+    result = make_all_cases_per_iter_boxplots(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     src = across_dir / "raw_all_cases.csv"
     if not src.exists():
         return []
@@ -408,6 +766,69 @@ def plot_study_aggregates(
     plot_status_csv_file: str,
     plot_status_json_file: str,
 ) -> dict[str, Any]:
+    """
+    Plot study aggregates.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    aggregate_title_filter : str | None
+        Input parameter used by this function.
+    case_filter : str | None
+        Input parameter used by this function.
+    read_json_fn : Callable[[Path], dict[str, Any]]
+        Input parameter used by this function.
+    load_source_study_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    aggregate_defs_from_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    case_matches_selector_fn : Callable[[dict[str, Any], str | None], bool]
+        Input parameter used by this function.
+    make_errorbar_plots_for_case_aggregate_fn : Callable[[Path], list[Path]] | Callable[..., list[Path]]
+        Input parameter used by this function.
+    make_boxplots_for_case_aggregate_fn : Callable[[Path], list[Path]] | Callable[..., list[Path]]
+        Input parameter used by this function.
+    make_all_cases_errorbar_plots_fn : Callable[[Path], list[Path]] | Callable[..., list[Path]]
+        Input parameter used by this function.
+    make_all_cases_heatmaps_fn : Callable[[Path], list[Path]] | Callable[..., list[Path]]
+        Input parameter used by this function.
+    make_all_cases_per_iter_boxplots_fn : Callable[[Path], list[Path]] | Callable[..., list[Path]]
+        Input parameter used by this function.
+    local_now_fn : Callable[[], str]
+        Input parameter used by this function.
+    duration_minutes_fn : Callable[[str | None, str | None], float | None]
+        Input parameter used by this function.
+    log_task_event_fn : Callable[..., None]
+        Input parameter used by this function.
+    write_named_status_fn : Callable[..., tuple[Path, Path]]
+        Input parameter used by this function.
+    plot_status_csv_file : str
+        Input parameter used by this function.
+    plot_status_json_file : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.present_engine import plot_study_aggregates
+    # Configure required arguments for your case.
+    result = plot_study_aggregates(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     study_manifest = read_json_fn(study_root / "study_manifest.json")
     study_doc = load_source_study_doc_fn(study_manifest)
     aggregate_defs = aggregate_defs_from_doc_fn(study_doc)

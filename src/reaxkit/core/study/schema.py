@@ -1,4 +1,11 @@
-"""Schema and validation helpers for study YAML."""
+"""
+Schema and validation helpers for study YAML.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -13,12 +20,40 @@ from reaxkit.core.study.naming import slug_underscore
 
 @dataclass(frozen=True)
 class StageDef:
+    """
+    Stage Def.
+    
+    This dataclass defines a structured container used by ReaxKit core workflows.
+    
+    Fields
+    -----
+    name : str
+        Field value used by this structured record.
+    payload : dict[str, Any]
+        Field value used by this structured record.
+    """
     name: str
     payload: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class AnalysisDef:
+    """
+    Analysis Def.
+    
+    This dataclass defines a structured container used by ReaxKit core workflows.
+    
+    Fields
+    -----
+    analysis_id : str
+        Field value used by this structured record.
+    title : str
+        Field value used by this structured record.
+    run_stage : str
+        Field value used by this structured record.
+    payload : dict[str, Any]
+        Field value used by this structured record.
+    """
     analysis_id: str
     title: str
     run_stage: str
@@ -27,6 +62,28 @@ class AnalysisDef:
 
 @dataclass(frozen=True)
 class AggregateDef:
+    """
+    Aggregate Def.
+    
+    This dataclass defines a structured container used by ReaxKit core workflows.
+    
+    Fields
+    -----
+    title : str
+        Field value used by this structured record.
+    analysis_title : str
+        Field value used by this structured record.
+    x : str
+        Field value used by this structured record.
+    y : list[str]
+        Field value used by this structured record.
+    reducer : str
+        Field value used by this structured record.
+    stats : list[str]
+        Field value used by this structured record.
+    on_missing : str
+        Field value used by this structured record.
+    """
     title: str
     analysis_title: str
     x: str
@@ -38,11 +95,52 @@ class AggregateDef:
 
 @dataclass(frozen=True)
 class ArtifactRef:
+    """
+    Artifact Ref.
+    
+    This dataclass defines a structured container used by ReaxKit core workflows.
+    
+    Fields
+    -----
+    stage : str
+        Field value used by this structured record.
+    artifact : str
+        Field value used by this structured record.
+    """
     stage: str
     artifact: str
 
 
 def load_study_yaml(path: Path) -> dict[str, Any]:
+    """
+    Load study yaml.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    path : Path
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.schema import load_study_yaml
+    # Configure required arguments for your case.
+    result = load_study_yaml(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if not path.exists():
         raise FileNotFoundError(f"Study file not found: {path}")
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -52,6 +150,35 @@ def load_study_yaml(path: Path) -> dict[str, Any]:
 
 
 def load_source_study_doc(study_manifest: dict[str, Any]) -> dict[str, Any]:
+    """
+    Load source study doc.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_manifest : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.schema import load_source_study_doc
+    # Configure required arguments for your case.
+    result = load_source_study_doc(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     source_yaml = Path(str(study_manifest.get("source_yaml") or "")).resolve()
     if not source_yaml.exists():
         raise FileNotFoundError(f"Study source YAML not found: {source_yaml}")
@@ -59,6 +186,35 @@ def load_source_study_doc(study_manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def analysis_defs_from_doc(doc: dict[str, Any]) -> dict[str, AnalysisDef]:
+    """
+    Analysis defs from doc.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    doc : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, AnalysisDef]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.schema import analysis_defs_from_doc
+    # Configure required arguments for your case.
+    result = analysis_defs_from_doc(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     _, _, _, _, analyses, _ = validate_study(doc)
     out: dict[str, AnalysisDef] = {}
     for a in analyses:
@@ -67,6 +223,35 @@ def analysis_defs_from_doc(doc: dict[str, Any]) -> dict[str, AnalysisDef]:
 
 
 def aggregate_defs_from_doc(doc: dict[str, Any]) -> dict[str, AggregateDef]:
+    """
+    Aggregate defs from doc.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    doc : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, AggregateDef]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.schema import aggregate_defs_from_doc
+    # Configure required arguments for your case.
+    result = aggregate_defs_from_doc(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     raw = doc.get("aggregate") or []
     if not isinstance(raw, list):
         raise ValueError("aggregate must be a list when provided.")
@@ -123,6 +308,35 @@ def aggregate_defs_from_doc(doc: dict[str, Any]) -> dict[str, AggregateDef]:
 def validate_study(
     doc: dict[str, Any],
 ) -> tuple[str, dict[str, list[Any]], int, list[StageDef], list[AnalysisDef], str | None]:
+    """
+    Validate study.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    doc : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    tuple[str, dict[str, list[Any]], int, list[StageDef], list[AnalysisDef], str | None]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.schema import validate_study
+    # Configure required arguments for your case.
+    result = validate_study(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     study_name = str(doc.get("study_name") or "").strip()
     if not study_name:
         raise ValueError("study_name is required.")

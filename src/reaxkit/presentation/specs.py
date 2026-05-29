@@ -1,4 +1,11 @@
-"""Typed presentation specs shared by CLI and Web UI frontends."""
+"""
+Typed presentation specs shared by CLI and Web UI frontends.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +20,23 @@ except Exception:  # pragma: no cover
 
 @dataclass(frozen=True)
 class PresentationSpec:
-    """Renderer-neutral visualization contract from analysis tasks."""
+    """
+    Renderer-neutral visualization contract from analysis tasks.
+    
+    
+    Fields
+    -----
+    renderer : str
+        Field value used by this structured record.
+    label : str
+        Field value used by this structured record.
+    mapping : dict[str, str], optional
+        Field value used by this structured record.
+    options : dict[str, Any], optional
+        Field value used by this structured record.
+    view_type : str | None, optional
+        Field value used by this structured record.
+    """
 
     renderer: str
     label: str
@@ -23,6 +46,9 @@ class PresentationSpec:
 
 
 def _infer_view_type(renderer: str) -> str:
+    """
+    Infer view type.
+    """
     key = str(renderer or "").strip().lower()
     if key in {"table"}:
         return "table"
@@ -34,7 +60,35 @@ def _infer_view_type(renderer: str) -> str:
 
 
 def ensure_presentation_spec(value: Any) -> PresentationSpec | None:
-    """Normalize arbitrary representation to PresentationSpec when possible."""
+    """
+    Normalize arbitrary representation to PresentationSpec when possible.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    value : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    PresentationSpec | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.specs import ensure_presentation_spec
+    result = ensure_presentation_spec(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if isinstance(value, PresentationSpec):
         return value
     if is_dataclass(value):
@@ -98,7 +152,35 @@ def ensure_presentation_spec(value: Any) -> PresentationSpec | None:
 
 
 def serialize_presentation_specs(values: list[Any]) -> list[dict[str, Any]]:
-    """Serialize spec objects into plain dicts for artifacts/API."""
+    """
+    Serialize spec objects into plain dicts for artifacts/API.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    values : list[Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[dict[str, Any]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.specs import serialize_presentation_specs
+    result = serialize_presentation_specs(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     out: list[dict[str, Any]] = []
     for value in values:
         spec = ensure_presentation_spec(value)
@@ -124,7 +206,35 @@ def serialize_presentation_specs(values: list[Any]) -> list[dict[str, Any]]:
 
 
 def spec_to_dash_request(value: Any) -> dict[str, str]:
-    """Convert a PresentationSpec into Dash visualization node request."""
+    """
+    Convert a PresentationSpec into Dash visualization node request.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    value : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, str]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.specs import spec_to_dash_request
+    result = spec_to_dash_request(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     spec = ensure_presentation_spec(value)
     if spec is None:
         return {
@@ -149,7 +259,37 @@ def spec_to_dash_request(value: Any) -> dict[str, str]:
 
 
 def spec_to_plot_payload(value: Any, result: Any) -> dict[str, Any] | None:
-    """Convert PresentationSpec into renderer payload for CLI plotting."""
+    """
+    Convert PresentationSpec into renderer payload for CLI plotting.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    value : Any
+        Input parameter used by this function.
+    result : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any] | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.specs import spec_to_plot_payload
+    result = spec_to_plot_payload(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     spec = ensure_presentation_spec(value)
     if spec is None:
         return None

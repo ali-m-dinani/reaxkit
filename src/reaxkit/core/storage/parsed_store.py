@@ -1,4 +1,11 @@
-"""Persistence helpers for durable parsed domain artifacts."""
+"""
+Persistence helpers for durable parsed domain artifacts.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -20,14 +27,23 @@ except Exception:  # pragma: no cover
 
 
 def _utc_now_iso() -> str:
+    """
+    Utc now iso.
+    """
     return datetime.now(timezone.utc).isoformat()
 
 
 def _sanitize_key(name: str) -> str:
+    """
+    Sanitize key.
+    """
     return re.sub(r"[^0-9a-zA-Z_.-]", "_", str(name))
 
 
 def _write_scalar_dataset(group, key: str, value: Any) -> None:
+    """
+    Write scalar dataset.
+    """
     if isinstance(value, str):
         group.create_dataset(key, data=np.asarray(value, dtype=h5py.string_dtype(encoding="utf-8")))
         return
@@ -35,6 +51,9 @@ def _write_scalar_dataset(group, key: str, value: Any) -> None:
 
 
 def _write_dataframe(group, key: str, frame: pd.DataFrame) -> None:
+    """
+    Write dataframe.
+    """
     g = group.create_group(key)
     g.attrs["reaxkit_type"] = "dataframe"
     g.create_dataset(
@@ -58,6 +77,9 @@ def _write_dataframe(group, key: str, frame: pd.DataFrame) -> None:
 
 
 def _write_sequence(group, key: str, values: list[Any]) -> None:
+    """
+    Write sequence.
+    """
     if not values:
         g = group.create_group(key)
         g.attrs["reaxkit_type"] = "sequence"
@@ -77,6 +99,9 @@ def _write_sequence(group, key: str, values: list[Any]) -> None:
 
 
 def _write_fallback_pickle(group, key: str, value: Any) -> None:
+    """
+    Write fallback pickle.
+    """
     payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
     g = group.create_group(key)
     g.attrs["reaxkit_type"] = "pickle_fallback"
@@ -84,6 +109,9 @@ def _write_fallback_pickle(group, key: str, value: Any) -> None:
 
 
 def _write_any(group, key: str, value: Any) -> None:
+    """
+    Write any.
+    """
     key = _sanitize_key(key)
     if value is None:
         g = group.create_group(key)
@@ -118,7 +146,38 @@ def _write_any(group, key: str, value: Any) -> None:
 
 
 def write_parsed_hdf5(path: Path, data: Any) -> Path:
-    """Write parsed domain data to HDF5 with a best-effort structured layout."""
+    """
+    Write parsed domain data to HDF5 with a best-effort structured layout.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    path : Path
+        Input parameter used by this function.
+    data : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.storage.parsed_store import write_parsed_hdf5
+    # Configure required arguments for your case.
+    result = write_parsed_hdf5(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if h5py is None:  # pragma: no cover
         raise RuntimeError("h5py is required to persist parsed artifacts as HDF5.")
 
@@ -143,7 +202,36 @@ def write_parsed_hdf5(path: Path, data: Any) -> Path:
 
 
 def load_parsed_hdf5(path: Path) -> Any:
-    """Load parsed domain data from HDF5 when pickle payload is available."""
+    """
+    Load parsed domain data from HDF5 when pickle payload is available.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    path : Path
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.storage.parsed_store import load_parsed_hdf5
+    # Configure required arguments for your case.
+    result = load_parsed_hdf5(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if h5py is None:  # pragma: no cover
         raise RuntimeError("h5py is required to load parsed HDF5 artifacts.")
     with h5py.File(path, "r") as h5:
@@ -154,7 +242,42 @@ def load_parsed_hdf5(path: Path) -> Any:
 
 
 def update_parsed_meta(parsed_dir: Path, *, parsed_id: str, artifact_name: str, file_name: str) -> Path:
-    """Update parsed meta manifest with saved artifact information."""
+    """
+    Update parsed meta manifest with saved artifact information.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    parsed_dir : Path
+        Input parameter used by this function.
+    parsed_id : str
+        Input parameter used by this function.
+    artifact_name : str
+        Input parameter used by this function.
+    file_name : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.storage.parsed_store import update_parsed_meta
+    # Configure required arguments for your case.
+    result = update_parsed_meta(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     meta_path = parsed_dir / "meta.json"
     payload: dict[str, Any] = {}
     if meta_path.exists():

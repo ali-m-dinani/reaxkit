@@ -21,10 +21,16 @@ import pandas as pd
 
 
 def _has_columns(df: pd.DataFrame, cols: list[str]) -> bool:
+    """
+    Has columns.
+    """
     return all(c in df.columns for c in cols)
 
 
 def _plot_dpyr_map(df: pd.DataFrame, outpath: Path) -> None:
+    """
+    Plot dpyr map.
+    """
     fig, ax = plt.subplots(figsize=(8, 6))
     regular = df[~df["is_undercoord"]]
     under = df[df["is_undercoord"]]
@@ -61,6 +67,9 @@ def _plot_dpyr_map(df: pd.DataFrame, outpath: Path) -> None:
 
 
 def _plot_label_map(df: pd.DataFrame, outpath: Path) -> None:
+    """
+    Plot label map.
+    """
     color_map = {
         "basal": "#4a4a8a",
         "edge_zigzag": "#e06c00",
@@ -84,6 +93,9 @@ def _plot_label_map(df: pd.DataFrame, outpath: Path) -> None:
 
 
 def _plot_grain_map(df: pd.DataFrame, outpath: Path) -> None:
+    """
+    Plot grain map.
+    """
     fig, ax = plt.subplots(figsize=(8, 6))
     grain_ids = df["grain_id"].to_numpy(dtype=int)
     unique_grains = sorted(set(grain_ids.tolist()))
@@ -103,6 +115,9 @@ def _plot_grain_map(df: pd.DataFrame, outpath: Path) -> None:
 
 
 def _plot_dpyr_hist(df: pd.DataFrame, outpath: Path) -> None:
+    """
+    Plot dpyr hist.
+    """
     fig, ax = plt.subplots(figsize=(7, 4))
     for lbl, color in [
         ("basal", "#4a4a8a"),

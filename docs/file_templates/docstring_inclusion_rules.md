@@ -82,3 +82,27 @@ Field entries under [Fields] should include:
 - type/container shape
 - semantic meaning (and units when relevant)
 - interpretation notes (for derived/normalized values)
+
+## Dataclass Docstring (General Domain/Composite Models)
+
+Use this section for non-analyzer dataclasses such as canonical domain models,
+composite bundles, and shared typed containers.
+
+Include these elements:
+
+1. One-line summary
+2. Short paragraph describing purpose/scope and intended usage boundary
+3. [Fields] make sure you put a line ----- under the section heading
+4. Optional [Notes] make sure you put a line ----- under the section heading
+5. Optional [Examples] make sure you put a line ----- under the section heading
+6. Optional [References] make sure you put a blank line under the section heading.
+
+Field entries under [Fields] should include:
+
+- field name
+- expected type/container shape
+- semantic meaning (and units when relevant)
+- default behavior if optional
+
+Engine-specific source references in these docstrings should use conditional
+wording. Example: if you use ReaxFF engine, then the file would be ``fort.99``.

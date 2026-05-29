@@ -1,8 +1,14 @@
 """
-Path utilities and storage maintenance commands for ReaxKit.
+Path resolution helpers for ReaxKit CLI outputs.
 
-This module provides:
-- `resolve_output_path(...)` for analysis exports
+This module defines utility logic that maps user-provided output paths to either
+explicit filesystem targets or scoped analysis storage locations under the
+configured project root.
+
+**Usage context**
+
+- Use these helpers in CLI handlers that accept user export filenames or paths.
+- Use scoped storage resolution when a bare filename should be placed under analysis storage.
 """
 
 from __future__ import annotations
@@ -22,10 +28,40 @@ def resolve_output_path(
     """
     Resolve the output path for a workflow result.
 
-    If the user provides only a bare filename, the file is written under
-    ``<project_root>/analysis/<workflow>/<analysis_id_or_run_id>/``.
-    If the user provides an absolute path
-    or a path containing directories, that path is used directly.
+    If the user provides a bare filename, the target is scoped under
+    ``<project_root>/analysis/<workflow>/<analysis_id_or_run_id>/``. If the user
+    provides an absolute path or a relative path that already contains
+    directories, that location is used directly and parent directories are
+    created as needed.
+
+    Parameters
+    -----
+    user_value : str
+        Output path value provided by the caller.
+    workflow : str
+        Workflow name used for scoped storage placement.
+    run_id : str | None, optional
+        Run identifier used when ``analysis_id`` is not provided.
+    project_root : str | Path, optional
+        Project root used for ReaxKit storage layout resolution.
+    analysis_id : str | None, optional
+        Analysis identifier that overrides ``run_id`` for scoped storage.
+
+    Returns
+    -----
+    Path
+        Resolved writable output path.
+
+    Examples
+    -----
+    ```python
+    resolve_output_path("result.csv", "bonds", run_id="run-001", project_root="C:/rk")
+    ```
+    Sample output:
+    ```text
+    C:/rk/analysis/bonds/run-001/result.csv
+    ```
+    A bare filename is scoped into the workflow analysis directory.
     """
     p = Path(user_value)
 

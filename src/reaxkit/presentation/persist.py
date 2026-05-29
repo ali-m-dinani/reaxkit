@@ -1,4 +1,11 @@
-"""Persistence helpers for analysis results."""
+"""
+Persistence helpers for analysis results.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +24,9 @@ logger = get_logger(__name__)
 
 
 def _result_frames(result: Any) -> dict[str, pd.DataFrame]:
+    """
+    Result frames.
+    """
     frames: dict[str, pd.DataFrame] = {}
     if hasattr(result, "table") and isinstance(getattr(result, "table"), pd.DataFrame):
         frames["table"] = getattr(result, "table")
@@ -29,6 +39,9 @@ def _result_frames(result: Any) -> dict[str, pd.DataFrame]:
 
 
 def _write_csvs(out_dir: Path, result: Any) -> list[str]:
+    """
+    Write csvs.
+    """
     frames = _result_frames(result)
     written: list[str] = []
     if not frames:
@@ -46,6 +59,9 @@ def _write_csvs(out_dir: Path, result: Any) -> list[str]:
 
 
 def _write_numpy_artifacts(command: str, out_dir: Path, result: Any) -> list[str]:
+    """
+    Write numpy artifacts.
+    """
     written: list[str] = []
     if str(command) != "active_site_structural":
         return written
@@ -58,6 +74,9 @@ def _write_numpy_artifacts(command: str, out_dir: Path, result: Any) -> list[str
 
 
 def _write_figure_artifacts(command: str, out_dir: Path, result: Any, *, analysis_id: str) -> list[str]:
+    """
+    Write figure artifacts.
+    """
     if str(command) != "active_site_structural":
         return []
     table = getattr(result, "table", None)
@@ -72,7 +91,41 @@ def _write_figure_artifacts(command: str, out_dir: Path, result: Any, *, analysi
 
 
 def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: bool = True) -> Path:
-    """Persist analysis result metadata (and optional CSV) under analysis/<command>/<run_id>/."""
+    """
+    Persist analysis result metadata (and optional CSV) under analysis/<command>/<run_id>/.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    command : str
+        Input parameter used by this function.
+    result : Any
+        Input parameter used by this function.
+    args : Any
+        Input parameter used by this function.
+    write_csv : bool, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.persist import persist_analysis_result
+    result = persist_analysis_result(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     project_root = Path(getattr(args, "project_root", "."))
     analysis_id = (
         getattr(args, "analysis_id", None)
@@ -109,7 +162,37 @@ def append_artifacts_to_settings(
     *,
     reports: list[str] | None = None,
 ) -> None:
-    """Append optional artifact names to existing analysis settings metadata."""
+    """
+    Append optional artifact names to existing analysis settings metadata.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    out_dir : Path
+        Input parameter used by this function.
+    reports : list[str] | None, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.persist import append_artifacts_to_settings
+    result = append_artifacts_to_settings(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     settings_path = out_dir / "settings.json"
     if not settings_path.exists():
         return

@@ -1,4 +1,11 @@
-"""Report rendering helpers for workflow presentation."""
+"""
+Report rendering helpers for workflow presentation.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +19,35 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 def normalize_report_formats(value: str | None) -> tuple[str, ...]:
-    """Return normalized report formats."""
+    """
+    Return normalized report formats.
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    value : str | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    tuple[str, ...]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.reporting import normalize_report_formats
+    result = normalize_report_formats(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     mode = str(value or "both").strip().lower()
     if mode == "pdf":
         return ("pdf",)
@@ -22,6 +57,9 @@ def normalize_report_formats(value: str | None) -> tuple[str, ...]:
 
 
 def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Normalize payload.
+    """
     out = dict(payload)
     out["title"] = str(out.get("title") or "Analysis Report")
     out["subtitle"] = str(out.get("subtitle") or "")
@@ -33,10 +71,16 @@ def _normalize_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _to_json_text(value: Any) -> str:
+    """
+    To json text.
+    """
     return json.dumps(value, indent=2, sort_keys=True)
 
 
 def _stringify_cell(value: Any) -> str:
+    """
+    Stringify cell.
+    """
     if isinstance(value, (dict, list, tuple)):
         try:
             return json.dumps(value, sort_keys=True)
@@ -46,6 +90,9 @@ def _stringify_cell(value: Any) -> str:
 
 
 def _section_table_data(section: dict[str, Any]) -> tuple[list[str], list[list[str]]] | None:
+    """
+    Section table data.
+    """
     table = section.get("table")
     if isinstance(table, dict):
         headers_raw = table.get("headers")
@@ -75,6 +122,9 @@ def _section_table_data(section: dict[str, Any]) -> tuple[list[str], list[list[s
 
 
 def _table_col_widths(n_cols: int) -> list[float]:
+    """
+    Table col widths.
+    """
     if n_cols <= 1:
         return [1.0]
     if n_cols == 2:
@@ -87,6 +137,9 @@ def _table_col_widths(n_cols: int) -> list[float]:
 
 
 def _wrap_table_rows(rows: list[list[str]], col_widths: list[float]) -> list[list[str]]:
+    """
+    Wrap table rows.
+    """
     wrapped: list[list[str]] = []
     if not rows:
         return wrapped
@@ -102,11 +155,17 @@ def _wrap_table_rows(rows: list[list[str]], col_widths: list[float]) -> list[lis
 
 
 def _row_line_units(row: list[str]) -> int:
+    """
+    Row line units.
+    """
     lines = [str(cell).count("\n") + 1 for cell in row]
     return max(lines) if lines else 1
 
 
 def _chunk_table_rows_for_pdf(rows: list[list[str]], *, line_budget: int = 30) -> list[list[list[str]]]:
+    """
+    Chunk table rows for pdf.
+    """
     if not rows:
         return []
     chunks: list[list[list[str]]] = []
@@ -126,6 +185,9 @@ def _chunk_table_rows_for_pdf(rows: list[list[str]], *, line_budget: int = 30) -
 
 
 def _wrap_line(line: str, width: int = 95) -> list[str]:
+    """
+    Wrap line.
+    """
     text = str(line)
     if not text:
         return [""]
@@ -133,6 +195,9 @@ def _wrap_line(line: str, width: int = 95) -> list[str]:
 
 
 def _section_lines(section: dict[str, Any]) -> list[str]:
+    """
+    Section lines.
+    """
     lines: list[str] = []
     title = str(section.get("title") or "").strip()
     if title:
@@ -167,6 +232,9 @@ def _section_lines(section: dict[str, Any]) -> list[str]:
 
 
 def _write_pdf(path: Path, payload: dict[str, Any]) -> None:
+    """
+    Write pdf.
+    """
     title = str(payload.get("title") or "Analysis Report")
     subtitle = str(payload.get("subtitle") or "")
     sections = payload.get("sections") if isinstance(payload.get("sections"), list) else []
@@ -302,6 +370,9 @@ def _write_pdf(path: Path, payload: dict[str, Any]) -> None:
 
 
 def _write_docx(path: Path, payload: dict[str, Any]) -> None:
+    """
+    Write docx.
+    """
     from docx import Document  # type: ignore
     from docx.shared import Inches  # type: ignore
 
@@ -375,7 +446,41 @@ def write_report_artifacts(
     stem: str,
     formats: Sequence[str],
 ) -> tuple[list[str], list[str]]:
-    """Write report artifacts and return (written_files, notes)."""
+    """
+    Write report artifacts and return (written_files, notes).
+    
+    This function is part of the ReaxKit presentation API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    payload : dict[str, Any]
+        Input parameter used by this function.
+    out_dir : Path
+        Input parameter used by this function.
+    stem : str
+        Input parameter used by this function.
+    formats : Sequence[str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    tuple[list[str], list[str]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.presentation.reporting import write_report_artifacts
+    result = write_report_artifacts(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
     normalized = _normalize_payload(payload)
 

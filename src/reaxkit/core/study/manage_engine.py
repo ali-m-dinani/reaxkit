@@ -1,4 +1,11 @@
-"""Management helpers for study relocation and cleanup."""
+"""
+Management helpers for study relocation and cleanup.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +18,35 @@ from reaxkit.core.study.naming import canonical_token, case_label_from_params_co
 
 
 def looks_like_abs_path(text: str) -> bool:
+    """
+    Looks like abs path.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    text : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    bool
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import looks_like_abs_path
+    # Configure required arguments for your case.
+    result = looks_like_abs_path(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     s = str(text).strip()
     if not s:
         return False
@@ -22,6 +58,39 @@ def looks_like_abs_path(text: str) -> bool:
 
 
 def replace_path_prefix(value: str, old_prefix: str | None, new_prefix: str | None) -> str:
+    """
+    Replace path prefix.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    value : str
+        Input parameter used by this function.
+    old_prefix : str | None
+        Input parameter used by this function.
+    new_prefix : str | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    str
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import replace_path_prefix
+    # Configure required arguments for your case.
+    result = replace_path_prefix(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if not old_prefix or new_prefix is None:
         return value
     if value == old_prefix:
@@ -33,6 +102,39 @@ def replace_path_prefix(value: str, old_prefix: str | None, new_prefix: str | No
 
 
 def remap_study_internal_path(value: str, *, new_study_root: str | None, study_name: str | None) -> str:
+    """
+    Remap study internal path.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    value : str
+        Input parameter used by this function.
+    new_study_root : str | None
+        Input parameter used by this function.
+    study_name : str | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    str
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import remap_study_internal_path
+    # Configure required arguments for your case.
+    result = remap_study_internal_path(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if new_study_root is None or not study_name:
         return value
     if not looks_like_abs_path(value):
@@ -65,6 +167,49 @@ def rewrite_json_paths(
     new_template_dir: str | None,
     study_name: str | None,
 ) -> Any:
+    """
+    Rewrite json paths.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    obj : Any
+        Input parameter used by this function.
+    old_source_yaml : str | None
+        Input parameter used by this function.
+    new_source_yaml : str | None
+        Input parameter used by this function.
+    old_study_root : str | None
+        Input parameter used by this function.
+    new_study_root : str | None
+        Input parameter used by this function.
+    old_template_dir : str | None
+        Input parameter used by this function.
+    new_template_dir : str | None
+        Input parameter used by this function.
+    study_name : str | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import rewrite_json_paths
+    # Configure required arguments for your case.
+    result = rewrite_json_paths(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if isinstance(obj, dict):
         out: dict[str, Any] = {}
         for k, v in obj.items():
@@ -115,6 +260,37 @@ def rewrite_json_paths(
 
 
 def rewrite_paths_by_map(obj: Any, path_map: dict[str, str]) -> Any:
+    """
+    Rewrite paths by map.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    obj : Any
+        Input parameter used by this function.
+    path_map : dict[str, str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import rewrite_paths_by_map
+    # Configure required arguments for your case.
+    result = rewrite_paths_by_map(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if isinstance(obj, dict):
         return {k: rewrite_paths_by_map(v, path_map) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -134,6 +310,41 @@ def json_path_matches_filters(
     replicate_filter: str | None,
     replicate_variants_fn: Callable[[str | None], set[str]],
 ) -> bool:
+    """
+    Json path matches filters.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    path : Path
+        Input parameter used by this function.
+    case_filter : str | None
+        Input parameter used by this function.
+    replicate_filter : str | None
+        Input parameter used by this function.
+    replicate_variants_fn : Callable[[str | None], set[str]]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    bool
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import json_path_matches_filters
+    # Configure required arguments for your case.
+    result = json_path_matches_filters(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if not case_filter and not replicate_filter:
         return True
     text = str(path).replace("\\", "/")
@@ -156,6 +367,45 @@ def update_study_directory_paths(
     prompt_with_default_fn: Callable[[str, str | None], str | None],
     replicate_variants_fn: Callable[[str | None], set[str]],
 ) -> dict[str, Any]:
+    """
+    Update study directory paths.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    case_filter : str | None, optional
+        Input parameter used by this function.
+    replicate_filter : str | None, optional
+        Input parameter used by this function.
+    dry_run : bool, optional
+        Input parameter used by this function.
+    prompt_with_default_fn : Callable[[str, str | None], str | None]
+        Input parameter used by this function.
+    replicate_variants_fn : Callable[[str | None], set[str]]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import update_study_directory_paths
+    # Configure required arguments for your case.
+    result = update_study_directory_paths(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     manifest_path = study_root / "study_manifest.json"
     manifest = read_json(manifest_path)
     study_name = str(manifest.get("study_name") or "").strip() or study_root.name
@@ -221,6 +471,41 @@ def rename_case_directories(
     dry_run: bool = False,
     case_matches_selector_fn: Callable[[dict[str, Any], str | None], bool],
 ) -> dict[str, Any]:
+    """
+    Rename case directories.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    case_filter : str | None, optional
+        Input parameter used by this function.
+    dry_run : bool, optional
+        Input parameter used by this function.
+    case_matches_selector_fn : Callable[[dict[str, Any], str | None], bool]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.manage_engine import rename_case_directories
+    # Configure required arguments for your case.
+    result = rename_case_directories(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     manifest_path = study_root / "study_manifest.json"
     manifest = read_json(manifest_path)
     cases = manifest.get("cases") or []

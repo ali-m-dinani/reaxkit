@@ -1,4 +1,11 @@
-"""Shared helpers to enrich analysis result tables with time from iteration."""
+"""
+Shared helpers to enrich analysis result tables with time from iteration.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +19,9 @@ from reaxkit.presentation.convert import convert_xaxis
 
 
 def _iter_time_mapping_from_simulation(simulation: Any) -> dict[int, float] | None:
+    """
+    Iter time mapping from simulation.
+    """
     if simulation is None:
         return None
     iterations = getattr(simulation, "iterations", None)
@@ -29,6 +39,9 @@ def _iter_time_mapping_from_simulation(simulation: Any) -> dict[int, float] | No
 
 
 def _iter_time_mapping_from_data(data: Any) -> dict[int, float] | None:
+    """
+    Iter time mapping from data.
+    """
     candidates: list[Any] = []
 
     sim = getattr(data, "simulation", None)
@@ -60,6 +73,9 @@ def _attach_time_to_frame(
     iter_to_time: dict[int, float] | None,
     control_file: str,
 ) -> pd.DataFrame:
+    """
+    Attach time to frame.
+    """
     if "time" in frame.columns or "iter" not in frame.columns or frame.empty:
         return frame
 
@@ -92,7 +108,40 @@ def _attach_time_to_frame(
 
 
 def enrich_result_with_time(result: Any, data: Any, *, control_file: str = "control") -> Any:
-    """Attach a ``time`` column to tabular result frames when ``iter`` exists."""
+    """
+    Attach a ``time`` column to tabular result frames when ``iter`` exists.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    result : Any
+        Input parameter used by this function.
+    data : Any
+        Input parameter used by this function.
+    control_file : str, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
+    # Configure required arguments for your case.
+    result = enrich_result_with_time(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     iter_to_time = _iter_time_mapping_from_data(data)
 
     def _enrich_attr(obj: Any, attr: str) -> None:

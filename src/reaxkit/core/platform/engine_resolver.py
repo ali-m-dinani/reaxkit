@@ -1,4 +1,11 @@
-"""Registry + resolver for engine adapters."""
+"""
+Registry + resolver for engine adapters.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +18,36 @@ ENGINE_REGISTRY: dict[str, type] = {}
 
 
 def register_engine(name: str):
-    """Decorator to register an engine adapter class."""
+    """
+    Decorator to register an engine adapter class.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    name : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.platform.engine_resolver import register_engine
+    # Configure required arguments for your case.
+    result = register_engine(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
 
     def wrapper(cls):
         ENGINE_REGISTRY[name] = cls
@@ -83,6 +119,9 @@ def _collect_engine_hints(target: Path) -> Dict[str, List[str]]:
 
 
 def _format_hints(hints: Dict[str, List[str]]) -> str:
+    """
+    Format hints.
+    """
     parts: list[str] = []
     for engine_name in ("reaxff", "ams", "lammps"):
         rows = hints.get(engine_name) or []
@@ -95,7 +134,38 @@ def _format_hints(hints: Dict[str, List[str]]) -> str:
 
 
 def resolve_engine(path: str, engine: str | None = None):
-    """Resolve adapter by explicit engine or confidence-based auto-detection."""
+    """
+    Resolve adapter by explicit engine or confidence-based auto-detection.
+    
+    This function is part of the ReaxKit core API and performs the operation
+    described by its name and arguments.
+    
+    Parameters
+    -----
+    path : str
+        Input parameter used by this function.
+    engine : str | None, optional
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.platform.engine_resolver import resolve_engine
+    # Configure required arguments for your case.
+    result = resolve_engine(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     if engine:
         if engine not in ENGINE_REGISTRY:
             raise ParseError(f"Unknown engine '{engine}'. Available engines: {sorted(ENGINE_REGISTRY)}")

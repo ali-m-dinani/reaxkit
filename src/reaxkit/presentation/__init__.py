@@ -1,4 +1,11 @@
-"""Presentation utilities for plotting, media, and user-facing units."""
+"""
+Presentation utilities for plotting, media, and user-facing units.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from reaxkit.presentation.specs import PresentationSpec
 
@@ -6,6 +13,9 @@ __all__ = ["plot", "present_result", "PresentationSpec"]
 
 
 def __getattr__(name: str):
+    """
+    Getattr.
+    """
     if name == "plot":
         from reaxkit.presentation.plot import plot
 

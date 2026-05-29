@@ -1,4 +1,11 @@
-"""Run orchestration for studies."""
+"""
+Run orchestration for studies.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +34,67 @@ def run_study(
     run_single_replicate_pipeline_fn: Callable[..., dict[str, Any]],
     write_study_run_status_fn: Callable[..., tuple[Path, Path]],
 ) -> dict[str, int]:
+    """
+    Run study.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    stage_filter : str | None
+        Input parameter used by this function.
+    case_filter : str | None
+        Input parameter used by this function.
+    replicate_filter : str | None
+        Input parameter used by this function.
+    artifact_transfer : str
+        Input parameter used by this function.
+    run_geometry_generator : bool
+        Input parameter used by this function.
+    strict_actions : bool
+        Input parameter used by this function.
+    parallel_workers : int
+        Input parameter used by this function.
+    rerun_failed : bool
+        Input parameter used by this function.
+    read_json_fn : Callable[[Path], dict[str, Any]]
+        Input parameter used by this function.
+    load_study_run_status_rows_fn : Callable[[Path], list[dict[str, str]]]
+        Input parameter used by this function.
+    to_int_fn : Callable[[Any], int]
+        Input parameter used by this function.
+    case_matches_selector_fn : Callable[[dict[str, Any], str | None], bool]
+        Input parameter used by this function.
+    replicate_matches_selector_fn : Callable[[str, str | None], bool]
+        Input parameter used by this function.
+    run_case_manifest_path_fn : Callable[[Path], Path]
+        Input parameter used by this function.
+    run_single_replicate_pipeline_fn : Callable[..., dict[str, Any]]
+        Input parameter used by this function.
+    write_study_run_status_fn : Callable[..., tuple[Path, Path]]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, int]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.run_engine import run_study
+    # Configure required arguments for your case.
+    result = run_study(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     manifest = read_json_fn(study_root / "study_manifest.json")
     case_entries = manifest.get("cases") or []
     if not isinstance(case_entries, list):

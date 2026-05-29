@@ -1,4 +1,11 @@
-"""Aggregation orchestration for studies."""
+"""
+Aggregation orchestration for studies.
+
+**Usage context**
+
+- Import these helpers from ReaxKit core modules when implementing CLI and workflow logic.
+- Reuse the public APIs here to keep behavior consistent across commands and engines.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +17,35 @@ from typing import Any, Callable
 
 
 def safe_float(value: Any) -> float | None:
+    """
+    Safe float.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    value : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    float | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import safe_float
+    # Configure required arguments for your case.
+    result = safe_float(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     try:
         fv = float(value)
     except Exception:
@@ -20,6 +56,37 @@ def safe_float(value: Any) -> float | None:
 
 
 def stat_value(row: dict[str, Any], key: str) -> Any:
+    """
+    Stat value.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    row : dict[str, Any]
+        Input parameter used by this function.
+    key : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import stat_value
+    # Configure required arguments for your case.
+    result = stat_value(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     prefixed = f"y_{key}"
     if prefixed in row:
         return row.get(prefixed)
@@ -27,6 +94,35 @@ def stat_value(row: dict[str, Any], key: str) -> Any:
 
 
 def load_csv_rows(path: Path) -> list[dict[str, str]]:
+    """
+    Load csv rows.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    path : Path
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[dict[str, str]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import load_csv_rows
+    # Configure required arguments for your case.
+    result = load_csv_rows(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     with path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
         return [dict(row) for row in reader]
@@ -37,6 +133,37 @@ def extract_scalar_from_csv(
     *,
     value_column: str | None,
 ) -> tuple[float | None, str | None]:
+    """
+    Extract scalar from csv.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    csv_path : Path
+        Input parameter used by this function.
+    value_column : str | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    tuple[float | None, str | None]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import extract_scalar_from_csv
+    # Configure required arguments for your case.
+    result = extract_scalar_from_csv(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     rows = load_csv_rows(csv_path)
     if not rows:
         return None, None
@@ -83,6 +210,37 @@ def extract_scalar_from_csv(
 
 
 def load_column_values(csv_path: Path, column: str) -> list[Any]:
+    """
+    Load column values.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    csv_path : Path
+        Input parameter used by this function.
+    column : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import load_column_values
+    # Configure required arguments for your case.
+    result = load_column_values(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     rows = load_csv_rows(csv_path)
     if not rows:
         return []
@@ -92,6 +250,37 @@ def load_column_values(csv_path: Path, column: str) -> list[Any]:
 
 
 def resolve_variable_csv_path(*, stage_dir: Path, spec: dict[str, str]) -> Path | None:
+    """
+    Resolve variable csv path.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    stage_dir : Path
+        Input parameter used by this function.
+    spec : dict[str, str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import resolve_variable_csv_path
+    # Configure required arguments for your case.
+    result = resolve_variable_csv_path(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     directory_value = str(spec.get("directory") or "").strip()
     folder_id_value = str(spec.get("folder_id") or "").strip()
     file_value = str(spec.get("file") or "").strip()
@@ -131,6 +320,39 @@ def resolve_variable_file_for_run(
     spec: dict[str, str],
     result_dirs: list[str] | None,
 ) -> Path | None:
+    """
+    Resolve variable file for run.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    stage_dir : Path
+        Input parameter used by this function.
+    spec : dict[str, str]
+        Input parameter used by this function.
+    result_dirs : list[str] | None
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Path | None
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import resolve_variable_file_for_run
+    # Configure required arguments for your case.
+    result = resolve_variable_file_for_run(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     file_value = str(spec.get("file") or "").strip()
     if not file_value:
         return None
@@ -147,6 +369,37 @@ def apply_reducer_to_series(
     pairs: list[tuple[Any, Any]],
     reducer: str,
 ) -> list[tuple[Any, float]]:
+    """
+    Apply reducer to series.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    pairs : list[tuple[Any, Any]]
+        Input parameter used by this function.
+    reducer : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[tuple[Any, float]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import apply_reducer_to_series
+    # Configure required arguments for your case.
+    result = apply_reducer_to_series(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     vals: list[tuple[Any, float]] = []
     for x, y in pairs:
         fy = safe_float(y)
@@ -194,6 +447,37 @@ def apply_reducer_to_series(
 
 
 def compute_stats(values: list[float], wanted: list[str]) -> dict[str, float]:
+    """
+    Compute stats.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    values : list[float]
+        Input parameter used by this function.
+    wanted : list[str]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, float]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import compute_stats
+    # Configure required arguments for your case.
+    result = compute_stats(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     out: dict[str, float] = {}
     n = len(values)
     if "n" in wanted:
@@ -216,6 +500,35 @@ def compute_stats(values: list[float], wanted: list[str]) -> dict[str, float]:
 
 
 def normalize_stage_variables(rendered_stage: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """
+    Normalize stage variables.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    rendered_stage : dict[str, Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, dict[str, str]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import normalize_stage_variables
+    # Configure required arguments for your case.
+    result = normalize_stage_variables(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     variables: dict[str, dict[str, str]] = {}
     raw = rendered_stage.get("variables")
     if not isinstance(raw, dict):
@@ -244,11 +557,69 @@ def normalize_stage_variables(rendered_stage: dict[str, Any]) -> dict[str, dict[
 
 
 def to_plot_value(v: Any):
+    """
+    To plot value.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    v : Any
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    Any
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import to_plot_value
+    # Configure required arguments for your case.
+    result = to_plot_value(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     fv = safe_float(v)
     return fv if fv is not None else str(v)
 
 
 def sort_values(values: list[Any]) -> list[Any]:
+    """
+    Sort values.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    values : list[Any]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import sort_values
+    # Configure required arguments for your case.
+    result = sort_values(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     def _key(v: Any):
         fv = safe_float(v)
         if fv is not None:
@@ -275,6 +646,61 @@ def aggregate_study_analysis(
     utc_now_fn: Callable[[], str],
     write_json_fn: Callable[[Path, dict[str, Any]], None],
 ) -> dict[str, Any]:
+    """
+    Aggregate study analysis.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    analysis_name : str
+        Input parameter used by this function.
+    value_column : str | None
+        Input parameter used by this function.
+    stage_filter : str | None
+        Input parameter used by this function.
+    read_json_fn : Callable[[Path], dict[str, Any]]
+        Input parameter used by this function.
+    load_source_study_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    aggregate_defs_from_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    analysis_defs_from_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    aggregate_from_definition_fn : Callable[..., dict[str, Any]]
+        Input parameter used by this function.
+    iter_replicate_variable_records_fn : Callable[..., tuple[list[dict[str, Any]], str | None]]
+        Input parameter used by this function.
+    to_plot_value_fn : Callable[[Any], Any]
+        Input parameter used by this function.
+    make_aggregate_plot_fn : Callable[..., tuple[bool, str]]
+        Input parameter used by this function.
+    utc_now_fn : Callable[[], str]
+        Input parameter used by this function.
+    write_json_fn : Callable[[Path, dict[str, Any]], None]
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    dict[str, Any]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import aggregate_study_analysis
+    # Configure required arguments for your case.
+    result = aggregate_study_analysis(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     study_manifest = read_json_fn(study_root / "study_manifest.json")
     try:
         study_doc = load_source_study_doc_fn(study_manifest)
@@ -410,6 +836,65 @@ def aggregate_study_all(
     aggregate_status_csv_file: str,
     aggregate_status_json_file: str,
 ) -> list[dict[str, Any]]:
+    """
+    Aggregate study all.
+    
+    This function is part of the ReaxKit core API and performs the operation described by its name and arguments.
+    
+    Parameters
+    -----
+    study_root : Path
+        Input parameter used by this function.
+    aggregate_title_filter : str | None
+        Input parameter used by this function.
+    stage_filter : str | None
+        Input parameter used by this function.
+    value_column : str | None
+        Input parameter used by this function.
+    legacy_analysis_name : str | None
+        Input parameter used by this function.
+    read_json_fn : Callable[[Path], dict[str, Any]]
+        Input parameter used by this function.
+    load_source_study_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    aggregate_defs_from_doc_fn : Callable[[dict[str, Any]], dict[str, Any]]
+        Input parameter used by this function.
+    aggregate_study_analysis_fn : Callable[..., dict[str, Any]]
+        Input parameter used by this function.
+    local_now_fn : Callable[[], str]
+        Input parameter used by this function.
+    utc_now_fn : Callable[[], str]
+        Input parameter used by this function.
+    duration_minutes_fn : Callable[[str | None, str | None], float | None]
+        Input parameter used by this function.
+    log_task_event_fn : Callable[..., None]
+        Input parameter used by this function.
+    write_named_status_fn : Callable[..., tuple[Path, Path]]
+        Input parameter used by this function.
+    aggregate_status_csv_file : str
+        Input parameter used by this function.
+    aggregate_status_json_file : str
+        Input parameter used by this function.
+    
+    Returns
+    -----
+    list[dict[str, Any]]
+        Value produced by this function call.
+    
+    Examples
+    -----
+    ```python
+    from reaxkit.core.study.aggregate_engine import aggregate_study_all
+    # Configure required arguments for your case.
+    result = aggregate_study_all(...)
+    print(type(result).__name__)
+    ```
+    Sample output:
+    ```text
+    str
+    ```
+    The output type reflects the return contract for this API call.
+    """
     study_manifest = read_json_fn(study_root / "study_manifest.json")
     aggregate_defs: dict[str, Any] = {}
     try:

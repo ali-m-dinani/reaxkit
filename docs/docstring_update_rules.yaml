@@ -6,6 +6,7 @@ scope:
     - "public function/method docstrings"
     - "private function/method docstrings"
     - "analyzer request/result dataclass docstrings"
+    - "general domain/composite dataclass docstrings"
     - "workflow CLI docs and related markdown docs"
   reference_rule_file: "docs/file_templates/docstring_inclusion_rules.md"
 
@@ -36,6 +37,7 @@ update_process:
       - "Locate public functions/methods."
       - "Locate private functions/methods."
       - "Locate Request/Result dataclasses."
+      - "Locate other dataclasses (domain/composite/shared models)."
   - step: "apply-template-rules"
     details:
       - "Follow docs/file_templates/docstring_inclusion_rules.md."
@@ -94,6 +96,15 @@ docstring_rules:
       - "Notes"
       - "Examples"
       - "References"
+  dataclass_general:
+    required:
+      - "one-line summary"
+      - "short paragraph"
+      - "Fields"
+    optional:
+      - "Notes"
+      - "Examples"
+      - "References"
 
 preservation_rules:
   links:
@@ -111,6 +122,7 @@ style_rules:
   - "Avoid redundant filler text."
   - "Use consistent tense and vocabulary across similar analyzers."
   - "Prefer concise, high-signal prose."
+  - "For engine-specific source files, use conditional engine wording (e.g., if ReaxFF is used, then the file would be fort.99)."
 
 editing_rules:
   - "Use minimal, targeted edits."
@@ -123,6 +135,7 @@ quality_checks:
     - "All required docstring sections are present."
     - "No important links/references removed."
     - "Request/Result dataclasses include complete Fields documentation."
+    - "General dataclasses include complete Fields documentation."
     - "Public task methods include Works on/Parameters/Returns/Examples."
     - "Private helpers have at least one-line docstrings."
     - "File compiles/lints after doc changes."

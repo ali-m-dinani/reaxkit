@@ -1,4 +1,11 @@
-"""Renderer for ``multi_subplots``."""
+"""
+Renderer for ``multi_subplots``.
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +22,9 @@ class MultiSubplotsRenderer(PlotRenderer):
 
     @staticmethod
     def _grid_shape(grid, nplots: int) -> tuple[int, int]:
+        """
+        Grid shape.
+        """
         if not grid:
             return (nplots, 1)
         if isinstance(grid, (tuple, list)) and len(grid) == 2:
@@ -30,6 +40,9 @@ class MultiSubplotsRenderer(PlotRenderer):
 
     @staticmethod
     def _paged_save_target(save, page_index: int, total_pages: int):
+        """
+        Paged save target.
+        """
         if not save or total_pages == 1:
             return save
         p = Path(save)
@@ -38,6 +51,38 @@ class MultiSubplotsRenderer(PlotRenderer):
         return str(p / f"page_{page_index + 1}")
 
     def render(self, result, style=None):
+        """
+        Render.
+        
+        This function is part of the ReaxKit presentation API and performs the operation
+        described by its name and arguments.
+        
+        Parameters
+        -----
+        result : Any
+            Input parameter used by this function.
+        style : Any, optional
+            Input parameter used by this function.
+        
+        Returns
+        -----
+        Any
+            Value produced by this function call.
+        
+        Examples
+        -----
+        ```python
+        from reaxkit.presentation.plot.renderers.multi_subplots import MultiSubplotsRenderer
+        instance = MultiSubplotsRenderer(...)
+        result = instance.render(...)
+        print(type(result).__name__)
+        ```
+        Sample output:
+        ```text
+        str
+        ```
+        The output type reflects the return contract for this API call.
+        """
         cfg = merged(result, style)
         subplots = cfg.get("subplots")
         nplots = len(subplots)

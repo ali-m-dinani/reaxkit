@@ -10,6 +10,11 @@ Typical use cases include:
 - plotting observables versus simulation time instead of iteration number
 - switching between iteration, frame, and time axes in workflows
 - automatically choosing appropriate time units (fs, ps, ns)
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
 """
 
 import numpy as np

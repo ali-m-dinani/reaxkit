@@ -10,6 +10,11 @@ Typical use cases include:
 - creating MP4 videos from sequentially saved plot images
 - visualizing time evolution of simulation frames
 - generating animations for presentations or reports
+
+**Usage context**
+
+- Import these helpers from presentation workflows that produce tables, files, or plots.
+- Reuse the public APIs here to keep output formatting and artifact behavior consistent.
 """
 
 

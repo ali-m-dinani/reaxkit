@@ -21,6 +21,9 @@ import pandas as pd
 
 
 def _as_int(value: Any, default: int = 0) -> int:
+    """
+    As int.
+    """
     try:
         return int(value)
     except Exception:
@@ -28,6 +31,9 @@ def _as_int(value: Any, default: int = 0) -> int:
 
 
 def _as_float(value: Any, default: float = 0.0) -> float:
+    """
+    As float.
+    """
     try:
         return float(value)
     except Exception:
@@ -35,12 +41,18 @@ def _as_float(value: Any, default: float = 0.0) -> float:
 
 
 def _label_counts(table: pd.DataFrame) -> dict[str, int]:
+    """
+    Label counts.
+    """
     if "label" not in table.columns or table.empty:
         return {}
     return {str(k): int(v) for k, v in table["label"].value_counts().to_dict().items()}
 
 
 def _defect_counts(table: pd.DataFrame) -> dict[str, int]:
+    """
+    Defect counts.
+    """
     if "defect_type" not in table.columns or table.empty:
         return {}
     counts = table["defect_type"].value_counts().to_dict()
@@ -54,6 +66,9 @@ def _defect_counts(table: pd.DataFrame) -> dict[str, int]:
 
 
 def _n_bonds_total(table: pd.DataFrame) -> int:
+    """
+    N bonds total.
+    """
     if "n_bonds" not in table.columns or table.empty:
         return 0
     series = pd.to_numeric(table["n_bonds"], errors="coerce").fillna(0.0)
@@ -61,6 +76,9 @@ def _n_bonds_total(table: pd.DataFrame) -> int:
 
 
 def _n_grains(table: pd.DataFrame) -> int:
+    """
+    N grains.
+    """
     if "grain_id" not in table.columns or table.empty:
         return 0
     series = pd.to_numeric(table["grain_id"], errors="coerce").dropna()
@@ -69,6 +87,9 @@ def _n_grains(table: pd.DataFrame) -> int:
 
 
 def _dpyr_stats(table: pd.DataFrame, *, tau_opt: float) -> dict[str, float]:
+    """
+    Dpyr stats.
+    """
     if table.empty or "d_pyr" not in table.columns:
         return {"mean_abs": 0.0, "median_abs": 0.0, "frac_above_tau": 0.0}
     if "is_undercoord" in table.columns:
@@ -87,6 +108,9 @@ def _dpyr_stats(table: pd.DataFrame, *, tau_opt: float) -> dict[str, float]:
 
 
 def _ring_summary_line(ring_histogram: dict[str, int]) -> str:
+    """
+    Ring summary line.
+    """
     total = int(sum(int(v) for v in ring_histogram.values()))
     if total <= 0:
         return "Ring histogram is unavailable for this run."
@@ -109,6 +133,9 @@ def _ring_summary_line(ring_histogram: dict[str, int]) -> str:
 
 
 def _structural_variable_description(var_name: str, *, tau_opt: float) -> str:
+    """
+    Structural variable description.
+    """
     base = {
         "source": "Input structure path used for this frame analysis.",
         "is_periodic": "Whether periodic boundary conditions were active for neighbor/ring analysis.",
@@ -135,6 +162,9 @@ def _structural_variable_description(var_name: str, *, tau_opt: float) -> str:
 
 
 def _summary_block_to_table_rows(summary_block: dict[str, Any], *, tau_opt: float) -> list[list[str]]:
+    """
+    Summary block to table rows.
+    """
     rows: list[list[str]] = []
 
     ordered_scalars = ("source", "is_periodic", "N_atoms", "N_undercoord", "N_bonds", "N_grains")
@@ -171,6 +201,9 @@ def _summary_block_to_table_rows(summary_block: dict[str, Any], *, tau_opt: floa
 
 
 def _grain_summary_line(n_grains: int, n_carbons: int) -> str:
+    """
+    Grain summary line.
+    """
     if n_grains <= 0:
         return "No crystalline grains were detected from psi6 clustering."
     high_cut = max(200, n_carbons // 5)
@@ -185,6 +218,9 @@ def _grain_summary_line(n_grains: int, n_carbons: int) -> str:
 
 
 def _figure_entries(analysis_dir: Path) -> list[dict[str, str]]:
+    """
+    Figure entries.
+    """
     suffixes = (
         ("_dpyr_map.png", "Spatial map of |d_pyr| with under-coordinated atoms highlighted."),
         ("_label_map.png", "Spatial map of site labels."),
@@ -365,6 +401,9 @@ def build_structural_report_payload(
 
 
 def _events_figure_entries(analysis_dir: Path) -> list[dict[str, str]]:
+    """
+    Events figure entries.
+    """
     entries: list[dict[str, str]] = []
     patterns = (
         ("*events*.png", "Event analysis figure."),
@@ -382,6 +421,9 @@ def _events_figure_entries(analysis_dir: Path) -> list[dict[str, str]]:
 
 
 def _top_event_atom_lines(table: pd.DataFrame, *, limit: int = 5) -> list[str]:
+    """
+    Top event atom lines.
+    """
     required = {"atom_id", "n_events_O", "n_events_Si"}
     if not required.issubset(table.columns):
         return []
@@ -404,6 +446,9 @@ def _top_event_atom_lines(table: pd.DataFrame, *, limit: int = 5) -> list[str]:
 
 
 def _events_variable_description(var_name: str) -> str:
+    """
+    Events variable description.
+    """
     mapping = {
         "source": "Input trajectory/source path used for event extraction.",
         "mode": "Event detection mode: bo (bond-order) or dist (distance cutoff).",
@@ -428,6 +473,9 @@ def _events_variable_description(var_name: str) -> str:
 
 
 def _events_summary_to_table_rows(summary_block: dict[str, Any]) -> list[list[str]]:
+    """
+    Events summary to table rows.
+    """
     rows: list[list[str]] = []
     order = (
         "source",
