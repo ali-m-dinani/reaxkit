@@ -15,7 +15,7 @@ import argparse
 from typing import Callable
 
 from reaxkit.analysis import params as _params_tasks  # noqa: F401
-from reaxkit.analysis.params.params import ForceFieldOptimizationParameterRequest
+from reaxkit.analysis.params.params import FFieldOptimizationParameterRequest
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
@@ -51,9 +51,9 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _build_params_request(args: argparse.Namespace) -> ForceFieldOptimizationParameterRequest:
+def _build_params_request(args: argparse.Namespace) -> FFieldOptimizationParameterRequest:
     """Build params request."""
-    return ForceFieldOptimizationParameterRequest(
+    return FFieldOptimizationParameterRequest(
         drop_duplicate=not args.keep_duplicates,
         interpret=args.interpret,
     )

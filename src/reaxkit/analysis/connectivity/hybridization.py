@@ -277,6 +277,8 @@ class HybridizationStatusTask(AnalysisTask):
     ) -> HybridizationStatusResult:
         """Classify per-atom hybridization status across selected frames.
 
+        For example, with `hybridizations={"sp": 1.0, "sp2": 2.0, "sp3": 3.0}` and `threshold=0.2`, a carbon atom with a sum of bond orders of 2.1 would be classified as `sp2` (matched), while one with a sum of 1.7 would be classified as `sp` (unmatched).
+
         Works on
         -----
         `ConnectivityData` plus `HybridizationStatusRequest` analyzer inputs

@@ -95,6 +95,26 @@ _No command-specific arguments found._
 
 _No command-specific arguments found._
 
+<a id="get_ffield_diagnostic_data_plot_tornado"></a>
+
+The figure below shows an example tornado plot for the sensitivity of force field optimization error to each parameter. Bars show 3 values: min, max, and mean of sensitivities per parameter.
+
+<div style="text-align:center;" markdown="1">
+![get_ffield_diagnostic_data_plot_tornado](../../../figures/get_ffield_diagnostic_data_plot_tornado.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample tornado plot for the sensitivity of force field optimization error to each parameter*
+</div>
+
+<a id="get_ffield_diagnostic_data_plot_beeswarm"></a>
+
+An example beeswarm plot for the sensitivity is as follows:
+
+<div style="text-align:center;" markdown="1">
+![get_ffield_diagnostic_data_plot_beeswarm](../../../figures/get_ffield_diagnostic_data_plot_beeswarm.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample beeswarm plot for the sensitivity of force field optimization error to each parameter*
+</div>
+
 </div>
 
 ## Command: `get_ffield_opt_results`
@@ -114,6 +134,16 @@ _No command-specific arguments found._
 ### Arguments
 
 _No command-specific arguments found._
+
+<a id="FFieldOptimizationReportEOSTask"></a>
+
+The figure below shows an example plot for the equation of state obtained using QM and ReaxFF optimized ffield data.
+
+<div style="text-align:center;" markdown="1">
+![FFieldOptimizationReportEOSTask](../../../figures/FFieldOptimizationReportEOSTask.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample plot for the equation of state obtained using QM and ReaxFF optimized ffield data.*
+</div>
 
 </div>
 

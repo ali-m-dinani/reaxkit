@@ -73,13 +73,10 @@ Analyzer task output for ``molecule_isomer_detection``.
 
 #### Examples
 
-```text
 ```python
 specs = MoleculeIsomerDetectionTask.recommended_presentations(_result, {})
 ```
 The returned list contains one table presentation spec.
-```
-
 
 </div>
 
@@ -112,7 +109,6 @@ Works on
 
 #### Examples
 
-```text
 ```python
 result = MoleculeIsomerDetectionTask().run(
     data,
@@ -120,8 +116,6 @@ result = MoleculeIsomerDetectionTask().run(
 )
 ```
 ``result.isomer_table`` contains grouped isomer classes for retained molecules.
-```
-
 
 </div>
 

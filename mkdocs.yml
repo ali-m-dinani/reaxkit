@@ -60,143 +60,205 @@ watch:
 
 nav:
 - Home: index.md
-- Installation: installation.md
-- Quickstart: quickstart.md
-- Tutorials: tutorials/index.md
-- Examples: examples/README.md
-- IO:
-  - 🔎 Overview: api/io/index.md
-  - Base: api/io/base_handler_doc.md
-  - Generators:
-    - 🔎 Overview: api/io/generators/index.md
-    - Control: api/io/generators/control_generator_doc.md
-    - Eregime: api/io/generators/eregime_generator_doc.md
-    - Geo: api/io/generators/geo_generator_doc.md
-    - Trainset: api/io/generators/trainset_generator_doc.md
-    - Tregime: api/io/generators/tregime_generator_doc.md
-    - Vregime: api/io/generators/vregime_generator_doc.md
-    - Xmolout: api/io/generators/xmolout_generator_doc.md
-  - Handlers:
-    - 🔎 Overview: api/io/handlers/index.md
-    - Control: api/io/handlers/control_handler_doc.md
-    - Eregime: api/io/handlers/eregime_handler_doc.md
-    - Ffield: api/io/handlers/ffield_handler_doc.md
-    - Fort13: api/io/handlers/fort13_handler_doc.md
-    - Fort57: api/io/handlers/fort57_handler_doc.md
-    - Fort73: api/io/handlers/fort73_handler_doc.md
-    - Fort74: api/io/handlers/fort74_handler_doc.md
-    - Fort76: api/io/handlers/fort76_handler_doc.md
-    - Fort78: api/io/handlers/fort78_handler_doc.md
-    - Fort79: api/io/handlers/fort79_handler_doc.md
-    - Fort7: api/io/handlers/fort7_handler_doc.md
-    - Fort99: api/io/handlers/fort99_handler_doc.md
-    - Geo: api/io/handlers/geo_handler_doc.md
-    - Molfra: api/io/handlers/molfra_handler_doc.md
-    - Params: api/io/handlers/params_handler_doc.md
-    - Summary: api/io/handlers/summary_handler_doc.md
-    - Trainset: api/io/handlers/trainset_handler_doc.md
-    - Vels: api/io/handlers/vels_handler_doc.md
-    - Xmolout: api/io/handlers/xmolout_handler_doc.md
-- Analysis:
-  - 🔎 Overview: api/analysis/index.md
-  - msd: api/analysis/trajectory/msd_analysis.md
-  - Composed:
-    - 🔎 Overview: api/analysis/composed/index.md
-    - Connectivity: api/analysis/composed/connectivity_analyzer_doc.md
-    - Coordination: api/analysis/composed/coordination_analyzer_doc.md
-    - Electrostatics: api/analysis/composed/electrostatics_analyzer_doc.md
-    - RDF: api/analysis/composed/RDF_analyzer_doc.md
-  - Per File:
-    - 🔎 Overview: api/analysis/per_file/index.md
-    - Control: api/analysis/per_file/control_analyzer_doc.md
-    - Eregime: api/analysis/per_file/eregime_analyzer_doc.md
-    - Ffield: api/analysis/per_file/ffield_analyzer_doc.md
-    - Fort13: api/analysis/per_file/fort13_analyzer_doc.md
-    - Fort57: api/analysis/per_file/fort57_analyzer_doc.md
-    - Fort73: api/analysis/per_file/fort73_analyzer_doc.md
-    - Fort74: api/analysis/per_file/fort74_analyzer_doc.md
-    - Fort76: api/analysis/per_file/fort76_analyzer_doc.md
-    - Fort78: api/analysis/per_file/fort78_analyzer_doc.md
-    - Fort79: api/analysis/per_file/fort79_analyzer_doc.md
-    - Fort7: api/analysis/per_file/fort7_analyzer_doc.md
-    - Fort99: api/analysis/per_file/fort99_analyzer_doc.md
-    - Molfra: api/analysis/per_file/molfra_analyzer_doc.md
-    - Params: api/analysis/per_file/params_analyzer_doc.md
-    - Summary: api/analysis/per_file/summary_analyzer_doc.md
-    - Trainset: api/analysis/per_file/trainset_analyzer_doc.md
-    - Vels: api/analysis/per_file/vels_analyzer_doc.md
-    - Xmolout: api/analysis/per_file/xmolout_analyzer_doc.md
-- Utils:
-  - 🔎 Overview: api/utils/index.md
-  - Equation Of States: api/utils/equation_of_states_doc.md
-  - autocorrelation: api/utils/numerical/autocorrelation_doc.md
-  - Alias: api/utils/alias_doc.md
-  - Cache: api/utils/cache_doc.md
-  - Constants: api/utils/constants_doc.md
-  - Exceptions: api/utils/exceptions_doc.md
-  - Frame Utils: api/utils/frame_utils_doc.md
-  - Log: api/utils/log_doc.md
-  - Path: api/utils/path_doc.md
-  - Units: api/utils/units_doc.md
-  - Media:
-    - 🔎 Overview: api/utils/media/index.md
-    - Convert: api/utils/media/convert_doc.md
-    - Make Video: api/utils/media/make_video_doc.md
-    - Plotter: api/utils/media/plotter_doc.md
-  - Numerical:
-    - 🔎 Overview: api/utils/numerical/index.md
-    - Extrema Finder: api/utils/numerical/extrema_finder_doc.md
-    - Moving Average: api/utils/numerical/moving_average_doc.md
-    - Numerical Calcs: api/utils/numerical/numerical_calcs_doc.md
-    - Signal Ops: api/utils/numerical/signal_ops_doc.md
-- Engine:
-    - alaki: api/engine/reaxff/io/eregime_handler_doc.md
-    - alaki2: api/engine/reaxff/adapter_doc.md
-    - alaki3: api/engine/reaxff/generators/addmol_generator_doc.md
-    - alaki4: api/engine/reaxff/adapter_parts/loaders_dynamics_doc.md
-    - alaki5: api/engine/lammps/dump_handler_doc.md
-- Workflows:
-  - 🔎 Overview: api/workflows/index.md
-  - trajectory: api/workflows/trajectory_workflow.md
-  - Composed:
-    - 🔎 Overview: api/workflows/composed/index.md
-    - Coordination: api/workflows/composed/coordination_doc.md
-    - Electrostatics: api/workflows/composed/electrostatics_doc.md
-    - Xmolout Fort7: api/workflows/composed/xmolout_fort7_doc.md
-  - Meta:
-    - 🔎 Overview: api/workflows/meta/index.md
-    - Help: api/workflows/meta/help_doc.md
-    - Introspection: api/workflows/meta/introspection_doc.md
-    - Make Video: api/workflows/meta/make_video_doc.md
-    - Plotter: api/workflows/meta/plotter_doc.md
-  - Per File:
-    - 🔎 Overview: api/workflows/per_file/index.md
-    - Control: api/workflows/per_file/control_doc.md
-    - Eregime: api/workflows/per_file/eregime_doc.md
-    - Ffield: api/workflows/per_file/ffield_doc.md
-    - Fort13: api/workflows/per_file/fort13_doc.md
-    - Fort57: api/workflows/per_file/fort57_doc.md
-    - Fort73: api/workflows/per_file/fort73_doc.md
-    - Fort74: api/workflows/per_file/fort74_doc.md
-    - Fort76: api/workflows/per_file/fort76_doc.md
-    - Fort78: api/workflows/per_file/fort78_doc.md
-    - Fort79: api/workflows/per_file/fort79_doc.md
-    - Fort7: api/workflows/per_file/fort7_doc.md
-    - Fort83: api/workflows/per_file/fort83_doc.md
-    - Fort99: api/workflows/per_file/fort99_doc.md
-    - Geo: api/workflows/per_file/geo_doc.md
-    - Molfra: api/workflows/per_file/molfra_doc.md
-    - Params: api/workflows/per_file/params_doc.md
-    - Summary: api/workflows/per_file/summary_doc.md
-    - Trainset: api/workflows/per_file/trainset_doc.md
-    - Tregime: api/workflows/per_file/tregime_doc.md
-    - Vels: api/workflows/per_file/vels_doc.md
-    - Vregime: api/workflows/per_file/vregime_doc.md
-    - Xmolout: api/workflows/per_file/xmolout_doc.md
+- Getting Started:
+  - 📍 Overview: getting_started.md
+  - Installation: installation.md
+  - Quickstart: quickstart.md
+  - Tutorials:
+    - 📍 Overview: tutorials/index.md
+    - 01 - Understanding Quickstart: tutorials/01_understanding_quickstart.md
+    - 02 - Atom Property And Video Workflows: tutorials/02_atom_property_and_video_workflows.md
+    - 03 - Eregime Generator: tutorials/03_eregime_generator.md
+    - 04 - Gen Plot Workflow: tutorials/04_gen_plot_workflow.md
+  - Examples: examples/README.md
+- API:
+  - 📍 Overview: api/index.md
+  - Analysis:
+    - 📍 Overview: api/analysis/index.md
+    - Active Sites:
+      - Events: api/analysis/active_sites/events_analysis.md
+      - Models: api/analysis/active_sites/models_analysis.md
+      - Structural: api/analysis/active_sites/structural_analysis.md
+    - Connectivity:
+      - Connectivity: api/analysis/connectivity/connectivity_analysis.md
+      - Coordination: api/analysis/connectivity/coordination_analysis.md
+      - Hybridization: api/analysis/connectivity/hybridization_analysis.md
+    - Control:
+      - Control: api/analysis/control/control_analysis.md
+    - Electrostatics:
+      - Charges: api/analysis/electrostatics/charges_analysis.md
+      - Electrostatics: api/analysis/electrostatics/electrostatics_analysis.md
+    - Force Field:
+      - Diagnostics: api/analysis/force_field/diagnostics_analysis.md
+      - Force Field: api/analysis/force_field/force_field_analysis.md
+      - MM Summary: api/analysis/force_field/MM_summary_analysis.md
+      - Optimization Progress: api/analysis/force_field/optimization_progress_analysis.md
+      - Report: api/analysis/force_field/report_analysis.md
+      - Trainset: api/analysis/force_field/trainset_analysis.md
+    - Kinematics:
+      - Kinematics: api/analysis/kinematics/kinematics_analysis.md
+    - Molecular Analysis:
+      - Isomer Detection: api/analysis/molecular_analysis/isomer_detection_analysis.md
+      - Molecular Analysis: api/analysis/molecular_analysis/molecular_analysis_analysis.md
+    - Params:
+      - Params: api/analysis/params/params_analysis.md
+    - Timeseries:
+      - Geometry Optimization: api/analysis/timeseries/geometry_optimization_analysis.md
+      - Timeseries: api/analysis/timeseries/timeseries_analysis.md
+    - Trajectory:
+      - Diffusivity: api/analysis/trajectory/diffusivity_analysis.md
+      - Dihedral: api/analysis/trajectory/dihedral_analysis.md
+      - MSD: api/analysis/trajectory/msd_analysis.md
+      - RDF: api/analysis/trajectory/rdf_analysis.md
+      - Relabel: api/analysis/trajectory/relabel_analysis.md
+      - Voronoi: api/analysis/trajectory/voronoi_analysis.md
+  - Engine:
+    - 📍 Overview: api/engine/index.md
+    - Base: api/engine/base_doc.md
+    - AMS:
+      - Adapter: api/engine/ams/adapter_doc.md
+      - Rkf Handler: api/engine/ams/rkf_handler_doc.md
+    - Common:
+      - Generators:
+        - Ffield Generator: api/engine/common/generators/ffield_generator_doc.md
+        - Structure Transformers: api/engine/common/generators/structure_transformers_doc.md
+        - Xyz Generator: api/engine/common/generators/xyz_generator_doc.md
+      - IO:
+        - Ffield Handler: api/engine/common/io/ffield_handler_doc.md
+        - Geo IO: api/engine/common/io/geo_io_doc.md
+    - LAMMPS:
+      - Adapter: api/engine/lammps/adapter_doc.md
+      - Dump Handler: api/engine/lammps/dump_handler_doc.md
+      - LAMMPS Log Handler: api/engine/lammps/lammps_log_handler_doc.md
+    - ReaxFF:
+      - Adapter: api/engine/reaxff/adapter_doc.md
+      - Adapter Parts:
+        - Loaders Dynamics: api/engine/reaxff/adapter_parts/loaders_dynamics_doc.md
+        - Loaders Forcefield: api/engine/reaxff/adapter_parts/loaders_forcefield_doc.md
+        - Loaders Properties: api/engine/reaxff/adapter_parts/loaders_properties_doc.md
+        - Normalizers: api/engine/reaxff/adapter_parts/normalizers_doc.md
+      - Generators:
+        - Addmol Generator: api/engine/reaxff/generators/addmol_generator_doc.md
+        - Charges Generator: api/engine/reaxff/generators/charges_generator_doc.md
+        - Control Generator: api/engine/reaxff/generators/control_generator_doc.md
+        - Eregime Generator: api/engine/reaxff/generators/eregime_generator_doc.md
+        - Fort7 Repair: api/engine/reaxff/generators/fort7_repair_doc.md
+        - Geo Generator: api/engine/reaxff/generators/geo_generator_doc.md
+        - Kopple2 Generator: api/engine/reaxff/generators/kopple2_generator_doc.md
+        - Trainset Elastic Energy: api/engine/reaxff/generators/trainset_elastic_energy_doc.md
+        - Trainset Elastic Geometry: api/engine/reaxff/generators/trainset_elastic_geometry_doc.md
+        - Trainset Heatfo: api/engine/reaxff/generators/trainset_heatfo_doc.md
+        - Trainset Mp: api/engine/reaxff/generators/trainset_mp_doc.md
+        - Trainset Source Adapter: api/engine/reaxff/generators/trainset_source_adapter_doc.md
+        - Trainset Yaml: api/engine/reaxff/generators/trainset_yaml_doc.md
+        - Tregime Generator: api/engine/reaxff/generators/tregime_generator_doc.md
+        - Vregime Generator: api/engine/reaxff/generators/vregime_generator_doc.md
+        - XMolout Generator: api/engine/reaxff/generators/xmolout_generator_doc.md
+      - IO:
+        - Base: api/engine/reaxff/io/base_doc.md
+        - Control Handler: api/engine/reaxff/io/control_handler_doc.md
+        - Eregime Handler: api/engine/reaxff/io/eregime_handler_doc.md
+        - Fort13 Handler: api/engine/reaxff/io/fort13_handler_doc.md
+        - Fort57 Handler: api/engine/reaxff/io/fort57_handler_doc.md
+        - Fort73 Handler: api/engine/reaxff/io/fort73_handler_doc.md
+        - Fort74 Handler: api/engine/reaxff/io/fort74_handler_doc.md
+        - Fort76 Handler: api/engine/reaxff/io/fort76_handler_doc.md
+        - Fort78 Handler: api/engine/reaxff/io/fort78_handler_doc.md
+        - Fort79 Handler: api/engine/reaxff/io/fort79_handler_doc.md
+        - Fort7 Handler: api/engine/reaxff/io/fort7_handler_doc.md
+        - Fort99 Handler: api/engine/reaxff/io/fort99_handler_doc.md
+        - Geo Handler: api/engine/reaxff/io/geo_handler_doc.md
+        - Molfra Handler: api/engine/reaxff/io/molfra_handler_doc.md
+        - Params Handler: api/engine/reaxff/io/params_handler_doc.md
+        - Summary Handler: api/engine/reaxff/io/summary_handler_doc.md
+        - Trainset Handler: api/engine/reaxff/io/trainset_handler_doc.md
+        - Vels Handler: api/engine/reaxff/io/vels_handler_doc.md
+        - XMolout Handler: api/engine/reaxff/io/xmolout_handler_doc.md
+  - Utils:
+    - 📍 Overview: api/utils/index.md
+    - Equation Of States: api/utils/equation_of_states_doc.md
+    - Numerical:
+      - Autocorrelation: api/utils/numerical/autocorrelation_doc.md
+      - Extrema Finder: api/utils/numerical/extrema_finder_doc.md
+      - FFT: api/utils/numerical/fft_doc.md
+      - Moving Average: api/utils/numerical/moving_average_doc.md
+      - Numerical Calcs: api/utils/numerical/numerical_calcs_doc.md
+      - Signal Ops: api/utils/numerical/signal_ops_doc.md
+  - Workflows:
+    - 📍 Overview: api/workflows/index.md
+    - Alaki: api/workflows/alaki_workflow.md
+    - Connectivity: api/workflows/connectivity_workflow.md
+    - Electrostatics: api/workflows/electrostatics_workflow.md
+    - Kinematics: api/workflows/kinematics_workflow.md
+    - Molecular Analysis: api/workflows/molecular_analysis_workflow.md
+    - Timeseries: api/workflows/timeseries_workflow.md
+    - Trajectory: api/workflows/trajectory_workflow.md
+    - File Tools:
+      - Addmol: api/workflows/file_tools/addmol_workflow.md
+      - Charges: api/workflows/file_tools/charges_workflow.md
+      - Control: api/workflows/file_tools/control_workflow.md
+      - Eregime: api/workflows/file_tools/eregime_workflow.md
+      - Ffield: api/workflows/file_tools/ffield_workflow.md
+      - Fort7: api/workflows/file_tools/fort7_workflow.md
+      - Fort83: api/workflows/file_tools/fort83_workflow.md
+      - Geo: api/workflows/file_tools/geo_workflow.md
+      - Kopple2: api/workflows/file_tools/kopple2_workflow.md
+      - Params: api/workflows/file_tools/params_workflow.md
+      - Trainset: api/workflows/file_tools/trainset_workflow.md
+      - Tregime: api/workflows/file_tools/tregime_workflow.md
+      - Vregime: api/workflows/file_tools/vregime_workflow.md
+      - XMolout: api/workflows/file_tools/xmolout_workflow.md
+    - Meta:
+      - Command Alias: api/workflows/meta/command_alias_workflow.md
+      - GUI: api/workflows/meta/gui_workflow.md
+      - Help: api/workflows/meta/help_workflow.md
+      - Introspection: api/workflows/meta/introspection_workflow.md
+      - Manage Workspace: api/workflows/meta/manage_workspace_workflow.md
+    - Presentation:
+      - Gen Plot: api/workflows/presentation/gen_plot_workflow.md
+      - Gen Video: api/workflows/presentation/gen_video_workflow.md
+      - Plot Atom Property: api/workflows/presentation/plot_atom_property_workflow.md
+    - Study Design:
+      - Runtime: api/workflows/study_design/runtime.md
+      - Study: api/workflows/study_design/study_workflow.md
 - For Developers:
-  - Contribution: contributing.md
-  - Docstrings: file_templates/docstrings.md
-  - Template Files: file_templates/index.md
-- Resources: resources.md
-- ReaxFF Reference: reaxff_reference/index.md
-
+  - 📍 Overview: for_developers/index.md
+  - Contributing: contributing.md
+  - File Templates: file_templates/index.md
+  - Rules and Conventions:
+    - 📍 Overview: rules_and_conventions/index.md
+    - Docstring Content And Inclusion Guidelines: rules_and_conventions/docstring_content_and_inclusion_guidelines.md
+    - Docstring Update Rules: rules_and_conventions/docstring_update_rules.md
+    - Workflow CLI Documentation Rules: rules_and_conventions/workflow_cli_documentation_rules.md
+    - Workflow Module Structure And Design Rules: rules_and_conventions/workflow_module_structure_and_design_rules.md
+- Resources:
+  - Reference Material: resources/reference_material.md
+  - ReaxFF Reference:
+    - 📍 Overview: resources/reaxff_reference/index.md
+    - Input Files:
+      - Addmol: resources/reaxff_reference/input_files/addmol.md
+      - Charges: resources/reaxff_reference/input_files/charges.md
+      - Control: resources/reaxff_reference/input_files/control.md
+      - Eregime: resources/reaxff_reference/input_files/eregime.md
+      - Exe: resources/reaxff_reference/input_files/exe.md
+      - Ffield: resources/reaxff_reference/input_files/ffield.md
+      - Geo: resources/reaxff_reference/input_files/geo.md
+      - Iopt: resources/reaxff_reference/input_files/iopt.md
+      - Koppel2: resources/reaxff_reference/input_files/koppel2.md
+      - Params: resources/reaxff_reference/input_files/params.md
+      - Readme: resources/reaxff_reference/input_files/README.md
+      - Trainset: resources/reaxff_reference/input_files/trainset.md
+      - Tregime: resources/reaxff_reference/input_files/tregime.md
+      - Vels: resources/reaxff_reference/input_files/vels.md
+      - Vregime: resources/reaxff_reference/input_files/vregime.md
+    - Output Files:
+      - Fort13: resources/reaxff_reference/output_files/fort13.md
+      - Fort57: resources/reaxff_reference/output_files/fort57.md
+      - Fort58: resources/reaxff_reference/output_files/fort58.md
+      - Fort71: resources/reaxff_reference/output_files/fort71.md
+      - Fort73: resources/reaxff_reference/output_files/fort73.md
+      - Fort79: resources/reaxff_reference/output_files/fort79.md
+      - Fort7 Fort8: resources/reaxff_reference/output_files/fort7_fort8.md
+      - Fort99: resources/reaxff_reference/output_files/fort99.md
+      - Readme: resources/reaxff_reference/output_files/README.md
+      - XMolout: resources/reaxff_reference/output_files/xmolout.md

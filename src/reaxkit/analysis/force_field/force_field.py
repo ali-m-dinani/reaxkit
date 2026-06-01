@@ -143,7 +143,7 @@ def _section_frame(data: ForceFieldParametersData, section: str, interpret: bool
 
 
 @dataclass
-class ForceFieldDataRequest(BaseRequest):
+class FFieldDataRequest(BaseRequest):
     """Request payload for force-field section extraction.
 
     This request controls section selection and whether bonded/multi-body rows
@@ -193,7 +193,7 @@ class ForceFieldDataRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldDataResult(BaseResult):
+class FFieldDataResult(BaseResult):
     """Result payload for force-field section table analysis.
 
     The analyzer returns one normalized DataFrame containing either a single
@@ -222,17 +222,17 @@ class ForceFieldDataResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldDataRequest
+    request: FFieldDataRequest
 
 
 @register_task("force_field_data", label="Force Field Data")
-class ForceFieldDataTask(AnalysisTask):
+class FFieldDataTask(AnalysisTask):
     """Return raw or interpreted force-field section data."""
 
     required_data = ForceFieldParametersData
 
     @staticmethod
-    def recommended_presentations(_result: ForceFieldDataResult, payload: dict[str, Any]) -> list[PresentationSpec]:
+    def recommended_presentations(_result: FFieldDataResult, payload: dict[str, Any]) -> list[PresentationSpec]:
         """Recommend default table and quick-look plot presentations.
 
         Selects a table view in all cases and adds a simple plot when at least
@@ -243,7 +243,7 @@ class ForceFieldDataTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldDataResult
+        _result : FFieldDataResult
             Typed analyzer result instance (unused by selection logic).
         payload : dict[str, Any]
             Serialized result payload expected to include ``table`` rows.
@@ -301,9 +301,9 @@ class ForceFieldDataTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldParametersData,
-        request: ForceFieldDataRequest,
+        request: FFieldDataRequest,
         reporter=None,
-    ) -> ForceFieldDataResult:
+    ) -> FFieldDataResult:
         """Run section-oriented extraction over parsed force-field parameters.
 
         Resolves the requested section scope, materializes section tables in raw
@@ -316,14 +316,14 @@ class ForceFieldDataTask(AnalysisTask):
         -----
         data : ForceFieldParametersData
             Parsed force-field parameter bundle.
-        request : ForceFieldDataRequest
+        request : FFieldDataRequest
             Section and interpretation options for extraction.
         reporter : Any, optional
             Optional progress callback invoked per processed section.
 
         Returns
         -----
-        ForceFieldDataResult
+        FFieldDataResult
             Result containing one extracted/combined section table.
 
         Examples
@@ -359,11 +359,11 @@ class ForceFieldDataTask(AnalysisTask):
                 section_df.insert(0, "section", section)
                 frames.append(section_df)
             table = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
-        return ForceFieldDataResult(table=table, request=request)
+        return FFieldDataResult(table=table, request=request)
 
 
 __all__ = [
-    "ForceFieldDataRequest",
-    "ForceFieldDataResult",
-    "ForceFieldDataTask",
+    "FFieldDataRequest",
+    "FFieldDataResult",
+    "FFieldDataTask",
 ]

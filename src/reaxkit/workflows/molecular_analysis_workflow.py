@@ -16,8 +16,6 @@ from types import SimpleNamespace
 from typing import Callable
 
 import pandas as pd
-
-from reaxkit.analysis import molecular_analysis as _molecular_tasks  # noqa: F401
 from reaxkit.analysis.molecular_analysis.molecular_analysis import (
     DominantSpeciesRequest,
     LargestMoleculeByMassRequest,

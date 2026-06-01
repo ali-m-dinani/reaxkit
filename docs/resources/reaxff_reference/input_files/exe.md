@@ -44,7 +44,7 @@ Although this manual refers to input files using descriptive names such as `geo`
 
 ## Example 2.10: UNIX `exe` script for running ReaxFF
 
-[Figure 1](../images/exe-script used for running ReaxFF from the UNIX command line.png) shows an example `exe` script used by the original author to run ReaxFF from the UNIX command line.
+[Figure 1](../images/exe-script%20used%20for%20running%20ReaxFF%20from%20the%20UNIX%20command%20line.png) shows an example `exe` script used by the original author to run ReaxFF from the UNIX command line.
 
 ```sh
 #!/bin/sh

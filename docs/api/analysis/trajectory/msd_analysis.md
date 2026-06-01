@@ -30,10 +30,12 @@ by the MSD task to compute displacement values from trajectory data.
 
 ### Examples
 
+```text
 Sample request payload/object:
 `MSDRequest(atom_types=["O"], dims=("x", "y", "z"), frames=[0, 10, 20], every=1, origin="first", unwrap=True)`
 This sample computes oxygen-atom MSD on selected frames using full 3D
 displacement from the first selected frame as reference.
+```
 
 </div>
 
@@ -83,7 +85,6 @@ Sample output meaning: returned specs describe how MSD results should be
 rendered (table view and, when possible, an MSD-vs-time plot).
 ```
 
-
 </div>
 
 ### Method: `run(data: TrajectoryData, request: MSDRequest, reporter=None)`
@@ -130,7 +131,6 @@ Sample output meaning: each row reports one atom's MSD at one frame for
 the selected dimension set (`dim`).
 ```
 
-
 </div>
 
 </div>
@@ -158,9 +158,11 @@ summed squared displacement across those dimensions.
 
 ### Examples
 
+```text
 Sample output payload/object:
 `MSDResult(table=<DataFrame rows with frame_index/iter/atom_id/atom_type/dim/msd>, request=<MSDRequest ...>)`
 The output table represents per-atom MSD values at each evaluated frame,
 with `dim` indicating which coordinate components were included.
+```
 
 </div>

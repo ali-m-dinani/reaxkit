@@ -7,7 +7,7 @@
       show_root_full_path: false
       members: []
 
-## Request: `ForceFieldOptimizationParameterRequest`
+## Request: `FFieldOptimizationParameterRequest`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -35,13 +35,13 @@ The request returns deduplicated rows with interpreted component mappings.
 
 </div>
 
-## Task: `ForceFieldOptimizationParameterTask`
+## Task: `FFieldOptimizationParameterTask`
 
 <div class="analysis-section-indent" markdown="1">
 
 Return raw or interpreted optimization-parameter definitions from params.
 
-### Method: `recommended_presentations(_result: ForceFieldOptimizationParameterResult, payload: dict[str, Any])`
+### Method: `recommended_presentations(_result: FFieldOptimizationParameterResult, payload: dict[str, Any])`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -57,7 +57,7 @@ Analyzer task output for ``force_field_optimization_parameters``.
 
 | Name | Type | Description |
 |---|---|---|
-| `_result` | `ForceFieldOptimizationParameterResult` | Typed analyzer result instance (unused by current logic). |
+| `_result` | `FFieldOptimizationParameterResult` | Typed analyzer result instance (unused by current logic). |
 | `payload` | `dict[str, Any]` | Serialized payload (unused for fixed recommendations). |
 
 #### Returns
@@ -68,17 +68,14 @@ Analyzer task output for ``force_field_optimization_parameters``.
 
 #### Examples
 
-```text
 ```python
 specs = ForceFieldOptimizationParameterTask.recommended_presentations(_result, {})
 ```
 The returned list contains one table view specification.
-```
-
 
 </div>
 
-### Method: `run(data: ForceFieldOptimizationParameterBundleData, request: ForceFieldOptimizationParameterRequest, reporter=None)`
+### Method: `run(data: ForceFieldOptimizationParameterBundleData, request: FFieldOptimizationParameterRequest, reporter=None)`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -96,18 +93,17 @@ Works on
 | Name | Type | Description |
 |---|---|---|
 | `data` | `ForceFieldOptimizationParameterBundleData` | Bundle containing optimization parameter rows and optional force-field parameter tables for interpretation. |
-| `request` | `ForceFieldOptimizationParameterRequest` | Request controlling deduplication and interpretation behavior. |
+| `request` | `FFieldOptimizationParameterRequest` | Request controlling deduplication and interpretation behavior. |
 | `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks; unused here. |
 
 #### Returns
 
 | Type | Description |
 |---|---|
-| `ForceFieldOptimizationParameterResult` | Result containing normalized parameter-update rows. |
+| `FFieldOptimizationParameterResult` | Result containing normalized parameter-update rows. |
 
 #### Examples
 
-```text
 ```python
 result = ForceFieldOptimizationParameterTask().run(
     data,
@@ -115,14 +111,12 @@ result = ForceFieldOptimizationParameterTask().run(
 )
 ```
 ``result.table`` contains raw params rows with a stable ``component`` column.
-```
-
 
 </div>
 
 </div>
 
-## Result: `ForceFieldOptimizationParameterResult`
+## Result: `FFieldOptimizationParameterResult`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -136,7 +130,7 @@ The analyzer returns raw or interpreted parameter-update rows with a stable
 | Field | Type | Default | Help | Choices |
 |---|---|---|---|---|
 | `table` | `pd.DataFrame` |  |  |  |
-| `request` | `ForceFieldOptimizationParameterRequest` |  |  |  |
+| `request` | `FFieldOptimizationParameterRequest` |  |  |  |
 
 ### Notes
 

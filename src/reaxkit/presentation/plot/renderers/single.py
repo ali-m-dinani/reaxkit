@@ -60,6 +60,9 @@ class SinglePlotRenderer(PlotRenderer):
         title = cfg.get("title")
         xlabel = cfg.get("xlabel")
         ylabel = cfg.get("ylabel")
+        xlim = cfg.get("xlim")
+        ylim = cfg.get("ylim")
+        aspect = cfg.get("aspect")
         save = cfg.get("save")
         legend = bool(cfg.get("legend", False))
         figsize = cfg.get("figsize", (8.0, 3.2))
@@ -121,6 +124,12 @@ class SinglePlotRenderer(PlotRenderer):
             ax.set_xlabel(xlabel)
         if ylabel:
             ax.set_ylabel(ylabel)
+        if isinstance(xlim, (list, tuple)) and len(xlim) == 2:
+            ax.set_xlim(float(xlim[0]), float(xlim[1]))
+        if isinstance(ylim, (list, tuple)) and len(ylim) == 2:
+            ax.set_ylim(float(ylim[0]), float(ylim[1]))
+        if aspect is not None:
+            ax.set_aspect(str(aspect))
         if legend:
             ax.legend()
 

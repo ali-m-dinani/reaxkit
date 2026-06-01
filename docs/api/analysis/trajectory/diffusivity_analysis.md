@@ -75,7 +75,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = DiffusivityTask.recommended_presentations(result, payload)
 ```
@@ -83,8 +82,6 @@ Sample output:
 A list with a table view and a diffusivity-by-atom plot view.
 Meaning:
 UIs can render diffusivity results with default mappings.
-```
-
 
 </div>
 
@@ -117,7 +114,6 @@ atom, and converts slope to diffusivity using `D = slope / (2*d)`.
 
 #### Examples
 
-```text
 ```python
 req = DiffusivityRequest(atom_ids=[1, 2], d=3.0)
 result = DiffusivityTask().run(data, req)
@@ -126,8 +122,6 @@ Sample output:
 `result.table` with `slope_msd_per_x` and `diffusivity` columns.
 Meaning:
 Each row corresponds to one atom's Einstein-relation diffusivity fit.
-```
-
 
 </div>
 

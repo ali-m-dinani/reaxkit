@@ -42,6 +42,12 @@ def register_canvas_callbacks(app, service: WebUIApiService) -> None:
     Meaning:
     Callback handlers for this section are attached to the Dash app.
     """
+    @app.callback(
+        Output("input-dataset-path", "value"),
+        Input("btn-browse-dataset", "n_clicks"),
+        State("input-dataset-path", "value"),
+        prevent_initial_call=True,
+    )
     def on_browse_dataset(n_clicks: int, current_value: str | None):
         if not n_clicks:
             return no_update

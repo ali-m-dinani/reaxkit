@@ -44,7 +44,7 @@ def _optimization_progress_table(
 
 
 @dataclass
-class ForceFieldOptimizationRequest(BaseRequest):
+class FFieldOptimizationProgressRequest(BaseRequest):
     """Request payload for optimization-progress extraction.
 
     This request optionally filters the optimization progression table to a
@@ -77,7 +77,7 @@ class ForceFieldOptimizationRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldOptimizationResult(BaseResult):
+class FFieldOptimizationProgressResult(BaseResult):
     """Result payload for optimization-progress analysis.
 
     The analyzer returns an epoch-indexed error trajectory suitable for trend
@@ -102,18 +102,18 @@ class ForceFieldOptimizationResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldOptimizationRequest
+    request: FFieldOptimizationProgressRequest
 
 
 @register_task("force_field_optimization", label="Force Field Optimization")
-class ForceFieldOptimizationTask(AnalysisTask):
+class FFieldOptimizationProgressTask(AnalysisTask):
     """Return total force-field error versus optimization epoch."""
 
     required_data = ForceFieldOptimizationProgressData
 
     @staticmethod
     def recommended_presentations(
-        _result: ForceFieldOptimizationResult, payload: dict[str, Any]
+        _result: FFieldOptimizationProgressResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Suggest default table/plot renderers for optimization progress output.
 
@@ -125,7 +125,7 @@ class ForceFieldOptimizationTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldOptimizationResult
+        _result : FFieldOptimizationProgressResult
             Typed analyzer result instance (unused by current logic).
         payload : dict[str, Any]
             Serialized analyzer payload expected to include ``table`` rows.
@@ -170,9 +170,9 @@ class ForceFieldOptimizationTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationProgressData,
-        request: ForceFieldOptimizationRequest,
+        request: FFieldOptimizationProgressRequest,
         reporter=None,
-    ) -> ForceFieldOptimizationResult:
+    ) -> FFieldOptimizationProgressResult:
         """Run the optimization-progress analyzer task.
 
         Extracts epoch/error rows from parsed optimization progress data,
@@ -185,14 +185,14 @@ class ForceFieldOptimizationTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationProgressData
             Parsed optimization progress record source.
-        request : ForceFieldOptimizationRequest
+        request : FFieldOptimizationProgressRequest
             Request containing optional epoch filters.
         reporter : Any, optional
             Progress callback accepted by the task interface; unused here.
 
         Returns
         -----
-        ForceFieldOptimizationResult
+        FFieldOptimizationProgressResult
             Analyzer result with the normalized progress table.
 
         Examples
@@ -204,11 +204,11 @@ class ForceFieldOptimizationTask(AnalysisTask):
         The output table contains only the requested epochs when available.
         """
         table = _optimization_progress_table(data, epochs=request.epochs)
-        return ForceFieldOptimizationResult(table=table, request=request)
+        return FFieldOptimizationProgressResult(table=table, request=request)
 
 
 __all__ = [
-    "ForceFieldOptimizationRequest",
-    "ForceFieldOptimizationResult",
-    "ForceFieldOptimizationTask",
+    "FFieldOptimizationProgressRequest",
+    "FFieldOptimizationProgressResult",
+    "FFieldOptimizationProgressTask",
 ]

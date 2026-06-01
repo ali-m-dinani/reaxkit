@@ -8,7 +8,7 @@ scope:
     - "analyzer request/result dataclass docstrings"
     - "general domain/composite dataclass docstrings"
     - "workflow CLI docs and related markdown docs"
-  reference_rule_file: "docs/file_templates/docstring_inclusion_rules.md"
+  reference_rule_file: "docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md"
 
 core_principles:
   - id: "preserve-important-content"
@@ -40,7 +40,7 @@ update_process:
       - "Locate other dataclasses (domain/composite/shared models)."
   - step: "apply-template-rules"
     details:
-      - "Follow docs/file_templates/docstring_inclusion_rules.md."
+      - "Follow docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md."
       - "Use required sections and separators exactly when defined."
   - step: "preserve-and-merge"
     details:
@@ -141,4 +141,4 @@ quality_checks:
     - "File compiles/lints after doc changes."
 
 future_usage:
-  instruction: "When user says 'follow workflow_cli_doc_rules.yaml', use this file plus docstring_inclusion_rules.md as authoritative guidance for doc updates."
+  instruction: "When user says 'follow workflow_cli_doc_rules.yaml', use this file plus docstring_content_and_inclusion_guidelines.md as authoritative guidance for doc updates."

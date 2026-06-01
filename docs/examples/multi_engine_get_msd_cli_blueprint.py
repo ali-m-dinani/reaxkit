@@ -8,7 +8,7 @@ It shows:
 3) An engine-agnostic `MSDTask(request)` that only sees normalized trajectory data
 
 Run:
-    python docs/examples/multi_engine_msd_cli_blueprint.py
+    python docs/examples/multi_engine_get_msd_cli_blueprint.py
 """
 
 from __future__ import annotations
@@ -114,11 +114,11 @@ class EngineAdapter(ABC):
         """Return confidence 0..100."""
 
     @abstractmethod
-    def validate(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> None:
+    def validate(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> None:
         """Raise ValueError if required inputs are missing for this engine."""
 
     @abstractmethod
-    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> TrajectoryPayload:
+    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> TrajectoryPayload:
         """Read engine-specific files and normalize into TrajectoryPayload."""
 
 
@@ -128,17 +128,18 @@ class ReaxFFAdapter(EngineAdapter):
     @staticmethod
     def detect(run_dir: Path) -> int:
         has_xmol = (run_dir / "xmolout").exists()
-        has_fort7 = (run_dir / "fort.7").exists()
-        return 90 if has_xmol and has_fort7 else 0
+        has_summary = (run_dir / "summary.txt").exists()
+        return 90 if has_xmol else (60 if has_summary else 0)
 
-    def validate(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> None:
+    def validate(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> None:
+        _ = summary
         if input_file is not None:
-            raise ValueError("For ReaxFF, use --xmolout and --fort7 (not --input).")
-        if xmolout is None or fort7 is None:
-            raise ValueError("ReaxFF MSD workflows require --xmolout and --fort7.")
+            raise ValueError("For ReaxFF, use --xmolout (not --input).")
+        if xmolout is None:
+            raise ValueError("ReaxFF MSD workflows require --xmolout.")
 
-    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> TrajectoryPayload:
-        _ = (xmolout, fort7)
+    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> TrajectoryPayload:
+        _ = (xmolout, summary)
         return TrajectoryPayload(
             positions=[
                 [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)],
@@ -157,13 +158,14 @@ class AMSAdapter(EngineAdapter):
     def detect(run_dir: Path) -> int:
         return 90 if any(run_dir.glob("*.rkf")) else 0
 
-    def validate(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> None:
-        if xmolout is not None or fort7 is not None:
-            raise ValueError("For AMS, use --input ams.rkf (not --xmolout/--fort7).")
+    def validate(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> None:
+        if xmolout is not None or summary is not None:
+            raise ValueError("For AMS, use --input ams.rkf (not --xmolout/--summary).")
         if input_file is None:
             raise ValueError("AMS workflows require --input ams.rkf (or auto-detected .rkf file).")
 
-    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, fort7: Path | None) -> TrajectoryPayload:
+    def load_trajectory(self, *, input_file: Path | None, xmolout: Path | None, summary: Path | None) -> TrajectoryPayload:
+        _ = summary
         _ = input_file
         return TrajectoryPayload(
             positions=[
@@ -199,10 +201,10 @@ def run_msd_cli(
     engine: str | None = None,
     input_file: str | None = None,
     xmolout: str | None = None,
-    fort7: str | None = None,
+    summary: str | None = None,
     atom_ids: Iterable[int] | None = None,
 ) -> tuple[str, MSDResult]:
-    """Single task-driven command path, e.g. `reaxkit msd [--engine ...]`."""
+    """Single task-driven command path, e.g. `reaxkit get_msd [--engine ...]`."""
     run_path = Path(run_dir)
 
     # 1) Pick engine (explicit override or auto-detect)
@@ -210,16 +212,16 @@ def run_msd_cli(
 
     input_path = Path(input_file) if input_file else None
     xmol_path = Path(xmolout) if xmolout else None
-    fort7_path = Path(fort7) if fort7 else None
+    summary_path = Path(summary) if summary else None
 
-    adapter.validate(input_file=input_path, xmolout=xmol_path, fort7=fort7_path)
+    adapter.validate(input_file=input_path, xmolout=xmol_path, summary=summary_path)
 
     # 2) Create task and run it on a lazy trajectory container
     trajectory = TrajectoryData(
         loader=lambda: adapter.load_trajectory(
             input_file=input_path,
             xmolout=xmol_path,
-            fort7=fort7_path,
+            summary=summary_path,
         )
     )
 
@@ -233,7 +235,6 @@ if __name__ == "__main__":
         run_dir=".",
         engine="reaxff",
         xmolout="xmolout",
-        fort7="fort.7",
         atom_ids=[1],
     )
     print(f"ReaxFF demo via engine={selected_engine}:", result)

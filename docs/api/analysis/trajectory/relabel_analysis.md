@@ -73,7 +73,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = TrajectoryRelabelByCoordinationTask.recommended_presentations(result, payload)
 ```
@@ -81,8 +80,6 @@ Sample output:
 `[PresentationSpec(renderer="table", ...)]`
 Meaning:
 The primary default representation is the coordination/relabel table.
-```
-
 
 </div>
 
@@ -116,7 +113,6 @@ subset aligned to selected frames.
 
 #### Examples
 
-```text
 ```python
 req = TrajectoryRelabelByCoordinationRequest(mode="global")
 result = TrajectoryRelabelByCoordinationTask().run(bundle, req)
@@ -125,8 +121,6 @@ Sample output:
 A result with `trajectory.atom_labels` and a coordination `table`.
 Meaning:
 Labels are transformed according to coordination status on sampled frames.
-```
-
 
 </div>
 

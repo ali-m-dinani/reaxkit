@@ -122,6 +122,21 @@ class Wireframe3DSubplotsRenderer(PlotRenderer):
             ax.set_xlabel("x")
             ax.set_ylabel("y")
             ax.set_zlabel("z")
+            xlim = item.get("xlim", cfg.get("xlim"))
+            ylim = item.get("ylim", cfg.get("ylim"))
+            zlim = item.get("zlim", cfg.get("zlim"))
+            if isinstance(xlim, (list, tuple)) and len(xlim) == 2:
+                ax.set_xlim(float(xlim[0]), float(xlim[1]))
+            if isinstance(ylim, (list, tuple)) and len(ylim) == 2:
+                ax.set_ylim(float(ylim[0]), float(ylim[1]))
+            if isinstance(zlim, (list, tuple)) and len(zlim) == 2:
+                ax.set_zlim(float(zlim[0]), float(zlim[1]))
+            box_aspect = item.get("box_aspect", cfg.get("box_aspect"))
+            if isinstance(box_aspect, (list, tuple)) and len(box_aspect) == 3:
+                try:
+                    ax.set_box_aspect((float(box_aspect[0]), float(box_aspect[1]), float(box_aspect[2])))
+                except Exception:
+                    pass
             ax.view_init(elev=float(cfg.get("elev", 22.0)), azim=float(cfg.get("azim", 38.0)))
 
         for j in range(nplots + 1, rows * cols + 1):

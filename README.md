@@ -58,9 +58,9 @@ Additional resources:
 - [Quickstart](docs/quickstart.md) — Get up and running with core ReaxKit workflows in minutes.
 - [Tutorials notes](docs/tutorials/index.md) and [source files](https://ali-m-dinani.github.io/reaxkit/tutorials/) — Step-by-step guides for common ReaxKit workflows and use cases.
 - [Examples](docs/examples/README.md) and [source files](https://ali-m-dinani.github.io/reaxkit/examples/) — Minimal, runnable Python examples using public APIs.
-- [ReaxFF Reference](docs/reaxff_reference/index.md) — Reference documentation for ReaxFF input and output files.
+- [ReaxFF Reference](docs/resources/reaxff_reference/index.md) — Reference documentation for ReaxFF input and output files.
 - [Contributing](docs/contributing.md) — Guidelines for contributing to ReaxKit.
-- [File Templates](docs/file_templates/index.md) and [Docstring Conventions](docs/file_templates/docstrings.md) — Development guidelines and code templates.
+- [File Templates](docs/file_templates/index.md) and [Docstring Inclusion Rules](docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md) — Development guidelines and code templates.
 - [AUTHORS.md](AUTHORS.md) —  Full credits and acknowledgments.
 - [LICENSE](LICENSE) — Full license terms under the **MIT License**
 

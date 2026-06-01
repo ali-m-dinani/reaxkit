@@ -45,6 +45,26 @@ charge series on iteration/frame/time axes.
 | `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
 | `--xaxis` | No | iter | Quantity on x-axis. Example: --xaxis time, which uses converted time instead of iteration index. | iter, frame, time |
 
+<a id="charge_table"></a>
+
+The figure below shows an example CSV output for the table of charges for different atoms across different frames.
+
+<div style="text-align:center;" markdown="1">
+![charge_table](../../../figures/charge_table.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample CSV output for the charges table.*
+</div>
+
+<a id="charges_table_pivoted_using_excel"></a>
+
+The above data can be pivoted using Excel's pivot table feature to see the charges for atoms across frames in a tabular-format as follows:
+
+<div style="text-align:center;" markdown="1">
+![charges_table_pivoted_using_excel](../../../figures/charges_table_pivoted_using_excel.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample pivoted data for charge data across frames and atoms.*
+</div>
+
 </div>
 
 ## Command: `dipole`
@@ -103,6 +123,16 @@ report coercive/remnant roots.
 | `--xaxis` | No | field_z | Quantity for x-axis. Example: --xaxis field_z, which uses z-field strength on x-axis. |  |
 | `--aggregate` | No | mean | Aggregation method. Example: --aggregate mean, which averages values at each field point. | mean, max, min, last |
 | `--roots` | No |  | Also print coercive and remnant values to stdout. Example: --roots, which prints root metrics directly in CLI output. |  |
+
+<a id="PolarizationFieldTask"></a>
+
+The figure below shows an example hysteresis plot, where electric field is on x-axis and polarization (or dipole) on the y-axis.
+
+<div style="text-align:center;" markdown="1">
+![PolarizationFieldTask](../../../figures/PolarizationFieldTask.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample polarization hysteresis plot.*
+</div>
 
 </div>
 

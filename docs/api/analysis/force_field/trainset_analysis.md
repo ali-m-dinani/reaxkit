@@ -7,7 +7,7 @@
       show_root_full_path: false
       members: []
 
-## Request: `GetTrainsetDataRequest`
+## Request: `TrainsetDataRequest`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -31,13 +31,13 @@ The request returns only ENERGY-section rows.
 
 </div>
 
-## Task: `GetTrainsetDataTask`
+## Task: `TrainsetDataTask`
 
 <div class="analysis-section-indent" markdown="1">
 
 Return trainset rows for one section or all sections.
 
-### Method: `recommended_presentations(_result: GetTrainsetDataResult, payload: dict[str, Any])`
+### Method: `recommended_presentations(_result: TrainsetDataResult, payload: dict[str, Any])`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -53,7 +53,7 @@ Analyzer task output for ``trainset_data``.
 
 | Name | Type | Description |
 |---|---|---|
-| `_result` | `GetTrainsetDataResult` | Typed analyzer result instance (unused by current logic). |
+| `_result` | `TrainsetDataResult` | Typed analyzer result instance (unused by current logic). |
 | `payload` | `dict[str, Any]` | Serialized payload expected to contain a ``table`` list. |
 
 #### Returns
@@ -64,7 +64,6 @@ Analyzer task output for ``trainset_data``.
 
 #### Examples
 
-```text
 ```python
 specs = GetTrainsetDataTask.recommended_presentations(
     _result,
@@ -72,12 +71,10 @@ specs = GetTrainsetDataTask.recommended_presentations(
 )
 ```
 The returned specs include a table and a default numeric plot.
-```
-
 
 </div>
 
-### Method: `run(data: ForceFieldOptimizationTrainingSetData, request: GetTrainsetDataRequest, reporter=None)`
+### Method: `run(data: ForceFieldOptimizationTrainingSetData, request: TrainsetDataRequest, reporter=None)`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -94,30 +91,27 @@ Works on
 | Name | Type | Description |
 |---|---|---|
 | `data` | `ForceFieldOptimizationTrainingSetData` | Parsed trainset data bundle. |
-| `request` | `GetTrainsetDataRequest` | Request with section selector. |
+| `request` | `TrainsetDataRequest` | Request with section selector. |
 | `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks; unused here. |
 
 #### Returns
 
 | Type | Description |
 |---|---|
-| `GetTrainsetDataResult` | Result containing the extracted trainset table. |
+| `TrainsetDataResult` | Result containing the extracted trainset table. |
 
 #### Examples
 
-```text
 ```python
 result = GetTrainsetDataTask().run(data, GetTrainsetDataRequest(section="all"))
 ```
 The returned table contains all supported sections with a ``section`` label.
-```
-
 
 </div>
 
 </div>
 
-## Result: `GetTrainsetDataResult`
+## Result: `TrainsetDataResult`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -131,7 +125,7 @@ DataFrame suitable for table/plot rendering.
 | Field | Type | Default | Help | Choices |
 |---|---|---|---|---|
 | `table` | `pd.DataFrame` |  |  |  |
-| `request` | `GetTrainsetDataRequest` |  |  |  |
+| `request` | `TrainsetDataRequest` |  |  |  |
 
 ### Notes
 
@@ -151,5 +145,142 @@ row = {
 }
 ```
 The sample row illustrates one ENERGY entry in an all-sections output.
+
+</div>
+
+## Request: `TrainsetGroupCommentsRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for unique trainset group-comment extraction.
+
+This request selects one trainset section or all sections when collecting
+unique non-empty ``group_comment`` annotations.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `section` | `str` | all | Trainset section to return comments for. Use 'all' for all sections. Examples: 'energy', 'geometry', 'cell_parameters'. | all, charge, heatfo, geometry, cell_parameters, energy |
+
+### Examples
+
+```python
+request = TrainsetGroupCommentsRequest(section="geometry")
+```
+The request limits comment extraction to GEOMETRY rows.
+
+</div>
+
+## Task: `TrainsetGroupCommentsTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Return unique trainset group-comment annotations by section.
+
+### Method: `recommended_presentations(_result: TrainsetGroupCommentsResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend table and section-count plots for grouped comments output.
+
+Emits a table view for all outputs and adds a section-count plot when
+section labels are available in serialized rows.
+
+Works on
+Analyzer task output for ``trainset_group_comments``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `TrainsetGroupCommentsResult` | Typed analyzer result instance (unused in current selection logic). |
+| `payload` | `dict[str, Any]` | Serialized payload expected to include ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs suitable for comments tables and count plots. |
+
+#### Examples
+
+```python
+specs = TrainsetGroupCommentsTask.recommended_presentations(
+    _result,
+    {"table": [{"section": "energy", "group_comment": "eos", "count": 1}]},
+)
+```
+The output includes a table and a comment-count-by-section plot.
+
+</div>
+
+### Method: `run(data: ForceFieldOptimizationTrainingSetData, request: TrainsetGroupCommentsRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run unique group-comment extraction from parsed trainset data.
+
+Builds the grouped-comment table across sections, then optionally
+filters rows to the request-selected section.
+
+Works on
+``ForceFieldOptimizationTrainingSetData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `ForceFieldOptimizationTrainingSetData` | Parsed trainset data source. |
+| `request` | `TrainsetGroupCommentsRequest` | Request containing section scope for comment extraction. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks; unused here. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `TrainsetGroupCommentsResult` | Result containing grouped comments and metadata. |
+
+#### Examples
+
+```python
+result = TrainsetGroupCommentsTask().run(
+    data,
+    TrainsetGroupCommentsRequest(section="all"),
+)
+```
+The result table contains unique comments from all supported sections.
+
+</div>
+
+</div>
+
+## Result: `TrainsetGroupCommentsResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload containing grouped trainset comments.
+
+The analyzer returns unique per-section comments with earliest line numbers
+when available, suitable for quality checks and section-level summaries.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `TrainsetGroupCommentsRequest` |  |  |  |
+
+### Examples
+
+```python
+row = {
+    "section": "energy",
+    "group_comment": "equation_of_state_reference_set",
+    "line_number": 142,
+    "count": 1,
+}
+```
+The sample indicates one unique ENERGY comment entry.
 
 </div>

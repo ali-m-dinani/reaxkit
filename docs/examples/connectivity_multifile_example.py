@@ -1,11 +1,11 @@
 """
-Example: xmolout + fort.7 (multi-file analysis)
+Example: connectivity + charge multi-file analysis
 
 This script demonstrates how to:
 1) Load xmolout + fort.7 using handlers and ConnectivityData
-2) Extract fort.7 per-atom features (partial charges, sum_BOs)
+2) Extract per-atom charge and sum_bond_orders features
 3) Build connectivity edge lists (bond network) from ConnectivityData
-4) Track bond-order time series and detect bond events
+4) Detect bond events from bond-order trajectories
 5) Classify coordination status over frames
 6) Export results to CSV (docs/examples-friendly)
 """
@@ -19,8 +19,6 @@ import pandas as pd
 from reaxkit.analysis.connectivity import (
     BondEventsRequest,
     BondEventsTask,
-    BondTimeseriesRequest,
-    BondTimeseriesTask,
     ConnectionListRequest,
     ConnectionListTask,
     ConnectionStatsRequest,
@@ -31,10 +29,6 @@ from reaxkit.analysis.connectivity import (
     CoordinationStatusTask,
 )
 from reaxkit.analysis.electrostatics import ChargeTableRequest, ChargeTableTask
-from reaxkit.analysis.per_file.fort7_analyzer import (
-    get_fort7_data_per_atom,
-    get_fort7_data_summaries,
-)
 from reaxkit.domain.data_models import ChargeData, ConnectivityData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
@@ -50,7 +44,7 @@ FORT7_PATH = DATA / "small_fort.7"
 FRAMES_SAMPLE = range(0, 50, 5)
 MIN_BO = 0.30
 
-OUTDIR = Path("reaxkit_outputs/examples/xmolout_fort7")
+OUTDIR = Path("reaxkit_outputs/examples/connectivity_multifile")
 OUTDIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -85,7 +79,14 @@ def main() -> None:
 
     print(f"Loaded xmolout frames      : {len(xdf)}")
     print(f"Loaded fort.7 frames       : {len(fdf)}")
-    print(f"Loaded ConnectivityData BO : {len(conn_data.bond_orders or [])}")
+    bo_frames = conn_data.bond_orders
+    if bo_frames is None:
+        bo_count = 0
+    elif hasattr(bo_frames, "shape"):
+        bo_count = int(bo_frames.shape[0])
+    else:
+        bo_count = len(bo_frames)
+    print(f"Loaded ConnectivityData BO : {bo_count}")
 
     _print_head(xdf, "xmolout summary dataframe")
     _print_head(fdf, "fort.7 summary dataframe")
@@ -97,13 +98,30 @@ def main() -> None:
     _print_head(charges, "fort.7 partial charges (sampled frames)")
     charges.to_csv(OUTDIR / "partial_charges_sample.csv", index=False)
 
-    sum_bos = get_fort7_data_per_atom(f7, columns="sum_BOs", frames=FRAMES_SAMPLE)
-    _print_head(sum_bos, "fort.7 sum_BOs (sampled frames)")
-    sum_bos.to_csv(OUTDIR / "sum_BOs_sample.csv", index=False)
+    if conn_data.sum_bond_orders is not None:
+        sum_bo_arr = conn_data.sum_bond_orders
+        atom_ids = list(conn_data.atom_ids or [])
+        iterations = list(conn_data.iterations) if conn_data.iterations is not None else list(range(sum_bo_arr.shape[0]))
+        rows = []
+        frame_indices = [i for i in FRAMES_SAMPLE if 0 <= i < int(sum_bo_arr.shape[0])]
+        for fi in frame_indices:
+            for ai, atom_id in enumerate(atom_ids):
+                rows.append(
+                    {
+                        "frame_idx": int(fi),
+                        "iter": int(iterations[fi]),
+                        "atom_id": int(atom_id),
+                        "sum_bond_order": float(sum_bo_arr[fi, ai]),
+                    }
+                )
+        sum_bos = pd.DataFrame(rows)
+        _print_head(sum_bos, "sum_bond_orders (sampled frames)")
+        sum_bos.to_csv(OUTDIR / "sum_bond_orders_sample.csv", index=False)
 
     wanted_summary_cols = [c for c in ["iter", "num_of_bonds", "total_BO", "total_charge"] if c in fdf.columns]
     if wanted_summary_cols:
-        summary_feats = get_fort7_data_summaries(f7, wanted_summary_cols, frames=FRAMES_SAMPLE)
+        valid_rows = [i for i in FRAMES_SAMPLE if 0 <= i < len(fdf)]
+        summary_feats = fdf.iloc[valid_rows][wanted_summary_cols].copy()
         _print_head(summary_feats, "fort.7 summary features (sampled frames)")
         summary_feats.to_csv(OUTDIR / "fort7_summary_features_sample.csv", index=False)
 
@@ -129,21 +147,9 @@ def main() -> None:
     _print_head(stats, "bond stats over frames (count)")
     stats.to_csv(OUTDIR / f"bond_stats_count_minbo_{MIN_BO:.2f}.csv", index=False)
 
-    ts = BondTimeseriesTask().run(
-        conn_data,
-        BondTimeseriesRequest(
-            frames=list(FRAMES_SAMPLE),
-            undirected=True,
-            bo_threshold=0.0,
-            as_wide=False,
-        ),
-    ).table
-    _print_head(ts, "bond timeseries (tidy)")
-    ts.to_csv(OUTDIR / "bond_timeseries_tidy.csv", index=False)
-
     if not stats.empty:
-        src = int(stats.iloc[0]["src"])
-        dst = int(stats.iloc[0]["dst"])
+        src = int(stats.iloc[0]["source"])
+        dst = int(stats.iloc[0]["destination"])
     else:
         src, dst = 1, 2
 
@@ -158,7 +164,6 @@ def main() -> None:
             smooth="ma",
             window=7,
             min_run=3,
-            xaxis="iter",
             undirected=True,
         ),
     ).table

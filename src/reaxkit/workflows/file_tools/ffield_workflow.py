@@ -19,15 +19,15 @@ from typing import Callable
 import pandas as pd
 
 from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
-from reaxkit.analysis.force_field.diagnostics import ParameterOptimizationDiagnosticRequest
-from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
-from reaxkit.analysis.force_field.optimization import ForceFieldOptimizationRequest
+from reaxkit.analysis.force_field.diagnostics import FFieldOptimizationDiagnosticRequest
+from reaxkit.analysis.force_field.force_field import FFieldDataRequest, FFieldDataTask
+from reaxkit.analysis.force_field.optimization_progress import FFieldOptimizationProgressRequest
 from reaxkit.analysis.force_field.report import (
-    ForceFieldOptimizationReportBulkModulusRequest,
-    ForceFieldOptimizationReportEOSRequest,
-    ForceFieldOptimizationReportRequest,
+    FFieldOptimizationReportBulkModulusRequest,
+    FFieldOptimizationReportEOSRequest,
+    FFieldOptimizationReportRequest,
 )
-from reaxkit.analysis.force_field.structure_summary import StructureSummaryRequest
+from reaxkit.analysis.force_field.MM_summary import MMSummaryRequest
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.resolve.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
@@ -358,13 +358,13 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 " 3. Getting the diagnostics data, plotting a tornado plot for the top 10 most sensitive parameters, and adding a vertical guide line at x=1.0:\n"
                 "  This plot shows the relative sensitivity of the parameters in a tornado format, where the bars represent the span between the error at the current parameter value and the error at the perturbed parameter value. "
                 "  This is helpful for understanding the marginal effect of each parameter on the total error, and for identifying which parameters are the most sensitive ones during optimization. \n"
-                "   reaxkit get_ffield_diagnostic_data --plot tornado --top 10 --vline 1.0 --export tornado.csv\n"
+                "   reaxkit get_ffield_diagnostic_data --plot tornado --top 3 --vline 1.0 --save tornado.png\n"
                 
                 "  4. Getting the diagnostics data, plotting a beeswarm plot for all parameters, and saving the plot:\n"
                 "   This plot is very similar to the tornado plot, but instead of showing the span between the current and perturbed error as a bar, "
                 "it shows the actual distribution of the error values at the current and perturbed parameter values as swarm points. \n"
-                "   A really good example of this plot can be found at: "
-                "reaxkit get_ffield_diagnostic_data --plot beeswarm --save diagnostic_beeswarm.png\n\n"
+                "   A really good example of this plot can be found at: https://www.aidancooper.co.uk/how-shapley-values-work/"
+                "reaxkit get_ffield_diagnostic_data --plot beeswarm --top 3 --save diagnostic_beeswarm.png\n\n"
             )
             parser.add_argument(
                 "--interpret",
@@ -1162,50 +1162,50 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
 
 
-def _build_force_field_data_request(args: argparse.Namespace) -> ForceFieldDataRequest:
+def _build_force_field_data_request(args: argparse.Namespace) -> FFieldDataRequest:
     """Build force field data request."""
     section = args.field if args.field else None
     fmt = _normalize_force_field_format(args.format)
-    return ForceFieldDataRequest(
+    return FFieldDataRequest(
         section=section,
         interpret=(fmt == "interpreted"),
     )
 
 
-def _build_force_field_optimization_request(args: argparse.Namespace) -> ForceFieldOptimizationRequest:
+def _build_force_field_optimization_request(args: argparse.Namespace) -> FFieldOptimizationProgressRequest:
     """Build force field optimization request."""
-    return ForceFieldOptimizationRequest(epochs=args.epochs)
+    return FFieldOptimizationProgressRequest(epochs=args.epochs)
 
 
-def _build_structure_summary_request(args: argparse.Namespace) -> StructureSummaryRequest:
+def _build_structure_summary_request(args: argparse.Namespace) -> MMSummaryRequest:
     """Build structure summary request."""
-    return StructureSummaryRequest()
+    return MMSummaryRequest()
 
 
-def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -> ParameterOptimizationDiagnosticRequest:
+def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -> FFieldOptimizationDiagnosticRequest:
     """Build parameter optimization diagnostic request."""
-    return ParameterOptimizationDiagnosticRequest(
+    return FFieldOptimizationDiagnosticRequest(
         interpret=bool(getattr(args, "interpret", False)),
     )
 
 
-def _build_force_field_optimization_report_request(args: argparse.Namespace) -> ForceFieldOptimizationReportRequest:
+def _build_force_field_optimization_report_request(args: argparse.Namespace) -> FFieldOptimizationReportRequest:
     """Build force field optimization report request."""
-    return ForceFieldOptimizationReportRequest()
+    return FFieldOptimizationReportRequest()
 
 
-def _build_force_field_optimization_report_eos_request(args: argparse.Namespace) -> ForceFieldOptimizationReportEOSRequest:
+def _build_force_field_optimization_report_eos_request(args: argparse.Namespace) -> FFieldOptimizationReportEOSRequest:
     """Build force field optimization report eos request."""
-    return ForceFieldOptimizationReportEOSRequest(
+    return FFieldOptimizationReportEOSRequest(
         iden=args.iden,
     )
 
 
 def _build_force_field_optimization_report_bulk_modulus_request(
     args: argparse.Namespace,
-) -> ForceFieldOptimizationReportBulkModulusRequest:
+) -> FFieldOptimizationReportBulkModulusRequest:
     """Build force field optimization report bulk modulus request."""
-    return ForceFieldOptimizationReportBulkModulusRequest(
+    return FFieldOptimizationReportBulkModulusRequest(
         iden=args.iden,
         shift_min_to_zero=not args.no_shift_min_to_zero,
         flip_sign=args.flip_sign,
@@ -1320,6 +1320,17 @@ def _build_tornado_result(base_result, top: int):
     return argparse.Namespace(table=grouped, values={}, metadata={})
 
 
+def _wants_tornado_view(args: argparse.Namespace) -> bool:
+    """Decide whether diagnostic output should be rendered as tornado."""
+    plot_mode = str(getattr(args, "plot", "") or "").strip().lower()
+    if plot_mode == "tornado":
+        return True
+    # If caller is saving and provided tornado-specific knobs, assume tornado intent.
+    if getattr(args, "save", None) and (getattr(args, "top", None) is not None or getattr(args, "vline", None) is not None):
+        return True
+    return False
+
+
 def _prepare_eos_table(result, *, flip_sign: bool) -> None:
     """Prepare eos table."""
     table = getattr(result, "table", None)
@@ -1387,9 +1398,35 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
                 "ylabel": "",
                 "title": "Parameter Sensitivity Beeswarm",
             }
-        if getattr(args, "plot", None) == "tornado":
-            if not {"min_eff", "max_eff", "median_eff", "identifier"}.issubset(set(table.columns)):
-                return None
+        tornado_cols = {"min_eff", "max_eff", "median_eff", "identifier"}
+        if _wants_tornado_view(args) or tornado_cols.issubset(set(table.columns)):
+            if not tornado_cols.issubset(set(table.columns)):
+                # Convert base diagnostic table into tornado payload shape on the fly.
+                if not {"identifier", "min_sensitivity", "max_sensitivity"}.issubset(set(table.columns)):
+                    return None
+                g = (
+                    table.groupby("identifier", dropna=True)
+                    .agg(min_eff=("min_sensitivity", "min"), max_eff=("max_sensitivity", "max"))
+                    .reset_index()
+                )
+                if g.empty:
+                    return None
+                eff_union = (
+                    table.melt(
+                        id_vars=["identifier"],
+                        value_vars=["min_sensitivity", "max_sensitivity"],
+                        var_name="kind",
+                        value_name="eff",
+                    )
+                    .dropna(subset=["eff"])
+                )
+                g["median_eff"] = g["identifier"].map(eff_union.groupby("identifier", dropna=True)["eff"].median())
+                g["span"] = g["max_eff"] - g["min_eff"]
+                g = g.sort_values("span", ascending=False).reset_index(drop=True)
+                top = int(getattr(args, "top", 0) or 0)
+                if top > 0:
+                    g = g.head(top).copy()
+                table = g
             return {
                 "plot_type": "tornado_plot",
                 "labels": table["identifier"].tolist(),
@@ -1552,12 +1589,12 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
     """Run ffield data."""
     data = _load_force_field_data(args)
     request = REQUEST_BUILDERS["get_ffield_data"](args)
-    task = ForceFieldDataTask()
+    task = FFieldDataTask()
     if args.term:
         if request.section is None:
             raise ValueError("--term requires exactly one selected section via --field.")
         selected_section = request.section
-        raw_result = task.run(data, ForceFieldDataRequest(section=selected_section, interpret=False))
+        raw_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=False))
         raw_table = raw_result.table
         filtered_raw = _filter_force_field_table_by_term(
             data,
@@ -1568,11 +1605,11 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
             any_order=args.any_order,
         )
         if request.interpret:
-            interpreted_result = task.run(data, ForceFieldDataRequest(section=selected_section, interpret=True))
+            interpreted_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=True))
             table = interpreted_result.table.loc[filtered_raw.index].copy()
         else:
             table = filtered_raw
-        result = task.run(data, ForceFieldDataRequest(section=selected_section, interpret=request.interpret))
+        result = task.run(data, FFieldDataRequest(section=selected_section, interpret=request.interpret))
         result.table = table
     else:
         result = task.run(data, request)
@@ -1619,7 +1656,7 @@ def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
                 )
                 export_result_csv(argparse.Namespace(table=result.metadata["full_table"]), str(out_all))
                 print(f"[Done] Exported full diagnostic table to {out_all}")
-        elif getattr(args, "plot", None) == "tornado":
+        elif _wants_tornado_view(args):
             result = _build_tornado_result(base_result, top=int(args.top))
         else:
             result = base_result

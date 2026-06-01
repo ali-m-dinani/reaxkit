@@ -7,7 +7,7 @@
       show_root_full_path: false
       members: []
 
-## Request: `ParameterOptimizationDiagnosticRequest`
+## Request: `FFieldOptimizationDiagnosticRequest`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -32,13 +32,13 @@ The request asks for interpreted identifier metadata in the output table.
 
 </div>
 
-## Task: `ParameterOptimizationDiagnosticTask`
+## Task: `FFieldOptimizationDiagnosticTask`
 
 <div class="analysis-section-indent" markdown="1">
 
 Return sensitivity diagnostics derived from parameter-update diagnostics.
 
-### Method: `recommended_presentations(_result: ParameterOptimizationDiagnosticResult, payload: dict[str, Any])`
+### Method: `recommended_presentations(_result: FFieldOptimizationDiagnosticResult, payload: dict[str, Any])`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -54,7 +54,7 @@ Analyzer task output for ``parameter_optimization_diagnostic``.
 
 | Name | Type | Description |
 |---|---|---|
-| `_result` | `ParameterOptimizationDiagnosticResult` | Typed analyzer result instance (unused for current selection logic). |
+| `_result` | `FFieldOptimizationDiagnosticResult` | Typed analyzer result instance (unused for current selection logic). |
 | `payload` | `dict[str, Any]` | Serialized analyzer payload expected to include ``table`` rows. |
 
 #### Returns
@@ -65,7 +65,6 @@ Analyzer task output for ``parameter_optimization_diagnostic``.
 
 #### Examples
 
-```text
 ```python
 specs = ParameterOptimizationDiagnosticTask.recommended_presentations(
     _result,
@@ -73,12 +72,10 @@ specs = ParameterOptimizationDiagnosticTask.recommended_presentations(
 )
 ```
 The returned list includes a table and a one-series sensitivity plot.
-```
-
 
 </div>
 
-### Method: `run(data: ForceFieldOptimizationDiagnosticBundleData, request: ParameterOptimizationDiagnosticRequest, reporter=None)`
+### Method: `run(data: ForceFieldOptimizationDiagnosticBundleData, request: FFieldOptimizationDiagnosticRequest, reporter=None)`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -96,18 +93,17 @@ Works on
 | Name | Type | Description |
 |---|---|---|
 | `data` | `ForceFieldOptimizationDiagnosticBundleData` | Bundle containing diagnostics and force-field parameter records. |
-| `request` | `ParameterOptimizationDiagnosticRequest` | Request controlling identifier interpretation. |
+| `request` | `FFieldOptimizationDiagnosticRequest` | Request controlling identifier interpretation. |
 | `reporter` | `Any, optional` | Progress callback accepted by the analyzer interface; unused here. |
 
 #### Returns
 
 | Type | Description |
 |---|---|
-| `ParameterOptimizationDiagnosticResult` | Result containing raw/derived diagnostics and optional metadata. |
+| `FFieldOptimizationDiagnosticResult` | Result containing raw/derived diagnostics and optional metadata. |
 
 #### Examples
 
-```text
 ```python
 result = ParameterOptimizationDiagnosticTask().run(
     data,
@@ -115,14 +111,12 @@ result = ParameterOptimizationDiagnosticTask().run(
 )
 ```
 The output contains sensitivity columns for each diagnostics row.
-```
-
 
 </div>
 
 </div>
 
-## Result: `ParameterOptimizationDiagnosticResult`
+## Result: `FFieldOptimizationDiagnosticResult`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -136,7 +130,7 @@ with optional interpreted force-field identifier metadata when requested.
 | Field | Type | Default | Help | Choices |
 |---|---|---|---|---|
 | `table` | `pd.DataFrame` |  |  |  |
-| `request` | `ParameterOptimizationDiagnosticRequest` |  |  |  |
+| `request` | `FFieldOptimizationDiagnosticRequest` |  |  |  |
 
 ### Notes
 

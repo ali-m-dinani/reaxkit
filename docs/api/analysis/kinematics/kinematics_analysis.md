@@ -65,7 +65,6 @@ Analyzer task output for ``get_kinematics``.
 
 #### Examples
 
-```text
 ```python
 specs = AtomicKinematicsTask.recommended_presentations(
     _result,
@@ -73,8 +72,6 @@ specs = AtomicKinematicsTask.recommended_presentations(
 )
 ```
 The returned list includes a table and one component-vs-atom plot.
-```
-
 
 </div>
 
@@ -106,7 +103,6 @@ Works on
 
 #### Examples
 
-```text
 ```python
 result = AtomicKinematicsTask().run(
     data,
@@ -114,8 +110,6 @@ result = AtomicKinematicsTask().run(
 )
 ```
 ``result.table`` contains the selected coordinate rows.
-```
-
 
 </div>
 

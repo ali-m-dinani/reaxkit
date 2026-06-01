@@ -67,7 +67,6 @@ Analyzer task output for ``get_dominant_species``.
 
 #### Examples
 
-```text
 ```python
 specs = DominantSpeciesTask.recommended_presentations(
     _result,
@@ -75,8 +74,6 @@ specs = DominantSpeciesTask.recommended_presentations(
 )
 ```
 The returned list includes a table and a grouped frequency plot.
-```
-
 
 </div>
 
@@ -108,7 +105,6 @@ Works on
 
 #### Examples
 
-```text
 ```python
 result = DominantSpeciesTask().run(
     data,
@@ -116,8 +112,6 @@ result = DominantSpeciesTask().run(
 )
 ```
 ``result.table`` contains up to 3 ranked species per sampled iteration.
-```
-
 
 </div>
 
@@ -152,5 +146,423 @@ row = {
 }
 ```
 The row represents the top-ranked species at one sampled iteration.
+
+</div>
+
+## Request: `MoleculeLifetimeRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for molecule lifetime segmentation.
+
+This request selects formulas, frame sampling, and the activity threshold
+used to detect contiguous lifetime segments.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `molecules` | `Optional[Sequence[str]]` |  | Optional molecular formulas to track (for example ['H2O', 'OH']). Empty means all formulas. | H2O, OH, CO2 |
+| `frames` | `Optional[Sequence[int]]` |  | Optional frame indices to evaluate. Empty means all frames. |  |
+| `every` | `int` | 1 | Stride over selected frames. | 1, 2, 5, 10 |
+| `min_freq` | `float` | 1.0 | Minimum frequency threshold for a species to be considered active. | 0.0, 1.0, 2.0 |
+
+### Examples
+
+```python
+request = MoleculeLifetimeRequest(molecules=["H2O", "OH"], every=5, min_freq=1.0)
+```
+The request tracks lifetime segments for selected formulas at stride 5.
+
+</div>
+
+## Task: `MoleculeLifetimeTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Compute active lifetimes and birth/death events for molecular species.
+
+### Method: `recommended_presentations(_result: MoleculeLifetimeResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend table and lifetime-segment plot views.
+
+Returns a table presentation and adds a lifetime length plot when
+required segment fields are present in serialized rows.
+
+Works on
+Analyzer task output for ``get_molecule_lifetime``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `MoleculeLifetimeResult` | Typed analyzer result instance (unused by current logic). |
+| `payload` | `dict[str, Any]` | Serialized payload expected to include ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Recommended presentation specifications. |
+
+#### Examples
+
+```python
+specs = MoleculeLifetimeTask.recommended_presentations(
+    _result,
+    {"table": [{"start_iter": 10, "molecular_formula": "OH", "lifetime_segment_sampled_step_count": 3}]},
+)
+```
+The returned list includes a table and a lifetime-length plot.
+
+</div>
+
+### Method: `run(data: MolecularAnalysisData, request: MoleculeLifetimeRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run molecule lifetime segmentation on sampled species frequencies.
+
+Samples iterations, tracks per-formula active periods above threshold,
+and returns contiguous segment statistics for each tracked formula.
+
+Works on
+``MolecularAnalysisData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `MolecularAnalysisData` | Parsed molecular analysis dataset containing frequency time series. |
+| `request` | `MoleculeLifetimeRequest` | Formula selection, sampling, and activity-threshold configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `MoleculeLifetimeResult` | Result containing lifetime segment rows per molecular formula. |
+
+#### Examples
+
+```python
+result = MoleculeLifetimeTask().run(
+    data,
+    MoleculeLifetimeRequest(min_freq=1.0),
+)
+```
+``result.table`` lists active segments with start/end iteration bounds.
+
+</div>
+
+</div>
+
+## Result: `MoleculeLifetimeResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for molecule lifetime analysis.
+
+The analyzer returns contiguous active segments for each tracked molecular
+formula, including segment bounds and summary frequency statistics.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `MoleculeLifetimeRequest` |  |  |  |
+
+### Examples
+
+```python
+row = {
+    "molecular_formula": "OH",
+    "lifetime_segment_id": 1,
+    "start_iter": 10,
+    "end_iter": 30,
+    "lifetime_segment_sampled_step_count": 3,
+    "peak_freq": 5.0,
+    "mean_freq": 3.3333333333,
+}
+```
+The sample row captures one contiguous active interval for ``OH``.
+
+</div>
+
+## Request: `LargestMoleculeByMassRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for largest-molecule-by-mass extraction.
+
+This request configures frame sampling used to pick the heaviest species
+per sampled iteration.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `frames` | `Optional[Sequence[int]]` |  | Optional frame indices to evaluate. Empty means all frames. |  |
+| `every` | `int` | 1 | Stride over selected frames. Example: every=5 evaluates frames 0,5,10,... | 1, 2, 5, 10 |
+
+### Examples
+
+```python
+request = LargestMoleculeByMassRequest(frames=[0, 5, 10], every=1)
+```
+The request evaluates the heaviest species on selected frames.
+
+</div>
+
+## Task: `LargestMoleculeByMassTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Return the heaviest individual molecular species per selected iteration.
+
+### Method: `recommended_presentations(_result: LargestMoleculeByMassResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend table and mass-vs-iteration plot views.
+
+Returns a table presentation and adds a molecular-mass trend plot when
+required fields are present in serialized rows.
+
+Works on
+Analyzer task output for ``get_largest_molecule_by_mass``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `LargestMoleculeByMassResult` | Typed analyzer result instance (unused by current logic). |
+| `payload` | `dict[str, Any]` | Serialized payload expected to include ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Recommended presentation specifications. |
+
+#### Examples
+
+```python
+specs = LargestMoleculeByMassTask.recommended_presentations(
+    _result,
+    {"table": [{"iter": 100, "molecular_formula": "Al2O3", "molecular_mass": 101.96}]},
+)
+```
+The output includes a table and a mass trend plot.
+
+</div>
+
+### Method: `run(data: MolecularAnalysisData, request: LargestMoleculeByMassRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run largest-molecule-by-mass selection on sampled iterations.
+
+Samples iterations, filters molecular rows, and selects the heaviest
+species at each sampled iteration.
+
+Works on
+``MolecularAnalysisData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `MolecularAnalysisData` | Parsed molecular analysis dataset. |
+| `request` | `LargestMoleculeByMassRequest` | Sampling configuration for iteration selection. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `LargestMoleculeByMassResult` | Result containing one heaviest-species row per sampled iteration. |
+
+#### Examples
+
+```python
+result = LargestMoleculeByMassTask().run(
+    data,
+    LargestMoleculeByMassRequest(every=2),
+)
+```
+``result.table`` contains heaviest species rows for sampled iterations.
+
+</div>
+
+</div>
+
+## Result: `LargestMoleculeByMassResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for largest-molecule-by-mass analysis.
+
+The analyzer returns one selected heaviest species row per sampled
+iteration with associated frequency and molecular mass.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `LargestMoleculeByMassRequest` |  |  |  |
+
+### Examples
+
+```python
+row = {
+    "frame_index": 20,
+    "iter": 100,
+    "molecular_formula": "Al2O3",
+    "freq": 3.0,
+    "molecular_mass": 101.96,
+}
+```
+The row indicates the heaviest species at one sampled iteration.
+
+</div>
+
+## Request: `LargestMoleculeCompositionRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for largest-molecule composition expansion.
+
+This request controls frame sampling used before decomposing each selected
+heaviest formula into per-element counts.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `frames` | `Optional[Sequence[int]]` |  | Optional frame indices to evaluate. Empty means all frames. |  |
+| `every` | `int` | 1 | Stride over selected frames. Example: every=5 evaluates frames 0,5,10,... | 1, 2, 5, 10 |
+
+### Examples
+
+```python
+request = LargestMoleculeCompositionRequest(every=5)
+```
+The request expands composition on every fifth sampled frame.
+
+</div>
+
+## Task: `LargestMoleculeCompositionTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Return per-element composition of the heaviest molecule per selected iteration.
+
+### Method: `recommended_presentations(_result: LargestMoleculeCompositionResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend table and element-count plot views.
+
+Returns a table by default and adds an element-count trend plot when
+required fields are present in serialized rows.
+
+Works on
+Analyzer task output for ``get_largest_molecule_composition``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `LargestMoleculeCompositionResult` | Typed analyzer result instance (unused by current logic). |
+| `payload` | `dict[str, Any]` | Serialized payload expected to include ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Recommended presentation specifications. |
+
+#### Examples
+
+```python
+specs = LargestMoleculeCompositionTask.recommended_presentations(
+    _result,
+    {"table": [{"iter": 100, "element": "O", "count": 3}]},
+)
+```
+The returned list includes a table and grouped element-count plot.
+
+</div>
+
+### Method: `run(data: MolecularAnalysisData, request: LargestMoleculeCompositionRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run largest-molecule composition expansion from sampled iterations.
+
+Reuses largest-molecule-by-mass selection, parses selected formulas into
+element/count pairs, and emits long-form composition rows.
+
+Works on
+``MolecularAnalysisData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `MolecularAnalysisData` | Parsed molecular analysis dataset. |
+| `request` | `LargestMoleculeCompositionRequest` | Sampling configuration for iteration selection. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `LargestMoleculeCompositionResult` | Result containing long-form element composition rows. |
+
+#### Examples
+
+```python
+result = LargestMoleculeCompositionTask().run(
+    data,
+    LargestMoleculeCompositionRequest(frames=[0, 1, 2]),
+)
+```
+``result.table`` contains one row per element per sampled iteration.
+
+</div>
+
+</div>
+
+## Result: `LargestMoleculeCompositionResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for largest-molecule composition analysis.
+
+The analyzer expands each selected largest molecular formula into
+element-count rows per sampled iteration.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `LargestMoleculeCompositionRequest` |  |  |  |
+
+### Examples
+
+```python
+rows = [
+    {"frame_index": 20, "iter": 100, "element": "Al", "count": 2},
+    {"frame_index": 20, "iter": 100, "element": "O", "count": 3},
+]
+```
+The sample rows represent composition for ``Al2O3`` at one iteration.
 
 </div>

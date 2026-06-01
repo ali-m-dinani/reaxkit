@@ -2,7 +2,7 @@
 
 The **`ffield`** input file defines all force field parameters used by ReaxFF.
 
-The first line of the `ffield` file contains a **force field identifier** (see [Example 2.8](../images/ffield-input file.png) in the). The remainder of the file is divided into **seven sections**, corresponding to different interaction types.
+The first line of the `ffield` file contains a **force field identifier** (see [Example 2.8](../images/ffield-input%20file.png) in the). The remainder of the file is divided into **seven sections**, corresponding to different interaction types.
 
 ---
 

@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.force_field.report import (
-    ForceFieldOptimizationReportEOSRequest,
-    ForceFieldOptimizationReportEOSTask,
+    FFieldOptimizationReportEOSRequest,
+    FFieldOptimizationReportEOSTask,
 )
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
@@ -29,11 +29,11 @@ def _run_and_save() -> Path:
 
     adapter = resolve_engine(str(run_dir), engine=None)
 
-    task = ForceFieldOptimizationReportEOSTask()
+    task = FFieldOptimizationReportEOSTask()
     task_name = str(task.__class__.__name__).replace("(", "").replace(")", "")
     task_artifacts_dir = ARTIFACTS_DIR / task_name
     task_artifacts_dir.mkdir(parents=True, exist_ok=True)
-    request = ForceFieldOptimizationReportEOSRequest(
+    request = FFieldOptimizationReportEOSRequest(
         iden="all",
     )
     executor = AnalysisExecutor()

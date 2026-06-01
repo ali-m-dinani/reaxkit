@@ -146,6 +146,16 @@ signals, then reports event points.
 | `--min-run` | No | 3 | Minimum run length after flicker cleanup. Example: --min-run 5, which suppresses short-lived toggles. |  |
 | `--undirected` | No | True | Collapse i-j and j-i. Example: --no-undirected, which keeps direction-specific events. |  |
 
+<a id="bond_events_with_smoothing_and_thresholds"></a>
+
+The figure below shows an example output plot where the raw bond-order time series between two atoms is shown, with the EMA-smoothed signal overlaid. With the current settings, multiple bond formation and breakage events are detected. Users should tune these parameters for their own systems so formation/breakage is detected correctly.
+
+<div style="text-align:center;" markdown="1">
+![bond_events_with_smoothing_and_thresholds](../../../figures/bond_events_with_smoothing_and_thresholds.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample bond events plot with detected bond breakage/formation iterations.*
+</div>
+
 </div>
 
 ## Command: `get_coordination`
@@ -155,6 +165,10 @@ signals, then reports event points.
 Classify atoms as under-, coordinated-, or over-coordinated.
 Classification compares bond-order totals against target valences from explicit maps
 or inferred values.
+For example, if an atom's valence is 3 and the threshold is 0.5, then:
+ - sum_BOs < 2.5 -> under-coordinated
+ - 2.5 <= sum_BOs <= 3.5 -> coordinated
+ - sum_BOs > 3.5 -> over-coordinated
 
 ### Examples
 -----
@@ -221,6 +235,16 @@ engine-specific output formatting.
 | `--keep-coord-original` | No |  | Keep original label when status is coordinated in by_type mode. Example: --keep-coord-original, which preserves original labels for coordinated atoms. |  |
 | `--precision` | No | 6 | Writer precision when supported by the engine. Example: --precision 8, which writes numeric coordinates with higher decimal precision. |  |
 | `--simulation` | No |  | Optional trajectory writer simulation label. Example: --simulation run_01, which tags output with that simulation name when supported. |  |
+
+<a id="relabel_traj_using_coordination"></a>
+
+The figure below shows an example relabeling output where atoms labels are changed according to their coordination status, and then plotted using OVITO.
+
+<div style="text-align:center;" markdown="1">
+![relabel_traj_using_coordination](../../../figures/relabel_traj_using_coordination.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample relabeling output plot based on their coordination status.*
+</div>
 
 </div>
 

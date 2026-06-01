@@ -15,7 +15,7 @@ import argparse
 from pathlib import Path
 
 from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
-from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, TrainsetGroupCommentsRequest
+from reaxkit.analysis.force_field.trainset import TrainsetDataRequest, TrainsetGroupCommentsRequest
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.runtime.generator_runtime import (
@@ -447,9 +447,9 @@ def _task_name_for_command(command: str) -> str:
     return WORKFLOW_TASK_NAME_MAP.get(command, command)
 
 
-def _build_get_trainset_data_request(args: argparse.Namespace) -> GetTrainsetDataRequest:
+def _build_get_trainset_data_request(args: argparse.Namespace) -> TrainsetDataRequest:
     """Build get trainset data request."""
-    return GetTrainsetDataRequest(section=str(getattr(args, "section", "all")))
+    return TrainsetDataRequest(section=str(getattr(args, "section", "all")))
 
 
 def _build_trainset_group_comments_request(args: argparse.Namespace) -> TrainsetGroupCommentsRequest:

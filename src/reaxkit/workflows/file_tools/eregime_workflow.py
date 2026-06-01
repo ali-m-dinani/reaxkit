@@ -95,11 +95,14 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "It only generates the input file and does not execute the simulation.\n\n"
         "Examples:\n"
         "  1. Sinusoidal profile:\n"
-        "   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n\n"
+        "   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n"
+        "   Meaning: generates a sine-wave electric field along z. --max-magnitude 0.004 means the field swings up to about +0.004 and down to about -0.004 V/A. --step-angle 0.05 controls how finely the sine curve is sampled (smaller means denser points). --iteration-step 500 maps each sampled point to every 500 MD iterations. --num-cycles 2 writes two full sine cycles. --V 1 writes to voltage index 1.\n\n"
         "  2. Pulse profile:\n"
-        "   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n\n"
+        "   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n"
+        "   Meaning: generates smooth bipolar pulses along z. --amplitude 0.003 sets pulse height above baseline. --width 50 is how long each pulse stays flat at the top. --period 200 is one full positive+negative cycle length. --slope 20 is the rise/fall ramp duration used to smooth edges. --iteration-step 250 writes rows every 250 MD iterations. --num-cycles 5 repeats the pulse pattern five times.\n\n"
         "  3. Custom function profile:\n"
-        "   reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1"
+        "   reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1\n"
+        "   Meaning: samples a user-defined field expression over time. --expr sets the exact formula (here a cosine with amplitude 0.003 V/A and period 100 in t-units). --t-end 1000 is the final sampled time. --dt 1 samples every 1 time unit. --iteration-step 250 maps each sampled value to every 250 MD iterations. --direction z and --V 1 choose axis and voltage index."
     )
 
     parser.add_argument(

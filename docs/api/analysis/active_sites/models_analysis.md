@@ -83,3 +83,70 @@ Meaning:
 The result packages detailed and report-ready structural outputs.
 
 </div>
+
+## Request: `ActiveSiteEventsRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for trajectory-level active-site event extraction.
+
+Configures frame sampling, detection mode, species definitions, and event
+persistence criteria for extracting C-O and C-Si event summaries.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `frames` | `Optional[Sequence[int]]` |  | Optional frame indices to evaluate. |  |
+| `every` | `int` | 10 | Frame stride for selected frames. |  |
+| `mode` | `str` | auto | Event mode: auto \| bo \| dist. | auto, bo, dist |
+| `bo_threshold` | `float` | 0.8 | Bond-order threshold for event detection in bo mode. |  |
+| `r_CO` | `float` | 1.65 | C-O cutoff in angstrom for distance mode. |  |
+| `r_CSi` | `float` | 2.1 | C-Si cutoff in angstrom for distance mode. |  |
+| `persist` | `int` | 50 | Required consecutive analyzed frames for confirmed binding. |  |
+| `carbon_element` | `str` | C | Element symbol used as reactive substrate atom type. |  |
+| `oxygen_element` | `str` | O | Element symbol treated as oxygen target. |  |
+| `silicon_element` | `str` | Si | Element symbol treated as silicon target. |  |
+| `strict_tract` | `bool` | False | Raise when canonical events fields are too incomplete for TRACT compatibility. | True, False |
+
+### Examples
+
+```python
+req = ActiveSiteEventsRequest(mode="auto", every=10, persist=50)
+```
+Sample output:
+`ActiveSiteEventsRequest(...)`
+Meaning:
+The request controls trajectory windowing and event confirmation logic.
+
+</div>
+
+## Result: `ActiveSiteEventsResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for trajectory-level active-site event extraction.
+
+Stores per-carbon event descriptors, TRACT-compatible table projection, and
+run-level event summary metadata.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `tract_table` | `pd.DataFrame` |  |  |  |
+| `summary` | `dict[str, Any]` |  |  |  |
+| `request` | `ActiveSiteEventsRequest` |  |  |  |
+
+### Examples
+
+```python
+result = ActiveSiteEventsResult(table=df, tract_table=tract_df, summary={}, request=req)
+```
+Sample output:
+`ActiveSiteEventsResult(...)`
+Meaning:
+The result bundles event rows and summary/report metadata.
+
+</div>

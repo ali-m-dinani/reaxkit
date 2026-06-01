@@ -332,6 +332,12 @@ class CoordinationStatusTask(AnalysisTask):
     ) -> CoordinationStatusResult:
         """Compute per-atom coordination status across selected frames.
 
+        Classify atoms as under-, coordinated-, or over-coordinated. Classification compares bond-order totals against target valences from explicit maps or inferred values.
+        For example, if an atom's valence is 3 and the threshold is 0.5, then:
+          - sum_BOs < 2.5 -> under-coordinated
+          - 2.5 <= sum_BOs <= 3.5 -> coordinated
+          - sum_BOs > 3.5 -> over-coordinated
+
         Works on
         -----
         `CoordinationStatusBundleData` plus `CoordinationStatusRequest` inputs

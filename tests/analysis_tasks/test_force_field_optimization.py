@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
-from reaxkit.analysis.force_field.optimization import (
-    ForceFieldOptimizationRequest,
-    ForceFieldOptimizationTask,
+from reaxkit.analysis.force_field.optimization_progress import (
+    FFieldOptimizationProgressRequest,
+    FFieldOptimizationProgressTask,
 )
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
@@ -29,11 +29,11 @@ def _run_and_save() -> Path:
 
     adapter = resolve_engine(str(run_dir), engine=None)
 
-    task = ForceFieldOptimizationTask()
+    task = FFieldOptimizationProgressTask()
     task_name = str(task.__class__.__name__).replace("(", "").replace(")", "")
     task_artifacts_dir = ARTIFACTS_DIR / task_name
     task_artifacts_dir.mkdir(parents=True, exist_ok=True)
-    request = ForceFieldOptimizationRequest(
+    request = FFieldOptimizationProgressRequest(
         epochs=[1, 2, 3, 4, 5],
     )
     executor = AnalysisExecutor()

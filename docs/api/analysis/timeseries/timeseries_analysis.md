@@ -7,6 +7,28 @@
       show_root_full_path: false
       members: []
 
+## Result: `TimeSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Generic result container for in-memory time-series representations.
+
+This base-style result supports reusable analyzers that produce both table
+outputs and optional in-memory ``Series`` vectors.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `series` | `list[Series]` |  |  |  |
+| `x_label` | `str` |  |  |  |
+| `y_label` | `str` |  |  |  |
+| `request` | `BaseRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+| `metadata` | `dict \| None` |  |  |  |
+
+</div>
+
 ## Request: `SimulationScalarSeriesRequest`
 
 <div class="analysis-section-indent" markdown="1">
@@ -51,7 +73,6 @@ Analyzer task output for ``simulation_series``.
 |---|---|
 | `list[PresentationSpec]` | Presentation specs for table and scalar plot rendering. |
 
-
 </div>
 
 ### Method: `run(data: SimulationData, request: SimulationScalarSeriesRequest, reporter=None)`
@@ -77,29 +98,1027 @@ Works on
 |---|---|
 | `SimulationScalarSeriesResult` | Scalar series rows with frame and iteration axes. |
 
-
 </div>
 
 </div>
 
-## Result: `TimeSeriesResult`
+## Result: `SimulationScalarSeriesResult`
 
 <div class="analysis-section-indent" markdown="1">
 
-Generic result container for in-memory time-series representations.
+Scalar simulation-series result.
 
-This base-style result supports reusable analyzers that produce both table
-outputs and optional in-memory ``Series`` vectors.
+Output structure:
+- request: SimulationScalarSeriesRequest
+  - the exact request used to generate this result
+  - includes selected scalar field, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'field', 'value']
+  - frame_index: source frame index in the sampled series
+  - iter: iteration corresponding to each sampled frame
+  - field: resolved simulation scalar name
+  - value: scalar value for that field at the sampled frame
 
 ### Fields
 
 | Field | Type | Default | Help | Choices |
 |---|---|---|---|---|
-| `series` | `list[Series]` |  |  |  |
-| `x_label` | `str` |  |  |  |
-| `y_label` | `str` |  |  |  |
-| `request` | `BaseRequest` |  |  |  |
+| `request` | `SimulationScalarSeriesRequest` |  |  |  |
 | `table` | `pd.DataFrame` |  |  |  |
-| `metadata` | `dict \| None` |  |  |  |
+
+</div>
+
+## Request: `TrajectoryCoordinateSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for trajectory coordinate-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `atom_ids` | `Optional[Sequence[int]]` |  | Atom Ids parameter for TrajectoryCoordinateSeriesRequest. |  |
+| `atom_types` | `Optional[Sequence[str]]` |  | Atom Types parameter for TrajectoryCoordinateSeriesRequest. |  |
+| `dims` | `Sequence[str]` | x | Coordinate dimensions to include. | x, y, z, xy, xz, yz, xyz |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for TrajectoryCoordinateSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for TrajectoryCoordinateSeriesRequest. |  |
+
+</div>
+
+## Task: `TrajectoryCoordinateSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build coordinate time series for one or more atoms.
+
+### Method: `recommended_presentations(_result: TrajectoryCoordinateSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for trajectory coordinate series.
+
+Works on
+Analyzer task output for ``trajectory_coordinate_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `TrajectoryCoordinateSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for coordinate tables and traces. |
+
+</div>
+
+### Method: `run(data: TrajectoryData, request: TrajectoryCoordinateSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run trajectory coordinate-series extraction.
+
+Works on
+``TrajectoryData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `TrajectoryData` | Parsed trajectory coordinates and metadata. |
+| `request` | `TrajectoryCoordinateSeriesRequest` | Atom, dimension, and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `TrajectoryCoordinateSeriesResult` | Long-form coordinate series rows. |
+
+</div>
+
+</div>
+
+## Result: `TrajectoryCoordinateSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Trajectory coordinate-series result.
+
+Output structure:
+- request: TrajectoryCoordinateSeriesRequest
+  - the exact request used to generate this result
+  - includes selected atoms/types, dimensions, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'atom_id', 'atom_type', 'dim', 'coord']
+  - frame_index: source frame index in the trajectory
+  - iter: iteration corresponding to the frame
+  - atom_id: atom identifier
+  - atom_type: element/type label for the atom
+  - dim: coordinate dimension ('x', 'y', or 'z')
+  - coord: coordinate value along the selected direction
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `TrajectoryCoordinateSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `TrajectoryDisplacementSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for trajectory displacement-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `atom_ids` | `Optional[Sequence[int]]` |  | Atom Ids parameter for TrajectoryDisplacementSeriesRequest. |  |
+| `atom_types` | `Optional[Sequence[str]]` |  | Atom Types parameter for TrajectoryDisplacementSeriesRequest. |  |
+| `dims` | `Sequence[str]` | xyz | Displacement dimensions to include. | x, y, z, xy, xz, yz, xyz |
+| `reference_frame` | `int` | 0 | Reference frame index used for displacement. |  |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for TrajectoryDisplacementSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for TrajectoryDisplacementSeriesRequest. |  |
+
+</div>
+
+## Task: `TrajectoryDisplacementSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build displacement time series for one or more atoms.
+
+### Method: `recommended_presentations(_result: TrajectoryDisplacementSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for displacement series.
+
+Works on
+Analyzer task output for ``trajectory_displacement_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `TrajectoryDisplacementSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs reused from coordinate-series logic. |
+
+</div>
+
+### Method: `run(data: TrajectoryData, request: TrajectoryDisplacementSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run trajectory displacement-series extraction.
+
+Works on
+``TrajectoryData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `TrajectoryData` | Parsed trajectory coordinates and metadata. |
+| `request` | `TrajectoryDisplacementSeriesRequest` | Atom, reference-frame, dimension, and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `TrajectoryDisplacementSeriesResult` | Long-form displacement series rows. |
+
+</div>
+
+</div>
+
+## Result: `TrajectoryDisplacementSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Trajectory displacement-series result.
+
+The analyzer returns displacement magnitude or component values by atom and
+sampled frame relative to a configured reference frame.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `TrajectoryDisplacementSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `CellDimensionsRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for cell-dimension time-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `fields` | `Sequence[str]` | a, b, c | Cell fields to include. | a, b, c, alpha, beta, gamma |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for CellDimensionsRequest. |  |
+| `every` | `int` | 1 | Every parameter for CellDimensionsRequest. |  |
+
+</div>
+
+## Task: `CellDimensionsTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build cell-dimension time series from ``SimulationData``.
+
+### Method: `recommended_presentations(_result: CellDimensionsResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for cell-dimension series.
+
+Works on
+Analyzer task output for ``cell_dimensions``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `CellDimensionsResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for cell-dimension tables and traces. |
+
+</div>
+
+### Method: `run(data: SimulationData, request: CellDimensionsRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run cell-dimension series extraction from simulation data.
+
+Works on
+``SimulationData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `SimulationData` | Parsed simulation dataset with cell and/or iteration arrays. |
+| `request` | `CellDimensionsRequest` | Cell field and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `CellDimensionsResult` | Long-form cell dimension rows. |
+
+</div>
+
+</div>
+
+## Result: `CellDimensionsResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Cell-dimensions result.
+
+Output structure:
+- request: CellDimensionsRequest
+  - the exact request used to generate this result
+  - includes selected fields (a/b/c/alpha/beta/gamma), frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'field', 'value']
+  - frame_index: source frame index in the sampled trajectory
+  - iter: iteration corresponding to each sampled frame
+  - field: selected cell field name
+  - value: scalar value for that cell field at the sampled frame
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `CellDimensionsRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `ChargeSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for per-atom charge time-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `atom_ids` | `Sequence[int]` |  | Atom Ids parameter for ChargeSeriesRequest. |  |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for ChargeSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for ChargeSeriesRequest. |  |
+
+</div>
+
+## Task: `ChargeSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build charge time series for one or more atoms.
+
+### Method: `recommended_presentations(_result: ChargeSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for charge series.
+
+Works on
+Analyzer task output for ``charge_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `ChargeSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for charge tables and traces. |
+
+</div>
+
+### Method: `run(data: ChargeData, request: ChargeSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run per-atom charge series extraction.
+
+Works on
+``ChargeData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `ChargeData` | Parsed charge matrix and optional simulation metadata. |
+| `request` | `ChargeSeriesRequest` | Atom and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `ChargeSeriesResult` | Long-form per-atom charge rows. |
+
+</div>
+
+</div>
+
+## Result: `ChargeSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Charge-series result.
+
+Output structure:
+- request: ChargeSeriesRequest
+  - the exact request used to generate this result
+  - includes selected atom IDs, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'atom_id', 'atom_type', 'charge']
+  - frame_index: source frame index in the sampled trajectory
+  - iter: iteration corresponding to each sampled frame
+  - atom_id: selected atom identifier
+  - atom_type: element/type label for that atom when available
+  - charge: charge value for the atom at the sampled frame
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `ChargeSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `ElectricFieldSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for electric-field component time-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `components` | `Sequence[str]` |  | Electric-field components to include. | field_x, field_y, field_z, E_field_x, E_field_y, E_field_z, E_field |
+| `field_kind` | `Literal['applied', 'energy', 'auto']` | auto | Which electric-field group to use. | applied, energy, auto |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for ElectricFieldSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for ElectricFieldSeriesRequest. |  |
+
+</div>
+
+## Task: `ElectricFieldSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build time series for applied-field or field-energy components.
+
+### Method: `recommended_presentations(_result: ElectricFieldSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for electric-field series.
+
+Works on
+Analyzer task output for ``electric_field_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `ElectricFieldSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for field-component tables and traces. |
+
+</div>
+
+### Method: `run(data: ElectricFieldData, request: ElectricFieldSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run electric-field component series extraction.
+
+Works on
+``ElectricFieldData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `ElectricFieldData` | Parsed electric-field samples and component metadata. |
+| `request` | `ElectricFieldSeriesRequest` | Component, field-group, and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `ElectricFieldSeriesResult` | Long-form electric-field component rows. |
+
+</div>
+
+</div>
+
+## Result: `ElectricFieldSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Electric-field series result.
+
+Output structure:
+- request: ElectricFieldSeriesRequest
+  - the exact request used to generate this result
+  - includes components, field selection mode, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'component', 'value']
+  - frame_index: source sample index
+  - iter: iteration associated with the sampled field value
+  - component: selected component name (for example Ex/Ey/Ez)
+  - value: electric-field scalar for that component at the sampled index
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `ElectricFieldSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `EregimeSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for eregime field-column series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `field` | `str` |  | Eregime column to extract. | field, field_zones, field_dir |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for EregimeSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for EregimeSeriesRequest. |  |
+
+</div>
+
+## Task: `EregimeSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build iteration-based series for one eregime field column.
+
+### Method: `recommended_presentations(_result: EregimeSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for eregime series.
+
+Works on
+Analyzer task output for ``eregime_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `EregimeSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for eregime tables and traces. |
+
+</div>
+
+### Method: `run(data: EregimeData, request: EregimeSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run eregime field-column series extraction.
+
+Works on
+``EregimeData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `EregimeData` | Parsed eregime arrays. |
+| `request` | `EregimeSeriesRequest` | Field-column and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `EregimeSeriesResult` | Long-form field/value rows for sampled iterations. |
+
+</div>
+
+</div>
+
+## Result: `EregimeSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Eregime-series result.
+
+Output structure:
+- request: EregimeSeriesRequest
+  - the exact request used to generate this result
+  - includes selected field, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'field', 'value']
+  - frame_index: source index in the eregime sequence
+  - iter: iteration corresponding to each sampled row
+  - field: resolved eregime field name used for extraction
+  - value: sampled value for the selected field at each row
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `EregimeSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `PartialEnergySeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for partial-energy component series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `components` | `Optional[Sequence[str]]` |  | Partial-energy components to include. | ebond, eover, eunder, eangle, epen, etors, econj, evdw, ecoul, ehb, eself, E_pot |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for PartialEnergySeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for PartialEnergySeriesRequest. |  |
+
+</div>
+
+## Task: `PartialEnergySeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build iteration-based series for one or more fort.73 energy components.
+
+### Method: `recommended_presentations(_result: PartialEnergySeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for partial-energy series.
+
+Works on
+Analyzer task output for ``partial_energy_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `PartialEnergySeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for component/value tables and traces. |
+
+</div>
+
+### Method: `run(data: PartialEnergyData, request: PartialEnergySeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run partial-energy component series extraction.
+
+Works on
+``PartialEnergyData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `PartialEnergyData` | Parsed partial-energy arrays. |
+| `request` | `PartialEnergySeriesRequest` | Component and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `PartialEnergySeriesResult` | Long-form component/value rows. |
+
+</div>
+
+</div>
+
+## Result: `PartialEnergySeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Partial-energy series result.
+
+Output structure:
+- request: PartialEnergySeriesRequest
+  - the exact request used to generate this result
+  - includes selected energy components, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'component', 'value']
+  - frame_index: source frame index
+  - iter: iteration corresponding to each sampled frame
+  - component: selected partial-energy component name
+  - value: sampled component value at the frame
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `PartialEnergySeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `RestraintSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for restraint-series extraction and reshaping.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `fields` | `Optional[Sequence[str]]` |  | Restraint fields to extract. Use 'E_res'/'E_pot' for energy values, or use 'r_target'/'r_actual' together with restraint_index to select a specific restraint. | E_res, E_pot, r_target, r_actual |
+| `restraint_index` | `Optional[Union[int, Sequence[int]]]` |  | 1-based restraint index (or indices) used with 'r_target'/'r_actual'. Example: 1 or [1, 2]. |  |
+| `dropna_rows` | `bool` | False | Dropna Rows parameter for RestraintSeriesRequest. | True, False |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for RestraintSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for RestraintSeriesRequest. |  |
+
+</div>
+
+## Task: `RestraintSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build iteration-based series for fort.76 restraint data.
+
+### Method: `recommended_presentations(_result: RestraintSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for restraint series.
+
+Works on
+Analyzer task output for ``restraint_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `RestraintSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for restraint tables and traces. |
+
+</div>
+
+### Method: `run(data: RestraintData, request: RestraintSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run restraint series extraction and long-form reshaping.
+
+Works on
+``RestraintData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `RestraintData` | Parsed restraint arrays and metadata. |
+| `request` | `RestraintSeriesRequest` | Field, restraint-index, and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `RestraintSeriesResult` | Long-form restraint rows with field labels and values. |
+
+</div>
+
+</div>
+
+## Result: `RestraintSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Restraint-series result.
+
+Output structure:
+- request: RestraintSeriesRequest
+  - the exact request used to generate this result
+  - includes selected fields or restraint index, frame selection, and options
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'restraint_index', 'field', 'value']
+  - frame_index: source frame index in restraint data
+  - iter: iteration corresponding to each sampled frame
+  - restraint_index: restraint number extracted from field name (for example r1_target -> 1), or NA
+  - field: selected restraint field name
+  - value: sampled numeric value for that field/frame pair
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `RestraintSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `MolecularFrequencySeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for molecular-frequency series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `molecules` | `Sequence[str]` |  | Molecules parameter for MolecularFrequencySeriesRequest. |  |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for MolecularFrequencySeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for MolecularFrequencySeriesRequest. |  |
+
+</div>
+
+## Task: `MolecularFrequencySeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build molecular-frequency time series for one or more molecular formulas.
+
+### Method: `recommended_presentations(_result: MolecularFrequencySeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for molecular-frequency series.
+
+Works on
+Analyzer task output for ``molecular_frequency_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `MolecularFrequencySeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for molecular-frequency tables and traces. |
+
+</div>
+
+### Method: `run(data: MolecularAnalysisData, request: MolecularFrequencySeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run molecular-frequency series extraction for selected formulas.
+
+Works on
+``MolecularAnalysisData``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `MolecularAnalysisData` | Parsed molecular-species frequency data. |
+| `request` | `MolecularFrequencySeriesRequest` | Molecule and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `MolecularFrequencySeriesResult` | Long-form molecular frequency rows. |
+
+</div>
+
+</div>
+
+## Result: `MolecularFrequencySeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Molecular-frequency series result.
+
+Output structure:
+- request: MolecularFrequencySeriesRequest
+  - the exact request used to generate this result
+  - includes selected molecules, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'molecules', 'freq', 'molecular_mass']
+  - frame_index: source frame index in molecular-analysis data
+  - iter: iteration corresponding to each sampled frame
+  - molecules: requested molecular formula label
+  - freq: sampled frequency value for that molecule at the frame
+  - molecular_mass: sampled molecular mass value for that molecule at the frame
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `MolecularFrequencySeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
+
+</div>
+
+## Request: `MolecularTotalsSeriesRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for molecular totals-series extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `quantities` | `Sequence[str]` | total_molecules, total_atoms, total_molecular_mass | Quantities to include in the molecular totals table. | total_molecules, total_atoms, total_molecular_mass |
+| `frames` | `Optional[Sequence[int]]` |  | Frames parameter for MolecularTotalsSeriesRequest. |  |
+| `every` | `int` | 1 | Every parameter for MolecularTotalsSeriesRequest. |  |
+
+</div>
+
+## Task: `MolecularTotalsSeriesTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+Build total molecule/atom/mass time series from MolecularAnalysisData.totals.
+
+### Method: `recommended_presentations(_result: MolecularTotalsSeriesResult, payload: dict[str, Any])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Recommend default table/plot views for molecular totals series.
+
+Works on
+Analyzer task output for ``molecular_totals_series``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `MolecularTotalsSeriesResult` | Typed analyzer result instance. |
+| `payload` | `dict[str, Any]` | Serialized payload with ``table`` rows. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Presentation specs for totals tables and traces. |
+
+</div>
+
+### Method: `run(data: MolecularAnalysisData, request: MolecularTotalsSeriesRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Run molecular totals-series extraction for selected quantities.
+
+Works on
+``MolecularAnalysisData.totals``.
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `MolecularAnalysisData` | Parsed molecular totals dataset. |
+| `request` | `MolecularTotalsSeriesRequest` | Quantity and sampling configuration. |
+| `reporter` | `Any, optional` | Progress callback accepted by analyzer tasks. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `MolecularTotalsSeriesResult` | Long-form totals quantity/value rows. |
+
+</div>
+
+</div>
+
+## Result: `MolecularTotalsSeriesResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Molecular-totals series result.
+
+Output structure:
+- request: MolecularTotalsSeriesRequest
+  - the exact request used to generate this result
+  - includes selected quantities, frames, and stride
+- table: pandas.DataFrame with columns
+  ['frame_index', 'iter', 'quantity', 'value']
+  - frame_index: source frame index in molecular totals data
+  - iter: iteration corresponding to each sampled frame
+  - quantity: selected quantity name (for example total_molecules)
+  - value: sampled scalar value for that quantity at the frame
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `request` | `MolecularTotalsSeriesRequest` |  |  |  |
+| `table` | `pd.DataFrame` |  |  |  |
 
 </div>

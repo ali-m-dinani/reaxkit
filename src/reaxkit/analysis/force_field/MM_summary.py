@@ -4,6 +4,8 @@ This module converts parsed geometry-summary records into typed, sortable
 tabular outputs used in force-field analysis workflows. It is bounded to
 summary extraction and does not perform additional structural computations.
 
+For example, if you use ReaxFF standalone for force field optimization, the geometry summary file is fort.74.
+
 **Usage context**
 
 - Structure QA: Review minima, iteration counts, and summary diagnostics.
@@ -67,7 +69,7 @@ def _get_fort74_data(*, data: GeometrySummaryData) -> pd.DataFrame:
 
 
 @dataclass
-class StructureSummaryRequest(BaseRequest):
+class MMSummaryRequest(BaseRequest):
     """Request payload for structure-summary extraction.
 
     This request configures the structure-summary analyzer task. The task
@@ -88,7 +90,7 @@ class StructureSummaryRequest(BaseRequest):
 
 
 @dataclass
-class StructureSummaryResult(BaseResult):
+class MMSummaryResult(BaseResult):
     """Result payload containing normalized structure-summary records.
 
     The analyzer returns one tabular view over parsed geometry summary entries,
@@ -119,18 +121,18 @@ class StructureSummaryResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: StructureSummaryRequest
+    request: MMSummaryRequest
 
 
 @register_task("structure_summary_data", label="Structure Summary Data")
-class StructureSummaryTask(AnalysisTask):
+class MMSummaryTask(AnalysisTask):
     """Return structure-summary data."""
 
     required_data = GeometrySummaryData
 
     @staticmethod
     def recommended_presentations(
-        _result: StructureSummaryResult, payload: dict[str, Any]
+        _result: MMSummaryResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Suggest table and plot views for structure-summary results.
 
@@ -142,7 +144,7 @@ class StructureSummaryTask(AnalysisTask):
 
         Parameters
         -----
-        _result : StructureSummaryResult
+        _result : MMSummaryResult
             Typed analyzer result instance (unused for current selection logic).
         payload : dict[str, Any]
             Serialized analyzer payload expected to include a ``table`` key.
@@ -189,9 +191,9 @@ class StructureSummaryTask(AnalysisTask):
     def run(
         self,
         data: GeometrySummaryData,
-        request: StructureSummaryRequest,
+        request: MMSummaryRequest,
         reporter=None,
-    ) -> StructureSummaryResult:
+    ) -> MMSummaryResult:
         """Execute structure-summary extraction for the provided geometry data.
 
         Builds a normalized DataFrame from parsed geometry summary fields and
@@ -204,14 +206,14 @@ class StructureSummaryTask(AnalysisTask):
         -----
         data : GeometrySummaryData
             Parsed geometry summary model with identifiers and optional metrics.
-        request : StructureSummaryRequest
+        request : MMSummaryRequest
             Analyzer request configuration.
         reporter : Any, optional
             Progress reporter accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        StructureSummaryResult
+        MMSummaryResult
             Result containing the normalized structure-summary table.
 
         Examples
@@ -225,11 +227,11 @@ class StructureSummaryTask(AnalysisTask):
         table = _get_fort74_data(
             data=data,
         )
-        return StructureSummaryResult(table=table, request=request)
+        return MMSummaryResult(table=table, request=request)
 
 
 __all__ = [
-    "StructureSummaryRequest",
-    "StructureSummaryResult",
-    "StructureSummaryTask",
+    "MMSummaryRequest",
+    "MMSummaryResult",
+    "MMSummaryTask",
 ]

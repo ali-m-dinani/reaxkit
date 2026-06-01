@@ -15,6 +15,16 @@
 
 _No command-specific arguments found._
 
+<a id="ReaxKit_Graphical_User_Interface"></a>
+
+A view of the graphical user interface (GUI) is seen below:
+
+<div style="text-align:center;" markdown="1">
+![ReaxKit_Graphical_User_Interface](../../../figures/ReaxKit_Graphical_User_Interface.png){ style="width:85%; max-width:800px;" }
+
+*Figure: View of ReaxKit's GUI.*
+</div>
+
 </div>
 
 ## Common Runtime and Presentation Arguments

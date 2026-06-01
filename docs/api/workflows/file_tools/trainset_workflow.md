@@ -123,6 +123,17 @@ There are multiple sections in a training set file such as ENRGY, CHARGET, etc.,
 | `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
 
+<a id="TrainsetDataTask"></a>
+
+The figure below shows an example CSV output for trainset data. Group comments are the comments above each set of data, which shows what does data are related to.
+In contrast, inline-comment is the comment line in front of each trainset line.
+ 
+<div style="text-align:center;" markdown="1">
+![TrainsetDataTask](../../../figures/TrainsetDataTask.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample CSV output for trainset data.*
+</div>
+
 </div>
 
 ## Command: `get_trainset_group_comments`

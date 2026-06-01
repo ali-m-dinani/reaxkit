@@ -133,7 +133,7 @@ def _build_trainset_data_table(
 
 
 @dataclass
-class GetTrainsetDataRequest(BaseRequest):
+class TrainsetDataRequest(BaseRequest):
     """Request payload for trainset row extraction.
 
     This request selects a single trainset section or all supported sections
@@ -169,7 +169,7 @@ class GetTrainsetDataRequest(BaseRequest):
 
 
 @dataclass
-class GetTrainsetDataResult(BaseResult):
+class TrainsetDataResult(BaseResult):
     """Result payload for trainset section extraction.
 
     The analyzer returns trainset rows for the requested scope as a normalized
@@ -204,18 +204,18 @@ class GetTrainsetDataResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: GetTrainsetDataRequest
+    request: TrainsetDataRequest
 
 
 @register_task("trainset_data", label="Trainset Data")
-class GetTrainsetDataTask(AnalysisTask):
+class TrainsetDataTask(AnalysisTask):
     """Return trainset rows for one section or all sections."""
 
     required_data = ForceFieldOptimizationTrainingSetData
 
     @staticmethod
     def recommended_presentations(
-        _result: GetTrainsetDataResult,
+        _result: TrainsetDataResult,
         payload: dict[str, Any],
     ) -> list[PresentationSpec]:
         """Recommend table and fallback plot views for trainset row outputs.
@@ -228,7 +228,7 @@ class GetTrainsetDataTask(AnalysisTask):
 
         Parameters
         -----
-        _result : GetTrainsetDataResult
+        _result : TrainsetDataResult
             Typed analyzer result instance (unused by current logic).
         payload : dict[str, Any]
             Serialized payload expected to contain a ``table`` list.
@@ -283,9 +283,9 @@ class GetTrainsetDataTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationTrainingSetData,
-        request: GetTrainsetDataRequest,
+        request: TrainsetDataRequest,
         reporter=None,
-    ) -> GetTrainsetDataResult:
+    ) -> TrainsetDataResult:
         """Run trainset section extraction for the requested scope.
 
         Resolves the section selector, materializes either one section table or
@@ -298,14 +298,14 @@ class GetTrainsetDataTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationTrainingSetData
             Parsed trainset data bundle.
-        request : GetTrainsetDataRequest
+        request : TrainsetDataRequest
             Request with section selector.
         reporter : Any, optional
             Progress callback accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        GetTrainsetDataResult
+        TrainsetDataResult
             Result containing the extracted trainset table.
 
         Examples
@@ -316,7 +316,7 @@ class GetTrainsetDataTask(AnalysisTask):
         The returned table contains all supported sections with a ``section`` label.
         """
         table = _build_trainset_data_table(data, section=request.section)
-        return GetTrainsetDataResult(table=table, request=request)
+        return TrainsetDataResult(table=table, request=request)
 
 
 @dataclass
@@ -495,9 +495,9 @@ class TrainsetGroupCommentsTask(AnalysisTask):
 
 
 __all__ = [
-    "GetTrainsetDataRequest",
-    "GetTrainsetDataResult",
-    "GetTrainsetDataTask",
+    "TrainsetDataRequest",
+    "TrainsetDataResult",
+    "TrainsetDataTask",
     "TrainsetGroupCommentsRequest",
     "TrainsetGroupCommentsResult",
     "TrainsetGroupCommentsTask",

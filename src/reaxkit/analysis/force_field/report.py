@@ -327,7 +327,7 @@ def _bulk_modulus_table_from_eos(
 
 
 @dataclass
-class ForceFieldOptimizationReportRequest(BaseRequest):
+class FFieldOptimizationReportRequest(BaseRequest):
     """Request payload for optimization-report table extraction.
 
     This request configures the base optimization-report analyzer. The current
@@ -348,7 +348,7 @@ class ForceFieldOptimizationReportRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldOptimizationReportResult(BaseResult):
+class FFieldOptimizationReportResult(BaseResult):
     """Result payload containing parsed optimization-report rows.
 
     The analyzer returns normalized report records and a derived
@@ -378,11 +378,11 @@ class ForceFieldOptimizationReportResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldOptimizationReportRequest
+    request: FFieldOptimizationReportRequest
 
 
 @dataclass
-class ForceFieldOptimizationReportEOSRequest(BaseRequest):
+class FFieldOptimizationReportEOSRequest(BaseRequest):
     """Request payload for EOS table extraction from report artifacts.
 
     This request optionally filters the derived base/other energy-volume table
@@ -414,7 +414,7 @@ class ForceFieldOptimizationReportEOSRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldOptimizationReportEOSResult(BaseResult):
+class FFieldOptimizationReportEOSResult(BaseResult):
     """Result payload containing EOS-compatible energy-volume rows.
 
     The analyzer joins repeated report identifiers with geometry summary values
@@ -440,11 +440,11 @@ class ForceFieldOptimizationReportEOSResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldOptimizationReportEOSRequest
+    request: FFieldOptimizationReportEOSRequest
 
 
 @dataclass
-class ForceFieldOptimizationReportBulkModulusRequest(BaseRequest):
+class FFieldOptimizationReportBulkModulusRequest(BaseRequest):
     """Request payload for Vinet bulk-modulus fitting from EOS rows.
 
     This request controls optional base filtering and fitting options used to
@@ -511,7 +511,7 @@ class ForceFieldOptimizationReportBulkModulusRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldOptimizationReportBulkModulusResult(BaseResult):
+class FFieldOptimizationReportBulkModulusResult(BaseResult):
     """Result payload for EOS-derived bulk-modulus fitting.
 
     The analyzer returns one row per successfully fitted base identifier,
@@ -540,18 +540,18 @@ class ForceFieldOptimizationReportBulkModulusResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldOptimizationReportBulkModulusRequest
+    request: FFieldOptimizationReportBulkModulusRequest
 
 
 @register_task("force_field_optimization_report", label="Force Field Optimization Report")
-class ForceFieldOptimizationReportTask(AnalysisTask):
+class FFieldOptimizationReportTask(AnalysisTask):
     """Return the parsed optimization-report table with QM-FF differences."""
 
     required_data = ForceFieldOptimizationReportData
 
     @staticmethod
     def recommended_presentations(
-        _result: ForceFieldOptimizationReportResult, payload: dict[str, Any]
+        _result: FFieldOptimizationReportResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Recommend table and QM-FF difference plot views for report output.
 
@@ -563,7 +563,7 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldOptimizationReportResult
+        _result : FFieldOptimizationReportResult
             Typed analyzer result instance (unused by current selection logic).
         payload : dict[str, Any]
             Serialized analyzer payload expected to include a ``table`` list.
@@ -608,9 +608,9 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationReportData,
-        request: ForceFieldOptimizationReportRequest,
+        request: FFieldOptimizationReportRequest,
         reporter=None,
-    ) -> ForceFieldOptimizationReportResult:
+    ) -> FFieldOptimizationReportResult:
         """Run base optimization-report extraction and difference computation.
 
         Converts parsed report rows into a normalized table and augments each
@@ -623,14 +623,14 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationReportData
             Parsed optimization-report data source.
-        request : ForceFieldOptimizationReportRequest
+        request : FFieldOptimizationReportRequest
             Request object for the analysis task.
         reporter : Any, optional
             Progress callback accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        ForceFieldOptimizationReportResult
+        FFieldOptimizationReportResult
             Result containing the normalized report table.
 
         Examples
@@ -644,18 +644,18 @@ class ForceFieldOptimizationReportTask(AnalysisTask):
         The result table includes ``qm_ff_difference`` for each report row.
         """
         table = _get_report_data(data)
-        return ForceFieldOptimizationReportResult(table=table, request=request)
+        return FFieldOptimizationReportResult(table=table, request=request)
 
 
 @register_task("force_field_optimization_report_eos", label="Force Field Optimization Report EOS")
-class ForceFieldOptimizationReportEOSTask(AnalysisTask):
+class FFieldOptimizationReportEOSTask(AnalysisTask):
     """Return ENERGY-vs-volume data derived from report + geometry summary."""
 
     required_data = ForceFieldOptimizationReportEOSBundleData
 
     @staticmethod
     def recommended_presentations(
-        _result: ForceFieldOptimizationReportEOSResult, payload: dict[str, Any]
+        _result: FFieldOptimizationReportEOSResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Recommend table and energy-vs-volume presentations for EOS output.
 
@@ -667,7 +667,7 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldOptimizationReportEOSResult
+        _result : FFieldOptimizationReportEOSResult
             Typed analyzer result instance (unused by current logic).
         payload : dict[str, Any]
             Serialized payload expected to include ``table`` rows.
@@ -717,9 +717,9 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationReportEOSBundleData,
-        request: ForceFieldOptimizationReportEOSRequest,
+        request: FFieldOptimizationReportEOSRequest,
         reporter=None,
-    ) -> ForceFieldOptimizationReportEOSResult:
+    ) -> FFieldOptimizationReportEOSResult:
         """Run EOS table extraction from report and geometry summary bundles.
 
         Builds the base/other energy-volume table and optionally filters it by
@@ -732,14 +732,14 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationReportEOSBundleData
             Bundle with parsed report rows and geometry summary values.
-        request : ForceFieldOptimizationReportEOSRequest
+        request : FFieldOptimizationReportEOSRequest
             Optional identifier filter for EOS table scope.
         reporter : Any, optional
             Progress callback accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        ForceFieldOptimizationReportEOSResult
+        FFieldOptimizationReportEOSResult
             Result containing EOS-compatible energy-volume rows.
 
         Examples
@@ -755,18 +755,18 @@ class ForceFieldOptimizationReportEOSTask(AnalysisTask):
         table = _base_other_energy_volume_table(data.report, data.geometry_summary)
         if request.iden and str(request.iden).lower() != "all":
             table = table[table["base_iden"] == request.iden].reset_index(drop=True)
-        return ForceFieldOptimizationReportEOSResult(table=table, request=request)
+        return FFieldOptimizationReportEOSResult(table=table, request=request)
 
 
 @register_task("force_field_optimization_report_bulk_modulus", label="Force Field Optimization Report Bulk Modulus")
-class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
+class FFieldOptimizationReportBulkModulusTask(AnalysisTask):
     """Return a Vinet bulk-modulus fit derived from report + geometry summary."""
 
     required_data = ForceFieldOptimizationReportEOSBundleData
 
     @staticmethod
     def recommended_presentations(
-        _result: ForceFieldOptimizationReportBulkModulusResult, payload: dict[str, Any]
+        _result: FFieldOptimizationReportBulkModulusResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Recommend table and bulk-modulus summary plot presentations.
 
@@ -778,7 +778,7 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldOptimizationReportBulkModulusResult
+        _result : FFieldOptimizationReportBulkModulusResult
             Typed analyzer result instance (unused by current selection logic).
         payload : dict[str, Any]
             Serialized payload expected to include ``table`` rows.
@@ -823,9 +823,9 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationReportEOSBundleData,
-        request: ForceFieldOptimizationReportBulkModulusRequest,
+        request: FFieldOptimizationReportBulkModulusRequest,
         reporter=None,
-    ) -> ForceFieldOptimizationReportBulkModulusResult:
+    ) -> FFieldOptimizationReportBulkModulusResult:
         """Run bulk-modulus fitting on EOS rows derived from report artifacts.
 
         Derives EOS rows from report and geometry summary data, applies request
@@ -838,14 +838,14 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationReportEOSBundleData
             Bundle with report and geometry summary inputs for EOS derivation.
-        request : ForceFieldOptimizationReportBulkModulusRequest
+        request : FFieldOptimizationReportBulkModulusRequest
             Fit configuration and optional identifier filter.
         reporter : Any, optional
             Progress callback accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        ForceFieldOptimizationReportBulkModulusResult
+        FFieldOptimizationReportBulkModulusResult
             Result containing Vinet fit parameters per base identifier.
 
         Examples
@@ -866,17 +866,17 @@ class ForceFieldOptimizationReportBulkModulusTask(AnalysisTask):
             flip_sign=bool(request.flip_sign),
             min_points=max(3, int(request.min_points)),
         )
-        return ForceFieldOptimizationReportBulkModulusResult(table=table, request=request)
+        return FFieldOptimizationReportBulkModulusResult(table=table, request=request)
 
 
 __all__ = [
-    "ForceFieldOptimizationReportRequest",
-    "ForceFieldOptimizationReportResult",
-    "ForceFieldOptimizationReportTask",
-    "ForceFieldOptimizationReportEOSRequest",
-    "ForceFieldOptimizationReportEOSResult",
-    "ForceFieldOptimizationReportEOSTask",
-    "ForceFieldOptimizationReportBulkModulusRequest",
-    "ForceFieldOptimizationReportBulkModulusResult",
-    "ForceFieldOptimizationReportBulkModulusTask",
+    "FFieldOptimizationReportRequest",
+    "FFieldOptimizationReportResult",
+    "FFieldOptimizationReportTask",
+    "FFieldOptimizationReportEOSRequest",
+    "FFieldOptimizationReportEOSResult",
+    "FFieldOptimizationReportEOSTask",
+    "FFieldOptimizationReportBulkModulusRequest",
+    "FFieldOptimizationReportBulkModulusResult",
+    "FFieldOptimizationReportBulkModulusTask",
 ]

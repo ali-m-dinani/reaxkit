@@ -183,6 +183,7 @@ Supported properties include first peak, dominant peak, area, and excess area.
 
 Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.
 Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geometry visualization.
+For a more discussion on voronoi plots, see the main documentaion at: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.voronoi_plot_2d.html
 
 ### Examples
 -----
@@ -196,9 +197,6 @@ Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geom
 
   3. Plot a 2D Voronoi diagram projection:
    reaxkit get_voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10
-
-  4. Plot 3D Voronoi diagrams as subplots over frame samples:
-   reaxkit get_voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5
 ```
 
 ### Arguments
@@ -211,6 +209,16 @@ Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geom
 | `--plot-target` | No | metrics | Plot Voronoi metrics or cell diagrams. Example: --plot-target diagram, which switches to geometry visualization mode. | metrics, diagram |
 | `--diagram-dim` | No | 2d | Diagram dimensionality. Example: --diagram-dim 3d, which renders 3D Voronoi cell wireframes. | 2d, 3d |
 | `--projection` | No | xy | Projection plane for 2D diagram mode. Example: --projection xz, which projects 2D diagram onto XZ plane. | xy, xz, yz |
+
+<a id="get_voronoi_diagram_2d"></a>
+
+The figure below shows an example 2D plot for the voronoi.
+
+<div style="text-align:center;" markdown="1">
+![get_voronoi_diagram_2d](../../../figures/get_voronoi_diagram_2d.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample an example 2D plot for the voronoi.*
+</div>
 
 </div>
 

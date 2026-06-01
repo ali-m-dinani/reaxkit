@@ -379,7 +379,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.description = (
             "Classify atoms as under-, coordinated-, or over-coordinated.\n"
             "Classification compares bond-order totals against target valences from explicit maps\n"
-            "or inferred values.\n\n"
+            "or inferred values.\n"
+            "For example, if an atom's valence is 3 and the threshold is 0.5, then:\n"
+            " - sum_BOs < 2.5 -> under-coordinated\n"
+            " - 2.5 <= sum_BOs <= 3.5 -> coordinated\n"
+            " - sum_BOs > 3.5 -> over-coordinated\n\n"
             "Examples:\n"
             "  1. Classify using explicit valence map and export:\n"
             "   reaxkit get_coordination --fort7 fort.7 --xmolout xmolout --valences Mg=2,O=2 --export coordination.csv\n\n"

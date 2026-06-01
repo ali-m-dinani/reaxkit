@@ -70,7 +70,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = DihedralTask.recommended_presentations(result, payload)
 ```
@@ -78,8 +77,6 @@ Sample output:
 A list containing a table view and a dihedral-vs-time plot view.
 Meaning:
 UIs can render dihedral outputs without custom mapping logic.
-```
-
 
 </div>
 
@@ -112,7 +109,6 @@ one row per frame in the result table.
 
 #### Examples
 
-```text
 ```python
 req = DihedralRequest(atom_ids=[1, 2, 3, 4], units="deg")
 result = DihedralTask().run(data, req)
@@ -121,8 +117,6 @@ Sample output:
 `result.table` with columns including `iter` and `dihedral`.
 Meaning:
 Each row is the torsion value for the selected quadruplet at one frame.
-```
-
 
 </div>
 

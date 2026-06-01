@@ -1,101 +1,48 @@
-# ReaxKit Templates for developers
+# ReaxKit File Templates
 
-This directory contains **minimal, reference templates** for developing new
-handlers, analyzers, and workflows in ReaxKit.  
-They are **not** runtime code and are intended for **contributors and developers**
-who want to extend ReaxKit in a consistent, maintainable way.
+This directory contains reference templates for building new ReaxKit modules.
+These files are for contributors to copy and adapt; they are not runtime code.
 
-The templates illustrate ReaxKit’s core architectural principles:
-**separation of concerns**, **tidy data flow**, and **CLI-first design**.
+## Available Templates
 
----
+### [`template_analyzer.py`](template_analyzer.py)
+Template for analysis modules with the ReaxKit request-task-result pattern:
+- request dataclass for user inputs
+- task class with `recommended_presentations` and `run(...)`
+- result dataclass with table/request-oriented outputs
 
-## Overview of Templates
+### [`template_workflow.py`](template_workflow.py)
+Template for CLI workflow modules:
+- argument registration and validation
+- task/request construction
+- user-facing output and file export flow
 
-### 1. `template_handler.py` — File Parsers (I/O layer)
+### [`template_handler.py`](template_handler.py)
+Template for file I/O handlers:
+- parse raw file content
+- expose structured DataFrame-style accessors
+- keep parsing concerns separated from analysis logic
 
-Use [template_handler.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_handler.py)
-when implementing a **new ReaxFF file handler**.
+### [`template_generator.py`](template_generator.py)
+Template for generator-style modules (e.g., writing ReaxFF input files):
+- spec dataclasses
+- validation and normalization helpers
+- deterministic content generation and save helpers
 
-A handler’s responsibility is strictly limited to:
-- reading a raw file,
-- parsing it into a **summary DataFrame**,
-- optionally extracting **per-frame data**,
-- performing lightweight cleaning (e.g. duplicate iterations),
-- exposing a consistent API (`dataframe()`, `frame()`, `iter_frames()`).
+### [`template_utils.py`](template_utils.py)
+Template for utility modules:
+- focused reusable functions
+- clear input/output contracts
+- docstrings aligned with project conventions
 
-**Handlers must NOT:**
-- give data to users through `get()` functions
-- perform numerical analysis,
-- generate plots,
-- make scientific interpretations.
+## Usage
 
-This guarantees that handlers remain reusable across analyzers, workflows,
-CLI commands, and future GUIs.
+1. Pick the closest template.
+2. Copy it into the target package.
+3. Rename classes/functions to domain-specific names.
+4. Replace placeholder logic with real implementation.
+5. Keep docstrings consistent with `docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md`.
 
----
+## Related Rule File
 
-### 2. `template_analyzer.py` — Data Analysis (analysis layer)
-
-Use [template_analyzer.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_analyzer.py) to implement **analysis routines** that operate on data
-provided by handlers.
-
-Analyzers:
-- accept one or more handlers as input,
-- retrieve data via `handler.dataframe()` or `handler.frame(...)`,
-- compute derived quantities,
-- return results as **tidy pandas objects**.
-
-Naming guidelines:
-- use descriptive, intention-revealing names (`compute_x`, `extract_y`,
-  `calculate_metric`)
-- avoid embedding file-specific logic (that belongs in handlers).
-
-To help `reaxkit intspec` CLI command find and report what functions are available in each analyzer, please put a one line short description of that function in the first line of its docstring, immediately followed by tripple quote signs.
-
-Analyzers should remain **pure and testable**, with no CLI or plotting logic.
-
----
-
-### 3. `template_workflow.py` — CLI Tasks (workflow layer)
-
-Use [template_workflow.py](https://github.com/ali-m-dinani/reaxkit/blob/master/docs/file_templates/template_workflow.py) to expose analysis functionality through the **ReaxKit CLI**.
-
-Workflows:
-- define CLI subcommands and arguments,
-- instantiate handlers,
-- call analyzers,
-- optionally trigger plotting or export,
-- handle user-facing messages and output paths.
-
-Key conventions shown in the template:
-- `reaxkit <kind> <task> --flags` CLI structure
-- grouping common CLI arguments via helper functions
-- consistent `--plot`, `--save`, and `--export` semantics
-- examples embedded in CLI help text
-- all outputs routed to a structured `reaxkit_output/` directory
-
-Workflows should **orchestrate**, not compute.
-
----
-
-## Typical Development Flow
-
-When adding support for a new file or analysis:
-
-1. **Write a handler** (based on `template_handler.py`)
-2. **Write one or more analyzers** (based on `template_analyzer.py`)
-3. **Expose them via a workflow** (based on `template_workflow.py`)
-4. Add tests and documentation as needed
-
-This layered approach keeps ReaxKit modular, debuggable, and scalable.
-
----
-
-## Notes
-
-- These templates are intentionally minimal.
-- Copy them when starting new development; do not import them directly.
-- They reflect current best practices used throughout the ReaxKit codebase.
-
-If in doubt, search existing handlers, analyzers, or workflows.
+- [Docstring content and inclusion guidelines](../rules_and_conventions/docstring_content_and_inclusion_guidelines.md)

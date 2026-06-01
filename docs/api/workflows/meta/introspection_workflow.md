@@ -15,6 +15,16 @@
 
 _No command-specific arguments found._
 
+<a id="Intspec_folder_workflows"></a>
+
+The figure below shows an example terminal output when running intspec on workflows.
+
+<div style="text-align:center;" markdown="1">
+![Intspec_folder_workflows](../../../figures/Intspec_folder_workflows.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample terminal output when running intspec on workflows.*
+</div>
+
 </div>
 
 ## Common Runtime and Presentation Arguments

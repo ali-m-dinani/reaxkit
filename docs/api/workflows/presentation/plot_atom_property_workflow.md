@@ -15,6 +15,16 @@
 
 _No command-specific arguments found._
 
+<a id="plot_atom_property_3d"></a>
+
+The figure below shows an example output plot when plotting the charges of atoms at a specific frame across their 3D coordinates.
+
+<div style="text-align:center;" markdown="1">
+![plot_atom_property_3d](../../../figures/plot_atom_property_3d.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample plot for charges of atoms at a specific frame across their 3D coordinates.*
+</div>
+
 </div>
 
 ## Common Runtime and Presentation Arguments

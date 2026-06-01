@@ -105,7 +105,10 @@ def get_registered_generators() -> dict[str, GeneratorSpec]:
 
 
 register_generator("get-control", module_path="reaxkit.workflows.file_tools.control_workflow")
+register_generator("get-control_data", module_path="reaxkit.workflows.file_tools.control_workflow")
 register_generator("gen_control", module_path="reaxkit.workflows.file_tools.control_workflow")
+register_generator("gen-control", module_path="reaxkit.workflows.file_tools.control_workflow")
+register_generator("gen_template_control", module_path="reaxkit.workflows.file_tools.control_workflow")
 register_generator("make-control", module_path="reaxkit.workflows.file_tools.control_workflow")
 register_generator("write-control", module_path="reaxkit.workflows.file_tools.control_workflow")
 register_generator("study", module_path="reaxkit.workflows.study_design.study_workflow")
@@ -130,6 +133,7 @@ register_generator("add-geo-restraint", module_path="reaxkit.workflows.file_tool
 register_generator("add_molcharge_to_geo", module_path="reaxkit.workflows.file_tools.geo_workflow")
 register_generator("add-geo-molcharge", module_path="reaxkit.workflows.file_tools.geo_workflow")
 register_generator("extract-optimized-ffield", module_path="reaxkit.workflows.file_tools.fort83_workflow")
+register_generator("get-optimized-ffield", module_path="reaxkit.workflows.file_tools.fort83_workflow")
 register_generator("merge-ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_generator("merge_ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")
 register_generator("add-element-to-ffield", module_path="reaxkit.workflows.file_tools.ffield_workflow")

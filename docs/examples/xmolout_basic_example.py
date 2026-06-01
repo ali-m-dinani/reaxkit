@@ -1,118 +1,104 @@
 """
-Example: Direct use of xmolout_analyzer (no CLI).
+Example: basic xmolout analysis with current ReaxKit tasks (no CLI).
 
 This script demonstrates how to:
-1. Load an xmolout file with XmoloutHandler
-2. Extract atom trajectories
-3. Compute mean squared displacement (MSD)
-4. Inspect box / thermodynamic information
-
+1) Load an xmolout file with XmoloutHandler
+2) Build TrajectoryData via ReaxFF adapter normalizer
+3) Extract trajectory coordinate series for one atom/dimension
+4) Compute MSD for selected atom(s)
+5) Extract cell dimensions from simulation metadata
+6) Export results to CSV
 """
+
+from __future__ import annotations
 
 from pathlib import Path
 
 import pandas as pd
 
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
-from reaxkit.analysis.per_file.xmolout_analyzer import (
-    get_atom_trajectories,
-    get_unit_cell_dimensions_across_frames,
-    get_atom_type_mapping,
+from reaxkit.analysis.timeseries import (
+    CellDimensionsRequest,
+    CellDimensionsTask,
+    TrajectoryCoordinateSeriesRequest,
+    TrajectoryCoordinateSeriesTask,
 )
-from reaxkit.analysis.trajectory.msd_task import MSDTask
-from reaxkit.domain.data_models import MSDRequest
+from reaxkit.analysis.trajectory.msd import MSDRequest, MSDTask
 from reaxkit.engine.reaxff.adapter import trajectory_from_xmolout_handler
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 
-# ---------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------
+HERE = Path(__file__).resolve().parent
+DATA = HERE / "data"
 
-XMOL_PATH = Path("data/small_xmolout")  # relative to docs/examples/
-FRAMES = slice(0, 50)                   # first 50 frames
-ATOM_ID = [1]                           # 1-based atom indexing
-DIMS = ("z",)
+XMOL_PATH = DATA / "small_xmolout"
+ATOM_IDS = [1]  # 1-based indexing
+FRAMES_SAMPLE = list(range(0, 50, 5))
 
-
-# ---------------------------------------------------------
-# Load xmolout
-# ---------------------------------------------------------
-
-xh = XmoloutHandler(XMOL_PATH)
-
-print(f"Loaded xmolout with {len(xh.dataframe())} frames")
-print()
+OUTDIR = Path("reaxkit_outputs/examples/xmolout_basic")
+OUTDIR.mkdir(parents=True, exist_ok=True)
 
 
-# ---------------------------------------------------------
-# Inspect atom types
-# ---------------------------------------------------------
-
-type_info = get_atom_type_mapping(xh, frame=0)
-
-print("Atom types in frame 0:")
-for t, ids in type_info["type_to_indices"].items():
-    print(f"  {t}: {len(ids)} atoms")
-print()
+def _print_head(df: pd.DataFrame, name: str, n: int = 5) -> None:
+    print(f"\n=== {name} (head {n}) ===")
+    if df.empty:
+        print("(empty)")
+    else:
+        print(df.head(n).to_string(index=False))
 
 
-# ---------------------------------------------------------
-# Extract atom trajectories
-# ---------------------------------------------------------
+def main() -> None:
+    if not XMOL_PATH.exists():
+        raise FileNotFoundError(f"Missing xmolout sample file: {XMOL_PATH}")
 
-traj = get_atom_trajectories(
-    xh,
-    frames=FRAMES,
-    atoms=ATOM_ID,
-    dims=DIMS,
-    format="long",
-)
+    xh = XmoloutHandler(str(XMOL_PATH))
+    xdf = xh.dataframe()
+    print(f"Loaded xmolout frames: {len(xdf)}")
+    _print_head(xdf, "xmolout summary dataframe")
 
-print("Trajectory preview:")
-print(traj.head())
-print()
+    traj_data = trajectory_from_xmolout_handler(xh)
+
+    coords = TrajectoryCoordinateSeriesTask().run(
+        traj_data,
+        TrajectoryCoordinateSeriesRequest(
+            atom_ids=ATOM_IDS,
+            dims=("z",),
+            frames=FRAMES_SAMPLE,
+            every=1,
+        ),
+    ).table
+    _print_head(coords, "atom trajectory coordinate series (z)")
+    coords.to_csv(OUTDIR / "atom1_z_trajectory.csv", index=False)
+
+    msd = MSDTask().run(
+        traj_data,
+        MSDRequest(
+            atom_ids=ATOM_IDS,
+            dims=("z",),
+            frames=FRAMES_SAMPLE,
+            every=1,
+            origin="first",
+            unwrap=True,
+        ),
+    ).table
+    _print_head(msd, "MSD (z)")
+    msd.to_csv(OUTDIR / "atom1_z_msd.csv", index=False)
+
+    if traj_data.simulation is not None:
+        cell = CellDimensionsTask().run(
+            traj_data.simulation,
+            CellDimensionsRequest(
+                fields=("a", "b", "c", "alpha", "beta", "gamma"),
+                frames=FRAMES_SAMPLE,
+                every=1,
+            ),
+        ).table
+        _print_head(cell, "cell dimensions")
+        cell.to_csv(OUTDIR / "cell_dimensions.csv", index=False)
+    else:
+        print("\nNo simulation metadata available; skipped cell-dimension extraction.")
+
+    print(f"\nDone. Results written to:\n  {OUTDIR.resolve()}")
 
 
-# ---------------------------------------------------------
-# Compute mean squared displacement (MSD)
-# ---------------------------------------------------------
-
-traj_data = trajectory_from_xmolout_handler(xh)
-msd_req = MSDRequest(
-    atom_ids=ATOM_ID,
-    dims=DIMS,
-    frames=list(range(FRAMES.start or 0, FRAMES.stop or len(xh.dataframe()))),
-)
-msd = MSDTask().run(traj_data, msd_req).table
-
-print("MSD preview:")
-print(msd.head())
-print()
-
-
-# ---------------------------------------------------------
-# Extract box / thermodynamic data
-# ---------------------------------------------------------
-
-box = get_unit_cell_dimensions_across_frames(
-    xh,
-    frames=FRAMES,
-)
-
-print("Box / thermodynamic data:")
-print(box.head())
-print()
-
-
-# ---------------------------------------------------------
-# Optional: export results
-# ---------------------------------------------------------
-
-outdir = Path("reaxkit_outputs/examples")
-outdir.mkdir(parents=True, exist_ok=True)
-
-traj.to_csv(outdir / "atom1_z_trajectory.csv", index=False)
-msd.to_csv(outdir / "atom1_z_msd.csv", index=False)
-box.to_csv(outdir / "box_dimensions.csv", index=False)
-
-print(f"Results written to: {outdir.resolve()}")
+if __name__ == "__main__":
+    main()

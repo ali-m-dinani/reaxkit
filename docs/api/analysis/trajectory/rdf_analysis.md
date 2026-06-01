@@ -73,7 +73,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = RDFTask.recommended_presentations(result, payload)
 ```
@@ -81,8 +80,6 @@ Sample output:
 A table view and an RDF line-plot view.
 Meaning:
 The payload can be rendered as numeric table and radial profile plot.
-```
-
 
 </div>
 
@@ -112,7 +109,6 @@ Compute RDF curves for selected atom groups across sampled frames.
 
 #### Examples
 
-```text
 ```python
 req = RDFRequest(atom_types_a=["O"], atom_types_b=["H"], backend="freud")
 result = RDFTask().run(data, req)
@@ -121,8 +117,6 @@ Sample output:
 `result.table` with columns `frame_index`, `iter`, `r`, `g`.
 Meaning:
 Each frame contributes one discretized `g(r)` curve to the table.
-```
-
 
 </div>
 
@@ -153,5 +147,150 @@ Sample output:
 DataFrame rows with one `g(r)` sample per radial bin and frame.
 Meaning:
 The table contains the discretized RDF curve(s) for selected frames.
+
+</div>
+
+## Request: `RDFPropertyRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for RDF-derived property extraction.
+
+Configures which single RDF property to extract and reuses RDF selection/
+discretization controls for per-frame property computation.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `property` | `str` | first_peak | RDF-derived property to compute from g(r). | first_peak, dominant_peak, area, excess_area |
+| `atom_ids_a` | `Optional[Sequence[int]]` |  | Atom IDs for group A. Empty means all atoms. |  |
+| `atom_ids_b` | `Optional[Sequence[int]]` |  | Atom IDs for group B. Empty means all atoms. |  |
+| `atom_types_a` | `Optional[Sequence[str]]` |  | Element symbols for group A when atom_ids_a is empty. |  |
+| `atom_types_b` | `Optional[Sequence[str]]` |  | Element symbols for group B when atom_ids_b is empty. |  |
+| `frames` | `Optional[Sequence[int]]` |  | Frame indices to include. Empty means all frames. |  |
+| `every` | `int` | 1 | Stride over selected frames. |  |
+| `bins` | `int` | 200 | Number of radial bins. |  |
+| `r_max` | `Optional[float]` |  | Maximum radius. Empty uses half of the shortest box length. |  |
+| `backend` | `str` | freud | RDF computation backend. | freud, ovito |
+
+### Examples
+
+```python
+req = RDFPropertyRequest(property="first_peak", atom_types_a=["O"], atom_types_b=["O"])
+```
+Sample output:
+`RDFPropertyRequest(...)`
+Meaning:
+The request asks for frame-resolved first-peak properties for O-O RDF.
+
+</div>
+
+## Task: `RDFPropertyTask`
+
+<div class="analysis-section-indent" markdown="1">
+
+RDF-derived property task.
+
+### Method: `recommended_presentations(_result: RDFPropertyResult, payload: dict[str, object])`
+
+<div class="analysis-method-indent" markdown="1">
+
+Build default table/plot presentations for RDF property outputs.
+
+#### Works on
+
+Analyzer task output payloads
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `_result` | `RDFPropertyResult` | Analysis result object for the executed task. |
+| `payload` | `dict[str, object]` | Serialized result payload used by presentation dispatch. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `list[PresentationSpec]` | Recommended renderer specs for property tables and line plots. |
+
+#### Examples
+
+```python
+specs = RDFPropertyTask.recommended_presentations(result, payload)
+```
+Sample output:
+A list containing table view and one property-vs-time plot view.
+Meaning:
+The selected property can be visualized directly over frames/iterations.
+
+</div>
+
+### Method: `run(data: TrajectoryData, request: RDFPropertyRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
+
+Compute one selected RDF-derived property per sampled frame.
+
+#### Works on
+
+`TrajectoryData` plus `RDFPropertyRequest` analyzer inputs
+
+#### Parameters
+
+| Name | Type | Description |
+|---|---|---|
+| `data` | `TrajectoryData` | Trajectory coordinates and metadata used to generate RDF curves. |
+| `request` | `RDFPropertyRequest` | Property selection and RDF computation configuration. |
+| `reporter` | `Any, optional` | Optional progress callback invoked during RDF evaluation. |
+
+#### Returns
+
+| Type | Description |
+|---|---|
+| `RDFPropertyResult` | Result object containing frame-wise derived RDF property rows. |
+
+#### Examples
+
+```python
+req = RDFPropertyRequest(property="dominant_peak")
+result = RDFPropertyTask().run(data, req)
+```
+Sample output:
+`result.table` with columns such as `r_peak` and `g_peak`.
+Meaning:
+Each row summarizes the selected RDF property for one analyzed frame.
+
+</div>
+
+</div>
+
+## Result: `RDFPropertyResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for RDF-derived property analysis.
+
+Stores frame-wise derived RDF properties and the request used to compute
+them.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `RDFPropertyRequest` |  |  |  |
+
+### Examples
+
+```python
+result = RDFPropertyTask().run(data, req)
+result.table.columns
+```
+Sample output:
+Index with `frame_index`, `iter`, and selected property columns.
+Meaning:
+Rows map each analyzed frame to its derived RDF property value(s).
 
 </div>

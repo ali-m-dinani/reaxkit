@@ -282,7 +282,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     elif canonical == "get_voronoi":
         parser.description = (
             "Compute per-atom Voronoi metrics or Voronoi diagrams for selected frames.\n"
-            "Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geometry visualization.\n\n"
+            "Use metrics mode for scalar series (e.g., volume) and diagram mode for cell geometry visualization.\n"
+            "For a more discussion on voronoi plots, see the main documentaion at: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.voronoi_plot_2d.html\n\n"
             "Examples:\n"
             "  1. Export Voronoi metrics table:\n"
             "   reaxkit get_voronoi --frames 0 10 20 --export voronoi.csv\n\n"
@@ -290,8 +291,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "   reaxkit get_voronoi --plot single --plot-target metrics --atom-types O --frames 0:100:5\n\n"
             "  3. Plot a 2D Voronoi diagram projection:\n"
             "   reaxkit get_voronoi --plot single --plot-target diagram --diagram-dim 2d --projection xy --frames 10\n\n"
-            "  4. Plot 3D Voronoi diagrams as subplots over frame samples:\n"
-            "   reaxkit get_voronoi --plot subplot --plot-target diagram --diagram-dim 3d --frames 0:20:5"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which limits Voronoi analysis to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which restricts analysis to oxygen atoms.")
@@ -358,6 +357,86 @@ def _collect_cell_edges(vertices, faces) -> list[tuple[int, int]]:
     return sorted(edges)
 
 
+def _clip_segment_to_bbox(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    *,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+) -> tuple[tuple[float, float], tuple[float, float]] | None:
+    """Clip a segment to an axis-aligned bounding box (Liang-Barsky)."""
+    x0, y0 = float(p0[0]), float(p0[1])
+    x1, y1 = float(p1[0]), float(p1[1])
+    dx = x1 - x0
+    dy = y1 - y0
+
+    t0, t1 = 0.0, 1.0
+    checks = (
+        (-dx, x0 - xmin),
+        (dx, xmax - x0),
+        (-dy, y0 - ymin),
+        (dy, ymax - y0),
+    )
+    for p, q in checks:
+        if abs(p) < 1e-12:
+            if q < 0.0:
+                return None
+            continue
+        r = q / p
+        if p < 0.0:
+            if r > t1:
+                return None
+            t0 = max(t0, r)
+        else:
+            if r < t0:
+                return None
+            t1 = min(t1, r)
+    if t0 > t1:
+        return None
+    a = (x0 + t0 * dx, y0 + t0 * dy)
+    b = (x0 + t1 * dx, y0 + t1 * dy)
+    return a, b
+
+
+def _ray_to_bbox_endpoint(
+    origin: np.ndarray,
+    direction: np.ndarray,
+    *,
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+) -> tuple[float, float] | None:
+    """Intersect a forward ray with the bounding box and return the nearest hit."""
+    ox, oy = float(origin[0]), float(origin[1])
+    dx, dy = float(direction[0]), float(direction[1])
+    candidates: list[tuple[float, float, float]] = []
+
+    if abs(dx) > 1e-12:
+        for x in (xmin, xmax):
+            t = (x - ox) / dx
+            if t <= 0.0:
+                continue
+            y = oy + t * dy
+            if ymin - 1e-9 <= y <= ymax + 1e-9:
+                candidates.append((t, x, y))
+    if abs(dy) > 1e-12:
+        for y in (ymin, ymax):
+            t = (y - oy) / dy
+            if t <= 0.0:
+                continue
+            x = ox + t * dx
+            if xmin - 1e-9 <= x <= xmax + 1e-9:
+                candidates.append((t, x, y))
+
+    if not candidates:
+        return None
+    _, xh, yh = min(candidates, key=lambda v: v[0])
+    return float(xh), float(yh)
+
+
 def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
     """Voronoi diagram payload 2d."""
     frame_groups = list(table.groupby("frame_index", sort=True))
@@ -365,7 +444,7 @@ def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -
         return None
     plane = str(getattr(args, "projection", "xy")).strip().lower()
 
-    def frame_series(dfi: pd.DataFrame) -> list[dict[str, object]]:
+    def frame_series(dfi: pd.DataFrame) -> tuple[list[dict[str, object]], tuple[float, float, float, float] | None]:
         """Frame series.
 
         Execute the workflow function for this command path and return the
@@ -385,43 +464,125 @@ def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -
         -----
         >>> # See workflow CLI usage for concrete examples.
         """
-        series: list[dict[str, object]] = []
+        points_2d: list[tuple[float, float]] = []
         for _, row in dfi.iterrows():
-            vertices = _safe_obj(row.get("vertices"))
-            faces = _safe_obj(row.get("faces"))
-            if not isinstance(vertices, list) or not isinstance(faces, list):
+            site = _safe_obj(row.get("site_position"))
+            if not isinstance(site, (list, tuple)) or len(site) < 3:
                 continue
-            edges = _collect_cell_edges(vertices, faces)
-            if not edges:
+            px, py = _project_xyz(site, plane)
+            if np.isfinite(px) and np.isfinite(py):
+                points_2d.append((float(px), float(py)))
+        if len(points_2d) < 3:
+            return [], None
+
+        pts = np.asarray(points_2d, dtype=float)
+        xmin, ymin = np.min(pts, axis=0)
+        xmax, ymax = np.max(pts, axis=0)
+        span_x = float(xmax - xmin)
+        span_y = float(ymax - ymin)
+        pad_x = max(1e-6, 0.08 * span_x) if span_x > 0 else 1.0
+        pad_y = max(1e-6, 0.08 * span_y) if span_y > 0 else 1.0
+        xmin -= pad_x
+        xmax += pad_x
+        ymin -= pad_y
+        ymax += pad_y
+
+        try:
+            from scipy.spatial import Voronoi as ScipyVoronoi
+
+            # QJ helps with near-collinear projected slabs.
+            vor2d = ScipyVoronoi(pts, qhull_options="Qbb Qc QJ")
+        except Exception:
+            return [], (xmin, xmax, ymin, ymax)
+
+        center = np.mean(vor2d.points, axis=0)
+        xs: list[float | None] = []
+        ys: list[float | None] = []
+        for (p1, p2), rv in zip(vor2d.ridge_points, vor2d.ridge_vertices):
+            if len(rv) != 2:
                 continue
-            xs: list[float | None] = []
-            ys: list[float | None] = []
-            for a, b in edges:
-                va = _safe_obj(vertices[a])
-                vb = _safe_obj(vertices[b])
-                if not isinstance(va, (list, tuple)) or not isinstance(vb, (list, tuple)) or len(va) < 3 or len(vb) < 3:
-                    continue
-                x1, y1 = _project_xyz(va, plane)
-                x2, y2 = _project_xyz(vb, plane)
-                xs.extend([x1, x2, None])
-                ys.extend([y1, y2, None])
-            if xs:
-                series.append(
-                    {
-                        "x": xs,
-                        "y": ys,
-                        "label": f"atom {int(row['atom_id'])}",
-                        "linewidth": 0.8,
-                        "alpha": 0.75,
-                    }
+            a, b = int(rv[0]), int(rv[1])
+            if a >= 0 and b >= 0:
+                v0 = vor2d.vertices[a]
+                v1 = vor2d.vertices[b]
+                clipped = _clip_segment_to_bbox(
+                    (float(v0[0]), float(v0[1])),
+                    (float(v1[0]), float(v1[1])),
+                    xmin=xmin,
+                    xmax=xmax,
+                    ymin=ymin,
+                    ymax=ymax,
                 )
-        return series
+                if clipped is None:
+                    continue
+                (cx0, cy0), (cx1, cy1) = clipped
+                xs.extend([cx0, cx1, None])
+                ys.extend([cy0, cy1, None])
+                continue
+
+            finite_idx = a if a >= 0 else b
+            if finite_idx < 0:
+                continue
+            v = np.asarray(vor2d.vertices[finite_idx], dtype=float)
+            t = vor2d.points[int(p2)] - vor2d.points[int(p1)]
+            nrm = np.linalg.norm(t)
+            if not np.isfinite(nrm) or nrm <= 0.0:
+                continue
+            t /= nrm
+            n = np.array([-t[1], t[0]], dtype=float)
+            midpoint = vor2d.points[[int(p1), int(p2)]].mean(axis=0)
+            sign = np.sign(np.dot(midpoint - center, n))
+            if sign == 0:
+                sign = 1.0
+            direction = sign * n
+            endpoint = _ray_to_bbox_endpoint(v, direction, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+            if endpoint is None:
+                continue
+            clipped = _clip_segment_to_bbox(
+                (float(v[0]), float(v[1])),
+                endpoint,
+                xmin=xmin,
+                xmax=xmax,
+                ymin=ymin,
+                ymax=ymax,
+            )
+            if clipped is None:
+                continue
+            (cx0, cy0), (cx1, cy1) = clipped
+            xs.extend([cx0, cx1, None])
+            ys.extend([cy0, cy1, None])
+
+        if not xs:
+            return [], (xmin, xmax, ymin, ymax)
+
+        series: list[dict[str, object]] = [
+            {
+                "x": xs,
+                "y": ys,
+                "label": "Voronoi edges",
+                "linewidth": 1.0,
+                "alpha": 0.9,
+                "marker": None,
+            }
+        ]
+        series.append(
+            {
+                "x": pts[:, 0].tolist(),
+                "y": pts[:, 1].tolist(),
+                "label": "sites",
+                "linewidth": 0.0,
+                "marker": ".",
+                "markersize": 3.0,
+                "alpha": 0.6,
+            }
+        )
+        return series, (xmin, xmax, ymin, ymax)
 
     if getattr(args, "plot", None) == "subplot":
         subplots: list[list[dict[str, object]]] = []
         titles: list[str] = []
         for frame_index, dfi in frame_groups:
-            ser = frame_series(dfi)
+            ser, _bbox = frame_series(dfi)
             if not ser:
                 continue
             iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
@@ -441,19 +602,25 @@ def _voronoi_diagram_payload_2d(table: pd.DataFrame, args: argparse.Namespace) -
         }
 
     frame_index, dfi = frame_groups[0]
-    ser = frame_series(dfi)
+    ser, bbox = frame_series(dfi)
     if not ser:
         return None
     iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
     iter_txt = f", iter {int(iter_vals[0])}" if iter_vals else ""
-    return {
+    payload = {
         "plot_type": "single_plot",
         "series": ser,
         "title": f"Voronoi Diagram 2D ({plane}), frame {int(frame_index)}{iter_txt}",
         "xlabel": f"{plane[0]} (A)",
         "ylabel": f"{plane[1]} (A)",
-        "legend": len(ser) <= 20,
+        "legend": True,
+        "aspect": "equal",
     }
+    if bbox is not None:
+        xmin, xmax, ymin, ymax = bbox
+        payload["xlim"] = [float(xmin), float(xmax)]
+        payload["ylim"] = [float(ymin), float(ymax)]
+    return payload
 
 
 def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
@@ -485,26 +652,99 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
         >>> # See workflow CLI usage for concrete examples.
         """
         segments: list[list[list[float]]] = []
+        segment_keys: set[tuple[tuple[float, float, float], tuple[float, float, float]]] = set()
         points: list[list[float]] = []
         values: list[float] = []
-        for _, row in dfi.iterrows():
-            vertices = _safe_obj(row.get("vertices"))
-            faces = _safe_obj(row.get("faces"))
-            if isinstance(vertices, list) and isinstance(faces, list):
-                edges = _collect_cell_edges(vertices, faces)
-                for a, b in edges:
-                    va = _safe_obj(vertices[a])
-                    vb = _safe_obj(vertices[b])
-                    if not isinstance(va, (list, tuple)) or not isinstance(vb, (list, tuple)) or len(va) < 3 or len(vb) < 3:
-                        continue
-                    segments.append([[float(va[0]), float(va[1]), float(va[2])], [float(vb[0]), float(vb[1]), float(vb[2])]])
 
+        # Unbounded cells tend to produce extreme geometry artifacts; exclude them for plotting.
+        dfi_cells = dfi
+        if "is_bounded" in dfi.columns:
+            bounded = dfi[dfi["is_bounded"] == True].copy()
+            if not bounded.empty:
+                dfi_cells = bounded
+
+        def _add_segment(p0: np.ndarray, p1: np.ndarray) -> None:
+            if p0.shape != (3,) or p1.shape != (3,):
+                return
+            if not (np.isfinite(p0).all() and np.isfinite(p1).all()):
+                return
+            a = (float(p0[0]), float(p0[1]), float(p0[2]))
+            b = (float(p1[0]), float(p1[1]), float(p1[2]))
+            key = tuple(sorted((tuple(round(v, 8) for v in a), tuple(round(v, 8) for v in b))))
+            if key in segment_keys:
+                return
+            segment_keys.add(key)
+            segments.append([[a[0], a[1], a[2]], [b[0], b[1], b[2]]])
+
+        def _hull_edges(vertices_obj) -> list[tuple[int, int]]:
+            verts = _safe_obj(vertices_obj)
+            if not isinstance(verts, list) or len(verts) < 4:
+                return []
+            arr = np.asarray(verts, dtype=float)
+            if arr.ndim != 2 or arr.shape[1] < 3:
+                return []
+            arr = arr[:, :3]
+            if not np.isfinite(arr).all():
+                return []
+            try:
+                from scipy.spatial import ConvexHull
+
+                hull = ConvexHull(arr, qhull_options="QJ")
+            except Exception:
+                return []
+            edges: set[tuple[int, int]] = set()
+            for simplex in np.asarray(hull.simplices, dtype=int):
+                if simplex.ndim != 1 or simplex.size < 2:
+                    continue
+                for i in range(simplex.size):
+                    a = int(simplex[i])
+                    b = int(simplex[(i + 1) % simplex.size])
+                    if a == b:
+                        continue
+                    edge = (a, b) if a < b else (b, a)
+                    edges.add(edge)
+            return sorted(edges)
+
+        for _, row in dfi_cells.iterrows():
+            vertices = _safe_obj(row.get("vertices"))
+            edges = _hull_edges(vertices)
+            if not edges:
+                continue
+            arr = np.asarray(vertices, dtype=float)
+            if arr.ndim != 2 or arr.shape[1] < 3 or not np.isfinite(arr[:, :3]).all():
+                continue
+            for a, b in edges:
+                if a < 0 or b < 0 or a >= arr.shape[0] or b >= arr.shape[0]:
+                    continue
+                _add_segment(arr[a, :3], arr[b, :3])
+
+        for _, row in dfi.iterrows():
             site = _safe_obj(row.get("site_position"))
             if isinstance(site, (list, tuple)) and len(site) >= 3:
-                points.append([float(site[0]), float(site[1]), float(site[2])])
-                values.append(float(pd.to_numeric(row.get("voronoi_volume"), errors="coerce")))
+                p = np.asarray([site[0], site[1], site[2]], dtype=float)
+                if np.isfinite(p).all():
+                    points.append([float(p[0]), float(p[1]), float(p[2])])
+                    values.append(float(pd.to_numeric(row.get("voronoi_volume"), errors="coerce")))
+
         if not segments and not points:
             return None
+
+        xlim = ylim = zlim = None
+        box_aspect = None
+        if points:
+            parr = np.asarray(points, dtype=float)
+            mins = np.nanmin(parr, axis=0)
+            maxs = np.nanmax(parr, axis=0)
+            spans = maxs - mins
+            pads = np.where(spans > 0.0, 0.08 * spans, 1.0)
+            lo = mins - pads
+            hi = maxs + pads
+            xlim = [float(lo[0]), float(hi[0])]
+            ylim = [float(lo[1]), float(hi[1])]
+            zlim = [float(lo[2]), float(hi[2])]
+            safe_spans = np.where(spans > 1e-12, spans, 1.0)
+            box_aspect = [float(safe_spans[0]), float(safe_spans[1]), float(safe_spans[2])]
+
         iter_vals = dfi["iter"].dropna().unique().tolist() if "iter" in dfi.columns else []
         iter_txt = f", iter {int(iter_vals[0])}" if iter_vals else ""
         return {
@@ -512,6 +752,10 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
             "points": points,
             "values": values,
             "title": f"frame {int(frame_index)}{iter_txt}",
+            "xlim": xlim,
+            "ylim": ylim,
+            "zlim": zlim,
+            "box_aspect": box_aspect,
         }
 
     payloads: list[dict[str, object]] = []

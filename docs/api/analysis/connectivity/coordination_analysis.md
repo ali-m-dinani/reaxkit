@@ -66,7 +66,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = CoordinationStatusTask.recommended_presentations(result, payload)
 ```
@@ -74,8 +73,6 @@ Sample output:
 A table view plus a delta/sum_BOs-vs-frame plot view when columns exist.
 Meaning:
 Coordination outputs can be rendered with default mappings.
-```
-
 
 </div>
 
@@ -84,6 +81,12 @@ Coordination outputs can be rendered with default mappings.
 <div class="analysis-method-indent" markdown="1">
 
 Compute per-atom coordination status across selected frames.
+
+Classify atoms as under-, coordinated-, or over-coordinated. Classification compares bond-order totals against target valences from explicit maps or inferred values.
+For example, if an atom's valence is 3 and the threshold is 0.5, then:
+  - sum_BOs < 2.5 -> under-coordinated
+  - 2.5 <= sum_BOs <= 3.5 -> coordinated
+  - sum_BOs > 3.5 -> over-coordinated
 
 #### Works on
 
@@ -105,7 +108,6 @@ Compute per-atom coordination status across selected frames.
 
 #### Examples
 
-```text
 ```python
 result = CoordinationStatusTask().run(bundle, req)
 ```
@@ -113,8 +115,6 @@ Sample output:
 `result.table` with `status` and `status_label` columns.
 Meaning:
 Atom coordination is classified using BO sums versus valence targets.
-```
-
 
 </div>
 

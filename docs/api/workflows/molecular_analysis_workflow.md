@@ -36,6 +36,16 @@ with optional frequency threshold filtering.
 | `--top-n` | No | 1 | Number of ranked species per frame. Example: --top-n 3, which returns first/second/third dominant species. |  |
 | `--min-freq` | No | 0.0 | Minimum species frequency to include. Example: --min-freq 2, which filters out low-frequency species. |  |
 
+<a id="get_dominant_species"></a>
+
+The figure below shows an example CSV output for the top 2 dominant species across a simulation. 
+
+<div style="text-align:center;" markdown="1">
+![get_dominant_species](../../../figures/get_dominant_species.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample CSV output for the top 2 dominant species across a simulation.*
+</div>
+
 </div>
 
 ## Command: `get_largest_molecule_by_mass`
@@ -121,6 +131,16 @@ lifetime statistics are reported.
 |---|---|---|---|---|
 | `--molecules` | No |  | Restrict to selected molecular formulae. Example: --molecules H2O OH, which limits analysis to water and hydroxyl. |  |
 | `--min-freq` | No | 1.0 | Minimum frequency for an active molecule. Example: --min-freq 2, which treats only sufficiently frequent molecules as active. |  |
+
+<a id="get_molecule_lifetime"></a>
+
+The figure below shows an example CSV output for the lifetime of OH. This table shows during which OH was available, so cycles of OH generation can be detected. 
+
+<div style="text-align:center;" markdown="1">
+![get_molecule_lifetime](../../../figures/get_molecule_lifetime.png){ style="width:85%; max-width:800px;" }
+
+*Figure: Sample CSV output for the lifetime of a molecule.*
+</div>
 
 </div>
 

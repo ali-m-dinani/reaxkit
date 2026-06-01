@@ -2024,13 +2024,12 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
 
     def row(node_id: str, label: str, depth: int, status: str | None = None) -> Any:
         selected = str(node_id) == str(selected_node_id)
-        prefix = "    " * depth + ("â””â”€ " if depth > 0 else "")
         cls = "rk-tree-node selected" if selected else "rk-tree-node"
-        prefix = ("   " * (depth - 1) + "|_") if depth > 0 else ""
+        prefix = ("   " * (depth - 1) + "|_ ") if depth > 0 else ""
         return html.Button(
             [
                 html.Span(prefix, className="rk-tree-prefix"),
-                html.Span("ðŸ“", className="rk-tree-icon"),
+                html.Span("\U0001F4C1", className="rk-tree-icon"),
                 html.Span(label, className="rk-tree-label"),
                 html.Span(f"[{status}]" if status else "", className="rk-tree-status"),
             ],
@@ -2223,5 +2222,10 @@ def _build_canvas_payload(
                 tr.update(marker=marker_update)
     _apply_3d_style(fig3d, req, apply_legend=True)
     return "plot", rows, fig3d
+
+
+# Re-export helper symbols for callback section modules that use
+# `from ...callback_helpers import *` (including underscore-prefixed helpers).
+__all__ = [name for name in globals() if not name.startswith("__")]
 
 

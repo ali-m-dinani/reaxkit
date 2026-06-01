@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
-from reaxkit.analysis.force_field.trainset import GetTrainsetDataRequest, GetTrainsetDataTask
+from reaxkit.analysis.force_field.trainset import TrainsetDataRequest, TrainsetDataTask
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import AnalysisError
@@ -26,11 +26,11 @@ def _run_and_save() -> Path:
 
     adapter = resolve_engine(str(run_dir), engine=None)
 
-    task = GetTrainsetDataTask()
+    task = TrainsetDataTask()
     task_name = str(task.__class__.__name__).replace("(", "").replace(")", "")
     task_artifacts_dir = ARTIFACTS_DIR / task_name
     task_artifacts_dir.mkdir(parents=True, exist_ok=True)
-    request = GetTrainsetDataRequest(section="all")
+    request = TrainsetDataRequest(section="all")
     executor = AnalysisExecutor()
 
     try:

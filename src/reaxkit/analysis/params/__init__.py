@@ -1,13 +1,13 @@
 """Optimization-parameter analysis tasks."""
 
 from reaxkit.analysis.params.params import (
-    ForceFieldOptimizationParameterRequest,
-    ForceFieldOptimizationParameterResult,
-    ForceFieldOptimizationParameterTask,
+    FFieldOptimizationParameterRequest,
+    FFieldOptimizationParameterResult,
+    FFieldOptimizationParameterTask,
 )
 
 __all__ = [
-    "ForceFieldOptimizationParameterRequest",
-    "ForceFieldOptimizationParameterResult",
-    "ForceFieldOptimizationParameterTask",
+    "FFieldOptimizationParameterRequest",
+    "FFieldOptimizationParameterResult",
+    "FFieldOptimizationParameterTask",
 ]

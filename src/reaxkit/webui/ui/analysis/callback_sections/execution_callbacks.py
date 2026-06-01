@@ -42,6 +42,15 @@ def register_execution_callbacks(app, service: WebUIApiService) -> None:
     Meaning:
     Callback handlers for this section are attached to the Dash app.
     """
+    @app.callback(
+        Output("pipeline-store", "data", allow_duplicate=True),
+        Output("status-banner", "children", allow_duplicate=True),
+        Input("btn-save-analysis-request-json", "n_clicks"),
+        State("analysis-request-json", "value"),
+        State("session-store", "data"),
+        State("pipeline-store", "data"),
+        prevent_initial_call=True,
+    )
     def on_save_analysis_request_json(
         n_clicks: int,
         raw_request: str | None,

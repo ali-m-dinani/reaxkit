@@ -7,7 +7,7 @@
       show_root_full_path: false
       members: []
 
-## Request: `ForceFieldDataRequest`
+## Request: `FFieldDataRequest`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -33,13 +33,13 @@ The request returns only the bond section with symbolic term labels.
 
 </div>
 
-## Task: `ForceFieldDataTask`
+## Task: `FFieldDataTask`
 
 <div class="analysis-section-indent" markdown="1">
 
 Return raw or interpreted force-field section data.
 
-### Method: `recommended_presentations(_result: ForceFieldDataResult, payload: dict[str, Any])`
+### Method: `recommended_presentations(_result: FFieldDataResult, payload: dict[str, Any])`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -55,7 +55,7 @@ Analyzer task output for ``force_field_data``.
 
 | Name | Type | Description |
 |---|---|---|
-| `_result` | `ForceFieldDataResult` | Typed analyzer result instance (unused by selection logic). |
+| `_result` | `FFieldDataResult` | Typed analyzer result instance (unused by selection logic). |
 | `payload` | `dict[str, Any]` | Serialized result payload expected to include ``table`` rows. |
 
 #### Returns
@@ -66,7 +66,6 @@ Analyzer task output for ``force_field_data``.
 
 #### Examples
 
-```text
 ```python
 specs = ForceFieldDataTask.recommended_presentations(
     _result,
@@ -74,12 +73,10 @@ specs = ForceFieldDataTask.recommended_presentations(
 )
 ```
 The output includes a table and a one-series plot when numeric data exists.
-```
-
 
 </div>
 
-### Method: `run(data: ForceFieldParametersData, request: ForceFieldDataRequest, reporter=None)`
+### Method: `run(data: ForceFieldParametersData, request: FFieldDataRequest, reporter=None)`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -96,18 +93,17 @@ Works on
 | Name | Type | Description |
 |---|---|---|
 | `data` | `ForceFieldParametersData` | Parsed force-field parameter bundle. |
-| `request` | `ForceFieldDataRequest` | Section and interpretation options for extraction. |
+| `request` | `FFieldDataRequest` | Section and interpretation options for extraction. |
 | `reporter` | `Any, optional` | Optional progress callback invoked per processed section. |
 
 #### Returns
 
 | Type | Description |
 |---|---|
-| `ForceFieldDataResult` | Result containing one extracted/combined section table. |
+| `FFieldDataResult` | Result containing one extracted/combined section table. |
 
 #### Examples
 
-```text
 ```python
 result = ForceFieldDataTask().run(
     data,
@@ -115,14 +111,12 @@ result = ForceFieldDataTask().run(
 )
 ```
 The returned table contains only interpreted angle-parameter rows.
-```
-
 
 </div>
 
 </div>
 
-## Result: `ForceFieldDataResult`
+## Result: `FFieldDataResult`
 
 <div class="analysis-section-indent" markdown="1">
 
@@ -136,7 +130,7 @@ section or a concatenated multi-section table based on request scope.
 | Field | Type | Default | Help | Choices |
 |---|---|---|---|---|
 | `table` | `pd.DataFrame` |  |  |  |
-| `request` | `ForceFieldDataRequest` |  |  |  |
+| `request` | `FFieldDataRequest` |  |  |  |
 
 ### Notes
 

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Tuple
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
+from reaxkit.analysis.force_field.force_field import FFieldDataRequest, FFieldDataTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
@@ -111,9 +111,9 @@ def _interpret_params(
 
         section_key, section_name = _SECTION_NUM_MAP[sec_num]
         if section_key not in sec_cache:
-            sec_cache[section_key] = ForceFieldDataTask().run(
+            sec_cache[section_key] = FFieldDataTask().run(
                 force_field,
-                ForceFieldDataRequest(
+                FFieldDataRequest(
                     section=section_name,
                     interpret=section_key not in {"general", "atom"},
                 ),
@@ -172,7 +172,7 @@ def _with_component_column(table: pd.DataFrame) -> pd.DataFrame:
 
 
 @dataclass
-class ForceFieldOptimizationParameterRequest(BaseRequest):
+class FFieldOptimizationParameterRequest(BaseRequest):
     """Request payload for optimization-parameter extraction and interpretation.
 
     This request controls duplicate handling and whether params pointer tuples
@@ -216,7 +216,7 @@ class ForceFieldOptimizationParameterRequest(BaseRequest):
 
 
 @dataclass
-class ForceFieldOptimizationParameterResult(BaseResult):
+class FFieldOptimizationParameterResult(BaseResult):
     """Result payload for optimization-parameter extraction.
 
     The analyzer returns raw or interpreted parameter-update rows with a stable
@@ -250,18 +250,18 @@ class ForceFieldOptimizationParameterResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ForceFieldOptimizationParameterRequest
+    request: FFieldOptimizationParameterRequest
 
 
 @register_task("force_field_optimization_parameters", label="Force Field Optimization Parameters")
-class ForceFieldOptimizationParameterTask(AnalysisTask):
+class FFieldOptimizationParameterTask(AnalysisTask):
     """Return raw or interpreted optimization-parameter definitions from params."""
 
     required_data = ForceFieldOptimizationParameterBundleData
 
     @staticmethod
     def recommended_presentations(
-        _result: ForceFieldOptimizationParameterResult, payload: dict[str, Any]
+        _result: FFieldOptimizationParameterResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Recommend the default tabular presentation for params outputs.
 
@@ -273,7 +273,7 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ForceFieldOptimizationParameterResult
+        _result : FFieldOptimizationParameterResult
             Typed analyzer result instance (unused by current logic).
         payload : dict[str, Any]
             Serialized payload (unused for fixed recommendations).
@@ -297,9 +297,9 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationParameterBundleData,
-        request: ForceFieldOptimizationParameterRequest,
+        request: FFieldOptimizationParameterRequest,
         reporter=None,
-    ) -> ForceFieldOptimizationParameterResult:
+    ) -> FFieldOptimizationParameterResult:
         """Run extraction of optimization parameters in raw or interpreted mode.
 
         Loads optimization parameter rows from the bundle, optionally resolves
@@ -314,14 +314,14 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
         data : ForceFieldOptimizationParameterBundleData
             Bundle containing optimization parameter rows and optional
             force-field parameter tables for interpretation.
-        request : ForceFieldOptimizationParameterRequest
+        request : FFieldOptimizationParameterRequest
             Request controlling deduplication and interpretation behavior.
         reporter : Any, optional
             Progress callback accepted by analyzer tasks; unused here.
 
         Returns
         -----
-        ForceFieldOptimizationParameterResult
+        FFieldOptimizationParameterResult
             Result containing normalized parameter-update rows.
 
         Examples
@@ -352,11 +352,11 @@ class ForceFieldOptimizationParameterTask(AnalysisTask):
                 drop_duplicate=bool(request.drop_duplicate),
             )
         table = _with_component_column(table)
-        return ForceFieldOptimizationParameterResult(table=table, request=request)
+        return FFieldOptimizationParameterResult(table=table, request=request)
 
 
 __all__ = [
-    "ForceFieldOptimizationParameterRequest",
-    "ForceFieldOptimizationParameterResult",
-    "ForceFieldOptimizationParameterTask",
+    "FFieldOptimizationParameterRequest",
+    "FFieldOptimizationParameterResult",
+    "FFieldOptimizationParameterTask",
 ]

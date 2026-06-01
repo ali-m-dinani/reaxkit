@@ -1,141 +1,87 @@
 # Quick Start
 
-This page walks you through a **minimal, end-to-end ReaxKit workflow**, and shows you how to use ReaxKit **CLI commands**.
-By the end, you will have parsed a ReaxFF output file and produced a simple result.
-
-This guide assumes ReaxKit is already installed (If not, see [Installation](installation.md)). Moreover,
-if you are not familiar with the data organization by ReaxFF, see [ReaxFF File References](reaxff_reference/index.md).
+This page walks through a minimal end-to-end ReaxKit CLI run.
 
 ---
 
-## Step 1: Check that ReaxKit works
-
-Open a terminal and run:
+## Step 1: Verify installation
 
 ```bash
 reaxkit --help
 ```
 
-You should see the ReaxKit CLI help message listing available workflows.
+If help is shown, the CLI is available.
 
 ---
 
-## Step 2: Inspect available data and files
-
-If you already know which file you should process, skip this step and go to step 3.
-
-ReaxKit includes a built-in help system that knows which quantities appear
-in which ReaxFF files.
-
-To explore this:
+## Step 2: Discover commands and searchable topics
 
 ```bash
 reaxkit help
-```
-
-or search for a specific quantity:
-
-```bash
 reaxkit help pressure
-```
-```bash
 reaxkit help "electric field"
 ```
 
-This helps you decide which file you need for a given analysis.
-
-Moreover, if you prefer to work with CLI commands to know which files are available
-in a director or to know what that files is about, you can easily obtain
-this information without any need to check the online documentation.
-
-For this purpose, 
+Optional introspection examples:
 
 ```bash
 reaxkit intspec --folder workflow
+reaxkit intspec --file trajectory_workflow
 ```
-
-will show you what files are available in the `workflow/` directory,
-while
-
-```bash
-reaxkit intspec --file fort7_analyzer
-```
-
-shows the explanations (i.e., docstrings) for a specific file and its
-public functions.
 
 ---
 
-## Step 3: Finding the supported tasks for a given ReaxFF file
+## Step 3: Check task-specific help
 
-If you want to know which task a specific file like `xmolout` supports, you can simply do:
+Current ReaxKit uses direct command workflows. For example:
 
 ```bash
-reaxkit xmolout -h
+reaxkit timeseries -h
+reaxkit get_msd -h
 ```
 
-which prints in the terminal a list of positional arguments (i.e., supported tasks) and options (i.e., supported flags).
-For example, the above CLI command will show you that `xmolout` workflow supports tasks like `trajget`, `MSD`, `RDF`, etc.
-
-Later on, for a specific task like `trajget` you may request its supported flags simply by:
-```bash
-reaxkit xmolout trajget -h
-```
-
-which lists CLI examples and options (i.e. flags) such as `--atoms`, `plot`, etc.
+Use `-h` on any command to inspect supported flags and examples.
 
 ---
 
 ## Step 4: Run a simple analysis
 
-Once you know the tasks and flags related to a specific ReaxFF output file, you can use the full, appropriate CLI command
-to extract data and generate a simple plot:
+Extract atom-1 z trajectory and export CSV:
 
 ```bash
-reaxkit xmolout trajget --atoms 1 --dims z --xaxis time --plot --export atom1_z.csv
+reaxkit timeseries --field trajectory[1].z --xaxis time --export atom1_z.csv
 ```
 
-This will show you the z-trajectory for atom 1 across time (not iteration), and then exports its data (i.e., z-coordination vs time) in a csv file.
-
-Generally, depending on the workflow:
-
-* data may be printed to the terminal,
-
-* plots may appear interactively,
-
-* or files may be saved to a `reaxkit_outputs/` directory (if you generate an input file such as tregime, it will be saved in `reaxkit_generated_inputs/` by default).
-
-### What just happened?
-
-Behind the scenes, ReaxKit:
-
-1. parsed the raw ReaxFF file using the `xmolout_handler`,
-
-2. processed the data using the `xmolout_analyzer`,
-
-3. exposed the result through the `xmolout_workflow` via the CLI.
-
-You do not need to interact with these layers directly to use ReaxKit.
+What this does:
+- resolves trajectory data input
+- computes the requested time series
+- exports a table to CSV
 
 ---
 
-## Where to go next
+## Output behavior
 
-* If you want a detailed explanation of what happened in this quick start, see [01_understanding_quickstart.md](tutorials/01_understanding_quickstart.md)
+Depending on flags and command:
+- tables can be printed to terminal
+- plots can be displayed (`--show`) or saved (`--save`)
+- tables can be exported (`--export`)
+- generated input files are written under generator output locations
 
-* More examples, specifically how to use/develop analyzers instead of workflows (i.e., CLI commands): see [examples](examples/README.md)
+---
 
-* Developer templates: see [templates](file_templates/index.md)
+## What happened internally
 
-* Installation details: see [Installation](installation.md)
+At a high level:
+1. workflow parses CLI args
+2. runtime resolves required data sources
+3. analysis task executes
+4. presentation/export layer handles outputs
 
-* CLI discovery: `run reaxkit help`
+---
 
-This quick start intentionally keeps things minimal.
-More advanced workflows (multi-file analysis, plotting options, video generation)
-are documented in the examples and tutorials.
+## Next steps
 
-
-
-
-
+- Detailed walkthrough: [01_understanding_quickstart.md](tutorials/01_understanding_quickstart.md)
+- More runnable examples: [examples](examples/README.md)
+- Developer templates: [file templates](file_templates/index.md)
+- Full tutorial sequence: [tutorials](tutorials/index.md)

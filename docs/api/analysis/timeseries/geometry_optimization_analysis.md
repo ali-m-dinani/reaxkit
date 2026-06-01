@@ -65,7 +65,6 @@ Analyzer task output for ``geometry_optimization_data``.
 
 #### Examples
 
-```text
 ```python
 specs = GeometryOptimizationTask.recommended_presentations(
     _result,
@@ -73,8 +72,6 @@ specs = GeometryOptimizationTask.recommended_presentations(
 )
 ```
 The returned list includes a table and a ``value`` vs ``iter`` plot.
-```
-
 
 </div>
 
@@ -103,7 +100,6 @@ Works on
 
 #### Examples
 
-```text
 ```python
 result = GeometryOptimizationTask().run(
     data,
@@ -111,8 +107,6 @@ result = GeometryOptimizationTask().run(
 )
 ```
 ``result.table`` contains iteration/value rows for requested components.
-```
-
 
 </div>
 

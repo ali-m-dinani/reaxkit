@@ -65,7 +65,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = ChargeTableTask.recommended_presentations(result, payload)
 ```
@@ -73,8 +72,6 @@ Sample output:
 A list with table and grouped charge trend plot views.
 Meaning:
 Charge outputs can be rendered with default mappings.
-```
-
 
 </div>
 
@@ -104,7 +101,6 @@ Extract per-atom charges across selected frames as a tidy table.
 
 #### Examples
 
-```text
 ```python
 result = ChargeTableTask().run(data, ChargeTableRequest(atom_types=["O"]))
 ```
@@ -112,8 +108,6 @@ Sample output:
 `result.table` with columns `frame_index`, `iter`, `atom_id`, `charge`.
 Meaning:
 Charges are normalized into one row per selected frame and atom.
-```
-
 
 </div>
 

@@ -29,7 +29,7 @@ class FieldRow:
 
 @dataclass
 class PreservedBlock:
-    section_kind: str  # request | task | result
+    section_kind: str  # request:<Class> | task:<Class> | result:<Class>
     context_heading: str  # nearest preceding ###/#### heading or "__section_start__"
     content: str
 
@@ -144,16 +144,20 @@ def _render_field_table(rows: list[FieldRow]) -> list[str]:
     return out
 
 
-def _find_task_class(classes: list[ast.ClassDef]) -> ast.ClassDef | None:
+def _find_task_classes(classes: list[ast.ClassDef]) -> list[ast.ClassDef]:
+    out: list[ast.ClassDef] = []
     for cls in classes:
-        for dec in cls.decorator_list:
-            if isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == "register_task":
-                return cls
-    for cls in classes:
-        for base in cls.bases:
-            if isinstance(base, ast.Name) and base.id == "AnalysisTask":
-                return cls
-    return None
+        if any(
+            isinstance(dec, ast.Call)
+            and isinstance(dec.func, ast.Name)
+            and dec.func.id == "register_task"
+            for dec in cls.decorator_list
+        ):
+            out.append(cls)
+            continue
+        if any(isinstance(base, ast.Name) and base.id == "AnalysisTask" for base in cls.bases):
+            out.append(cls)
+    return out
 
 
 def _format_method_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
@@ -228,12 +232,16 @@ def _method_sections(doc: str) -> tuple[str, list[tuple[str, str]]]:
     return "\n".join(intro).strip(), sections
 
 
-def _parse_param_like_rows(body: str) -> list[tuple[str, str, str]]:
+def _parse_param_like_rows(
+    body: str,
+    *,
+    allowed_names: set[str] | None = None,
+) -> list[tuple[str, str, str]]:
     """Parse numpydoc-style `name : type` blocks into rows."""
     lines = body.splitlines()
     rows: list[tuple[str, str, str]] = []
     i = 0
-    pat = re.compile(r"^\s*([^\n:][^:]*)\s*:\s*(.+?)\s*$")
+    pat = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$")
     while i < len(lines):
         raw = lines[i]
         m = pat.match(raw)
@@ -241,13 +249,18 @@ def _parse_param_like_rows(body: str) -> list[tuple[str, str, str]]:
             i += 1
             continue
         name = m.group(1).strip()
+        if allowed_names is not None and name not in allowed_names:
+            i += 1
+            continue
         type_text = m.group(2).strip()
         desc_lines: list[str] = []
         i += 1
         while i < len(lines):
             nxt = lines[i]
-            if pat.match(nxt):
-                break
+            m_next = pat.match(nxt)
+            if m_next:
+                if allowed_names is None or m_next.group(1).strip() in allowed_names:
+                    break
             if nxt.strip():
                 desc_lines.append(nxt.strip())
             i += 1
@@ -282,6 +295,29 @@ def _parse_returns_rows(body: str) -> list[tuple[str, str]]:
     return out
 
 
+def _parse_name_only_param_rows(body: str, *, allowed_names: set[str]) -> list[tuple[str, str]]:
+    """Parse sections where parameter names are standalone lines followed by description."""
+    lines = body.splitlines()
+    rows: list[tuple[str, str]] = []
+    i = 0
+    while i < len(lines):
+        name = lines[i].strip()
+        if name not in allowed_names:
+            i += 1
+            continue
+        i += 1
+        desc_lines: list[str] = []
+        while i < len(lines):
+            nxt = lines[i].strip()
+            if nxt in allowed_names:
+                break
+            if nxt:
+                desc_lines.append(nxt)
+            i += 1
+        rows.append((name, " ".join(desc_lines).strip()))
+    return rows
+
+
 def _render_method_section(title: str, body: str) -> list[str]:
     lines: list[str] = [f"#### {title}", ""]
     normalized = title.strip().lower()
@@ -309,9 +345,12 @@ def _render_method_section(title: str, body: str) -> list[str]:
             return lines
 
     if normalized == "examples":
-        lines.append("```text")
-        lines.append(body.rstrip())
-        lines.append("```")
+        if "```" in body:
+            lines.append(body.rstrip())
+        else:
+            lines.append("```text")
+            lines.append(body.rstrip())
+            lines.append("```")
         lines.append("")
         return lines
 
@@ -325,14 +364,69 @@ def _render_method_section(title: str, body: str) -> list[str]:
     return lines
 
 
+def _render_doc_section(
+    title: str,
+    body: str,
+    *,
+    allowed_param_names: set[str] | None = None,
+) -> list[str]:
+    """Render a generic numpydoc-style section with consistent formatting."""
+    lines: list[str] = [f"### {title}", ""]
+    normalized = title.strip().lower()
+
+    if normalized == "parameters":
+        rows = _parse_param_like_rows(body, allowed_names=allowed_param_names)
+        if rows:
+            lines.append("| Name | Type | Description |")
+            lines.append("|---|---|---|")
+            for name, typ, desc in rows:
+                lines.append(
+                    f"| `{name.replace('|', '\\|')}` | `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |"
+                )
+            lines.append("")
+            return lines
+        if allowed_param_names:
+            rows2 = _parse_name_only_param_rows(body, allowed_names=allowed_param_names)
+            if rows2:
+                for name, desc in rows2:
+                    lines.append(f"- `{name}`: {desc}")
+                lines.append("")
+                return lines
+
+    if normalized == "returns":
+        rows = _parse_returns_rows(body)
+        if rows:
+            lines.append("| Type | Description |")
+            lines.append("|---|---|")
+            for typ, desc in rows:
+                lines.append(f"| `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |")
+            lines.append("")
+            return lines
+
+    if normalized == "examples":
+        _append_examples_or_text(lines, body)
+        return lines
+
+    if body.strip():
+        lines.append(body.strip())
+        lines.append("")
+    else:
+        lines.append("_No details provided._")
+        lines.append("")
+    return lines
+
+
 def _section_kind_from_heading(line: str) -> str | None:
     stripped = line.strip()
-    if stripped.startswith("## Request:"):
-        return "request"
-    if stripped.startswith("## Task:"):
-        return "task"
-    if stripped.startswith("## Result:"):
-        return "result"
+    m = re.match(r"^## Request: `(.+)`$", stripped)
+    if m:
+        return f"request:{m.group(1)}"
+    m = re.match(r"^## Task: `(.+)`$", stripped)
+    if m:
+        return f"task:{m.group(1)}"
+    m = re.match(r"^## Result: `(.+)`$", stripped)
+    if m:
+        return f"result:{m.group(1)}"
     return None
 
 
@@ -444,14 +538,45 @@ def _append_remaining_preserved(
         consumed.add(idx)
 
 
+def _class_stem(name: str) -> str:
+    for suffix in ("Request", "Result", "Task"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _append_examples_or_text(lines: list[str], body: str) -> None:
+    text = body.strip()
+    if not text:
+        return
+    if "```" in text:
+        lines.append(text)
+        lines.append("")
+        return
+    lines.append("```text")
+    lines.append(text)
+    lines.append("```")
+    lines.append("")
+
+
 def _write_page(target: AnalysisDocTarget) -> Path:
     source = target.analysis_file.read_text(encoding="utf-8")
     tree = ast.parse(source)
     classes = [n for n in tree.body if isinstance(n, ast.ClassDef)]
 
-    request_cls = next((c for c in classes if c.name.endswith("Request")), None)
-    result_cls = next((c for c in classes if c.name.endswith("Result")), None)
-    task_cls = _find_task_class(classes)
+    request_classes = [c for c in classes if c.name.endswith("Request")]
+    result_classes = [c for c in classes if c.name.endswith("Result")]
+    task_classes = _find_task_classes(classes)
+
+    request_by_stem = {_class_stem(c.name): c for c in request_classes}
+    result_by_stem = {_class_stem(c.name): c for c in result_classes}
+    task_by_stem = {_class_stem(c.name): c for c in task_classes}
+    stems_in_order = []
+    for cls in classes:
+        stem = _class_stem(cls.name)
+        if stem in request_by_stem or stem in task_by_stem or stem in result_by_stem:
+            if stem not in stems_in_order:
+                stems_in_order.append(stem)
 
     preserved_blocks: list[PreservedBlock] = []
     if target.output_md.exists():
@@ -469,104 +594,120 @@ def _write_page(target: AnalysisDocTarget) -> Path:
     lines.append("      members: []")
     lines.append("")
 
-    if request_cls is not None:
-        lines.append(f"## Request: `{request_cls.name}`")
-        lines.append("")
-        lines.append('<div class="analysis-section-indent" markdown="1">')
-        lines.append("")
-        _append_preserved_at_context(lines, preserved_blocks, "request", "__section_start__", consumed_blocks)
-        req_doc = ast.get_docstring(request_cls) or ""
-        req_summary, req_sections = _doc_sections(req_doc)
-        if req_summary:
-            lines.append(req_summary)
-            lines.append("")
-        lines.append("### Fields")
-        lines.append("")
-        lines.extend(_render_field_table(_class_fields(request_cls)))
-        lines.append("")
-        for section_name in ("Notes", "Examples"):
-            body = req_sections.get(section_name, "")
-            if body:
-                lines.append(f"### {section_name}")
-                lines.append("")
-                lines.append(body)
-                lines.append("")
-                _append_preserved_at_context(
-                    lines, preserved_blocks, "request", f"### {section_name}", consumed_blocks
-                )
-        _append_remaining_preserved(lines, preserved_blocks, "request", consumed_blocks)
-        lines.append("</div>")
-        lines.append("")
+    for stem in stems_in_order:
+        request_cls = request_by_stem.get(stem)
+        task_cls = task_by_stem.get(stem)
+        result_cls = result_by_stem.get(stem)
 
-    if task_cls is not None:
-        lines.append(f"## Task: `{task_cls.name}`")
-        lines.append("")
-        lines.append('<div class="analysis-section-indent" markdown="1">')
-        lines.append("")
-        _append_preserved_at_context(lines, preserved_blocks, "task", "__section_start__", consumed_blocks)
-        task_doc = ast.get_docstring(task_cls) or ""
-        if task_doc:
-            lines.append(task_doc.strip())
+        if request_cls is not None:
+            section_key = f"request:{request_cls.name}"
+            lines.append(f"## Request: `{request_cls.name}`")
             lines.append("")
-
-        methods = [n for n in task_cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
-        wanted = [m for m in methods if m.name in {"recommended_presentations", "run"}]
-        for method in wanted:
-            method_heading = f"### Method: `{_format_method_signature(method)}`"
-            lines.append(method_heading)
+            lines.append('<div class="analysis-section-indent" markdown="1">')
             lines.append("")
-            lines.append('<div class="analysis-method-indent" markdown="1">')
+            _append_preserved_at_context(lines, preserved_blocks, section_key, "__section_start__", consumed_blocks)
+            req_doc = ast.get_docstring(request_cls) or ""
+            req_summary, req_sections = _doc_sections(req_doc)
+            req_fields = _class_fields(request_cls)
+            req_field_names = {row.name for row in req_fields}
+            if req_summary:
+                lines.append(req_summary)
+                lines.append("")
+            lines.append("### Fields")
             lines.append("")
-            _append_preserved_at_context(lines, preserved_blocks, "task", method_heading, consumed_blocks)
-            doc_body = _method_doc_body(method).strip()
-            if doc_body:
-                intro, sections = _method_sections(doc_body)
-                if intro:
-                    lines.append(intro)
-                    lines.append("")
-                for sec_title, sec_body in sections:
-                    rendered = _render_method_section(sec_title, sec_body)
-                    lines.extend(rendered)
-                    _append_preserved_at_context(
-                        lines, preserved_blocks, "task", f"#### {sec_title}", consumed_blocks
+            lines.extend(_render_field_table(req_fields))
+            lines.append("")
+            for section_name, body in req_sections.items():
+                if not body.strip():
+                    continue
+                if section_name.strip().lower() == "fields":
+                    continue
+                lines.extend(
+                    _render_doc_section(
+                        section_name,
+                        body,
+                        allowed_param_names=req_field_names if section_name.strip().lower() == "parameters" else None,
                     )
-            else:
-                lines.append("_No docstring available._")
-            lines.append("")
+                )
+                _append_preserved_at_context(lines, preserved_blocks, section_key, f"### {section_name}", consumed_blocks)
+            _append_remaining_preserved(lines, preserved_blocks, section_key, consumed_blocks)
             lines.append("</div>")
             lines.append("")
-        _append_remaining_preserved(lines, preserved_blocks, "task", consumed_blocks)
-        lines.append("</div>")
-        lines.append("")
 
-    if result_cls is not None:
-        lines.append(f"## Result: `{result_cls.name}`")
-        lines.append("")
-        lines.append('<div class="analysis-section-indent" markdown="1">')
-        lines.append("")
-        _append_preserved_at_context(lines, preserved_blocks, "result", "__section_start__", consumed_blocks)
-        res_doc = ast.get_docstring(result_cls) or ""
-        res_summary, res_sections = _doc_sections(res_doc)
-        if res_summary:
-            lines.append(res_summary)
+        if task_cls is not None:
+            section_key = f"task:{task_cls.name}"
+            lines.append(f"## Task: `{task_cls.name}`")
             lines.append("")
-        lines.append("### Fields")
-        lines.append("")
-        lines.extend(_render_field_table(_class_fields(result_cls)))
-        lines.append("")
-        for section_name in ("Notes", "Examples", "References"):
-            body = res_sections.get(section_name, "")
-            if body:
-                lines.append(f"### {section_name}")
+            lines.append('<div class="analysis-section-indent" markdown="1">')
+            lines.append("")
+            _append_preserved_at_context(lines, preserved_blocks, section_key, "__section_start__", consumed_blocks)
+            task_doc = ast.get_docstring(task_cls) or ""
+            if task_doc:
+                lines.append(task_doc.strip())
                 lines.append("")
-                lines.append(body)
+
+            methods = [n for n in task_cls.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+            wanted = [m for m in methods if m.name in {"recommended_presentations", "run"}]
+            for method in wanted:
+                method_heading = f"### Method: `{_format_method_signature(method)}`"
+                lines.append(method_heading)
                 lines.append("")
-                _append_preserved_at_context(
-                    lines, preserved_blocks, "result", f"### {section_name}", consumed_blocks
+                lines.append('<div class="analysis-method-indent" markdown="1">')
+                lines.append("")
+                _append_preserved_at_context(lines, preserved_blocks, section_key, method_heading, consumed_blocks)
+                doc_body = _method_doc_body(method).strip()
+                if doc_body:
+                    intro, sections = _method_sections(doc_body)
+                    if intro:
+                        lines.append(intro)
+                        lines.append("")
+                    for sec_title, sec_body in sections:
+                        rendered = _render_method_section(sec_title, sec_body)
+                        lines.extend(rendered)
+                        _append_preserved_at_context(lines, preserved_blocks, section_key, f"#### {sec_title}", consumed_blocks)
+                else:
+                    lines.append("_No docstring available._")
+                    lines.append("")
+                lines.append("</div>")
+                lines.append("")
+            _append_remaining_preserved(lines, preserved_blocks, section_key, consumed_blocks)
+            lines.append("</div>")
+            lines.append("")
+
+        if result_cls is not None:
+            section_key = f"result:{result_cls.name}"
+            lines.append(f"## Result: `{result_cls.name}`")
+            lines.append("")
+            lines.append('<div class="analysis-section-indent" markdown="1">')
+            lines.append("")
+            _append_preserved_at_context(lines, preserved_blocks, section_key, "__section_start__", consumed_blocks)
+            res_doc = ast.get_docstring(result_cls) or ""
+            res_summary, res_sections = _doc_sections(res_doc)
+            res_fields = _class_fields(result_cls)
+            res_field_names = {row.name for row in res_fields}
+            if res_summary:
+                lines.append(res_summary)
+                lines.append("")
+            lines.append("### Fields")
+            lines.append("")
+            lines.extend(_render_field_table(res_fields))
+            lines.append("")
+            for section_name, body in res_sections.items():
+                if not body.strip():
+                    continue
+                if section_name.strip().lower() == "fields":
+                    continue
+                lines.extend(
+                    _render_doc_section(
+                        section_name,
+                        body,
+                        allowed_param_names=res_field_names if section_name.strip().lower() == "parameters" else None,
+                    )
                 )
-        _append_remaining_preserved(lines, preserved_blocks, "result", consumed_blocks)
-        lines.append("</div>")
-        lines.append("")
+                _append_preserved_at_context(lines, preserved_blocks, section_key, f"### {section_name}", consumed_blocks)
+            _append_remaining_preserved(lines, preserved_blocks, section_key, consumed_blocks)
+            lines.append("</div>")
+            lines.append("")
 
     target.output_md.parent.mkdir(parents=True, exist_ok=True)
     target.output_md.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
@@ -593,7 +734,7 @@ def _is_task_module(py_file: Path) -> bool:
     has_request_dataclass = any(c.name.endswith("Request") and _has_dataclass(c) for c in classes)
     has_result_dataclass = any(c.name.endswith("Result") and _has_dataclass(c) for c in classes)
     has_task_dataclass = any(c.name.endswith("Task") and _has_dataclass(c) for c in classes)
-    has_task_cls = _find_task_class(classes) is not None
+    has_task_cls = bool(_find_task_classes(classes))
 
     # Keep helper modules out: include only modules that define request/result/task
     # dataclass payloads, optionally paired with a task class.

@@ -48,7 +48,23 @@ class ExplicitERegimeSpec:
     Fields
     ------
     rows : tuple[tuple[int, int, str, float], ...]
-        Dataclass field.
+        Ordered explicit schedule rows in ``(iteration, voltage_idx, direction, magnitude)``
+        form used verbatim when writing ``eregime.in``.
+
+    Examples
+    --------
+    ```python
+    spec = ExplicitERegimeSpec(
+        rows=(
+            (0, 1, "z", 0.0),
+            (500, 1, "z", 0.25),
+            (1000, 1, "z", -0.25),
+        )
+    )
+    ```
+    This means you provide every row yourself: at iteration 0 the field is 0.0 V/A,
+    at 500 it is +0.25 V/A, and at 1000 it is -0.25 V/A, all on voltage index 1
+    and along the z direction.
     """
     rows: tuple[tuple[int, int, str, float], ...]
 
@@ -62,23 +78,49 @@ class SinusoidalERegimeSpec:
     Fields
     ------
     max_magnitude : float
-        Dataclass field.
+        Peak sinusoidal amplitude (V/A) around ``dc_offset``.
     step_angle : float
-        Dataclass field.
+        Angular increment (radians) between consecutive samples.
     iteration_step : int
-        Dataclass field.
+        MD-iteration increment between consecutive output rows.
     num_cycles : float
-        Dataclass field.
+        Number of sinusoidal cycles to generate.
     direction : str
-        Dataclass field.
+        Field axis label (``"x"``, ``"y"``, or ``"z"``).
     voltage_idx : int
-        Dataclass field.
+        ReaxFF voltage slot index written to the second ``eregime.in`` column.
     phase : float
-        Dataclass field.
+        Initial phase offset in radians applied to the sine argument.
     dc_offset : float
-        Dataclass field.
+        Constant baseline value (V/A) added to the sinusoid.
     start_iter : int
-        Dataclass field.
+        Iteration number for the first generated row.
+
+    Examples
+    --------
+    ```python
+    spec = SinusoidalERegimeSpec(
+        max_magnitude=0.4,
+        step_angle=0.05,
+        iteration_step=100,
+        num_cycles=2.0,
+        direction="z",
+        voltage_idx=1,
+        phase=0.0,
+        dc_offset=0.0,
+        start_iter=0,
+    )
+    ```
+    Plain-language meaning of each value:
+    ``max_magnitude=0.4`` means the signal gets as high or as low as about 0.4 V/A
+    around the offset. ``step_angle=0.05`` sets how finely the sine wave is sampled.
+    ``iteration_step=100`` means each sampled point is 100 MD steps apart.
+    ``num_cycles=2.0`` means generate two full sine cycles.
+    ``direction="z"`` applies the field along z.
+    ``voltage_idx=1`` writes to voltage column/index 1 in ReaxFF.
+    ``phase=0.0`` starts the sine at zero phase shift.
+    ``dc_offset=0.0`` adds no constant bias.
+    ``start_iter=0`` starts writing rows at MD iteration 0.
     """
     max_magnitude: float
     step_angle: float
@@ -100,27 +142,57 @@ class SmoothPulseERegimeSpec:
     Fields
     ------
     amplitude : float
-        Dataclass field.
+        Pulse height above ``baseline`` (V/A) during the positive half-cycle.
     width : float
-        Dataclass field.
+        Duration of the flat pulse plateau within each half-cycle.
     period : float
-        Dataclass field.
+        Full pulse period in the profile time domain.
     slope : float
-        Dataclass field.
+        Rise/fall ramp duration used to smooth pulse edges.
     iteration_step : int
-        Dataclass field.
+        MD-iteration increment between consecutive sampled rows.
     num_of_cycles : int | float
-        Dataclass field.
+        Number of full pulse periods to generate.
     step_size : float
-        Dataclass field.
+        Sampling interval in profile time units.
     direction : str
-        Dataclass field.
+        Field axis label (``"x"``, ``"y"``, or ``"z"``).
     voltage_idx : int
-        Dataclass field.
+        ReaxFF voltage slot index written to the second ``eregime.in`` column.
     baseline : float
-        Dataclass field.
+        Base field value around which bipolar pulses oscillate.
     start_iter : int
-        Dataclass field.
+        Iteration number for the first generated row.
+
+    Examples
+    --------
+    ```python
+    spec = SmoothPulseERegimeSpec(
+        amplitude=0.6,
+        width=1.0,
+        period=6.0,
+        slope=0.5,
+        iteration_step=50,
+        num_of_cycles=3,
+        step_size=0.1,
+        direction="z",
+        voltage_idx=1,
+        baseline=0.0,
+        start_iter=0,
+    )
+    ```
+    Plain-language meaning of each value:
+    ``amplitude=0.6`` sets the pulse height above baseline.
+    ``width=1.0`` is how long the flat top lasts.
+    ``period=6.0`` is the full positive+negative cycle length.
+    ``slope=0.5`` smooths edges by ramping up/down over 0.5 time units.
+    ``iteration_step=50`` means output points are 50 MD steps apart.
+    ``num_of_cycles=3`` generates three full pulse cycles.
+    ``step_size=0.1`` controls time-resolution of sampling.
+    ``direction="z"`` applies the field along z.
+    ``voltage_idx=1`` writes to voltage column/index 1.
+    ``baseline=0.0`` centers pulses around zero field.
+    ``start_iter=0`` starts writing from iteration 0.
     """
     amplitude: float
     width: float
@@ -144,19 +216,42 @@ class FunctionalERegimeSpec:
     Fields
     ------
     func : Callable[[float], float]
-        Dataclass field.
+        Callable mapping sample time to field magnitude (V/A).
     t_end : float
-        Dataclass field.
+        Final sample time (inclusive) in the function time domain.
     dt : float
-        Dataclass field.
+        Sampling interval passed to ``func``.
     iteration_step : int
-        Dataclass field.
+        MD-iteration increment between consecutive sampled rows.
     direction : str
-        Dataclass field.
+        Field axis label (``"x"``, ``"y"``, or ``"z"``).
     voltage_idx : int
-        Dataclass field.
+        ReaxFF voltage slot index written to the second ``eregime.in`` column.
     start_iter : int
-        Dataclass field.
+        Iteration number for the first generated row.
+
+    Examples
+    --------
+    ```python
+    spec = FunctionalERegimeSpec(
+        func=lambda t: 0.2 * math.sin(t),
+        t_end=10.0,
+        dt=0.1,
+        iteration_step=20,
+        direction="z",
+        voltage_idx=1,
+        start_iter=0,
+    )
+    ```
+    Plain-language meaning of each value:
+    ``func`` is the rule used to compute field magnitude at each sampled time.
+    Here it is a sine with amplitude 0.2 V/A.
+    ``t_end=10.0`` means sample up to time 10.0.
+    ``dt=0.1`` means sample every 0.1 time units.
+    ``iteration_step=20`` maps consecutive samples to rows 20 MD steps apart.
+    ``direction="z"`` applies the field along z.
+    ``voltage_idx=1`` writes to voltage column/index 1.
+    ``start_iter=0`` starts row indexing at iteration 0.
     """
     func: Callable[[float], float]
     t_end: float
@@ -460,50 +555,50 @@ def gen_eregime(
     Parameters
     ----------
     out_path : str | Path, optional
-        Input parameter.
+        Destination file path for the generated ``eregime.in`` payload.
     profile_type : str
-        Keyword-only parameter.
+        Profile selector: ``"sin"``, ``"pulse"``, or ``"func"``.
     iteration_step : int
-        Keyword-only parameter.
+        MD-iteration spacing between successive rows in the schedule.
     direction : str, optional
-        Keyword-only parameter.
+        Field direction written to the regime file (``"x"``, ``"y"``, ``"z"``).
     voltage_idx : int, optional
-        Keyword-only parameter.
+        ReaxFF voltage slot index written in column two.
     start_iter : int, optional
-        Keyword-only parameter.
+        Iteration index assigned to the first row.
     max_magnitude : float | None, optional
-        Keyword-only parameter.
+        Sinusoidal amplitude (required when ``profile_type="sin"``).
     step_angle : float | None, optional
-        Keyword-only parameter.
+        Angular sample spacing in radians (required for ``"sin"``).
     num_cycles : float | None, optional
-        Keyword-only parameter.
+        Number of cycles for ``"sin"``/``"pulse"`` profiles.
     phase : float, optional
-        Keyword-only parameter.
+        Initial phase shift in radians for the sinusoidal profile.
     dc_offset : float, optional
-        Keyword-only parameter.
+        Constant offset added to the sinusoidal profile.
     amplitude : float | None, optional
-        Keyword-only parameter.
+        Pulse amplitude above baseline (required for ``"pulse"``).
     width : float | None, optional
-        Keyword-only parameter.
+        Flat-top duration for each pulse (required for ``"pulse"``).
     period : float | None, optional
-        Keyword-only parameter.
+        Pulse period in profile time units (required for ``"pulse"``).
     slope : float | None, optional
-        Keyword-only parameter.
+        Ramp duration for pulse rise/fall (required for ``"pulse"``).
     step_size : float, optional
-        Keyword-only parameter.
+        Time increment used to sample pulse profiles.
     baseline : float, optional
-        Keyword-only parameter.
+        Baseline field level for pulse profiles.
     func : Callable[[float], float] | None, optional
-        Keyword-only parameter.
+        Magnitude function ``f(t)`` (required when ``profile_type="func"``).
     t_end : float | None, optional
-        Keyword-only parameter.
+        Final sample time for function-based profiles.
     dt : float | None, optional
-        Keyword-only parameter.
+        Sampling interval for function-based profiles.
 
     Returns
     -------
     Path
-        Return value.
+        Path to the written ``eregime.in`` file.
 
     Examples
     --------

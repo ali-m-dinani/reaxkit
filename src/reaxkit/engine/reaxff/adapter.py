@@ -91,6 +91,16 @@ from reaxkit.engine.reaxff.adapter_parts.loaders_properties import (
     load_restraints as _load_restraints_impl,
     load_structure_summary as _load_structure_summary_impl,
 )
+from reaxkit.engine.reaxff.adapter_parts.normalizers import (
+    charges_from_fort7_handler,
+    connectivity_from_fort7_handler,
+    trajectory_from_xmolout_handler,
+)
+
+# Backward-compatible aliases for older imports.
+_charges_from_fort7_handler = charges_from_fort7_handler
+_connectivity_from_fort7_handler = connectivity_from_fort7_handler
+_trajectory_from_xmolout_handler = trajectory_from_xmolout_handler
 
 
 @register_engine("reaxff")
@@ -144,7 +154,7 @@ class ReaxFFAdapter(EngineAdapter):
         """
         p = Path(path)
         if p.is_dir():
-            if (p / "xmolout").exists() or (p / "fort.7").exists():
+            if (p / "xmolout").exists() or (p / "fort.7").exists() or (p / "summary.txt").exists():
                 return 0.95
             return 0.0
         if p.is_file():

@@ -1080,3 +1080,23 @@ def _molecular_analysis_from_molfra_handler(handler: MolFraHandler) -> Molecular
     )
 
 
+def trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
+    """Public wrapper for trajectory normalization from ``XmoloutHandler``."""
+    return _trajectory_from_xmolout_handler(handler)
+
+
+def connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> ConnectivityData:
+    """Public wrapper for connectivity normalization from ``Fort7Handler``."""
+    return _connectivity_from_fort7_handler(handler, reporter=reporter)
+
+
+def charges_from_fort7_handler(
+    handler: Fort7Handler,
+    *,
+    simulation: SimulationData | None = None,
+    reporter=None,
+) -> ChargeData:
+    """Public wrapper for charge normalization from ``Fort7Handler``."""
+    return _charges_from_fort7_handler(handler, simulation=simulation, reporter=reporter)
+
+

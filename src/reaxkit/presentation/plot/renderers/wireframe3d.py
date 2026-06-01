@@ -92,6 +92,21 @@ class Wireframe3DRenderer(PlotRenderer):
         ax.set_xlabel("x (A)")
         ax.set_ylabel("y (A)")
         ax.set_zlabel("z (A)")
+        xlim = cfg.get("xlim")
+        ylim = cfg.get("ylim")
+        zlim = cfg.get("zlim")
+        if isinstance(xlim, (list, tuple)) and len(xlim) == 2:
+            ax.set_xlim(float(xlim[0]), float(xlim[1]))
+        if isinstance(ylim, (list, tuple)) and len(ylim) == 2:
+            ax.set_ylim(float(ylim[0]), float(ylim[1]))
+        if isinstance(zlim, (list, tuple)) and len(zlim) == 2:
+            ax.set_zlim(float(zlim[0]), float(zlim[1]))
+        box_aspect = cfg.get("box_aspect")
+        if isinstance(box_aspect, (list, tuple)) and len(box_aspect) == 3:
+            try:
+                ax.set_box_aspect((float(box_aspect[0]), float(box_aspect[1]), float(box_aspect[2])))
+            except Exception:
+                pass
         ax.set_title(str(cfg.get("title", "Voronoi Diagram (3D)")))
         ax.view_init(elev=float(cfg.get("elev", 22.0)), azim=float(cfg.get("azim", 38.0)))
         return save_or_show(fig, cfg)

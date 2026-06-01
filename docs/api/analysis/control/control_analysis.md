@@ -32,6 +32,32 @@ The request asks for one control key lookup in a selected section.
 
 </div>
 
+## Result: `ControlParametersTaskResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result for a control-parameter table extraction.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `request` | `ControlParametersTaskRequest` |  |  |  |
+
+### Examples
+
+```python
+result = ControlParametersTask().run(data, req)
+result.table
+```
+Sample output:
+One-row DataFrame (for example: `key='iout2', value=20, section='md', found=True`).
+Meaning:
+The result captures resolved value and provenance for one key lookup.
+
+</div>
+
 ## Task: `ControlParametersTask`
 
 <div class="analysis-section-indent" markdown="1">
@@ -63,7 +89,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = ControlParametersTask.recommended_presentations(result, payload)
 ```
@@ -71,8 +96,6 @@ Sample output:
 `[PresentationSpec(renderer="table", ...)]`
 Meaning:
 Control lookup outputs default to tabular rendering.
-```
-
 
 </div>
 
@@ -102,7 +125,6 @@ Resolve one control key and return a one-row result table.
 
 #### Examples
 
-```text
 ```python
 result = ControlParametersTask().run(data, ControlParametersTaskRequest(key="iout2"))
 ```
@@ -110,35 +132,7 @@ Sample output:
 `result.table` with columns `key`, `value`, `section`, `found`.
 Meaning:
 A single control entry is normalized into table form.
-```
-
 
 </div>
-
-</div>
-
-## Result: `ControlParametersTaskResult`
-
-<div class="analysis-section-indent" markdown="1">
-
-Result for a control-parameter table extraction.
-
-### Fields
-
-| Field | Type | Default | Help | Choices |
-|---|---|---|---|---|
-| `table` | `pd.DataFrame` |  |  |  |
-| `request` | `ControlParametersTaskRequest` |  |  |  |
-
-### Examples
-
-```python
-result = ControlParametersTask().run(data, req)
-result.table
-```
-Sample output:
-One-row DataFrame (for example: `key='iout2', value=20, section='md', found=True`).
-Meaning:
-The result captures resolved value and provenance for one key lookup.
 
 </div>

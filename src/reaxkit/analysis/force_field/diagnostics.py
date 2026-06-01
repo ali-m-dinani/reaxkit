@@ -5,6 +5,8 @@ parameter-change signals and section-aware summaries used during force-field
 tuning. It is scoped to diagnostic artifacts and does not mutate force-field
 parameters.
 
+When using Standalone ReaxFF for force field optimization, this data will be available in 'fort.79' output file.
+
 **Usage context**
 
 - Optimization debugging: Inspect parameter update behavior across iterations.
@@ -22,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
-from reaxkit.analysis.force_field.force_field import ForceFieldDataRequest, ForceFieldDataTask
+from reaxkit.analysis.force_field.force_field import FFieldDataRequest, FFieldDataTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
@@ -136,9 +138,9 @@ def _interpret_identifier_details(
     out["ffield_section_name"] = section_name
 
     if section_key not in cache:
-        cache[section_key] = ForceFieldDataTask().run(
+        cache[section_key] = FFieldDataTask().run(
             force_field,
-            ForceFieldDataRequest(
+            FFieldDataRequest(
                 section=section_name,
                 interpret=section_key not in {"general", "atom"},
             ),
@@ -193,7 +195,7 @@ def _with_interpreted_identifiers(
 
 
 @dataclass
-class ParameterOptimizationDiagnosticRequest(BaseRequest):
+class FFieldOptimizationDiagnosticRequest(BaseRequest):
     """Request payload for optimization diagnostics analysis.
 
     This request controls whether parsed diagnostic identifiers are returned as
@@ -228,7 +230,7 @@ class ParameterOptimizationDiagnosticRequest(BaseRequest):
 
 
 @dataclass
-class ParameterOptimizationDiagnosticResult(BaseResult):
+class FFieldOptimizationDiagnosticResult(BaseResult):
     """Result payload for parameter-optimization diagnostics.
 
     The analyzer returns raw diagnostic values plus derived sensitivity ratios,
@@ -264,18 +266,18 @@ class ParameterOptimizationDiagnosticResult(BaseResult):
     """
 
     table: pd.DataFrame
-    request: ParameterOptimizationDiagnosticRequest
+    request: FFieldOptimizationDiagnosticRequest
 
 
 @register_task("parameter_optimization_diagnostic", label="Parameter Optimization Diagnostic")
-class ParameterOptimizationDiagnosticTask(AnalysisTask):
+class FFieldOptimizationDiagnosticTask(AnalysisTask):
     """Return sensitivity diagnostics derived from parameter-update diagnostics."""
 
     required_data = ForceFieldOptimizationDiagnosticBundleData
 
     @staticmethod
     def recommended_presentations(
-        _result: ParameterOptimizationDiagnosticResult, payload: dict[str, Any]
+        _result: FFieldOptimizationDiagnosticResult, payload: dict[str, Any]
     ) -> list[PresentationSpec]:
         """Recommend table and sensitivity plot views for diagnostics output.
 
@@ -287,7 +289,7 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
 
         Parameters
         -----
-        _result : ParameterOptimizationDiagnosticResult
+        _result : FFieldOptimizationDiagnosticResult
             Typed analyzer result instance (unused for current selection logic).
         payload : dict[str, Any]
             Serialized analyzer payload expected to include ``table`` rows.
@@ -332,9 +334,9 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
     def run(
         self,
         data: ForceFieldOptimizationDiagnosticBundleData,
-        request: ParameterOptimizationDiagnosticRequest,
+        request: FFieldOptimizationDiagnosticRequest,
         reporter=None,
-    ) -> ParameterOptimizationDiagnosticResult:
+    ) -> FFieldOptimizationDiagnosticResult:
         """Run diagnostics analysis and optional identifier interpretation.
 
         Builds the sensitivity-augmented diagnostics table from parsed
@@ -348,14 +350,14 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
         -----
         data : ForceFieldOptimizationDiagnosticBundleData
             Bundle containing diagnostics and force-field parameter records.
-        request : ParameterOptimizationDiagnosticRequest
+        request : FFieldOptimizationDiagnosticRequest
             Request controlling identifier interpretation.
         reporter : Any, optional
             Progress callback accepted by the analyzer interface; unused here.
 
         Returns
         -----
-        ParameterOptimizationDiagnosticResult
+        FFieldOptimizationDiagnosticResult
             Result containing raw/derived diagnostics and optional metadata.
 
         Examples
@@ -374,11 +376,11 @@ class ParameterOptimizationDiagnosticTask(AnalysisTask):
         table = _diagnostic_sensitivity_table(diagnostic_data)
         if bool(request.interpret):
             table = _with_interpreted_identifiers(table, force_field=data.force_field_parameters)
-        return ParameterOptimizationDiagnosticResult(table=table, request=request)
+        return FFieldOptimizationDiagnosticResult(table=table, request=request)
 
 
 __all__ = [
-    "ParameterOptimizationDiagnosticRequest",
-    "ParameterOptimizationDiagnosticResult",
-    "ParameterOptimizationDiagnosticTask",
+    "FFieldOptimizationDiagnosticRequest",
+    "FFieldOptimizationDiagnosticResult",
+    "FFieldOptimizationDiagnosticTask",
 ]
