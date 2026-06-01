@@ -20,7 +20,7 @@ examples/
 
 ## Example scripts
 
-### [`xmolout_basic_example.py`](xmolout_basic_example.py)
+### [`xmolout_basic_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/xmolout_basic_example.py)
 
 Demonstrates direct Python-task usage on `xmolout` data:
 - load trajectory via `XmoloutHandler`
@@ -29,7 +29,7 @@ Demonstrates direct Python-task usage on `xmolout` data:
 - extract cell dimensions
 - export CSV outputs
 
-### [`connectivity_multifile_example.py`](connectivity_multifile_example.py)
+### [`connectivity_multifile_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/connectivity_multifile_example.py)
 
 Demonstrates multi-file connectivity/charge analysis with `xmolout` + `fort.7`:
 - load `ConnectivityData` and `ChargeData`
@@ -40,7 +40,7 @@ Demonstrates multi-file connectivity/charge analysis with `xmolout` + `fort.7`:
 
 Related tutorial: [02_atom_property_and_video_workflows.md](../tutorials/02_atom_property_and_video_workflows.md)
 
-### [`gen_plot_presentation_example.py`](gen_plot_presentation_example.py)
+### [`gen_plot_presentation_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/gen_plot_presentation_example.py)
 
 Demonstrates file-agnostic plotting utilities on tabular data:
 - single and multi-series plots
@@ -51,7 +51,7 @@ Demonstrates file-agnostic plotting utilities on tabular data:
 
 Related tutorial: [04_gen_plot_workflow.md](../tutorials/04_gen_plot_workflow.md)
 
-### [`multi_engine_get_msd_cli_blueprint.py`](multi_engine_get_msd_cli_blueprint.py)
+### [`multi_engine_get_msd_cli_blueprint.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/multi_engine_get_msd_cli_blueprint.py)
 
 Demonstrates a task-first, multi-engine architecture blueprint for
 `reaxkit get_msd` style flows.

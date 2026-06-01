@@ -44,6 +44,8 @@
 
 </div>
 
+</div>
+
 ## Class: `BulkEnergySpec`
 
 <div class="analysis-section-indent" markdown="1">
