@@ -165,6 +165,8 @@ def build_nav() -> list[dict[str, object]]:
         nav.append({"Home": "index.md"})
 
     getting_started: list[dict[str, object]] = []
+    if (DOCS_DIR / "architecture_overview.md").is_file():
+        getting_started.append({"Architecture Overview": "architecture_overview.md"})
     if (DOCS_DIR / "getting_started/index.md").is_file():
         getting_started.append({OVERVIEW_LABEL: "getting_started/index.md"})
     if (DOCS_DIR / "installation.md").is_file():

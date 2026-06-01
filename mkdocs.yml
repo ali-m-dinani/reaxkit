@@ -62,6 +62,7 @@ nav:
 - Home: index.md
 - Getting Started:
   - 📍 Overview: getting_started.md
+  - Architecture Overview: architecture_overview.md
   - Installation: installation.md
   - Quickstart: quickstart.md
   - Tutorials:
