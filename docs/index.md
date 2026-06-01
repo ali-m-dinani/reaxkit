@@ -7,6 +7,7 @@ simulation data.
 
 ## Getting started
 
+- **[Architecture Overview](architecture_overview.md)** - Overview of different codes, how ReaxKit works, and how it stores the results
 - **[Installation](installation.md)** - Install ReaxKit and dependencies
 - **[Quickstart](quickstart.md)** - First end-to-end CLI run
 - **[Tutorials](tutorials/index.md)** - Step-by-step workflows

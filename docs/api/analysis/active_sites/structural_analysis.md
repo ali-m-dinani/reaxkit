@@ -15,6 +15,8 @@ Compute per-atom active-site structural descriptors on one frame.
 
 ### Method: `recommended_presentations(_result: ActiveSiteStructuralResult, payload: dict[str, Any])`
 
+<div class="analysis-method-indent" markdown="1">
+
 Build default table/plot presentations for structural task output.
 
 #### Works on
@@ -36,7 +38,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = ActiveSiteStructuralTask.recommended_presentations(result, payload)
 ```
@@ -44,10 +45,12 @@ Sample output:
 A list with table and `d_pyr vs atom_id` plot views.
 Meaning:
 Structural outputs can be rendered without custom plotting metadata.
-```
 
+</div>
 
 ### Method: `run(data: ConnectivityTrajectoryData | TrajectoryData, request: ActiveSiteStructuralRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
 
 Compute frame-level active-site structural descriptors and labels.
 
@@ -75,7 +78,6 @@ TRACT-compatible structural tables.
 
 #### Examples
 
-```text
 ```python
 req = ActiveSiteStructuralRequest(frame=0, bond_mode="bo")
 result = ActiveSiteStructuralTask().run(bundle, req)
@@ -84,7 +86,7 @@ Sample output:
 `result.table` with per-atom descriptors and labels.
 Meaning:
 One analyzed frame is transformed into rich structural site features.
-```
 
+</div>
 
 </div>

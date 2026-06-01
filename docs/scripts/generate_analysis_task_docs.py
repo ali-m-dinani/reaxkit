@@ -736,13 +736,19 @@ def _is_task_module(py_file: Path) -> bool:
     has_task_dataclass = any(c.name.endswith("Task") and _has_dataclass(c) for c in classes)
     has_task_cls = bool(_find_task_classes(classes))
 
-    # Keep helper modules out: include only modules that define request/result/task
-    # dataclass payloads, optionally paired with a task class.
+    # Include any module that defines an analysis task class (decorated with
+    # register_task or inheriting AnalysisTask). Some task modules keep their
+    # Request/Result dataclasses in a separate shared models module.
+    if has_task_cls:
+        return True
+
+    # Backward compatibility: retain support for modules that currently expose
+    # only dataclass payloads in this file.
     if has_task_dataclass:
         return True
     if has_request_dataclass or has_result_dataclass:
         return True
-    return has_task_cls and (has_request_dataclass or has_result_dataclass)
+    return False
 
 
 def _analysis_source_root(repo_root: Path) -> tuple[Path, str]:

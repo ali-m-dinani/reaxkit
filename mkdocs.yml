@@ -32,7 +32,7 @@ theme:
   - navigation.tabs.sticky
   - navigation.top
   - navigation.sections
-  - toc.integrate
+  - toc.follow
   - search.suggest
   - search.highlight
   - search.share
@@ -62,16 +62,16 @@ nav:
 - Home: index.md
 - Getting Started:
   - 📍 Overview: getting_started.md
-  - Architecture Overview: architecture_overview.md
+  -    Architecture Overview: architecture_overview.md
   - Installation: installation.md
   - Quickstart: quickstart.md
+  - Examples: examples/README.md
   - Tutorials:
     - 📍 Overview: tutorials/index.md
     - 01 - Understanding Quickstart: tutorials/01_understanding_quickstart.md
     - 02 - Atom Property And Video Workflows: tutorials/02_atom_property_and_video_workflows.md
     - 03 - Eregime Generator: tutorials/03_eregime_generator.md
     - 04 - Gen Plot Workflow: tutorials/04_gen_plot_workflow.md
-  - Examples: examples/README.md
 - API:
   - 📍 Overview: api/index.md
   - Analysis:

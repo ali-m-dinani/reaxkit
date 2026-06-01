@@ -213,3 +213,21 @@
   padding-left: 0.8rem;
   border-left: 1px solid rgba(128, 128, 128, 0.3);
 }
+
+/* Sidebar indentation: left navigation tree */
+.md-sidebar--primary .md-nav__list .md-nav__list {
+  margin-left: 0.5rem;
+}
+
+.md-sidebar--primary .md-nav__link {
+  padding-left: 0.15rem;
+}
+
+/* Sidebar indentation: right page TOC tree */
+.md-sidebar--secondary .md-nav__list .md-nav__list {
+  margin-left: 0.5rem;
+}
+
+.md-sidebar--secondary .md-nav__link {
+  padding-left: 0.15rem;
+}

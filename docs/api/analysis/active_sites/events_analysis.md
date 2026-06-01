@@ -15,6 +15,8 @@ Extract persistent C-O and C-Si active-site events over trajectory frames.
 
 ### Method: `recommended_presentations(_result: ActiveSiteEventsResult, payload: dict[str, Any])`
 
+<div class="analysis-method-indent" markdown="1">
+
 Build default table/plot presentations for event task outputs.
 
 #### Works on
@@ -36,7 +38,6 @@ Analyzer task output payloads
 
 #### Examples
 
-```text
 ```python
 specs = ActiveSiteEventsTask.recommended_presentations(result, payload)
 ```
@@ -44,10 +45,12 @@ Sample output:
 A list with table and `n_events_O vs atom_id` plot specs.
 Meaning:
 Event outputs can be rendered with default plotting metadata.
-```
 
+</div>
 
 ### Method: `run(data: ConnectivityTrajectoryData | TrajectoryData, request: ActiveSiteEventsRequest, reporter=None)`
+
+<div class="analysis-method-indent" markdown="1">
 
 Extract persistent C-O and C-Si event descriptors over sampled frames.
 
@@ -75,7 +78,6 @@ TRACT-compatible projection.
 
 #### Examples
 
-```text
 ```python
 req = ActiveSiteEventsRequest(mode="auto", every=10, persist=50)
 result = ActiveSiteEventsTask().run(bundle, req)
@@ -84,7 +86,7 @@ Sample output:
 `result.table` with reactive flags and event counts per carbon atom.
 Meaning:
 Time-resolved contacts are condensed into persistent event descriptors.
-```
 
+</div>
 
 </div>
