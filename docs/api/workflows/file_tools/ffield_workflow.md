@@ -100,7 +100,7 @@ _No command-specific arguments found._
 The figure below shows an example tornado plot for the sensitivity of force field optimization error to each parameter. Bars show 3 values: min, max, and mean of sensitivities per parameter.
 
 <div style="text-align:center;" markdown="1">
-![get_ffield_diagnostic_data_plot_tornado](../../../figures/get_ffield_diagnostic_data_plot_tornado.png){ style="width:85%; max-width:800px;" }
+![get_ffield_diagnostic_data_plot_tornado](../../../figures/get_ffield_diagnostic_data_plot_tornado.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample tornado plot for the sensitivity of force field optimization error to each parameter*
 </div>

@@ -41,7 +41,7 @@ with optional frequency threshold filtering.
 The figure below shows an example CSV output for the top 2 dominant species across a simulation. 
 
 <div style="text-align:center;" markdown="1">
-![get_dominant_species](../../../figures/get_dominant_species.png){ style="width:85%; max-width:800px;" }
+![get_dominant_species](../../figures/get_dominant_species.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample CSV output for the top 2 dominant species across a simulation.*
 </div>
@@ -137,7 +137,7 @@ lifetime statistics are reported.
 The figure below shows an example CSV output for the lifetime of OH. This table shows during which OH was available, so cycles of OH generation can be detected. 
 
 <div style="text-align:center;" markdown="1">
-![get_molecule_lifetime](../../../figures/get_molecule_lifetime.png){ style="width:85%; max-width:800px;" }
+![get_molecule_lifetime](../../figures/get_molecule_lifetime.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample CSV output for the lifetime of a molecule.*
 </div>

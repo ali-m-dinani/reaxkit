@@ -151,7 +151,7 @@ signals, then reports event points.
 The figure below shows an example output plot where the raw bond-order time series between two atoms is shown, with the EMA-smoothed signal overlaid. With the current settings, multiple bond formation and breakage events are detected. Users should tune these parameters for their own systems so formation/breakage is detected correctly.
 
 <div style="text-align:center;" markdown="1">
-![bond_events_with_smoothing_and_thresholds](../../../figures/bond_events_with_smoothing_and_thresholds.png){ style="width:85%; max-width:800px;" }
+![bond_events_with_smoothing_and_thresholds](../../figures/bond_events_with_smoothing_and_thresholds.png){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample bond events plot with detected bond breakage/formation iterations.*
 </div>
@@ -241,7 +241,7 @@ engine-specific output formatting.
 The figure below shows an example relabeling output where atoms labels are changed according to their coordination status, and then plotted using OVITO.
 
 <div style="text-align:center;" markdown="1">
-![relabel_traj_using_coordination](../../../figures/relabel_traj_using_coordination.png){ style="width:85%; max-width:800px;" }
+![relabel_traj_using_coordination](../../figures/relabel_traj_using_coordination.png){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample relabeling output plot based on their coordination status.*
 </div>

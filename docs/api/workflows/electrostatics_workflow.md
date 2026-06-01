@@ -50,7 +50,7 @@ charge series on iteration/frame/time axes.
 The figure below shows an example CSV output for the table of charges for different atoms across different frames.
 
 <div style="text-align:center;" markdown="1">
-![charge_table](../../../figures/charge_table.png){ style="width:85%; max-width:800px;" }
+![charge_table](../../figures/charge_table.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample CSV output for the charges table.*
 </div>
@@ -60,7 +60,7 @@ The figure below shows an example CSV output for the table of charges for differ
 The above data can be pivoted using Excel's pivot table feature to see the charges for atoms across frames in a tabular-format as follows:
 
 <div style="text-align:center;" markdown="1">
-![charges_table_pivoted_using_excel](../../../figures/charges_table_pivoted_using_excel.png){ style="width:85%; max-width:800px;" }
+![charges_table_pivoted_using_excel](../../figures/charges_table_pivoted_using_excel.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample pivoted data for charge data across frames and atoms.*
 </div>
@@ -129,7 +129,7 @@ report coercive/remnant roots.
 The figure below shows an example hysteresis plot, where electric field is on x-axis and polarization (or dipole) on the y-axis.
 
 <div style="text-align:center;" markdown="1">
-![PolarizationFieldTask](../../../figures/PolarizationFieldTask.png){ style="width:85%; max-width:800px;" }
+![PolarizationFieldTask](../../figures/PolarizationFieldTask.png){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample polarization hysteresis plot.*
 </div>

@@ -215,7 +215,7 @@ For a more discussion on voronoi plots, see the main documentaion at: https://do
 The figure below shows an example 2D plot for the voronoi.
 
 <div style="text-align:center;" markdown="1">
-![get_voronoi_diagram_2d](../../../figures/get_voronoi_diagram_2d.png){ style="width:85%; max-width:800px;" }
+![get_voronoi_diagram_2d](../../figures/get_voronoi_diagram_2d.png){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample an example 2D plot for the voronoi.*
 </div>

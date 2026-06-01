@@ -129,7 +129,7 @@ The figure below shows an example CSV output for trainset data. Group comments a
 In contrast, inline-comment is the comment line in front of each trainset line.
  
 <div style="text-align:center;" markdown="1">
-![TrainsetDataTask](../../../figures/TrainsetDataTask.png){ style="width:85%; max-width:800px;" }
+![TrainsetDataTask](../../../figures/TrainsetDataTask.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: Sample CSV output for trainset data.*
 </div>

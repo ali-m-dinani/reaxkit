@@ -20,7 +20,7 @@ _No command-specific arguments found._
 A view of the graphical user interface (GUI) is seen below:
 
 <div style="text-align:center;" markdown="1">
-![ReaxKit_Graphical_User_Interface](../../../figures/ReaxKit_Graphical_User_Interface.png){ style="width:85%; max-width:800px;" }
+![ReaxKit_Graphical_User_Interface](../../../figures/ReaxKit_Graphical_User_Interface.PNG){ style="width:85%; max-width:800px;" }
 
 *Figure: View of ReaxKit's GUI.*
 </div>
