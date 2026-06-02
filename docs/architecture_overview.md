@@ -13,6 +13,20 @@ ReaxKit modules are grouped by role:
 - **Presentation** (`src/reaxkit/presentation/...`): plotting, rendering, and output formatting utilities.
 - **WebUI** (`src/reaxkit/webui/...`): graphical interface and callback wiring.
 
+### Note
+
+```text
+Worth mentioning that throughout this package, when we refer to 
+'ReaxFF', we are referring to 'Standalone ReaxFF',
+which is the original ReaxFF implementation by van Duin et al. 
+This is to distinguish it from other engines that can produce 
+ReaxFF-like outputs (e.g. LAMMPS with ReaxFF potential, AMS 
+with ReaxFF module). The Engine category includes handlers 
+for all engines, but the core 'ReaxFF' handlers are designed 
+around the standalone ReaxFF output formats.
+```
+
+
 <a id="all_things_in_reaxkit_by_category"></a>
 
 The figure below shows a category-level map of major ReaxKit components.
@@ -49,7 +63,7 @@ Core flow:
 1. User submits a request (CLI or UI), including what to compute and optional filters.
 2. Workflow layer validates/normalizes the request and builds a typed **request** object.
 3. The request is routed to the matching analysis task based on task contract/type.
-4. The analysis executor runs task logic and produces a typed **result** object.
+4. The **analysis executor** runs task logic and produces a typed **result** object.
 5. Result is presented/exported (table, plot, file), using a consistent output contract.
 
 <a id="how_requests_are_handled_and_analysis_executor_works"></a>
@@ -81,22 +95,13 @@ Example:
 
 ## 3) `reaxkit-workspace` Structure
 
-A typical `ReaxKit` workspace is organized into these folders:
-
-- **analysis**
-- **cache**
-- **data**
-  - **raw**
-  - **parsed**
-  - **run_index**
-- **inputs**
-- **figures**
-- **logs**
-- **reports**
+In order to have a structured way to organize ReaxKit's generated files and outputs, 
+we have developed a dedicated folder, named `reaxkit-workspace`. This workspace is designed to keep all ReaxKit-related artifacts in a well-organized manner, facilitating easy access and management of inputs, outputs, and intermediate files.
+This ensures **reproducibility, traceability, and a clear separation of raw data, processed data, analysis results, and visualizations**.
 
 <a id="reaxkit_workspace_overall_folder_structure"></a>
 
-The figure below shows the overall folder layout of a typical `reaxkit-workspace`.
+Figure below shows the overall folder layout of a typical `reaxkit-workspace`.
 
 <div style="text-align:center;" markdown="1">
 ![reaxkit_workspace_overall_folder_structure](figures/reaxkit_workspace_overall_folder_structure.png){ style="width:90%; max-width:800px;" }
@@ -104,38 +109,52 @@ The figure below shows the overall folder layout of a typical `reaxkit-workspace
 *Figure: Overall folder structure for organizing ReaxKit inputs, generated files, and outputs.*
 </div>
 
-How to use this structure:
+How to navigate this structure:
 
-- Keep original simulation artifacts in `data/raw/<run_id>/...` and do not edit them in place.
-- Store normalized parsed datasets in `data/parsed/<parsed_id>/` (for example `trajectorydata.h5` + `meta.json`).
-- Use `data/run_index/<run_id>.json` for run-level metadata and lookup.
-- Keep generated/selected input files under `inputs/<run_id>/...`.
-- Write analysis tabular outputs under `analysis/<task>/<analysis_id>/...`.
-- Write visual outputs under `figures/<task>/<analysis_id>/...`.
-- Use `cache` for handler/analysis caches and cache indexes.
-- Keep execution traces in `logs` and higher-level deliverables in `reports`.
+- Original simulation artifacts can be found in `data/raw/<run_id>/...`. Every time you run a new task, its required raw files are automatically copied into a new run-specific folder here.
+- Once the data is loaded and normalized into ReaxKit's main data classes, they sit in `data/parsed/<parsed_id>/` (for example `trajectorydata.h5` + `meta.json`).
+- `data/run_index/<run_id>.json` can be used for run-level metadata and lookup to see which runs you had, what files they used, etc.
+- Generated input files are by default stored under `inputs/<run_id>/...`. This can be a 'control' file which you will use for your simulations.
+- Analysis tabular outputs and figures are saved under `analysis/<task>/<analysis_id>/...`.
+- `cache` is a place for handler/analysis caches and cache indexes.
+- Execution traces are saved in `logs` to see the timing of different steps and debug if needed.
+- Higher-level deliverables in PDF or Word format are saved in `reports`.
+
+### Note
+
+```text
+Different IDs (run_id, parsed_id, analysis_id, handler_id) are used 
+to keep track of different artifacts and their relationships. 
+These IDs are generated automatically when you run tasks or 
+load data, and they are used to organize files in a way that 
+maintains traceability between raw inputs, parsed data, 
+analysis results, and caches. For example, a run_id might 
+correspond to a specific simulation run, while a parsed_id 
+corresponds to the normalized data extracted from that run, and 
+an analysis_id corresponds to a specific analysis task 
+performed on that data. This structured approach allows you to 
+easily navigate and manage the various files and outputs 
+generated during your work with ReaxKit, ensuring that you 
+can always trace back from an analysis result to the original 
+raw data and the specific analysis parameters used to produce it.
+
+Once you run a task, you are informed where the relevant files are 
+stored in the workspace, so finding your outputs and inputs is easy.
+```
 
 Example placement by folder:
 
-- **inputs**: `ReaxKit/inputs/<run_id>/control`
-- **data/raw**: `ReaxKit/data/raw/<run_id>/xmolout`
-- **data/parsed**: `ReaxKit/data/parsed/<parsed_id>/trajectorydata.h5` and `ReaxKit/data/parsed/<parsed_id>/meta.json`
-- **data/run_index**: `ReaxKit/data/run_index/<run_id>.json`
-- **analysis**: `ReaxKit/analysis/msd/<analysis_id>/result.csv` and `ReaxKit/analysis/msd/<analysis_id>/settings.json`
-- **figures**: `ReaxKit/figures/msd/<analysis_id>/msd_vs_time.png`
-- **cache/handlers**: `ReaxKit/cache/handlers/<handler_id>/cache.h5`
-- **cache/analysis**: `ReaxKit/cache/analysis/<analysis_id>/cache.h5`
-- **cache/index**: `ReaxKit/cache/index/handlers.json` and `ReaxKit/cache/index/analysis.json`
-- **logs**: `ReaxKit/logs/reaxkit.log`
-- **reports**: `ReaxKit/reports/summary.md`
-
-Recommended practice:
-
-- Keep raw source files immutable.
-- Keep generated/processed artifacts in their designated folders.
-- Prefer HDF5 + JSON for parsed/cached metadata and CSV/PNG for exported analysis products.
-- Keep reports and reproducibility metadata version-controlled.
+- **inputs**: `ReaxKit/inputs/<run_id>/control` is a generated control file
+- **data/raw**: `ReaxKit/data/raw/<run_id>/xmolout` is a snapshot of the original ReaxFF output file (i.e., xmolout) copied into the workspace for a specific run.
+- **data/parsed**: `ReaxKit/data/parsed/<parsed_id>/trajectorydata.h5` and `ReaxKit/data/parsed/<parsed_id>/meta.json` are the ReaxKit's normalized and structured representations of the raw data, stored in HDF5 and JSON formats for efficient access and metadata storage.
+- **data/run_index**: `ReaxKit/data/run_index/<run_id>.json` is a JSON file that serves as an index for all the runs you have executed, containing metadata about each run such as the files used, parameters, and timestamps.
+- **analysis**: `ReaxKit/analysis/msd/<analysis_id>/result.csv` and `ReaxKit/analysis/msd/<analysis_id>/settings.json` are the outputs of an MSD analysis task, where `result.csv` contains the computed mean squared displacement values and `settings.json` contains the parameters and configuration used for that analysis.
+- **cache/handlers**: `ReaxKit/cache/handlers/<handler_id>/cache.h5` is a cache file that stores intermediate data and results related to a specific handler (i.e., XmoloutHandler), allowing for faster access and reuse of previously computed information when the same handler is invoked again with the same parameters.
+- **cache/analysis**: `ReaxKit/cache/analysis/<analysis_id>/cache.h5` is a cache file that stores intermediate data and results related to a specific analysis task (i.e., MSDTask), enabling efficient retrieval of previously computed results when the same analysis is performed again with the same parameters.
+- **cache/index**: `ReaxKit/cache/index/handlers.json` and `ReaxKit/cache/index/analysis.json` are JSON files that serve as indexes for the handler and analysis caches, respectively, keeping track of which cache files correspond to which handlers and analyses, along with metadata such as timestamps, parameters, and relationships between different cached artifacts.
+- **logs**: `ReaxKit/logs/general/reaxkit_general.log` and `ReaxKit/logs/timing/human_readable_timing.log` are log files that capture general logs and timing information for your ReaxKit runs, providing insights into the execution flow, performance, and any issues that may arise during the processing of your data and analyses.
+- **reports**: `ReaxKit/reports/<analysis_id>/active_site_events_report.pdf` is a generated report that summarizes the findings of a specific analysis task (i.e., active site events), presenting the results in a structured and visually appealing format for easy interpretation and sharing.
 
 ---
 
-For first usage flow, continue with [Quickstart](quickstart.md) and [Tutorials](tutorials/index.md).
+For first usage flow, continue with [Installation](installation.md).

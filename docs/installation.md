@@ -24,13 +24,13 @@ Some features need optional packages or external tools:
 pip install reaxkit
 ```
 
-This installs the core package and core dependencies only.
+This installs the **core package and core dependencies** only.
 
 ---
 
 ## Install with extras
 
-Use extras based on your workflow:
+To install optional dependencies for specific features, follow these commands:
 
 ```bash
 pip install "reaxkit[plot]"
@@ -38,6 +38,9 @@ pip install "reaxkit[trajectory]"
 pip install "reaxkit[webui]"
 pip install "reaxkit[all]"
 ```
+
+where the last one installs all optional dependencies. 
+
 
 Available extras include:
 - `plot`
@@ -54,13 +57,15 @@ Available extras include:
 
 ## Install from source
 
+If you want to install the latest development version (which is not yet publihsed on PyPI, and hence not installable yet using pip) or contribute, you can clone the repository and install from source:
+
 ```bash
 git clone https://github.com/ali-m-dinani/reaxkit.git
 cd reaxkit
 pip install .
 ```
 
-For editable development install:
+For editable development install (i.e., changes to source code are reflected without reinstalling), use:
 
 ```bash
 pip install -e .
@@ -76,8 +81,10 @@ pip install -e ".[plot,trajectory]"
 
 ## Verify installation
 
+To make sure ReaxKit is installed correctly, run the following command in your terminal:
+
 ```bash
-reaxkit --help
+reaxkit help -h
 ```
 
 If the help message appears, installation is successful.

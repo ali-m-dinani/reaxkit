@@ -17,7 +17,7 @@ simulation data.
 
 ## Core concepts
 
-ReaxKit uses a layered model:
+As you will read more in detail in **[Architecture Overview](architecture_overview.md)**, ReaxKit uses a layered model:
 - **Engine I/O + generators** for data/file handling
 - **Analysis tasks** for computations
 - **Workflows** for CLI orchestration and presentation
@@ -39,12 +39,20 @@ Example current commands:
 
 ## Reference material
 
-ReaxFF file semantics and context:
+One of the engines supported by ReaxKit is ReaxFF (i.e., ReaxFF standalone).
+This engine saves the data across multiple files, and needs specific input files. 
+If you are not familiar with ReaxFF data structure and file semantics,
+it is recommended to read the following resources to understand the file semantics 
+and context:
+
 - **[ReaxFF Reference](resources/reaxff_reference/index.md)**
 
 ---
 
 ## Developer resources
+
+If you are interested in contributing to ReaxKit, or want to understand the codebase
+and design decisions, check out the following resources:
 
 - **[File templates](file_templates/index.md)**
 - **[Contributing](contributing.md)**
@@ -53,4 +61,4 @@ ReaxFF file semantics and context:
 ---
 
 If you are not sure where to begin, start from
-**[Tutorials](tutorials/index.md)**.
+**[Architecture Overview](architecture_overview.md)**.

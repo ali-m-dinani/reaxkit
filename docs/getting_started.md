@@ -1,6 +1,8 @@
 # Getting Started
 
-Use this section for first-time setup and first runs.
+This is a top-level document to help you get started with ReaxKit. 
+It provides an overview of the architecture, installation instructions, 
+and links to tutorials and examples.
 
 ## Start Here
 
