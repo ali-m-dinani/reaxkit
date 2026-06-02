@@ -75,11 +75,13 @@ Best practice: use `frame` for deterministic indexing, and `iter`/`time` for int
 ## Output locations
 
 By default:
-- exported analysis tables/plots go under `reaxkit_outputs/<workflow_or_command>/`
-- generated input files go under `reaxkit_generated_inputs/`
+- exported analysis tables/plots go under `reaxkit_workspace/analysis/`
+- generated input files go under `reaxkit_workspace/inputs/`
 
 Example:
-- `reaxkit_outputs/timeseries/atom1_z.csv`
+- `reaxkit_workspace/analysis/timeseries/run_20260523_115443_cfc58e/atom1_z.csv`
+
+where `run_20260523_115443_cfc58e` is a unique identifier for this specific command execution.
 
 You can override output file paths via `--export` and `--save`.
 
@@ -87,12 +89,7 @@ You can override output file paths via `--export` and `--save`.
 
 ## Related next steps
 
-- For trajectory analysis commands: `reaxkit get_msd`, `reaxkit get_rdf`, `reaxkit get_dihedral`, `reaxkit get_voronoi`
-- For generic field-driven series extraction: `reaxkit timeseries --field ...`
-- For command discovery:
-  - `reaxkit --help`
-  - `reaxkit timeseries -h`
-  - `reaxkit get_msd -h`
+- See the next tutorial [02_atom_property_and_video_workflows](02_atom_property_and_video_workflows.md) to learn how to make plots and videos.
 
 ---
 

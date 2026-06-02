@@ -11,7 +11,7 @@ Engine docs are organized into:
 - `ams` (AMS adapter + RKF handlers)
 - `lammps` (LAMMPS adapter + dump/log handlers)
 - `common` (engine-agnostic IO and generators)
-- `reaxff` (ReaxFF adapters, adapter parts, generators, and IO handlers)
+- `reaxff` (ReaxFF Standalone adapters, adapter parts, generators, and IO handlers)
 
 ## Module Index
 

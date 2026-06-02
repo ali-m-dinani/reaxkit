@@ -60,4 +60,3 @@ Demonstrates a task-first, multi-engine architecture blueprint for
 
 - These examples are for learning and exploration, not formal tests.
 - For conceptual walkthroughs, use [tutorials](../tutorials/index.md).
-- For templates, see [file templates](../file_templates/index.md).

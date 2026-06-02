@@ -8,18 +8,19 @@ reaxkit gen-plot --type <plot_type> ...
 ```
 
 `gen-plot` is file-agnostic: it reads tabular files and plots by column
-selectors (`c1`, `c2`, ...), without requiring ReaxFF-specific semantics.
+selectors (`c1`, `c2`, ...), without requiring ReaxFF-specific semantics. As a result,
+it can be used for **any** tabular data.
 
 ---
 
 ## Supported plot types
 
-- `single`
-- `directed`
-- `dual`
-- `tornado`
-- `scatter3d`
-- `heatmap2d`
+- `single` which is a flexible line/scatter plot with multiple series and shared x-axis
+- `directed` which is a directed curve plot with arrows indicating directionality along the curve
+- `dual` which is a dual y-axis plot
+- `tornado` which is a tornado plot
+- `scatter3d` which is a 3D scatter plot with optional value-based coloring
+- `heatmap2d` which is a 2D heatmap generated from 3D coordinates by projecting onto a plane and binning
 
 All are selected through `--type`.
 
@@ -38,6 +39,8 @@ All are selected through `--type`.
 
 ### 1) Single line/scatter plot
 
+To get a simple line plot of column 2 vs column 1:
+
 ```bash
 reaxkit gen-plot --type single --file summary.txt --xaxis c1 --yaxis c2 --plot
 ```
@@ -48,7 +51,7 @@ Multi-series with shared x:
 reaxkit gen-plot --type single --file summary.txt --xaxis c1 --yaxis c2,c3,c4 --plot
 ```
 
-Pairwise x-y mode:
+Pairwise x-y mode, meaning c1 vs c2 and c3 vs c4:
 
 ```bash
 reaxkit gen-plot --type single --file data.txt --xaxis c1,c3 --yaxis c2,c4 --plot
@@ -61,6 +64,8 @@ reaxkit gen-plot --type single --file data.txt --xaxis c1 --yaxis c2 --scatter -
 ```
 
 ### 2) Directed curve
+
+This type of plot is useful for visualizing gradients or trajectories where the direction of change along the curve is important. Arrows are automatically placed along the curve to indicate directionality.
 
 ```bash
 reaxkit gen-plot --type directed --file summary.txt --xaxis c1 --yaxis c2 --save directed.png

@@ -1,7 +1,12 @@
 # Atom-Property Plots and Video Workflows
 
+###Note
+
+```
 This tutorial replaces the old `xmolout_fort7` tutorial with the current
 ReaxKit command structure.
+```
+
 
 You will use:
 - `plot_atom_property` for frame-wise 3D scatter or 2D heatmap plots of
@@ -90,6 +95,12 @@ This creates an MP4 from ordered frame images.
 3. Export one CSV (`--export`) for QA and reproducibility.
 4. Increase frame density for final rendering.
 5. Use `gen-video` for publication-ready animations.
+
+---
+
+## Related next steps
+
+- See the next tutorial [03_eregime_generator](03_eregime_generator.md) to learn how to make eregime.in files with custom profile.
 
 ---
 

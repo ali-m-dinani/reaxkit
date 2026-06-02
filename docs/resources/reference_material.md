@@ -13,9 +13,10 @@ Resource types include: `Paper`, `Review`, `Book`, `Spec`, `Manual`,
 
 These references informed implementation details, algorithms, or validation.
 
-| Type  | File                    | Specific Function                             | Purpose                      | Resource |
-|-------|-------------------------|-----------------------------------------------|------------------------------|----------|
-| Paper | `equation_of_states.py` | `vinet_energy_ev` and `vinet_energy_trainset` | Rose-Vinet equation of state | Vinet, P., Ferrante, J., Rose, J. H., and Smith, J. R. (1987). *Compressibility of solids*. *J. Geophys. Res.*, 92(B9), 9319-9325. doi:10.1029/JB092iB09p09319 |
+| Type  | File                    | Specific Function/command                           | Purpose                                                               | Resource |
+|-------|-------------------------|-----------------------------------------------------|-----------------------------------------------------------------------|----------|
+| Paper | `equation_of_states.py` | `vinet_energy_ev` and `vinet_energy_trainset`       | Rose-Vinet equation of state                                          | Vinet, P., Ferrante, J., Rose, J. H., and Smith, J. R. (1987). *Compressibility of solids*. *J. Geophys. Res.*, 92(B9), 9319-9325. doi:10.1029/JB092iB09p09319 |
+
 
 ---
 
@@ -23,9 +24,9 @@ These references informed implementation details, algorithms, or validation.
 
 These are optional references for deeper context.
 
-| Type | File | Specific Function | Purpose | Resource |
-|------|------|-------------------|---------|----------|
-|      |      |                   |         |          |
+| Type    | File                   | Specific Function                                 | Purpose                                                                                                                                      | Resource                                                                                                                              |
+|---------|------------------------|---------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| Manual  | `trainset_workflow.py` | `gen_elastic_trainset` and `gen_heatfo_trainset`  | Obtained cell angle and length values using Material's project API when generating training sets based on elastic and heat-of-formation data | https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project  |
 
 ---
 

@@ -8,10 +8,10 @@ Workflows parse user arguments, load data/adapters, execute tasks, and route out
 Workflow docs are organized into:
 
 - top-level domain workflows
-- `file_tools` workflows
-- `meta` workflows
-- `presentation` workflows
-- `study_design` workflows
+- `file_tools` workflows, which are specific to file-based tasks (e.g. file conversion, file generation, data extraction)
+- `meta` workflows, which are cross-cutting workflows related to CLI management, help, and introspection
+- `presentation` workflows, which are focused on visualizing and presenting data
+- `study_design` workflows, which is a new category focused on study design (i.e., systematically generating and executing a series of simulations along with their analyses)
 
 ## Module Index
 

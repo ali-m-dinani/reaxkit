@@ -41,8 +41,4 @@ Template for utility modules:
 2. Copy it into the target package.
 3. Rename classes/functions to domain-specific names.
 4. Replace placeholder logic with real implementation.
-5. Keep docstrings consistent with `docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md`.
-
-## Related Rule File
-
-- [Docstring content and inclusion guidelines](../rules_and_conventions/docstring_content_and_inclusion_guidelines.md)
+5. Keep docstrings consistent with [Docstring content and inclusion guidelines](../rules_and_conventions/docstring_content_and_inclusion_guidelines.md)

@@ -22,7 +22,7 @@ with header:
 
 ## Main command
 
-Use the direct command:
+The general format for this command is as follows:
 
 ```bash
 reaxkit gen_eregime --type <sin|pulse|func> --iteration-step <int> [profile-specific flags]
@@ -113,9 +113,16 @@ with `profile_type="sin" | "pulse" | "func"` and the same profile parameters.
 
 ## Output location
 
-Generated inputs are stored using ReaxKit generator output layout (typically
-under `reaxkit_generated_inputs/`), with optional `--copy-to-dot` to place a
+Generated inputs are stored using ReaxKit generator output layout 
+(under `reaxkit_workspace/inputs/`), with optional `--copy-to-dot` to place a
 copy in the current working directory.
+
+---
+
+
+## Related next steps
+
+- See the next tutorial [04_gen_plot_workflow](04_gen_plot_workflow.md) to learn how to plots for any data you have.
 
 ---
 

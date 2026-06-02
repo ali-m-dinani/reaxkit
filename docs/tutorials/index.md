@@ -25,14 +25,6 @@ structure. If you are new, follow them in order.
 
 ---
 
-## Tips
-
-- Start with sparse frame sampling, then refine.
-- Use `frame` for deterministic selection, and `iter`/`time` for interpretation.
-- Export intermediate tables when validating new workflows.
-
----
-
 ## Related docs
 
 - **Examples:** [examples](../examples/README.md)

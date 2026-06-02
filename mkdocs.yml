@@ -187,7 +187,6 @@ nav:
       - Signal Ops: api/utils/numerical/signal_ops_doc.md
   - Workflows:
     - 📍 Overview: api/workflows/index.md
-    - Alaki: api/workflows/alaki_workflow.md
     - Connectivity: api/workflows/connectivity_workflow.md
     - Electrostatics: api/workflows/electrostatics_workflow.md
     - Kinematics: api/workflows/kinematics_workflow.md

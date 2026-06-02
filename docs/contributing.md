@@ -7,7 +7,7 @@ propose changes, set up a dev environment, run tests, and update docs.
 
 ## Code of Conduct
 
-Be respectful and constructive in all project interactions.
+Please be respectful and constructive in all project interactions.
 
 ---
 
@@ -77,7 +77,6 @@ Include:
 
 ## What You Can Contribute
 
-- **Handlers (I/O):** engine/file parsers (for example `src/reaxkit/engine/reaxff/io/`)
 - **Analyzers:** analysis tasks and derived quantities (`src/reaxkit/analysis/`)
 - **Workflows / CLI:** user-facing commands (`src/reaxkit/workflows/`)
 - **Docs:** guides, references, API pages (`docs/`)
@@ -90,26 +89,21 @@ Include:
 
 ### Code style and structure
 
-- [ ] **Docstrings**  
-      Follow [Docstring Inclusion Rules](rules_and_conventions/docstring_content_and_inclusion_guidelines.md).
+- [ ] **Docstrings**: follow [Docstring Inclusion Rules](rules_and_conventions/docstring_content_and_inclusion_guidelines.md).
 
 - [ ] **Code placement**  
-      If analyzer logic becomes generic/reusable, move it to `utils/`.  
-      If a utility becomes domain-specific, move it back to `analysis/` or a focused submodule.
+      1. If analyzer logic becomes generic/reusable, move it to `utils/`.  
+      2. If a utility becomes domain-specific, move it to `analysis/` or a focused submodule.
 
-- [ ] **Workflow boundaries**  
-      Workflows orchestrate only.  
-      Parsing belongs to handlers; computational logic belongs to analyzers.
+- [ ] **Workflow boundaries**: workflows orchestrate only, while parsing belongs to handlers, and computational logic belongs to analyzers.
 
 - [ ] **Workflow command registration**  
-      Register new/updated commands in CLI routing registries under `src/reaxkit/core/registry/` (analysis/generator routing as appropriate).  
-      Update workflow metadata maps under `src/reaxkit/workflows/data/` when needed.
-
-- [ ] **Shared constants / aliases / units**  
-      Put shared values in central utilities/data locations and import them where needed; avoid scattering duplicate literals.
+      1. Register new/updated commands in CLI routing registries under `src/reaxkit/core/registry/` (analysis/generator routing as appropriate).  
+      2. Update workflow metadata maps under `src/reaxkit/workflows/data/` when needed.
 
 ### Before submitting a PR
 
+- [ ] If you want to include some figures to the docs, please follow the instructions in [this guide](template_for_adding_figures_to_docs_md_files.md).
 - [ ] The change has a clear purpose and is explained in the PR.
 - [ ] Tests are added/updated where applicable.
 
