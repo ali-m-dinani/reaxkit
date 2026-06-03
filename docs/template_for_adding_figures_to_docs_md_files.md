@@ -5,30 +5,26 @@ Use this template when adding figures from `docs/figures/` to ReaxKit documentat
 ```md
 <a id="figure_anchor_name"></a>
 
-The figure below shows the result produced by this workflow:
+Figure below shows the result produced by this workflow:
 
-<div class="figure-large" markdown="1">
-
-![short_descriptive_alt_text](relative/path/to/figure.png)
+<div style="text-align:center;" markdown="1">
+![short_descriptive_alt_text](relative/path/to/figure.png){ style="width:90%; max-width:800px;" }
 
 *Figure: One-sentence caption explaining what the reader should notice.*
-
 </div>
 ```
 
 Concrete example:
 
 ```md
-<a id="bond_events_with_smoothing_and_thresholds"></a>
+<a id="all_things_in_reaxkit_by_category"></a>
 
-The figure below shows an example bond-events output plot:
+Figure below shows a category-level map of major ReaxKit components.
 
-<div class="figure-large" markdown="1">
+<div style="text-align:center;" markdown="1">
+![all_things_in_reaxkit_by_category](figures/all_things_in_reaxkit_by_category.png){ style="width:90%; max-width:800px;" }
 
-![bond_events_with_smoothing_and_thresholds](../../../figures/bond_events_with_smoothing_and_thresholds.png)
-
-*Figure: Sample bond events plot with detected bond breakage and formation iterations.*
-
+*Figure: ReaxKit components organized by category.*
 </div>
 ```
 
