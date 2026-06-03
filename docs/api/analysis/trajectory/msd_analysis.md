@@ -27,6 +27,8 @@ by the MSD task to compute displacement values from trajectory data.
 | `frames` | `Optional[Sequence[int]]` |  | Frame indices to evaluate. Empty means all frames. |  |
 | `every` | `int` | 1 | Stride over selected frames. |  |
 | `unwrap` | `bool` | True | Unwrap coordinates across periodic boundaries when cell data is available. |  |
+| `max_lag` | `Optional[int]` |  | Maximum lag time in number of frames. If empty, all selected frames are used. |  |
+| `delta_t_ps` | `float` | 1.0 | Time between selected trajectory frames. |  |
 
 ### Examples
 
@@ -91,45 +93,24 @@ rendered (table view and, when possible, an MSD-vs-time plot).
 
 <div class="analysis-method-indent" markdown="1">
 
-Run MSD analysis for selected atoms, frames, and dimensions.
+Run time-origin averaged MSD analysis.
 
-Computes per-atom squared displacement relative to a reference frame and
-returns one row per `(frame, atom)` in the output table.
+This implementation follows the Vale 2005 Fortran-style MSD algorithm:
 
-#### Works on
+    MSD(lag) = average over atoms and all valid time origins of
+               |r(t + lag) - r(t)|^2
 
-TrajectoryData plus MSDRequest analyzer inputs
+Unlike a simple MSD relative to the first frame, this method averages over
+multiple time origins, which gives smoother and more statistically stable
+MSD curves.
 
-#### Notes
+#### Expected optional request attributes
 
-- Requires `TrajectoryData.simulation.cell_lengths` for optional
-  unwrapping support.
-- When `origin="first"`, the first selected frame is used as the
-  displacement reference.
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| `data` | `TrajectoryData` | Trajectory bundle containing positions, atom metadata, and optional iteration values. |
-| `request` | `MSDRequest` | Analysis configuration and selection controls. |
-| `reporter` | `Any` | Optional progress callback invoked during analysis steps. |
-
-#### Returns
-
-| Type | Description |
-|---|---|
-| `MSDResult` | Result object containing per-atom MSD table and original request. |
-
-#### Examples
-
-```text
->>> result = task.run(data, MSDRequest(dims=("x", "y", "z"), origin="first"))
->>> list(result.table.columns)
-['frame_index', 'iter', 'atom_id', 'atom_type', 'dim', 'msd']
-Sample output meaning: each row reports one atom's MSD at one frame for
-the selected dimension set (`dim`).
-```
+request.max_lag : int, optional
+    Maximum lag in number of frames. If missing, uses all selected frames.
+request.delta_t_ps : float, optional
+    Time spacing between selected trajectory frames in ps. If missing,
+    uses 1.0 ps.
 
 </div>
 

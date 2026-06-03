@@ -150,3 +150,46 @@ Meaning:
 The result bundles event rows and summary/report metadata.
 
 </div>
+
+## Request: `ActiveSiteEventDiagnosticsRequest`
+
+<div class="analysis-section-indent" markdown="1">
+
+Request payload for active-site event cutoff diagnostics.
+
+Samples trajectory frames to characterize nearest C-O and C-Si distance
+distributions before full event extraction. The diagnostic helps choose
+`r_CO`, `r_CSi`, and persistence thresholds for distance-mode runs.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `frames` | `Optional[Sequence[int]]` |  | Optional frame indices to sample. Empty means all frames. |  |
+| `every` | `int` | 10 | Frame stride for diagnostic sampling. |  |
+| `r_probe` | `float` | 2.5 | Generous C-X distance cutoff used to detect close-approach episodes. |  |
+| `max_diag_frames` | `int` | 500 | Maximum number of sampled frames to analyze. |  |
+| `timestep_fs` | `float` | 10.0 | Raw trajectory timestep used to convert episode lengths to ps. |  |
+| `carbon_element` | `str` | C | Element symbol used as reactive substrate atom type. |  |
+| `oxygen_element` | `str` | O | Element symbol treated as oxygen target. |  |
+| `silicon_element` | `str` | Si | Element symbol treated as silicon target. |  |
+
+</div>
+
+## Result: `ActiveSiteEventDiagnosticsResult`
+
+<div class="analysis-section-indent" markdown="1">
+
+Result payload for active-site event cutoff diagnostics.
+
+### Fields
+
+| Field | Type | Default | Help | Choices |
+|---|---|---|---|---|
+| `table` | `pd.DataFrame` |  |  |  |
+| `distance_table` | `pd.DataFrame` |  |  |  |
+| `episode_table` | `pd.DataFrame` |  |  |  |
+| `summary` | `dict[str, Any]` |  |  |  |
+| `request` | `ActiveSiteEventDiagnosticsRequest` |  |  |  |
+
+</div>

@@ -28,6 +28,8 @@ dimensionality used to estimate diffusion coefficients.
 | `every` | `int` | 1 | Stride over selected frames. |  |
 | `d` | `float` | 3.0 | Einstein relation dimensionality in MSD = 2*d*D*t. |  |
 | `unwrap` | `bool` | True | Unwrap coordinates across periodic boundaries when cell data is available. |  |
+| `max_lag` | `Optional[int]` |  | Maximum lag in number of selected frames for MSD fitting. |  |
+| `delta_t_ps` | `float` | 1.0 | Time between selected trajectory frames. |  |
 
 ### Examples
 
@@ -89,39 +91,9 @@ UIs can render diffusivity results with default mappings.
 
 <div class="analysis-method-indent" markdown="1">
 
-Estimate per-atom diffusivity from linear MSD trends.
+Estimate diffusivity from time-origin averaged MSD.
 
-Computes MSD using `MSDTask`, fits `MSD` versus time/iteration for each
-atom, and converts slope to diffusivity using `D = slope / (2*d)`.
-
-#### Works on
-
-`TrajectoryData` plus `DiffusivityRequest` analyzer inputs
-
-#### Parameters
-
-| Name | Type | Description |
-|---|---|---|
-| `data` | `TrajectoryData` | Trajectory bundle containing coordinates, atom metadata, and timing axes (simulation time and/or iterations). |
-| `request` | `DiffusivityRequest` | Analysis configuration controlling selection, MSD setup, and `d`. |
-| `reporter` | `Any, optional` | Optional progress callback invoked during atom-wise fitting. |
-
-#### Returns
-
-| Type | Description |
-|---|---|
-| `DiffusivityResult` | Result object containing per-atom fit parameters and diffusivity. |
-
-#### Examples
-
-```python
-req = DiffusivityRequest(atom_ids=[1, 2], d=3.0)
-result = DiffusivityTask().run(data, req)
-```
-Sample output:
-`result.table` with `slope_msd_per_x` and `diffusivity` columns.
-Meaning:
-Each row corresponds to one atom's Einstein-relation diffusivity fit.
+Uses MSD = 2 * d * D * t, so D = slope / (2*d).
 
 </div>
 

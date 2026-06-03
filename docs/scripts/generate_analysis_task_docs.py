@@ -58,6 +58,11 @@ def _as_text(value: Any) -> str:
     return repr(value)
 
 
+def _escape_md_table_cell(value: str) -> str:
+    """Escape Markdown table separators before interpolating table rows."""
+    return value.replace("|", "\\|")
+
+
 def _doc_sections(doc: str) -> tuple[str, dict[str, str]]:
     lines = doc.splitlines()
     summary_lines: list[str] = []
@@ -329,7 +334,7 @@ def _render_method_section(title: str, body: str) -> list[str]:
             lines.append("|---|---|---|")
             for name, typ, desc in rows:
                 lines.append(
-                    f"| `{name.replace('|', '\\|')}` | `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |"
+                    f"| `{_escape_md_table_cell(name)}` | `{_escape_md_table_cell(typ)}` | {_escape_md_table_cell(desc)} |"
                 )
             lines.append("")
             return lines
@@ -340,7 +345,7 @@ def _render_method_section(title: str, body: str) -> list[str]:
             lines.append("| Type | Description |")
             lines.append("|---|---|")
             for typ, desc in rows:
-                lines.append(f"| `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |")
+                lines.append(f"| `{_escape_md_table_cell(typ)}` | {_escape_md_table_cell(desc)} |")
             lines.append("")
             return lines
 
@@ -381,7 +386,7 @@ def _render_doc_section(
             lines.append("|---|---|---|")
             for name, typ, desc in rows:
                 lines.append(
-                    f"| `{name.replace('|', '\\|')}` | `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |"
+                    f"| `{_escape_md_table_cell(name)}` | `{_escape_md_table_cell(typ)}` | {_escape_md_table_cell(desc)} |"
                 )
             lines.append("")
             return lines
@@ -399,7 +404,7 @@ def _render_doc_section(
             lines.append("| Type | Description |")
             lines.append("|---|---|")
             for typ, desc in rows:
-                lines.append(f"| `{typ.replace('|', '\\|')}` | {desc.replace('|', '\\|')} |")
+                lines.append(f"| `{_escape_md_table_cell(typ)}` | {_escape_md_table_cell(desc)} |")
             lines.append("")
             return lines
 
