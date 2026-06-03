@@ -103,6 +103,8 @@ def _build_diffusivity_request(args: argparse.Namespace) -> DiffusivityRequest:
         every=args.every,
         d=float(args.d),
         unwrap=bool(args.unwrap),
+        max_lag=args.max_lag,
+        delta_t_ps=args.delta_t_ps,
     )
 
 
@@ -237,21 +239,24 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
     elif canonical == "get_diffusivity":
         parser.description = (
-            "Estimate per-atom diffusivity from Einstein relation `MSD = 2*d*D*t`.\n"
-            "This command fits/derives diffusivity using selected dimensions, atoms, and frame windows.\n\n"
+            "Estimate diffusivity from time-origin averaged MSD using the Einstein relation `MSD = 2*d*D*t`.\n"
+            "This command first computes MSD averaged over selected atoms and valid time origins, then fits\n"
+            "MSD versus lag time to estimate a diffusion coefficient for the selected atom group.\n\n"
             "Examples:\n"
             "  1. Plot diffusivity for selected atom ids:\n"
-            "   reaxkit get_diffusivity --atom-ids 1 2 3 --plot single\n\n"
+            "   reaxkit get_diffusivity --atom-ids 1 2 3 --max-lag 500 --delta-t-ps 1.0 --d 3 --plot single\n\n"
             "  2. Export oxygen diffusivity using 3D Einstein dimensionality:\n"
-            "   reaxkit get_diffusivity --atom-types O --d 3 --export diffusivity_oxygen.csv\n\n"
-            "  3. Save atom-specific diffusivity with frame sampling:\n"
-            "   reaxkit get_diffusivity --atom-ids 5 --frames 0:100:5 --d 2 --save diffusivity_atom5.png"
+            "   reaxkit get_diffusivity --atom-types O --max-lag 800 --delta-t-ps 0.25 --d 3 --export diffusivity_oxygen.csv\n\n"
+            "  3. Estimate diffusivity from sampled frames without PBC unwrapping:\n"
+            "   reaxkit get_diffusivity --atom-ids 1 2 3 4 5 --frames 0:999:1 --max-lag 800 --delta-t-ps 1.0 --d 3 --no-unwrap --export diffusivity.csv"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts diffusivity estimates to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which limits analysis to oxygen atoms.")
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y z, which uses full 3D displacement.")
         parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
         parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t. Example: --d 2, which applies 2D diffusivity relation.")
+        parser.add_argument("--max-lag", type=int, default=None)
+        parser.add_argument("--delta-t-ps", type=float, default=1.0)
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,

@@ -97,6 +97,23 @@ class DiffusivityRequest(BaseRequest):
         default=True,
         metadata={"label": "Unwrap PBC", "help": "Unwrap coordinates across periodic boundaries when cell data is available."},
     )
+    max_lag: Optional[int] = dc_field(
+        default=None,
+        metadata={
+            "label": "Maximum lag",
+            "help": "Maximum lag in number of selected frames for MSD fitting.",
+            "units": "frames",
+        },
+    )
+
+    delta_t_ps: float = dc_field(
+        default=1.0,
+        metadata={
+            "label": "Frame spacing",
+            "help": "Time between selected trajectory frames.",
+            "units": "ps",
+        },
+    )
 
 
 @dataclass
@@ -198,44 +215,12 @@ class DiffusivityTask(AnalysisTask):
         ]
 
     def run(self, data: TrajectoryData, request: DiffusivityRequest, reporter=None) -> DiffusivityResult:
-        """Estimate per-atom diffusivity from linear MSD trends.
+        """Estimate diffusivity from time-origin averaged MSD.
 
-        Computes MSD using `MSDTask`, fits `MSD` versus time/iteration for each
-        atom, and converts slope to diffusivity using `D = slope / (2*d)`.
-
-        Works on
-        -----
-        `TrajectoryData` plus `DiffusivityRequest` analyzer inputs
-
-        Parameters
-        -----
-        data : TrajectoryData
-            Trajectory bundle containing coordinates, atom metadata, and timing
-            axes (simulation time and/or iterations).
-        request : DiffusivityRequest
-            Analysis configuration controlling selection, MSD setup, and `d`.
-        reporter : Any, optional
-            Optional progress callback invoked during atom-wise fitting.
-
-        Returns
-        -----
-        DiffusivityResult
-            Result object containing per-atom fit parameters and diffusivity.
-
-        Examples
-        -----
-        ```python
-        req = DiffusivityRequest(atom_ids=[1, 2], d=3.0)
-        result = DiffusivityTask().run(data, req)
-        ```
-        Sample output:
-        `result.table` with `slope_msd_per_x` and `diffusivity` columns.
-        Meaning:
-        Each row corresponds to one atom's Einstein-relation diffusivity fit.
+        Uses MSD = 2 * d * D * t, so D = slope / (2*d).
         """
+
         out_cols = [
-            "atom_id",
-            "atom_type",
             "dim",
             "d",
             "x_source",
@@ -246,16 +231,17 @@ class DiffusivityTask(AnalysisTask):
             "intercept",
             "diffusivity",
         ]
+
         if data.simulation is None or data.simulation.cell_lengths is None:
             raise ValueError("Diffusivity requires TrajectoryData.simulation.cell_lengths.")
 
         d_val = float(request.d)
         if not np.isfinite(d_val) or d_val <= 0.0:
-            raise ValueError("d must be a positive finite number")
+            raise ValueError("d must be a positive finite number.")
 
         dims = tuple(d for d in request.dims if d in ("x", "y", "z"))
         if not dims:
-            raise ValueError("dims must include at least one of 'x','y','z'")
+            raise ValueError("dims must include at least one of 'x', 'y', or 'z'.")
 
         n_frames = data.positions.shape[0]
         if n_frames == 0:
@@ -265,58 +251,61 @@ class DiffusivityTask(AnalysisTask):
             atom_ids=request.atom_ids,
             atom_types=request.atom_types,
             dims=dims,
-            origin=request.origin,
             frames=request.frames,
             every=request.every,
             unwrap=request.unwrap,
+            max_lag=getattr(request, "max_lag", None),
+            delta_t_ps=getattr(request, "delta_t_ps", 1.0),
         )
+
         msd_result = MSDTask().run(data, msd_request, reporter=reporter)
         table_msd = msd_result.table
+
         if table_msd.empty:
             return DiffusivityResult(table=pd.DataFrame(columns=out_cols), request=request)
 
-        x_all, x_source = _axis_source(data, n_frames)
-        rows: list[dict[str, Any]] = []
+        if "time_ps" in table_msd.columns:
+            x = pd.to_numeric(table_msd["time_ps"], errors="coerce").to_numpy(dtype=float)
+            x_source = "time_ps"
+        elif "lag_frame" in table_msd.columns:
+            x = pd.to_numeric(table_msd["lag_frame"], errors="coerce").to_numpy(dtype=float)
+            x_source = "lag_frame"
+        else:
+            raise ValueError("MSD table must contain either 'time_ps' or 'lag_frame'.")
 
-        by_atom = table_msd.sort_values(["atom_id", "frame_index"]).groupby("atom_id", sort=True)
-        n_atoms = int(table_msd["atom_id"].nunique())
-        for atom_i, (atom_id, dfi) in enumerate(by_atom, start=1):
-            fi = dfi["frame_index"].to_numpy(dtype=int)
-            msd = dfi["msd"].to_numpy(dtype=float)
-            if fi.size == 0:
-                continue
-            t = np.asarray([float(x_all[i]) for i in fi], dtype=float)
-            t = t - float(t[0])
+        msd = pd.to_numeric(table_msd["msd"], errors="coerce").to_numpy(dtype=float)
 
-            mask = np.isfinite(t) & np.isfinite(msd)
-            tv = t[mask]
-            mv = msd[mask]
-            if tv.size < 2 or np.unique(tv).size < 2:
-                continue
+        mask = np.isfinite(x) & np.isfinite(msd)
 
-            slope, intercept = np.polyfit(tv, mv, 1)
-            diffusivity = float(slope / (2.0 * d_val))
-            atom_type = str(dfi["atom_type"].iloc[0]) if "atom_type" in dfi.columns and not dfi.empty else ""
-            dim_label = str(dfi["dim"].iloc[0]) if "dim" in dfi.columns and not dfi.empty else ",".join(dims)
-            rows.append(
-                {
-                    "atom_id": int(atom_id),
-                    "atom_type": atom_type,
-                    "dim": dim_label,
-                    "d": float(d_val),
-                    "x_source": x_source,
-                    "x_start": float(np.min(tv)),
-                    "x_end": float(np.max(tv)),
-                    "n_points": int(tv.size),
-                    "slope_msd_per_x": float(slope),
-                    "intercept": float(intercept),
-                    "diffusivity": diffusivity,
-                }
-            )
-            if reporter:
-                reporter("analyze", atom_i, n_atoms, "Estimating diffusivity")
+        # Usually exclude lag = 0 from fitting because it is exactly zero
+        # and can dominate very short fits.
+        mask &= x > 0.0
 
-        table = pd.DataFrame(rows, columns=out_cols).sort_values("atom_id").reset_index(drop=True)
+        x_fit = x[mask]
+        msd_fit = msd[mask]
+
+        if x_fit.size < 2 or np.unique(x_fit).size < 2:
+            return DiffusivityResult(table=pd.DataFrame(columns=out_cols), request=request)
+
+        slope, intercept = np.polyfit(x_fit, msd_fit, 1)
+
+        diffusivity = float(slope / (2.0 * d_val))
+
+        row = {
+            "dim": ",".join(dims),
+            "d": float(d_val),
+            "x_source": x_source,
+            "x_start": float(np.min(x_fit)),
+            "x_end": float(np.max(x_fit)),
+            "n_points": int(x_fit.size),
+            "slope_msd_per_x": float(slope),
+            "intercept": float(intercept),
+            "diffusivity": diffusivity,
+        }
+
+        table = pd.DataFrame([row], columns=out_cols)
+
         if reporter:
-            reporter("analyze", n_atoms, n_atoms, "Finished diffusivity")
+            reporter("analyze", 1, 1, "Finished diffusivity")
+
         return DiffusivityResult(table=table, request=request)
