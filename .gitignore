@@ -4,95 +4,99 @@
 __pycache__/
 *.py[cod]
 *.so
-
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Jupyter notebooks checkpoints
 .ipynb_checkpoints/
 
-# --------------------------------
-# BUILD / PACKAGING
-# --------------------------------
-build/
-dist/
-*.egg-info/
+# ------------------------------
+# VIRTUAL ENVIRONMENTS
+# ------------------------------
+.venv/
+env/
+venv/
 
-# Coverage / testing
-htmlcov/
+# ------------------------------
+# BUILD / PACKAGING / TESTING
+# ------------------------------
+.cache/
 .coverage
 *.cover
-.cache/
+*.egg-info/
+build/
+dist/
+htmlcov/
 
-# --------------------------------
+# ------------------------------
 # EDITOR / IDE
-# --------------------------------
-# VSCode
+# ------------------------------
+.idea/
 .vscode/
 
-# PyCharm
-.idea/
-
-# --------------------------------
+# ------------------------------
 # LOGS & TEMP FILES
-# --------------------------------
+# ------------------------------
+*.bak
 *.log
 *.tmp
-*.bak
 
-# --------------------------------
+# ------------------------------
 # REAXKIT PROJECT-SPECIFIC
-# --------------------------------
-# Temporary outputs
-results/
-output/
-plots/
-exports/
-examples_to_test/
-
-# Simulation run directories or files
-full_sim_examples/
-src/reaxkit/trash/
-src/reaxkit/under_development/
+# ------------------------------
+# Documentation and templates
 docs/file_templates/control
 docs/file_templates/coordinations.csv
 docs/file_templates/coordination/xmolout_relabeled
 docs/file_templates/eregime.in
-docs/file_templates/fort.7
 docs/file_templates/fort.13
+docs/file_templates/fort.7
 docs/file_templates/fort.78
 docs/file_templates/fort.79
 docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
+src/reaxkit/webui/reaxkit_workspace
+src/reaxkit/webui/.reaxkit_cache/
+tests/engine/reaxff/io/.reaxkit_cache/
+
+# Generated outputs and temporary folders
+examples_to_test/
+exports/
+full_sim_examples/
+output/
+plots/
+results/
+tests/engine/artifacts/
+../other/trash/
+src/reaxkit/under_development/
+../other/under_dev
+site/
+tests/analysis_tasks/artifacts/
+
+# Project-local files to ignore
 README.txt
+../other/done/README_convert_to_txt.py
 README_full_version.md
-README_convert_to_txt.py
 requirements.txt
-requirements_to_add_to_pyproject_toml.txt
+requirements_all.txt
 requirements_gen.py
+requirements_to_add_to_pyproject_toml.txt
 src/reaxkit/count_loc.py
 src/reaxkit/loc_report.csv
-src/reaxkit/under_dev
-src/reaxkit/webui
-../other/Reax_user_manual_June_2017_converted_to_md.md
+
+# External local files
 ../other/Reax_user_manual_June_2017.docx
-requirements_all.txt
+../other/Reax_user_manual_June_2017_converted_to_md.md
 
-
-# Large intermediate analysis outputs
-cache/
+# ------------------------------
+# LARGE INTERMEDIATE OUTPUTS
+# ------------------------------
+*.csv
 *.h5
 *.hdf5
-*.csv   # If you really want to keep processed CSV out of repo
+cache/
 
-# --------------------------------
+# ------------------------------
 # OS-SPECIFIC
-# --------------------------------
-# macOS
+# ------------------------------
 .DS_Store
-
-# Windows
 Thumbs.db
+/.reaxkit_cache/index/handlers.json
+/src/reaxkit/webui/.reaxkit_cache/index/handlers.json

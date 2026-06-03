@@ -1,15 +1,14 @@
-"""
-Time-series smoothing utilities.
+"""Smooth one-dimensional time-series data using moving-average methods.
 
 This module provides simple and exponential moving-average functions for
 smoothing one-dimensional data series commonly produced by ReaxFF simulations,
 such as energies, bond orders, dipole moments, or polarization signals.
 
-Typical use cases include:
+**Usage context**
 
-- reducing high-frequency noise in MD trajectories
-- smoothing field-response or hysteresis curves
-- preparing time-series data for extrema or trend analysis
+- Noise reduction: Suppress high-frequency variance in MD trajectories.
+- Curve conditioning: Smooth field-response or hysteresis signals.
+- Preprocessing: Prepare series for extrema and trend analysis steps.
 """
 
 
@@ -27,15 +26,14 @@ def simple_moving_average(
     center: bool = True,
     min_periods: Optional[int] = 1,
 ) -> pd.Series:
-    """
-    Compute a simple moving average (SMA) of a 1D data series.
+    """Compute a simple moving average (SMA) of a 1D data series.
 
     The moving average is computed over a fixed-size sliding window and
     returned as a pandas Series. If the input is already a Series, its index
     is preserved.
 
     Parameters
-    ----------
+    -----
     y : array-like
         Input data values to smooth.
     window : int, optional
@@ -45,13 +43,19 @@ def simple_moving_average(
     min_periods : int, optional
         Minimum number of observations required to compute a value.
 
+    Notes
+    -----
+    - This function uses pandas.Series.rolling under the hood for SMA computation.
+    - Main documentation for pandas.Series.rolling: https://pandas.pydata.org/docs/reference/api/pandas.Series.rolling.html
+    - An example is at: https://www.geeksforgeeks.org/python/pandas-rolling-mean-by-time-interval/
+
     Returns
-    -------
+    -----
     pandas.Series
         Smoothed data series using a simple moving average.
 
     Examples
-    --------
+    -----
     >>> simple_moving_average(energy, window=10)
     """
     if window < 1:
@@ -66,15 +70,14 @@ def exponential_moving_average(
     alpha: Optional[float] = None,
     adjust: bool = False,
 ) -> pd.Series:
-    """
-    Compute an exponential moving average (EMA) of a 1D data series.
+    """Compute an exponential moving average (EMA) of a 1D data series.
 
     The exponential moving average applies exponentially decreasing weights
     to past observations. The smoothing factor may be specified directly
     via ``alpha`` or indirectly via a window size.
 
     Parameters
-    ----------
+    -----
     y : array-like
         Input data values to smooth.
     window : int, optional
@@ -85,13 +88,20 @@ def exponential_moving_average(
     adjust : bool, optional
         Whether to use bias-adjusted weights.
 
+    Notes
+    -----
+    - This function uses pandas.Series.ewm under the hood for EMA computation.
+    - Main documentation for pandas.Series.ewm: https://pandas.pydata.org/docs/reference/api/pandas.Series.ewm.html
+    - An example is at: https://aleksandarhaber.com/exponential-moving-average-in-pandas-and-python/
+
+
     Returns
-    -------
+    -----
     pandas.Series
         Smoothed data series using an exponential moving average.
 
     Examples
-    --------
+    -----
     >>> exponential_moving_average(signal, window=8)
     >>> exponential_moving_average(signal, alpha=0.2)
     """

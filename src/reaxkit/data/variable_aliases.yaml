@@ -1,0 +1,94 @@
+# Canonical-to-alias mappings for resolving equivalent variable and column names.
+# In the CLI, aliases allow users to reference variables using familiar,
+# abbreviated, or file-specific names.
+# In the Python API, canonical names should prefer domain-model field names
+# where those names exist.
+
+variable_aliases:
+  iterations:
+    - iter
+    - iteration
+    - Iter
+    - Iter.
+    - Iteration
+    - "#start"
+    - start
+
+  potential_energy:
+    - E_pot
+    - Epot(kcal)
+    - Epot(kcal/mol)
+    - E_potential
+
+  frame: [frm]
+  time: ["Time(fs)", "Time"]
+  num_of_atoms: [num_atoms, number_of_atoms, count_of_atoms]
+  volume: [V, "Vol(A^3)", Volume, volume]
+  density: [D, "Dens(kg/dm3)", Density, density]
+  temperature: [T, "T(K)", Temp, temp, temperature]
+  pressure: [P, "Pres(MPa)", Pressure, pressure]
+  elapsed_time: [elap_time, Elap, time_elapsed, elapsed_time]
+
+  # molfra.out
+  frequency: [freq, count]
+  molecular_formula: [mol_formula, molecule_formula, molecule]
+  molecular_mass: [mol_mass, mass]
+  total_molecules: [tot_mol]
+  total_atoms: [tot_atom]
+  total_molecular_mass: [tot_mol_mass]
+
+  # fort.78
+  field_x: [Ex, Efield_x, Field_x, fieldX]
+  field_y: [Ey, Efield_y, Field_y, fieldY]
+  field_z: [Ez, Efield_z, Field_z, fieldZ]
+  field_energy_x: [E_field_x, Efx]
+  field_energy_y: [E_field_y, Efy]
+  field_energy_z: [E_field_z, Efz]
+  field_energy: [E_field, Ef]
+
+  # summary.txt
+  nmol: [Nmol]
+
+  # fort.13
+  total_ff_error: [tot_err, err_tot]
+
+  # eregime.in
+  field_zones: ["#V", V]
+  field_dir: [direction, dir, direction1]
+  field: ["E", "Magnitude(V/A)", "Magnitude1(V/A)", E1]
+  field_dir1: [direction1]
+  field1: ["Magnitude1(V/A)", E1]
+  field_dir2: [direction2]
+  field2: ["Magnitude2(V/A)", E2]
+  field_dir3: [direction3]
+  field3: ["Magnitude3(V/A)", E3]
+
+  # xmolout
+  atom_type: [type_of_atom, atm_type]
+  x: [x_coordinate, x_coord, coord_x, coordinate_x]
+  y: [y_coordinate, y_coord, coord_y, coordinate_y]
+  z: [z_coordinate, z_coord, coord_z, coordinate_z]
+
+  # fort.7
+  molecule_num: [molecular_number, molecular_num]
+  partial_charge: [charge, q]
+  total_charge: [charge_total, total_charge]
+
+  # fort.99
+  errors: [error, Err, Error]
+
+  # electrostatics
+  "mu_x (debye)": [mu_x, dipole_x, dipole_moment_x]
+  "mu_y (debye)": [mu_y, dipole_y, dipole_moment_y]
+  "mu_z (debye)": [mu_z, dipole_z, dipole_moment_z]
+  "P_x (uC/cm^2)": [pol_x, polarization_x]
+  "P_y (uC/cm^2)": [pol_y, polarization_y]
+  "P_z (uC/cm^2)": [pol_z, polarization_z]
+
+  # fort.76
+  restraint_energy: [E_res, "Eres(kcal)", "Eres(kcal/mol)", E_restraint, restraint_E]
+
+  # fort.57
+  temperature_setpoint: [T_set, Tset, "Tset(K)", "Tset (K)", "T_set(K)"]
+  rms_gradient: [RMSG, rmsg, RmsG, RMSg]
+  n_force_calls: [nfc, NFC]

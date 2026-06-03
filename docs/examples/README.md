@@ -1,125 +1,88 @@
 # ReaxKit Examples
 
-This directory contains **runnable example scripts** that demonstrate how to use
-ReaxKit in practice. These examples are intended to be:
-
-- minimal,
-- reproducible,
-- easy to modify,
-- executable without Jupyter notebooks.
-
-They complement the tutorials in [tutorials](../tutorials/index.md) by showing **working code**
-rather than detailed explanations.
-
----
+This directory contains runnable scripts that demonstrate current ReaxKit usage.
 
 ## Directory structure
 
-```
+```text
 examples/
     data/
         control
         sample_tabular_data.csv
         small_fort.7
         small_xmolout
-    
     xmolout_basic_example.py
-    xmolout_fort7_example.py
-    plotter_meta_example.py
+    connectivity_multifile_example.py
+    gen_plot_presentation_example.py
+    multi_engine_get_msd_cli_blueprint.py
     README.md
+    lifs_box_pipeline/
+        data/
+            fort.90
+        prepare_lis_box.py
+        run_fort90_to_xmolout.py
+        README.md
+    romp_active_control/
+        data/
+            fort.90
+            monomer.bgf
+        config.yaml
+        romp_edit_ops.py
+        run_active_step.py
+        README.md
 ```
-
-
----
-
-## Data files (`examples/data/`)
-
-The `data/` subfolder contains **small, truncated sample files** used by the
-example scripts.
-
-These files are intentionally small so that examples:
-- run quickly,
-- do not require large downloads,
-- are suitable for local testing.
-
-### Included files
-- `small_xmolout`  
-  Minimal `xmolout` trajectory for geometry-based analysis.
-
-- `small_fort.7`  
-  Minimal `fort.7` file containing per-atom and bond-order information.
-
-- `control`  
-  Example ReaxFF control file (used for reference or input generation examples).
-
-- `sample_tabular_data.csv`  
-  Generic tabular data used by the meta plotting example.
-
----
 
 ## Example scripts
 
-### `xmolout_basic_example.py`
+### [`xmolout_basic_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/xmolout_basic_example.py)
 
-Demonstrates **direct Python usage** of ReaxKit analyzers on an `xmolout` file.
+Demonstrates direct Python-task usage on `xmolout` data:
+- load trajectory via `XmoloutHandler`
+- extract coordinate series
+- compute MSD
+- extract cell dimensions
+- export CSV outputs
 
-Shows how to:
-- load `xmolout` with `XmoloutHandler`,
-- extract atom trajectories,
-- compute derived quantities (e.g. MSD),
-- inspect box and thermodynamic information,
-- export results to CSV.
+### [`connectivity_multifile_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/connectivity_multifile_example.py)
 
-This example mirrors the logic used in CLI workflows (as explained by [01_understanding_quickstart.md](../tutorials/01_understanding_quickstart.md)), but uses analyzers directly.
+Demonstrates multi-file connectivity/charge analysis with `xmolout` + `fort.7`:
+- load `ConnectivityData` and `ChargeData`
+- extract charge and sum-bond-order features
+- build connection lists/tables/stats
+- detect bond events
+- compute coordination status
 
----
+Related tutorial: [02_atom_property_and_video_workflows.md](../tutorials/02_atom_property_and_video_workflows.md)
 
-### `xmolout_fort7_example.py`
+### [`gen_plot_presentation_example.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/gen_plot_presentation_example.py)
 
-Demonstrates **multi-file analysis** using both `xmolout` and `fort.7`.
+Demonstrates file-agnostic plotting utilities on tabular data:
+- single and multi-series plots
+- directed plots
+- dual y-axis plots
+- 3D scatter
+- 2D heatmap projection
 
-Shows how to:
-- load geometry (`xmolout`) and chemical data (`fort.7`),
-- extract per-atom properties (charges, sum of bond orders),
-- construct connectivity graphs,
-- track bond-order time series and bond events,
-- compute coordination status using atom types and valences,
-- export results for further analysis or plotting.
+Related tutorial: [04_gen_plot_workflow.md](../tutorials/04_gen_plot_workflow.md)
 
-This example corresponds to the concepts explained in [02_xmolout_fort7_coordination.md](../tutorials/02_xmolout_fort7_coordination.md).
+### [`multi_engine_get_msd_cli_blueprint.py`](https://github.com/ali-m-dinani/reaxkit/blob/new-features/docs/examples/multi_engine_get_msd_cli_blueprint.py)
 
----
+Demonstrates a task-first, multi-engine architecture blueprint for
+`reaxkit get_msd` style flows.
 
-### `plotter_meta_example.py`
+### [`LiFS box pipeline/`](lifs_box_pipeline/README.md)
 
-Demonstrates use of ReaxKit’s **meta plotting utilities** on arbitrary tabular data.
+Demonstrates a reusable workflow for generating packed Li/S structures 
+from ReaxFF/XTLGRF `fort.90` files. It coordinates several reusable ReaxKit 
+modules and produces new files from an input structure.
 
-Shows how to:
-- read a generic CSV file,
-- generate single-curve and multi-curve plots,
-- create directed plots,
-- generate dual y-axis plots,
-- visualize 3D scatter data,
-- project 3D data into 2D heatmaps.
+### [`ROMP active-control/`](romp_active_control/README.md)
 
-This example is file-agnostic and does not rely on ReaxFF-specific semantics. A CLI tutorial for this existes in [04_plotter_meta_workflow](../tutorials/04_plotter_meta_workflow.md).
-
----
+Demonstrates a config-driven simulation controller that reads a ReaxFF
+`fort.90` state, removes selected molecular fragments, inserts a monomer with
+overlap checks, and writes next-step `geo` plus report files.
 
 ## Notes
 
-* These examples are not tests.
-* They are meant for learning, exploration, and validation.
-* For conceptual explanations, see [tutorials](../tutorials/index.md).
-* For extending ReaxKit, see [templates](../file_templates/index.md).
-
-If you encounter issues running an example, verify that ReaxKit is installed
-correctly and that paths to the `data/files` are unchanged.
-
-
-
-
-
-
-
-
+- These examples are for learning and exploration, not formal tests.
+- For conceptual walkthroughs, use [tutorials](../tutorials/index.md).

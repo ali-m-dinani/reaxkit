@@ -132,7 +132,7 @@ C:\Users\alimo\PycharmProjects\pythonProject\reaxkit/
         figures/
             one-figure_mental_model.png
         file_templates/
-            docstrings.md
+            docstring_inclusion_rules.md
             index.md
             template_analyzer.py
             template_handler.py

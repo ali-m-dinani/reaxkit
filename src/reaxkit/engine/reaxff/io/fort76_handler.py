@@ -1,0 +1,288 @@
+"""
+ReaxFF restraint monitor (fort.76) handler.
+
+This module provides a handler for parsing ReaxFF ``fort.76`` files,
+which record per-iteration restraint energies and target/actual values
+for distance or coordinate restraints applied during simulations.
+
+Typical use cases include:
+
+- monitoring restraint convergence
+- comparing target vs actual restraint values
+- debugging constrained MD or minimization runs
+
+**Usage context**
+
+- ReaxFF parsing: Read ReaxFF text outputs into normalized tabular structures.
+- Workflow ingestion: Provide canonical handler interfaces used by adapters/workflows.
+- Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
+"""
+
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import pickle
+import shutil
+from typing import Any, Dict, Iterator, List, Optional
+
+import pandas as pd
+
+from reaxkit.engine.reaxff.io.base import BaseHandler
+
+
+class Fort76Handler(BaseHandler):
+    """
+    Parser for ReaxFF restraint monitor files (``fort.76``).
+
+    This class parses ``fort.76`` files and exposes per-iteration
+    restraint information as a structured, iteration-indexed table.
+
+    Parsed Data
+    -----------
+    Summary table
+        One row per iteration, returned by ``dataframe()``, with columns:
+
+        - Base columns:
+          ["iter", "E_res", "E_pot"]
+
+        - Restraint columns (repeated per restraint):
+          ["r1_target", "r1_actual",
+           "r2_target", "r2_actual", ...]
+
+        The number of restraints is inferred automatically from the file.
+
+    Metadata
+        Returned by ``metadata()``, containing:
+        ["n_records", "n_frames", "n_restraints", "restraint_cols"]
+
+    Notes
+    -----
+    - Supports an arbitrary number of restraints per iteration.
+    - Header, comment, and malformed lines are skipped robustly.
+    - Duplicate iteration indices are resolved by keeping the last entry.
+    - This handler represents one row per iteration (frame-like semantics).
+    """
+
+    def __init__(self, file_path: str | Path = "fort.76", reporter=None):
+        """
+        Initialize the instance.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Parameter description.
+
+        """
+        super().__init__(file_path)
+        self._reporter = reporter
+        self._frames: List[pd.DataFrame] = []  # optional, kept for template consistency
+        self._n_records: Optional[int] = None
+
+    @staticmethod
+    def _is_float(token: str) -> bool:
+        """
+         is float.
+
+        Parameters
+        ----------
+        token : str
+            Parameter description.
+
+        Returns
+        -------
+        bool
+            Return value description.
+
+        """
+        try:
+            float(token)
+            return True
+        except Exception:
+            return False
+
+    def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """
+         parse.
+
+        Returns
+        -------
+        tuple[pd.DataFrame, dict[str, Any]]
+            Return value description.
+
+        """
+        rows: List[List[float]] = []
+        n_restraints_max = 0
+
+        with open(self.path, "r") as fh_count:
+            total_lines = sum(1 for _ in fh_count)
+        with open(self.path, "r") as fh:
+            for line_i, line in enumerate(fh, start=1):
+                if self._reporter and (line_i % 500 == 0 or line_i == total_lines):
+                    self._reporter("load", line_i, total_lines, "Parsing fort.76")
+                s = line.strip()
+                if not s:
+                    continue
+                # Common comment styles
+                if s.startswith(("#", "!", "//")):
+                    continue
+
+                parts = s.split()
+                if len(parts) < 3:
+                    continue
+
+                # If the line doesn't look numeric, treat as header and skip
+                if not (self._is_float(parts[0]) and self._is_float(parts[1]) and self._is_float(parts[2])):
+                    continue
+
+                # Convert tokens to floats (iter will be cast to int later)
+                try:
+                    vals = [float(x) for x in parts]
+                except Exception:
+                    continue
+
+                # Determine restraint pairs beyond (iter, E_res, E_pot)
+                extra = len(vals) - 3
+                if extra < 0:
+                    continue
+
+                # If odd number of extra columns, ignore this malformed row
+                if extra % 2 != 0:
+                    continue
+
+                n_restraints = extra // 2
+                n_restraints_max = max(n_restraints_max, n_restraints)
+
+                rows.append(vals)
+
+        # If nothing parsed, return empty but well-defined DF
+        base_cols = ["iter", "E_res", "E_pot"]
+        if not rows:
+            df_empty = pd.DataFrame(columns=base_cols)
+            meta = {
+                "n_records": 0,
+                "n_frames": 0,
+                "n_restraints": 0,
+                "restraint_cols": [],
+            }
+            self._frames = []
+            return df_empty, meta
+
+        # Pad rows so all have same number of restraint columns (in case file changes mid-run)
+        target_len = 3 + 2 * n_restraints_max
+        for r in rows:
+            if len(r) < target_len:
+                r.extend([float("nan")] * (target_len - len(r)))
+
+        # Build columns dynamically
+        cols = list(base_cols)
+        for i in range(1, n_restraints_max + 1):
+            cols.append(f"r{i}_target")
+            cols.append(f"r{i}_actual")
+
+        df = pd.DataFrame(rows, columns=cols)
+
+        # Types
+        df["iter"] = df["iter"].astype(int, errors="ignore")
+
+        # Clean: drop duplicate iterations (keep last)
+        if not df.empty:
+            keep_idx = df.drop_duplicates("iter", keep="last").index
+            df = df.loc[keep_idx].reset_index(drop=True)
+
+        self._frames = []  # fort.76 is already 1-row-per-iter; no extra per-frame tables needed
+
+        meta: Dict[str, Any] = {
+            "n_records": int(len(df)),
+            "n_frames": int(len(df)),
+            "n_restraints": int(n_restraints_max),
+            "restraint_cols": [c for c in df.columns if c.startswith("r")],
+        }
+        if self._reporter:
+            self._reporter("load", total_lines, total_lines, "Finished parsing fort.76")
+        return df, meta
+
+    # ---- File-specific accessors
+    def n_frames(self) -> int:
+        # 1 row per iteration
+        """
+        N frames.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
+        return int(self.metadata().get("n_frames", len(self.dataframe())))
+
+    def n_restraints(self) -> int:
+        """
+        N restraints.
+
+        Returns
+        -------
+        int
+            Return value description.
+
+        """
+        return int(self.metadata().get("n_restraints", 0))
+
+    def frame(self, i: int) -> Dict[str, Any]:
+        """
+        Return a normalized per-row structure.
+        restraints is a list of dicts:
+          [{"index": 1, "target": ..., "actual": ...}, ...]
+        """
+        df = self.dataframe()
+        row = df.iloc[i]
+
+        restraints: List[Dict[str, Any]] = []
+        n = self.n_restraints()
+        for k in range(1, n + 1):
+            tgt = row.get(f"r{k}_target")
+            act = row.get(f"r{k}_actual")
+            # Skip if both are NaN (e.g., padded)
+            if pd.isna(tgt) and pd.isna(act):
+                continue
+            restraints.append({"index": k, "target": tgt, "actual": act})
+
+        return {
+            "index": int(i),
+            "iter": int(row.get("iter")),
+            "E_res": row.get("E_res"),
+            "E_pot": row.get("E_pot"),
+            "restraints": restraints,
+        }
+
+    def iter_frames(self, step: int = 1) -> Iterator[Dict[str, Any]]:
+        """
+        Iter frames.
+
+        Parameters
+        ----------
+        step : int
+            Parameter description.
+
+        Yields
+        -------
+        Iterator[Dict[str, Any]]
+            Return value description.
+
+        """
+        for i in range(0, self.n_frames(), max(1, int(step))):
+            yield self.frame(i)
+
+    # ---- disk-cache override (parquet + json) -------------------
+    def _disk_cache_dir(self, key: str) -> Path:
+        """Disk cache dir."""
+        return self._cache_root() / key
+
+    def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
+        """Store in disk cache."""
+        super()._store_in_disk_cache(key, payload)
+
+    def _load_from_disk_cache(self, key: str) -> bytes | None:
+        """Load from disk cache."""
+        return super()._load_from_disk_cache(key)

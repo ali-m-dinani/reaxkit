@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "1.0.0"
+version = "2.0.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
   { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
   { name = "Adri van Duin", email = "acv13@psu.edu" },
   { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
   { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
+  { name = "Seyed Mahmoud Mortazavi", email = "mahmoud.mortazavi72@gmail.com" },
+  { name = "Anirban Phukan", email = "akp6421@psu.edu" },
+  { name = "Jupjeet Dhingra", email = "jvd6198@psu.edu" },
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,19 +23,58 @@ requires-python = ">=3.9"
 dependencies = [
     "numpy",
     "pandas",
-    "matplotlib",
-    "seaborn",
     "scipy",
     "tqdm",
     "rich",
-    "freud-analysis",
-    "ovito",
     "tabulate",
-    "ase",
-    "imageio",
-    "mp_api",
     "PyYAML",
     "rapidfuzz",
+]
+
+[project.optional-dependencies]
+plot = [
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "imageio",
+]
+webui = [
+    "dash",
+    "dash_bootstrap_templates",
+    "fastapi",
+]
+trajectory = [
+    "MDAnalysis",
+    "freud-analysis",
+    "ovito",
+    "pyvoro",
+]
+materials = [
+    "ase",
+    "mp_api",
+    "pymatgen",
+]
+graph = [
+    "networkx",
+    "igraph",
+]
+ml = [
+    "dscribe",
+    "spacy",
+    "scikit-learn",
+]
+io = [
+    "openpyxl",
+    "h5py",
+    "python-docx",
+    "zstandard",
+]
+engines = [
+    "lammps",
+    "scm",
+]
+all = [
+    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines]",
 ]
 
 [project.scripts]

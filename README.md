@@ -1,40 +1,41 @@
 # ReaxKit
 
 **ReaxKit** is a modular, extensible Python toolkit for **pre‑processing, post‑processing, and analysis of ReaxFF** molecular dynamics simulations.
-It provides a clean separation between file parsing, analysis routines, and reproducible workflows, with both **Python APIs** and a **CLI interface**.
+It provides a clean separation between file parsing, analysis routines, and reproducible workflows, with **Python APIs**, a **CLI interface**, and a **Dash-based GUI**.
 
-ReaxKit is designed for researchers who want a transparent, scriptable bridge between raw ReaxFF files and quantitative, publication‑ready results.
+ReaxKit is designed for researchers who want a transparent, scriptable bridge between raw ReaxFF data and quantitative, publication‑ready results.
 
 ---
 
 ## Key Capabilities
 
-### File IO (Parsing & Generation)
-- Robust handlers for ReaxFF input and output files:
-  - `xmolout`, `fort.7`, `fort.13`, `molfra`, and more
-- Input file generators:
-  - `control`, `geo`, `eregime`, `tregime`, and more
-- Unified handler interface for consistent data access
+### Engine
+- Shared engine abstractions for consistent parsing and generating input/output files across 3 different ReaxFF simulation engines, namely `ams`, `lammps`, `reaxff`
+- Example IO and generator modules under the `reaxff` engine:
+  - ReaxFF input and output files such as `xmolout`, `fort.7`, `fort.13`, `molfra`, and more
+  - Input generators for `control`, `geo`, `eregime`, `tregime`, and related files
 
 ### Analysis
-- Per‑file analyzers (one analyzer per ReaxFF file type)
-- Composed analyzers that combine multiple data sources:
-  - Coordination numbers
-  - Connectivity graphs
-  - Electrostatics and dipoles
-  - Radial distribution functions (RDF)
-- Numerical utilities for smoothing, extrema detection, and signal processing
+- Engine-agnostic analyzers built on ReaxKit's domain data models
+- Analyzer tasks organized around separated request, result, and task objects
+- Analysis components separated from engine IO so the same computations can be reused across scripts, workflows, web UI, and presentation modules
 
 ### Workflows
-- Reproducible, CLI‑driven workflows for:
-  - Single‑file analysis
-  - Multi‑file composed analysis
-  - Plotting and media generation
-- Designed to automate common ReaxFF post‑processing tasks
+- Reproducible workflows organized by data handling, file tools, meta orchestration, presentation, and study design
+- Automation paths for common ReaxFF pre-processing, analysis, post-processing, and presentation tasks
 
-### Visualization & Media
-- Publication‑ready plotting utilities (2D, dual‑axis, tornado plots, 3D scatter, heatmaps)
-- Trajectory and plot video generation
+### Web UI
+- Dash-based interface components for interactive ReaxFF data inspection
+- Backend, UI, and presentation layers for browser-driven workflows
+
+### Presentation
+- Publication-ready plotting utilities:
+  - 2D plots, dual-axis plots, tornado plots, 3D scatter, and heatmaps
+- Video generators
+
+### Utilities
+- Shared data, media, and numerical utilities
+- Common infrastructure used by analysis, workflows, web UI, and presentation modules
 
 See the full documentation (API reference, tutorials, examples) on [ReaxKit Site](https://ali-m-dinani.github.io/reaxkit/).
 
@@ -44,25 +45,18 @@ See the full documentation (API reference, tutorials, examples) on [ReaxKit Site
 
 ```
 src/reaxkit/
-├── analysis/        # Analysis routines (per-file and composed)
-├── io/              # File handlers and generators
-├── utils/           # Shared utilities (aliases, units, constants, numerics)
-├── workflows/       # CLI and automation workflows
+├── analysis/        # Engine-agnostic analysis tasks
+├── cli/             # Command-line entry points
+├── core/            # Registries and shared core infrastructure
+├── data/            # Packaged reference data and resources
+├── domain/          # Central data models, requests, and results
+├── engine/          # IO handlers and input generators
 ├── help/            # Introspection and help system
-└── cli.py           # Command-line entry point
+├── presentation/    # Plotting, active-site views, and media presentation
+├── utils/           # Shared data, media, and numerical utilities
+├── webui/           # Dash/web interface backend, UI, and presentation layers
+└── workflows/       # Workflow orchestration and automation
 ```
-
-Additional resources:
-
-- [Installation notes](docs/installation.md) — Full installation instructions (requires **Python ≥ 3.9**).
-- [Quickstart](docs/quickstart.md) — Get up and running with core ReaxKit workflows in minutes.
-- [Tutorials notes](docs/tutorials/index.md) and [source files](https://ali-m-dinani.github.io/reaxkit/tutorials/) — Step-by-step guides for common ReaxKit workflows and use cases.
-- [Examples](docs/examples/README.md) and [source files](https://ali-m-dinani.github.io/reaxkit/examples/) — Minimal, runnable Python examples using public APIs.
-- [ReaxFF Reference](docs/reaxff_reference/index.md) — Reference documentation for ReaxFF input and output files.
-- [Contributing](docs/contributing.md) — Guidelines for contributing to ReaxKit.
-- [File Templates](docs/file_templates/index.md) and [Docstring Conventions](docs/file_templates/docstrings.md) — Development guidelines and code templates.
-- [AUTHORS.md](AUTHORS.md) —  Full credits and acknowledgments.
-- [LICENSE](LICENSE) — Full license terms under the **MIT License**
 
 ---
 
@@ -94,8 +88,14 @@ Source code: https://github.com/ali-m-dinani/reaxkit
 
 ## Future Directions
 
-* Add support for other analyzers including autocorrelation functions, thermodynamic properties calculations, etc.
-* Develop GUI dashboard for interactive ReaxFF data inspection
-* Implement ML-based trend prediction for simulation outputs
+* Implement machine learning-based surrogate models for rapid property prediction and active-site identification.
+* Develop a plugin system for user-contributed analysis routines and visualization components.
+* Integrate with Jupyter notebooks for interactive analysis and visualization.
 
 If you have any feature request, you can submit it through the ReaxKit's GitHub page, or directly sending an email to `Dinani@psu.edu`.
+
+---
+## Additional resources:
+
+- [AUTHORS.md](AUTHORS.md) —  Full credits and acknowledgments.
+- [LICENSE](LICENSE) — Full license terms under the **MIT License**

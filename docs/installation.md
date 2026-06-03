@@ -1,41 +1,63 @@
 # Installation
 
-This document describes how to install **ReaxKit** and verify that it is working
-correctly. All other documentation assumes ReaxKit is already installed.
+This page explains how to install ReaxKit and verify the CLI.
 
 ---
 
 ## Requirements
 
-- **Python** ≥ 3.9 (recommended: 3.10 or newer)
-- Operating system:
-  - Linux, macOS, or Windows
-  - Windows users may prefer WSL for HPC / cluster workflows
+- Python >= 3.9
+- Linux, macOS, or Windows
 
-ReaxKit is a pure-Python package but depends on several scientific libraries
-(e.g. NumPy, pandas, SciPy, Matplotlib). These are handled automatically by `pip`.
+Core dependencies are installed automatically with `pip`.
 
-Some optional features may require external tools:
-- **OVITO** (for advanced visualization)
-- **ffmpeg** (for video generation)
-
-These are not required for core functionality.
+Some features need optional packages or external tools:
+- plotting packages (via extras)
+- trajectory backends (via extras)
+- `ffmpeg` for video workflows
 
 ---
 
-## Install from PyPI (recommended)
-
-You can easily install ReaxKit and its dependencies using:
+## Install from PyPI (base)
 
 ```bash
 pip install reaxkit
 ```
 
+This installs the **core package and core dependencies** only.
+
+---
+
+## Install with extras
+
+To install optional dependencies for specific features, follow these commands:
+
+```bash
+pip install "reaxkit[plot]"
+pip install "reaxkit[trajectory]"
+pip install "reaxkit[webui]"
+pip install "reaxkit[all]"
+```
+
+where the last one installs all optional dependencies. 
+
+
+Available extras include:
+- `plot`
+- `webui`
+- `trajectory`
+- `materials`
+- `graph`
+- `ml`
+- `io`
+- `engines`
+- `all`
+
 ---
 
 ## Install from source
 
-Clone the repository and install locally:
+If you want to install the latest development version (which is not yet publihsed on PyPI, and hence not installable yet using pip) or contribute, you can clone the repository and install from source:
 
 ```bash
 git clone https://github.com/ali-m-dinani/reaxkit.git
@@ -43,63 +65,33 @@ cd reaxkit
 pip install .
 ```
 
-This is useful if you want the latest development version.
-
----
-
-## Developer / editable installation
-
-If you plan to modify ReaxKit (handlers, analyzers, workflows):
+For editable development install (i.e., changes to source code are reflected without reinstalling), use:
 
 ```bash
 pip install -e .
 ```
 
-This installs ReaxKit in editable mode, so changes to the source code are
-picked up immediately without reinstalling.
+or with extras:
 
----
-
-## Optional dependencies
-
-Some features rely on optional tools:
-
-* Plotting / visualization
-
-  * `matplotlib` (installed by default)
-
-  * `ovito` (optional, install separately if needed)
-
-* Video generation
-
-  * Requires `ffmpeg` available on your system
-
-ReaxKit will function without these, but related workflows may be unavailable.
+```bash
+pip install -e ".[plot,trajectory]"
+```
 
 ---
 
 ## Verify installation
 
-After installation, run:
+To make sure ReaxKit is installed correctly, run the following command in your terminal:
 
 ```bash
-reaxkit --help
+reaxkit help -h
 ```
 
-You should see the ReaxKit CLI help message, which shows that ReaxKit is installed correctly.
+If the help message appears, installation is successful.
 
-If you encounter installation issues, please consult the README or open an issue
-on the repository.
+---
 
+## Notes
 
-
-
-
-
-
-
-
-
-
-
-
+- If `gen-video` fails, ensure `ffmpeg` is installed and available in `PATH`.
+- Some optional backends may have platform-specific install constraints.

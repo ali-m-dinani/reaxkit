@@ -29,13 +29,8 @@ jobs:
           pip install -e .
           pip install mkdocs mkdocs-material "mkdocstrings[python]"
 
-      - name: Generate API docs
-        run: |
-          python docs/api/analysis/_gen_analysis_docs.py
-          python docs/api/io/_gen_io_docs.py
-          python docs/api/utils/_gen_utils_docs.py
-          python docs/api/workflows/_gen_workflows_docs.py
-          python _gen_mkdocs.py
+      - name: Regenerate MkDocs nav
+        run: python _gen_mkdocs.py
 
       - name: Build MkDocs
         run: mkdocs build --strict

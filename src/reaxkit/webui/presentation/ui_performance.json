@@ -1,0 +1,8 @@
+{
+  "plot2d_scattergl_threshold": 4000,
+  "plot2d_max_points": 40000,
+  "plot2d_min_points_per_trace": 600,
+  "plot2d_initial_max_points": 12000,
+  "plot2d_zoom_max_points": 120000,
+  "plot2d_max_curves_display": 10
+}

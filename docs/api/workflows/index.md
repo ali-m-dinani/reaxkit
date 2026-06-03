@@ -1,59 +1,61 @@
-# Workflows
+# Workflows API
 
-This section documents **ReaxKit workflows**.
-Workflows are the **user-facing layer** of the toolkit, exposing analysis functionality
-through a consistent and discoverable CLI interface.
+This section documents ReaxKit workflow modules (CLI-facing orchestration layer).
+Workflows parse user arguments, load data/adapters, execute tasks, and route outputs.
 
-They connect handlers and analyzers into complete, runnable tasks.
+## Structure
 
----
+Workflow docs are organized into:
 
-## What is a workflow in ReaxKit
+- top-level domain workflows
+- `file_tools` workflows, which are specific to file-based tasks (e.g. file conversion, file generation, data extraction)
+- `meta` workflows, which are cross-cutting workflows related to CLI management, help, and introspection
+- `presentation` workflows, which are focused on visualizing and presenting data
+- `study_design` workflows, which is a new category focused on study design (i.e., systematically generating and executing a series of simulations along with their analyses)
 
-A workflow:
+## Module Index
 
-- Parses CLI arguments
-- Loads data via one or more handlers
-- Executes analysis logic
-- Optionally plots or exports results
+### Top-Level Workflows
 
-Most workflows follow the pattern:
+- [connectivity_workflow](connectivity_workflow.md)
+- [electrostatics_workflow](electrostatics_workflow.md)
+- [kinematics_workflow](kinematics_workflow.md)
+- [molecular_analysis_workflow](molecular_analysis_workflow.md)
+- [timeseries_workflow](timeseries_workflow.md)
+- [trajectory_workflow](trajectory_workflow.md)
 
-```bash
-reaxkit <workflow> <task> [options]
-```
+### File Tools
 
----
+- [addmol_workflow](file_tools/addmol_workflow.md)
+- [charges_workflow](file_tools/charges_workflow.md)
+- [control_workflow](file_tools/control_workflow.md)
+- [eregime_workflow](file_tools/eregime_workflow.md)
+- [ffield_workflow](file_tools/ffield_workflow.md)
+- [fort7_workflow](file_tools/fort7_workflow.md)
+- [fort83_workflow](file_tools/fort83_workflow.md)
+- [geo_workflow](file_tools/geo_workflow.md)
+- [kopple2_workflow](file_tools/kopple2_workflow.md)
+- [params_workflow](file_tools/params_workflow.md)
+- [trainset_workflow](file_tools/trainset_workflow.md)
+- [tregime_workflow](file_tools/tregime_workflow.md)
+- [vregime_workflow](file_tools/vregime_workflow.md)
+- [xmolout_workflow](file_tools/xmolout_workflow.md)
 
-## Workflow categories
+### Meta
 
-ReaxKit workflows are organized into three groups:
+- [command_alias_workflow](meta/command_alias_workflow.md)
+- [gui_workflow](meta/gui_workflow.md)
+- [help_workflow](meta/help_workflow.md)
+- [introspection_workflow](meta/introspection_workflow.md)
+- [manage_workspace_workflow](meta/manage_workspace_workflow.md)
 
-### Per-file workflows
-Operate on **a single ReaxFF file** and provide direct access to file-specific analyses.
+### Presentation
 
-→ See [per-file workflows](per_file/index.md)
+- [gen_plot_workflow](presentation/gen_plot_workflow.md)
+- [gen_video_workflow](presentation/gen_video_workflow.md)
+- [plot_atom_property_workflow](presentation/plot_atom_property_workflow.md)
 
----
+### Study Design
 
-### Composed workflows
-Coordinate **multiple files and analyses** to perform higher-level scientific tasks.
-
-→ See [composed workflows](composed/index.md)
-
----
-
-### Meta workflows
-Provide **tooling and support utilities** such as help, introspection, plotting,
-and media generation.
-
-→ See [meta workflows](meta/index.md)
-
----
-
-## When to start here
-
-If you are new to ReaxKit, workflows are the best entry point:
-they expose most functionality without requiring Python scripting.
-
-For lower-level APIs, see the [io](../io/index.md) and [analysis](../analysis/index.md) documentation instead.
+- [runtime](study_design/runtime.md)
+- [study_workflow](study_design/study_workflow.md)

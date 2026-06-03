@@ -1,0 +1,385 @@
+_meta:
+  version: '1.0'
+  source: reaxkit.engine.reaxff.generators.*
+  purpose: Maps ReaxFF generator functions to searchable capabilities and workflow
+    links.
+  last_updated: '2026-05-21'
+generators:
+  add_molcharge_to_geo:
+    description: Add MOLCHARGE directives to GEO files with EACH (atom-number range or atom type) and TOGETHER charge rules.
+    tags:
+    - geo
+    - generator
+    - molcharge
+    - charge assignment
+    - ereaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: add_molcharge_to_geo'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: add_molcharge_to_geo'
+    notes:
+    - Exposed via reaxkit add_molcharge_to_geo.
+    - Supports atom re-ordering when EACH + TOGETHER(rest) requires one contiguous rest range.
+    aliases:
+    - add molcharge to geo
+    - add_molcharge_to_geo
+    - add-geo-molcharge
+    help_search_examples:
+    - reaxkit help "add molcharge to geo"
+    - run add geo molcharge
+  add_restraints_to_geo:
+    description: Add bond/angle/torsion/mass-center restraint blocks to GEO files.
+    tags:
+    - geo
+    - generator
+    - restraint
+    - bond restraint
+    - angle restraint
+    - torsion
+    - constraints
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: add_restraints_to_geo'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: add_restraints_to_geo'
+    notes:
+    - Exposed via reaxkit add_restraints_to_geo.
+    - Implemented by add_restraints_to_geo in geo_generator.
+    aliases:
+    - add geo restraint
+    - add_geo_restraint
+    help_search_examples:
+    - reaxkit help "add geometry file restraint"
+    - run add geometry file restraint
+  xtob:
+    description: Convert XYZ structures into ReaxFF GEO/XTLGRF format.
+    tags:
+    - geo
+    - generator
+    - xtob
+    - conversion
+    - xyz
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: xtob'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: xtob'
+    aliases:
+    - xtob
+    help_search_examples:
+    - reaxkit help "trajectory coordinates to geometry file"
+    - run trajectory coordinates to geometry file
+  sort_geo:
+    description: Sort atoms in an existing GEO file by atom index, coordinate, or
+      atom type and write a new GEO file.
+    tags:
+    - geo
+    - generator
+    - sorting
+    - coordinates
+    implementation_module: 'reaxkit.engine.reaxff.generators.geo_generator: sort_geo'
+    related_workflow_module: 'reaxkit.workflows.file_tools.geo_workflow: sort_geo'
+    aliases:
+    - sort geo
+    - sort_geo
+    - sort geometry file
+    help_search_examples:
+    - reaxkit help "sort geometry file by x coordinate"
+    - sort geo by atom type
+  gen_eregime:
+    description: Generate eregime.in electric-field schedules (sin, pulse, function).
+    tags:
+    - eregime
+    - electric field
+    - generator
+    - schedule
+    - field
+    implementation_module: 'reaxkit.engine.reaxff.generators.eregime_generator: gen_eregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.eregime_workflow: gen_eregime'
+    aliases:
+    - gen_eregime
+    - make eregime
+    - make_eregime
+    - generate eregime
+    help_search_examples:
+    - reaxkit help "gen eregime"
+    - reaxkit help "make electric field regime"
+    - make electric field regime
+  gen_template_charges:
+    description: Generate charges template files for ReaxFF workflows.
+    tags:
+    - charges
+    - generator
+    - template
+    implementation_module: 'reaxkit.engine.reaxff.generators.charges_generator: gen_template_charges'
+    related_workflow_module: 'reaxkit.workflows.file_tools.charges_workflow: gen_template_charges'
+    aliases:
+    - gen_template_charges
+    - make charges
+    - make_charges
+    - generate charges
+    help_search_examples:
+    - reaxkit help "gen template charges"
+    - reaxkit help "make charges"
+    - make charges
+  gen_heatfo_trainset:
+    description: Generate heat of formation trainsets in yaml, material-id, or batch
+      modes.
+    tags:
+    - trainset
+    - heat of formation
+    - generator
+    - materials project
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_heatfo: gen_heatfo_trainset'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_heatfo_trainset'
+    notes:
+    - Core generator used for heat of formation training set generation.
+    aliases:
+    - gen_heatfo_trainset
+    - make trainset heat of formation
+    - generate heat of formation trainset
+    - make trainset using heat of formation
+    - make-trainset-heatfo
+    help_search_examples:
+    - reaxkit help "make trainset using heat of formation"
+    - create heat of formation training set from materials project
+  gen_control:
+    description: Generate, inspect, and rewrite ReaxFF control files.
+    tags:
+    - control
+    - control file
+    - generator
+    - template
+    - keywords
+    implementation_module: 'reaxkit.engine.reaxff.generators.control_generator: gen_control'
+    related_workflow_module: 'reaxkit.workflows.file_tools.control_workflow: gen_control'
+    aliases:
+    - gen_control
+    - get control
+    - get_control
+    - read control
+    - make control
+    - make_control
+    - generate control
+    - write control
+    - write_control
+    help_search_examples:
+    - reaxkit help "gen control"
+    - reaxkit help "get control"
+    - get control
+    - reaxkit help "make control"
+    - make control
+    - reaxkit help "write control"
+    - run write control
+  gen_template_addmol:
+    description: Generate addmol.bgf and addmol.vel templates for molecule insertion
+      workflows.
+    tags:
+    - addmol
+    - molecule insertion
+    - generator
+    - template
+    implementation_module: 'reaxkit.engine.reaxff.generators.addmol_generator: gen_template_addmol'
+    related_workflow_module: 'reaxkit.workflows.file_tools.addmol_workflow: gen_template_addmol'
+    aliases:
+    - gen_template_addmol
+    - make addmol
+    - make_addmol
+    - generate addmol
+    help_search_examples:
+    - reaxkit help "gen template addmol"
+    - reaxkit help "make molecule insertion"
+    - make molecule insertion
+  gen_template_kopple2:
+    description: Generate kopple2 template files for coupling or parameter setup workflows.
+    tags:
+    - kopple2
+    - coupling template
+    - generator
+    - template
+    implementation_module: 'reaxkit.engine.reaxff.generators.kopple2_generator: gen_template_kopple2'
+    related_workflow_module: 'reaxkit.workflows.file_tools.kopple2_workflow: gen_template_kopple2'
+    aliases:
+    - gen_template_kopple2
+    - make kopple2
+    - make_kopple2
+    - generate kopple2
+    help_search_examples:
+    - reaxkit help "gen template kopple2"
+    - reaxkit help "make coupling template"
+    - make coupling template
+  gen_template_tregime:
+    description: Generate tregime.in temperature schedule files for MD simulations.
+    tags:
+    - tregime
+    - temperature regime
+    - generator
+    - schedule
+    implementation_module: 'reaxkit.engine.reaxff.generators.tregime_generator: gen_template_tregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.tregime_workflow: gen_template_tregime'
+    aliases:
+    - gen_template_tregime
+    - make tregime
+    - make_tregime
+    - generate tregime
+    help_search_examples:
+    - reaxkit help "make temperature regime"
+    - make temperature regime
+  gen_template_vregime:
+    description: Generate vregime.in volume or cell schedule files for MD simulations.
+    tags:
+    - vregime
+    - volume regime
+    - generator
+    - schedule
+    implementation_module: 'reaxkit.engine.reaxff.generators.vregime_generator: gen_template_vregime'
+    related_workflow_module: 'reaxkit.workflows.file_tools.vregime_workflow: gen_template_vregime'
+    aliases:
+    - gen_template_vregime
+    - make vregime
+    - make_vregime
+    - generate vregime
+    help_search_examples:
+    - reaxkit help "make volume regime"
+    - make volume regime
+  merge_ffields:
+    description: Merge selected atom-type parameter blocks from a source ffield into a destination ffield with index remapping and merge-audit reports.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - merge
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: merge_ffields'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
+    aliases:
+    - merge ffield
+    - merge-ffield
+    - merge_ffield
+    - merge force fields
+    - combine ffields
+    help_search_examples:
+    - reaxkit help "merge ffield"
+    - merge source and destination force fields
+  add_element_to_ffield:
+    description: Add one missing atom type to an existing ffield by selecting the closest existing template atom and projecting bond/angle/torsion/hbond terms.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - add element
+    - extrapolation
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: add_element_to_ffield'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-element-to-ffield'
+    aliases:
+    - add element to ffield
+    - add-element-to-ffield
+    - add_element_to_ffield
+    - expand ffield element
+    help_search_examples:
+    - reaxkit help "add element to ffield"
+    - add Al to existing force field using closest atom template
+  add_term_to_ffield:
+    description: Add one explicit missing bond/off-diagonal/angle/torsion/hbond term to an existing ffield by templating from similar existing atom types.
+    tags:
+    - ffield
+    - force field
+    - generator
+    - add term
+    - angle
+    - bond
+    - torsion
+    - reaxff
+    implementation_module: 'reaxkit.engine.reaxff.generators.ffield_generator: add_term_to_ffield'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-term-to-ffield'
+    aliases:
+    - add term to ffield
+    - add-term-to-ffield
+    - add_term_to_ffield
+    - add missing angle term
+    help_search_examples:
+    - reaxkit help "add term to ffield"
+    - add Al-N-Al angle term to existing force field
+  trim_xmolout:
+    description: Create a lightweight xmolout file containing atom type and xyz coordinates.
+    tags:
+    - xmolout
+    - generator
+    - trajectory
+    - trim
+    implementation_module: 'reaxkit.engine.reaxff.generators.xmolout_generator: trim_xmolout'
+    related_workflow_module: 'reaxkit.workflows.file_tools.xmolout_workflow: trim-xmolout'
+    aliases:
+    - trim xmolout
+    - trim-xmolout
+    - reduce xmolout
+    help_search_examples:
+    - reaxkit help "trim xmolout"
+    - create lightweight xmolout trajectory
+  repair_fort7:
+    description: Repair corrupted ``fort.7`` atom lines caused by fused integer columns at large atom counts.
+    tags:
+    - fort7
+    - generator
+    - repair
+    - connectivity
+    - reaxff output
+    implementation_module: 'reaxkit.engine.reaxff.generators.fort7_repair: repair_fort7'
+    related_workflow_module: 'reaxkit.workflows.file_tools.fort7_workflow: repair_fort7'
+    aliases:
+    - repair fort7
+    - repair-fort7
+    - fix fort7
+    - repair_fort7
+    help_search_examples:
+    - reaxkit help "fix fort7"
+    - repair corrupted fort.7 output
+  gen_template_yaml_for_elastic_settings:
+    description: Write elastic trainset settings YAML templates.
+    tags:
+    - trainset settings
+    - yaml template
+    - heatfo settings
+    - generator
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_yaml: gen_template_yaml_for_elastic_settings'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_elastic_settings'
+    aliases:
+    - gen_template_yaml_for_elastic_settings
+    - make trainset settings
+    - make_trainset_settings
+    - generate trainset settings
+    help_search_examples:
+    - reaxkit help "make training set settings"
+    - make training set settings
+  gen_template_yaml_for_heatfo_settings:
+    description: Write heat of formation trainset settings YAML templates.
+    tags:
+    - trainset settings
+    - yaml template
+    - heat of formation
+    - generator
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_yaml: gen_template_yaml_for_heatfo_settings'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_heatfo_settings'
+    aliases:
+    - gen_template_yaml_for_heatfo_settings
+    - make trainset heatfo settings
+    - make_trainset_settings_heatfo
+    - generate heatfo trainset settings
+    help_search_examples:
+    - reaxkit help "make heat of formation training set settings"
+    - write heat of formation training set yaml
+  gen_elastic_trainset:
+    description: Generate elastic trainsets in yaml, material-id, or batch modes.
+    tags:
+    - trainset
+    - yaml
+    - generator
+    - training set
+    implementation_module: 'reaxkit.engine.reaxff.generators.trainset_yaml: gen_elastic_trainset'
+    related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_elastic_trainset'
+    notes:
+    - Used by trainset workflows to materialize trainset files from YAML configuration.
+    aliases:
+    - gen_elastic_trainset
+    - make trainset
+    - generate trainset
+    - trainset from yaml
+    - make trainset from yaml
+    - make trainset from material id
+    - make trainset in batch mode
+    help_search_examples:
+    - reaxkit help "make trainset from yaml"
+    - make training set from yaml settings

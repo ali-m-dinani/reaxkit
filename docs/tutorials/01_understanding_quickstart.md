@@ -1,245 +1,96 @@
 # Understanding the Quick Start
 
-In [quickstart.md](../quickstart.md), you ran a working ReaxKit CLI command and obtained results
-with almost no setup. This tutorial explains **what actually happened** during
-that process and introduces several core concepts that will help you use
-ReaxKit effectively.
+In [quickstart.md](../quickstart.md), you ran a working ReaxKit CLI command with minimal setup.
+This tutorial explains what happened internally, using the current command style.
 
-We will walk through the *same command* step by step and explain:
-- how ReaxKit processes an `xmolout` file,
-- what each CLI flag means,
-- how handlers, analyzers, and workflows interact,
-- the difference between **frame**, **iteration**, and **time**,
-- where outputs are written,
-- and what you can do next.
+We walk through:
+- how ReaxKit processes trajectory data,
+- what each CLI flag does,
+- how workflows, tasks, and engine loaders interact,
+- the difference between `frame`, `iter`, and `time`,
+- and where outputs are written.
 
 ---
 
 ## Re-running the Quick Start command
 
-From the Quick Start, the example command was:
+Use this command:
 
 ```bash
-reaxkit xmolout trajget --atoms 1 --dims z --xaxis time --export atom1_z.csv
+reaxkit timeseries --field trajectory[1].z --xaxis time --export atom1_z.csv
 ```
 
-This command extracts the z-coordinate trajectory of atom 1 from an
-xmolout file and exports it as a CSV table.
-
-Let’s unpack what each part does.
+This extracts the z-coordinate trajectory of atom 1 and exports it as CSV.
 
 ---
 
 ## Explaining the CLI flags
 
-`--atoms 1` selects which atoms to extract trajectories for. 
+`--field trajectory[1].z`
+- `trajectory[...]` means coordinate time series from trajectory data.
+- `[1]` selects atom id 1 (1-based indexing).
+- `.z` selects only the z component.
 
-* Atom indices are 1-based (as in ReaxFF input/output), hence `--atoms 1` means only atom 1.
+`--xaxis time`
+- Controls x-axis representation.
+- Allowed values are `frame`, `iter`, `time`.
+- `time` converts iteration index to physical time using the `control` file when available.
 
-* You can also use:
-
-    * `--atoms 1,5,12`
-
-    * `--atoms 1:10`
-
-Internally, ReaxKit converts these to 0-based indices (to properly work with pandas dataframes) before accessing the underlying arrays.
-
-`--dims z` specifies which coordinate components to include.
-
-* Allowed values are: x, y, z
-
-* `--dims z` means: only extract the z-coordinate.
-
-If omitted, all three coordinates (x y z) are included.
-
-`--xaxis time` controls what appears on the x-axis (and the first column of exported data).
-
-Options:
-
-* `frame` → frame index (0, 1, 2, …)
-
-* `iter` → MD iteration number (from the file)
-
-* `time` → physical time (which will be calculated using time-step in the `control` file)
-
-Internally:
-
-* ReaxKit always starts from frame indices
-
-* `--xaxis` simply converts them to the requested representation
-
-This conversion happens in a single, centralized utility (i.e., `src/reaxkit/utils/convert.py`), so all workflows
-behave consistently.
-
-`--export atom1_z.csv` exports the processed data to a CSV file.
-
-* Exported files are automatically placed in a structured output directory
-(see below).
+`--export atom1_z.csv`
+- Writes the computed table to CSV.
+- Relative paths are placed under ReaxKit-managed output folders.
 
 ---
 
-## What happens internally: the pipeline
+## What happens internally
 
-When you run the command above, ReaxKit executes a multi-layer pipeline:
+When you run the command, the flow is:
 
-1. Workflow gets the CLI command, and extracts the flags, settings, requests
-2. An specific analyzer is called to process the request
-3. A handler is called to parse the appropriate file(s)
-4. A specific calculation is done on the parsed data by the analyzer
-5. Results are sent back to the workflow, and workflow shows the results to the user
-
-Below, the above parts are explained more.
-
-### 1. Workflow (CLI layer)
-
-The workflow:
-
-* `cli.py` parses CLI arguments and decides what task to run (`trajget`),
-
-* `xmolout_workflow` orchestrates I/O, plotting, and export.
-
-Workflows do not parse files or perform scientific calculations.
-
-### 2. Handler (I/O layer)
-
-The `XmoloutHandler`:
-
-* reads the raw `xmolout` file,
-
-* parses per-frame metadata (iterations, energies, cell dimensions),
-
-* stores per-frame atom tables (coordinates, atom types),
-
-* exposes a consistent interface:
-
-    * `dataframe()` → per-frame summary
-
-    * `frame(i)` → atom coordinates and types for frame i
-
-Handlers are intentionally lightweight and reusable.
-
-### 3. Analyzer (analysis layer)
-
-The analyzer functions:
-
-* request data from the handler,
-
-* apply selections (frames, atoms, dimensions),
-
-* construct tidy pandas tables (long or wide format),
-
-* return results without performing any I/O.
-
-In this example, the analyzer builds a table with:
-
-* frame_index
-
-* iter
-
-* atom_id
-
-* selected coordinates (z)
+1. The `timeseries` workflow parses CLI arguments and resolves the request type from `--field`.
+2. ReaxKit loads required simulation/trajectory data through the runtime engine adapter.
+3. The matching analysis task runs (for this command: trajectory coordinate series).
+4. The result is returned as a structured table/series object.
+5. Presentation/export layers write output and optionally render plots.
 
 ---
 
-## Frame vs iteration vs time (important)
+## `frame` vs `iter` vs `time`
 
-This distinction is critical when analyzing ReaxFF trajectories.
+### `frame`
+- Sequential snapshot index (0-based).
+- Always available.
 
-#### Frame
+### `iter`
+- Simulation iteration number from source data.
+- May skip or restart depending on simulation runs/restarts.
 
-* A frame is simply the n-th snapshot in the trajectory.
+### `time`
+- Physical time derived from iteration and timestep metadata.
+- Requires enough metadata (typically `control`) for conversion.
 
-* Frames are always 0-based and sequential.
-
-* Frames are the internal reference used by ReaxKit.
-
-#### Iteration (`iter`)
-
-* The MD iteration number stored in the `xmolout` file.
-
-* Iterations may:
-
-    * skip values,
-
-    * repeat,
-
-    * restart (e.g., after restarts).
-
-ReaxKit always preserves `iter` explicitly.
-
-#### Time
-
-* Physical time derived from `iteration` × `timestep`.
-
-* Only available if the `control` file is available.
-
-#### Best practice:
-* Use frame for indexing and selection, and use iter or time for plotting
-and interpretation
+Best practice: use `frame` for deterministic indexing, and `iter`/`time` for interpretation and plotting.
 
 ---
 
 ## Output locations
 
-ReaxKit never writes files randomly. By default:
+By default:
+- exported analysis tables/plots go under `reaxkit_workspace/analysis/`
+- generated input files go under `reaxkit_workspace/inputs/`
 
-* exported CSV files go to: `reaxkit_outputs/<workflow_name>/`
+Example:
+- `reaxkit_workspace/analysis/timeseries/run_20260523_115443_cfc58e/atom1_z.csv`
 
+where `run_20260523_115443_cfc58e` is a unique identifier for this specific command execution.
 
-* generated inputs or derived files go to: `reaxkit_generated_inputs/`
-
-
-For example: 
-* `reaxkit_outputs/xmolout/atom1_z.csv` is for a trajectory result based on a `xmolout` file.
-* `reaxkit_generated_inputs/vregime.in` is for a generated template for a `vregime.in` file.
-
-
-This structure:
-
-* prevents clutter,
-
-* keeps results grouped by workflow,
-
-* makes batch analysis reproducible.
-
-You can override paths explicitly if needed by passing the desired **directory** (not the file name) to the `save`, `export`, or `output` flag.
+You can override output file paths via `--export` and `--save`.
 
 ---
 
-## Recommended practices
+## Related next steps
 
-* Start with currently developed CLI workflows, not Python scripts.
-* Prefer frame for selection, iter/time for plotting.
-* Keep handlers simple; do analysis in analyzers.
-* Treat workflows as orchestration, not computation.
+- See the next tutorial [02_atom_property_and_video_workflows](02_atom_property_and_video_workflows.md) to learn how to make plots and videos.
 
 ---
 
-## What you can do next
-
-Now that you understand the Quick Start pipeline, you can:
-
-* extract trajectories for multiple atoms or atom types,
-* compute mean squared displacement (MSD), radial distribution functions (RDF), etc.,
-* combine `xmolout` with other files (e.g. fort.7) for more advanced analysis (i.e., dipole moment calculations),
-* explore advanced plotting and export options.
-
-Next tutorials will build on this foundation and introduce
-multi-file analysis and more advanced workflows.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+[Back to Tutorials](index.md)

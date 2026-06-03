@@ -1,0 +1,144 @@
+version: "1.0"
+name: "workflow_cli_doc_rules"
+scope:
+  applies_to:
+    - "module/file-level docstrings"
+    - "public function/method docstrings"
+    - "private function/method docstrings"
+    - "analyzer request/result dataclass docstrings"
+    - "general domain/composite dataclass docstrings"
+    - "workflow CLI docs and related markdown docs"
+  reference_rule_file: "docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md"
+
+core_principles:
+  - id: "preserve-important-content"
+    rule: "Do not remove important existing documentation."
+    includes:
+      - "links and URLs"
+      - "references/citations"
+      - "warnings and caveats"
+      - "assumptions and invariants"
+      - "domain-specific terminology"
+  - id: "expand-not-truncate"
+    rule: "Prefer expanding and restructuring docs over shortening them."
+  - id: "no-behavior-changes"
+    rule: "Doc updates must not change runtime behavior or public API signatures."
+  - id: "consistency-first"
+    rule: "Use the exact section headings required by the rule template when specified."
+
+update_process:
+  - step: "read-existing-content"
+    details:
+      - "Read full target file before editing."
+      - "Identify all existing links/references and preserve them."
+  - step: "classify-doc-targets"
+    details:
+      - "Locate file-level docstring."
+      - "Locate public functions/methods."
+      - "Locate private functions/methods."
+      - "Locate Request/Result dataclasses."
+      - "Locate other dataclasses (domain/composite/shared models)."
+  - step: "apply-template-rules"
+    details:
+      - "Follow docs/rules_and_conventions/docstring_content_and_inclusion_guidelines.md."
+      - "Use required sections and separators exactly when defined."
+  - step: "preserve-and-merge"
+    details:
+      - "Merge existing useful text into new structure."
+      - "Keep links in place or move them into appropriate sections (See Also/References)."
+  - step: "validate"
+    details:
+      - "Ensure every public analyzer method has complete structured docstring."
+      - "Ensure private helpers use minimal style."
+      - "Run a syntax/compile check after edits."
+
+docstring_rules:
+  file_level:
+    required:
+      - "one-line purpose"
+      - "short scope/boundary paragraph"
+      - "**Usage context** section with bullet points"
+    optional:
+      - "Notes section with invariants/assumptions"
+  public_function:
+    required:
+      - "one-line summary"
+      - "extended summary"
+      - "Parameters"
+      - "Returns"
+      - "Examples"
+    analyzer_tasks:
+      additional_required:
+        - "Works on"
+    optional:
+      - "Notes"
+      - "See Also"
+      - "References"
+  private_function:
+    required:
+      - "one-line summary"
+    optional:
+      - "Notes"
+  dataclass_request:
+    required:
+      - "one-line summary"
+      - "short paragraph"
+      - "Fields"
+    optional:
+      - "Notes"
+      - "Examples"
+  dataclass_result:
+    required:
+      - "one-line summary"
+      - "short paragraph"
+      - "Fields"
+    optional:
+      - "Notes"
+      - "Examples"
+      - "References"
+  dataclass_general:
+    required:
+      - "one-line summary"
+      - "short paragraph"
+      - "Fields"
+    optional:
+      - "Notes"
+      - "Examples"
+      - "References"
+
+preservation_rules:
+  links:
+    - "Never delete working links unless they are clearly invalid and replaced by a better link."
+    - "If moving content, keep original link targets intact."
+  examples:
+    - "Retain meaningful existing examples; expand instead of replacing where possible."
+  terminology:
+    - "Keep established naming used by the codebase (fields, task IDs, domain terms)."
+  warnings:
+    - "Keep safety notes, constraints, and caveats."
+
+style_rules:
+  - "Keep wording precise and implementation-aligned."
+  - "Avoid redundant filler text."
+  - "Use consistent tense and vocabulary across similar analyzers."
+  - "Prefer concise, high-signal prose."
+  - "For engine-specific source files, use conditional engine wording (e.g., if ReaxFF is used, then the file would be fort.99)."
+
+editing_rules:
+  - "Use minimal, targeted edits."
+  - "Do not remove unrelated documentation."
+  - "Do not rewrite content that is already compliant unless needed for consistency."
+  - "When uncertain, preserve original text and add structured sections around it."
+
+quality_checks:
+  checklist:
+    - "All required docstring sections are present."
+    - "No important links/references removed."
+    - "Request/Result dataclasses include complete Fields documentation."
+    - "General dataclasses include complete Fields documentation."
+    - "Public task methods include Works on/Parameters/Returns/Examples."
+    - "Private helpers have at least one-line docstrings."
+    - "File compiles/lints after doc changes."
+
+future_usage:
+  instruction: "When user says 'follow workflow_cli_doc_rules.yaml', use this file plus docstring_content_and_inclusion_guidelines.md as authoritative guidance for doc updates."

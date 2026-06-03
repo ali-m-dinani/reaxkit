@@ -1,0 +1,110 @@
+{
+  "entries": {
+    "07ab4889d9ef398730b7657d44428185d90349ae743dcbbfbc1ed8565fdaaa54": {
+      "handler": "reaxkit.engine.reaxff.io.fort57_handler.Fort57Handler",
+      "path": ".reaxkit_cache\\handlers\\07ab4889d9ef398730b7657d44428185d90349ae743dcbbfbc1ed8565fdaaa54\\cache.h5",
+      "updated_at": "2026-03-10T14:11:35.201936+00:00"
+    },
+    "08210ddb64225e3bbffc75bc3c9ba2f30b7b8c2c5d6c78d38b24bfd74ecebc2b": {
+      "handler": "reaxkit.engine.reaxff.io.fort79_handler.Fort79Handler",
+      "path": ".reaxkit_cache\\handlers\\08210ddb64225e3bbffc75bc3c9ba2f30b7b8c2c5d6c78d38b24bfd74ecebc2b\\cache.h5",
+      "updated_at": "2026-03-10T19:41:30.975549+00:00"
+    },
+    "1d2c629d8ad43b153aee06cc51a4fb3667316c7a046cbd7e93312ce7ee31b058": {
+      "handler": "reaxkit.engine.reaxff.io.fort79_handler.Fort79Handler",
+      "path": ".reaxkit_cache\\handlers\\1d2c629d8ad43b153aee06cc51a4fb3667316c7a046cbd7e93312ce7ee31b058\\cache.h5",
+      "updated_at": "2026-03-10T14:11:36.558937+00:00"
+    },
+    "209b224baafb5f1b6a1f31f21f25a4c5e62227cfba7b44fba07e2f88b713402b": {
+      "handler": "reaxkit.engine.reaxff.io.fort78_handler.Fort78Handler",
+      "path": ".reaxkit_cache\\handlers\\209b224baafb5f1b6a1f31f21f25a4c5e62227cfba7b44fba07e2f88b713402b\\cache.h5",
+      "updated_at": "2026-03-10T14:11:36.090327+00:00"
+    },
+    "2458eea00755769cf7a212f228e65fbe6c32d51709e02c3a56a0c3c781376533": {
+      "handler": "reaxkit.engine.reaxff.io.params_handler.ParamsHandler",
+      "path": ".reaxkit_cache\\handlers\\2458eea00755769cf7a212f228e65fbe6c32d51709e02c3a56a0c3c781376533\\cache.h5",
+      "updated_at": "2026-03-10T14:12:00.509325+00:00"
+    },
+    "3f52c26ab6bb0386fc60045d791a32c9c3b285fa511f7b2fcc6499c104c212fa": {
+      "handler": "reaxkit.engine.reaxff.io.summary_handler.SummaryHandler",
+      "path": ".reaxkit_cache\\handlers\\3f52c26ab6bb0386fc60045d791a32c9c3b285fa511f7b2fcc6499c104c212fa\\cache.h5",
+      "updated_at": "2026-03-10T14:12:00.612241+00:00"
+    },
+    "3fe4718b86e113d3ed791cfec93bfe1fd901469ac29f6fbb0dec53f69d3333b8": {
+      "handler": "reaxkit.engine.reaxff.io.trainset_handler.TrainsetHandler",
+      "path": ".reaxkit_cache\\handlers\\3fe4718b86e113d3ed791cfec93bfe1fd901469ac29f6fbb0dec53f69d3333b8\\cache.h5",
+      "updated_at": "2026-03-10T14:12:00.798988+00:00"
+    },
+    "4347ea988c7c548e96a1dd2b068ca85e52c28502ad55afe37a4c8523ac1ba3ef": {
+      "handler": "reaxkit.engine.reaxff.io.molfra_handler.MolFraHandler",
+      "path": ".reaxkit_cache\\handlers\\4347ea988c7c548e96a1dd2b068ca85e52c28502ad55afe37a4c8523ac1ba3ef\\cache.h5",
+      "updated_at": "2026-03-10T14:11:43.340819+00:00"
+    },
+    "511af1ec2737e1f17e60ebf90e7305213ef6b4062d6dd94cb2b968241497ee23": {
+      "handler": "reaxkit.engine.reaxff.io.fort99_handler.Fort99Handler",
+      "path": ".reaxkit_cache\\handlers\\511af1ec2737e1f17e60ebf90e7305213ef6b4062d6dd94cb2b968241497ee23\\cache.h5",
+      "updated_at": "2026-03-10T14:11:42.148140+00:00"
+    },
+    "6dd98011afd6182bec41874202aef06f3758a0d560fe1b139f9fe53306f012bc": {
+      "handler": "reaxkit.engine.reaxff.io.xmolout_handler.XmoloutHandler",
+      "path": ".reaxkit_cache\\handlers\\6dd98011afd6182bec41874202aef06f3758a0d560fe1b139f9fe53306f012bc\\cache.h5",
+      "updated_at": "2026-03-10T14:12:02.667843+00:00"
+    },
+    "8b18ff1e738b92c698aa94dd258ff8e6e438cf42fb95a4e00b691ff416c7a502": {
+      "handler": "reaxkit.engine.reaxff.io.eregime_handler.EregimeHandler",
+      "path": ".reaxkit_cache\\handlers\\8b18ff1e738b92c698aa94dd258ff8e6e438cf42fb95a4e00b691ff416c7a502\\cache.h5",
+      "updated_at": "2026-03-10T16:32:12.550792+00:00"
+    },
+    "95cb991750cd230cf2d10999166585cf36050d804d41277df218a5d164da02f3": {
+      "handler": "reaxkit.engine.reaxff.io.ffield_handler.FFieldHandler",
+      "path": ".reaxkit_cache\\handlers\\95cb991750cd230cf2d10999166585cf36050d804d41277df218a5d164da02f3\\cache.h5",
+      "updated_at": "2026-03-10T14:11:34.738578+00:00"
+    },
+    "9e13ed07d705ceac7ff678d3fe2ce61e9244391ffe2fa6b283b10f69c9e33941": {
+      "handler": "reaxkit.engine.reaxff.io.fort73_handler.Fort73Handler",
+      "path": ".reaxkit_cache\\handlers\\9e13ed07d705ceac7ff678d3fe2ce61e9244391ffe2fa6b283b10f69c9e33941\\cache.h5",
+      "updated_at": "2026-03-10T14:11:35.424839+00:00"
+    },
+    "b5d9421bba048219a1f36b9396569f10a3faaf4ee1de20ddf07e30b1ac06a5c9": {
+      "handler": "reaxkit.engine.reaxff.io.fort76_handler.Fort76Handler",
+      "path": ".reaxkit_cache\\handlers\\b5d9421bba048219a1f36b9396569f10a3faaf4ee1de20ddf07e30b1ac06a5c9\\cache.h5",
+      "updated_at": "2026-03-10T14:11:35.750141+00:00"
+    },
+    "b812495431c0d64224d1d51753f6a78c7054de734166004e941e5c20958cfeee": {
+      "handler": "reaxkit.engine.reaxff.io.fort13_handler.Fort13Handler",
+      "path": ".reaxkit_cache\\handlers\\b812495431c0d64224d1d51753f6a78c7054de734166004e941e5c20958cfeee\\cache.h5",
+      "updated_at": "2026-03-10T14:11:34.979300+00:00"
+    },
+    "c489bb4076f48c767747beb5d3449fcbac905e68c61b3abc060e526f2bed20e0": {
+      "handler": "reaxkit.engine.reaxff.io.fort7_handler.Fort7Handler",
+      "path": ".reaxkit_cache\\handlers\\c489bb4076f48c767747beb5d3449fcbac905e68c61b3abc060e526f2bed20e0\\cache.h5",
+      "updated_at": "2026-03-10T14:11:41.519682+00:00"
+    },
+    "c8fb83ea3f38c7aaa8b3509845e8511adb48d42663e7fd093e923f337fef29e8": {
+      "handler": "reaxkit.engine.reaxff.io.fort74_handler.Fort74Handler",
+      "path": ".reaxkit_cache\\handlers\\c8fb83ea3f38c7aaa8b3509845e8511adb48d42663e7fd093e923f337fef29e8\\cache.h5",
+      "updated_at": "2026-03-10T14:11:35.689998+00:00"
+    },
+    "d21d9e5c2b937d934d16f30dc362ce459f2f0436828245bc337527668e6cbbb3": {
+      "handler": "reaxkit.engine.reaxff.io.vels_handler.VelsHandler",
+      "path": ".reaxkit_cache\\handlers\\d21d9e5c2b937d934d16f30dc362ce459f2f0436828245bc337527668e6cbbb3\\cache.h5",
+      "updated_at": "2026-03-10T14:12:00.821498+00:00"
+    },
+    "fc9cb50902441e6d72871a1f0c81226a38def8ad772e253342bd6aa1eac51a07": {
+      "handler": "reaxkit.engine.reaxff.io.control_handler.ControlHandler",
+      "path": ".reaxkit_cache\\handlers\\fc9cb50902441e6d72871a1f0c81226a38def8ad772e253342bd6aa1eac51a07\\cache.h5",
+      "updated_at": "2026-03-10T14:11:34.345034+00:00"
+    },
+    "fcac9637499926ab82a495c565f2177cbf1856ecfeb078dc9c45cddcb1ca47c8": {
+      "handler": "reaxkit.engine.reaxff.io.eregime_handler.EregimeHandler",
+      "path": ".reaxkit_cache\\handlers\\fcac9637499926ab82a495c565f2177cbf1856ecfeb078dc9c45cddcb1ca47c8\\cache.h5",
+      "updated_at": "2026-03-10T14:11:34.664209+00:00"
+    },
+    "ffa464eeff6b637b43331b469e3231597f9bfa596f371a871aefd756a291940d": {
+      "handler": "reaxkit.engine.reaxff.io.geo_handler.GeoHandler",
+      "path": ".reaxkit_cache\\handlers\\ffa464eeff6b637b43331b469e3231597f9bfa596f371a871aefd756a291940d\\cache.h5",
+      "updated_at": "2026-03-10T14:11:42.203618+00:00"
+    }
+  },
+  "namespace": "handlers"
+}

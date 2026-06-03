@@ -1,5 +1,4 @@
-"""
-CLI workflow for introspecting ReaxKit modules and folders.
+"""CLI workflow for introspecting ReaxKit modules and folders.
 
 This workflow powers the `reaxkit intspec` command, allowing users to:
 - Inspect a single Python module and view its top-level docstring summary
@@ -10,6 +9,12 @@ This workflow powers the `reaxkit intspec` command, allowing users to:
 It is designed as a lightweight discovery and navigation tool to help users
 understand what functionality exists inside ReaxKit without opening files
 manually.
+
+**Usage context**
+
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
 """
 
 
@@ -21,13 +26,15 @@ import os
 from typing import List, Optional, Tuple
 
 from tabulate import tabulate
-
 from reaxkit.help.introspection_utils import (
     list_modules_recursive_with_summaries,
     module_docstring_first_line_from_file,
     public_symbols_from_file,
     resolve_module_hint_to_file,
 )
+
+ALL_COMMANDS = ("intspec",)
+ALL_LEGACY_COMMANDS = ()
 
 # Try exact first, then common prefixes
 CANDIDATE_PREFIXES: List[str] = [
@@ -43,7 +50,7 @@ CANDIDATE_PREFIXES: List[str] = [
     "reaxkit.io.handlers.",
     "reaxkit.io.generators.",
     "reaxkit.utils.",
-    "reaxkit.utils.media.",
+    "reaxkit.presentation.movie.",
     "reaxkit.utils.numerical.",
     "reaxkit.help.",
 ]
@@ -59,6 +66,29 @@ FOLDER_ROOTS: List[str] = [
 
 
 def _print_table(rows: List[Tuple[str, str]], headers: Tuple[str, str]) -> int:
+    """
+    Print table.
+
+    Works on
+    -----
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    -----
+    rows : List[Tuple[str, str]]
+        Parameter description.
+    headers : Tuple[str, str]
+        Parameter description.
+
+    Returns
+    -----
+    int
+        Return value description.
+
+    Examples
+    -----
+    >>>
+    """
     if not rows:
         print("No items found.")
         return 0
@@ -67,6 +97,27 @@ def _print_table(rows: List[Tuple[str, str]], headers: Tuple[str, str]) -> int:
 
 
 def _resolve_pkg_dir_from_module_name(modname: str) -> Optional[str]:
+    """
+    Resolve pkg dir from module name.
+
+    Works on
+    -----
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    -----
+    modname : str
+        Parameter description.
+
+    Returns
+    -----
+    Optional[str]
+        Return value description.
+
+    Examples
+    -----
+    >>>
+    """
     try:
         mod = importlib.import_module(modname)
         if getattr(mod, "__path__", None):
@@ -77,6 +128,27 @@ def _resolve_pkg_dir_from_module_name(modname: str) -> Optional[str]:
 
 
 def _looks_like_path(hint: str) -> bool:
+    """
+    Looks like path.
+
+    Works on
+    -----
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    -----
+    hint : str
+        Parameter description.
+
+    Returns
+    -----
+    bool
+        Return value description.
+
+    Examples
+    -----
+    >>>
+    """
     return hint.endswith(".py") or ("/" in hint) or ("\\" in hint) or (os.sep in hint)
 
 
@@ -127,10 +199,46 @@ def _resolve_folder_hint_to_dir(folder_hint: str) -> Optional[str]:
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
-    """Define CLI args for `reaxkit intspec` (kind-level)."""
+    """
+    Build parser.
+
+    Works on
+    -----
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    -----
+    p : argparse.ArgumentParser
+        Parameter description.
+
+    Examples
+    -----
+    >>>
+    """
+    p.formatter_class = argparse.RawTextHelpFormatter
+    p.description = (
+        "Inspect ReaxKit modules and folders for quick codebase discovery.\n"
+        "This command supports two mutually exclusive modes:\n"
+        "  1. `--file`   -> inspect one module/file and list public symbols\n"
+        "  2. `--folder` -> recursively list modules with docstring summaries\n"
+        "Use it to understand available functionality without opening files manually.\n\n"
+        "Examples:\n"
+        "  1. Recursively inspect the workflows package via shorthand:\n"
+        "   reaxkit intspec --folder workflows\n\n"
+        "  2. Inspect a specific dotted package path:\n"
+        "   reaxkit intspec --folder reaxkit.workflows.meta\n\n"
+        "  3. Inspect a module by dotted module name:\n"
+        "   reaxkit intspec --file reaxkit.workflows.meta.help_workflow\n\n"
+    )
     g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
-    g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
+    g.add_argument(
+        "--file",
+        help="Module name or path to .py. Example: --file reaxkit.workflows.meta.help_workflow, which inspects that module and lists public symbols.",
+    )
+    g.add_argument(
+        "--folder",
+        help="Folder/package to scan recursively. Example: --folder workflows, which expands to the workflows package and lists contained modules.",
+    )
 
 
 # ------------------------- FILE MODE -------------------------
@@ -187,7 +295,25 @@ def run_file(module_hint: str) -> int:
 
 def run_folder(folder_hint: str) -> int:
     """
-    Recursively list all .py files under the folder/package with module docstring first line.
+    Run folder.
+
+    Works on
+    -----
+    CLI workflow task arguments and helper utilities
+
+    Parameters
+    -----
+    folder_hint : str
+        Parameter description.
+
+    Returns
+    -----
+    int
+        Return value description.
+
+    Examples
+    -----
+    >>>
     """
     pkg_dir = _resolve_folder_hint_to_dir(folder_hint)
     if not pkg_dir:
@@ -215,21 +341,5 @@ def run_main(file: str | None, folder: str | None) -> int:
 
 
 def register_tasks(subparsers) -> None:
-    """Task-level entry: `reaxkit intspec run ...`."""
-    p = subparsers.add_parser(
-        "run",
-        help="Introspect a module (--file) or folder (--folder).",
-        description=(
-            "Introspect a module (--file) or folder (--folder).\n"
-            "Examples:\n"
-            "  reaxkit intspec --folder workflow\n"
-            "  reaxkit intspec run --folder workflow\n"
-            "  reaxkit intspec --file fort7_analyzer\n"
-            "  reaxkit intspec run --file fort7_analyzer\n"
-        ),
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("--file", help="Module name (e.g. fort7_analyzer) or path to .py")
-    g.add_argument("--folder", help="Folder/package (e.g. workflow, workflows, reaxkit/workflows)")
-    p.set_defaults(_run=lambda args: run_main(getattr(args, "file", None), getattr(args, "folder", None)))
+    """`intspec` is a kind-level command and intentionally has no task subcommands."""
+    return

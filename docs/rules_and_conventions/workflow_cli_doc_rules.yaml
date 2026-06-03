@@ -1,0 +1,62 @@
+version: 1
+title: "Workflow CLI Documentation Rules"
+purpose: >
+  Standard rules for writing descriptive argparse parser descriptions and argument help
+  text in ReaxKit workflows. Use this as the default style guide for new workflow commands.
+
+scope:
+  applies_to:
+    - "build_parser(...) command descriptions"
+    - "parser.add_argument(..., help=...) text"
+    - "shared argument helper functions (for example _add_runtime_arguments)"
+  does_not_change:
+    - "runtime behavior"
+    - "argument names, defaults, choices, or parsing logic"
+
+parser_description_rules:
+  - "Start with what the command does in one clear sentence."
+  - "Add 1-3 short lines describing when/why to use it."
+  - "State important scope limits (for example template generation only, no simulation run)."
+  - "Use a clean 'Examples:' section."
+  - "Use numbered examples (1., 2., 3.) with short labels when helpful."
+  - "Indent command lines consistently for readability."
+  - "Prefer realistic, domain-relevant examples over placeholders."
+  - "If a command has multiple modes, include at least one example per mode."
+  - "Keep wording direct and technical; avoid marketing phrasing."
+
+add_argument_help_rules:
+  required_pattern: "<what this flag controls>. Example: <flag usage>, <what that example means>."
+  requirements:
+    - "Explain the flag in plain language first."
+    - "Include one concrete example invocation snippet for the flag."
+    - "After the example, add a short explanation of the effect."
+    - "Keep each help string concise but complete."
+    - "For boolean flags, explain what enabling/disabling changes."
+    - "For selectors/filters, explain what gets included/excluded."
+    - "For file/path flags, explain what file is read or written."
+    - "For numeric thresholds/tunables, explain how value changes behavior."
+    - "For axis/plot options, explain output interpretation (not just syntax)."
+
+formatting_conventions:
+  parser_description:
+    - "Use argparse.RawTextHelpFormatter-compatible multi-line strings."
+    - "Separate sections with blank lines: summary, details, examples."
+    - "Keep examples in command-ready form (copy/paste friendly)."
+  help_text:
+    - "Use sentence case."
+    - "Use 'Example:' exactly once per help string where practical."
+    - "Avoid overly long examples; one focused example per flag is enough."
+
+quality_checklist:
+  - "Would a new user understand what the command does without reading code?"
+  - "Does each important argument explain both syntax and intent?"
+  - "Do examples cover common real usage paths?"
+  - "Are mode-specific flags documented with mode-specific examples?"
+  - "Are descriptions accurate to current behavior?"
+  - "Were only docs/help strings changed (unless explicitly requested otherwise)?"
+
+maintenance_notes:
+  - "When adding new commands, follow this file before copying old parser text."
+  - "When behavior changes, update examples and help explanations together."
+  - "If this file is moved to docs later, keep a lightweight pointer in workflows/."
+

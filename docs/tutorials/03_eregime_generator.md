@@ -1,234 +1,129 @@
-# Generating Electric-Field Schedules with `eregime.in`
+# Generating Electric-Field Schedules with `gen_eregime`
 
-In previous tutorials, we focused on **analyzing existing ReaxFF outputs**.
-In this tutorial, we shift to the *input side* and show how ReaxKit helps you
-**generate an `eregime.in` file** for electric-field–driven simulations.
-
-The goal is to make electric-field protocols:
-- reproducible,
-- readable,
-- easy to modify,
-- and consistent with ReaxFF / AMS expectations.
+This tutorial reflects the current ReaxKit generator workflow for creating
+`eregime.in` files.
 
 ---
 
-## What is `eregime.in`?
+## What `eregime.in` contains
 
-`eregime.in` defines **time-dependent electric fields** applied during a ReaxFF
-simulation.
-
-Each line typically specifies:
-- the iteration at which the field is applied,
-- the applied electric field (`V`),
-- the field direction (`x`, `y`, or `z`),
-- the field magnitude (in V/Å).
-
----
-
-## ReaxKit’s approach to `eregime.in` generation
-
-Instead of manually editing `eregime.in`, ReaxKit provides **programmatic
-generators** that:
-
-- construct field schedules from physical parameters,
-- validate directions and sampling,
-- write correctly formatted files,
-- keep logic separate from file I/O.
-
-All generators ultimately call a single low-level writer:
-
-```text
-write_eregime()
-```
-
-This ensures a single, consistent file format.
-
----
-
-## The common output structure
-
-All generators produce rows of the form:
+`eregime.in` stores sampled electric-field rows with this structure:
 
 `(iteration, V_index, direction, magnitude)`
 
-These rows are then written with a standard header:
+with header:
 
 ```text
 #Electric field regimes
 #start #V direction Magnitude(V/A)
 ```
 
-This format matches ReaxFF expectations exactly.
+---
+
+## Main command
+
+The general format for this command is as follows:
+
+```bash
+reaxkit gen_eregime --type <sin|pulse|func> --iteration-step <int> [profile-specific flags]
+```
+
+Common flags:
+- `--output` output filename/path (default `eregime.in`)
+- `--direction` field axis (`x`, `y`, `z`)
+- `--V` voltage index column
+- `--start-iter` first iteration number
 
 ---
 
-## Generator 1: Sinusoidal electric fields
+## Profile 1: Sinusoidal field
 
-A sinusoidal field is commonly used for:
-
-* dielectric response,
-* polarization hysteresis,
-* frequency-dependent studies.
-
-Mathematically:
-
-```equation
-E(t) = dc_offset + A · sin(phase + ωt)
+```bash
+reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1
 ```
 
-#### Using `make_eregime_sinusoidal`
+Meaning:
+- `--max-magnitude`: peak amplitude (about +0.004 to -0.004 V/A around offset)
+- `--step-angle`: angular sampling density (smaller = denser sampling)
+- `--iteration-step`: MD iterations between consecutive rows
+- `--num-cycles`: number of sine cycles
 
-```
-make_eregime_sinusoidal(
-     "eregime.in",
-    max_magnitude=0.05,
-    step_angle=0.05,
-    iteration_step=100,
-    num_cycles=5,
-    direction="z",
-)
-```
-
-Key parameters:
-
-* `max_magnitude` → peak field amplitude (V/Å)
-* `step_angle` → angular resolution (radians)
-* `iteration_step` → MD iterations between samples
-* `num_cycles` → number of sinusoidal cycles
-* `direction` → field direction (x, y, or z)
-
-Internally:
-
-* the sine wave is sampled uniformly in angle,
-* each sample is mapped to a simulation iteration,
-* the result is written as a complete `eregime.in`.
+Optional sin-only controls:
+- `--phase`
+- `--dc-offset`
 
 ---
 
-## Generator 2: Smooth bipolar pulse fields
+## Profile 2: Smooth pulse field
 
-Smooth pulses are useful for:
-
-* switching dynamics,
-* avoiding numerical artifacts,
-* studying transient responses.
-
-Each cycle consists of:
-
-* ramp up,
-* flat top,
-* ramp down,
-* baseline,
-
-followed by a mirrored negative pulse.
-
-#### Using `make_eregime_smooth_pulse`
-```
-make_eregime_smooth_pulse(
-    "eregime.in",
-    amplitude=0.04,
-    width=50.0,
-    period=200.0,
-    slope=20.0,
-    iteration_step=50,
-    num_of_cycles=3,
-    direction="z",
-)
+```bash
+reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1
 ```
 
-Key parameters:
+Meaning:
+- `--amplitude`: pulse height above baseline
+- `--width`: flat-top duration
+- `--period`: full positive+negative cycle length
+- `--slope`: rise/fall duration
+- `--num-cycles`: cycle count
 
-* `amplitude` → pulse height (V/Å)
-* `width` → flat-top duration
-* `slope` → ramp duration
-* `period` → full pulse cycle
-* `step_size` → temporal resolution
-* `num_of_cycles` → number of cycles
-
-The generator enforces:
-
-* physically consistent timing,
-* symmetric positive/negative pulses,
-* smooth transitions (no discontinuities).
+Optional pulse controls:
+- `--step-size` (sampling resolution)
+- `--baseline`
 
 ---
 
-## Generator 3: Arbitrary user-defined fields
+## Profile 3: User-defined function
 
-Sometimes the field profile does not match a standard waveform.
-
-ReaxKit allows you to define:
-
-```text
-E(t) = f(t)
+```bash
+reaxkit gen_eregime --type func --output eregime.in --expr "0.003*cos(2*pi*t/100)" --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1
 ```
 
-directly.
-
-#### Using `make_eregime_from_function`
-
-```
-def my_field(t):
-    return 0.02 * t * np.exp(-t / 10.0)
-
-make_eregime_from_function(
-    "eregime.in",
-    func=my_field,
-    t_end=50.0,
-    dt=0.2,
-    iteration_step=100,
-    direction="z",
-)
-```
-
-This approach:
-
-* samples `func(t)` uniformly in time,
-* maps time samples to iteration numbers,
-* gives you full freedom over the waveform.
-
-This is especially useful for:
-
-* externally fitted fields,
-* machine-learning–generated protocols,
-* experiment-informed schedules.
+Meaning:
+- `--expr`: function of `t`
+- `--t-end`: final sampled time
+- `--dt`: sampling interval
+- `--iteration-step`: iteration mapping between samples
 
 ---
 
-## Direction, iteration, and validation
+## Validation behavior
 
-Across all generators:
+The generator validates inputs before writing:
+- direction must be `x`, `y`, or `z`
+- `iteration_step` must be positive
+- profile-specific required flags must be provided
+- pulse constraints must be physically consistent
 
-* directions are validated (x, y, z only),
-* iteration steps must be positive,
-* invalid timing configurations raise errors early.
-
-This prevents silent generation of invalid `eregime.in` files.
-
----
-
-## Output location and usage
-
-Generated files are typically written to:
-
-`reaxkit_generated_inputs/eregime.in`
-
-You can then:
-
-* reference `eregime.in` directly in your ReaxFF input,
-* version-control it,
-* regenerate it parametrically when conditions change.
+Invalid settings raise clear errors instead of producing malformed files.
 
 ---
 
-## What you can do next
+## Python API note
 
-With eregime generation in place, you can now:
+If you need programmatic generation, the core API is:
 
-* couple electric fields with trajectory analysis,
-* generate polarization vs field loops,
-* explore frequency-dependent response,
-* integrate experiment-informed field profiles,
-* automate full input–simulation–analysis pipelines.
+```python
+from reaxkit.engine.reaxff.generators.eregime_generator import gen_eregime
+```
 
-This closes the loop between **input generation** and **output analysis** in ReaxKit.
+with `profile_type="sin" | "pulse" | "func"` and the same profile parameters.
+
+---
+
+## Output location
+
+Generated inputs are stored using ReaxKit generator output layout 
+(under `reaxkit_workspace/inputs/`), with optional `--copy-to-dot` to place a
+copy in the current working directory.
+
+---
+
+
+## Related next steps
+
+- See the next tutorial [04_gen_plot_workflow](04_gen_plot_workflow.md) to learn how to plots for any data you have.
+
+---
+
+[Back to Tutorials](index.md)

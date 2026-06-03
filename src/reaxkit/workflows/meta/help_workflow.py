@@ -1,136 +1,111 @@
-"""
-Interactive help and discovery workflow for ReaxKit.
+"""Interactive help and discovery workflow for ReaxKit.
 
-This workflow provides a search-based help system that maps conceptual,
-human-language queries (e.g. "electric field", "restraint", "bond order")
-to relevant ReaxFF input and output files.
+This workflow supports two complementary help modes:
+1) capability discovery (intent -> responsible analysis tasks/workflows/generators)
+2) ReaxFF file discovery (query -> relevant input/output files)
 
-It operates as a kind-level command (`reaxkit help`) rather than a task-based
-workflow, and therefore does not define subcommands. Instead, it queries
-curated help indices and ranks matches based on relevance.
+**Usage context**
 
-Optional flags allow users to inspect why a file matched, view example
-ReaxKit commands, and explore core, optional, and derived variables
-associated with each file.
+- Command routing: Resolve CLI aliases and normalized command names.
+- Task execution: Build request objects and invoke registered tasks.
+- Output handling: Forward results to table, plot, export, or report flows.
 """
 
 from __future__ import annotations
 
 import argparse
-from reaxkit.help.help_index_loader import search_help_indices, _format_hits
+
+ALL_COMMANDS = ("help",)
+ALL_LEGACY_COMMANDS = ()
 
 
 def build_parser(p: argparse.ArgumentParser) -> None:
-    """
-    Define CLI arguments for the kind-level command: `reaxkit help`.
+    """Define CLI arguments for `reaxkit help`."""
+    p.formatter_class = argparse.RawTextHelpFormatter
+    p.description = (
+        "Interactive help and discovery for ReaxKit commands, capabilities, and file semantics.\n"
+        "Use this command to search ReaxKit concepts (for example analyses or generators) and\n"
+        "ReaxFF-related files by keyword. You can narrow results, enforce exact matching, and\n"
+        "request detailed mapping information.\n\n"
+        
+        "For more information, you can see:\n"
+        " ReaxKit code: https://github.com/ali-m-dinani/reaxkit\n"
+        " ReaxFF documentation: https://ali-m-dinani.github.io/reaxkit/\n\n"
+        
+        "Examples:\n"
+        "  1. Basic keyword search:\n"
+        "   reaxkit help \"msd\"\n\n"
+        "  2. Search with multi-word phrase:\n"
+        "   reaxkit help \"bond order\"\n\n"
+        "  3. Limit result count:\n"
+        "   reaxkit help \"bond order\" --top 3\n\n"
+        "  4. Search with explicit engine context:\n"
+        "   reaxkit help \"restraint\" --engine reaxff\n\n"
+        "  5. Show detailed mapping information:\n"
+        "   reaxkit help \"fort.7\" --all-info\n"
+        "   reaxkit help \"xmolout\" --all-info"
+    )
 
-    This is used by documentation generation to render a stable list of flags
-    and defaults, and can also be reused by the CLI entry-point when building
-    the parser for `help`.
-    """
     p.add_argument(
         "query",
         nargs="?",
         default=None,
-        help="Search query (use quotes for multi-word queries).",
+        help="Search query (use quotes for multi-word queries). Example: \"bond order\", which searches that phrase across help index entries.",
     )
 
     p.add_argument(
         "--top",
         type=int,
-        default=8,
-        help="Maximum number of matches to display.",
+        default=1,
+        help="Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3 hits per category.",
     )
+
     p.add_argument(
-        "--min-score",
-        type=float,
-        default=35.0,
-        help="Minimum score threshold; lower-scoring matches are hidden.",
+        "--engine",
+        type=str,
+        default=None,
+        help="Optional engine context for dataclass-to-file mappings. Example: --engine reaxff, which resolves relationships using ReaxFF context.",
     )
 
-    # Output detail toggles
-    p.add_argument("--why", action="store_true", help="Show why each file matched the query.")
-    p.add_argument("--file_templates", action="store_true", help="Show one example ReaxKit command per match.")
-    p.add_argument("--tags", action="store_true", help="Show tags for each match.")
-    p.add_argument("--core-vars", dest="core_vars", action="store_true", help="Show core variables for each match.")
-    p.add_argument("--optional-vars", dest="optional_vars", action="store_true", help="Show optional variables.")
-    p.add_argument("--derived-vars", dest="derived_vars", action="store_true", help="Show derived variables.")
-    p.add_argument("--notes", action="store_true", help="Show notes for each match.")
-
-    # Convenience flag
     p.add_argument(
         "--all-info",
         dest="all_info",
         action="store_true",
-        help="Show why/file_templates/tags/core/optional/derived/notes all at once.",
+        help="Show detailed implementation and file/dataclass/analyzer mapping information. Example: --all-info, which expands output beyond summary hits.",
+    )
+
+    p.add_argument(
+        "--exact-match",
+        dest="exact_match",
+        action="store_true",
+        help="Match query exactly against item title (and aliases) before returning results. Example: --exact-match, which avoids broad fuzzy matches.",
     )
 
 
 def run_main(args: argparse.Namespace) -> None:
-    """
-    Run the `reaxkit help` command.
-
-    Behavior:
-    -----------
-    - If no query is provided, prints a short usage message and exits.
-    - If a query is provided, searches curated help indices and prints ranked matches.
-    - Use `--top` and `--min-score` to control result count and filtering.
-    - Use detail flags (`--why`, `--file_templates`, `--tags`, `--core-vars`, `--optional-vars`,
-      `--derived-vars`, `--notes`) to expand what is shown per match.
-    - `--all-info` enables all detail flags together.
-
-    Examples
-    -----------
-    reaxkit help 'restraint'
-    reaxkit help 'electric field'
-    """
-    # Allow: `reaxkit help` (no query)
+    """Run the `reaxkit help` command."""
     if getattr(args, "query", None) is None:
         print("ReaxKit help\n")
-        print('Usage:\n  reaxkit help "restraint"\n  reaxkit help bond\n  reaxkit help "electric field"\n')
+        print('Usage:\n  reaxkit help "msd"\n  reaxkit help "bond order"\n  reaxkit help "restraint"')
+        print('  reaxkit help "restraint" --engine reaxff\n')
         print("Tip: put multi-word queries in quotes.")
         return
 
-    hits = search_help_indices(
+    from reaxkit.help.help_index_loader import (
+        build_help_relationship_report,
+    )
+
+    engine = getattr(args, "engine", None) or "reaxff"
+    report = build_help_relationship_report(
         args.query,
-        top_k=getattr(args, "top", 8),
-        min_score=getattr(args, "min_score", 35.0),
+        top_k=max(1, int(getattr(args, "top", 8))),
+        engine=engine,
+        all_info=bool(getattr(args, "all_info", False)),
+        exact_match=bool(getattr(args, "exact_match", False)),
     )
-
-    if not hits:
-        print(f"❌ No matches for: {args.query!r}")
-        return
-
-    all_info = getattr(args, "all_info", False)
-
-    show_why = all_info or getattr(args, "why", False)
-    show_examples = all_info or getattr(args, "file_templates", False)
-    show_tags = all_info or getattr(args, "tags", False)
-    show_core_vars = all_info or getattr(args, "core_vars", False)
-    show_optional_vars = all_info or getattr(args, "optional_vars", False)
-    show_derived_vars = all_info or getattr(args, "derived_vars", False)
-    show_notes = all_info or getattr(args, "notes", False)
-
-    print(
-        _format_hits(
-            hits,
-            show_why=show_why,
-            show_examples=show_examples,
-            show_tags=show_tags,
-            show_core_vars=show_core_vars,
-            show_optional_vars=show_optional_vars,
-            show_derived_vars=show_derived_vars,
-            show_notes=show_notes,
-        )
-    )
+    print(report)
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    """
-    Intentionally empty.
-
-    `help` is a kind-level command (invoked as `reaxkit help "<query>"`), so it does
-    not define subcommands via `register_tasks`. The CLI entry-point should call
-    `build_parser(...)` and route execution to `run_main(...)`.
-    """
+    """`help` is a kind-level command and intentionally has no task subcommands."""
     return
