@@ -58,10 +58,6 @@ class LAMMPSLogHandler:
     def read(self) -> dict[str, object]:
         """Parse ``log.lammps`` and return runs/errors plus a selected thermo table.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         dict[str, object]

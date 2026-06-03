@@ -68,7 +68,7 @@ nav:
   - Examples:
     - 📍 Overview: examples/README.md
     - LiFS Example: examples/lifs_box_pipeline/README.md
-    - ROMP Example: examples/romp_box_pipeline/README.md
+    - ROMP Example: examples/romp_active_control/README.md
   - Tutorials:
     - 📍 Overview: tutorials/index.md
     - 01 - Understanding Quickstart: tutorials/01_understanding_quickstart.md
@@ -229,6 +229,7 @@ nav:
   - ReaxKit's folder structure: for_developers/reaxkit_folder_structure_and_data_models.md
   - Contributing: contributing.md
   - File Templates: file_templates/index.md
+  - Figure Template: template_for_adding_figures_to_docs_md_files.md
   - Rules and Conventions:
     - 📍 Overview: rules_and_conventions/index.md
     - Docstring Content And Inclusion Guidelines: rules_and_conventions/docstring_content_and_inclusion_guidelines.md

@@ -59,10 +59,6 @@ class CellSpec:
     def as_dict(self) -> Dict[str, float]:
         """As dict.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         Dict[str, float]

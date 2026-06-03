@@ -172,10 +172,6 @@ class AMSAdapter(EngineAdapter):
     def clear_runtime_cache(cls) -> None:
         """Clear AMS runtime caches used by RKF handler instances.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None

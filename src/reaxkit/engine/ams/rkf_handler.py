@@ -37,10 +37,6 @@ class RKFHandler:
     def clear_runtime_cache(cls) -> None:
         """Clear all cached ``KFFile`` handles for the current Python process.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
@@ -82,10 +78,6 @@ class RKFHandler:
 
         Loads on first access and then reuses the same in-memory handle for
         subsequent calls while the underlying file identity is unchanged.
-
-        Parameters
-        ----------
-        None
 
         Returns
         -------

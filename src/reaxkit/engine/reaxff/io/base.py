@@ -219,10 +219,6 @@ class BaseHandler(ABC):
     def clear_runtime_cache(cls) -> None:
         """Clear runtime cache.
 
-        Parameters
-        ----------
-        None
-
         Returns
         -------
         None
