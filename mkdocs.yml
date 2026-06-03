@@ -65,7 +65,10 @@ nav:
   -    Architecture Overview: architecture_overview.md
   - Installation: installation.md
   - Quickstart: quickstart.md
-  - Examples: examples/README.md
+  - Examples:
+    - 📍 Overview: examples/README.md
+    - LiFS Example: examples/lifs_box_pipeline/README.md
+    - ROMP Example: examples/romp_box_pipeline/README.md
   - Tutorials:
     - 📍 Overview: tutorials/index.md
     - 01 - Understanding Quickstart: tutorials/01_understanding_quickstart.md

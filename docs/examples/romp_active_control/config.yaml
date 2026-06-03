@@ -1,0 +1,47 @@
+input:
+  fort90: data/fort.90
+  monomer: data/monomer.bgf
+
+output:
+  geo_out: generated/geo_next
+  report_json: generated/active_step_report.json
+  report_txt: generated/active_step_report.txt
+
+removal:
+  enabled: true
+  mode: formula
+  # first | random
+  selection_strategy: first
+  target_formulas:
+    - C8H12
+  max_molecules: null
+  rules:
+    # Used when mode: rules
+    # Molecule must contain at least one listed element
+    include_any_elements: []
+    # Molecule must contain all listed elements
+    include_all_elements: []
+    # Molecule is rejected if it contains any listed element
+    exclude_any_elements: []
+    # Molecule's element set must be a subset of this list (empty disables)
+    allowed_elements: []
+    # Formula-like motifs, examples: SFx, S1F6, Li1S1F1
+    include_motifs: []
+    # Exclusion motifs in same syntax
+    exclude_motifs: []
+
+insertion:
+  enabled: true
+  place_count: 1
+  anchor_element: Ru
+  nearest_element: C
+  search_radius: 7.5
+  min_distance: 3.0
+  candidate_samples: 10000
+  seed: 42
+
+box:
+  # If omitted, the runner tries to reuse input CRYSTX values and falls back
+  # to [100,100,100] and [90,90,90].
+  lengths: [100.0, 100.0, 100.0]
+  angles: [90.0, 90.0, 90.0]

@@ -16,6 +16,20 @@ examples/
     gen_plot_presentation_example.py
     multi_engine_get_msd_cli_blueprint.py
     README.md
+    lifs_box_pipeline/
+        data/
+            fort.90
+        prepare_lis_box.py
+        run_fort90_to_xmolout.py
+        README.md
+    romp_active_control/
+        data/
+            fort.90
+            monomer.bgf
+        config.yaml
+        romp_edit_ops.py
+        run_active_step.py
+        README.md
 ```
 
 ## Example scripts
@@ -55,6 +69,18 @@ Related tutorial: [04_gen_plot_workflow.md](../tutorials/04_gen_plot_workflow.md
 
 Demonstrates a task-first, multi-engine architecture blueprint for
 `reaxkit get_msd` style flows.
+
+### [`LiFS box pipeline/`](lifs_box_pipeline/README.md)
+
+Demonstrates a reusable workflow for generating packed Li/S structures 
+from ReaxFF/XTLGRF `fort.90` files. It coordinates several reusable ReaxKit 
+modules and produces new files from an input structure.
+
+### [`ROMP active-control/`](romp_active_control/README.md)
+
+Demonstrates a config-driven simulation controller that reads a ReaxFF
+`fort.90` state, removes selected molecular fragments, inserts a monomer with
+overlap checks, and writes next-step `geo` plus report files.
 
 ## Notes
 
