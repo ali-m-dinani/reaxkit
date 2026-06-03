@@ -84,10 +84,11 @@ def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
         atom_ids=args.atom_ids,
         atom_types=args.atom_types,
         dims=tuple(args.dims),
-        origin=args.origin,
         frames=parse_frame_indices(args.frames),
         every=args.every,
         unwrap=bool(args.unwrap),
+        max_lag=args.max_lag,
+        delta_t_ps=args.delta_t_ps,
     )
 
 
@@ -196,20 +197,38 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--backend", choices=["numpy", "mdanalysis"], default="numpy", help="Dihedral backend. Example: --backend mdanalysis, which uses MDAnalysis implementation.")
     elif canonical == "get_msd":
         parser.description = (
-            "Compute mean-squared displacement (MSD) for selected atoms.\n"
-            "MSD is computed over selected frames and can be filtered by atom ids or atom types.\n\n"
+            "Compute time-origin averaged mean-squared displacement (MSD) for selected atoms.\n"
+            "The output is averaged over selected atoms and all valid time origins, giving MSD vs lag time.\n\n"
             "Examples:\n"
             "  1. Plot MSD for selected atom ids:\n"
-            "   reaxkit get_msd --atom-ids 1 2 3 --plot single\n\n"
-            "  2. Save oxygen-only MSD on time axis:\n"
-            "   reaxkit get_msd --atom-types O --xaxis time --save msd_oxygen.png\n\n"
-            "  3. Export MSD for one atom on selected frames:\n"
-            "   reaxkit get_msd --atom-ids 5 --frames 0 10 20 --export msd_atom5.csv"
+            "   reaxkit get_msd --atom-ids 1 2 3 --max-lag 500 --delta-t-ps 0.25 --plot single\n\n"
+            "  2. Save oxygen-only MSD vs lag time:\n"
+            "   reaxkit get_msd --atom-types O --max-lag 800 --delta-t-ps 1.0 --save msd_oxygen.png\n\n"
+            "  3. Export MSD using selected frames:\n"
+            "   reaxkit get_msd --atom-ids 5 --frames 0:1000:10 --max-lag 80 --export msd_atom5.csv"
         )
         parser.add_argument("--atom-ids", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atom-ids 1 2 3, which restricts MSD to those atoms.")
         parser.add_argument("--atom-types", nargs="*", default=None, help="Element symbols to include. Example: --atom-types O, which computes MSD for oxygen atoms only.")
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y, which computes MSD using in-plane displacement.")
-        parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
+        parser.add_argument(
+            "--max-lag",
+            type=int,
+            default=None,
+            help=(
+                "Maximum lag in number of selected frames. "
+                "Example: --max-lag 800, which computes MSD from lag 0 to lag 799."
+            ),
+        )
+
+        parser.add_argument(
+            "--delta-t-ps",
+            type=float,
+            default=1.0,
+            help=(
+                "Time between selected trajectory frames in ps. "
+                "Example: --delta-t-ps 0.25, which reports lag time in ps."
+            ),
+        )
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,
@@ -793,41 +812,35 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         return None
 
     if command == "get_msd":
-        grouped = table.groupby(["frame_index", "iter", "atom_id"], as_index=False)["msd"].mean()
-        frame_values = np.sort(grouped["frame_index"].unique())
-        xvals, xlabel = convert_xaxis(frame_values, getattr(args, "xaxis", "frame"))
-        frame_to_x = dict(zip(frame_values, xvals))
+        if "msd" not in table.columns:
+            return None
 
-        series = []
-        subplots = []
-        for atom_id in sorted(grouped["atom_id"].unique()):
-            dfi = grouped[grouped["atom_id"] == atom_id].sort_values("frame_index")
-            payload = {
-                "x": [frame_to_x[idx] for idx in dfi["frame_index"].to_numpy()],
-                "y": dfi["msd"].tolist(),
-                "label": f"atom {atom_id}",
-            }
-            series.append(payload)
-            subplots.append([payload])
+        work = table.copy()
 
-        title = f"MSD of atoms: {', '.join(str(v) for v in sorted(grouped['atom_id'].unique()))}"
-        if getattr(args, "plot", None) == "subplot":
-            return {
-                "plot_type": "multi_subplots",
-                "subplots": subplots,
-                "xlabel": xlabel,
-                "ylabel": "A^2",
-                "title": title,
-                "legend": True,
-                "grid": getattr(args, "grid", None),
-            }
+        if "time_ps" in work.columns:
+            x_col = "time_ps"
+            xlabel = "Time lag (ps)"
+        elif "lag_frame" in work.columns:
+            x_col = "lag_frame"
+            xlabel = "Lag (frames)"
+        else:
+            return None
+
+        work = work.sort_values(x_col)
+
+        payload = {
+            "x": pd.to_numeric(work[x_col], errors="coerce").tolist(),
+            "y": pd.to_numeric(work["msd"], errors="coerce").tolist(),
+            "label": "MSD",
+        }
+
         return {
             "plot_type": "single_plot",
-            "series": series,
+            "series": [payload],
             "xlabel": xlabel,
-            "ylabel": "A^2",
-            "title": title,
-            "legend": True,
+            "ylabel": "MSD (A^2)",
+            "title": "Time-Origin Averaged MSD",
+            "legend": False,
         }
 
     if command == "get_diffusivity":
