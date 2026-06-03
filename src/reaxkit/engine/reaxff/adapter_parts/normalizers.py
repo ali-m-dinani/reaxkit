@@ -37,7 +37,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationDiagnosticData,
     PartialEnergyData,
     RestraintData,
-    GeometrySummaryData,
+    EnergyMinimizationSummaryData,
     SimulationData,
     TrajectoryData,
 )
@@ -805,10 +805,10 @@ def _partial_energy_from_energy_log_handler(handler: Fort73Handler) -> PartialEn
     )
 
 
-def _structure_summary_from_fort74_handler(handler: Fort74Handler) -> GeometrySummaryData:
-    """Normalize a ``Fort74Handler`` into ``GeometrySummaryData``."""
+def _structure_summary_from_fort74_handler(handler: Fort74Handler) -> EnergyMinimizationSummaryData:
+    """Normalize a ``Fort74Handler`` into ``EnergyMinimizationSummaryData``."""
     df = handler.dataframe().copy()
-    return GeometrySummaryData(
+    return EnergyMinimizationSummaryData(
         identifiers=df["identifier"].fillna("").to_numpy(dtype=object) if "identifier" in df.columns else np.empty((0,), dtype=object),
         minimum_energy=(df["Emin"].to_numpy(dtype=float) if "Emin" in df.columns else None),
         iterations=(df["iter"].to_numpy(dtype=float) if "iter" in df.columns else None),

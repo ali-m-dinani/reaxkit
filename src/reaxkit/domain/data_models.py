@@ -625,7 +625,7 @@ class ForceFieldOptimizationParameterData:
 
 
 @dataclass
-class GeometrySummaryData:
+class EnergyMinimizationSummaryData:
     """Canonical structure-summary model.
 
     This dataclass stores structure-level summary series aligned by identifier.
@@ -653,14 +653,14 @@ class GeometrySummaryData:
         self.validate()
 
     def validate(self) -> None:
-        n_rows = _as_1d("GeometrySummaryData.identifiers", self.identifiers).shape[0]
+        n_rows = _as_1d("EnergyMinimizationSummaryData.identifiers", self.identifiers).shape[0]
         for name in ["minimum_energy", "iterations", "formation_energy", "volume", "density"]:
             vals = getattr(self, name)
             if vals is None:
                 continue
-            arr = _as_1d(f"GeometrySummaryData.{name}", vals)
+            arr = _as_1d(f"EnergyMinimizationSummaryData.{name}", vals)
             if arr.shape[0] != n_rows:
-                raise ValueError(f"GeometrySummaryData.{name} length must match identifiers length.")
+                raise ValueError(f"EnergyMinimizationSummaryData.{name} length must match identifiers length.")
 
 
 @dataclass
@@ -1275,14 +1275,14 @@ class ForceFieldOptimizationReportEOSBundleData:
     -----
     report : ForceFieldOptimizationReportData
         Required optimization report data.
-    geometry_summary : GeometrySummaryData
+    geometry_summary : EnergyMinimizationSummaryData
         Required structure summary data with volume mapping.
     metadata : Optional[dict[str, Any]], optional
         Optional bundle metadata.
     """
 
     report: ForceFieldOptimizationReportData
-    geometry_summary: GeometrySummaryData
+    geometry_summary: EnergyMinimizationSummaryData
     metadata: Optional[dict[str, Any]] = None
 
 

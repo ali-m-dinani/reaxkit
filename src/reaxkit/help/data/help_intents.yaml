@@ -187,7 +187,7 @@ intents:
     - ForceFieldOptimizationReportData
     - ForceFieldOptimizationTrainingSetData
     - ForceFieldOptimizationParameterData
-    - GeometrySummaryData
+    - EnergyMinimizationSummaryData
     workflows: []
     generators:
     - extract-optimized-ffield

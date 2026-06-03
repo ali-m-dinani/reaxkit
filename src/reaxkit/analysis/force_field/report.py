@@ -28,7 +28,7 @@ from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (
     ForceFieldOptimizationReportData,
     ForceFieldOptimizationReportEOSBundleData,
-    GeometrySummaryData,
+    EnergyMinimizationSummaryData,
 )
 from reaxkit.presentation.specs import PresentationSpec
 from reaxkit.utils.equation_of_states import vinet_energy_ev
@@ -52,7 +52,7 @@ def _report_frame(data: ForceFieldOptimizationReportData) -> pd.DataFrame:
     return df
 
 
-def _geometry_summary_frame(data: GeometrySummaryData) -> pd.DataFrame:
+def _geometry_summary_frame(data: EnergyMinimizationSummaryData) -> pd.DataFrame:
     """Build an identifier/volume/energy frame from geometry-summary data."""
     n_rows = len(data.identifiers)
     energy_series = None
@@ -130,7 +130,7 @@ def _parse_two_body_energy_terms(data: ForceFieldOptimizationReportData) -> pd.D
 
 def _energy_vs_volume(
     report: ForceFieldOptimizationReportData,
-    geometry_summary: GeometrySummaryData,
+    geometry_summary: EnergyMinimizationSummaryData,
 ) -> pd.DataFrame:
     """Join repeated two-body report terms with geometry volumes."""
     energy_df = _parse_two_body_energy_terms(report)
@@ -157,7 +157,7 @@ def _energy_vs_volume(
 
 def _base_other_energy_volume_table(
     report: ForceFieldOptimizationReportData,
-    geometry_summary: GeometrySummaryData,
+    geometry_summary: EnergyMinimizationSummaryData,
 ) -> pd.DataFrame:
     """Build base/other EOS table from repeated base identifiers."""
     energy_df = _parse_two_body_energy_terms(report)

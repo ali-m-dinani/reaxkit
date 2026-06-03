@@ -23,7 +23,7 @@ from reaxkit.domain.data_models import (
     EregimeData,
     ElectricFieldData,
     GeometryOptimizationProgressData,
-    GeometrySummaryData,
+    EnergyMinimizationSummaryData,
     MolecularAnalysisData,
     PartialEnergyData,
     RestraintData,
@@ -46,11 +46,11 @@ if TYPE_CHECKING:
     from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
 
-def load_structure_summary(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometrySummaryData:
+def load_structure_summary(adapter: ReaxFFAdapter, args: dict, reporter=None) -> EnergyMinimizationSummaryData:
     """Load structure-summary data.
 
     Resolves a structure-summary source and parses it through `Fort74Handler`
-    into a normalized `GeometrySummaryData` model. If the ReaxFF engine is
+    into a normalized `EnergyMinimizationSummaryData` model. If the ReaxFF engine is
     used, then this file would usually be `fort.74`.
 
     Parameters
@@ -64,7 +64,7 @@ def load_structure_summary(adapter: ReaxFFAdapter, args: dict, reporter=None) ->
 
     Returns
     -------
-    GeometrySummaryData
+    EnergyMinimizationSummaryData
         Normalized structure-summary record.
 
     Examples

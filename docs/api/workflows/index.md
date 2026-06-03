@@ -17,7 +17,6 @@ Workflow docs are organized into:
 
 ### Top-Level Workflows
 
-- [alaki_workflow](alaki_workflow.md)
 - [connectivity_workflow](connectivity_workflow.md)
 - [electrostatics_workflow](electrostatics_workflow.md)
 - [kinematics_workflow](kinematics_workflow.md)

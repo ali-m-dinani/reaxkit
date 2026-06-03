@@ -24,11 +24,11 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import GeometrySummaryData
+from reaxkit.domain.data_models import EnergyMinimizationSummaryData
 from reaxkit.presentation.specs import PresentationSpec
 
 
-def _fort74_frame(data: GeometrySummaryData) -> pd.DataFrame:
+def _fort74_frame(data: EnergyMinimizationSummaryData) -> pd.DataFrame:
     """Build the base structure-summary table from geometry summary fields."""
     n_rows = len(data.identifiers)
     return pd.DataFrame(
@@ -63,7 +63,7 @@ def _fort74_frame(data: GeometrySummaryData) -> pd.DataFrame:
     )
 
 
-def _get_fort74_data(*, data: GeometrySummaryData) -> pd.DataFrame:
+def _get_fort74_data(*, data: EnergyMinimizationSummaryData) -> pd.DataFrame:
     """Retrieve thermodynamic summary data from structure-summary data."""
     return _fort74_frame(data)
 
@@ -128,7 +128,7 @@ class MMSummaryResult(BaseResult):
 class MMSummaryTask(AnalysisTask):
     """Return structure-summary data."""
 
-    required_data = GeometrySummaryData
+    required_data = EnergyMinimizationSummaryData
 
     @staticmethod
     def recommended_presentations(
@@ -190,7 +190,7 @@ class MMSummaryTask(AnalysisTask):
 
     def run(
         self,
-        data: GeometrySummaryData,
+        data: EnergyMinimizationSummaryData,
         request: MMSummaryRequest,
         reporter=None,
     ) -> MMSummaryResult:
@@ -200,11 +200,11 @@ class MMSummaryTask(AnalysisTask):
         wraps it in a typed analyzer result object.
 
         Works on
-        ``GeometrySummaryData`` parsed from geometry summary artifacts.
+        ``EnergyMinimizationSummaryData`` parsed from geometry summary artifacts.
 
         Parameters
         -----
-        data : GeometrySummaryData
+        data : EnergyMinimizationSummaryData
             Parsed geometry summary model with identifiers and optional metrics.
         request : MMSummaryRequest
             Analyzer request configuration.

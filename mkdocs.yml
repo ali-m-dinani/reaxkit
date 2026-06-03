@@ -223,6 +223,7 @@ nav:
       - Study: api/workflows/study_design/study_workflow.md
 - For Developers:
   - 📍 Overview: for_developers/index.md
+  - ReaxKit's folder structure: for_developers/reaxkit_folder_structure_and_data_models.md
   - Contributing: contributing.md
   - File Templates: file_templates/index.md
   - Rules and Conventions:

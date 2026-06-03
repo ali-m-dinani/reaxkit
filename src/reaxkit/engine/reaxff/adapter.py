@@ -49,7 +49,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationDiagnosticData,
     PartialEnergyData,
     RestraintData,
-    GeometrySummaryData,
+    EnergyMinimizationSummaryData,
     SimulationData,
     TrajectoryData,
 )
@@ -207,7 +207,7 @@ class ReaxFFAdapter(EngineAdapter):
             ForceFieldOptimizationParameterData: ("params",),
             ForceFieldOptimizationReportData: ("fort.99",),
             ForceFieldOptimizationDiagnosticData: ("fort.79",),
-            GeometrySummaryData: ("fort.74",),
+            EnergyMinimizationSummaryData: ("fort.74",),
             PartialEnergyData: ("fort.73", "energylog", "fort.58"),
             RestraintData: ("fort.76",),
             GeometryOptimizationProgressData: ("fort.57",),
@@ -369,7 +369,7 @@ class ReaxFFAdapter(EngineAdapter):
         """Load force-field optimization EOS bundle data."""
         return _load_force_field_optimization_report_eos_bundle_impl(self, args, reporter=reporter)
 
-    def load_structure_summary(self, args: dict, reporter=None) -> GeometrySummaryData:
+    def load_structure_summary(self, args: dict, reporter=None) -> EnergyMinimizationSummaryData:
         """Load structure-summary data."""
         return _load_structure_summary_impl(self, args, reporter=reporter)
 

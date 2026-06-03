@@ -74,7 +74,7 @@ The returned list includes at least a table view and may include one plot.
 
 </div>
 
-### Method: `run(data: GeometrySummaryData, request: MMSummaryRequest, reporter=None)`
+### Method: `run(data: EnergyMinimizationSummaryData, request: MMSummaryRequest, reporter=None)`
 
 <div class="analysis-method-indent" markdown="1">
 
@@ -84,13 +84,13 @@ Builds a normalized DataFrame from parsed geometry summary fields and
 wraps it in a typed analyzer result object.
 
 Works on
-``GeometrySummaryData`` parsed from geometry summary artifacts.
+``EnergyMinimizationSummaryData`` parsed from geometry summary artifacts.
 
 #### Parameters
 
 | Name | Type | Description |
 |---|---|---|
-| `data` | `GeometrySummaryData` | Parsed geometry summary model with identifiers and optional metrics. |
+| `data` | `EnergyMinimizationSummaryData` | Parsed geometry summary model with identifiers and optional metrics. |
 | `request` | `MMSummaryRequest` | Analyzer request configuration. |
 | `reporter` | `Any, optional` | Progress reporter accepted by analyzer tasks; unused here. |
 

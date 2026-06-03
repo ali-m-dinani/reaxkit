@@ -40,7 +40,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationDiagnosticData,
     PartialEnergyData,
     RestraintData,
-    GeometrySummaryData,
+    EnergyMinimizationSummaryData,
     SimulationData,
     TrajectoryData,
 )
@@ -109,7 +109,7 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_force_field_optimization_report", args, reporter=reporter)
         if data_type is ForceFieldOptimizationDiagnosticData:
             return self._invoke_loader("load_parameter_optimization_diagnostic", args, reporter=reporter)
-        if data_type is GeometrySummaryData:
+        if data_type is EnergyMinimizationSummaryData:
             return self._invoke_loader("load_structure_summary", args, reporter=reporter)
         if data_type is PartialEnergyData:
             return self._invoke_loader("load_partial_energy", args, reporter=reporter)
