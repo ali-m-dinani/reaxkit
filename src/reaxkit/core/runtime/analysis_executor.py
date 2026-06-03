@@ -21,6 +21,7 @@ from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import ParseError, AnalysisError
 from reaxkit.core.platform.log import get_logger, configure_file_logging
 from reaxkit.core.runtime.progress import resolve_reporter
+from reaxkit.core.runtime.provenance import user_settings_from_args
 from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
 import reaxkit.engine  # noqa: F401 (register engine adapters)
@@ -422,6 +423,7 @@ class AnalysisExecutor:
                                 analysis_id=analysis_id,
                                 task_name=task_name,
                                 task_version=task_version,
+                                user_settings=user_settings_from_args(args),
                             )
                         except Exception as exc:  # pragma: no cover - best-effort index update
                             logger.debug("Run analysis index update skipped: %s", exc)
@@ -503,6 +505,7 @@ class AnalysisExecutor:
                     analysis_id=analysis_id,
                     task_name=task_name,
                     task_version=task_version,
+                    user_settings=user_settings_from_args(args),
                 )
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)
@@ -613,6 +616,7 @@ class AnalysisExecutor:
                     analysis_id=analysis_id,
                     task_name=task_name,
                     task_version=task_version,
+                    user_settings=user_settings_from_args(args),
                 )
             except Exception as exc:  # pragma: no cover - best-effort index update
                 logger.debug("Run analysis index update skipped: %s", exc)

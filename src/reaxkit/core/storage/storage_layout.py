@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
+from reaxkit.core.runtime.provenance import json_safe
 from reaxkit.core.storage.parsed_store import load_parsed_hdf5, update_parsed_meta, write_parsed_hdf5
 
 _DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
@@ -1121,6 +1122,7 @@ class ReaxkitStorageLayout:
         analysis_id: str,
         task_name: str,
         task_version: str = "1",
+        user_settings: dict[str, Any] | None = None,
     ) -> Path:
         """
         Record run analysis.
@@ -1180,6 +1182,8 @@ class ReaxkitStorageLayout:
             "parsed_id": str(parsed_id) if parsed_id is not None else None,
             "updated_at": _utc_now_iso(),
         }
+        if user_settings is not None:
+            record["user_settings"] = json_safe(user_settings)
         if existing_idx is None:
             analyses.append(record)
         else:
@@ -1197,6 +1201,7 @@ class ReaxkitStorageLayout:
         command: str,
         output_path: str | Path,
         settings_path: str | Path | None = None,
+        user_settings: dict[str, Any] | None = None,
     ) -> Path:
         """
         Record run generator.
@@ -1242,15 +1247,16 @@ class ReaxkitStorageLayout:
 
         entries = list(payload.get("generators") or [])
         entry_id = f"gen_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(2)}"
-        entries.append(
-            {
-                "generator_id": entry_id,
-                "command": str(command),
-                "output_path": str(output_path),
-                "settings_path": str(settings_path) if settings_path is not None else None,
-                "updated_at": _utc_now_iso(),
-            }
-        )
+        record = {
+            "generator_id": entry_id,
+            "command": str(command),
+            "output_path": str(output_path),
+            "settings_path": str(settings_path) if settings_path is not None else None,
+            "updated_at": _utc_now_iso(),
+        }
+        if user_settings is not None:
+            record["user_settings"] = json_safe(user_settings)
+        entries.append(record)
         payload["generators"] = entries
         payload["updated_at"] = _utc_now_iso()
         _write_json(path, payload)

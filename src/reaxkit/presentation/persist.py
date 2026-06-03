@@ -18,6 +18,11 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.core.platform.log import get_logger
+from reaxkit.core.runtime.provenance import (
+    effective_settings_from_args,
+    runtime_metadata_from_args,
+    user_settings_from_args,
+)
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout
 
 logger = get_logger(__name__)
@@ -257,6 +262,9 @@ def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: 
         "analysis_id": str(analysis_id),
         "run_id": getattr(args, "run_id", None),
         "parsed_id": getattr(args, "_parsed_id", None),
+        "user_settings": user_settings_from_args(args),
+        "effective_settings": effective_settings_from_args(args),
+        "runtime": runtime_metadata_from_args(args),
         "artifacts": {
             "csv": csv_files,
             "npy": npy_files,

@@ -16,22 +16,13 @@ from pathlib import Path
 from typing import Any
 
 from reaxkit.core.platform.log import configure_file_logging
+from reaxkit.core.runtime.provenance import (
+    effective_settings_from_args,
+    json_safe,
+    runtime_metadata_from_args,
+    user_settings_from_args,
+)
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, default_project_root, generate_run_id
-
-
-def _json_safe(value: Any) -> Any:
-    """
-    Json safe.
-    """
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        return {str(k): _json_safe(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple, set)):
-        return [_json_safe(v) for v in value]
-    return str(value)
 
 
 def prepare_generator_output(args: Any, *, command: str, output_value: str) -> tuple[Path, ReaxkitStorageLayout]:
@@ -137,26 +128,32 @@ def persist_generator_metadata(
     """
     run_id = str(getattr(args, "run_id"))
     settings_path = output_path.parent / "settings.json"
+    user_settings = user_settings_from_args(args)
+    effective_settings = effective_settings_from_args(args)
     payload: dict[str, Any] = {
         "command": str(command),
         "run_id": run_id,
         "project_root": str(getattr(args, "project_root", "")),
+        "user_settings": user_settings,
+        "effective_settings": effective_settings,
+        "runtime": runtime_metadata_from_args(args),
         "output": {
             "name": output_path.name,
             "path": str(output_path),
         },
         "copy_to_dot": bool(copy_to_dot),
-        "args": _json_safe(vars(args)),
+        "args": json_safe(vars(args)),
         "updated_at_utc": datetime.now(timezone.utc).isoformat(),
     }
     if extra:
-        payload["extra"] = _json_safe(extra)
+        payload["extra"] = json_safe(extra)
     settings_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     layout.record_run_generator(
         run_id=run_id,
         command=command,
         output_path=output_path,
         settings_path=settings_path,
+        user_settings=user_settings,
     )
     return settings_path
 

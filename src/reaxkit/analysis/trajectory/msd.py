@@ -305,13 +305,13 @@ class MSDTask(AnalysisTask):
         n_selected_frames = coords_series.shape[0]
         n_selected_atoms = coords_series.shape[1]
 
-        print("Selected atom indices:", sel_idx)
-        print("Selected atom ids:", [data.atom_ids[i] for i in sel_idx])
-        print("Selected atom types:", [data.elements[i] for i in sel_idx])
-        print("First-frame selected coords:")
-        print(coords_series[0])
-        print("Second-frame selected coords:")
-        print(coords_series[1])
+        # print("Selected atom indices:", sel_idx)
+        # print("Selected atom ids:", [data.atom_ids[i] for i in sel_idx])
+        # print("Selected atom types:", [data.elements[i] for i in sel_idx])
+        # print("First-frame selected coords:")
+        # print(coords_series[0])
+        # print("Second-frame selected coords:")
+        # print(coords_series[1])
 
         # Equivalent to Fortran ndim.
         # Prefer request.max_lag if you add it to MSDRequest.
