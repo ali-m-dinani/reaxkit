@@ -40,9 +40,14 @@ from reaxkit.engine.ams.rkf_handler import RKFHandler
 from reaxkit.engine.common.generators.xyz_generator import write_xyz_trajectory
 
 
+BOHR_TO_ANG = 0.529177210903
+
+
 @register_engine("ams")
 class AMSAdapter(EngineAdapter):
     """Adapter scaffold for AMS KF/RKF-based loading."""
+
+    HANDLER_VERSION = "2"
 
     _AMS_ENERGY_COMPONENTS: tuple[str, ...] = (
         "E_pot",  # 1: Total potential
@@ -136,6 +141,10 @@ class AMSAdapter(EngineAdapter):
             if candidate is not None:
                 return candidate
 
+        input_candidate = _as_candidate(args.get("input"))
+        if input_candidate is not None and str(args.get("input")) != ".":
+            return input_candidate
+
         run_dir_candidate = _as_candidate(args.get("run_dir"))
         if run_dir_candidate is not None:
             return run_dir_candidate
@@ -200,7 +209,6 @@ class AMSAdapter(EngineAdapter):
         files = adapter.required_input_files(TrajectoryData, {})
         ```
         """
-        _ = args
         if data_type in {
             AtomicKinematicsData,
             AtomStrainEnergyData,
@@ -213,6 +221,11 @@ class AMSAdapter(EngineAdapter):
             ChargeData,
             StressData,
         }:
+            explicit_input = args.get("input") if isinstance(args, dict) else None
+            if explicit_input and str(explicit_input) != ".":
+                input_path = Path(str(explicit_input))
+                if input_path.suffix.lower() in {".kf", ".rkf"}:
+                    return (input_path.name,)
             return ("reaxout.kf", "reaxout.rkf")
         return None
 
@@ -245,16 +258,230 @@ class AMSAdapter(EngineAdapter):
             if not str(key).startswith(prefix):
                 continue
             idx = None
-            parts = str(key).split()
-            if parts:
-                try:
-                    idx = int(parts[-1])
-                except Exception:
-                    idx = None
+            match = re.search(r"(?:\((\d+)\)|\s+(\d+))\s*$", str(key))
+            if match:
+                idx = int(match.group(1) or match.group(2))
             rows.append((idx, np.asarray(values, dtype=dtype).ravel()))
         if rows and all(idx is not None for idx, _ in rows):
             rows.sort(key=lambda x: int(x[0]))
         return [arr for _, arr in rows]
+
+    @staticmethod
+    def _coordinate_entries(history_data: dict, *, dtype=float) -> list[np.ndarray]:
+        """Collect AMS coordinate frames, preferring RKF ``Coords(n)`` keys."""
+        coords_entries = AMSAdapter._history_entries(history_data, "Coords", dtype=dtype)
+        if coords_entries:
+            return coords_entries
+        return AMSAdapter._history_entries(history_data, "Coordinates", dtype=dtype)
+
+    @staticmethod
+    def _read_kf_variable(kf, section: str, variable: str):
+        """Read one KF variable using both PLAMS access styles."""
+        try:
+            return kf.read(section, variable)
+        except Exception:
+            pass
+        try:
+            return kf[f"{section}%{variable}"]
+        except Exception:
+            return None
+
+    @staticmethod
+    def _read_history_frame_variable(kf, prefix: str, frame_no: int):
+        """Read a frame-indexed History variable without loading the whole section."""
+        for variable in (f"{prefix}({frame_no})", f"{prefix} {frame_no}"):
+            raw = AMSAdapter._read_kf_variable(kf, "History", variable)
+            if raw is not None:
+                return raw
+        return None
+
+    @staticmethod
+    def _history_frame_count(kf) -> int:
+        """Return RKF trajectory frame count using TRACT's MDHistory fallback."""
+        for section, variable in (("MDHistory", "nEntries"), ("History", "nEntries")):
+            raw = AMSAdapter._read_kf_variable(kf, section, variable)
+            if raw is not None:
+                try:
+                    return int(np.asarray(raw).ravel()[0])
+                except Exception:
+                    pass
+
+        n = 0
+        while True:
+            probe = AMSAdapter._read_kf_variable(kf, "History", f"Coords({n + 1})")
+            if probe is None:
+                probe = AMSAdapter._read_kf_variable(kf, "History", f"Coordinates({n + 1})")
+            if probe is None:
+                break
+            n += 1
+        return n
+
+    @staticmethod
+    def _direct_coordinate_entries(kf, *, dtype=float, reporter=None) -> list[np.ndarray]:
+        """Read RKF coordinate frames directly as ``History/Coords(n)``."""
+        n_frames = AMSAdapter._history_frame_count(kf)
+        entries: list[np.ndarray] = []
+        for frame_no in range(1, n_frames + 1):
+            raw = AMSAdapter._read_kf_variable(kf, "History", f"Coords({frame_no})")
+            if raw is None:
+                raw = AMSAdapter._read_kf_variable(kf, "History", f"Coordinates({frame_no})")
+            if raw is None:
+                continue
+            entries.append(np.asarray(raw, dtype=dtype).ravel())
+            if callable(reporter):
+                reporter("load", frame_no, n_frames, "Reading AMS RKF coordinates")
+        return entries
+
+    @staticmethod
+    def _direct_connectivity_entries(kf, *, reporter=None) -> tuple[dict[str, list[np.ndarray]], int]:
+        """Read AMS connectivity series frame-by-frame from ``History`` keys."""
+        n_frames = AMSAdapter._history_frame_count(kf)
+        series: dict[str, list[np.ndarray]] = {
+            "neighbors": [],
+            "bond_orders": [],
+            "num_neighb": [],
+            "total_bo": [],
+            "lone_pairs": [],
+        }
+
+        first_bond_index = AMSAdapter._read_history_frame_variable(kf, "Bonds.Index", 1)
+        first_bond_atoms = AMSAdapter._read_history_frame_variable(kf, "Bonds.Atoms", 1)
+        first_bond_orders = AMSAdapter._read_history_frame_variable(kf, "Bonds.Orders", 1)
+        if first_bond_index is not None and first_bond_atoms is not None and first_bond_orders is not None:
+            for frame_no in range(1, n_frames + 1):
+                if frame_no == 1:
+                    bi_raw = first_bond_index
+                    ba_raw = first_bond_atoms
+                    bo_raw = first_bond_orders
+                else:
+                    bi_raw = AMSAdapter._read_history_frame_variable(kf, "Bonds.Index", frame_no)
+                    ba_raw = AMSAdapter._read_history_frame_variable(kf, "Bonds.Atoms", frame_no)
+                    bo_raw = AMSAdapter._read_history_frame_variable(kf, "Bonds.Orders", frame_no)
+                if bi_raw is None or ba_raw is None or bo_raw is None:
+                    series["neighbors"].append(np.asarray([], dtype=int))
+                    series["bond_orders"].append(np.asarray([], dtype=float))
+                    series["num_neighb"].append(np.asarray([], dtype=int))
+                    series["total_bo"].append(np.asarray([], dtype=float))
+                    series["lone_pairs"].append(np.asarray([], dtype=float))
+                    if callable(reporter):
+                        reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
+                    continue
+
+                bi = np.asarray(bi_raw, dtype=int).ravel()
+                ba = np.asarray(ba_raw, dtype=int).ravel()
+                bo = np.asarray(bo_raw, dtype=float).ravel()
+                if bi.size >= 2:
+                    starts = np.maximum(bi[:-1] - 1, 0)
+                    ends = np.maximum(bi[1:] - 1, starts)
+                    counts = np.maximum(ends - starts, 0).astype(int, copy=False)
+                    total_bo = np.zeros((counts.size,), dtype=float)
+                    for ai, (start, end) in enumerate(zip(starts, ends)):
+                        start_i = min(int(start), bo.size)
+                        end_i = min(int(end), bo.size)
+                        if end_i > start_i:
+                            total_bo[ai] = float(np.nansum(bo[start_i:end_i]))
+                else:
+                    counts = np.asarray([], dtype=int)
+                    total_bo = np.asarray([], dtype=float)
+
+                series["neighbors"].append(ba)
+                series["bond_orders"].append(bo)
+                series["num_neighb"].append(counts)
+                series["total_bo"].append(total_bo)
+                series["lone_pairs"].append(np.full((counts.size,), np.nan, dtype=float))
+                if callable(reporter):
+                    reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
+            return series, n_frames
+
+        specs = (
+            ("neighbors", "ConnTab neighbors", int),
+            ("bond_orders", "ConnTab bond order", float),
+            ("num_neighb", "ConnTab num neighb", int),
+            ("total_bo", "Total bond orders", float),
+            ("lone_pairs", "Lone pairs", float),
+        )
+        found_any = False
+        for frame_no in range(1, n_frames + 1):
+            frame_found = False
+            for key, prefix, dtype in specs:
+                raw = AMSAdapter._read_history_frame_variable(kf, prefix, frame_no)
+                if raw is None:
+                    series[key].append(np.asarray([], dtype=dtype))
+                    continue
+                arr = np.asarray(raw, dtype=dtype).ravel()
+                series[key].append(arr)
+                frame_found = True
+                found_any = True
+            if frame_found and callable(reporter):
+                reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
+
+            # If the RKF lacks direct ConnTab frame keys, avoid probing every
+            # frame before falling back to the section-based legacy reader.
+            if frame_no == 1 and not frame_found:
+                return {key: [] for key in series}, 0
+
+        return (series if found_any else {key: [] for key in series}, n_frames if found_any else 0)
+
+    @classmethod
+    def _minimal_simulation_context(
+        cls,
+        kf,
+        *,
+        n_frames: int,
+        n_atoms: int,
+        elements: list[str],
+        iterations: np.ndarray,
+    ) -> SimulationData | None:
+        """Build lightweight simulation context without loading full History."""
+        fixed_axes = cls._molecule_lattice_vectors(kf)
+        if fixed_axes is None:
+            return None
+        cell_lengths = np.tile(np.linalg.norm(fixed_axes, axis=1), (n_frames, 1))
+        cell_angles = np.tile(cls._cell_angles_from_axes(fixed_axes), (n_frames, 1))
+        return SimulationData(
+            atom_ids=list(range(1, n_atoms + 1)),
+            iterations=iterations,
+            elements=elements,
+            cell_lengths=cell_lengths,
+            cell_angles=cell_angles,
+        )
+
+    @staticmethod
+    def _molecule_lattice_vectors(kf) -> np.ndarray | None:
+        """Return fixed molecule lattice vectors in angstrom when present."""
+        if kf is None:
+            return None
+        raw = None
+        try:
+            raw = kf.read("Molecule", "LatticeVectors")
+        except Exception:
+            raw = None
+        if raw is None:
+            try:
+                raw = kf["Molecule%LatticeVectors"]
+            except Exception:
+                raw = None
+        if raw is None:
+            return None
+        arr = np.asarray(raw, dtype=float).ravel()
+        if arr.size < 9:
+            return None
+        axes = arr[:9].reshape(3, 3) * BOHR_TO_ANG
+        return axes if np.isfinite(axes).all() else None
+
+    @staticmethod
+    def _cell_angles_from_axes(axes: np.ndarray) -> np.ndarray:
+        """Return alpha, beta, gamma angles in degrees from row-major axes."""
+        a, b, c = [np.asarray(v, dtype=float) for v in np.asarray(axes, dtype=float).reshape(3, 3)]
+
+        def _angle(u: np.ndarray, v: np.ndarray) -> float:
+            denom = float(np.linalg.norm(u) * np.linalg.norm(v))
+            if denom <= 0.0:
+                return np.nan
+            cosang = float(np.dot(u, v) / denom)
+            return float(np.degrees(np.arccos(np.clip(cosang, -1.0, 1.0))))
+
+        return np.asarray([_angle(b, c), _angle(a, c), _angle(a, b)], dtype=float)
 
     @staticmethod
     def _parse_atom_names(raw_atom_names) -> list[str]:
@@ -283,6 +510,16 @@ class AMSAdapter(EngineAdapter):
         if raw_atom_names is None and kf is not None:
             try:
                 raw_atom_names = kf["History%Atom names"]
+            except Exception:
+                raw_atom_names = None
+        if raw_atom_names is None and kf is not None:
+            try:
+                raw_atom_names = kf.read("Molecule", "AtomSymbols")
+            except Exception:
+                raw_atom_names = None
+        if raw_atom_names is None and kf is not None:
+            try:
+                raw_atom_names = kf["Molecule%AtomSymbols"]
             except Exception:
                 raw_atom_names = None
         return raw_atom_names
@@ -558,18 +795,22 @@ class AMSAdapter(EngineAdapter):
         ```
         """
         kf = self.load_kf(args)
-        history_data = kf.read_section("History")
-
-        coord_entries = self._history_entries(history_data, "Coordinates", dtype=float)
+        direct_coord_entries = self._direct_coordinate_entries(kf, dtype=float, reporter=reporter)
+        if direct_coord_entries:
+            history_data = {}
+            coord_entries = direct_coord_entries
+        else:
+            history_data = kf.read_section("History")
+            coord_entries = self._coordinate_entries(history_data, dtype=float)
         frames: list[np.ndarray] = []
         for flat in coord_entries:
             if flat.size % 3 != 0:
                 continue
-            coords = flat.reshape(-1, 3)
+            coords = flat.reshape(-1, 3) * BOHR_TO_ANG
             frames.append(coords)
 
         if not frames:
-            raise RuntimeError("No 'Coordinates*' entries were found in AMS History section.")
+            raise RuntimeError("No 'Coords*' or 'Coordinates*' entries were found in AMS History section.")
 
         n_frames = len(frames)
         n_atoms = max(coords.shape[0] for coords in frames)
@@ -577,19 +818,28 @@ class AMSAdapter(EngineAdapter):
         for fi, coords in enumerate(frames):
             n = coords.shape[0]
             positions[fi, :n, :] = coords
-            if callable(reporter):
+            if callable(reporter) and not direct_coord_entries:
                 reporter("load", fi + 1, n_frames, "Reading AMS coordinates from History")
 
         elements = self._elements_from_history(kf, history_data, n_atoms)
         iterations = self._iterations_from_general(kf, n_frames)
         atom_ids = list(range(1, n_atoms + 1))
         atom_labels = np.tile(np.asarray(elements, dtype=object), (n_frames, 1))
+        simulation = self._minimal_simulation_context(
+            kf,
+            n_frames=n_frames,
+            n_atoms=n_atoms,
+            elements=elements,
+            iterations=iterations,
+        )
+
         return TrajectoryData(
             positions=positions,
             elements=elements,
             atom_ids=atom_ids,
             atom_labels=atom_labels,
             iterations=iterations,
+            simulation=simulation,
         )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
@@ -614,13 +864,24 @@ class AMSAdapter(EngineAdapter):
         ```
         """
         kf = self.load_kf(args)
-        history_data = kf.read_section("History")
+        direct_entries, direct_n_frames = self._direct_connectivity_entries(kf, reporter=reporter)
+        if direct_n_frames > 0:
+            history_data = {}
+            neighbors_entries = direct_entries["neighbors"]
+            bond_order_entries = direct_entries["bond_orders"]
+            num_neighb_entries = direct_entries["num_neighb"]
+            total_bo_entries = direct_entries["total_bo"]
+            lone_pairs_entries = direct_entries["lone_pairs"]
+        else:
+            if callable(reporter):
+                reporter("load", 0, 0, "Reading AMS connectivity History section")
+            history_data = kf.read_section("History")
 
-        neighbors_entries = self._history_entries(history_data, "ConnTab neighbors", dtype=int)
-        bond_order_entries = self._history_entries(history_data, "ConnTab bond order", dtype=float)
-        num_neighb_entries = self._history_entries(history_data, "ConnTab num neighb", dtype=int)
-        total_bo_entries = self._history_entries(history_data, "Total bond orders", dtype=float)
-        lone_pairs_entries = self._history_entries(history_data, "Lone pairs", dtype=float)
+            neighbors_entries = self._history_entries(history_data, "ConnTab neighbors", dtype=int)
+            bond_order_entries = self._history_entries(history_data, "ConnTab bond order", dtype=float)
+            num_neighb_entries = self._history_entries(history_data, "ConnTab num neighb", dtype=int)
+            total_bo_entries = self._history_entries(history_data, "Total bond orders", dtype=float)
+            lone_pairs_entries = self._history_entries(history_data, "Lone pairs", dtype=float)
 
         n_frames = max(
             len(neighbors_entries),
@@ -639,7 +900,7 @@ class AMSAdapter(EngineAdapter):
         elif lone_pairs_entries:
             n_atoms = max(arr.size for arr in lone_pairs_entries)
         else:
-            coords_entries = self._history_entries(history_data, "Coordinates", dtype=float)
+            coords_entries = self._coordinate_entries(history_data, dtype=float)
             n_atoms = 0
             for arr in coords_entries:
                 if arr.size % 3 == 0:
@@ -686,8 +947,9 @@ class AMSAdapter(EngineAdapter):
         sum_bond_orders = self._stack_1d_per_frame(total_bo_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan)
         num_lone_pairs = self._stack_1d_per_frame(lone_pairs_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan)
 
-        if callable(reporter):
-            reporter("load", n_frames, n_frames, "Reading AMS connectivity from History")
+        if callable(reporter) and direct_n_frames <= 0:
+            for frame_no in range(1, n_frames + 1):
+                reporter("load", frame_no, n_frames, "Reading AMS connectivity from History")
 
         return ConnectivityData(
             connectivity=connectivity,
@@ -728,6 +990,8 @@ class AMSAdapter(EngineAdapter):
         mol_index_entries = self._history_entries(history_data, "ConnTab mol index", dtype=float)
         cell_axes_entries = self._history_entries(history_data, "Unit cell axes", dtype=float)
         cell_angle_entries = self._history_entries(history_data, "Unit cell angles", dtype=float)
+        coords_entries = self._coordinate_entries(history_data, dtype=float)
+        direct_n_frames = self._history_frame_count(kf)
 
         n_frames = max(
             len(energies_entries),
@@ -735,6 +999,8 @@ class AMSAdapter(EngineAdapter):
             len(mol_index_entries),
             len(cell_axes_entries),
             len(cell_angle_entries),
+            len(coords_entries),
+            direct_n_frames,
         )
         if n_frames == 0:
             raise RuntimeError("No simulation entries were found in AMS History section.")
@@ -743,10 +1009,17 @@ class AMSAdapter(EngineAdapter):
         if mol_index_entries:
             n_atoms = max(arr.size for arr in mol_index_entries)
         if n_atoms == 0:
-            coords_entries = self._history_entries(history_data, "Coordinates", dtype=float)
             for arr in coords_entries:
                 if arr.size % 3 == 0:
                     n_atoms = max(n_atoms, int(arr.size // 3))
+        if n_atoms == 0 and direct_n_frames > 0:
+            first_coords = self._read_kf_variable(kf, "History", "Coords(1)")
+            if first_coords is None:
+                first_coords = self._read_kf_variable(kf, "History", "Coordinates(1)")
+            if first_coords is not None:
+                flat = np.asarray(first_coords, dtype=float).ravel()
+                if flat.size % 3 == 0:
+                    n_atoms = int(flat.size // 3)
         if n_atoms == 0:
             n_atoms = self._atom_name_count(kf, history_data)
 
@@ -775,19 +1048,32 @@ class AMSAdapter(EngineAdapter):
         molecule_nums = self._stack_1d_per_frame(mol_index_entries, n_frames=n_frames, n_atoms=n_atoms, fill_value=np.nan)
 
         cell_lengths = np.full((n_frames, 3), np.nan, dtype=float)
+        cell_axes_by_frame: list[np.ndarray | None] = [None] * n_frames
         for fi in range(min(n_frames, len(cell_axes_entries))):
             arr = np.asarray(cell_axes_entries[fi], dtype=float).ravel()
             if arr.size >= 9:
-                axes = arr[:9].reshape(3, 3)
+                axes = arr[:9].reshape(3, 3) * BOHR_TO_ANG
+                cell_axes_by_frame[fi] = axes
                 cell_lengths[fi] = np.linalg.norm(axes, axis=1)
             elif arr.size >= 3:
-                cell_lengths[fi] = arr[:3]
+                cell_lengths[fi] = arr[:3] * BOHR_TO_ANG
+        if not np.isfinite(cell_lengths).any():
+            fixed_axes = self._molecule_lattice_vectors(kf)
+            if fixed_axes is not None:
+                cell_lengths[:, :] = np.linalg.norm(fixed_axes, axis=1)
+        else:
+            fixed_axes = None
 
         cell_angles = np.full((n_frames, 3), np.nan, dtype=float)
         for fi in range(min(n_frames, len(cell_angle_entries))):
             arr = np.asarray(cell_angle_entries[fi], dtype=float).ravel()
             if arr.size >= 3:
                 cell_angles[fi] = arr[:3]
+        for fi, axes in enumerate(cell_axes_by_frame):
+            if axes is not None and not np.isfinite(cell_angles[fi]).all():
+                cell_angles[fi] = self._cell_angles_from_axes(axes)
+        if not np.isfinite(cell_angles).any() and fixed_axes is not None:
+            cell_angles[:, :] = self._cell_angles_from_axes(fixed_axes)
 
         if callable(reporter):
             reporter("load", n_frames, n_frames, "Reading AMS simulation series from History")

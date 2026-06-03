@@ -10,6 +10,8 @@ import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.active_sites import (
     TRACT_EVENTS_COLUMNS,
+    ActiveSiteEventDiagnosticsRequest,
+    ActiveSiteEventDiagnosticsTask,
     ActiveSiteEventsRequest,
     ActiveSiteEventsTask,
 )
@@ -207,6 +209,50 @@ def test_active_site_events_first_event_frame_uses_iteration_marker():
     assert int(result.table.iloc[0]["first_event_frame_O"]) == 100
     assert int(result.summary["frame_first"]) == 0
     assert int(result.summary["frame_last"]) == 100
+
+
+def test_active_site_event_diagnostics_runs_with_trajectory_only():
+    positions = np.array(
+        [
+            [[0.0, 0.0, 0.0], [1.20, 0.0, 0.0], [6.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0], [1.25, 0.0, 0.0], [6.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0], [2.80, 0.0, 0.0], [6.0, 0.0, 0.0]],
+        ],
+        dtype=float,
+    )
+    sim = SimulationData(
+        atom_ids=[1, 2, 3],
+        iterations=np.array([0, 10, 20], dtype=int),
+        cell_lengths=np.array([[20.0, 20.0, 20.0]] * 3, dtype=float),
+        cell_angles=np.array([[90.0, 90.0, 90.0]] * 3, dtype=float),
+    )
+    data = TrajectoryData(
+        positions=positions,
+        elements=["C", "O", "Si"],
+        atom_ids=[1, 2, 3],
+        simulation=sim,
+        iterations=np.array([0, 10, 20], dtype=int),
+    )
+    task = ActiveSiteEventDiagnosticsTask()
+    req = ActiveSiteEventDiagnosticsRequest(
+        frames=[0, 1, 2],
+        every=1,
+        r_probe=2.5,
+        max_diag_frames=10,
+    )
+    result = task.run(data, req)
+
+    assert result.summary["diagnostic"] is True
+    assert int(result.summary["frames_analyzed"]) == 3
+    assert result.summary["duration_scale"] == "physical"
+    assert result.summary["duration_ps_factor"] == pytest.approx(0.01)
+    assert {"species", "suggested_r_cut"}.issubset(result.table.columns)
+    assert {"species", "frame_index", "atom_id", "min_distance"}.issubset(result.distance_table.columns)
+    assert {"species", "duration_frames", "duration_ps"}.issubset(result.episode_table.columns)
+    assert result.episode_table["duration_ps"].min() == pytest.approx(
+        result.episode_table["duration_frames"].min() * 0.01
+    )
+    assert set(result.distance_table["species"]) == {"C-O", "C-Si"}
 
 
 def main() -> None:

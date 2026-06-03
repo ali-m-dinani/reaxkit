@@ -135,14 +135,17 @@ def tqdm_reporter_factory() -> ProgressReporter:
         msg = (message or "").strip()
         desc = f"{key}: {msg}" if msg else key
 
-        if key in completed_totals and tot > 0 and cur >= tot and completed_totals[key] == tot:
+        if key not in bars and key in completed_totals and tot > 0 and cur >= tot and completed_totals[key] == tot:
             return
 
         if key not in bars:
-            bars[key] = tqdm(total=tot if tot > 0 else None, desc=desc, unit="step", leave=False, mininterval=0.2)
+            bars[key] = tqdm(total=tot if tot > 0 else None, desc=desc, unit="step", leave=True, mininterval=0.2)
             last_seen[key] = 0
         bar = bars[key]
         bar.set_description_str(desc)
+        if tot > 0 and bar.total is None:
+            bar.total = tot
+            bar.refresh()
 
         prev = int(last_seen.get(key, 0))
         delta = cur - prev
@@ -192,6 +195,8 @@ def resolve_reporter(args: dict[str, Any]) -> ProgressReporter:
     rep = args.get("reporter")
     if callable(rep):
         return rep
+    if args.get("quiet") or args.get("log") == "quiet":
+        return noop_reporter
     if args.get("progress"):
         return tqdm_reporter_factory()
     return noop_reporter

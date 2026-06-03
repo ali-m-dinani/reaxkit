@@ -1,5 +1,10 @@
 """Active-site analysis namespace."""
 
+from reaxkit.analysis.active_sites.event_diagnostics import (
+    ActiveSiteEventDiagnosticsRequest,
+    ActiveSiteEventDiagnosticsResult,
+    ActiveSiteEventDiagnosticsTask,
+)
 from reaxkit.analysis.active_sites.events import (
     ActiveSiteEventsRequest,
     ActiveSiteEventsResult,
@@ -27,6 +32,9 @@ __all__ = [
     "ActiveSiteStructuralRequest",
     "ActiveSiteStructuralResult",
     "ActiveSiteStructuralTask",
+    "ActiveSiteEventDiagnosticsRequest",
+    "ActiveSiteEventDiagnosticsResult",
+    "ActiveSiteEventDiagnosticsTask",
     "ActiveSiteEventsRequest",
     "ActiveSiteEventsResult",
     "ActiveSiteEventsTask",

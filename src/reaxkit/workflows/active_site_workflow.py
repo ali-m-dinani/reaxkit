@@ -12,12 +12,15 @@ This module implements CLI workflow orchestration for its command family, includ
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Callable
 
+import numpy as np
 import pandas as pd
 
 from reaxkit.analysis import active_sites as _active_site_tasks  # noqa: F401
 from reaxkit.analysis.active_sites import (
+    ActiveSiteEventDiagnosticsRequest,
     ActiveSiteEventsRequest,
     ActiveSiteStructuralRequest,
 )
@@ -27,6 +30,7 @@ from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.utils.frame_utils import parse_frame_indices
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
+from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.core.results_shaping.result_bundle import bundle_canonical_and_tract_tables
 
 ALL_COMMANDS = ("get_active_site_structural", "get_active_site_events")
@@ -111,6 +115,20 @@ def _build_active_site_events_request(args: argparse.Namespace) -> ActiveSiteEve
     )
 
 
+def _build_active_site_event_diagnostics_request(args: argparse.Namespace) -> ActiveSiteEventDiagnosticsRequest:
+    """Build active site event diagnostics request."""
+    return ActiveSiteEventDiagnosticsRequest(
+        frames=parse_frame_indices(args.frames),
+        every=int(args.every),
+        r_probe=float(args.r_probe),
+        max_diag_frames=int(args.max_diag_frames),
+        timestep_fs=float(args.timestep_fs),
+        carbon_element=str(args.carbon_element),
+        oxygen_element=str(args.oxygen_element),
+        silicon_element=str(args.silicon_element),
+    )
+
+
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "get_active_site_structural": _build_active_site_structural_request,
     "get_active_site_events": _build_active_site_events_request,
@@ -120,6 +138,56 @@ TASK_KEY_BY_COMMAND = {
     "get_active_site_structural": "active_site_structural",
     "get_active_site_events": "active_site_events",
 }
+
+DIAGNOSTIC_TASK_KEY_BY_COMMAND = {
+    "get_active_site_events": "active_site_event_diagnostics",
+}
+
+
+def _print_active_site_event_diagnostic_console(result, args: argparse.Namespace, out_dir: Path) -> None:
+    """Print TRACT-style diagnostic guidance for active-site event extraction."""
+    if str(getattr(args, "log", "") or "").lower() == "quiet" or bool(getattr(args, "quiet", False)):
+        return
+
+    summary = getattr(result, "summary", {}) if isinstance(getattr(result, "summary", None), dict) else {}
+    if not summary.get("diagnostic"):
+        return
+
+    r_probe = float(summary.get("r_probe", getattr(args, "r_probe", 2.5)))
+    max_diag_frames = int(summary.get("max_diag_frames", getattr(args, "max_diag_frames", 500)))
+    stride = int(summary.get("every", getattr(args, "every", 10)))
+    frames_analyzed = int(summary.get("frames_analyzed", 0))
+    n_carbon = int(summary.get("n_carbon", 0))
+    n_oxygen = int(summary.get("n_oxygen", 0))
+    n_silicon = int(summary.get("n_silicon", 0))
+
+    print(
+        f"[TRACT Tool 2 - diagnose]  r_probe={r_probe:g} A, "
+        f"max_diag_frames={max_diag_frames}, stride={stride}"
+    )
+    print(f"  First frame: {n_carbon} C, {n_oxygen} O, {n_silicon} Si atoms")
+    if frames_analyzed:
+        print(f"  Analyzed {frames_analyzed} frames...")
+    print(f"  Total analyzed: {frames_analyzed} frames")
+
+    species_summary = summary.get("species", {}) if isinstance(summary.get("species", None), dict) else {}
+    for species in ("C-O", "C-Si"):
+        data = species_summary.get(species, {}) if isinstance(species_summary, dict) else {}
+        if not data or int(data.get("n_distance_samples", 0) or 0) == 0:
+            continue
+        print(f"\n  {species} episode breakdown:")
+        print(f"    < 1 ps  (thermal bounces): {int(data.get('n_thermal_episodes_lt_1ps', 0) or 0)}")
+        print(f"    >= 1 ps  (stable contacts): {int(data.get('n_stable_episodes_ge_1ps', 0) or 0)}")
+        suggested = data.get("suggested_r_cut")
+        if suggested is not None and np.isfinite(float(suggested)):
+            option = "--r_CO" if species == "C-O" else "--r_CSi"
+            print(f"    -> Suggested {option}: {float(suggested):.2f} A (valley in distance distribution)")
+        print("    -> Suggested --persist: adjust based on gap above (default 50 frames = 5 ps)")
+
+    diag_path = out_dir / "diagnose_distances.png"
+    print(f"\n  -> {diag_path}")
+    print("\n  Use the valley position as --r_CO (or --r_CSi) in the full run.")
+    print("  Use the episode duration gap to set --persist (in analyzed frames).")
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
@@ -146,6 +214,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
@@ -205,14 +274,18 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Extract persistent active-site C-O and C-Si events across trajectory frames.\n"
             "Use this command to detect bond-forming or bond-breaking event patterns over time\n"
             "from connectivity-aware data.\n"
+            "Use --diagnose first to sample C-X distance distributions and choose distance cutoffs.\n"
             "This command analyzes existing data and does not generate force-field input templates.\n\n"
             "Examples:\n"
+            "  0. Diagnose distance cutoffs before full extraction:\n"
+            "   reaxkit get_active_site_events --diagnose --r-probe 2.5 --max-diag-frames 500\n\n"
             "  1. Automatic mode for persistent events:\n"
             "   reaxkit get_active_site_events --mode auto --persist 5\n\n"
             "  2. Bond-order mode on a sampled frame range:\n"
             "   reaxkit get_active_site_events --frames 0:500:5 --mode bo --bo-threshold 0.8\n\n"
             "  3. Distance mode with custom cutoffs:\n"
-            "   reaxkit get_active_site_events --mode dist --r-co 1.65 --r-csi 2.10 --strict-tract"
+            "     reaxkit get_active_site_events --input 30_1073_ams.rkf --r-co 1.65 --persist 50 --every 10"
+            "     reaxkit get_active_site_events --mode dist --r-co 1.65 --r-csi 2.10 --strict-tract"
         )
         parser.add_argument(
             "--frames",
@@ -220,12 +293,44 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             default=None,
             help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
         )
-        parser.add_argument("--every", type=int, default=10, help="Use every Nth selected frame (default: 10)")
+        parser.add_argument(
+            "--every",
+            "--stride",
+            dest="every",
+            type=int,
+            default=10,
+            help="Use every Nth selected frame (TRACT alias: --stride; default: 10)",
+        )
         parser.add_argument("--mode", choices=["auto", "bo", "dist"], default="auto", help="Event detection mode")
-        parser.add_argument("--bo-threshold", type=float, default=0.8, help="Bond-order threshold for bo mode")
-        parser.add_argument("--r-co", type=float, default=1.65, help="C-O distance cutoff in angstrom for dist mode")
-        parser.add_argument("--r-csi", type=float, default=2.10, help="C-Si distance cutoff in angstrom for dist mode")
+        parser.add_argument(
+            "--bo-threshold",
+            "--bo_threshold",
+            dest="bo_threshold",
+            type=float,
+            default=0.8,
+            help="Bond-order threshold for bo mode",
+        )
+        parser.add_argument(
+            "--r-co",
+            "--r_CO",
+            dest="r_co",
+            type=float,
+            default=1.65,
+            help="C-O distance cutoff in angstrom for dist mode",
+        )
+        parser.add_argument(
+            "--r-csi",
+            "--r_CSi",
+            dest="r_csi",
+            type=float,
+            default=2.10,
+            help="C-Si distance cutoff in angstrom for dist mode",
+        )
         parser.add_argument("--persist", type=int, default=50, help="Required consecutive analyzed frames for confirmed binding")
+        parser.add_argument("--diagnose", action="store_true", help="Sample C-X distance and episode distributions to choose --r-co/--r-csi and --persist before full extraction")
+        parser.add_argument("--r-probe", type=float, default=2.5, help="Generous C-X cutoff in angstrom used for diagnostic close-approach episodes")
+        parser.add_argument("--max-diag-frames", type=int, default=500, help="Maximum sampled frames for --diagnose")
+        parser.add_argument("--timestep-fs", type=float, default=10.0, help="Raw trajectory timestep in fs used to report diagnostic episode durations")
         parser.add_argument("--carbon-element", default="C", help="Carbon element symbol")
         parser.add_argument("--oxygen-element", default="O", help="Oxygen element symbol")
         parser.add_argument("--silicon-element", default="Si", help="Silicon element symbol")
@@ -323,11 +428,22 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     >>> # See workflow CLI usage for concrete examples.
     """
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
-    task_cls = TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]]
-    request = REQUEST_BUILDERS[canonical](args)
+    diagnose = canonical == "get_active_site_events" and bool(getattr(args, "diagnose", False))
+    task_key = DIAGNOSTIC_TASK_KEY_BY_COMMAND[canonical] if diagnose else TASK_KEY_BY_COMMAND[canonical]
+    task_cls = TASK_REGISTRY[task_key]
+    request = (
+        _build_active_site_event_diagnostics_request(args)
+        if diagnose
+        else REQUEST_BUILDERS[canonical](args)
+    )
 
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
+    if diagnose:
+        out_dir = persist_analysis_result(canonical, result, args, write_csv=True)
+        _print_active_site_event_diagnostic_console(result, args, out_dir)
+        return 0
+
     bundled = bundle_canonical_and_tract_tables(result)
     present_result(
         canonical,

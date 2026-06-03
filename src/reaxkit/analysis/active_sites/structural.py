@@ -50,6 +50,37 @@ def _as_dense_frame(frame_obj: Any) -> np.ndarray:
     return np.asarray(frame_obj, dtype=float)
 
 
+def _frame_from_series(series: Any, frame_index: int) -> Any:
+    if isinstance(series, np.ndarray):
+        return series[frame_index]
+    if isinstance(series, (list, tuple)):
+        return series[frame_index]
+    return None
+
+
+def _ragged_bond_order_frame(data: ConnectivityTrajectoryData, frame_index: int, bo_frame: np.ndarray) -> np.ndarray:
+    """Expand per-atom neighbor-list bond orders into a dense frame matrix."""
+    n_atoms = len(data.trajectory.atom_ids)
+    conn_raw = _frame_from_series(data.connectivity.connectivity, frame_index)
+    if conn_raw is None:
+        raise ValueError("Ragged bond-order frames require ConnectivityData.connectivity.")
+    conn_frame = np.asarray(conn_raw, dtype=int)
+    bo_values = np.asarray(bo_frame, dtype=float)
+    if conn_frame.ndim != 2 or bo_values.ndim != 2 or conn_frame.shape != bo_values.shape:
+        raise ValueError("Ragged connectivity and bond_orders frames must have matching 2D shapes.")
+
+    dense = np.zeros((n_atoms, n_atoms), dtype=float)
+    n_rows = min(n_atoms, conn_frame.shape[0])
+    for ai in range(n_rows):
+        for partner_id, order in zip(conn_frame[ai], bo_values[ai]):
+            if not np.isfinite(order) or order <= 0.0:
+                continue
+            pj = int(partner_id) - 1
+            if 0 <= pj < n_atoms:
+                dense[ai, pj] = max(dense[ai, pj], float(order))
+    return dense
+
+
 def _bond_order_frame(data: ConnectivityTrajectoryData, frame_index: int) -> np.ndarray:
     bo = data.connectivity.bond_orders
     if bo is None:
@@ -57,9 +88,17 @@ def _bond_order_frame(data: ConnectivityTrajectoryData, frame_index: int) -> np.
     if isinstance(bo, np.ndarray):
         if bo.ndim != 3:
             raise ValueError("bond_orders ndarray must have shape (n_frames, n_atoms, n_atoms).")
-        return _as_dense_frame(bo[frame_index])
+        frame = _as_dense_frame(bo[frame_index])
+        n_atoms = len(data.trajectory.atom_ids)
+        if frame.shape == (n_atoms, n_atoms):
+            return frame
+        return _ragged_bond_order_frame(data, frame_index, frame)
     if isinstance(bo, (list, tuple)):
-        return _as_dense_frame(bo[frame_index])
+        frame = _as_dense_frame(bo[frame_index])
+        n_atoms = len(data.trajectory.atom_ids)
+        if frame.shape == (n_atoms, n_atoms):
+            return frame
+        return _ragged_bond_order_frame(data, frame_index, frame)
     raise TypeError("Unsupported bond_orders type.")
 
 

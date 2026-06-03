@@ -217,6 +217,20 @@ class AnalysisExecutor:
                 return str(value)
         return "."
 
+    @classmethod
+    def _engine_detection_path(cls, args: dict) -> str:
+        """
+        Return the path used for engine detection.
+
+        An explicit --input must win over the snapshot source directory. The
+        snapshot source is often the parent directory of a file input, and that
+        directory can contain mixed engine artifacts.
+        """
+        explicit_input = args.get("input")
+        if explicit_input and str(explicit_input) != ".":
+            return str(explicit_input)
+        return str(args.get("_snapshot_source_dir") or cls._detection_path(args))
+
     @staticmethod
     def _console_step(args: dict, message: str) -> None:
         """
@@ -306,7 +320,7 @@ class AnalysisExecutor:
         # 3) Resolve engine adapter from input hints and snapshot required raw
         #    inputs into run-scoped storage for traceability/reproducibility.
         # ---------------------------------------------------------------------
-        input_path = str(args.get("_snapshot_source_dir") or self._detection_path(args))
+        input_path = self._engine_detection_path(args)
         forced_engine = args.get("engine")
         self._console_step(args, f"Resolving engine input={input_path} forced_engine={forced_engine or 'auto'}")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
@@ -514,6 +528,7 @@ class AnalysisExecutor:
         # ---------------------------------------------------------------------
         t_load0 = perf_counter()
         self._console_step(args, f"Loading data via adapter={adapter.__class__.__name__} data_type={data_name}")
+        reporter("load", 0, 0, f"Loading {data_name} via {adapter.__class__.__name__}")
         try:
             data = adapter.load(required_data, args, reporter=reporter)
         except ParseError:

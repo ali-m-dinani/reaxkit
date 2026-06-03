@@ -21,6 +21,25 @@ tasks:
     help_search_examples:
     - reaxkit help "active site events"
     - run active site events
+  active_site_event_diagnostics:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.active_sites.event_diagnostics: active_site_event_diagnostics'
+    description: Samples trajectory frames to diagnose C-O and C-Si distance cutoffs
+      before full active-site event extraction. It reports nearest-distance distributions,
+      close-approach episode durations, and suggested threshold values.
+    related_workflow_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events --diagnose'
+    tags:
+    - active site
+    - event diagnostics
+    - trajectory
+    notes: []
+    aliases:
+    - active site event diagnostics
+    - active-site-event-diagnostics
+    - diagnose active site events
+    help_search_examples:
+    - reaxkit help "active site event diagnostics"
+    - run active site events diagnose
   get_active_site_structural:
     consumes_dataclass: ConnectivityTrajectoryData
     implementation_module: 'reaxkit.analysis.active_sites.structural: active_site_structural'
@@ -925,6 +944,7 @@ dataclass_usage_across_tasks:
   - cell_dimensions
   - simulation_series
   TrajectoryData:
+  - active_site_event_diagnostics
   - get_dihedral
   - get_diffusivity
   - get_msd

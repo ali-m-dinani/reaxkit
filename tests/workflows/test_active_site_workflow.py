@@ -46,6 +46,10 @@ def _base_args(**overrides):
         "r_co": 1.65,
         "r_csi": 2.10,
         "persist": 50,
+        "diagnose": False,
+        "r_probe": 2.5,
+        "max_diag_frames": 500,
+        "timestep_fs": 10.0,
         "oxygen_element": "O",
         "silicon_element": "Si",
     }
@@ -127,3 +131,75 @@ def test_active_site_events_run_main_bundles_tables_and_passes_strict(monkeypatc
     assert captured["request"].mode == "bo"
     assert isinstance(captured["present_result"].table, pd.DataFrame)
     assert isinstance(captured["present_result"].tract_table, pd.DataFrame)
+
+
+def test_active_site_events_parser_accepts_tract_option_aliases():
+    parser = active_site_workflow.build_parser(
+        argparse.ArgumentParser(),
+        command="get_active_site_events",
+    )
+
+    args = parser.parse_args(
+        [
+            "--stride",
+            "10",
+            "--r_CO",
+            "1.65",
+            "--r_CSi",
+            "2.10",
+            "--bo_threshold",
+            "0.8",
+        ]
+    )
+
+    assert args.every == 10
+    assert args.r_co == 1.65
+    assert args.r_csi == 2.10
+    assert args.bo_threshold == 0.8
+    assert args.progress is True
+
+
+def test_active_site_events_diagnose_routes_to_diagnostic_task(monkeypatch):
+    captured = {}
+
+    def fake_run(self, task, request, args):
+        captured["task_name"] = task.__class__.__name__
+        captured["request"] = request
+        return SimpleNamespace(
+            table=pd.DataFrame({"species": ["C-O"], "suggested_r_cut": [1.65]}),
+            distance_table=pd.DataFrame({"species": ["C-O"], "min_distance": [1.2]}),
+            episode_table=pd.DataFrame({"species": ["C-O"], "duration_frames": [5]}),
+            summary={"diagnostic": True},
+            request=request,
+        )
+
+    def fake_present(command, result, args, plot_payload_builder=None, report_payload_builder=None):
+        captured["command"] = command
+        captured["present_result"] = result
+
+    def fake_persist(command, result, args, write_csv=True):
+        captured["command"] = command
+        captured["present_result"] = result
+        captured["write_csv"] = write_csv
+        return "."
+
+    def fake_print(result, args, out_dir):
+        captured["diagnostic_printed"] = True
+        captured["out_dir"] = out_dir
+
+    monkeypatch.setattr(active_site_workflow.AnalysisExecutor, "run", fake_run)
+    monkeypatch.setattr(active_site_workflow, "present_result", fake_present)
+    monkeypatch.setattr(active_site_workflow, "persist_analysis_result", fake_persist)
+    monkeypatch.setattr(active_site_workflow, "_print_active_site_event_diagnostic_console", fake_print)
+
+    rc = active_site_workflow.run_main(
+        "active_site_events",
+        _base_args(diagnose=True, frames=["0:20:5"], every=2, r_probe=2.6, max_diag_frames=25),
+    )
+
+    assert rc == 0
+    assert captured["task_name"] == "ActiveSiteEventDiagnosticsTask"
+    assert captured["request"].r_probe == 2.6
+    assert captured["request"].max_diag_frames == 25
+    assert isinstance(captured["present_result"].distance_table, pd.DataFrame)
+    assert captured["diagnostic_printed"] is True

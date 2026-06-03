@@ -8,7 +8,76 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from reaxkit.domain.data_models import ConnectivityTrajectoryData
 from reaxkit.engine.ams.adapter import AMSAdapter
+
+
+class _FakeKF:
+    def __init__(self):
+        self.frames = {
+            1: [0.0, 0.0, 0.0, 2.0, 0.0, 0.0],
+            2: [1.0, 0.0, 0.0, 3.0, 0.0, 0.0],
+            3: [2.0, 0.0, 0.0, 4.0, 0.0, 0.0],
+        }
+
+    def read_section(self, section: str):
+        if section == "History":
+            return {"Coords(1)": self.frames[1]}
+        raise KeyError(section)
+
+    def read(self, section: str, variable: str):
+        if (section, variable) == ("MDHistory", "nEntries"):
+            return 3
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            return "C O"
+        if section == "History":
+            match = variable.startswith("Coords(") and variable.endswith(")")
+            if match:
+                frame_no = int(variable.removeprefix("Coords(").removesuffix(")"))
+                return self.frames[frame_no]
+        raise KeyError(f"{section}%{variable}")
+
+    def __getitem__(self, key: str):
+        if key == "General%Step numbers":
+            return np.asarray([10, 20, 30], dtype=int)
+        raise KeyError(key)
+
+
+class _FakeConnectivityKF:
+    def __init__(self):
+        self.n_frames = 3
+
+    def read_section(self, section: str):
+        raise AssertionError(f"read_section({section!r}) should not be used for direct RKF connectivity")
+
+    def read(self, section: str, variable: str):
+        if (section, variable) == ("MDHistory", "nEntries"):
+            return self.n_frames
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            return "C O"
+        if section == "History":
+            frame_no = None
+            for prefix in (
+                "Bonds.Index",
+                "Bonds.Atoms",
+                "Bonds.Orders",
+            ):
+                if variable.startswith(f"{prefix}(") and variable.endswith(")"):
+                    frame_no = int(variable.removeprefix(f"{prefix}(").removesuffix(")"))
+                    if not 1 <= frame_no <= self.n_frames:
+                        raise KeyError(f"{section}%{variable}")
+                    if prefix == "Bonds.Index":
+                        return [1, 2, 3]
+                    if prefix == "Bonds.Atoms":
+                        return [2, 1]
+                    if prefix == "Bonds.Orders":
+                        return [0.75 + 0.01 * frame_no, 0.75 + 0.01 * frame_no]
+        raise KeyError(f"{section}%{variable}")
+
+    def __getitem__(self, key: str):
+        if key == "General%Step numbers":
+            return np.asarray([10, 20, 30], dtype=int)
+        raise KeyError(key)
 
 
 def _save_dataframe(df: pd.DataFrame, out: Path) -> None:
@@ -90,6 +159,68 @@ def _save_selected_frames_as_excel(frames: Any, out_dir: Path, base_name: str) -
 def _real_kf_path() -> Path:
     repo_root = Path(__file__).resolve().parents[3]
     return repo_root / "full_sim_examples" / "ZMO_Orio_AMS_KF" / "reaxout.kf"
+
+
+def test_ams_load_trajectory_prefers_direct_coords_over_single_history_section_frame(monkeypatch):
+    adapter = AMSAdapter()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: _FakeKF())
+
+    trajectory = adapter.load_trajectory({"input": "fake.rkf"})
+
+    assert trajectory.positions.shape == (3, 2, 3)
+    assert trajectory.elements == ["C", "O"]
+    assert trajectory.iterations.tolist() == [10, 20, 30]
+    assert trajectory.positions[2, 1, 0] == pytest.approx(4.0 * 0.529177210903)
+
+
+def test_ams_load_connectivity_reads_direct_rkf_frames_without_history_section(monkeypatch):
+    adapter = AMSAdapter()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: _FakeConnectivityKF())
+    progress: list[tuple[str, int, int, str | None]] = []
+
+    connectivity = adapter.load_connectivity(
+        {"input": "fake.rkf"},
+        reporter=lambda stage, current, total, message=None: progress.append((stage, current, total, message)),
+    )
+
+    assert len(connectivity.connectivity) == 3
+    assert connectivity.connectivity[0].tolist() == [[2], [1]]
+    assert connectivity.bond_orders[2].tolist() == pytest.approx([[0.78], [0.78]])
+    assert connectivity.sum_bond_orders.shape == (3, 2)
+    assert connectivity.elements == ["C", "O"]
+    assert connectivity.iterations.tolist() == [10, 20, 30]
+    assert progress == [
+        ("load", 1, 3, "Reading AMS RKF connectivity"),
+        ("load", 2, 3, "Reading AMS RKF connectivity"),
+        ("load", 3, 3, "Reading AMS RKF connectivity"),
+    ]
+
+
+def test_ams_resolve_kf_path_prefers_explicit_input_over_rewritten_run_dir(tmp_path):
+    explicit = tmp_path / "30_173_ams.rkf"
+    explicit.write_text("fake", encoding="utf-8")
+    raw_dir = tmp_path / "reaxkit_workspace" / "data" / "raw" / "run_x"
+    raw_dir.mkdir(parents=True)
+
+    resolved = AMSAdapter._resolve_kf_path(
+        {
+            "input": str(explicit),
+            "run_dir": str(raw_dir),
+        }
+    )
+
+    assert resolved == explicit
+
+
+def test_ams_required_input_files_prefers_explicit_kf_input_name():
+    adapter = AMSAdapter()
+
+    names = adapter.required_input_files(
+        ConnectivityTrajectoryData,
+        {"input": "30_1073_ams.rkf"},
+    )
+
+    assert names == ("30_1073_ams.rkf",)
 
 
 def test_ams_adapter_loaders_export_artifacts():

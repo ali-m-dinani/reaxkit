@@ -405,3 +405,90 @@ class ActiveSiteEventsResult(BaseResult):
     tract_table: pd.DataFrame
     summary: dict[str, Any]
     request: ActiveSiteEventsRequest
+
+
+@dataclass
+class ActiveSiteEventDiagnosticsRequest(BaseRequest):
+    """Request payload for active-site event cutoff diagnostics.
+
+    Samples trajectory frames to characterize nearest C-O and C-Si distance
+    distributions before full event extraction. The diagnostic helps choose
+    `r_CO`, `r_CSi`, and persistence thresholds for distance-mode runs.
+    """
+
+    frames: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={
+            "label": "Frames",
+            "help": "Optional frame indices to sample. Empty means all frames.",
+            "units": "frame_index",
+        },
+    )
+    every: int = dc_field(
+        default=10,
+        metadata={
+            "label": "Every",
+            "help": "Frame stride for diagnostic sampling.",
+            "min": 1,
+            "units": "frames",
+        },
+    )
+    r_probe: float = dc_field(
+        default=2.5,
+        metadata={
+            "label": "r_probe",
+            "help": "Generous C-X distance cutoff used to detect close-approach episodes.",
+            "min": 0.0,
+            "units": "angstrom",
+        },
+    )
+    max_diag_frames: int = dc_field(
+        default=500,
+        metadata={
+            "label": "Max Diagnostic Frames",
+            "help": "Maximum number of sampled frames to analyze.",
+            "min": 1,
+            "units": "frames",
+        },
+    )
+    timestep_fs: float = dc_field(
+        default=10.0,
+        metadata={
+            "label": "Timestep",
+            "help": "Raw trajectory timestep used to convert episode lengths to ps.",
+            "min": 0.0,
+            "units": "fs",
+        },
+    )
+    carbon_element: str = dc_field(
+        default="C",
+        metadata={
+            "label": "Carbon Element",
+            "help": "Element symbol used as reactive substrate atom type.",
+        },
+    )
+    oxygen_element: str = dc_field(
+        default="O",
+        metadata={
+            "label": "Oxygen Element",
+            "help": "Element symbol treated as oxygen target.",
+        },
+    )
+    silicon_element: str = dc_field(
+        default="Si",
+        metadata={
+            "label": "Silicon Element",
+            "help": "Element symbol treated as silicon target.",
+        },
+    )
+
+
+@dataclass
+class ActiveSiteEventDiagnosticsResult(BaseResult):
+    """Result payload for active-site event cutoff diagnostics."""
+
+    table: pd.DataFrame
+    distance_table: pd.DataFrame
+    episode_table: pd.DataFrame
+    summary: dict[str, Any]
+    request: ActiveSiteEventDiagnosticsRequest

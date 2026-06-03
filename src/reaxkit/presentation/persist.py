@@ -77,17 +77,127 @@ def _write_figure_artifacts(command: str, out_dir: Path, result: Any, *, analysi
     """
     Write figure artifacts.
     """
-    if str(command) != "active_site_structural":
+    if str(command) in {"active_site_structural", "get_active_site_structural"}:
+        table = getattr(result, "table", None)
+        if not isinstance(table, pd.DataFrame):
+            return []
+        try:
+            from reaxkit.presentation.active_sites.plot_exports import save_structural_figures_tract_style
+        except Exception as exc:  # pragma: no cover - defensive: plotting deps may be unavailable
+            logger.debug("Skipping active-site structural figure export: %s", exc)
+            return []
+        return save_structural_figures_tract_style(table, out_dir, stem=str(analysis_id))
+
+    if str(command) in {"active_site_events", "get_active_site_events"} and bool(
+        getattr(result, "summary", {}).get("diagnostic", False)
+        if isinstance(getattr(result, "summary", None), dict)
+        else False
+    ):
+        try:
+            from reaxkit.presentation.active_sites.plot_exports import save_event_diagnostic_figures
+        except Exception as exc:  # pragma: no cover - defensive: plotting deps may be unavailable
+            logger.debug("Skipping active-site event diagnostic figure export: %s", exc)
+            return []
+        return save_event_diagnostic_figures(
+            getattr(result, "distance_table", pd.DataFrame()),
+            getattr(result, "episode_table", pd.DataFrame()),
+            getattr(result, "summary", {}),
+            out_dir,
+        )
+
+    return []
+
+
+def _as_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None or (isinstance(value, float) and not np.isfinite(value)):
+            return int(default)
+        return int(value)
+    except Exception:
+        return int(default)
+
+
+def _as_float(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return float(default)
+        out = float(value)
+        return out if np.isfinite(out) else float(default)
+    except Exception:
+        return float(default)
+
+
+def _result_request_value(result: Any, args: Any, name: str, default: Any = None) -> Any:
+    request = getattr(result, "request", None)
+    if request is not None and hasattr(request, name):
+        return getattr(request, name)
+    if hasattr(args, name):
+        return getattr(args, name)
+    return default
+
+
+def _write_active_site_events_summary(command: str, out_dir: Path, result: Any, args: Any) -> list[str]:
+    """Write TRACT-style active-site event summary text."""
+    if str(command) not in {"active_site_events", "get_active_site_events"}:
+        return []
+    summary = getattr(result, "summary", None)
+    if isinstance(summary, dict) and bool(summary.get("diagnostic", False)):
         return []
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame):
         return []
-    try:
-        from reaxkit.presentation.active_sites.plot_exports import save_structural_figures_tract_style
-    except Exception as exc:  # pragma: no cover - defensive: plotting deps may be unavailable
-        logger.debug("Skipping active-site structural figure export: %s", exc)
-        return []
-    return save_structural_figures_tract_style(table, out_dir, stem=str(analysis_id))
+
+    n_carbon = _as_int((summary or {}).get("n_carbon") if isinstance(summary, dict) else None, len(table))
+    frames_analyzed = _as_int((summary or {}).get("frames_analyzed") if isinstance(summary, dict) else None, 0)
+    stride = _as_int((summary or {}).get("every") if isinstance(summary, dict) else None, _result_request_value(result, args, "every", 1))
+    persist = _as_int((summary or {}).get("persist") if isinstance(summary, dict) else None, _result_request_value(result, args, "persist", 1))
+    timestep_fs = _as_float(_result_request_value(result, args, "timestep_fs", 10.0), 10.0)
+    persist_fs = persist * max(1, stride) * timestep_fs
+
+    r_co = _as_float(
+        (summary or {}).get("r_CO") if isinstance(summary, dict) else None,
+        _as_float(_result_request_value(result, args, "r_CO", _result_request_value(result, args, "r_co", 1.65)), 1.65),
+    )
+    r_csi = _as_float(
+        (summary or {}).get("r_CSi") if isinstance(summary, dict) else None,
+        _as_float(_result_request_value(result, args, "r_CSi", _result_request_value(result, args, "r_csi", 2.10)), 2.10),
+    )
+
+    total_o = _as_int(table["n_events_O"].sum() if "n_events_O" in table.columns else 0)
+    total_si = _as_int(table["n_events_Si"].sum() if "n_events_Si" in table.columns else 0)
+    reactive_o = _as_int(table["is_reactive_O"].sum() if "is_reactive_O" in table.columns else 0)
+    reactive_si = _as_int(table["is_reactive_Si"].sum() if "is_reactive_Si" in table.columns else 0)
+    pct_o = (100.0 * reactive_o / n_carbon) if n_carbon > 0 else 0.0
+    pct_si = (100.0 * reactive_si / n_carbon) if n_carbon > 0 else 0.0
+    input_name = Path(str(getattr(args, "input", "") or "")).name or str(getattr(args, "input", "") or "")
+
+    lines = [
+        "TRACT Tool 2 - Binding Event Summary",
+        "=====================================",
+        f"Input:          {input_name}",
+        f"Frames analyzed:{frames_analyzed}  (stride={stride})",
+        f"C atoms:        {n_carbon}",
+        "",
+        "Parameters:",
+        f"  r_CO       = {r_co:g} A",
+        f"  r_CSi      = {r_csi:g} A",
+        f"  persist    = {persist} frames = {persist_fs:g} fs",
+        f"  stride     = {stride} (every {stride}th raw frame analyzed)",
+        "",
+        "C-O binding events:",
+        f"  Total confirmed:  {total_o}",
+        f"  Reactive C atoms: {reactive_o} / {n_carbon}  ({pct_o:.2f}%)",
+        "",
+        "C-Si binding events:",
+        f"  Total confirmed:  {total_si}",
+        f"  Reactive C atoms: {reactive_si} / {n_carbon}  ({pct_si:.2f}%)",
+        "",
+        "Merge with Tool 1 output on column: atom_id",
+        "",
+    ]
+    path = out_dir / "summary.txt"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return [path.name]
 
 
 def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: bool = True) -> Path:
@@ -140,6 +250,7 @@ def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: 
     csv_files = _write_csvs(out_dir, result) if write_csv else []
     npy_files = _write_numpy_artifacts(command, out_dir, result)
     figure_files = _write_figure_artifacts(command, out_dir, result, analysis_id=str(analysis_id))
+    text_files = _write_active_site_events_summary(command, out_dir, result, args)
 
     settings = {
         "command": str(command),
@@ -150,6 +261,7 @@ def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: 
             "csv": csv_files,
             "npy": npy_files,
             "figures": figure_files,
+            "text": text_files,
             "settings": "settings.json",
         },
     }

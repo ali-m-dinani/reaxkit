@@ -208,4 +208,92 @@ def save_structural_figures_tract_style(
     return written
 
 
-__all__ = ["save_structural_figures_tract_style"]
+def save_event_diagnostic_figures(
+    distance_table: pd.DataFrame,
+    episode_table: pd.DataFrame,
+    summary: dict,
+    out_dir: Path,
+) -> list[str]:
+    """Write TRACT-style diagnostic event figures and return filenames."""
+    if not isinstance(distance_table, pd.DataFrame) or distance_table.empty:
+        return []
+    if not isinstance(summary, dict) or not bool(summary.get("diagnostic", False)):
+        return []
+    required = ["species", "min_distance"]
+    if not _has_columns(distance_table, required):
+        return []
+
+    species_available = [
+        species
+        for species in ("C-O", "C-Si")
+        if not distance_table[distance_table["species"] == species].empty
+    ]
+    if not species_available:
+        return []
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    n_panels = 2 * len(species_available)
+    n_cols = 2
+    n_rows = int(np.ceil(n_panels / n_cols))
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(12, 4 * n_rows))
+    axes = np.asarray(axes).reshape(-1)
+    ax_idx = 0
+    species_summary = summary.get("species", {}) if isinstance(summary, dict) else {}
+    eq_bonds = {"C-O": 1.43, "C-Si": 1.88}
+    r_probe = float(summary.get("r_probe", 2.5)) if isinstance(summary, dict) else 2.5
+    frames_analyzed = int(summary.get("frames_analyzed", 0)) if isinstance(summary, dict) else 0
+    every = int(summary.get("every", 1)) if isinstance(summary, dict) else 1
+
+    for species in species_available:
+        dists = pd.to_numeric(
+            distance_table.loc[distance_table["species"] == species, "min_distance"],
+            errors="coerce",
+        ).dropna()
+        dists = dists[dists < 3.5]
+
+        ax = axes[ax_idx]
+        ax_idx += 1
+        ax.hist(dists, bins=80, color="steelblue", alpha=0.7, edgecolor="none")
+        ax.set_yscale("log")
+        ax.axvline(eq_bonds.get(species, 0.0), color="green", linestyle="--", linewidth=1.2, label=f"Eq. bond {eq_bonds.get(species, 0.0):.2f} A")
+        ax.axvline(r_probe, color="orange", linestyle=":", linewidth=1.2, label=f"r_probe {r_probe:.2f} A")
+        suggested = species_summary.get(species, {}).get("suggested_r_cut") if isinstance(species_summary, dict) else None
+        if suggested is not None:
+            ax.axvline(float(suggested), color="red", linestyle="-", linewidth=1.5, label=f"Valley -> r_cut ~= {float(suggested):.2f} A")
+        ax.set_xlabel(f"Min {species} distance [A]")
+        ax.set_ylabel("Count (log scale)")
+        ax.set_title(f"{species} distance distribution\n({frames_analyzed} frames, {len(dists)} C-atom samples)")
+        ax.legend(fontsize=8)
+
+        ax = axes[ax_idx]
+        ax_idx += 1
+        if isinstance(episode_table, pd.DataFrame) and not episode_table.empty and {"species", "duration_ps"}.issubset(episode_table.columns):
+            durations = pd.to_numeric(
+                episode_table.loc[episode_table["species"] == species, "duration_ps"],
+                errors="coerce",
+            ).dropna()
+        else:
+            durations = pd.Series(dtype=float)
+        if not durations.empty:
+            ax.hist(durations, bins=40, color="coral", alpha=0.8, edgecolor="none")
+            ax.axvline(5.0, color="red", linestyle="--", linewidth=1.5, label="Current persist = 5 ps")
+            ax.set_xlabel(f"{species} episode duration [ps]")
+            ax.set_ylabel("Count")
+            ax.set_title(f"{species} close-approach episode lengths\n(r_probe < {r_probe:.2f} A, {len(durations)} episodes)")
+            ax.legend(fontsize=8)
+        else:
+            ax.text(0.5, 0.5, f"No {species} episodes\nbelow {r_probe:.2f} A", ha="center", va="center", transform=ax.transAxes, fontsize=12)
+            ax.set_title(f"{species} episode durations")
+
+    for j in range(ax_idx, len(axes)):
+        axes[j].set_visible(False)
+
+    fig.suptitle(f"TRACT Tool 2 - Diagnostic ({frames_analyzed} frames analyzed, stride={every})", fontsize=11, y=1.01)
+    fig.tight_layout()
+    path = out_dir / "diagnose_distances.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return [path.name] if path.exists() else []
+
+
+__all__ = ["save_structural_figures_tract_style", "save_event_diagnostic_figures"]
