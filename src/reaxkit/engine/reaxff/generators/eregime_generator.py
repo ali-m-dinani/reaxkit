@@ -5,6 +5,12 @@ This module provides deterministic utilities for generating ReaxFF
 ``eregime.in`` files, which define time-dependent external electric
 field schedules applied during MD simulations.
 
+Notes
+-----
+Worth mentioning that eregime.in can have a maximum of 100 entry lines. So, if you are working with
+a relatively long eregime profile, you may need to decrease the number of sampled points, or run
+multiple simulations using restart files.
+
 **Usage context**
 
 - Template generation: Produce canonical text payloads for ReaxFF artifacts.
@@ -74,6 +80,12 @@ class SinusoidalERegimeSpec:
     """Represent SinusoidalERegimeSpec.
 
     Public class used by ReaxFF generator components.
+
+    Notes
+    -----
+    As mentioned above, you can have a maximum of 100 entry points in eregime.in file. In order to know how
+    many points will be in the output eregime.in file when using this command, you can use this formula:
+        number_of_points = (2 * num_of_cycles * pi) / (step_angle) - 1
 
     Fields
     ------
