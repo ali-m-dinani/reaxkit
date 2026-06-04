@@ -30,10 +30,11 @@ API entry points:
 - **[Workflows API](api/workflows/index.md)**
 
 Example current commands:
-- `reaxkit timeseries --field trajectory[1].z --xaxis time`
-- `reaxkit get_msd --atom-types O --xaxis time`
-- `reaxkit gen_eregime --type sin --iteration-step 500 ...`
-- `reaxkit gen-plot --type single --file table.csv --xaxis c1 --yaxis c2`
+
+1. `reaxkit timeseries --field trajectory[1].z --xaxis time`
+2. `reaxkit get_msd --atom-types O --xaxis time`
+3. `reaxkit gen_eregime --type sin --iteration-step 500 ...`
+4. `reaxkit gen-plot --type single --file table.csv --xaxis c1 --yaxis c2`
 
 ---
 

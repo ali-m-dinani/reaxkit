@@ -39,6 +39,7 @@ htmlcov/
 
 # ------------------------------
 # REAXKIT PROJECT-SPECIFIC
+.reaxkit_cache/
 # ------------------------------
 # Documentation and templates
 docs/file_templates/control
@@ -53,8 +54,6 @@ docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
 src/reaxkit/webui/reaxkit_workspace
-src/reaxkit/webui/.reaxkit_cache/
-tests/engine/reaxff/io/.reaxkit_cache/
 
 # Generated outputs and temporary folders
 examples_to_test/
@@ -98,5 +97,3 @@ cache/
 # ------------------------------
 .DS_Store
 Thumbs.db
-/.reaxkit_cache/index/handlers.json
-/src/reaxkit/webui/.reaxkit_cache/index/handlers.json
