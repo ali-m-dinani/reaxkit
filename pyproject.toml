@@ -14,6 +14,7 @@ authors = [
   { name = "Seyed Mahmoud Mortazavi", email = "mahmoud.mortazavi72@gmail.com" },
   { name = "Anirban Phukan", email = "akp6421@psu.edu" },
   { name = "Jupjeet Dhingra", email = "jvd6198@psu.edu" },
+  { name = "Swarit Dwivedi", email = "Swarit.Dwivedi@monash.edu" },
 ]
 readme = "README.md"
 license = { text = "MIT" }

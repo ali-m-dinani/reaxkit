@@ -2,13 +2,13 @@ cff-version: 1.2.0
 message: "If you use ReaxKit in your research, please cite it using the following reference."
 
 title: "ReaxKit: A modular Python toolkit for ReaxFF simulation analysis"
-version: "1.0.0"
+version: "2.0.0"
 doi: 10.5281/zenodo.18485384
-date-released: 2025-02-04
+date-released: 2026-06-03
 
 authors:
-  - family-names: Dinani
-    given-names: Ali Mohammadi
+  - family-names: Mohammadi Dinani
+    given-names: Ali
 
   - family-names: van Duin
     given-names: Adri
@@ -18,6 +18,19 @@ authors:
 
   - family-names: Sepehrinezhad
     given-names: Alireza
+
+  - family-names: Mortazavi
+    given-names: Seyed Mahmoud
+
+  - family-names: Phukan
+    given-names: Anirban
+
+  - family-names: Dhingra
+    given-names: Jupjeet
+
+  - family-names: Dwivedi
+    given-names: Swarit
+
 
 repository-code: https://github.com/ali-m-dinani/reaxkit
 url: https://ali-m-dinani.github.io/reaxkit/
