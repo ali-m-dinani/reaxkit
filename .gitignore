@@ -17,7 +17,6 @@ venv/
 # BUILD / PACKAGING / TESTING
 # ------------------------------
 .cache/
-.pytest_cache/
 .coverage
 *.cover
 *.egg-info/
@@ -57,7 +56,6 @@ docs/file_templates/xmolout
 src/reaxkit/webui/reaxkit_workspace
 
 # Generated outputs and temporary folders
-reaxkit_workspace/
 examples_to_test/
 exports/
 full_sim_examples/
