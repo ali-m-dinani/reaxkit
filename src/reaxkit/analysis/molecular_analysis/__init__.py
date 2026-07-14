@@ -19,6 +19,16 @@ from reaxkit.analysis.molecular_analysis.isomer_detection import (
     MoleculeIsomerDetectionResult,
     MoleculeIsomerDetectionTask,
 )
+from reaxkit.analysis.molecular_analysis.reaxff_isomer_representatives_detection import (
+    ReaxFFIsomerRepresentativeControl,
+    ReaxFFIsomerRepresentativeResult,
+    ReaxFFIsomerRepresentative,
+    detect_reaxff_isomer_representatives,
+    extract_xmolout_isomer_structures,
+    parse_reaxff_isomer_representative_control,
+    scan_reaxff_isomer_representatives,
+    write_reaxff_isomer_representative_log,
+)
 
 __all__ = [
     "DominantSpeciesRequest",
@@ -36,4 +46,12 @@ __all__ = [
     "MoleculeIsomerDetectionRequest",
     "MoleculeIsomerDetectionResult",
     "MoleculeIsomerDetectionTask",
+    "ReaxFFIsomerRepresentativeControl",
+    "ReaxFFIsomerRepresentativeResult",
+    "ReaxFFIsomerRepresentative",
+    "detect_reaxff_isomer_representatives",
+    "extract_xmolout_isomer_structures",
+    "parse_reaxff_isomer_representative_control",
+    "scan_reaxff_isomer_representatives",
+    "write_reaxff_isomer_representative_log",
 ]
