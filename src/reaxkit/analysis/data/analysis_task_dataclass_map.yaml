@@ -57,6 +57,28 @@ tasks:
     help_search_examples:
     - reaxkit help "active site structural"
     - run active site structural
+  isomer_representative_detection:
+    consumes_dataclass: ConnectivityTrajectoryData
+    implementation_module: 'reaxkit.analysis.molecular_analysis.isomer_representative_detection: isomer_representative_detection'
+    description: Detects coarse same-formula molecular isomer representatives from
+      trajectory-aligned canonical connectivity data. It is intended as a fast
+      representative-selection stage before more expensive downstream quantum jobs.
+    related_workflow_module: 'reaxkit.workflows.file_tools.isomer_workflow: detect-isomer-representatives'
+    tags:
+    - molecular analysis
+    - isomer representatives
+    - connectivity trajectory
+    - training workflow
+    notes:
+    - Analyzer consumes canonical ConnectivityTrajectoryData and does not parse
+      engine-specific ReaxFF files directly.
+    aliases:
+    - isomer representatives
+    - isomer representative detection
+    - detect-isomer-representatives
+    help_search_examples:
+    - reaxkit help "isomer representatives"
+    - run isomer representative detection
   get_kinematics:
     consumes_dataclass: AtomicKinematicsData
     implementation_module: 'reaxkit.analysis.kinematics.kinematics: get_kinematics'
@@ -957,7 +979,6 @@ dataclass_usage_across_tasks:
   - voronoi_geometry_scipy
   - voronoi_geometry_pyvoro
   - plot_atom_property
-
 
 
 
