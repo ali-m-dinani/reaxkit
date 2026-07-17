@@ -23,11 +23,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import pickle
+import re
 import shutil
 from typing import List, Dict, Any, Optional
 import pandas as pd
 
 from reaxkit.engine.reaxff.io.base import BaseHandler
+
+_FORT7_HEADER_RE = re.compile(
+    r"^\s*(?P<num_atoms>\d+)\s+(?P<simulation_name>\S+)\s+Iteration:\s*(?P<iteration>\d+)\s+#Bonds:\s*(?P<num_bonds>\d+)\s*$"
+)
 
 
 class Fort7Handler(BaseHandler):
@@ -137,14 +142,16 @@ class Fort7Handler(BaseHandler):
                 if not values:
                     continue
 
-                # Header
-                if len(values) == 6:
+                header_match = _FORT7_HEADER_RE.match(raw)
+                # Header. Some ReaxFF outputs omit the space after
+                # "Iteration:" once iteration numbers grow large.
+                if header_match:
                     if cur_atoms_rows:
                         _finalize_iteration()
                         cur_atoms_rows.clear()
                         cur_totals.clear()
 
-                    cur_num_particles = int(values[0])
+                    cur_num_particles = int(header_match.group("num_atoms"))
                     if cur_num_particles > 9999 and not warned_large_atom_count:
                         warning_msg = (
                             "Warning: fort.7 reports > 9999 atoms. ReaxFF fixed-width atom-index fields "
@@ -159,9 +166,9 @@ class Fort7Handler(BaseHandler):
                                 # Backward-compatible fallback for reporters that only handle load events.
                                 self._reporter("load", lines_read, total_lines, warning_msg)
                         warned_large_atom_count = True
-                    sim_name = values[1]
-                    iteration = int(values[3])
-                    cur_nbonds = int(values[5])
+                    sim_name = header_match.group("simulation_name")
+                    iteration = int(header_match.group("iteration"))
+                    cur_nbonds = int(header_match.group("num_bonds"))
                     sim_rows.append([iteration, cur_num_particles, cur_nbonds])
 
                 # Totals
