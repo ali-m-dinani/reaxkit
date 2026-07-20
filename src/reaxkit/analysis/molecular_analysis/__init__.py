@@ -33,6 +33,14 @@ from reaxkit.analysis.molecular_analysis.jaguar_isomer_jobs import (
     load_slurm_jaguar_job_config,
     render_slurm_jaguar_script,
 )
+from reaxkit.analysis.molecular_analysis.isomer_trainset import (
+    IsomerTrainsetAtom,
+    IsomerTrainsetRecord,
+    IsomerTrainsetResult,
+    IsomerTrainsetSkippedRecord,
+    create_isomer_trainset,
+    parse_isomer_hf_output,
+)
 
 __all__ = [
     "DominantSpeciesRequest",
@@ -60,4 +68,10 @@ __all__ = [
     "create_jaguar_isomer_jobs",
     "load_slurm_jaguar_job_config",
     "render_slurm_jaguar_script",
+    "IsomerTrainsetAtom",
+    "IsomerTrainsetRecord",
+    "IsomerTrainsetResult",
+    "IsomerTrainsetSkippedRecord",
+    "create_isomer_trainset",
+    "parse_isomer_hf_output",
 ]
