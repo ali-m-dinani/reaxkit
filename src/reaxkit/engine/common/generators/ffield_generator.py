@@ -344,6 +344,15 @@ def _safe_float(value) -> float | None:
     return out
 
 
+def _is_float_token(value: str) -> bool:
+    """Return whether a token can be parsed as a floating-point value."""
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
     """Atom maps."""
     if atom_df.empty or "symbol" not in atom_df.columns:
@@ -381,7 +390,7 @@ def _format_atom(atom_df: pd.DataFrame, names: list[str]) -> str:
         for block in range(4):
             start = block * 8
             end = start + 8
-            lead = f"{int(idx):3d} {symbol:<2} " if block == 0 else "       "
+            lead = f" {symbol:<2} " if block == 0 else "    "
             tail = "".join(f"{value:9.4f}" for value in values[start:end])
             lines.append(f"{lead}{tail}".rstrip())
     return "\n".join(lines) + ("\n" if lines else "")
@@ -435,7 +444,7 @@ def _format_section_rows(section: str, df: pd.DataFrame, row_indices: list[int],
     current: list[str] = []
     for line in txt.strip("\n").splitlines():
         if section in {"atom", "bond"}:
-            if section == "atom" and line[:3].strip():
+            if section == "atom" and not _is_float_token(line.split()[0]):
                 if current:
                     blocks.append("\n".join(current))
                     current = []
