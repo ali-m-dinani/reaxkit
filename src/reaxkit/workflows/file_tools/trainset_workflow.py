@@ -219,7 +219,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
-            default="to-primitive",
+            default="to-conventional",
             help="Convert fetched crystal structure setting before generating files",
         )
         parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes.")
@@ -227,7 +227,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--skip-not-orthogonal",
             action="store_true",
+            default=True,
             help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90).",
+        )
+        parser.add_argument(
+            "--skip-negative-elastic-data",
+            action="store_true",
+            help="Skip materials whose elastic tensor contains negative cij values.",
         )
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for elastic ENERGY lines in the training set.")
@@ -301,7 +307,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
-            default="to-primitive",
+            default="to-conventional",
             help="Convert fetched crystal structure setting before generating files.",
         )
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set.")
@@ -334,6 +340,9 @@ def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) 
     if copied is not None:
         dirs.append(copied.parent)
     print_saved_dirs(dirs)
+    negative_ids = extra.get("negative_tensor_material_ids", []) if isinstance(extra, dict) else []
+    if negative_ids:
+        print("\n[Warning] Successful materials with negative elastic tensor values: " + ", ".join(negative_ids))
     return 0
 
 
@@ -376,6 +385,7 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
         out_yaml=str(args.out_yaml),
         structure_dir=args.structure_dir,
         skip_no_orthogonal=bool(getattr(args, "skip_not_orthogonal", False)),
+        skip_negative_elastic_data=bool(getattr(args, "skip_negative_elastic_data", False)),
         verbose=bool(args.verbose),
         weight=float(args.weight),
     )
