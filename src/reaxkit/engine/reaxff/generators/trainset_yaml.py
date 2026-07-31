@@ -215,6 +215,28 @@ def _extract_material_metadata_from_yaml(yaml_path: str | Path) -> Dict[str, str
     }
 
 
+def _extract_cell_parameters_from_yaml(yaml_path: str | Path) -> Dict[str, str]:
+    """Extract the bulk-cell lengths and angles used to generate a trainset."""
+    empty = {key: "" for key in ("a", "b", "c", "alpha", "beta", "gamma")}
+    try:
+        import yaml
+    except ImportError:
+        return empty
+    path = Path(yaml_path)
+    if not path.exists():
+        return empty
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return empty
+    cell = (data.get("bulk", {}) or {}).get("cell", {}) or {}
+    if not isinstance(cell, dict):
+        return empty
+    return {
+        key: str(cell.get(key, "") if cell.get(key) is not None else "").strip()
+        for key in empty
+    }
+
+
 def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
     """Collect cell warnings from yaml."""
     try:
@@ -713,6 +735,9 @@ def _generate_trainset_from_yaml(
     material_prefix = f"for material ID [{material_id}] " if material_id else ""
     bulk_cell = CellSpec(**bulk_cfg["cell"])
     elastic_cell = CellSpec(**elastic_cfg.get("cell", bulk_cfg["cell"]))
+    negative_tensor_warning = _collect_negative_elastic_tensor_warning(yaml_path)
+    if negative_tensor_warning:
+        print(f"[Warning] {material_prefix}{negative_tensor_warning}")
 
     if skip_no_orthogonal:
         is_elastic_ortho = _is_orthogonal_cell(elastic_cell)
@@ -977,6 +1002,7 @@ def _gen_elastic_trainset_batch_mode(
                 weight=weight,
             )
             meta = _extract_material_metadata_from_yaml(yaml_path)
+            cell_parameters = _extract_cell_parameters_from_yaml(yaml_path)
             warnings_list = _collect_cell_warnings_from_yaml(yaml_path)
             warning_text = " | ".join(warnings_list)
             negative_warning = _collect_negative_elastic_tensor_warning(yaml_path)
@@ -992,6 +1018,7 @@ def _gen_elastic_trainset_batch_mode(
                     "chemical_formula": meta.get("formula_pretty", ""),
                     "crystal_system": meta.get("crystal_system", ""),
                     "material_id": meta.get("mp_id", mat_id) or mat_id,
+                    **cell_parameters,
                     "status": "skip",
                     "warning": negative_warning + " (skipped by --skip-negative-elastic-data)",
                 })
@@ -1006,6 +1033,7 @@ def _gen_elastic_trainset_batch_mode(
                         "chemical_formula": meta.get("formula_pretty", ""),
                         "crystal_system": meta.get("crystal_system", ""),
                         "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        **cell_parameters,
                         "status": "success",
                         "warning": warning_text,
                     }
@@ -1022,6 +1050,7 @@ def _gen_elastic_trainset_batch_mode(
                         "chemical_formula": meta.get("formula_pretty", ""),
                         "crystal_system": meta.get("crystal_system", ""),
                         "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        **cell_parameters,
                         "status": "skip",
                         "warning": warning_text,
                     }
@@ -1052,6 +1081,7 @@ def _gen_elastic_trainset_batch_mode(
                     "chemical_formula": formula,
                     "crystal_system": crystal,
                     "material_id": material_id_for_row,
+                    **{key: "" for key in ("a", "b", "c", "alpha", "beta", "gamma")},
                     "status": "skip",
                     "warning": "",
                 }
@@ -1063,7 +1093,19 @@ def _gen_elastic_trainset_batch_mode(
     with csv_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(
             fh,
-            fieldnames=["chemical_formula", "crystal_system", "material_id", "status", "warning"],
+            fieldnames=[
+                "chemical_formula",
+                "crystal_system",
+                "material_id",
+                "a",
+                "b",
+                "c",
+                "alpha",
+                "beta",
+                "gamma",
+                "status",
+                "warning",
+            ],
         )
         writer.writeheader()
         writer.writerows(status_rows)
