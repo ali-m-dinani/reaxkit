@@ -639,6 +639,14 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             help="Comma-separated source atom symbols to merge, for example: W or W,Mo",
         )
         parser.add_argument(
+            "--keep-atoms-in-dest",
+            default=None,
+            help=(
+                "Comma-separated destination atom symbols to retain before merging, for example: Al,N. "
+                "All other destination atoms and parameter rows involving them are removed."
+            ),
+        )
+        parser.add_argument(
             "--replace-existing",
             action="store_true",
             help="Replace destination rows when the same atom tuple already exists.",
@@ -856,6 +864,11 @@ def _run_ffield_main(command: str, args: argparse.Namespace) -> int:
             template_similarity_mode=str(getattr(args, "template_similarity", "group")),
             template_closest_atom=getattr(args, "template_closest_atom", None),
             template_radius_metrics=_parse_csv_items(getattr(args, "template_radius_metrics", "")),
+            keep_atoms_in_destination=(
+                _parse_csv_items(args.keep_atoms_in_dest)
+                if getattr(args, "keep_atoms_in_dest", None) is not None
+                else None
+            ),
         )
 
         print(f"[Done] Merged ffield written to {summary.output_path}")
@@ -945,6 +958,7 @@ def _run_ffield_main(command: str, args: argparse.Namespace) -> int:
                 "source": str(args.source),
                 "destination": str(args.destination),
                 "atom_types": list(summary.atom_types_merged),
+                "keep_atoms_in_dest": _parse_csv_items(getattr(args, "keep_atoms_in_dest", "")),
                 "fields": list(summary.fields),
                 "report_format": str(args.report_format),
                 "report_paths": [str(p) for p in report_paths],

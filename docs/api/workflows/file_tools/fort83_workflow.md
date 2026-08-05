@@ -26,7 +26,7 @@ These are shared workflow-level CLI flags added before command-specific options,
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--fort83` | No | fort.83 | Path to fort.83. Example: --fort83 runs/job1/fort.83, which reads that optimization output file. |  |
-| `--output` | No | ffield_optimized | Output path for the extracted force field. Example: --output trained_ffield, which writes extracted parameters to that filename. |  |
+| `--output` | No | fort83_optimized_ffield | Output path for the extracted force field. Example: --output trained_ffield, which writes extracted parameters to that filename. |  |
 | `--copy-to-dot` | No |  | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
 | `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |

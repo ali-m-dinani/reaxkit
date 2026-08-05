@@ -22,6 +22,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
@@ -393,7 +394,13 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
     return pd.DataFrame(rows)
 
 
-def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
+def _parse_energy(
+    lines: List[str | tuple[int, str]],
+    section_name: str,
+    *,
+    strict: bool = False,
+    source_path: str = "<unknown>",
+) -> pd.DataFrame:
     """
      parse energy.
 
@@ -445,26 +452,36 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
         data, inline_comment = _split_inline_comment(line)
         tokens = data.split()
-        if len(tokens) < 3:
-            # need at least weight, something, lit
+
+        def reject(reason: str) -> None:
+            if strict:
+                raise ParseError(
+                    f"Invalid ENERGY entry in '{source_path}' at line {line_number}: "
+                    f"{reason}."
+                )
+
+        if len(tokens) < 4:
+            reject("expected weight, at least one operand, and literature value")
             continue
 
         # first token: weight
         try:
             weight = float(tokens[0])
         except ValueError:
-            # not a valid energy line
+            reject(f"weight '{tokens[0]}' is not numeric")
             continue
 
         # last token: lit (target energy)
         try:
             lit = float(tokens[-1])
         except ValueError:
+            reject(f"literature value '{tokens[-1]}' is not numeric")
             continue
 
         # middle_part: everything between weight and lit
         middle_part = " ".join(tokens[1:-1]).strip()
         if not middle_part:
+            reject("missing ENERGY operand")
             continue
 
         middle_tokens = middle_part.split()
@@ -481,6 +498,50 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
                     norm.append("/" + rest)
             else:
                 norm.append(tok)
+
+        normalized_operands: List[str] = []
+        operand_index = 1
+        i = 0
+        valid = True
+        while i < len(norm):
+            if i + 1 >= len(norm):
+                reject(f"operand {operand_index} is missing its identifier")
+                valid = False
+                break
+            normalized_operands.extend((norm[i], norm[i + 1]))
+            i += 2
+            if i < len(norm) and norm[i].startswith("/"):
+                normalized_operands.append(norm[i])
+                i += 1
+            else:
+                normalized_operands.append("/1")
+            operand_index += 1
+        if not valid:
+            continue
+        norm = normalized_operands
+        valid = True
+        for operand_index in range(0, len(norm), 3):
+            op, iden, divisor = norm[operand_index : operand_index + 3]
+            if op == "\u2013":
+                op = "-"
+            if op not in {"+", "-"}:
+                reject(f"operand {operand_index // 3 + 1} has invalid operator '{norm[operand_index]}'")
+                valid = False
+                break
+            if not iden or any(char in iden for char in "+-/"):
+                reject(f"operand {operand_index // 3 + 1} has invalid identifier '{iden}'")
+                valid = False
+                break
+            divisor_value = divisor[1:] if divisor.startswith("/") else ""
+            if not divisor_value.isdigit() or int(divisor_value) <= 0:
+                reject(
+                    f"operand {operand_index // 3 + 1} has invalid divisor '{divisor}'; "
+                    "expected / followed by a positive integer"
+                )
+                valid = False
+                break
+        if not valid:
+            continue
 
         row: Dict[str, Any] = {
             "section": section_name,
@@ -599,13 +660,20 @@ class TrainsetHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
-    _CACHE_VERSION = "3"
+    _CACHE_VERSION = "4"
     filetype = "trainset"
 
-    def __init__(self, file_path: str = "trainset.in", reporter=None):
+    def __init__(
+        self,
+        file_path: str = "trainset.in",
+        reporter=None,
+        *,
+        strict: bool = False,
+    ):
         """Init."""
         super().__init__(file_path)
         self._reporter = reporter
+        self.strict = strict
 
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
         """
@@ -621,8 +689,11 @@ class TrainsetHandler(BaseHandler):
         current_raw_label: Optional[str] = None
         current_canonical: Optional[str] = None
         buffer: List[tuple[int, str]] = []
+        section_occurrences: List[Dict[str, Any]] = []
+        occurrence_counts: Dict[str, int] = {}
+        current_section_start_line: Optional[int] = None
 
-        def flush_section():
+        def flush_section(end_line_number: Optional[int] = None):
             """Flush section.
 
             Parameters
@@ -643,7 +714,7 @@ class TrainsetHandler(BaseHandler):
             """
             nonlocal buffer, current_canonical, tables
 
-            if not current_canonical or not buffer:
+            if not current_canonical:
                 buffer = []
                 return
 
@@ -658,7 +729,12 @@ class TrainsetHandler(BaseHandler):
             elif name == "CELL_PARAMETERS":
                 df = _parse_cell_parameters(buffer, name)
             elif name == "ENERGY":
-                df = _parse_energy(buffer, name)
+                df = _parse_energy(
+                    buffer,
+                    name,
+                    strict=self.strict,
+                    source_path=str(self.path),
+                )
             else:
                 df = pd.DataFrame()
 
@@ -667,6 +743,19 @@ class TrainsetHandler(BaseHandler):
                 tables[name] = pd.concat([tables[name], df], ignore_index=True)
             else:
                 tables[name] = df
+
+            occurrence = occurrence_counts.get(name, 0) + 1
+            occurrence_counts[name] = occurrence
+            section_occurrences.append(
+                {
+                    "section": name,
+                    "occurrence": occurrence,
+                    "section_order": len(section_occurrences) + 1,
+                    "start_line_number": current_section_start_line,
+                    "end_line_number": end_line_number,
+                    "entry_count": len(df),
+                }
+            )
 
             buffer = []
 
@@ -681,10 +770,11 @@ class TrainsetHandler(BaseHandler):
 
             # SECTION START?
             if upper in SECTION_MAP:
-                flush_section()
+                flush_section(line_i - 1)
                 current_raw_label = stripped
                 current_canonical = SECTION_MAP[upper]
                 buffer = []
+                current_section_start_line = line_i
                 continue
 
             # INSIDE A SECTION
@@ -692,16 +782,17 @@ class TrainsetHandler(BaseHandler):
                 end_token = "END" + current_raw_label.replace(" ", "").upper()
 
                 if upper.startswith(end_token):
-                    flush_section()
+                    flush_section(line_i)
                     current_raw_label = None
                     current_canonical = None
                     buffer = []
+                    current_section_start_line = None
                     continue
 
                 buffer.append((line_i, raw))
 
         # Final flush
-        flush_section()
+        flush_section(total_lines if current_canonical else None)
         if self._reporter:
             self._reporter("load", total_lines, total_lines, "Finished parsing trainset")
 
@@ -709,6 +800,7 @@ class TrainsetHandler(BaseHandler):
         return pd.DataFrame(), {
             "sections": list(tables.keys()),
             "tables": tables,
+            "section_occurrences": section_occurrences,
         }
 
     # ------------------------------------------------------------------

@@ -126,17 +126,26 @@ def _interpret_params(
                 f"params points to {section_name} line {line_1b}, but section has {len(sec_df)} rows."
             )
 
-        param_cols = _param_columns_for_section(sec_df, section_key)
-        param_cols = [c for c in param_cols if not (str(c).endswith("_symbol") or c == "term")]
-        par_idx = par_1b - 1
-        if par_idx < 0 or par_idx >= len(param_cols):
-            raise IndexError(
-                f"params points to {section_name} parameter {par_1b}, "
-                f"but only {len(param_cols)} parameter columns exist: {param_cols}"
-            )
-
-        param_name = param_cols[par_idx]
         sec_row = sec_df.iloc[row_idx]
+        if section_key == "general":
+            if par_1b != 1:
+                raise IndexError(
+                    f"params points to general parameter {par_1b}; general rows "
+                    "contain exactly one value and require parameter index 1."
+                )
+            param_name = str(sec_row["name"])
+            parameter_value = sec_row["value"]
+        else:
+            param_cols = _param_columns_for_section(sec_df, section_key)
+            param_cols = [c for c in param_cols if not (str(c).endswith("_symbol") or c == "term")]
+            par_idx = par_1b - 1
+            if par_idx < 0 or par_idx >= len(param_cols):
+                raise IndexError(
+                    f"params points to {section_name} parameter {par_1b}, "
+                    f"but only {len(param_cols)} parameter columns exist: {param_cols}"
+                )
+            param_name = param_cols[par_idx]
+            parameter_value = sec_row[param_name]
         out_rows.append(
             {
                 "component": param_name,
@@ -148,7 +157,7 @@ def _interpret_params(
                 "max_value": row.max_value,
                 "inline_comment": row.inline_comment,
                 "ffield_section_name": section_name,
-                "ffield_value": sec_row[param_name],
+                "ffield_value": parameter_value,
                 "term": sec_row.get("term"),
             }
         )

@@ -41,7 +41,7 @@ class Fort99Handler(BaseHandler):
     Summary table
         One row per training target, returned by ``dataframe()``,
         with columns:
-        ["lineno", "section", "title",
+        ["lineno", "title_lineno", "section", "title",
          "ffield_value", "qm_value", "weight",
          "error", "total_ff_error"]
 
@@ -56,6 +56,9 @@ class Fort99Handler(BaseHandler):
     -----
     - The last five numeric values on each line are interpreted as
       (FF value, QM/reference value, weight, error, total error).
+    - Both one-line records and a title line followed by a numeric line are
+      accepted. ``lineno`` identifies the numeric line and ``title_lineno``
+      identifies the title source line.
     - Section categories are inferred heuristically from the title text.
     - Unrecognized entries are retained with ``section=None``.
     - This handler is not frame-based; ``n_frames()`` always returns 0.
@@ -85,6 +88,7 @@ class Fort99Handler(BaseHandler):
 
         """
         rows: List[Dict[str, Any]] = []
+        pending_title: tuple[int, str] | None = None
 
         # float like -17.8000, 1.54, 1.0e-03, etc.
         float_re = re.compile(r"[+-]?(?:\d+\.\d*|\d*\.\d+|\d+)(?:[eE][+-]?\d+)?")
@@ -102,6 +106,9 @@ class Fort99Handler(BaseHandler):
                 # Find all floats
                 matches = list(float_re.finditer(line))
                 if len(matches) < 5:
+                    candidate = line.strip()
+                    if candidate and "ffield value" not in candidate.lower():
+                        pending_title = (lineno, candidate.rstrip(":"))
                     continue
 
                 # Extract last 5 numbers
@@ -112,8 +119,12 @@ class Fort99Handler(BaseHandler):
                 # Title
                 title_start = last5[0].start()
                 title = line[:title_start].strip()
+                title_line_number = lineno
+                if not title and pending_title is not None:
+                    title_line_number, title = pending_title
                 if not title:
                     continue
+                pending_title = None
 
                 tl = title.lower()
 
@@ -130,12 +141,12 @@ class Fort99Handler(BaseHandler):
                     section = "ENERGY"
                 else:
                     section = None  # mark unknown
-                    print(f"Unrecognized fort.99 entry at line {lineno}: {title}")
 
                 # Save row
                 rows.append(
                     {
                         "lineno": lineno,
+                        "title_lineno": title_line_number,
                         "section": section,
                         "title": title,
                         "ffield_value": ffield_val,

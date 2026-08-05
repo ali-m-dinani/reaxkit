@@ -593,7 +593,9 @@ class FFieldHandler(BaseHandler):
             record.update({name: val for name, val in zip(names, values)})
             records.append(record)
 
-        df = pd.DataFrame.from_records(records).set_index("bond_index")
+        df = pd.DataFrame.from_records(
+            records, columns=["bond_index", "i", "j", *names]
+        ).set_index("bond_index")
         return df, i
 
     def _parse_off_diagonal_section(
@@ -679,7 +681,9 @@ class FFieldHandler(BaseHandler):
             record.update({name: val for name, val in zip(names, values)})
             records.append(record)
 
-        df = pd.DataFrame.from_records(records).set_index("offdiag_index")
+        df = pd.DataFrame.from_records(
+            records, columns=["offdiag_index", "i", "j", *names]
+        ).set_index("offdiag_index")
         return df, i
 
     def _parse_angle_section(
@@ -773,7 +777,9 @@ class FFieldHandler(BaseHandler):
             record.update({name: val for name, val in zip(names, values)})
             records.append(record)
 
-        df = pd.DataFrame.from_records(records).set_index("angle_index")
+        df = pd.DataFrame.from_records(
+            records, columns=["angle_index", "i", "j", "k", *names]
+        ).set_index("angle_index")
         return df, i
 
     def _parse_torsion_section(
@@ -875,7 +881,9 @@ class FFieldHandler(BaseHandler):
             record.update({name: val for name, val in zip(names, values)})
             records.append(record)
 
-        df = pd.DataFrame.from_records(records).set_index("torsion_index")
+        df = pd.DataFrame.from_records(
+            records, columns=["torsion_index", "i", "j", "k", "l", *names]
+        ).set_index("torsion_index")
         return df, i
 
     def _parse_hbond_section(
@@ -969,7 +977,9 @@ class FFieldHandler(BaseHandler):
             record.update({name: val for name, val in zip(names, values)})
             records.append(record)
 
-        df = pd.DataFrame.from_records(records).set_index("hbond_index")
+        df = pd.DataFrame.from_records(
+            records, columns=["hbond_index", "i", "j", "k", *names]
+        ).set_index("hbond_index")
         return df, i
 
     # ---------------- helpers ------------------------------------
