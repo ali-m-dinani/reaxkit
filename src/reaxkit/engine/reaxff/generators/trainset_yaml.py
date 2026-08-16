@@ -44,6 +44,12 @@ DEFAULT_CIJ_GPA = {
     "c66": 50,
 }
 
+
+def _filesystem_safe_material_id(material_id: str) -> str:
+    """Return a shell-friendly material ID for directory and file names."""
+    return re.sub(r"[^A-Za-z0-9_]+", "_", str(material_id).strip()).strip("_")
+
+
 DEFAULT_CELL = CellSpec(a=2.85086, b=2.85086, c=3.49456, alpha=90.0, beta=90.0, gamma=90.0)
 DEFAULT_TABLES = {
     "bulk": "EvsStrain_bulk.dat",
@@ -785,7 +791,7 @@ def _generate_trainset_from_yaml(
         out_dir=out_dir_p,
         trainset_filename=cfg.get("output", {}).get("trainset_file", "trainset_elastic.in"),
     )
-    dat_dir = out_dir_p / "volume energy data"
+    dat_dir = out_dir_p / "volume_energy_data"
     dat_dir.mkdir(parents=True, exist_ok=True)
     for key, path in written_energy_paths.items():
         if key == "trainset":
@@ -986,7 +992,8 @@ def _gen_elastic_trainset_batch_mode(
     for idx, mat_id in enumerate(mat_ids):
         if idx > 0:
             print("")
-        target_dir = successful_root / mat_id
+        filesystem_mat_id = _filesystem_safe_material_id(mat_id)
+        target_dir = successful_root / filesystem_mat_id
         try:
             yaml_path, generated = _run_single_material_id_elastic_trainset(
                 source_adapter=source_adapter,
@@ -1009,7 +1016,7 @@ def _gen_elastic_trainset_batch_mode(
             if generated and skip_negative_elastic_data and negative_warning:
                 generated = False
                 skipped += 1
-                skipped_target = skipped_root / mat_id
+                skipped_target = skipped_root / filesystem_mat_id
                 if skipped_target.exists():
                     shutil.rmtree(skipped_target)
                 if target_dir.exists():
@@ -1040,7 +1047,7 @@ def _gen_elastic_trainset_batch_mode(
                 )
             else:
                 skipped_non_orthogonal += 1
-                skipped_target = skipped_root / mat_id
+                skipped_target = skipped_root / filesystem_mat_id
                 if skipped_target.exists():
                     shutil.rmtree(skipped_target)
                 if target_dir.exists():
@@ -1057,7 +1064,7 @@ def _gen_elastic_trainset_batch_mode(
                 )
         except Exception as exc:
             skipped += 1
-            skipped_target = skipped_root / mat_id
+            skipped_target = skipped_root / filesystem_mat_id
             if skipped_target.exists():
                 shutil.rmtree(skipped_target)
             if target_dir.exists():

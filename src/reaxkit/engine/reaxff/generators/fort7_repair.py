@@ -129,11 +129,21 @@ def _fix_data_line(line: str, n_bonds: int) -> tuple[str, str]:
     atom_index, atom_type = left[0], left[1]
     raw = left[2:]
 
+    atom_type_was_fused = False
     if len(atom_type) > 1 and atom_type.isdigit():
         raw = [atom_type[1:]] + raw if atom_type[1:] else raw
         atom_type = atom_type[0]
+        atom_type_was_fused = True
 
     if _is_valid_compact_row(raw, n_bonds):
+        # ``raw`` may only have become valid because the original atom-type
+        # token contained both the one-digit type and the first neighbor id
+        # (for example ``120594`` -> type 1, neighbor 20594).  Returning the
+        # original line here used to discard that split and left the repaired
+        # file unparseable even though it was reported as ``unchanged``.
+        if atom_type_was_fused:
+            rebuilt_left = [atom_index, atom_type] + raw
+            return " ".join(rebuilt_left + right) + "\n", "fixed"
         return line, "unchanged"
 
     if len(raw) < 1:

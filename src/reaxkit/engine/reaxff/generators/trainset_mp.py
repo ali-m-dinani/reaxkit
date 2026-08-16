@@ -20,7 +20,10 @@ from mp_api.client import MPRester
 
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import CellSpec
-from reaxkit.engine.reaxff.generators.trainset_yaml import _write_trainset_settings_yaml
+from reaxkit.engine.reaxff.generators.trainset_yaml import (
+    _filesystem_safe_material_id,
+    _write_trainset_settings_yaml,
+)
 
 
 BulkModulusMode = Literal["voigt", "reuss", "vrh"]
@@ -448,7 +451,7 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
     structure_dir = Path(spec.structure_dir) if spec.structure_dir is not None else out_yaml.parent
     structure_dir.mkdir(parents=True, exist_ok=True)
 
-    base = spec.mp_id.replace(":", "_")
+    base = _filesystem_safe_material_id(spec.mp_id)
     cif_path = structure_dir / f"{base}.cif"
     xyz_path = structure_dir / f"{base}.xyz"
 

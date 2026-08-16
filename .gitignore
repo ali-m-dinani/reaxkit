@@ -54,6 +54,7 @@ docs/file_templates/molfra.out
 docs/file_templates/summary.txt
 docs/file_templates/xmolout
 src/reaxkit/webui/reaxkit_workspace
+reaxkit_workspace/
 
 # Generated outputs and temporary folders
 examples_to_test/
