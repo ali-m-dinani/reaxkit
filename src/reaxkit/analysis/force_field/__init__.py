@@ -20,6 +20,11 @@ from reaxkit.analysis.force_field.diagnostics import (
     FFieldOptimizationDiagnosticResult,
     FFieldOptimizationDiagnosticTask,
 )
+from reaxkit.analysis.force_field.diagnostic_beeswarm import (
+    FFieldOptimizationDiagnosticBeeswarmRequest,
+    FFieldOptimizationDiagnosticBeeswarmResult,
+    FFieldOptimizationDiagnosticBeeswarmTask,
+)
 from reaxkit.analysis.force_field.report import (
     FFieldOptimizationReportBulkModulusRequest,
     FFieldOptimizationReportBulkModulusResult,
@@ -50,6 +55,9 @@ __all__ = [
     "FFieldOptimizationDiagnosticRequest",
     "FFieldOptimizationDiagnosticResult",
     "FFieldOptimizationDiagnosticTask",
+    "FFieldOptimizationDiagnosticBeeswarmRequest",
+    "FFieldOptimizationDiagnosticBeeswarmResult",
+    "FFieldOptimizationDiagnosticBeeswarmTask",
     "FFieldOptimizationReportRequest",
     "FFieldOptimizationReportResult",
     "FFieldOptimizationReportTask",

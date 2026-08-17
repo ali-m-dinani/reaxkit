@@ -107,13 +107,22 @@ The figure below shows an example tornado plot for the sensitivity of force fiel
 
 <a id="get_ffield_diagnostic_data_plot_beeswarm"></a>
 
-An example beeswarm plot for the sensitivity is as follows:
+The diagnostic beeswarm normalizes every sampled parameter value with the lower
+and upper bounds declared in `params`. Marker color represents the objective
+function, from blue for lower values to red for higher values. By default each
+parameter uses its own objective range; `--global-objective-scale` applies one
+range across the full plot. Use `--sort parameter`, `--sort final`, or
+`--sort starting` to order the rows.
 
-<div style="text-align:center;" markdown="1">
-![get_ffield_diagnostic_data_plot_beeswarm](../../../figures/get_ffield_diagnostic_data_plot_beeswarm.png){ style="width:85%; max-width:800px;" }
+```text
+reaxkit get_ffield_diagnostic_data --plot beeswarm --params params \
+  --sort parameter --save diagnostic_beeswarm.png
+```
 
-*Figure: Sample beeswarm plot for the sensitivity of force field optimization error to each parameter*
-</div>
+The rendered plot places the normalized samples on the left, the stored bounds
+and final/starting values in a separate annotation region, and the objective
+color scale on the far right. Interactive plot windows show the interpreted
+force-field parameter name when hovering over a marker.
 
 </div>
 

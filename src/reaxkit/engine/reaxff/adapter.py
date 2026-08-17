@@ -40,6 +40,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationData,
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationDiagnosticBundleData,
+    ForceFieldOptimizationDiagnosticPlotData,
     ForceFieldOptimizationReportEOSBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
@@ -77,6 +78,7 @@ from reaxkit.engine.reaxff.adapter_parts.loaders_forcefield import (
     load_force_field_optimization_training_set as _load_force_field_optimization_training_set_impl,
     load_parameter_optimization_diagnostic as _load_parameter_optimization_diagnostic_impl,
     load_parameter_optimization_diagnostic_bundle as _load_parameter_optimization_diagnostic_bundle_impl,
+    load_parameter_optimization_diagnostic_plot_data as _load_parameter_optimization_diagnostic_plot_data_impl,
 )
 from reaxkit.engine.reaxff.adapter_parts.loaders_properties import (
     load_atomic_kinematics as _load_atomic_kinematics_impl,
@@ -203,6 +205,7 @@ class ReaxFFAdapter(EngineAdapter):
             ForceFieldOptimizationData: ("ffield", "params"),
             ForceFieldOptimizationParameterBundleData: ("params", "ffield"),
             ForceFieldOptimizationDiagnosticBundleData: ("fort.79", "ffield"),
+            ForceFieldOptimizationDiagnosticPlotData: ("fort.79", "ffield", "params"),
             ForceFieldOptimizationReportEOSBundleData: ("fort.99", "fort.74"),
             ForceFieldOptimizationParameterData: ("params",),
             ForceFieldOptimizationReportData: ("fort.99",),
@@ -360,6 +363,14 @@ class ReaxFFAdapter(EngineAdapter):
     ) -> ForceFieldOptimizationDiagnosticBundleData:
         """Load parameter-optimization diagnostic bundle data."""
         return _load_parameter_optimization_diagnostic_bundle_impl(self, args, reporter=reporter)
+
+    def load_parameter_optimization_diagnostic_plot_data(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationDiagnosticPlotData:
+        """Load bounded parameter-diagnostic plot inputs."""
+        return _load_parameter_optimization_diagnostic_plot_data_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_report_eos_bundle(
         self,

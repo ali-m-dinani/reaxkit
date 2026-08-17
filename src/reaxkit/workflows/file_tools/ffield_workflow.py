@@ -20,6 +20,9 @@ import pandas as pd
 
 from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
 from reaxkit.analysis.force_field.diagnostics import FFieldOptimizationDiagnosticRequest
+from reaxkit.analysis.force_field.diagnostic_beeswarm import (
+    FFieldOptimizationDiagnosticBeeswarmRequest,
+)
 from reaxkit.analysis.force_field.force_field import FFieldDataRequest, FFieldDataTask
 from reaxkit.analysis.force_field.optimization_progress import FFieldOptimizationProgressRequest
 from reaxkit.analysis.force_field.report import (
@@ -362,9 +365,8 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 
                 "  4. Getting the diagnostics data, plotting a beeswarm plot for all parameters, and saving the plot:\n"
                 "   This plot is very similar to the tornado plot, but instead of showing the span between the current and perturbed error as a bar, "
-                "it shows the actual distribution of the error values at the current and perturbed parameter values as swarm points. \n"
-                "   A really good example of this plot can be found at: https://www.aidancooper.co.uk/how-shapley-values-work/"
-                "reaxkit get_ffield_diagnostic_data --plot beeswarm --top 3 --save diagnostic_beeswarm.png\n\n"
+                "it normalizes sampled parameter values with their declared params bounds and colors them by objective value. \n"
+                "   reaxkit get_ffield_diagnostic_data --plot beeswarm --sort parameter --save diagnostic_beeswarm.png\n\n"
             )
             parser.add_argument(
                 "--interpret",
@@ -385,13 +387,25 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 "--top",
                 type=int,
                 default=0,
-                help="For tornado view, keep top-N widest spans; 0 keeps all.",
+                help="For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all.",
             )
             parser.add_argument(
                 "--vline",
                 type=float,
                 default=1.0,
                 help="For tornado view, reference x-value for the guide line.",
+            )
+            parser.add_argument(
+                "--sort",
+                dest="diagnostic_sort",
+                choices=["parameter", "final", "starting"],
+                default="parameter",
+                help="For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value.",
+            )
+            parser.add_argument(
+                "--global-objective-scale",
+                action="store_true",
+                help="For beeswarm view, use one objective-function color range across all parameters.",
             )
         elif command == "get_ffield_opt_results":
             parser.description = (
@@ -1157,6 +1171,7 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
     parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
     parser.add_argument("--ffield", default="ffield", help="Path to ffield")
+    parser.add_argument("--params", default="params", help="Path to optimization parameter bounds")
     parser.add_argument("--fort13", default="fort.13", help="Path to fort.13")
     parser.add_argument("--fort79", default="fort.79", help="Path to fort.79")
     parser.add_argument("--fort99", default="fort.99", help="Path to fort.99")
@@ -1200,6 +1215,17 @@ def _build_parameter_optimization_diagnostic_request(args: argparse.Namespace) -
     """Build parameter optimization diagnostic request."""
     return FFieldOptimizationDiagnosticRequest(
         interpret=bool(getattr(args, "interpret", False)),
+    )
+
+
+def _build_parameter_optimization_diagnostic_beeswarm_request(
+    args: argparse.Namespace,
+) -> FFieldOptimizationDiagnosticBeeswarmRequest:
+    """Build the bounded diagnostic beeswarm request."""
+    return FFieldOptimizationDiagnosticBeeswarmRequest(
+        sort_by=str(getattr(args, "diagnostic_sort", "parameter") or "parameter"),
+        global_objective_scale=bool(getattr(args, "global_objective_scale", False)),
+        top=int(getattr(args, "top", 0) or 0),
     )
 
 
@@ -1373,44 +1399,33 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
     if command == "get_ffield_diagnostic_data":
         if getattr(args, "plot", None) == "beeswarm":
-            if "identifier" not in table.columns:
+            parameters = getattr(result, "parameters", None)
+            required = {
+                "normalized_value",
+                "plot_row",
+                "objective_value",
+                "parameter_value",
+                "parameter_label",
+                "sample_name",
+            }
+            if not isinstance(parameters, pd.DataFrame) or parameters.empty:
                 return None
-            candidate_cols = [col for col in table.columns if "sensitivity" in str(col).lower()]
-            if not candidate_cols:
+            if not required.issubset(table.columns):
                 return None
-            long = (
-                table[["identifier"] + candidate_cols]
-                .melt(id_vars=["identifier"], value_vars=candidate_cols, var_name="metric", value_name="value")
-                .dropna(subset=["value"])
-            )
-            if long.empty:
-                return None
-            long["value"] = pd.to_numeric(long["value"], errors="coerce")
-            long = long.dropna(subset=["value"])
-            if long.empty:
-                return None
-            top = int(getattr(args, "top", 0) or 0)
-            if top > 0:
-                spans = (
-                    long.groupby("identifier", dropna=False)["value"]
-                    .agg(lambda s: float(s.max() - s.min()))
-                    .sort_values(ascending=False)
-                )
-                keep = set(spans.head(top).index.tolist())
-                long = long.loc[long["identifier"].isin(keep)].copy()
-                if long.empty:
-                    return None
             return {
                 "plot_type": "beeswarm_plot",
-                "x": long["value"].tolist(),
-                "y": long["identifier"].astype(str).tolist(),
-                "hue": long["value"].tolist(),
-                "palette": "coolwarm",
-                "size": 5,
-                "legend": False,
-                "xlabel": "Sensitivity",
-                "ylabel": "",
-                "title": "Parameter Sensitivity Beeswarm",
+                "x": pd.to_numeric(table["normalized_value"], errors="coerce").tolist(),
+                "y": pd.to_numeric(table["plot_row"], errors="coerce").tolist(),
+                "hue": pd.to_numeric(table["objective_value"], errors="coerce").tolist(),
+                "parameter_values": pd.to_numeric(table["parameter_value"], errors="coerce").tolist(),
+                "parameter_labels": table["parameter_label"].astype(str).tolist(),
+                "sample_names": table["sample_name"].astype(str).tolist(),
+                "diagnostic_parameters": parameters.to_dict(orient="records"),
+                "global_objective_scale": bool(getattr(result.request, "global_objective_scale", False)),
+                "size": 42,
+                "xlabel": "Normalized parameter value within optimization bounds",
+                "ylabel": "Parameter",
+                "title": "Parameter diagnostics",
             }
         tornado_cols = {"min_eff", "max_eff", "median_eff", "identifier"}
         if _wants_tornado_view(args) or tornado_cols.issubset(set(table.columns)):
@@ -1653,6 +1668,14 @@ def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
 
     if canonical == "get_ffield_diagnostic_data":
         executor = AnalysisExecutor()
+        if str(getattr(args, "plot", "") or "").lower() == "beeswarm":
+            result = executor.run(
+                TASK_REGISTRY["parameter_optimization_diagnostic_beeswarm"](),
+                _build_parameter_optimization_diagnostic_beeswarm_request(args),
+                vars(args),
+            )
+            present_result(canonical, result, args, plot_payload_builder=_plot_payload)
+            return 0
         base_result = executor.run(
             TASK_REGISTRY["parameter_optimization_diagnostic"](),
             REQUEST_BUILDERS["get_ffield_diagnostic_data"](args),

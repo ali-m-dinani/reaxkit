@@ -19,6 +19,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationData,
     ForceFieldOptimizationDiagnosticBundleData,
     ForceFieldOptimizationDiagnosticData,
+    ForceFieldOptimizationDiagnosticPlotData,
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationProgressData,
@@ -411,6 +412,19 @@ def load_parameter_optimization_diagnostic_bundle(
     return ForceFieldOptimizationDiagnosticBundleData(
         diagnostics=adapter.load_parameter_optimization_diagnostic(args, reporter=reporter),
         force_field_parameters=adapter.load_force_field(args, reporter=reporter),
+    )
+
+
+def load_parameter_optimization_diagnostic_plot_data(
+    adapter: ReaxFFAdapter,
+    args: dict,
+    reporter=None,
+) -> ForceFieldOptimizationDiagnosticPlotData:
+    """Load diagnostics, force-field values, and optimization bounds for plotting."""
+    return ForceFieldOptimizationDiagnosticPlotData(
+        diagnostics=adapter.load_parameter_optimization_diagnostic(args, reporter=reporter),
+        force_field_parameters=adapter.load_force_field(args, reporter=reporter),
+        optimization_parameters=adapter.load_force_field_optimization_parameters(args, reporter=reporter),
     )
 
 

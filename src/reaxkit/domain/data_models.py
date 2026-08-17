@@ -1265,6 +1265,34 @@ class ForceFieldOptimizationDiagnosticBundleData:
 
 
 @dataclass
+class ForceFieldOptimizationDiagnosticPlotData:
+    """Composite inputs for bounded optimization-diagnostic plots.
+
+    The diagnostic samples and force-field tables provide the objective values,
+    descriptive parameter labels, and starting force-field values.  The
+    optimization-parameter definitions provide the stored search bounds used to
+    normalize every parameter onto the shared ``[0, 1]`` plot axis.
+
+    Fields
+    ------
+    diagnostics : ForceFieldOptimizationDiagnosticData
+        Required optimization diagnostic samples.
+    force_field_parameters : ForceFieldParametersData
+        Required force-field tables used to resolve parameter names and starting
+        values.
+    optimization_parameters : ForceFieldOptimizationParameterData
+        Required optimization declarations containing increments and bounds.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
+    """
+
+    diagnostics: ForceFieldOptimizationDiagnosticData
+    force_field_parameters: ForceFieldParametersData
+    optimization_parameters: ForceFieldOptimizationParameterData
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
 class ForceFieldOptimizationReportEOSBundleData:
     """Composite data for EOS report tasks.
 
