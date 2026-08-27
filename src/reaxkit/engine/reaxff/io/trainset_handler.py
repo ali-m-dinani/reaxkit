@@ -19,6 +19,7 @@ parameters, and energies.
 
 from __future__ import annotations
 
+import math
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
@@ -29,6 +30,7 @@ from reaxkit.engine.reaxff.io.base import BaseHandler
 # Map raw section labels in the file to canonical section names
 SECTION_MAP = {
     "CHARGE": "CHARGE",
+    "CHARGES": "CHARGE",
     "HEATFO": "HEATFO",
     "GEOMETRY": "GEOMETRY",
     "CELL PARAMETERS": "CELL_PARAMETERS",
@@ -68,6 +70,30 @@ def _unpack_line_item(item: str | tuple[int, str]) -> tuple[int, str]:
     return -1, str(item)
 
 
+def _advance_group_comment(
+    *,
+    current: str,
+    text: str,
+    last_was_comment: bool,
+    current_line_number: object,
+    occurrence: int,
+    line_number: int,
+) -> tuple[str, bool, object, int]:
+    """Update one comment block while preserving its source occurrence."""
+    if last_was_comment:
+        if current and text:
+            current = f"{current} /// {text}"
+        elif text:
+            current = text
+        return current, True, current_line_number, occurrence
+    return (
+        text,
+        True,
+        line_number if line_number >= 0 else pd.NA,
+        occurrence + 1,
+    )
+
+
 def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     CHARGE block:
@@ -90,6 +116,8 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track previous processed line
 
     for item in lines:
@@ -110,12 +138,19 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
             # If previous line was comment → append
             # If previous line was data/start → new block
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → the next comment block should replace, not append
@@ -136,6 +171,8 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "atom": atom,
@@ -156,10 +193,14 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
         # group line 1
         # group line 2
         benzene  1.0  -19.82  !heat of formation
+        cyclohexane  2.0      !reference may be supplied by fort.99
         ...
         ENDHEATFO
 
     Columns: section, iden, weight, lit, inline_comment, group_comment
+
+    ``lit`` is optional because some ReaxFF trainsets omit it while fort.99
+    still reports the QM/literature target used by the optimization.
 
     group_comment behavior:
     - Consecutive '#' lines are concatenated with " /// ".
@@ -168,6 +209,8 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -187,12 +230,19 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
                 continue
 
             # Same block → append; new block → overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comment block should overwrite, not append
@@ -200,18 +250,20 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
         data, inline_comment = _split_inline_comment(line)
         tokens = data.split()
-        if len(tokens) < 3:
+        if len(tokens) < 2:
             continue
 
         iden = tokens[0]
         weight = float(tokens[1])
-        lit = float(tokens[2])
+        lit = float(tokens[2]) if len(tokens) >= 3 else pd.NA
 
         rows.append(
             {
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "lit": lit,
@@ -247,6 +299,8 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -265,12 +319,19 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
                 continue
 
             # Same block → append; new block → overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comment block should overwrite, not append
@@ -298,6 +359,8 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
             "lit": lit,
             "inline_comment": inline_comment,
             "group_comment": group_comment,
+            "group_comment_line_number": group_comment_line_number,
+            "group_comment_occurrence": group_comment_occurrence,
         }
 
         # Fill at1–at4 only if present
@@ -337,6 +400,8 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -357,12 +422,19 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
 
             # If previous line was also a comment, append (same block)
             # If previous line was data or start of section, start a new block
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comments should be treated as a new block
@@ -383,6 +455,8 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "type": type_,
@@ -419,6 +493,8 @@ def _parse_energy(
     """
     rows: List[Dict[str, Any]] = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track if previous processed line was a comment
 
     for item in lines:
@@ -439,12 +515,19 @@ def _parse_energy(
 
             # If previous line was also a comment → same block, append
             # If previous line was data or start → new block, overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # ---- data line ----
@@ -533,10 +616,14 @@ def _parse_energy(
                 valid = False
                 break
             divisor_value = divisor[1:] if divisor.startswith("/") else ""
-            if not divisor_value.isdigit() or int(divisor_value) <= 0:
+            try:
+                parsed_divisor = float(divisor_value)
+            except ValueError:
+                parsed_divisor = 0.0
+            if not math.isfinite(parsed_divisor) or parsed_divisor <= 0:
                 reject(
                     f"operand {operand_index // 3 + 1} has invalid divisor '{divisor}'; "
-                    "expected / followed by a positive integer"
+                    "expected / followed by a positive number"
                 )
                 valid = False
                 break
@@ -547,6 +634,8 @@ def _parse_energy(
             "section": section_name,
             "line_number": line_number if line_number >= 0 else pd.NA,
             "group_comment": group_comment,
+            "group_comment_line_number": group_comment_line_number,
+            "group_comment_occurrence": group_comment_occurrence,
             "weight": weight,
         }
 
@@ -660,7 +749,7 @@ class TrainsetHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
-    _CACHE_VERSION = "4"
+    _CACHE_VERSION = "7"
     filetype = "trainset"
 
     def __init__(

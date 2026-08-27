@@ -41,6 +41,7 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationDiagnosticBundleData,
     ForceFieldOptimizationDiagnosticPlotData,
+    ForceFieldOptimizationPlotBundleData,
     ForceFieldOptimizationReportEOSBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
@@ -73,6 +74,7 @@ from reaxkit.engine.reaxff.adapter_parts.loaders_forcefield import (
     load_force_field_optimization_data as _load_force_field_optimization_data_impl,
     load_force_field_optimization_parameter_bundle as _load_force_field_optimization_parameter_bundle_impl,
     load_force_field_optimization_parameters as _load_force_field_optimization_parameters_impl,
+    load_force_field_optimization_plot_bundle as _load_force_field_optimization_plot_bundle_impl,
     load_force_field_optimization_report as _load_force_field_optimization_report_impl,
     load_force_field_optimization_report_eos_bundle as _load_force_field_optimization_report_eos_bundle_impl,
     load_force_field_optimization_training_set as _load_force_field_optimization_training_set_impl,
@@ -206,6 +208,7 @@ class ReaxFFAdapter(EngineAdapter):
             ForceFieldOptimizationParameterBundleData: ("params", "ffield"),
             ForceFieldOptimizationDiagnosticBundleData: ("fort.79", "ffield"),
             ForceFieldOptimizationDiagnosticPlotData: ("fort.79", "ffield", "params"),
+            ForceFieldOptimizationPlotBundleData: ("fort.99", "fort.74", "trainset.in", "geo"),
             ForceFieldOptimizationReportEOSBundleData: ("fort.99", "fort.74"),
             ForceFieldOptimizationParameterData: ("params",),
             ForceFieldOptimizationReportData: ("fort.99",),
@@ -379,6 +382,14 @@ class ReaxFFAdapter(EngineAdapter):
     ) -> ForceFieldOptimizationReportEOSBundleData:
         """Load force-field optimization EOS bundle data."""
         return _load_force_field_optimization_report_eos_bundle_impl(self, args, reporter=reporter)
+
+    def load_force_field_optimization_plot_bundle(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationPlotBundleData:
+        """Load force-field optimization curve-classification inputs."""
+        return _load_force_field_optimization_plot_bundle_impl(self, args, reporter=reporter)
 
     def load_structure_summary(self, args: dict, reporter=None) -> EnergyMinimizationSummaryData:
         """Load structure-summary data."""

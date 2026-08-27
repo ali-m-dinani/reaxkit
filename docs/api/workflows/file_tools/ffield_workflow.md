@@ -11,9 +11,25 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Build energy curves from force-field optimization report data. In `single` mode,
+one figure is created per EOS identifier. If physical volumes are unavailable,
+the numeric scan coordinate encoded in each point identifier is used.
+
+### Examples
+
+```text
+reaxkit get_ffield_opt_eos --iden all --plot single --save eos_plots
+reaxkit get_ffield_opt_eos --iden all --plot subplot --save eos.png
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+| Flag | Required | Default | Help |
+|---|---|---|---|
+| `--iden` | No | all | Identifier to keep; use `all` for every EOS group. |
+| `--flip-sign` | No | false | Flip the energy sign before plotting or export. |
+| `--plot` | No |  | Use `single` for one figure per identifier or `subplot` for one combined figure. |
+| `--save` | No |  | In `single` mode, an output directory; in `subplot` mode, a figure path. |
 
 </div>
 

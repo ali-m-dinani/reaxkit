@@ -48,7 +48,7 @@ source_files_by_layer:
 
   workflow_level:
     - file: reaxkit/workflows/data/workflow_dataclass_map.yaml
-      role: "Workflow modules, routed commands, and command_to_workflow_module mapping."
+      role: "Workflow families, dedicated runnable-command metadata, and command_to_workflow_module routing."
 
 runtime_usage:
   module: reaxkit/help/help_index_loader.py

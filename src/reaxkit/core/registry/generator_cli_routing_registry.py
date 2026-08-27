@@ -154,5 +154,5 @@ register_generator("gen_template_vregime", module_path="reaxkit.workflows.file_t
 register_generator("make-vregime", module_path="reaxkit.workflows.file_tools.vregime_workflow")
 register_generator("free-up", module_path="reaxkit.workflows.meta.manage_workspace_workflow")
 register_generator("manage-workspace", module_path="reaxkit.workflows.meta.manage_workspace_workflow")
-register_generator("gen-video", module_path="reaxkit.workflows.meta.gen_video_workflow")
+register_generator("gen-video", module_path="reaxkit.workflows.presentation.gen_video_workflow")
 register_generator("gen-plot", module_path="reaxkit.workflows.meta.gen_plot_workflow")

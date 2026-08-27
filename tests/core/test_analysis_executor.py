@@ -23,3 +23,13 @@ def test_engine_detection_path_uses_snapshot_source_when_input_is_default():
     }
 
     assert AnalysisExecutor._engine_detection_path(args) == "run_directory"
+
+
+def test_engine_detection_path_ignores_storage_synthesized_input():
+    args = {
+        "input": "reaxkit_workspace/data/raw/run_123",
+        "_input_was_explicit": False,
+        "_snapshot_source_dir": "run_directory",
+    }
+
+    assert AnalysisExecutor._engine_detection_path(args) == "run_directory"

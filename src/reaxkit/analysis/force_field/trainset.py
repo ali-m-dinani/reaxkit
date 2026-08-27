@@ -15,6 +15,7 @@ trainset files directly.
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
+import re
 from typing import Any
 
 import pandas as pd
@@ -52,49 +53,195 @@ def _get_trainset_section_tables(data: ForceFieldOptimizationTrainingSetData) ->
 def _get_trainset_group_comments(
     data: ForceFieldOptimizationTrainingSetData,
 ) -> pd.DataFrame:
-    """Collect unique non-empty group comments across trainset sections."""
+    """Collect every comment-block occurrence, including empty blocks."""
     tables = _get_trainset_section_tables(data)
-    rows: list[dict[str, str]] = []
+    rows: list[dict[str, object]] = []
     for section_name, df in tables.items():
-        if "group_comment" not in df.columns:
+        if df.empty or "group_comment" not in df.columns:
             continue
         work = df.copy()
-        work["group_comment"] = work["group_comment"].astype(str).str.strip()
-        work = work[work["group_comment"] != ""]
-        if work.empty:
-            continue
-        if "line_number" in work.columns:
-            work["line_number"] = pd.to_numeric(work["line_number"], errors="coerce")
-            reduced = (
-                work.groupby("group_comment", as_index=False)["line_number"]
-                .min()
-                .sort_values("line_number", kind="stable", na_position="last")
-            )
-            for _, row in reduced.iterrows():
-                rows.append(
-                    {
-                        "section": section_name.lower(),
-                        "group_comment": str(row["group_comment"]),
-                        "line_number": row["line_number"],
-                        "count": 1,
-                    }
-                )
-        else:
-            for group_comment in work["group_comment"].unique():
-                rows.append(
-                    {
-                        "section": section_name.lower(),
-                        "group_comment": str(group_comment),
-                        "line_number": pd.NA,
-                        "count": 1,
-                    }
-                )
+        work["group_comment"] = work["group_comment"].fillna("").astype(str).str.strip()
+        work["line_number"] = pd.to_numeric(
+            work.get("line_number", pd.Series(index=work.index, dtype=float)),
+            errors="coerce",
+        )
+        work["group_comment_line_number"] = pd.to_numeric(
+            work.get(
+                "group_comment_line_number",
+                pd.Series(index=work.index, dtype=float),
+            ),
+            errors="coerce",
+        )
+        work = work.sort_values("line_number", kind="stable", na_position="last")
 
-    out = pd.DataFrame(rows).drop_duplicates(ignore_index=True)
+        blocks: list[list[object]] = []
+        current_indices: list[object] = []
+        previous_marker: object = None
+        previous_comment: str | None = None
+        previous_line: float | None = None
+        for index, entry in work.iterrows():
+            marker_value = entry.get("group_comment_line_number")
+            marker = None if pd.isna(marker_value) else float(marker_value)
+            comment = str(entry.get("group_comment", ""))
+            line_value = entry.get("line_number")
+            line_number = None if pd.isna(line_value) else float(line_value)
+            new_block = not current_indices
+            if current_indices and (marker != previous_marker or comment != previous_comment):
+                new_block = True
+            elif (
+                current_indices
+                and marker is None
+                and previous_marker is None
+                and line_number is not None
+                and previous_line is not None
+                and line_number > previous_line + 1
+            ):
+                new_block = True
+            if new_block and current_indices:
+                blocks.append(current_indices)
+                current_indices = []
+            current_indices.append(index)
+            previous_marker = marker
+            previous_comment = comment
+            previous_line = line_number
+        if current_indices:
+            blocks.append(current_indices)
+
+        for occurrence, indices in enumerate(blocks, start=1):
+            block = work.loc[indices]
+            comment = str(block.iloc[0].get("group_comment", ""))
+            marker = pd.to_numeric(
+                block["group_comment_line_number"], errors="coerce"
+            ).dropna()
+            entry_lines = pd.to_numeric(block["line_number"], errors="coerce").dropna()
+            comment_line = marker.iloc[0] if not marker.empty else pd.NA
+            first_entry_line = entry_lines.min() if not entry_lines.empty else pd.NA
+            last_entry_line = entry_lines.max() if not entry_lines.empty else pd.NA
+            rows.append(
+                {
+                    "section": section_name.lower(),
+                    "occurrence": occurrence,
+                    "group_comment": comment,
+                    "type of data": _classify_trainset_comment_block(
+                        section_name, block, comment
+                    ),
+                    "identifiers": _trainset_block_identifiers(block),
+                    "line_number": (
+                        comment_line if pd.notna(comment_line) else first_entry_line
+                    ),
+                    "comment_line_number": comment_line,
+                    "first_entry_line_number": first_entry_line,
+                    "last_entry_line_number": last_entry_line,
+                    "count": len(block),
+                }
+            )
+
+    out = pd.DataFrame(rows)
     if out.empty:
         return out
-    out["line_number"] = pd.to_numeric(out["line_number"], errors="coerce")
+    for column in (
+        "line_number",
+        "comment_line_number",
+        "first_entry_line_number",
+        "last_entry_line_number",
+    ):
+        out[column] = pd.to_numeric(out[column], errors="coerce").astype("Int64")
     return out.sort_values(["line_number"], kind="stable", na_position="last").reset_index(drop=True)
+
+
+def _trainset_block_identifiers(block: pd.DataFrame) -> str:
+    """Return stable unique identifiers referenced by one comment block."""
+    columns = ["iden"] if "iden" in block.columns else []
+    columns.extend(
+        sorted(
+            (column for column in block.columns if re.fullmatch(r"id\d+", str(column))),
+            key=lambda column: int(str(column)[2:]),
+        )
+    )
+    values: list[str] = []
+    for column in columns:
+        for value in block[column]:
+            if pd.isna(value):
+                continue
+            identifier = str(value).strip()
+            if identifier and identifier not in values:
+                values.append(identifier)
+    return "; ".join(values)
+
+
+def _identifier_suggests_eos(identifier: object) -> bool:
+    text = str(identifier).strip().lower()
+    return bool(
+        re.search(r"(?:^|[_\-.])(bulk|volume|eos)(?:[_\-.]|$)", text)
+        or re.search(r"(?:^|[_\-.])c\d+(?:[_\-.]|$)", text)
+    )
+
+
+def _geometry_block_type(block: pd.DataFrame) -> str:
+    types: list[str] = []
+    for _, entry in block.iterrows():
+        atom_count = sum(
+            pd.notna(entry.get(column)) for column in ("at1", "at2", "at3", "at4")
+        )
+        kind = {
+            0: "rmsg",
+            2: "bond",
+            3: "valence_angle",
+            4: "torsion_angle",
+        }.get(atom_count, "geometry")
+        if kind not in types:
+            types.append(kind)
+    return ", ".join(types) if types else "geometry"
+
+
+def _classify_trainset_comment_block(
+    section_name: str,
+    block: pd.DataFrame,
+    comment: str,
+) -> str:
+    """Infer the training-data kind from its section, comment, and entries."""
+    if section_name == "CHARGE":
+        return "charge"
+    if section_name == "HEATFO":
+        return "heatfo"
+    if section_name == "GEOMETRY":
+        return _geometry_block_type(block)
+    if section_name == "CELL_PARAMETERS":
+        return "cell_parameters"
+    if section_name != "ENERGY":
+        return section_name.lower()
+
+    normalized_comment = str(comment).lower()
+    if re.search(r"\b(?:heat\s+of\s+formation|heatfo)\b", normalized_comment):
+        return "heatfo"
+    if re.search(r"\brestraint\b", normalized_comment):
+        return "restraint"
+
+    identifier_columns = sorted(
+        (column for column in block.columns if re.fullmatch(r"id\d+", str(column))),
+        key=lambda column: int(str(column)[2:]),
+    )
+    identifiers = [
+        value
+        for column in identifier_columns
+        for value in block[column]
+        if pd.notna(value) and str(value).strip()
+    ]
+    if re.search(r"\b(?:eos|volume|bulk)\b", normalized_comment) or any(
+        _identifier_suggests_eos(identifier) for identifier in identifiers
+    ):
+        return "eos"
+
+    operand_counts = [
+        sum(pd.notna(entry.get(column)) and bool(str(entry.get(column)).strip()) for column in identifier_columns)
+        for _, entry in block.iterrows()
+    ]
+    if operand_counts and all(count >= 3 for count in operand_counts):
+        return "reaction_energy"
+    if operand_counts and all(count == 2 for count in operand_counts):
+        identifier_counts = pd.Series([str(value).strip() for value in identifiers]).value_counts()
+        return "energy_curve" if (identifier_counts > 1).any() else "energy_difference"
+    return "energy"
 
 
 def _normalize_trainset_section(section: str) -> str:
@@ -130,6 +277,18 @@ def _build_trainset_data_table(
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
     return tables[section_key].copy().reset_index(drop=True)
+
+
+def _select_trainset_section_tables(
+    data: ForceFieldOptimizationTrainingSetData,
+    section: str,
+) -> dict[str, pd.DataFrame]:
+    """Return native-schema tables for the requested trainset section scope."""
+    tables = _get_trainset_section_tables(data)
+    section_key = _normalize_trainset_section(section)
+    if section_key == "all":
+        return {name: table.reset_index(drop=True) for name, table in tables.items()}
+    return {section_key: tables[section_key].reset_index(drop=True)}
 
 
 @dataclass
@@ -182,6 +341,10 @@ class TrainsetDataResult(BaseResult):
     table : pandas.DataFrame
         Extracted trainset rows. For ``section="all"``, includes a leading
         ``section`` column identifying each source section.
+    section_tables : dict[str, pandas.DataFrame]
+        Requested trainset sections as separate, native-schema tables keyed by
+        canonical section name. These tables support section-by-section export
+        without the empty columns introduced by concatenating unlike schemas.
 
     Notes
     -----
@@ -205,6 +368,7 @@ class TrainsetDataResult(BaseResult):
 
     table: pd.DataFrame
     request: TrainsetDataRequest
+    section_tables: dict[str, pd.DataFrame] = dc_field(default_factory=dict)
 
 
 @register_task("trainset_data", label="Trainset Data")
@@ -316,15 +480,20 @@ class TrainsetDataTask(AnalysisTask):
         The returned table contains all supported sections with a ``section`` label.
         """
         table = _build_trainset_data_table(data, section=request.section)
-        return TrainsetDataResult(table=table, request=request)
+        section_tables = _select_trainset_section_tables(data, section=request.section)
+        return TrainsetDataResult(
+            table=table,
+            request=request,
+            section_tables=section_tables,
+        )
 
 
 @dataclass
 class TrainsetGroupCommentsRequest(BaseRequest):
-    """Request payload for unique trainset group-comment extraction.
+    """Request payload for occurrence-level trainset group-comment extraction.
 
     This request selects one trainset section or all sections when collecting
-    unique non-empty ``group_comment`` annotations.
+    every ``group_comment`` block, including repeated and empty annotations.
 
     Fields
     -----
@@ -359,16 +528,16 @@ class TrainsetGroupCommentsRequest(BaseRequest):
 class TrainsetGroupCommentsResult(BaseResult):
     """Result payload containing grouped trainset comments.
 
-    The analyzer returns unique per-section comments with earliest line numbers
-    when available, suitable for quality checks and section-level summaries.
+    The analyzer returns every per-section comment occurrence with its comment
+    and entry line ranges, inferred data type, identifiers, and entry count.
 
     Fields
     -----
     request : TrainsetGroupCommentsRequest
         Request object used to generate this result.
     table : pandas.DataFrame
-        Table with columns ``section``, ``group_comment``, ``line_number``,
-        and ``count`` (currently set to ``1`` per unique comment row).
+        Occurrence table including ``section``, ``group_comment``,
+        ``type of data``, source lines, identifiers, and entry ``count``.
 
     Examples
     -----
@@ -389,7 +558,7 @@ class TrainsetGroupCommentsResult(BaseResult):
 
 @register_task("trainset_group_comments", label="Trainset Group Comments")
 class TrainsetGroupCommentsTask(AnalysisTask):
-    """Return unique trainset group-comment annotations by section."""
+    """Return every trainset group-comment occurrence by section."""
 
     required_data = ForceFieldOptimizationTrainingSetData
 
@@ -455,7 +624,7 @@ class TrainsetGroupCommentsTask(AnalysisTask):
         request: TrainsetGroupCommentsRequest,
         reporter=None,
     ) -> TrainsetGroupCommentsResult:
-        """Run unique group-comment extraction from parsed trainset data.
+        """Run occurrence-level group-comment extraction from parsed data.
 
         Builds the grouped-comment table across sections, then optionally
         filters rows to the request-selected section.

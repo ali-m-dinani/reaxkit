@@ -210,6 +210,92 @@ class BeeswarmPlotRenderer(PlotRenderer):
         fig.canvas.mpl_connect("motion_notify_event", show_hover)
         return save_or_show(fig, cfg)
 
+    def _render_sensitivity(self, cfg):
+        """Render sensitivity samples without requiring seaborn."""
+        samples = pd.DataFrame(
+            {
+                "sensitivity": cfg.get("x", []),
+                "parameter": cfg.get("y", []),
+                "parameter_value": cfg.get("hue", []),
+            }
+        ).dropna(subset=["sensitivity", "parameter", "parameter_value"])
+        if samples.empty:
+            fig, ax = plt.subplots(figsize=(7.6, 3.4))
+            ax.text(0.5, 0.5, "No sensitivity samples to plot", ha="center", va="center")
+            ax.axis("off")
+            return save_or_show(fig, cfg)
+
+        samples["sensitivity"] = pd.to_numeric(samples["sensitivity"], errors="coerce")
+        samples["parameter_value"] = pd.to_numeric(samples["parameter_value"], errors="coerce")
+        samples = samples.dropna(subset=["sensitivity", "parameter_value"])
+        parameter_order = list(dict.fromkeys(samples["parameter"].astype(str).tolist()))
+        fig, ax = plt.subplots(
+            figsize=cfg.get("figsize", (9.2, max(3.4, 0.48 * len(parameter_order) + 1.6)))
+        )
+        cmap = plt.get_cmap(cfg.get("palette", "coolwarm"))
+        jitter_pattern = np.asarray([0.0, -0.16, 0.16, -0.08, 0.08, -0.22, 0.22], dtype=float)
+        marker_size = float(cfg.get("size", 5.0)) ** 2
+
+        for row_index, parameter in enumerate(parameter_order):
+            group = samples.loc[samples["parameter"].astype(str) == parameter].copy()
+            group = group.sort_values("sensitivity", kind="stable").reset_index(drop=True)
+            values = group["parameter_value"].to_numpy(dtype=float)
+            color_min = float(np.nanmin(values))
+            color_max = float(np.nanmax(values))
+            if color_min == color_max:
+                padding = max(abs(color_min) * 1e-6, 1e-9)
+                color_min -= padding
+                color_max += padding
+            y_values = row_index + jitter_pattern[np.arange(len(group)) % len(jitter_pattern)]
+            ax.scatter(
+                group["sensitivity"].to_numpy(dtype=float),
+                y_values,
+                c=values,
+                cmap=cmap,
+                norm=Normalize(vmin=color_min, vmax=color_max),
+                s=marker_size,
+                edgecolors=(0.06, 0.09, 0.16, 0.28),
+                linewidths=0.45,
+                alpha=float(cfg.get("alpha", 0.88)),
+                zorder=3,
+            )
+        reference_value = float(cfg.get("vline", 1.0))
+        ax.axvline(reference_value, c="grey", alpha=0.8, linewidth=1.0, zorder=2)
+        vals = samples["sensitivity"].to_numpy(dtype=float)
+        p01 = float(np.nanpercentile(vals, 1))
+        p99 = float(np.nanpercentile(vals, 99))
+        median = float(np.nanmedian(vals))
+        span = max(p99 - p01, float(np.nanmax(vals) - np.nanmin(vals)))
+        if 0.95 <= median <= 1.05 and span <= 0.35:
+            ax.set_xlim(0.9, 1.1)
+        else:
+            pad = max(0.02 * max(abs(p01), abs(p99), 1.0), 0.01)
+            ax.set_xlim(p01 - pad, p99 + pad)
+        for row_index in range(len(parameter_order)):
+            ax.axhline(row_index, color="#e2e8f0", linewidth=0.8, zorder=1)
+        ax.set_ylim(len(parameter_order) - 0.45, -0.55)
+        ax.set_yticks(range(len(parameter_order)), parameter_order)
+        ax.set_xlabel(cfg.get("xlabel", "Sensitivity (Error Response)"))
+        ax.set_ylabel(cfg.get("ylabel", "Parameter"))
+        ax.grid(axis="x")
+        ax.set_title(str(cfg.get("title") or "Parameter Sensitivity Beeswarm"))
+        lower_handle = Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor="#3B4CC0", markersize=7,
+            label="Lower parameter value",
+        )
+        higher_handle = Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor="#B40426", markersize=7,
+            label="Higher parameter value",
+        )
+        ax.legend(
+            handles=[lower_handle, higher_handle],
+            loc=str(cfg.get("legend_loc", "best")),
+            frameon=False,
+            title=str(cfg.get("legend_title", "Color Meaning")),
+        )
+        fig.tight_layout()
+        return save_or_show(fig, cfg)
+
     def render(self, result, style=None):
         """
         Render.
@@ -246,6 +332,8 @@ class BeeswarmPlotRenderer(PlotRenderer):
         cfg = merged(result, style)
         if cfg.get("diagnostic_parameters") is not None:
             return self._render_diagnostic(cfg)
+        if bool(cfg.get("sensitivity_beeswarm", False)):
+            return self._render_sensitivity(cfg)
         import seaborn as sns
 
         x = cfg.get("x")
@@ -267,7 +355,8 @@ class BeeswarmPlotRenderer(PlotRenderer):
 
         fig = plt.figure(figsize=cfg.get("figsize", (9.2, max(3.4, 0.32 * df["y"].nunique()))))
         ax = fig.add_subplot(111)
-        ax.axvline(0.0, c="grey", alpha=0.8, linewidth=1.0)
+        reference_value = float(cfg.get("vline", 0.0))
+        ax.axvline(reference_value, c="grey", alpha=0.8, linewidth=1.0)
         marker_size = float(cfg.get("size", 3.5))
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", UserWarning)
@@ -283,7 +372,7 @@ class BeeswarmPlotRenderer(PlotRenderer):
         placement_warning = any("cannot be placed" in str(w.message).lower() for w in caught)
         if placement_warning:
             ax.cla()
-            ax.axvline(0.0, c="grey", alpha=0.8, linewidth=1.0)
+            ax.axvline(reference_value, c="grey", alpha=0.8, linewidth=1.0)
             ax = sns.stripplot(
                 data=df,
                 x="x",

@@ -13,6 +13,7 @@ from reaxkit.analysis.force_field.diagnostic_beeswarm import (
     FFieldOptimizationDiagnosticBeeswarmRequest,
     FFieldOptimizationDiagnosticBeeswarmTask,
     build_diagnostic_beeswarm_tables,
+    normalize_evolution_values,
 )
 from reaxkit.domain.data_models import (
     ForceFieldOptimizationDiagnosticData,
@@ -21,8 +22,11 @@ from reaxkit.domain.data_models import (
     ForceFieldParametersData,
 )
 from reaxkit.presentation.plot.renderers.beeswarm import BeeswarmPlotRenderer
+from reaxkit.presentation.plot.renderers.diagnostic_evolution import DiagnosticEvolutionPlotRenderer
 from reaxkit.workflows.file_tools.ffield_workflow import (
     _build_parameter_optimization_diagnostic_beeswarm_request,
+    _build_sensitivity_beeswarm_result,
+    _build_tornado_result,
     _plot_payload,
     build_parser,
 )
@@ -160,6 +164,168 @@ def test_workflow_builds_bounded_diagnostic_plot_payload() -> None:
     assert payload["global_objective_scale"] is True
     assert payload["x"] == pytest.approx(result.table["normalized_value"].tolist())
     assert len(payload["diagnostic_parameters"]) == 2
+
+
+def test_dedicated_diagnostic_commands_expose_separate_plot_contracts() -> None:
+    sensitivity_parser = build_parser(
+        argparse.ArgumentParser(),
+        command="get_ffield_diagnostics_sensitivity",
+    )
+    sensitivity_args = sensitivity_parser.parse_args([])
+    assert sensitivity_args.plot == "tornado"
+    assert sensitivity_parser.parse_args(["--plot", "beeswarm"]).plot == "beeswarm"
+    with pytest.raises(SystemExit):
+        sensitivity_parser.parse_args(["--plot", "single"])
+
+    evolution_parser = build_parser(
+        argparse.ArgumentParser(),
+        command="get_ffield_diagnostics_evolution",
+    )
+    evolution_args = evolution_parser.parse_args([])
+    assert evolution_args.plot == "beeswarm"
+    assert evolution_args.normalization == "bound_min"
+    scatter_args = evolution_parser.parse_args(["--plot", "scatter", "--normalization", "first"])
+    assert scatter_args.plot == "scatter"
+    assert scatter_args.normalization == "first"
+    with pytest.raises(SystemExit):
+        evolution_parser.parse_args(["--plot", "tornado"])
+
+
+def test_sensitivity_command_builds_beeswarm_and_tornado_views() -> None:
+    base_result = argparse.Namespace(
+        table=pd.DataFrame(
+            {
+                "identifier": ["3 1 1", "3 1 1", "2 1 1"],
+                "value1": [1.0, 1.2, 2.0],
+                "value2": [1.5, 1.6, 2.2],
+                "value4": [1.8, 1.9, 2.4],
+                "sensitivity1/3": [0.90, 0.92, 0.99],
+                "sensitivity2/3": [1.00, 1.02, 1.00],
+                "sensitivity4/3": [1.10, 1.08, 1.01],
+                "min_sensitivity": [0.90, 0.92, 0.99],
+                "max_sensitivity": [1.10, 1.08, 1.01],
+            }
+        )
+    )
+    beeswarm = _build_sensitivity_beeswarm_result(base_result, top=1)
+    beeswarm_args = argparse.Namespace(plot="beeswarm", vline=1.0)
+    beeswarm_payload = _plot_payload(
+        "get_ffield_diagnostics_sensitivity",
+        beeswarm,
+        beeswarm_args,
+    )
+
+    assert set(beeswarm.table["parameter"]) == {"3 1 1"}
+    assert len(beeswarm.table) == 6
+    assert beeswarm_payload is not None
+    assert beeswarm_payload["plot_type"] == "beeswarm_plot"
+    assert beeswarm_payload["xlabel"] == "Sensitivity (Error Response)"
+    assert beeswarm_payload["vline"] == 1.0
+
+    tornado = _build_tornado_result(base_result, top=1)
+    tornado_payload = _plot_payload(
+        "get_ffield_diagnostics_sensitivity",
+        tornado,
+        argparse.Namespace(plot="tornado", vline=1.0),
+    )
+    assert tornado.table["parameter"].tolist() == ["3 1 1"]
+    assert tornado_payload is not None
+    assert tornado_payload["plot_type"] == "tornado_plot"
+
+
+def test_evolution_command_uses_bounded_diagnostic_payload() -> None:
+    args = build_parser(
+        argparse.ArgumentParser(),
+        command="get_ffield_diagnostics_evolution",
+    ).parse_args(["--sort", "final"])
+    result = FFieldOptimizationDiagnosticBeeswarmTask().run(
+        _plot_data(),
+        _build_parameter_optimization_diagnostic_beeswarm_request(args),
+    )
+
+    payload = _plot_payload("get_ffield_diagnostics_evolution", result, args)
+
+    assert payload is not None
+    assert payload["plot_type"] == "beeswarm_plot"
+    assert payload["xlabel"] == "Normalized parameter value within optimization bounds"
+    assert payload["x"] == pytest.approx(result.table["normalized_value"].tolist())
+
+
+def test_evolution_scatter_uses_epochs_and_selected_normalization() -> None:
+    args = build_parser(
+        argparse.ArgumentParser(),
+        command="get_ffield_diagnostics_evolution",
+    ).parse_args(["--plot", "scatter", "--normalization", "first"])
+    result = FFieldOptimizationDiagnosticBeeswarmTask().run(
+        _plot_data(),
+        _build_parameter_optimization_diagnostic_beeswarm_request(args),
+    )
+
+    payload = _plot_payload("get_ffield_diagnostics_evolution", result, args)
+
+    assert payload is not None
+    assert payload["plot_type"] == "diagnostic_evolution_plot"
+    assert payload["normalization"] == "first"
+    assert payload["x"] == [1, 1]
+    assert payload["y"] == pytest.approx([0.0, 0.0])
+    assert payload["hue"] == pytest.approx([200.0, 1.0])
+
+
+def test_evolution_normalization_uses_common_bound_span() -> None:
+    values = [2.0, 4.0, 8.0]
+
+    assert normalize_evolution_values(
+        values, lower_bound=0.0, upper_bound=10.0, normalization="bound_min"
+    ).tolist() == pytest.approx([0.2, 0.4, 0.8])
+    assert normalize_evolution_values(
+        values, lower_bound=0.0, upper_bound=10.0, normalization="first"
+    ).tolist() == pytest.approx([0.0, 0.2, 0.6])
+
+
+def test_evolution_renderer_builds_one_line_axis_and_colorbar_per_parameter(monkeypatch) -> None:
+    args = build_parser(
+        argparse.ArgumentParser(),
+        command="get_ffield_diagnostics_evolution",
+    ).parse_args(["--plot", "scatter"])
+    result = FFieldOptimizationDiagnosticBeeswarmTask().run(
+        _plot_data(),
+        _build_parameter_optimization_diagnostic_beeswarm_request(args),
+    )
+    payload = _plot_payload("get_ffield_diagnostics_evolution", result, args)
+    assert payload is not None
+    monkeypatch.setattr(
+        "reaxkit.presentation.plot.renderers.diagnostic_evolution.save_or_show",
+        lambda figure, _cfg: figure,
+    )
+
+    figure = DiagnosticEvolutionPlotRenderer().render(payload)
+
+    assert len(figure.axes) == 4
+    assert figure.axes[0].get_ylabel() == "Normalized value"
+    assert figure.axes[1].get_xlabel() == "Epoch"
+    assert len(figure.axes[0].lines) == 1
+
+
+def test_sensitivity_renderer_uses_dedicated_matplotlib_path(monkeypatch) -> None:
+    payload = {
+        "plot_type": "beeswarm_plot",
+        "sensitivity_beeswarm": True,
+        "x": [0.95, 1.0, 1.05, 0.98, 1.01],
+        "y": ["3 1 1", "3 1 1", "3 1 1", "2 1 1", "2 1 1"],
+        "hue": [1.0, 2.0, 3.0, 0.2, 0.8],
+        "vline": 1.0,
+    }
+    monkeypatch.setattr(
+        "reaxkit.presentation.plot.renderers.beeswarm.save_or_show",
+        lambda figure, _cfg: figure,
+    )
+
+    figure = BeeswarmPlotRenderer().render(payload)
+
+    axes = figure.axes[0]
+    assert [tick.get_text() for tick in axes.get_yticklabels()] == ["3 1 1", "2 1 1"]
+    assert axes.get_xlabel() == "Sensitivity (Error Response)"
+    assert axes.get_xlim() == pytest.approx((0.9, 1.1))
 
 
 def test_renderer_reserves_separate_annotation_and_colorbar_regions(monkeypatch) -> None:

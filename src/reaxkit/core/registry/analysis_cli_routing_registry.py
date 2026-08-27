@@ -128,6 +128,14 @@ register_analysis_command(
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command(
+    "get_ffield_diagnostics_sensitivity",
+    module_path="reaxkit.workflows.file_tools.ffield_workflow",
+)
+register_analysis_command(
+    "get_ffield_diagnostics_evolution",
+    module_path="reaxkit.workflows.file_tools.ffield_workflow",
+)
+register_analysis_command(
     "parameter_optimization_most_sensitive",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
@@ -140,6 +148,10 @@ register_analysis_command(
 register_analysis_command(
     "ffield_opt_bulk_modulus",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
+)
+register_analysis_command(
+    "get_ffield_opt_plots",
+    module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
 )
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")

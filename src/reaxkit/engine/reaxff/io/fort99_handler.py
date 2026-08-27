@@ -64,6 +64,8 @@ class Fort99Handler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
+    _CACHE_VERSION = "3"
+
     def __init__(self, file_path: str | Path = "fort.99", reporter=None):
         """
         Initialize the instance.
@@ -135,7 +137,9 @@ class Fort99Handler(BaseHandler):
                     section = "HEATFO"
                 elif ("bond" in tl) or ("angle" in tl):
                     section = "GEOMETRY"
-                elif ("a:" in tl) or ("b:" in tl) or ("c:" in tl):
+                elif re.search(
+                    r"(?:^|\s)(?:a|b|c|alpha|beta|gamma)\s*:?\s*$", tl
+                ):
                     section = "CELL PARAMETERS"
                 elif "energy" in tl:
                     section = "ENERGY"

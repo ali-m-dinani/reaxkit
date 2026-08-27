@@ -4,20 +4,225 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.force_field.report import (
     FFieldOptimizationReportEOSRequest,
     FFieldOptimizationReportEOSTask,
+    _base_other_energy_volume_table,
+    _classify_curve_rows,
+    _curve_table_from_classified_rows,
+    _force_field_optimization_curve_tables,
 )
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import AnalysisError
+from reaxkit.domain.data_models import (
+    EnergyMinimizationSummaryData,
+    ForceFieldOptimizationPlotBundleData,
+    ForceFieldOptimizationReportData,
+    ForceFieldOptimizationTrainingSetData,
+)
 
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
 )
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+
+
+def test_eos_table_preserves_reaxff_and_qm_values() -> None:
+    report = ForceFieldOptimizationReportData(
+        linenos=np.array([1, 2]),
+        sections=np.array(["ENERGY", "ENERGY"], dtype=object),
+        titles=np.array(
+            [
+                "Energy +bulk/1.00 -bulk_0.9/1.00",
+                "Energy +bulk/1.00 -bulk_1.1/1.00",
+            ],
+            dtype=object,
+        ),
+        ffield_values=np.array([-1.2, -0.8]),
+        qm_values=np.array([-1.0, -0.7]),
+        weights=np.array([1.0, 1.0]),
+        errors=np.array([0.2, 0.1]),
+        total_ff_error=np.array([0.2, 0.3]),
+    )
+    summary = EnergyMinimizationSummaryData(
+        identifiers=np.array(["bulk_0.9", "bulk", "bulk_1.1"], dtype=object),
+        minimum_energy=np.array([-10.0, -11.0, -9.0]),
+        volume=np.array([9.0, 10.0, 11.0]),
+    )
+
+    table = _base_other_energy_volume_table(report, summary)
+
+    assert table[["other_iden", "ffield_value", "qm_value"]].to_dict(orient="records") == [
+        {"other_iden": "bulk_0.9", "ffield_value": -1.2, "qm_value": -1.0},
+        {"other_iden": "bulk", "ffield_value": 0.0, "qm_value": 0.0},
+        {"other_iden": "bulk_1.1", "ffield_value": -0.8, "qm_value": -0.7},
+    ]
+
+
+def test_comment_aware_classifier_finds_reference_in_either_operand() -> None:
+    report = ForceFieldOptimizationReportData(
+        linenos=np.array([10, 11, 12, 13]),
+        sections=np.array(["ENERGY"] * 4, dtype=object),
+        titles=np.array(
+            [
+                "Energy +bulk_c1_mp_1008557/1 -bulk_0_mp_1008557/1",
+                "Energy +bulk_0_mp_1008557/1 -bulk_0_mp_1008557/1",
+                "Energy +H2BCH3/1 -H2BCH3_0_652/1",
+                "Energy +H2BCH3/1 -H2BCH3_0_700/1",
+            ],
+            dtype=object,
+        ),
+        ffield_values=np.array([0.2, 0.0, -3.0, -2.0]),
+        qm_values=np.array([0.1, 0.0, -4.0, -3.0]),
+        weights=np.ones(4),
+        errors=np.zeros(4),
+        total_ff_error=np.zeros(4),
+    )
+    energy = pd.DataFrame(
+        {
+            "line_number": [100, 101, 102, 103],
+            "op1": [1, 1, 1, 1],
+            "id1": [
+                "bulk_c1_mp_1008557",
+                "bulk_0_mp_1008557",
+                "H2BCH3",
+                "H2BCH3",
+            ],
+            "n1": [1.0] * 4,
+            "op2": [-1, -1, -1, -1],
+            "id2": [
+                "bulk_0_mp_1008557",
+                "bulk_0_mp_1008557",
+                "H2BCH3_0_652",
+                "H2BCH3_0_700",
+            ],
+            "n2": [1.0] * 4,
+            "group_comment": [
+                "EOS data /// Volume Bulk_EOS",
+                "EOS data /// Volume Bulk_EOS",
+                "Restraint H2BCH3_bond",
+                "Restraint H2BCH3_bond",
+            ],
+            "inline_comment": ["compressed", "reference", "r1", "r2"],
+        }
+    )
+    summary = EnergyMinimizationSummaryData(
+        identifiers=np.array(
+            ["bulk_c1_mp_1008557", "bulk_0_mp_1008557"], dtype=object
+        ),
+        minimum_energy=np.array([-9.0, -10.0]),
+        volume=np.array([31.0, 32.0]),
+    )
+    data = ForceFieldOptimizationPlotBundleData(
+        report=report,
+        geometry_summary=summary,
+        training_set=ForceFieldOptimizationTrainingSetData(
+            sections=("ENERGY",), energy=energy
+        ),
+        geometry_restraints=pd.DataFrame(
+            {
+                "descriptor": ["H2BCH3_0_652"],
+                "restraint_type": ["bond"],
+                "coordinate": [0.652],
+                "restraint_line_number": [200],
+            }
+        ),
+    )
+
+    tables = _force_field_optimization_curve_tables(data)
+
+    assert set(tables["eos"]["base_iden"]) == {"bulk_0_mp_1008557"}
+    assert "bulk_c1_mp_1008557" in set(tables["eos"]["other_iden"])
+    assert tables["eos"]["group_comment"].str.contains("Bulk_EOS").all()
+    assert not tables["eos"]["base_iden"].str.contains("H2BCH3").any()
+    assert set(tables["restraint"]["base_iden"]) == {"H2BCH3"}
+    assert {"group_comment", "inline_comment"}.issubset(tables["restraint"].columns)
+    assert set(tables["bond"]["base_iden"]) == {"H2BCH3"}
+    assert tables["bond"]["scan_coordinate"].dropna().tolist() == [0.652, 0.7]
+    assert tables["angle"].empty
+
+
+def test_volume_comment_eos_accepts_report_terms_without_divisors() -> None:
+    report = ForceFieldOptimizationReportData(
+        linenos=np.array([122, 123]),
+        sections=np.array(["ENERGY", "ENERGY"], dtype=object),
+        titles=np.array(
+            [
+                "Energy -cBN_opt      +cBN_1.20",
+                "Energy -cBN_opt      +cBN_1.10",
+            ],
+            dtype=object,
+        ),
+        ffield_values=np.array([1.3702, 1.2179]),
+        qm_values=np.array([4.79, 1.39]),
+        weights=np.array([10.1, 0.1]),
+        errors=np.zeros(2),
+        total_ff_error=np.zeros(2),
+    )
+    energy = pd.DataFrame(
+        {
+            "line_number": [958, 959],
+            "op1": ["-", "-"],
+            "id1": ["cBN_opt", "cBN_opt"],
+            "n1": [64.0, 64.0],
+            "op2": ["+", "+"],
+            "id2": ["cBN_1.20", "cBN_1.10"],
+            "n2": [64.0, 64.0],
+            "group_comment": ["Volume cBN_cubic", "Volume cBN_cubic"],
+            "inline_comment": ["", ""],
+        }
+    )
+    summary = EnergyMinimizationSummaryData(
+        identifiers=np.array(["cBN_opt", "cBN_1.20", "cBN_1.10"], dtype=object),
+        minimum_energy=np.array([-10246.4, -10158.7, -10200.0]),
+        volume=np.array([364.325, 456.764, 420.0]),
+    )
+    data = ForceFieldOptimizationPlotBundleData(
+        report=report,
+        geometry_summary=summary,
+        training_set=ForceFieldOptimizationTrainingSetData(
+            sections=("ENERGY",), energy=energy
+        ),
+        geometry_restraints=pd.DataFrame(),
+    )
+
+    table = _force_field_optimization_curve_tables(data)["eos"]
+
+    assert set(table["base_iden"]) == {"cBN_opt"}
+    assert {"cBN_1.20", "cBN_1.10"}.issubset(set(table["other_iden"]))
+    assert table["group_comment"].str.contains("Volume cBN_cubic").all()
+    assert table.loc[table["other_iden"].eq("cBN_1.20"), "V_other_iden"].iloc[0] == 456.764
+
+
+def test_unresolved_repeated_energy_family_is_preserved_as_other_curve() -> None:
+    rows = pd.DataFrame(
+        {
+            "iden1": ["scan_1", "scan_2"],
+            "iden2": ["reference", "reference"],
+            "ffield_value": [2.0, 1.0],
+            "qm_value": [2.5, 1.5],
+            "group_comment": ["DFT coordinate scan"] * 2,
+            "inline_comment": ["", ""],
+            "report_line_number": [10, 11],
+            "trainset_line_number": [20, 21],
+        }
+    )
+    classified = _classify_curve_rows(rows, pd.DataFrame())
+    table = _curve_table_from_classified_rows(
+        classified,
+        EnergyMinimizationSummaryData(identifiers=np.array([], dtype=object)),
+        pd.DataFrame(),
+        curve_type="other_curve",
+    )
+
+    assert set(classified["curve_type"]) == {"other_curve"}
+    assert {"scan_1", "scan_2"}.issubset(set(table["other_iden"]))
+    assert table.loc[table["other_iden"] == "scan_1", "scan_coordinate"].iloc[0] == 1.0
 
 
 def _run_and_save() -> Path:
@@ -53,14 +258,21 @@ def _run_and_save() -> Path:
     except AnalysisError as exc:
         msg = str(exc)
         if (
-            "expected data type ForceFieldOptimizationReportEOSBundleData, got NoneType" in msg
-            or "Failed to load required data 'ForceFieldOptimizationReportEOSBundleData'" in msg
+            "expected data type ForceFieldOptimizationPlotBundleData, got NoneType" in msg
+            or "Failed to load required data 'ForceFieldOptimizationPlotBundleData'" in msg
         ):
-            pytest.skip("ForceFieldOptimizationReportEOSBundleData is not available for this run_dir.")
+            pytest.skip("ForceFieldOptimizationPlotBundleData is not available for this run_dir.")
         raise
 
     assert result.request == request
-    assert {"base_iden", "other_iden", "V_other_iden", "E_other_iden"}.issubset(set(result.table.columns))
+    assert {
+        "base_iden",
+        "other_iden",
+        "V_other_iden",
+        "E_other_iden",
+        "ffield_value",
+        "qm_value",
+    }.issubset(set(result.table.columns))
 
     metadata_path = task_artifacts_dir / "force_field_optimization_report_eos_summary.txt"
     csv_path = task_artifacts_dir / "force_field_optimization_report_eos.csv"

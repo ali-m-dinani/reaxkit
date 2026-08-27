@@ -26,6 +26,7 @@ from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (
+    ForceFieldOptimizationPlotBundleData,
     ForceFieldOptimizationReportData,
     ForceFieldOptimizationReportEOSBundleData,
     EnergyMinimizationSummaryData,
@@ -85,18 +86,19 @@ def _get_report_data(
 
 
 def _parse_two_body_energy_terms(data: ForceFieldOptimizationReportData) -> pd.DataFrame:
-    """Parse two-body ENERGY titles into structured identifier components."""
+    """Parse two-body ENERGY titles with optional displayed divisors."""
     df = _report_frame(data)
     if "section" not in df.columns or "title" not in df.columns:
         raise KeyError("Expected 'section' and 'title' columns in report DataFrame.")
 
     energy_df = df[df["section"].astype(str).str.upper() == "ENERGY"].copy()
-    energy_df = energy_df[energy_df["title"].astype(str).str.count("/") == 2].copy()
 
     pattern = re.compile(
-        r"^Energy\s+"
-        r"(?P<sign1>[+-])(?P<iden1>[^/]+?)\s*/\s*(?P<n1>\d+(?:\.\d+)?)\s+"
-        r"(?P<sign2>[+-])(?P<iden2>[^/]+?)\s*/\s*(?P<n2>\d+(?:\.\d+)?)",
+        r"^\s*Energy\s+"
+        r"(?P<sign1>[+-])\s*(?P<iden1>[^\s/]+)"
+        r"(?:\s*/\s*(?P<n1>\d+(?:\.\d+)?))?\s+"
+        r"(?P<sign2>[+-])\s*(?P<iden2>[^\s/]+)"
+        r"(?:\s*/\s*(?P<n2>\d+(?:\.\d+)?))?\s*$",
         flags=re.IGNORECASE,
     )
 
@@ -116,10 +118,10 @@ def _parse_two_body_energy_terms(data: ForceFieldOptimizationReportData) -> pd.D
         return {
             "opt1": 1 if g["sign1"] == "+" else -1,
             "iden1": g["iden1"].strip(),
-            "n1": float(g["n1"]),
+            "n1": float(g["n1"]) if g["n1"] is not None else np.nan,
             "opt2": 1 if g["sign2"] == "+" else -1,
             "iden2": g["iden2"].strip(),
-            "n2": float(g["n2"]),
+            "n2": float(g["n2"]) if g["n2"] is not None else np.nan,
         }
 
     parsed = energy_df["title"].astype(str).apply(_parse_title)
@@ -159,10 +161,18 @@ def _base_other_energy_volume_table(
     report: ForceFieldOptimizationReportData,
     geometry_summary: EnergyMinimizationSummaryData,
 ) -> pd.DataFrame:
-    """Build base/other EOS table from repeated base identifiers."""
+    """Build base/other EOS data with both ReaxFF and QM energies."""
+    columns = [
+        "base_iden",
+        "other_iden",
+        "V_other_iden",
+        "E_other_iden",
+        "ffield_value",
+        "qm_value",
+    ]
     energy_df = _parse_two_body_energy_terms(report)
     if energy_df.empty:
-        return pd.DataFrame(columns=["base_iden", "other_iden", "V_other_iden", "E_other_iden"])
+        return pd.DataFrame(columns=columns)
 
     # Explicit joined identifier used for downstream duplicate inspection/debugging.
     energy_df = energy_df.copy()
@@ -180,11 +190,11 @@ def _base_other_energy_volume_table(
         .tolist()
     )
     if not repeated_bases:
-        return pd.DataFrame(columns=["base_iden", "other_iden", "V_other_iden", "E_other_iden"])
+        return pd.DataFrame(columns=columns)
 
     geometry_df = _geometry_summary_frame(geometry_summary)
     if geometry_df.empty or "identifier" not in geometry_df.columns:
-        return pd.DataFrame(columns=["base_iden", "other_iden", "V_other_iden", "E_other_iden"])
+        return pd.DataFrame(columns=columns)
 
     geometry_df = geometry_df[["identifier", "V", "E"]].drop_duplicates(subset=["identifier"], keep="first")
     geo_map: dict[str, tuple[Any, Any]] = {
@@ -194,9 +204,11 @@ def _base_other_energy_volume_table(
 
     rows: list[dict[str, Any]] = []
     for base in repeated_bases:
-        sub = energy_df[energy_df["iden1"].astype(str).str.strip() == base]
+        sub = energy_df[energy_df["iden1"].astype(str).str.strip() == base].copy()
+        sub["_other_iden"] = sub["iden2"].astype(str).str.strip()
+        report_rows = sub.drop_duplicates(subset=["_other_iden"], keep="first").set_index("_other_iden")
         other_order: list[str] = []
-        for raw in sub["iden2"].astype(str).tolist():
+        for raw in sub["_other_iden"].tolist():
             other = str(raw).strip()
             if other not in other_order:
                 other_order.append(other)
@@ -205,18 +217,433 @@ def _base_other_energy_volume_table(
 
         for other in other_order:
             vol, eng = geo_map.get(other, (pd.NA, pd.NA))
+            if other in report_rows.index:
+                report_row = report_rows.loc[other]
+                ffield_value = report_row.get("ffield_value", pd.NA)
+                qm_value = report_row.get("qm_value", pd.NA)
+            else:
+                # The base is the zero-energy reference for a ``+base -other``
+                # EOS series; fort.99 normally omits base-minus-base.
+                ffield_value = 0.0 if other == base else pd.NA
+                qm_value = 0.0 if other == base else pd.NA
             rows.append(
                 {
                     "base_iden": base,
                     "other_iden": other,
                     "V_other_iden": vol,
                     "E_other_iden": eng,
+                    "ffield_value": ffield_value,
+                    "qm_value": qm_value,
                 }
             )
     out = pd.DataFrame(rows)
     if out.empty:
         return out
-    return out.sort_values(["base_iden", "V_other_iden"], ascending=[True, True], na_position="last").reset_index(drop=True)
+    return out.loc[:, columns].sort_values(
+        ["base_iden", "V_other_iden"],
+        ascending=[True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+
+
+_CURVE_COLUMNS = [
+    "curve_type",
+    "base_iden",
+    "other_iden",
+    "iden1",
+    "iden2",
+    "V_other_iden",
+    "E_other_iden",
+    "scan_type",
+    "scan_coordinate",
+    "scan_unit",
+    "coordinate_source",
+    "geo_restraint_line_number",
+    "ffield_value",
+    "qm_value",
+    "group_comment",
+    "inline_comment",
+    "classification_reason",
+    "report_line_number",
+    "trainset_line_number",
+]
+
+
+def _two_body_expression_key(
+    op1: object,
+    iden1: object,
+    n1: object,
+    op2: object,
+    iden2: object,
+    n2: object,
+) -> str:
+    """Build an ordered sign/identifier key independent of displayed divisors.
+
+    fort.99 may omit common divisors that are explicit in the training set, so
+    the divisor values cannot be required for comment linkage.
+    """
+    sign1 = "+" if str(op1).strip() in {"+", "1", "1.0"} or op1 == 1 else "-"
+    sign2 = "+" if str(op2).strip() in {"+", "1", "1.0"} or op2 == 1 else "-"
+    return "|".join(
+        (sign1, str(iden1).strip(), sign2, str(iden2).strip())
+    )
+
+
+def _annotated_two_body_energy_terms(
+    data: ForceFieldOptimizationPlotBundleData,
+) -> pd.DataFrame:
+    """Join fort.99 two-body rows to trainset comments by expression occurrence."""
+    report_rows = _parse_two_body_energy_terms(data.report).copy()
+    train_rows = data.training_set.energy.copy()
+    if report_rows.empty or train_rows.empty:
+        return pd.DataFrame()
+
+    extra_id_cols = [
+        col
+        for col in train_rows.columns
+        if re.fullmatch(r"id\d+", str(col)) and str(col) not in {"id1", "id2"}
+    ]
+    mask = train_rows["id1"].notna() & train_rows["id2"].notna()
+    for col in extra_id_cols:
+        mask &= train_rows[col].isna() | train_rows[col].astype(str).str.strip().eq("")
+    train_rows = train_rows.loc[mask].copy()
+    if train_rows.empty:
+        return pd.DataFrame()
+
+    report_rows["expression_key"] = report_rows.apply(
+        lambda row: _two_body_expression_key(
+            row.get("opt1"), row.get("iden1"), row.get("n1"),
+            row.get("opt2"), row.get("iden2"), row.get("n2"),
+        ),
+        axis=1,
+    )
+    train_rows["expression_key"] = train_rows.apply(
+        lambda row: _two_body_expression_key(
+            row.get("op1"), row.get("id1"), row.get("n1"),
+            row.get("op2"), row.get("id2"), row.get("n2"),
+        ),
+        axis=1,
+    )
+    report_rows["expression_occurrence"] = report_rows.groupby(
+        "expression_key", sort=False
+    ).cumcount()
+    train_rows["expression_occurrence"] = train_rows.groupby(
+        "expression_key", sort=False
+    ).cumcount()
+    annotations = train_rows.loc[
+        :,
+        [
+            "expression_key",
+            "expression_occurrence",
+            "group_comment",
+            "inline_comment",
+            "line_number",
+        ],
+    ].rename(columns={"line_number": "trainset_line_number"})
+    joined = report_rows.merge(
+        annotations,
+        on=["expression_key", "expression_occurrence"],
+        how="left",
+    )
+    joined["group_comment"] = joined["group_comment"].fillna("").astype(str)
+    joined["inline_comment"] = joined["inline_comment"].fillna("").astype(str)
+    joined["report_line_number"] = joined["lineno"]
+    return joined
+
+
+def _identifier_suggests_eos(identifier: object) -> bool:
+    """Recognize common EOS and elastic-family identifier conventions."""
+    text = str(identifier).strip().lower()
+    return bool(
+        re.search(r"(?:^|[_\-.])(bulk|volume|eos)(?:[_\-.]|$)", text)
+        or re.search(r"(?:^|[_\-.])c\d+(?:[_\-.]|$)", text)
+    )
+
+
+def _geo_restraint_lookup(restraints: pd.DataFrame) -> dict[str, dict[str, Any]]:
+    """Return unambiguous per-descriptor BOND/ANGLE restraint metadata."""
+    required = {"descriptor", "restraint_type", "coordinate"}
+    if restraints.empty or not required.issubset(restraints.columns):
+        return {}
+    lookup: dict[str, dict[str, Any]] = {}
+    for descriptor, group in restraints.groupby("descriptor", sort=False, dropna=False):
+        name = str(descriptor).strip()
+        kinds = {
+            str(value).strip().lower()
+            for value in group["restraint_type"].dropna()
+            if str(value).strip().lower() in {"bond", "angle"}
+        }
+        if not name or len(kinds) != 1:
+            continue
+        first = group.loc[
+            group["restraint_type"].astype(str).str.lower().isin(kinds)
+        ].iloc[0]
+        kind = next(iter(kinds))
+        lookup[name] = {
+            "restraint_type": kind,
+            "coordinate": pd.to_numeric(first.get("coordinate"), errors="coerce"),
+            "restraint_line_number": first.get("restraint_line_number", pd.NA),
+        }
+    return lookup
+
+
+def _identifier_scan_coordinate(identifier: object) -> float | None:
+    """Extract a terminal decimal scan coordinate when geo has no restraint."""
+    text = str(identifier).strip()
+    encoded_decimal = re.search(r"(?<!\d)([+-]?\d+)_([0-9]+)$", text)
+    if encoded_decimal:
+        integer, fraction = encoded_decimal.groups()
+        return float(f"{integer}.{fraction}")
+    number = re.search(r"(?<![A-Za-z0-9])([+-]?\d+(?:\.\d+)?)$", text)
+    return float(number.group(1)) if number else None
+
+
+def _classify_curve_rows(
+    rows: pd.DataFrame,
+    geometry_restraints: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """Classify two-structure candidates as EOS, bond, angle, or other curves."""
+    if rows.empty:
+        return rows
+    out = rows.copy()
+    comments = (
+        out["group_comment"].fillna("").astype(str)
+        + " "
+        + out["inline_comment"].fillna("").astype(str)
+    ).str.lower()
+    out["legacy_restraint"] = comments.str.contains(r"\brestraint\b", regex=True)
+    eos_comment = comments.str.contains(r"\b(?:eos|volume|bulk)\b", regex=True)
+    eos_identifier = out.apply(
+        lambda row: _identifier_suggests_eos(row.get("iden1"))
+        or _identifier_suggests_eos(row.get("iden2")),
+        axis=1,
+    )
+    restraint_lookup = _geo_restraint_lookup(
+        geometry_restraints if geometry_restraints is not None else pd.DataFrame()
+    )
+
+    out["curve_type"] = "other_curve"
+    out["classification_reason"] = "no unique BOND/ANGLE RESTRAINT in geo"
+    out["_comment_bucket"] = out["group_comment"].str.strip()
+    out.loc[out["_comment_bucket"] == "", "_comment_bucket"] = "<uncommented>"
+    for _, comment_rows in out.groupby("_comment_bucket", sort=False, dropna=False):
+        for indices in _component_row_indices(comment_rows):
+            component = out.loc[indices]
+            if eos_comment.loc[indices].any():
+                curve_type = "eos"
+                reason = "EOS/volume/bulk comment"
+            elif eos_identifier.loc[indices].any():
+                curve_type = "eos"
+                reason = "EOS identifier family"
+            else:
+                identifiers = {
+                    str(value).strip()
+                    for column in ("iden1", "iden2")
+                    for value in component[column]
+                }
+                kinds = {
+                    restraint_lookup[identifier]["restraint_type"]
+                    for identifier in identifiers
+                    if identifier in restraint_lookup
+                }
+                curve_type = next(iter(kinds)) if len(kinds) == 1 else "other_curve"
+                reason = {
+                    "bond": "BOND RESTRAINT in geo",
+                    "angle": "ANGLE RESTRAINT in geo",
+                }.get(curve_type, "no unique BOND/ANGLE RESTRAINT in geo")
+            out.loc[indices, "curve_type"] = curve_type
+            out.loc[indices, "classification_reason"] = reason
+    out = out.drop(columns=["_comment_bucket"])
+    return out
+
+
+def _component_row_indices(rows: pd.DataFrame) -> list[list[int]]:
+    """Return connected row components for identifier-pair expressions."""
+    parent: dict[str, str] = {}
+
+    def find(value: str) -> str:
+        parent.setdefault(value, value)
+        if parent[value] != value:
+            parent[value] = find(parent[value])
+        return parent[value]
+
+    def union(left: str, right: str) -> None:
+        left_root, right_root = find(left), find(right)
+        if left_root != right_root:
+            parent[right_root] = left_root
+
+    for _, row in rows.iterrows():
+        union(str(row["iden1"]).strip(), str(row["iden2"]).strip())
+
+    grouped: dict[str, list[int]] = {}
+    for index, row in rows.iterrows():
+        root = find(str(row["iden1"]).strip())
+        grouped.setdefault(root, []).append(int(index))
+    return list(grouped.values())
+
+
+def _curve_table_from_classified_rows(
+    rows: pd.DataFrame,
+    geometry_summary: EnergyMinimizationSummaryData,
+    geometry_restraints: pd.DataFrame | None = None,
+    *,
+    curve_type: str,
+) -> pd.DataFrame:
+    """Build one row per curve point while allowing either operand to repeat."""
+    if rows.empty or "curve_type" not in rows.columns:
+        return pd.DataFrame(columns=_CURVE_COLUMNS)
+    selected = rows.loc[rows["curve_type"] == curve_type].copy()
+    if selected.empty:
+        return pd.DataFrame(columns=_CURVE_COLUMNS)
+
+    geometry_df = _geometry_summary_frame(geometry_summary)
+    geo_map = {
+        str(row["identifier"]).strip(): (row.get("V", pd.NA), row.get("E", pd.NA))
+        for _, row in geometry_df.drop_duplicates("identifier", keep="first").iterrows()
+    }
+    restraint_lookup = _geo_restraint_lookup(
+        geometry_restraints if geometry_restraints is not None else pd.DataFrame()
+    )
+
+    def scan_metadata(identifier: str) -> dict[str, Any]:
+        record = restraint_lookup.get(identifier)
+        if record is not None:
+            kind = str(record["restraint_type"])
+            return {
+                "scan_type": kind,
+                "scan_coordinate": record["coordinate"],
+                "scan_unit": "angstrom" if kind == "bond" else "degree",
+                "coordinate_source": "geo restraint",
+                "geo_restraint_line_number": record["restraint_line_number"],
+            }
+        return {
+            "scan_type": "other" if curve_type == "other_curve" else curve_type,
+            "scan_coordinate": _identifier_scan_coordinate(identifier),
+            "scan_unit": {
+                "bond": "angstrom",
+                "angle": "degree",
+            }.get(curve_type, ""),
+            "coordinate_source": "identifier suffix",
+            "geo_restraint_line_number": pd.NA,
+        }
+    output_rows: list[dict[str, Any]] = []
+    selected["_comment_bucket"] = selected["group_comment"].str.strip()
+    selected.loc[selected["_comment_bucket"] == "", "_comment_bucket"] = "<uncommented>"
+
+    for _, comment_rows in selected.groupby("_comment_bucket", sort=False, dropna=False):
+        for indices in _component_row_indices(comment_rows):
+            component = comment_rows.loc[indices].copy()
+            occurrence_counts: dict[str, int] = {}
+            for _, row in component.iterrows():
+                for identifier in {str(row["iden1"]).strip(), str(row["iden2"]).strip()}:
+                    occurrence_counts[identifier] = occurrence_counts.get(identifier, 0) + 1
+            if not occurrence_counts:
+                continue
+            base_iden, repeat_count = sorted(
+                occurrence_counts.items(), key=lambda item: (-item[1], item[0])
+            )[0]
+            if repeat_count < 2:
+                continue
+
+            seen_other: set[str] = set()
+            for _, row in component.iterrows():
+                iden1, iden2 = str(row["iden1"]).strip(), str(row["iden2"]).strip()
+                if iden1 == base_iden:
+                    other_iden = iden2
+                elif iden2 == base_iden:
+                    other_iden = iden1
+                else:
+                    continue
+                if other_iden in seen_other:
+                    continue
+                seen_other.add(other_iden)
+                volume, energy = geo_map.get(other_iden, (pd.NA, pd.NA))
+                scan = scan_metadata(other_iden)
+                output_rows.append(
+                    {
+                        "curve_type": curve_type,
+                        "base_iden": base_iden,
+                        "other_iden": other_iden,
+                        "iden1": iden1,
+                        "iden2": iden2,
+                        "V_other_iden": volume,
+                        "E_other_iden": energy,
+                        **scan,
+                        "ffield_value": row.get("ffield_value", pd.NA),
+                        "qm_value": row.get("qm_value", pd.NA),
+                        "group_comment": row.get("group_comment", ""),
+                        "inline_comment": row.get("inline_comment", ""),
+                        "classification_reason": row.get("classification_reason", ""),
+                        "report_line_number": row.get("report_line_number", pd.NA),
+                        "trainset_line_number": row.get("trainset_line_number", pd.NA),
+                    }
+                )
+
+            if base_iden not in seen_other:
+                volume, energy = geo_map.get(base_iden, (pd.NA, pd.NA))
+                scan = scan_metadata(base_iden)
+                first = component.iloc[0]
+                output_rows.append(
+                    {
+                        "curve_type": curve_type,
+                        "base_iden": base_iden,
+                        "other_iden": base_iden,
+                        "iden1": base_iden,
+                        "iden2": base_iden,
+                        "V_other_iden": volume,
+                        "E_other_iden": energy,
+                        **scan,
+                        "ffield_value": 0.0,
+                        "qm_value": 0.0,
+                        "group_comment": first.get("group_comment", ""),
+                        "inline_comment": "",
+                        "classification_reason": first.get("classification_reason", ""),
+                        "report_line_number": pd.NA,
+                        "trainset_line_number": pd.NA,
+                    }
+                )
+
+    if not output_rows:
+        return pd.DataFrame(columns=_CURVE_COLUMNS)
+    sort_coordinate = "V_other_iden" if curve_type == "eos" else "scan_coordinate"
+    return pd.DataFrame(output_rows, columns=_CURVE_COLUMNS).sort_values(
+        ["base_iden", sort_coordinate, "other_iden"],
+        kind="stable",
+        na_position="last",
+    ).reset_index(drop=True)
+
+
+def _force_field_optimization_curve_tables(
+    data: ForceFieldOptimizationPlotBundleData,
+) -> dict[str, pd.DataFrame]:
+    """Return EOS plus geo-classified bond, angle, and fallback curve tables."""
+    classified = _classify_curve_rows(
+        _annotated_two_body_energy_terms(data), data.geometry_restraints
+    )
+    tables = {
+        curve_type: _curve_table_from_classified_rows(
+            classified,
+            data.geometry_summary,
+            data.geometry_restraints,
+            curve_type=curve_type,
+        )
+        for curve_type in ("eos", "bond", "angle", "other_curve")
+    }
+    if classified.empty:
+        legacy = classified.copy()
+    else:
+        legacy = classified.loc[
+            classified["legacy_restraint"].astype(bool)
+            & classified["curve_type"].ne("eos")
+        ].copy()
+    legacy["curve_type"] = "restraint"
+    tables["restraint"] = _curve_table_from_classified_rows(
+        legacy,
+        data.geometry_summary,
+        data.geometry_restraints,
+        curve_type="restraint",
+    )
+    return tables
 
 
 def _fit_vinet_bulk_modulus(
@@ -426,7 +853,8 @@ class FFieldOptimizationReportEOSResult(BaseResult):
         Request object used to generate this result.
     table : pandas.DataFrame
         Table with columns ``base_iden``, ``other_iden``, ``V_other_iden``,
-        and ``E_other_iden``.
+        ``E_other_iden``, ``ffield_value`` (ReaxFF prediction), and
+        ``qm_value`` (QM/literature target).
 
     Examples
     -----
@@ -441,6 +869,21 @@ class FFieldOptimizationReportEOSResult(BaseResult):
 
     table: pd.DataFrame
     request: FFieldOptimizationReportEOSRequest
+
+
+@dataclass
+class FFieldOptimizationReportRestraintRequest(BaseRequest):
+    """Select all restraint curves or one repeated reference identifier."""
+
+    iden: Optional[str] = None
+
+
+@dataclass
+class FFieldOptimizationReportRestraintResult(BaseResult):
+    """Comment-annotated ReaxFF/QM restraint curve rows."""
+
+    table: pd.DataFrame
+    request: FFieldOptimizationReportRestraintRequest
 
 
 @dataclass
@@ -649,9 +1092,9 @@ class FFieldOptimizationReportTask(AnalysisTask):
 
 @register_task("force_field_optimization_report_eos", label="Force Field Optimization Report EOS")
 class FFieldOptimizationReportEOSTask(AnalysisTask):
-    """Return ENERGY-vs-volume data derived from report + geometry summary."""
+    """Return comment-aware ENERGY-vs-volume EOS data."""
 
-    required_data = ForceFieldOptimizationReportEOSBundleData
+    required_data = ForceFieldOptimizationPlotBundleData
 
     @staticmethod
     def recommended_presentations(
@@ -716,7 +1159,7 @@ class FFieldOptimizationReportEOSTask(AnalysisTask):
 
     def run(
         self,
-        data: ForceFieldOptimizationReportEOSBundleData,
+        data: ForceFieldOptimizationPlotBundleData,
         request: FFieldOptimizationReportEOSRequest,
         reporter=None,
     ) -> FFieldOptimizationReportEOSResult:
@@ -726,12 +1169,12 @@ class FFieldOptimizationReportEOSTask(AnalysisTask):
         one base identifier from the request.
 
         Works on
-        ``ForceFieldOptimizationReportEOSBundleData``.
+        ``ForceFieldOptimizationPlotBundleData``.
 
         Parameters
         -----
-        data : ForceFieldOptimizationReportEOSBundleData
-            Bundle with parsed report rows and geometry summary values.
+        data : ForceFieldOptimizationPlotBundleData
+            Bundle with parsed report rows, geometry values, and training-set comments.
         request : FFieldOptimizationReportEOSRequest
             Optional identifier filter for EOS table scope.
         reporter : Any, optional
@@ -752,10 +1195,31 @@ class FFieldOptimizationReportEOSTask(AnalysisTask):
         ```
         The output table includes all eligible base-identifier EOS rows.
         """
-        table = _base_other_energy_volume_table(data.report, data.geometry_summary)
+        table = _force_field_optimization_curve_tables(data)["eos"]
         if request.iden and str(request.iden).lower() != "all":
             table = table[table["base_iden"] == request.iden].reset_index(drop=True)
         return FFieldOptimizationReportEOSResult(table=table, request=request)
+
+
+@register_task(
+    "force_field_optimization_report_restraints",
+    label="Force Field Optimization Report Restraints",
+)
+class FFieldOptimizationReportRestraintTask(AnalysisTask):
+    """Return repeated two-structure ENERGY terms labeled as restraints."""
+
+    required_data = ForceFieldOptimizationPlotBundleData
+
+    def run(
+        self,
+        data: ForceFieldOptimizationPlotBundleData,
+        request: FFieldOptimizationReportRestraintRequest,
+        reporter=None,
+    ) -> FFieldOptimizationReportRestraintResult:
+        table = _force_field_optimization_curve_tables(data)["restraint"]
+        if request.iden and str(request.iden).lower() != "all":
+            table = table[table["base_iden"] == request.iden].reset_index(drop=True)
+        return FFieldOptimizationReportRestraintResult(table=table, request=request)
 
 
 @register_task("force_field_optimization_report_bulk_modulus", label="Force Field Optimization Report Bulk Modulus")
@@ -876,6 +1340,9 @@ __all__ = [
     "FFieldOptimizationReportEOSRequest",
     "FFieldOptimizationReportEOSResult",
     "FFieldOptimizationReportEOSTask",
+    "FFieldOptimizationReportRestraintRequest",
+    "FFieldOptimizationReportRestraintResult",
+    "FFieldOptimizationReportRestraintTask",
     "FFieldOptimizationReportBulkModulusRequest",
     "FFieldOptimizationReportBulkModulusResult",
     "FFieldOptimizationReportBulkModulusTask",

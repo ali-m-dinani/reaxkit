@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -22,6 +23,7 @@ from reaxkit.analysis import force_field as _force_field_tasks  # noqa: F401
 from reaxkit.analysis.force_field.diagnostics import FFieldOptimizationDiagnosticRequest
 from reaxkit.analysis.force_field.diagnostic_beeswarm import (
     FFieldOptimizationDiagnosticBeeswarmRequest,
+    normalize_evolution_values,
 )
 from reaxkit.analysis.force_field.force_field import FFieldDataRequest, FFieldDataTask
 from reaxkit.analysis.force_field.optimization_progress import FFieldOptimizationProgressRequest
@@ -45,6 +47,8 @@ from reaxkit.core.runtime.generator_runtime import (
 )
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments, normalize_storage_args
 from reaxkit.domain.data_models import (
+    ForceFieldOptimizationReportData,
+    ForceFieldOptimizationTrainingSetData,
     ForceFieldParametersData,
 )
 from reaxkit.engine.common.generators.ffield_generator import (
@@ -207,6 +211,8 @@ ALL_COMMANDS = (
     "get_ffield_opt_progress_data",
     "get_energy_min_summary_data",
     "get_ffield_diagnostic_data",
+    "get_ffield_diagnostics_sensitivity",
+    "get_ffield_diagnostics_evolution",
     "get_ffield_opt_results",
     "get_ffield_opt_eos",
     "ffield_opt_bulk_modulus",
@@ -229,7 +235,7 @@ LEGACY_FORCE_FIELD_ALIASES = {
     "ffield_optimization_report_eos": "get_ffield_opt_eos",
     "ffield_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
     "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
-    "parameter_optimization_tornado": "get_ffield_diagnostic_data",
+    "parameter_optimization_tornado": "get_ffield_diagnostics_sensitivity",
 }
 ALL_LEGACY_COMMANDS = tuple(LEGACY_FORCE_FIELD_ALIASES.keys())
 
@@ -238,6 +244,8 @@ WORKFLOW_TASK_NAME_MAP = {
     "get_ffield_opt_progress_data": "force_field_optimization",
     "get_energy_min_summary_data": "structure_summary_data",
     "get_ffield_diagnostic_data": "parameter_optimization_diagnostic",
+    "get_ffield_diagnostics_sensitivity": "parameter_optimization_diagnostic",
+    "get_ffield_diagnostics_evolution": "parameter_optimization_diagnostic_beeswarm",
     "get_ffield_opt_results": "force_field_optimization_report",
     "get_ffield_opt_eos": "force_field_optimization_report_eos",
     "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
@@ -266,7 +274,28 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
     if command in FFIELD_ANALYSIS_COMMANDS:
         parser.set_defaults(progress=True)
         _add_runtime_arguments(parser)
-        _add_presentation_arguments(parser)
+        if command == "get_ffield_diagnostics_sensitivity":
+            _add_presentation_arguments(
+                parser,
+                plot_choices=("tornado", "beeswarm"),
+                default_plot="tornado",
+            )
+        elif command == "get_ffield_diagnostics_evolution":
+            _add_presentation_arguments(
+                parser,
+                plot_choices=("beeswarm", "scatter"),
+                default_plot="beeswarm",
+            )
+        elif command == "get_ffield_opt_eos":
+            _add_presentation_arguments(
+                parser,
+                save_help=(
+                    "Save plots. With --plot single, provide an output directory; "
+                    "with --plot subplot, provide one figure path."
+                ),
+            )
+        else:
+            _add_presentation_arguments(parser)
 
         if command == "get_ffield_data":
             parser.description = (
@@ -407,23 +436,102 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 action="store_true",
                 help="For beeswarm view, use one objective-function color range across all parameters.",
             )
+        elif command == "get_ffield_diagnostics_sensitivity":
+            parser.description = (
+                "Plot force-field optimization sensitivity diagnostics derived from fort.79.\n"
+                "Sensitivity values are the relative objective responses diff1/diff3, diff2/diff3, "
+                "and diff4/diff3 for each force-field parameter.\n\n"
+                "Examples:\n"
+                " 1. Plot the widest sensitivity ranges as a tornado plot:\n"
+                "   reaxkit get_ffield_diagnostics_sensitivity --plot tornado --top 10 --save sensitivity_tornado.png\n\n"
+                " 2. Plot all sensitivity observations as a parameter-colored beeswarm:\n"
+                "   reaxkit get_ffield_diagnostics_sensitivity --plot beeswarm --save sensitivity_beeswarm.png\n"
+            )
+            parser.add_argument(
+                "--interpret",
+                action="store_true",
+                help="Use interpreted force-field section, term, and component labels when possible.",
+            )
+            parser.add_argument(
+                "--top",
+                type=int,
+                default=0,
+                help="Keep the top-N parameters with the widest sensitivity spans; 0 keeps all.",
+            )
+            parser.add_argument(
+                "--vline",
+                type=float,
+                default=1.0,
+                help="Reference sensitivity value drawn on tornado and beeswarm plots.",
+            )
+        elif command == "get_ffield_diagnostics_evolution":
+            parser.description = (
+                "Plot force-field parameter evolution from fort.79 diagnostic samples.\n"
+                "The beeswarm view normalizes all diagnostic samples with their params bounds. "
+                "The scatter view follows each parameter's final value by epoch, connects the values "
+                "with a line, and colors the markers by objective-function value.\n\n"
+                "Examples:\n"
+                " 1. Plot the bounded diagnostic beeswarm in numeric pointer order:\n"
+                "   reaxkit get_ffield_diagnostics_evolution --plot beeswarm --save diagnostic_evolution.png\n\n"
+                " 2. Plot epoch-wise evolution relative to each parameter's first value:\n"
+                "   reaxkit get_ffield_diagnostics_evolution --plot scatter --normalization first "
+                "--save diagnostic_evolution_scatter.png\n\n"
+                " 3. Plot the top 10 widest objective-response ranges using one shared color scale:\n"
+                "   reaxkit get_ffield_diagnostics_evolution --top 10 --global-objective-scale "
+                "--save diagnostic_evolution_top10.png\n"
+            )
+            parser.add_argument(
+                "--normalization",
+                choices=["bound_min", "first"],
+                default="bound_min",
+                help=(
+                    "Scatter normalization origin. bound_min uses (value-lower)/(upper-lower); "
+                    "first uses (value-first)/(upper-lower)."
+                ),
+            )
+            parser.add_argument(
+                "--top",
+                type=int,
+                default=0,
+                help="Keep the top-N parameters with the widest objective ranges; 0 keeps all.",
+            )
+            parser.add_argument(
+                "--sort",
+                dest="diagnostic_sort",
+                choices=["parameter", "final", "starting"],
+                default="parameter",
+                help="Sort parameter rows by numeric pointer, final value, or starting value.",
+            )
+            parser.add_argument(
+                "--global-objective-scale",
+                action="store_true",
+                help="Use one objective-function color range across all parameters.",
+            )
         elif command == "get_ffield_opt_results":
             parser.description = (
                 "Get force-field optimization report data, which can be obtained from fort.99 file if using ReaxFF standalone code for ffield optimization. \n"
-                "This includes the values in training set and the values generated by the optimized ffield. \n\n"
+                "This includes the values in training set and the values generated by the optimized ffield. "
+                "Each report row is linked to its matching trainset line, group comment, and inline comment.\n\n"
                 "Examples:\n"
                 "  1. Getting all optimization report data and exporting to CSV:\n"
                 "    reaxkit get_ffield_opt_results --export fort99.csv\n\n"
             )
         elif command == "get_ffield_opt_eos":
             parser.description = (
-                "Build energy-vs-volume EOS data from optimization outputs.\n\n"
+                "Build paired ReaxFF-vs-QM/literature EOS data from optimization outputs.\n"
+                "EOS families are classified from trainset group/inline comments (EOS, Volume, or Bulk) "
+                "and identifier families such as bulk_* and c11_*. Restraint-comment groups are excluded.\n"
+                "Exports include ffield_value, qm_value, group_comment, and inline_comment; plots show both curves.\n\n"
+                "In single-plot mode, figures are grouped into material subfolders, for example "
+                "eos_plots/mp_1008557/.\n\n"
                 "Examples:\n"
                 "  1. Getting the EOS data for a specific identifier (for example, MgO) and plotting energy vs volume curve:\n"
                 "    reaxkit get_ffield_opt_eos --iden MgO --plot single\n\n"
-                "  2. Getting the EOS data for all available identifiers, exporting to CSV, and plotting all EOS curves in subplots:\n"
+                "  2. Getting the EOS data for all available identifiers and exporting it to CSV:\n"
                 "    reaxkit get_ffield_opt_eos --iden all --export eos.csv\n\n"
-                "  3. Getting the EOS data for all available identifiers, plotting all EOS curves in subplots, and saving the plot:\n"
+                "  3. Getting the EOS data for all available identifiers, plotting one figure per identifier, and saving them to a directory:\n"
+                "    reaxkit get_ffield_opt_eos --iden all --plot single --save eos_plots\n\n"
+                "  4. Plotting all EOS curves as subplots in one figure:\n"
                 "    reaxkit get_ffield_opt_eos --iden all --plot subplot --save eos.png"
             )
             parser.add_argument(
@@ -1181,11 +1289,22 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     add_storage_cli_arguments(parser)
 
 
-def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_presentation_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    plot_choices: tuple[str, ...] = ("single", "subplot", "tornado", "beeswarm"),
+    default_plot: str | None = None,
+    save_help: str = "Save the generated plot to a file path",
+) -> None:
     """Add presentation arguments."""
-    parser.add_argument("--plot", choices=["single", "subplot", "tornado", "beeswarm"], default=None, help="Render a plot")
+    parser.add_argument(
+        "--plot",
+        choices=list(plot_choices),
+        default=default_plot,
+        help="Render a plot",
+    )
     parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
+    parser.add_argument("--save", default=None, help=save_help)
     parser.add_argument("--export", default=None, help="Write the result table to CSV")
     parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
     parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
@@ -1338,26 +1457,101 @@ def _build_tornado_result(base_result, top: int):
     if not isinstance(table, pd.DataFrame) or table.empty:
         return argparse.Namespace(table=pd.DataFrame(), values={}, metadata={})
     sensitivities = table.copy()
+    sensitivities["parameter"] = _diagnostic_parameter_labels(sensitivities)
     grouped = (
-        sensitivities.groupby("identifier", dropna=True)
+        sensitivities.groupby("parameter", dropna=True, sort=False)
         .agg(min_eff=("min_sensitivity", "min"), max_eff=("max_sensitivity", "max"))
         .reset_index()
     )
     eff_union = (
         sensitivities.melt(
-            id_vars=["identifier"],
+            id_vars=["parameter"],
             value_vars=["min_sensitivity", "max_sensitivity"],
             var_name="kind",
             value_name="eff",
         )
         .dropna(subset=["eff"])
     )
-    grouped["median_eff"] = grouped["identifier"].map(eff_union.groupby("identifier", dropna=True)["eff"].median())
+    grouped["median_eff"] = grouped["parameter"].map(
+        eff_union.groupby("parameter", dropna=True)["eff"].median()
+    )
     grouped["span"] = grouped["max_eff"] - grouped["min_eff"]
     grouped = grouped.sort_values("span", ascending=False).reset_index(drop=True)
     if top and top > 0:
         grouped = grouped.head(int(top)).copy()
     return argparse.Namespace(table=grouped, values={}, metadata={})
+
+
+def _diagnostic_parameter_labels(table: pd.DataFrame) -> pd.Series:
+    """Return stable raw or interpreted labels for diagnostic parameter rows."""
+    if "identifier" in table.columns:
+        return table["identifier"].astype(str)
+
+    pointer_cols = ["ff_section", "ff_section_line", "ff_parameter"]
+    if not set(pointer_cols).issubset(table.columns):
+        return pd.Series(table.index.astype(str), index=table.index, dtype=object)
+
+    def _format_row(row: pd.Series) -> str:
+        def _pointer_value(name: str) -> str:
+            value = pd.to_numeric(pd.Series([row.get(name)]), errors="coerce").iloc[0]
+            return str(int(value)) if pd.notna(value) else "?"
+
+        pointer = " ".join(_pointer_value(name) for name in pointer_cols)
+        details = [
+            str(row.get(name)).strip()
+            for name in ("ffield_section_name", "term", "component")
+            if pd.notna(row.get(name)) and str(row.get(name)).strip()
+        ]
+        return f"{pointer}: {' '.join(details)}" if details else pointer
+
+    return table.apply(_format_row, axis=1)
+
+
+def _build_sensitivity_beeswarm_result(base_result, top: int):
+    """Build long-form sensitivity samples for the dedicated beeswarm view."""
+    table = getattr(base_result, "table", None)
+    if not isinstance(table, pd.DataFrame) or table.empty:
+        return argparse.Namespace(table=pd.DataFrame(), values={}, metadata={})
+
+    source = table.copy()
+    source["parameter"] = _diagnostic_parameter_labels(source)
+    sample_specs = (
+        ("Sample 1", "sensitivity1/3", "value1"),
+        ("Sample 2", "sensitivity2/3", "value2"),
+        ("Final value", "sensitivity4/3", "value4"),
+    )
+    frames: list[pd.DataFrame] = []
+    for sample_name, sensitivity_col, parameter_value_col in sample_specs:
+        required = {"parameter", sensitivity_col, parameter_value_col}
+        if not required.issubset(source.columns):
+            continue
+        frame = source.loc[:, ["parameter", sensitivity_col, parameter_value_col]].copy()
+        frame = frame.rename(
+            columns={
+                sensitivity_col: "sensitivity",
+                parameter_value_col: "parameter_value",
+            }
+        )
+        frame["sample_name"] = sample_name
+        frames.append(frame)
+
+    samples = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    if samples.empty:
+        return argparse.Namespace(table=samples, values={}, metadata={})
+    samples["sensitivity"] = pd.to_numeric(samples["sensitivity"], errors="coerce")
+    samples["parameter_value"] = pd.to_numeric(samples["parameter_value"], errors="coerce")
+    samples = samples.dropna(subset=["parameter", "sensitivity", "parameter_value"])
+
+    if top and top > 0 and not samples.empty:
+        spans = (
+            samples.groupby("parameter", sort=False)["sensitivity"]
+            .agg(lambda values: float(values.max() - values.min()))
+            .sort_values(ascending=False, kind="stable")
+        )
+        selected = set(spans.head(int(top)).index.astype(str))
+        samples = samples.loc[samples["parameter"].astype(str).isin(selected)].copy()
+
+    return argparse.Namespace(table=samples.reset_index(drop=True), values={}, metadata={})
 
 
 def _wants_tornado_view(args: argparse.Namespace) -> bool:
@@ -1381,7 +1575,275 @@ def _prepare_eos_table(result, *, flip_sign: bool) -> None:
             result.table[col] = -pd.to_numeric(table[col], errors="coerce")
 
 
-def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+def _eos_identifier_coordinate(base_iden: object, other_iden: object) -> float | None:
+    """Extract a numeric scan coordinate from an EOS point identifier."""
+    base = str(base_iden).strip()
+    other = str(other_iden).strip()
+    base_variants = [base]
+    if base.lower().endswith(".opt"):
+        base_variants.append(base[:-4])
+
+    suffix = ""
+    for candidate in sorted(base_variants, key=len, reverse=True):
+        if other.startswith(candidate):
+            suffix = other[len(candidate) :].lstrip("._-")
+            break
+    if not suffix:
+        return None
+
+    if re.fullmatch(r"[+-]?\d+(?:\.\d+)?", suffix):
+        return float(suffix)
+    match = re.fullmatch(r"([+-]?\d+)_([0-9]+)", suffix)
+    if match:
+        sign_and_integer, decimals = match.groups()
+        return float(f"{sign_and_integer}.{decimals}")
+    return None
+
+
+def _eos_plot_groups(table: pd.DataFrame) -> list[dict[str, object]]:
+    """Build paired ReaxFF/QM EOS groups with a shared x-axis."""
+    required = {
+        "base_iden",
+        "other_iden",
+        "V_other_iden",
+        "ffield_value",
+        "qm_value",
+    }
+    if table.empty or not required.issubset(table.columns):
+        return []
+
+    work = table.copy()
+    work["V_other_iden"] = pd.to_numeric(work["V_other_iden"], errors="coerce")
+    work["ffield_value"] = pd.to_numeric(work["ffield_value"], errors="coerce")
+    work["qm_value"] = pd.to_numeric(work["qm_value"], errors="coerce")
+    groups: list[dict[str, object]] = []
+    for iden, raw_group in work.groupby("base_iden", dropna=False, sort=False):
+        group = raw_group.copy()
+        has_energy = group[["ffield_value", "qm_value"]].notna().any(axis=1)
+        volume_rows = group.loc[group["V_other_iden"].notna() & has_energy].copy()
+        if not volume_rows.empty:
+            plotted = volume_rows.sort_values("V_other_iden", kind="stable")
+            x_col = "V_other_iden"
+            xlabel = "Volume (Å³)"
+        else:
+            group["scan_coordinate"] = [
+                _eos_identifier_coordinate(iden, other)
+                for other in group["other_iden"]
+            ]
+            plotted = group.loc[group["scan_coordinate"].notna() & has_energy].copy()
+            plotted = plotted.sort_values("scan_coordinate", kind="stable")
+            x_col = "scan_coordinate"
+            xlabel = "Scan coordinate"
+        if plotted.empty:
+            continue
+
+        reaxff_rows = plotted.dropna(subset=[x_col, "ffield_value"])
+        qm_rows = plotted.dropna(subset=[x_col, "qm_value"])
+        if reaxff_rows.empty and qm_rows.empty:
+            continue
+        groups.append(
+            {
+                "identifier": str(iden),
+                "reaxff_x": reaxff_rows[x_col].astype(float).tolist(),
+                "reaxff_y": reaxff_rows["ffield_value"].astype(float).tolist(),
+                "qm_x": qm_rows[x_col].astype(float).tolist(),
+                "qm_y": qm_rows["qm_value"].astype(float).tolist(),
+                "xlabel": xlabel,
+            }
+        )
+    return groups
+
+
+def _eos_plot_filename(identifier: str) -> str:
+    """Return a filesystem-safe PNG filename for one EOS identifier."""
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", str(identifier)).strip("._")
+    return f"eos_{safe or 'identifier'}.png"
+
+
+def _eos_material_name(identifier: object) -> str:
+    """Extract a material key from an EOS reference identifier.
+
+    Reference identifiers normally have ``<scan-family>_<reference>_<material>``
+    form, such as ``bulk_0_mp_1008557`` or ``c11_0_mp_1008557``. Materials
+    Project identifiers are also recognized wherever they occur. When an EOS
+    reference has no removable scan-family prefix, the complete reference
+    identifier is retained as the material key.
+    """
+    text = str(identifier).strip()
+    mp_match = re.search(r"(?:^|[_\-.])(mp[_-]\d+)(?:[_\-.]|$)", text, re.IGNORECASE)
+    if mp_match:
+        material = mp_match.group(1).replace("-", "_")
+    else:
+        family_match = re.match(
+            r"^(?:bulk|volume|eos|c\d+)[_\-.](?:0|ref(?:erence)?)[_\-.](.+)$",
+            text,
+            re.IGNORECASE,
+        )
+        material = family_match.group(1) if family_match else text
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", material).strip("._")
+    return safe or "unclassified"
+
+
+def _validate_eos_save_target(args: argparse.Namespace) -> None:
+    """Require a directory target when single mode emits one plot per identifier."""
+    save = getattr(args, "save", None)
+    plot_mode = str(getattr(args, "plot", "") or "").strip().lower()
+    figure_suffixes = {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".svg",
+        ".pdf",
+        ".tif",
+        ".tiff",
+        ".bmp",
+    }
+    if save and plot_mode == "single" and Path(str(save)).suffix.lower() in figure_suffixes:
+        raise ValueError(
+            "get_ffield_opt_eos --plot single creates one figure per EOS identifier; "
+            "--save must be a directory, for example: --save eos_plots"
+        )
+
+
+def _tornado_plot_payload(table: pd.DataFrame, args: argparse.Namespace) -> dict[str, object] | None:
+    """Build a tornado renderer payload from a grouped sensitivity table."""
+    required = {"min_eff", "max_eff", "median_eff"}
+    if table.empty or not required.issubset(table.columns):
+        return None
+    label_col = "parameter" if "parameter" in table.columns else "identifier"
+    if label_col not in table.columns:
+        return None
+    return {
+        "plot_type": "tornado_plot",
+        "labels": table[label_col].astype(str).tolist(),
+        "min_vals": pd.to_numeric(table["min_eff"], errors="coerce").tolist(),
+        "max_vals": pd.to_numeric(table["max_eff"], errors="coerce").tolist(),
+        "median_vals": pd.to_numeric(table["median_eff"], errors="coerce").tolist(),
+        "xlabel": "Sensitivity (Error Response)",
+        "ylabel": "Parameter",
+        "title": "Parameter Sensitivity Tornado Plot",
+        "vline": getattr(args, "vline", None),
+    }
+
+
+def _sensitivity_beeswarm_plot_payload(
+    table: pd.DataFrame,
+    args: argparse.Namespace,
+) -> dict[str, object] | None:
+    """Build the dedicated sensitivity beeswarm renderer payload."""
+    required = {"sensitivity", "parameter", "parameter_value"}
+    if table.empty or not required.issubset(table.columns):
+        return None
+    return {
+        "plot_type": "beeswarm_plot",
+        "sensitivity_beeswarm": True,
+        "x": pd.to_numeric(table["sensitivity"], errors="coerce").tolist(),
+        "y": table["parameter"].astype(str).tolist(),
+        "hue": pd.to_numeric(table["parameter_value"], errors="coerce").tolist(),
+        "size": 5.0,
+        "xlabel": "Sensitivity (Error Response)",
+        "ylabel": "Parameter",
+        "title": "Parameter Sensitivity Beeswarm",
+        "legend_title": "Color Meaning",
+        "legend_loc": "upper right",
+        "vline": getattr(args, "vline", 1.0),
+    }
+
+
+def _diagnostic_evolution_plot_payload(
+    result,
+    args: argparse.Namespace,
+) -> dict[str, object] | None:
+    """Build a per-parameter scatter-and-line evolution payload."""
+    table = getattr(result, "table", None)
+    parameters = getattr(result, "parameters", None)
+    required = {
+        "epoch",
+        "sample_name",
+        "parameter_key",
+        "parameter_label",
+        "parameter_value",
+        "objective_value",
+    }
+    if not isinstance(table, pd.DataFrame) or table.empty or not required.issubset(table.columns):
+        return None
+    if not isinstance(parameters, pd.DataFrame) or parameters.empty:
+        return None
+
+    samples = table.loc[table["sample_name"].astype(str) == "Final value"].copy()
+    samples["parameter_value"] = pd.to_numeric(samples["parameter_value"], errors="coerce")
+    samples["objective_value"] = pd.to_numeric(samples["objective_value"], errors="coerce")
+    samples["epoch"] = pd.to_numeric(samples["epoch"], errors="coerce")
+    samples = samples.dropna(subset=["parameter_value", "objective_value", "epoch"])
+    if samples.empty:
+        return None
+
+    mode = str(getattr(args, "normalization", "bound_min") or "bound_min")
+    parameter_rows = []
+    normalized_groups = []
+    for parameter in parameters.sort_values("plot_row", kind="stable").to_dict(orient="records"):
+        key = str(parameter["parameter_key"])
+        group = samples.loc[samples["parameter_key"].astype(str) == key].copy()
+        if group.empty:
+            continue
+        group = group.sort_values("epoch", kind="stable")
+        group["normalized_value"] = normalize_evolution_values(
+            group["parameter_value"].to_numpy(dtype=float),
+            lower_bound=float(parameter["lower_bound"]),
+            upper_bound=float(parameter["upper_bound"]),
+            normalization=mode,
+        )
+        parameter["plot_row"] = len(parameter_rows)
+        parameter["final_value"] = float(group.iloc[-1]["parameter_value"])
+        objectives = group["objective_value"].to_numpy(dtype=float)
+        color_min = float(objectives.min())
+        color_max = float(objectives.max())
+        if color_min == color_max:
+            padding = max(abs(color_min) * 1e-6, 1e-9)
+            color_min -= padding
+            color_max += padding
+        parameter["color_min"] = color_min
+        parameter["color_max"] = color_max
+        parameter_rows.append(parameter)
+        normalized_groups.append(group)
+    if not normalized_groups:
+        return None
+
+    plotted = pd.concat(normalized_groups, ignore_index=True)
+    if bool(getattr(result.request, "global_objective_scale", False)):
+        global_min = float(plotted["objective_value"].min())
+        global_max = float(plotted["objective_value"].max())
+        if global_min == global_max:
+            padding = max(abs(global_min) * 1e-6, 1e-9)
+            global_min -= padding
+            global_max += padding
+        for parameter in parameter_rows:
+            parameter["color_min"] = global_min
+            parameter["color_max"] = global_max
+
+    return {
+        "plot_type": "diagnostic_evolution_plot",
+        "x": plotted["epoch"].astype(int).tolist(),
+        "y": pd.to_numeric(plotted["normalized_value"], errors="coerce").tolist(),
+        "hue": plotted["objective_value"].tolist(),
+        "parameter_values": plotted["parameter_value"].tolist(),
+        "parameter_keys": plotted["parameter_key"].astype(str).tolist(),
+        "parameter_labels": plotted["parameter_label"].astype(str).tolist(),
+        "diagnostic_parameters": parameter_rows,
+        "global_objective_scale": bool(getattr(result.request, "global_objective_scale", False)),
+        "normalization": mode,
+        "size": 46,
+        "xlabel": "Epoch",
+        "ylabel": "Normalized parameter value",
+        "title": "Parameter evolution",
+    }
+
+
+def _plot_payload(
+    command: str,
+    result,
+    args: argparse.Namespace,
+) -> dict[str, object] | list[dict[str, object]] | None:
     """Plot payload."""
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
@@ -1397,7 +1859,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "title": "Force-Field Optimization",
         }
 
-    if command == "get_ffield_diagnostic_data":
+    if command in {"get_ffield_diagnostic_data", "get_ffield_diagnostics_evolution"}:
         if getattr(args, "plot", None) == "beeswarm":
             parameters = getattr(result, "parameters", None)
             required = {
@@ -1427,46 +1889,22 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
                 "ylabel": "Parameter",
                 "title": "Parameter diagnostics",
             }
-        tornado_cols = {"min_eff", "max_eff", "median_eff", "identifier"}
+        if command == "get_ffield_diagnostics_evolution":
+            if str(getattr(args, "plot", "beeswarm") or "beeswarm").lower() == "scatter":
+                return _diagnostic_evolution_plot_payload(result, args)
+            return None
+
+    if command == "get_ffield_diagnostics_sensitivity":
+        if str(getattr(args, "plot", "tornado") or "tornado").lower() == "beeswarm":
+            return _sensitivity_beeswarm_plot_payload(table, args)
+        return _tornado_plot_payload(table, args)
+
+    if command == "get_ffield_diagnostic_data":
+        tornado_cols = {"min_eff", "max_eff", "median_eff"}
         if _wants_tornado_view(args) or tornado_cols.issubset(set(table.columns)):
             if not tornado_cols.issubset(set(table.columns)):
-                # Convert base diagnostic table into tornado payload shape on the fly.
-                if not {"identifier", "min_sensitivity", "max_sensitivity"}.issubset(set(table.columns)):
-                    return None
-                g = (
-                    table.groupby("identifier", dropna=True)
-                    .agg(min_eff=("min_sensitivity", "min"), max_eff=("max_sensitivity", "max"))
-                    .reset_index()
-                )
-                if g.empty:
-                    return None
-                eff_union = (
-                    table.melt(
-                        id_vars=["identifier"],
-                        value_vars=["min_sensitivity", "max_sensitivity"],
-                        var_name="kind",
-                        value_name="eff",
-                    )
-                    .dropna(subset=["eff"])
-                )
-                g["median_eff"] = g["identifier"].map(eff_union.groupby("identifier", dropna=True)["eff"].median())
-                g["span"] = g["max_eff"] - g["min_eff"]
-                g = g.sort_values("span", ascending=False).reset_index(drop=True)
-                top = int(getattr(args, "top", 0) or 0)
-                if top > 0:
-                    g = g.head(top).copy()
-                table = g
-            return {
-                "plot_type": "tornado_plot",
-                "labels": table["identifier"].tolist(),
-                "min_vals": pd.to_numeric(table["min_eff"], errors="coerce").tolist(),
-                "max_vals": pd.to_numeric(table["max_eff"], errors="coerce").tolist(),
-                "median_vals": pd.to_numeric(table["median_eff"], errors="coerce").tolist(),
-                "xlabel": "Sensitivity (Error Response)",
-                "ylabel": "Parameter",
-                "title": "Parameter Sensitivity Tornado Plot",
-                "vline": getattr(args, "vline", None),
-            }
+                table = _build_tornado_result(result, top=int(getattr(args, "top", 0) or 0)).table
+            return _tornado_plot_payload(table, args)
         if getattr(args, "report_most_sensitive", False):
             if "sensitivity" not in table.columns:
                 return None
@@ -1531,38 +1969,55 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         }
 
     if command == "get_ffield_opt_eos":
-        work = table.copy()
-        for col in ("V_other_iden", "E_other_iden"):
-            if col in work.columns:
-                work[col] = pd.to_numeric(work[col], errors="coerce")
-        work = work.sort_values(["base_iden", "V_other_iden"]).reset_index(drop=True)
-        groups = [(iden, grp.copy()) for iden, grp in work.groupby("base_iden", dropna=False)]
-        if getattr(args, "plot", None) == "subplot" and len(groups) > 1:
+        groups = _eos_plot_groups(table)
+        if not groups:
+            return None
+
+        def _series_for_group(group: dict[str, object]) -> list[dict[str, object]]:
+            series: list[dict[str, object]] = []
+            if group["reaxff_x"]:
+                series.append(
+                    {
+                        "x": group["reaxff_x"],
+                        "y": group["reaxff_y"],
+                        "label": "ReaxFF",
+                        "marker": "o",
+                    }
+                )
+            if group["qm_x"]:
+                series.append(
+                    {
+                        "x": group["qm_x"],
+                        "y": group["qm_y"],
+                        "label": "QM/Literature",
+                        "marker": "o",
+                    }
+                )
+            return series
+
+        if getattr(args, "plot", None) == "subplot":
             return {
                 "plot_type": "multi_subplots",
-                "subplots": [
-                    [
-                        {"x": grp["V_other_iden"].tolist(), "y": grp["E_other_iden"].tolist(), "label": f"{iden} energy"},
-                    ]
-                    for iden, grp in groups
-                ],
-                "xlabel": "Volume",
+                "subplots": [_series_for_group(group) for group in groups],
+                "xlabel": [group["xlabel"] for group in groups],
                 "ylabel": "Energy",
-                "title": "EOS Energy vs Volume",
+                "title": [f"EOS {group['identifier']}" for group in groups],
                 "legend": True,
                 "grid": getattr(args, "grid", None),
             }
-        series = []
-        for iden, grp in groups:
-            series.append({"x": grp["V_other_iden"].tolist(), "y": grp["E_other_iden"].tolist(), "label": f"{iden} energy"})
-        return {
-            "plot_type": "single_plot",
-            "series": series,
-            "xlabel": "Volume",
-            "ylabel": "Energy",
-            "title": "EOS Energy vs Volume",
-            "legend": True,
-        }
+        return [
+            {
+                "plot_type": "single_plot",
+                "series": _series_for_group(group),
+                "xlabel": group["xlabel"],
+                "ylabel": "Energy",
+                "title": f"EOS {group['identifier']}",
+                "legend": True,
+                "filename": _eos_plot_filename(str(group["identifier"])),
+                "subdirectory": _eos_material_name(group["identifier"]),
+            }
+            for group in groups
+        ]
 
     if command == "get_energy_min_summary_data":
         x_col = getattr(args, "xaxis", None) or "identifier"
@@ -1663,8 +2118,35 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
 def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
     """Run ffield analysis main."""
     canonical = _resolve_workflow_command(command)
+    if canonical == "get_ffield_opt_eos":
+        _validate_eos_save_target(args)
     if canonical == "get_ffield_data":
         return _run_ffield_data(args)
+
+    if canonical == "get_ffield_diagnostics_evolution":
+        executor = AnalysisExecutor()
+        result = executor.run(
+            TASK_REGISTRY["parameter_optimization_diagnostic_beeswarm"](),
+            _build_parameter_optimization_diagnostic_beeswarm_request(args),
+            vars(args),
+        )
+        present_result(canonical, result, args, plot_payload_builder=_plot_payload)
+        return 0
+
+    if canonical == "get_ffield_diagnostics_sensitivity":
+        executor = AnalysisExecutor()
+        base_result = executor.run(
+            TASK_REGISTRY["parameter_optimization_diagnostic"](),
+            _build_parameter_optimization_diagnostic_request(args),
+            vars(args),
+        )
+        plot_mode = str(getattr(args, "plot", "tornado") or "tornado").lower()
+        if plot_mode == "beeswarm":
+            result = _build_sensitivity_beeswarm_result(base_result, top=int(args.top))
+        else:
+            result = _build_tornado_result(base_result, top=int(args.top))
+        present_result(canonical, result, args, plot_payload_builder=_plot_payload)
+        return 0
 
     if canonical == "get_ffield_diagnostic_data":
         executor = AnalysisExecutor()
@@ -1705,7 +2187,25 @@ def _run_ffield_analysis_main(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
     result = _prepare_result(canonical, result)
-    if canonical == "get_energy_min_summary_data":
+    if canonical == "get_ffield_opt_results":
+        from reaxkit.workflows.force_field_opt.report_linkage import (
+            add_trainset_links,
+            build_report_trainset_links,
+        )
+
+        normalized = normalize_storage_args(vars(args))
+        adapter = _resolve_engine_from_args(normalized, args)
+        report_data = adapter.load(ForceFieldOptimizationReportData, normalized)
+        training_set_data = adapter.load(
+            ForceFieldOptimizationTrainingSetData, normalized
+        )
+        trainset_links = build_report_trainset_links(
+            argparse.Namespace(report=report_data, training_set=training_set_data)
+        )
+        result.table = add_trainset_links(
+            result.table, trainset_links, report_line_column="lineno"
+        )
+    elif canonical == "get_energy_min_summary_data":
         _filter_structure_summary_columns(result, getattr(args, "col", "all"))
     elif canonical == "get_ffield_opt_eos":
         _prepare_eos_table(result, flip_sign=bool(getattr(args, "flip_sign", False)))

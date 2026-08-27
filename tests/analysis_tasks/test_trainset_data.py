@@ -4,17 +4,59 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.force_field.trainset import TrainsetDataRequest, TrainsetDataTask
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import AnalysisError
+from reaxkit.domain.data_models import ForceFieldOptimizationTrainingSetData
 
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
 )
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+
+
+def test_trainset_data_result_keeps_native_section_tables() -> None:
+    data = ForceFieldOptimizationTrainingSetData(
+        charge=pd.DataFrame({"atom": [1], "charge": [-0.5]}),
+        heatfo=pd.DataFrame({"structure": ["bulk"], "heatfo": [-1.2]}),
+        geometry=pd.DataFrame({"atom1": [1], "atom2": [2], "distance": [1.9]}),
+        cell_parameters=pd.DataFrame({"structure": ["bulk"], "a": [3.1]}),
+        energy=pd.DataFrame({"id1": ["bulk"], "lit": [-15.4]}),
+    )
+
+    result = TrainsetDataTask().run(data, TrainsetDataRequest(section="all"))
+
+    assert list(result.section_tables) == [
+        "CHARGE",
+        "HEATFO",
+        "GEOMETRY",
+        "CELL_PARAMETERS",
+        "ENERGY",
+    ]
+    assert list(result.section_tables["CHARGE"].columns) == ["atom", "charge"]
+    assert "lit" not in result.section_tables["CHARGE"].columns
+    assert list(result.section_tables["ENERGY"].columns) == ["id1", "lit"]
+
+
+def test_trainset_data_result_limits_section_tables_to_selection() -> None:
+    data = ForceFieldOptimizationTrainingSetData(
+        charge=pd.DataFrame(),
+        heatfo=pd.DataFrame(),
+        geometry=pd.DataFrame({"distance": [1.9]}),
+        cell_parameters=pd.DataFrame(),
+        energy=pd.DataFrame(),
+    )
+
+    result = TrainsetDataTask().run(data, TrainsetDataRequest(section="geometry"))
+
+    assert list(result.section_tables) == ["GEOMETRY"]
+    assert result.section_tables["GEOMETRY"].to_dict(orient="records") == [
+        {"distance": 1.9}
+    ]
 
 
 def _run_and_save() -> Path:

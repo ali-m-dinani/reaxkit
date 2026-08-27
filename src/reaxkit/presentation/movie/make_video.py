@@ -108,7 +108,14 @@ def images_to_video(
         for f in files
     ]
 
-    # Save video
-    imageio.mimsave(output_file, images, fps=fps)
+    # Resolve the output once and create parent directories for nested paths such
+    # as the CLI default: reaxkit_outputs/video/output_video.mp4.
+    output_path = os.path.abspath(output_file)
+    output_directory = os.path.dirname(output_path)
+    if output_directory:
+        os.makedirs(output_directory, exist_ok=True)
 
-    return os.path.abspath(output_file)
+    # Save video
+    imageio.mimsave(output_path, images, fps=fps)
+
+    return output_path

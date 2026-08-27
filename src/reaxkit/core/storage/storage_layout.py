@@ -1436,6 +1436,9 @@ def normalize_storage_args(
     The output type reflects the return contract for this API call.
     """
     out = dict(args)
+    if "_input_was_explicit" not in out:
+        input_value = out.get("input")
+        out["_input_was_explicit"] = bool(input_value and str(input_value) != ".")
     run_id = out.get("run_id")
     if not run_id:
         run_id = generate_run_id()

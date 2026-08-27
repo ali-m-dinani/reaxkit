@@ -1315,6 +1315,23 @@ class ForceFieldOptimizationReportEOSBundleData:
 
 
 @dataclass
+class ForceFieldOptimizationPlotBundleData:
+    """Composite inputs for classifying optimization EOS and restraint curves.
+
+    The report supplies ReaxFF/QM values, the geometry summary supplies volume
+    coordinates, the parsed training set supplies comments, and
+    ``geometry_restraints`` maps structure identifiers to BOND/ANGLE scan
+    coordinates parsed from the ReaxFF ``geo`` file.
+    """
+
+    report: ForceFieldOptimizationReportData
+    geometry_summary: EnergyMinimizationSummaryData
+    training_set: ForceFieldOptimizationTrainingSetData
+    geometry_restraints: pd.DataFrame = field(default_factory=pd.DataFrame)
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
 class CoordinationStatusBundleData:
     """Composite data for coordination-status analysis tasks.
 

@@ -37,6 +37,7 @@ _SAMPLE_COLUMNS = [
     "normalized_value",
     "objective_value",
     "diagnostic_row",
+    "epoch",
     "plot_row",
 ]
 
@@ -92,6 +93,36 @@ def _text(value: Any) -> str:
     except (TypeError, ValueError):
         pass
     return str(value).strip()
+
+
+def normalize_evolution_values(
+    values: Iterable[float],
+    *,
+    lower_bound: float,
+    upper_bound: float,
+    normalization: str = "bound_min",
+) -> np.ndarray:
+    """Normalize an evolution series using a lower-bound or first-value origin.
+
+    Both modes use the declared optimization span as their scale. ``bound_min``
+    maps the lower and upper bounds to zero and one, while ``first`` maps the
+    first finite observed value to zero and expresses later movement relative
+    to that starting observation.
+    """
+    mode = str(normalization or "bound_min").lower()
+    if mode not in {"bound_min", "first"}:
+        raise ValueError("normalization must be one of: bound_min, first")
+    lower = float(lower_bound)
+    upper = float(upper_bound)
+    span = upper - lower
+    if not np.isfinite(span) or span == 0.0:
+        raise ValueError("Evolution normalization requires distinct finite bounds.")
+    array = np.asarray(list(values), dtype=float)
+    finite = array[np.isfinite(array)]
+    if finite.size == 0:
+        return np.full(array.shape, np.nan, dtype=float)
+    origin = float(finite[0]) if mode == "first" else lower
+    return (array - origin) / span
 
 
 def _parameter_label(details: dict[str, Any], pointer: tuple[int, int, int]) -> str:
@@ -193,7 +224,7 @@ def build_diagnostic_beeswarm_tables(
         parameter_key = " ".join(map(str, pointer))
         label = _parameter_label(details, pointer)
         group_samples: list[dict[str, Any]] = []
-        for record in records:
+        for epoch, record in enumerate(records, start=1):
             for sample_name, value_field, objective_field in _SAMPLES:
                 value = _number(record[value_field])
                 objective = _number(record[objective_field])
@@ -208,6 +239,7 @@ def build_diagnostic_beeswarm_tables(
                     "normalized_value": normalized,
                     "objective_value": objective,
                     "diagnostic_row": int(record["diagnostic_row"]),
+                    "epoch": epoch,
                 })
         if not group_samples:
             excluded.add(parameter_key)
@@ -360,4 +392,5 @@ __all__ = [
     "FFieldOptimizationDiagnosticBeeswarmResult",
     "FFieldOptimizationDiagnosticBeeswarmTask",
     "build_diagnostic_beeswarm_tables",
+    "normalize_evolution_values",
 ]

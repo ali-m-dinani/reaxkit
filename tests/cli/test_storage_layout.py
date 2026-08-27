@@ -24,11 +24,28 @@ def test_normalize_storage_args_maps_defaults_to_run_raw(tmp_path: Path):
 
     expected_raw = tmp_path / "data" / "raw" / "run_91ac0e"
     assert out["input"] == str(expected_raw)
+    assert out["_input_was_explicit"] is False
     assert out["run_dir"] == str(expected_raw)
     assert out["xmolout"] == str(expected_raw / "xmolout")
     assert out["fort7"] == str(expected_raw / "fort.7")
     assert (tmp_path / "inputs" / "run_91ac0e").exists()
     assert expected_raw.exists()
+
+
+def test_normalize_storage_args_preserves_explicit_input(tmp_path: Path):
+    input_path = tmp_path / "simulation.rkf"
+    input_path.write_text("", encoding="utf-8")
+    args = {
+        "run_id": "run_explicit",
+        "project_root": str(tmp_path / "workspace"),
+        "input": str(input_path),
+        "run_dir": ".",
+    }
+
+    out = normalize_storage_args(args, snapshot=False)
+
+    assert out["input"] == str(input_path)
+    assert out["_input_was_explicit"] is True
 
 
 def test_register_parsed_dataset_reuses_same_id(tmp_path: Path):

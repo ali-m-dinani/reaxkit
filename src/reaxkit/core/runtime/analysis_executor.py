@@ -228,7 +228,12 @@ class AnalysisExecutor:
         directory can contain mixed engine artifacts.
         """
         explicit_input = args.get("input")
-        if explicit_input and str(explicit_input) != ".":
+        input_was_explicit = args.get("_input_was_explicit")
+        if input_was_explicit is None:
+            # Support callers that have not passed through storage argument
+            # normalization, where a non-default input is necessarily explicit.
+            input_was_explicit = bool(explicit_input and str(explicit_input) != ".")
+        if input_was_explicit and explicit_input and str(explicit_input) != ".":
             return str(explicit_input)
         return str(args.get("_snapshot_source_dir") or cls._detection_path(args))
 

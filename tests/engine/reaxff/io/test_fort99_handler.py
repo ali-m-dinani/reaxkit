@@ -20,3 +20,25 @@ def test_fort99_handler_accepts_single_and_two_line_records(tmp_path) -> None:
     assert table.iloc[1]["title"] == "Bond distance: 1 2"
     assert table.iloc[1]["title_lineno"] == 3
     assert table.iloc[1]["lineno"] == 4
+
+
+def test_fort99_handler_recognizes_cell_parameter_records(tmp_path) -> None:
+    source = tmp_path / "fort.99"
+    source.write_text(
+        "crystal a: 5.10 5.00 1.0 0.01 0.01\n"
+        "b:\n"
+        "5.20 5.25 1.0 0.01 0.02\n"
+        "crystal alpha: 90.1 90.0 1.0 0.01 0.03\n",
+        encoding="utf-8",
+    )
+
+    table = Fort99Handler(source).dataframe()
+
+    assert table["section"].tolist() == [
+        "CELL PARAMETERS",
+        "CELL PARAMETERS",
+        "CELL PARAMETERS",
+    ]
+    assert table["title"].tolist() == ["crystal a:", "b", "crystal alpha:"]
+    assert table.iloc[1]["title_lineno"] == 2
+    assert table.iloc[1]["lineno"] == 3
