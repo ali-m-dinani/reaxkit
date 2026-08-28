@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-from reaxkit.workflows import timeseries_workflow
+from reaxkit.workflows.timeseries import timeseries_workflow
 
 
 def _base_args(**overrides):

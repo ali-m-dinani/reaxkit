@@ -3,7 +3,7 @@
   source: workflow registries + analysis task dataclass map + workflow module docstrings
   purpose: Maps workflow families and independently invocable workflow commands
     to related analysis and generator implementation modules.
-  last_updated: '2026-08-27'
+  last_updated: '2026-08-28'
 workflows:
   active_site_workflow:
     implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
@@ -149,10 +149,10 @@ workflows:
     - reaxkit help "spatial property workflow"
     - run atom property plot3d workflow
   timeseries_workflow:
-    implementation_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
-    description: Dispatcher workflow for time-series analyses. this supports multiple
-      time-series analysis tasks (like restraint time series data) and routes to the
-      appropriate one based on user intent and command context.
+    implementation_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
+    module_prefix: reaxkit.workflows.timeseries
+    description: Time-series workflow family with a generic field dispatcher and dedicated
+      commands for every supported scalar or analysis family.
     dispatch_mode: kind_runner
     related_commands:
       analysis: []
@@ -165,7 +165,7 @@ workflows:
     notes:
     - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries
       and geometry_optimization.
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be timeseries'
+    - 'Use reaxkit timeseries --field <expression> or a dedicated reaxkit get_<name> command.'
     aliases:
     - time series
     - series workflow
@@ -980,8 +980,8 @@ workflows:
     command: get_ffield_opt_eos
     command_kind: analysis
     analysis_task: get_ffield_opt_eos
-    description: Derives equation-of-state relationships from force-field optimization report data. In
-      single-plot mode it groups figure files into material subfolders such as mp_1008557.
+    description: Derives equation-of-state relationships from force-field optimization report data. It is
+      intended for energy-volume, pressure-volume, and related property curves in fitted force fields.
     tags:
     - force field
     - equation of state
@@ -1005,12 +1005,8 @@ workflows:
     implementation_module: 'reaxkit.workflows.force_field_opt.get_ffield_opt_plots: get_ffield_opt_plots'
     command: get_ffield_opt_plots
     command_kind: analysis
-    description: Classifies force-field optimization ENERGY expressions into EOS and restraint curves,
-      then writes separate image and CSV collections with ReaxFF, QM/literature, and training-set comments.
+    description: Run the get ffield opt plots workflow command provided by force_field_opt_workflow.
     tags:
-    - equation of state
-    - restraint plots
-    - force field optimization
     - get ffield opt plots
     - force field opt workflow
     - analysis workflow command
@@ -1593,7 +1589,7 @@ workflows:
     - reaxkit study -h
   timeseries:
     parent_workflow: timeseries_workflow
-    implementation_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    implementation_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     command: timeseries
     command_kind: workflow
     analysis_task: cell_dimensions
@@ -1612,6 +1608,465 @@ workflows:
     help_search_examples:
     - reaxkit help "timeseries"
     - reaxkit timeseries -h
+  get_potential_energy:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_potential_energy: get_potential_energy'
+    command: get_potential_energy
+    command_kind: analysis
+    description: Run the get potential energy workflow command provided by timeseries_workflow.
+    tags:
+    - get potential energy
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_potential_energy -h'
+    aliases:
+    - get-potential-energy
+    help_search_examples:
+    - reaxkit help "get potential energy"
+    - reaxkit get_potential_energy -h
+  get_num_of_atoms:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_num_of_atoms: get_num_of_atoms'
+    command: get_num_of_atoms
+    command_kind: analysis
+    description: Run the get num of atoms workflow command provided by timeseries_workflow.
+    tags:
+    - get num of atoms
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_num_of_atoms -h'
+    aliases:
+    - get-num-of-atoms
+    help_search_examples:
+    - reaxkit help "get num of atoms"
+    - reaxkit get_num_of_atoms -h
+  get_volume:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_volume: get_volume'
+    command: get_volume
+    command_kind: analysis
+    description: Run the get volume workflow command provided by timeseries_workflow.
+    tags:
+    - get volume
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_volume -h'
+    aliases:
+    - get-volume
+    help_search_examples:
+    - reaxkit help "get volume"
+    - reaxkit get_volume -h
+  get_temperature:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_temperature: get_temperature'
+    command: get_temperature
+    command_kind: analysis
+    description: Run the get temperature workflow command provided by timeseries_workflow.
+    tags:
+    - get temperature
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_temperature -h'
+    aliases:
+    - get-temperature
+    help_search_examples:
+    - reaxkit help "get temperature"
+    - reaxkit get_temperature -h
+  get_pressure:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_pressure: get_pressure'
+    command: get_pressure
+    command_kind: analysis
+    description: Run the get pressure workflow command provided by timeseries_workflow.
+    tags:
+    - get pressure
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_pressure -h'
+    aliases:
+    - get-pressure
+    help_search_examples:
+    - reaxkit help "get pressure"
+    - reaxkit get_pressure -h
+  get_density:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_density: get_density'
+    command: get_density
+    command_kind: analysis
+    description: Run the get density workflow command provided by timeseries_workflow.
+    tags:
+    - get density
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_density -h'
+    aliases:
+    - get-density
+    help_search_examples:
+    - reaxkit help "get density"
+    - reaxkit get_density -h
+  get_elapsed_time:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_elapsed_time: get_elapsed_time'
+    command: get_elapsed_time
+    command_kind: analysis
+    description: Run the get elapsed time workflow command provided by timeseries_workflow.
+    tags:
+    - get elapsed time
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_elapsed_time -h'
+    aliases:
+    - get-elapsed-time
+    help_search_examples:
+    - reaxkit help "get elapsed time"
+    - reaxkit get_elapsed_time -h
+  get_a:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_a: get_a'
+    command: get_a
+    command_kind: analysis
+    description: Run the get a workflow command provided by timeseries_workflow.
+    tags:
+    - get a
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_a -h'
+    aliases:
+    - get-a
+    help_search_examples:
+    - reaxkit help "get a"
+    - reaxkit get_a -h
+  get_b:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_b: get_b'
+    command: get_b
+    command_kind: analysis
+    description: Run the get b workflow command provided by timeseries_workflow.
+    tags:
+    - get b
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_b -h'
+    aliases:
+    - get-b
+    help_search_examples:
+    - reaxkit help "get b"
+    - reaxkit get_b -h
+  get_c:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_c: get_c'
+    command: get_c
+    command_kind: analysis
+    description: Run the get c workflow command provided by timeseries_workflow.
+    tags:
+    - get c
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_c -h'
+    aliases:
+    - get-c
+    help_search_examples:
+    - reaxkit help "get c"
+    - reaxkit get_c -h
+  get_alpha:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_alpha: get_alpha'
+    command: get_alpha
+    command_kind: analysis
+    description: Run the get alpha workflow command provided by timeseries_workflow.
+    tags:
+    - get alpha
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_alpha -h'
+    aliases:
+    - get-alpha
+    help_search_examples:
+    - reaxkit help "get alpha"
+    - reaxkit get_alpha -h
+  get_beta:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_beta: get_beta'
+    command: get_beta
+    command_kind: analysis
+    description: Run the get beta workflow command provided by timeseries_workflow.
+    tags:
+    - get beta
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_beta -h'
+    aliases:
+    - get-beta
+    help_search_examples:
+    - reaxkit help "get beta"
+    - reaxkit get_beta -h
+  get_gamma:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_gamma: get_gamma'
+    command: get_gamma
+    command_kind: analysis
+    description: Run the get gamma workflow command provided by timeseries_workflow.
+    tags:
+    - get gamma
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_gamma -h'
+    aliases:
+    - get-gamma
+    help_search_examples:
+    - reaxkit help "get gamma"
+    - reaxkit get_gamma -h
+  get_trajectory:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_trajectory: get_trajectory'
+    command: get_trajectory
+    command_kind: analysis
+    description: Run the get trajectory workflow command provided by timeseries_workflow.
+    tags:
+    - get trajectory
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_trajectory -h'
+    aliases:
+    - get-trajectory
+    help_search_examples:
+    - reaxkit help "get trajectory"
+    - reaxkit get_trajectory -h
+  get_displacement:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_displacement: get_displacement'
+    command: get_displacement
+    command_kind: analysis
+    description: Run the get displacement workflow command provided by timeseries_workflow.
+    tags:
+    - get displacement
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_displacement -h'
+    aliases:
+    - get-displacement
+    help_search_examples:
+    - reaxkit help "get displacement"
+    - reaxkit get_displacement -h
+  get_charge:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_charge: get_charge'
+    command: get_charge
+    command_kind: analysis
+    description: Run the get charge workflow command provided by timeseries_workflow.
+    tags:
+    - get charge
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_charge -h'
+    aliases:
+    - get-charge
+    help_search_examples:
+    - reaxkit help "get charge"
+    - reaxkit get_charge -h
+  get_cell_dimensions:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_cell_dimensions: get_cell_dimensions'
+    command: get_cell_dimensions
+    command_kind: analysis
+    description: Run the get cell dimensions workflow command provided by timeseries_workflow.
+    tags:
+    - get cell dimensions
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_cell_dimensions -h'
+    aliases:
+    - get-cell-dimensions
+    help_search_examples:
+    - reaxkit help "get cell dimensions"
+    - reaxkit get_cell_dimensions -h
+  get_electric_field:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_electric_field: get_electric_field'
+    command: get_electric_field
+    command_kind: analysis
+    description: Run the get electric field workflow command provided by timeseries_workflow.
+    tags:
+    - get electric field
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_electric_field -h'
+    aliases:
+    - get-electric-field
+    help_search_examples:
+    - reaxkit help "get electric field"
+    - reaxkit get_electric_field -h
+  get_eregime:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_eregime: get_eregime'
+    command: get_eregime
+    command_kind: analysis
+    description: Run the get eregime workflow command provided by timeseries_workflow.
+    tags:
+    - get eregime
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_eregime -h'
+    aliases:
+    - get-eregime
+    help_search_examples:
+    - reaxkit help "get eregime"
+    - reaxkit get_eregime -h
+  get_partial_energy:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_partial_energy: get_partial_energy'
+    command: get_partial_energy
+    command_kind: analysis
+    description: Run the get partial energy workflow command provided by timeseries_workflow.
+    tags:
+    - get partial energy
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_partial_energy -h'
+    aliases:
+    - get-partial-energy
+    help_search_examples:
+    - reaxkit help "get partial energy"
+    - reaxkit get_partial_energy -h
+  get_restraint:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_restraint: get_restraint'
+    command: get_restraint
+    command_kind: analysis
+    description: Run the get restraint workflow command provided by timeseries_workflow.
+    tags:
+    - get restraint
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_restraint -h'
+    aliases:
+    - get-restraint
+    help_search_examples:
+    - reaxkit help "get restraint"
+    - reaxkit get_restraint -h
+  get_molecular_frequency:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_molecular_frequency: get_molecular_frequency'
+    command: get_molecular_frequency
+    command_kind: analysis
+    description: Run the get molecular frequency workflow command provided by timeseries_workflow.
+    tags:
+    - get molecular frequency
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_molecular_frequency -h'
+    aliases:
+    - get-molecular-frequency
+    help_search_examples:
+    - reaxkit help "get molecular frequency"
+    - reaxkit get_molecular_frequency -h
+  get_molecular_totals:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_molecular_totals: get_molecular_totals'
+    command: get_molecular_totals
+    command_kind: analysis
+    description: Run the get molecular totals workflow command provided by timeseries_workflow.
+    tags:
+    - get molecular totals
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_molecular_totals -h'
+    aliases:
+    - get-molecular-totals
+    help_search_examples:
+    - reaxkit help "get molecular totals"
+    - reaxkit get_molecular_totals -h
+  get_total_molecules:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_molecules: get_total_molecules'
+    command: get_total_molecules
+    command_kind: analysis
+    description: Run the get total molecules workflow command provided by timeseries_workflow.
+    tags:
+    - get total molecules
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_molecules -h'
+    aliases:
+    - get-total-molecules
+    help_search_examples:
+    - reaxkit help "get total molecules"
+    - reaxkit get_total_molecules -h
+  get_total_atoms:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_atoms: get_total_atoms'
+    command: get_total_atoms
+    command_kind: analysis
+    description: Run the get total atoms workflow command provided by timeseries_workflow.
+    tags:
+    - get total atoms
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_atoms -h'
+    aliases:
+    - get-total-atoms
+    help_search_examples:
+    - reaxkit help "get total atoms"
+    - reaxkit get_total_atoms -h
+  get_total_molecular_mass:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_molecular_mass: get_total_molecular_mass'
+    command: get_total_molecular_mass
+    command_kind: analysis
+    description: Run the get total molecular mass workflow command provided by timeseries_workflow.
+    tags:
+    - get total molecular mass
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_molecular_mass -h'
+    aliases:
+    - get-total-molecular-mass
+    help_search_examples:
+    - reaxkit help "get total molecular mass"
+    - reaxkit get_total_molecular_mass -h
+  get_geometry_optimization:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_geometry_optimization: get_geometry_optimization'
+    command: get_geometry_optimization
+    command_kind: analysis
+    description: Run the get geometry optimization workflow command provided by timeseries_workflow.
+    tags:
+    - get geometry optimization
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_geometry_optimization -h'
+    aliases:
+    - get-geometry-optimization
+    help_search_examples:
+    - reaxkit help "get geometry optimization"
+    - reaxkit get_geometry_optimization -h
   get_trainset_data:
     parent_workflow: trainset_workflow
     implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_data'
@@ -1645,9 +2100,9 @@ workflows:
     command: get_trainset_group_comments
     command_kind: analysis
     analysis_task: get_trainset_group_comments
-    description: Lists every training-set comment-block occurrence, including repeated
-      and empty comments, with source lines, identifiers, entry counts, and inferred
-      data types such as EOS, HeatFO, charge, and geometry.
+    description: Lists every comment-block occurrence from training-set definitions, retaining repeated
+      and empty comments with source lines, referenced identifiers, entry counts, and inferred data types
+      such as EOS, HeatFO, charge, and geometry.
     tags:
     - force field
     - training set
@@ -2455,7 +2910,61 @@ command_to_workflow_module:
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.study_design.study_workflow
-  timeseries: reaxkit.workflows.timeseries_workflow
+  timeseries: reaxkit.workflows.timeseries.timeseries_workflow
+  get_potential_energy: reaxkit.workflows.timeseries.get_potential_energy
+  get-potential-energy: reaxkit.workflows.timeseries.get_potential_energy
+  get_num_of_atoms: reaxkit.workflows.timeseries.get_num_of_atoms
+  get-num-of-atoms: reaxkit.workflows.timeseries.get_num_of_atoms
+  get_volume: reaxkit.workflows.timeseries.get_volume
+  get-volume: reaxkit.workflows.timeseries.get_volume
+  get_temperature: reaxkit.workflows.timeseries.get_temperature
+  get-temperature: reaxkit.workflows.timeseries.get_temperature
+  get_pressure: reaxkit.workflows.timeseries.get_pressure
+  get-pressure: reaxkit.workflows.timeseries.get_pressure
+  get_density: reaxkit.workflows.timeseries.get_density
+  get-density: reaxkit.workflows.timeseries.get_density
+  get_elapsed_time: reaxkit.workflows.timeseries.get_elapsed_time
+  get-elapsed-time: reaxkit.workflows.timeseries.get_elapsed_time
+  get_a: reaxkit.workflows.timeseries.get_a
+  get-a: reaxkit.workflows.timeseries.get_a
+  get_b: reaxkit.workflows.timeseries.get_b
+  get-b: reaxkit.workflows.timeseries.get_b
+  get_c: reaxkit.workflows.timeseries.get_c
+  get-c: reaxkit.workflows.timeseries.get_c
+  get_alpha: reaxkit.workflows.timeseries.get_alpha
+  get-alpha: reaxkit.workflows.timeseries.get_alpha
+  get_beta: reaxkit.workflows.timeseries.get_beta
+  get-beta: reaxkit.workflows.timeseries.get_beta
+  get_gamma: reaxkit.workflows.timeseries.get_gamma
+  get-gamma: reaxkit.workflows.timeseries.get_gamma
+  get_trajectory: reaxkit.workflows.timeseries.get_trajectory
+  get-trajectory: reaxkit.workflows.timeseries.get_trajectory
+  get_displacement: reaxkit.workflows.timeseries.get_displacement
+  get-displacement: reaxkit.workflows.timeseries.get_displacement
+  get_charge: reaxkit.workflows.timeseries.get_charge
+  get-charge: reaxkit.workflows.timeseries.get_charge
+  get_cell_dimensions: reaxkit.workflows.timeseries.get_cell_dimensions
+  get-cell-dimensions: reaxkit.workflows.timeseries.get_cell_dimensions
+  get_electric_field: reaxkit.workflows.timeseries.get_electric_field
+  get-electric-field: reaxkit.workflows.timeseries.get_electric_field
+  get_eregime: reaxkit.workflows.timeseries.get_eregime
+  get-eregime: reaxkit.workflows.timeseries.get_eregime
+  get_partial_energy: reaxkit.workflows.timeseries.get_partial_energy
+  get-partial-energy: reaxkit.workflows.timeseries.get_partial_energy
+  get_restraint: reaxkit.workflows.timeseries.get_restraint
+  get-restraint: reaxkit.workflows.timeseries.get_restraint
+  get_molecular_frequency: reaxkit.workflows.timeseries.get_molecular_frequency
+  get-molecular-frequency: reaxkit.workflows.timeseries.get_molecular_frequency
+  get_molecular_totals: reaxkit.workflows.timeseries.get_molecular_totals
+  get-molecular-totals: reaxkit.workflows.timeseries.get_molecular_totals
+  get_total_molecules: reaxkit.workflows.timeseries.get_total_molecules
+  get-total-molecules: reaxkit.workflows.timeseries.get_total_molecules
+  get_total_atoms: reaxkit.workflows.timeseries.get_total_atoms
+  get-total-atoms: reaxkit.workflows.timeseries.get_total_atoms
+  get_total_molecular_mass: reaxkit.workflows.timeseries.get_total_molecular_mass
+  get-total-molecular-mass: reaxkit.workflows.timeseries.get_total_molecular_mass
+  get_geometry_optimization: reaxkit.workflows.timeseries.get_geometry_optimization
+  get-geometry-optimization: reaxkit.workflows.timeseries.get_geometry_optimization
   get_trainset_data: reaxkit.workflows.file_tools.trainset_workflow
   get_trainset_group_comments: reaxkit.workflows.file_tools.trainset_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow

@@ -104,7 +104,7 @@ tasks:
     description: Returns time series for simulation cell lengths, angles, and related
       box dimensions. Use it to inspect expansion, compression, deformation, or volume-coupled
       behavior in ReaxFF runs.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - cell dimensions
@@ -116,7 +116,7 @@ tasks:
     description: Returns time series of selected atomic charges from parsed ReaxFF
       charge output. It is useful for following charge transfer, local oxidation changes,
       and atom-specific electrostatic behavior.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - charges
@@ -286,7 +286,7 @@ tasks:
     description: Returns electric-field component and magnitude time series from parsed
       field data. Use it to inspect applied-field schedules and align field changes
       with polarization, charge, or structural response.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field
@@ -297,7 +297,7 @@ tasks:
     description: Returns time series fields parsed from eregime schedules. It connects
       generated electric-field regime inputs to analysis-ready tables that can be
       compared with simulation response.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field regime
@@ -430,7 +430,7 @@ tasks:
     description: Returns geometry-minimization progress series such as potential energy,
       gradient metrics, and convergence indicators. Use it to inspect optimization
       stability and final relaxation quality.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - geometry optimization
@@ -494,7 +494,7 @@ tasks:
     description: Returns species-frequency time series from molecular analysis data.
       Use it to follow how counts of selected molecules, products, or intermediates
       change across frames.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular frequency
@@ -506,7 +506,7 @@ tasks:
     description: Returns totals series such as molecule count, atom count, and molecular
       mass from molecular analysis data. It provides compact aggregate trends for
       reaction or decomposition studies.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular totals
@@ -624,7 +624,7 @@ tasks:
     description: Returns series for selected partial-energy components from parsed
       ReaxFF energy output. Use it to inspect how bond, angle, torsion, van der Waals,
       Coulomb, or other terms evolve over time.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - partial energy
@@ -704,7 +704,7 @@ tasks:
     description: Returns restraint-related time series such as restraint energies,
       distances, angles, or other restraint measures parsed from fort.76. Use it to
       evaluate restraints created in GEO input workflows.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - restraint data
@@ -716,7 +716,7 @@ tasks:
     description: Returns simulation-level scalar series such as temperature, pressure,
       volume, energy, density, and timestep values. It is the general time-series
       task for ReaxFF log-style simulation data.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - simulation data
@@ -784,7 +784,7 @@ tasks:
     description: Returns coordinate trajectories for selected atoms and axes from
       trajectory data. Use it to track atom positions, displacement paths, or coordinate
       components as time-series output.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - trajectory coordinates
@@ -804,7 +804,7 @@ tasks:
     description: Returns displacement trajectories for selected atoms and axes from
       trajectory data using a reference frame. Use it to track dx/dy/dz or vector-magnitude
       displacement as time-series output.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - trajectory displacement

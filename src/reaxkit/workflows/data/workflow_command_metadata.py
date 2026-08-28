@@ -106,11 +106,15 @@ def build_command_workflows(document: dict[str, Any]) -> OrderedDict[str, dict[s
     kinds = _command_kinds()
 
     parent_by_module: dict[str, str] = {}
+    parent_by_prefix: list[tuple[str, str]] = []
     for parent_name, parent_meta in family_workflows.items():
         implementation = str(parent_meta.get("implementation_module") or "")
         module_name = implementation.split(":", 1)[0].strip()
         if module_name:
             parent_by_module[module_name] = parent_name
+        module_prefix = str(parent_meta.get("module_prefix") or "").strip().rstrip(".")
+        if module_prefix:
+            parent_by_prefix.append((module_prefix, parent_name))
 
     groups: OrderedDict[str, list[str]] = OrderedDict()
     for command_name in routes:
@@ -121,7 +125,16 @@ def build_command_workflows(document: dict[str, Any]) -> OrderedDict[str, dict[s
         task_name, task_meta = _analysis_task_for_group(names, tasks)
         canonical = task_name if task_name in names else names[0]
         module_name = str(routes.get(canonical) or routes.get(names[0]) or "").strip()
-        parent_name = parent_by_module.get(module_name, module_name.rsplit(".", 1)[-1])
+        parent_name = parent_by_module.get(module_name)
+        if parent_name is None:
+            parent_name = next(
+                (
+                    candidate_parent
+                    for prefix, candidate_parent in parent_by_prefix
+                    if module_name == prefix or module_name.startswith(f"{prefix}.")
+                ),
+                module_name.rsplit(".", 1)[-1],
+            )
         command_kind = kinds.get(identity, "workflow")
 
         task_meta = task_meta or {}

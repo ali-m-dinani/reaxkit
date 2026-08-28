@@ -184,3 +184,38 @@ register_analysis_command("get_hybridization", module_path="reaxkit.workflows.co
 register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.meta.plot_atom_property_workflow")
 register_analysis_command("get_active_site_structural", module_path="reaxkit.workflows.active_site_workflow")
 register_analysis_command("get_active_site_events", module_path="reaxkit.workflows.active_site_workflow")
+
+_TIMESERIES_WORKFLOW_COMMANDS = (
+    "get_potential_energy",
+    "get_num_of_atoms",
+    "get_volume",
+    "get_temperature",
+    "get_pressure",
+    "get_density",
+    "get_elapsed_time",
+    "get_a",
+    "get_b",
+    "get_c",
+    "get_alpha",
+    "get_beta",
+    "get_gamma",
+    "get_trajectory",
+    "get_displacement",
+    "get_charge",
+    "get_cell_dimensions",
+    "get_electric_field",
+    "get_eregime",
+    "get_partial_energy",
+    "get_restraint",
+    "get_molecular_frequency",
+    "get_molecular_totals",
+    "get_total_molecules",
+    "get_total_atoms",
+    "get_total_molecular_mass",
+    "get_geometry_optimization",
+)
+for _command in _TIMESERIES_WORKFLOW_COMMANDS:
+    register_analysis_command(
+        _command,
+        module_path=f"reaxkit.workflows.timeseries.{_command}",
+    )
