@@ -69,7 +69,11 @@ def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Trajec
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     trj = adapter._time_source(
         args,
@@ -228,7 +232,11 @@ def _load_simulation_from_xmolout(adapter_cls: type[ReaxFFAdapter], args: dict, 
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     trj = adapter_cls._time_source(
         args,
@@ -309,7 +317,11 @@ def load_connectivity(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Conn
         args,
         handler_name="Fort7Handler",
         source_path=fort7_path,
-        factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        factory=lambda: Fort7Handler(
+            fort7_path,
+            reporter=reporter,
+            frame_indices=args.get("_frame_indices"),
+        ),
     )
     conn = adapter._time_source(
         args,
@@ -396,13 +408,21 @@ def load_connectivity_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=No
         args,
         handler_name="Fort7Handler",
         source_path=fort7_path,
-        factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        factory=lambda: Fort7Handler(
+            fort7_path,
+            reporter=reporter,
+            frame_indices=args.get("_frame_indices"),
+        ),
     )
     xmol_handler = adapter._build_handler(
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     summary_simulation = adapter._load_simulation_from_summary(args, reporter=reporter)
     force_field_parameters: ForceFieldParametersData | None = None

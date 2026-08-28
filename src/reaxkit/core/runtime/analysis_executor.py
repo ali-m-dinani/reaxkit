@@ -9,12 +9,16 @@ Core orchestration for engine resolution + typed data loading + task execution.
 
 from __future__ import annotations
 
+import copy
 import inspect
 import os
 from pathlib import Path
 from time import perf_counter
 from datetime import datetime, timezone
 import json
+
+import numpy as np
+import pandas as pd
 
 from reaxkit.core.storage.cache_manager import CacheConfig, CacheManager
 from reaxkit.core.platform.engine_resolver import resolve_engine
@@ -31,6 +35,12 @@ logger = get_logger(__name__)
 
 class AnalysisExecutor:
     """Orchestrate task execution with strict layer boundaries."""
+
+    FRAME_SELECTIVE_DATA_TYPES = {
+        "TrajectoryData",
+        "ConnectivityData",
+        "ConnectivityTrajectoryData",
+    }
 
     DETECTION_HINT_KEYS = (
         "xmolout",
@@ -197,15 +207,146 @@ class AnalysisExecutor:
 
         return _emit
 
+    @classmethod
+    def _requested_frame_indices(cls, request, required_data) -> list[int] | None:
+        """Return explicit source-frame dependencies for a partial load."""
+        if getattr(required_data, "__name__", "") not in cls.FRAME_SELECTIVE_DATA_TYPES:
+            return None
+
+        primary = None
+        for name in ("frames", "frame_indices"):
+            value = getattr(request, name, None)
+            if value is not None and not isinstance(value, (str, bytes)):
+                try:
+                    values = [int(i) for i in value]
+                except TypeError:
+                    continue
+                if values:
+                    primary = values
+                    break
+        if not primary:
+            return None
+
+        # Some analyses need an additional reference snapshot that is not in
+        # the main frame list (for example displacement relative to frame 0).
+        dependencies = list(primary)
+        for name in ("reference_frame",):
+            value = getattr(request, name, None)
+            if value is not None:
+                dependencies.append(int(value))
+        return list(dict.fromkeys(i for i in dependencies if i >= 0))
+
     @staticmethod
-    def _run_task(task, data, request, reporter):
+    def _source_frame_indices(data) -> list[int] | None:
+        """Find the compact-frame to source-frame mapping on loaded data."""
+        candidates = [data, getattr(data, "trajectory", None), getattr(data, "connectivity", None)]
+        for candidate in candidates:
+            if candidate is None:
+                continue
+            values = getattr(candidate, "source_frame_indices", None)
+            if values is None:
+                continue
+            return [int(i) for i in np.asarray(values, dtype=int).reshape(-1)]
+        return None
+
+    @staticmethod
+    def _use_selective_sources(args: dict, snapshot_names) -> tuple[tuple[str, ...], dict[str, str]]:
+        """Keep large partial-load sources in place instead of copying them."""
+        source_dir = Path(str(args.get("_snapshot_source_dir") or "."))
+        borrowed: dict[str, str] = {}
+        remaining: list[str] = []
+        for name in tuple(snapshot_names or ()):
+            name_s = str(name)
+            name_lower = name_s.lower()
+            if name_lower == "xmolout":
+                key = "xmolout"
+            elif name_lower == "fort.7":
+                key = "fort7"
+            elif Path(name_s).suffix.lower() in {".kf", ".rkf"}:
+                key = "rkf"
+            elif "dump" in name_lower or "lammpstrj" in name_lower:
+                key = "dump"
+            else:
+                key = None
+            candidate = source_dir / str(name)
+            if key is not None and candidate.is_file():
+                resolved = str(candidate.resolve())
+                args[key] = resolved
+                borrowed[str(name)] = resolved
+            else:
+                remaining.append(str(name))
+        if borrowed:
+            args["_selective_source_files"] = borrowed
+        return tuple(remaining), borrowed
+
+    @classmethod
+    def _request_for_loaded_frames(cls, request, data):
+        """Translate source frame selectors to compact in-memory indices."""
+        source_indices = cls._source_frame_indices(data)
+        if source_indices is None:
+            return request, None
+        source_to_local = {source: local for local, source in enumerate(source_indices)}
+        execution_request = copy.copy(request)
+
+        for name in ("frames", "frame_indices"):
+            values = getattr(request, name, None)
+            if values is None or isinstance(values, (str, bytes)):
+                continue
+            setattr(
+                execution_request,
+                name,
+                [source_to_local[int(i)] for i in values if int(i) in source_to_local],
+            )
+        if hasattr(request, "reference_frame"):
+            reference_value = getattr(request, "reference_frame")
+            if reference_value is not None:
+                source_reference = int(reference_value)
+                if source_reference in source_to_local:
+                    setattr(execution_request, "reference_frame", source_to_local[source_reference])
+        return execution_request, source_indices
+
+    @staticmethod
+    def _restore_result_frame_indices(result, source_indices: list[int] | None, original_request):
+        """Restore user-facing source indices after compact-frame analysis."""
+        if source_indices is None:
+            return result
+        local_to_source = {local: source for local, source in enumerate(source_indices)}
+
+        def _restore_frame(frame: pd.DataFrame) -> pd.DataFrame:
+            columns = [name for name in ("frame_index", "frame_idx") if name in frame.columns]
+            if not columns:
+                return frame
+            out = frame.copy()
+            for name in columns:
+                numeric = pd.to_numeric(out[name], errors="coerce")
+                out[name] = [
+                    local_to_source.get(int(value), value) if pd.notna(value) else value
+                    for value in numeric
+                ]
+            return out
+
+        if isinstance(result, pd.DataFrame):
+            result = _restore_frame(result)
+        elif hasattr(result, "__dict__"):
+            for name, value in vars(result).items():
+                if isinstance(value, pd.DataFrame):
+                    setattr(result, name, _restore_frame(value))
+            if hasattr(result, "request"):
+                result.request = original_request
+        return result
+
+    @classmethod
+    def _run_task(cls, task, data, request, reporter):
         """
         Run task.
         """
+        execution_request, source_indices = cls._request_for_loaded_frames(request, data)
         params = inspect.signature(task.run).parameters
         if "reporter" in params:
-            return task.run(data, request, reporter=reporter)
-        return task.run(data, request)
+            result = task.run(data, execution_request, reporter=reporter)
+        else:
+            result = task.run(data, execution_request)
+        return cls._restore_result_frame_indices(result, source_indices, request)
 
     @classmethod
     def _detection_path(cls, args: dict) -> str:
@@ -292,6 +433,9 @@ class AnalysisExecutor:
         required_data = (
             task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
         )
+        requested_frame_indices = self._requested_frame_indices(request, required_data)
+        if requested_frame_indices is not None:
+            args["_frame_indices"] = requested_frame_indices
         task_name = task.__class__.__name__
         data_name = getattr(required_data, "__name__", str(required_data))
 
@@ -334,6 +478,9 @@ class AnalysisExecutor:
         self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
         snapshot_names = adapter.required_input_files(required_data, args)
+        selective_sources: dict[str, str] = {}
+        if requested_frame_indices is not None:
+            snapshot_names, selective_sources = self._use_selective_sources(args, snapshot_names)
         self._console_step(args, "Snapshotting raw inputs")
         snapshot_storage_inputs(args, names=snapshot_names)
         if run_id := args.get("run_id"):
@@ -349,6 +496,9 @@ class AnalysisExecutor:
                     "raw_dir": str(raw_dir),
                     "files": ",".join(copied),
                     "required_inputs": ",".join(snapshot_names or ()),
+                    "selective_sources": ",".join(
+                        f"{name}:{path}" for name, path in sorted(selective_sources.items())
+                    ),
                     "engine_adapter": adapter.__class__.__name__,
                 },
             )
@@ -362,7 +512,7 @@ class AnalysisExecutor:
         # 4) If run-scoped layout is active, pre-register parsed dataset
         #    metadata (best effort) before loading/parsing input data.
         # ---------------------------------------------------------------------
-        if layout is not None:
+        if layout is not None and requested_frame_indices is None:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
                 engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()
@@ -547,7 +697,7 @@ class AnalysisExecutor:
                 f"for task '{task_name}': {exc}"
             ) from exc
         self._console_step(args, "Data loading complete")
-        if run_id and layout is not None and parsed_id is None:
+        if run_id and layout is not None and parsed_id is None and requested_frame_indices is None:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
                 engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()

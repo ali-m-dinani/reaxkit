@@ -68,6 +68,7 @@ class XmoloutHandler(BaseHandler):
         file_path: str | Path = "xmolout",
         *,
         extra_atom_cols: Optional[list[str]] = None,
+        frame_indices: Optional[list[int]] = None,
         reporter=None,
     ):
         """
@@ -86,6 +87,11 @@ class XmoloutHandler(BaseHandler):
         self._n_atoms: Optional[int] = None
         self.simulation_name: str = ""
         self._extra_atom_cols = list(extra_atom_cols) if extra_atom_cols else None
+        self._frame_indices = (
+            tuple(dict.fromkeys(int(i) for i in frame_indices if int(i) >= 0))
+            if frame_indices is not None
+            else None
+        )
         self._reporter = reporter
 
     # ---- FileHandler requirement
@@ -99,6 +105,9 @@ class XmoloutHandler(BaseHandler):
             Return value description.
 
         """
+        if self._frame_indices is not None:
+            return self._parse_selected_frames()
+
         sim_rows: List[list] = []
         frames: List[pd.DataFrame] = []
 
@@ -187,6 +196,106 @@ class XmoloutHandler(BaseHandler):
             self._reporter("load", total_lines, total_lines, "Finished parsing xmolout")
         return df, meta
 
+    def _parse_selected_frames(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """Parse only explicitly requested frames and stop after the last one."""
+        sim_cols = ["num_of_atoms", "iter", "E_pot", "a", "b", "c", "alpha", "beta", "gamma"]
+        base_atom_cols = ["atom_type", "x", "y", "z"]
+        requested = list(self._frame_indices or ())
+        requested_set = set(requested)
+        max_requested = max(requested, default=-1)
+        records: dict[int, tuple[list[Any], pd.DataFrame]] = {}
+
+        current_index = -1
+        current_selected = False
+        current_summary: list[Any] | None = None
+        atom_buf: list[list[Any]] = []
+        atom_count = 0
+        current_atom_cols: list[str] | None = None
+
+        with open(self.path, "r") as fh:
+            for line in fh:
+                vals = line.strip().split()
+                if not vals:
+                    continue
+
+                if len(vals) == 1 and vals[0].isdigit():
+                    current_index += 1
+                    if current_index > max_requested:
+                        break
+                    self._n_atoms = int(vals[0])
+                    current_selected = current_index in requested_set
+                    current_summary = [self._n_atoms] if current_selected else None
+                    atom_buf = []
+                    atom_count = 0
+                    current_atom_cols = None
+                    continue
+
+                if len(vals) == 9 and self._n_atoms and vals[1].lstrip("-").isdigit():
+                    if not self.simulation_name:
+                        self.simulation_name = vals[0]
+                    if current_selected:
+                        current_summary = [self._n_atoms, int(vals[1])] + list(map(float, vals[2:]))
+                    continue
+
+                if not current_selected or not self._n_atoms or len(vals) < 4:
+                    continue
+
+                if current_atom_cols is None:
+                    n_extras = max(0, len(vals) - 4)
+                    if self._extra_atom_cols:
+                        names = list(self._extra_atom_cols)[:n_extras]
+                        if len(names) < n_extras:
+                            names += [f"unknown_{i + 1}" for i in range(n_extras - len(names))]
+                    else:
+                        names = [f"unknown_{i + 1}" for i in range(n_extras)]
+                    current_atom_cols = base_atom_cols + names
+
+                base = [vals[0]] + list(map(float, vals[1:4]))
+                expected_extras = len(current_atom_cols) - 4
+                extras_vals = [float(x) for x in vals[4:4 + expected_extras]]
+                extras_vals.extend([float("nan")] * (expected_extras - len(extras_vals)))
+                atom_buf.append(base + extras_vals)
+                atom_count += 1
+
+                if atom_count == self._n_atoms:
+                    if current_summary is not None:
+                        records[current_index] = (
+                            current_summary,
+                            pd.DataFrame(atom_buf, columns=current_atom_cols),
+                        )
+                    if self._reporter:
+                        done = sum(1 for i in requested if i in records)
+                        self._reporter("load", done, len(requested), "Loading selected xmolout frames")
+                    atom_buf = []
+                    atom_count = 0
+                    current_atom_cols = None
+                    if len(records) == len(requested_set):
+                        break
+
+        source_indices = [i for i in requested if i in records]
+        sim_rows = [records[i][0] for i in source_indices]
+        frames = [records[i][1] for i in source_indices]
+        df = pd.DataFrame(sim_rows, columns=sim_cols)
+
+        if not df.empty and "iter" in df.columns:
+            keep_idx = df.drop_duplicates("iter", keep="last").index.tolist()
+            frames = [frames[i] for i in keep_idx]
+            source_indices = [source_indices[i] for i in keep_idx]
+            df = df.iloc[keep_idx].reset_index(drop=True)
+
+        self._frames = frames
+        meta: Dict[str, Any] = {
+            "simulation_name": self.simulation_name,
+            "n_atoms": self._n_atoms,
+            "n_frames": len(frames),
+            "has_time": False,
+            "source_frame_indices": source_indices,
+            "partial": True,
+        }
+        if self._reporter:
+            self._reporter("load", len(source_indices), len(requested), "Finished loading selected xmolout frames")
+        return df, meta
+
     def _count_lines(self) -> int:
         """Count lines."""
         with open(self.path, "r") as fh:
@@ -256,6 +365,7 @@ class XmoloutHandler(BaseHandler):
         row = df.iloc[i]
         return {
             "index": i,
+            "source_index": int(self._meta.get("source_frame_indices", [i] * len(self._frames))[i]),
             "iter": int(row["iter"]) if "iter" in df.columns else i,
             "coords": coords,
             "atom_types": atom_types,

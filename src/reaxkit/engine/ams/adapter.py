@@ -292,8 +292,8 @@ class AMSAdapter(EngineAdapter):
         return None
 
     @staticmethod
-    def _history_frame_count(kf) -> int:
-        """Return RKF trajectory frame count using TRACT's MDHistory fallback."""
+    def _history_frame_count(kf, *, frame_indices=None) -> int:
+        """Return RKF frame count without scanning coordinates for partial reads."""
         for section, variable in (("MDHistory", "nEntries"), ("History", "nEntries")):
             raw = AMSAdapter._read_kf_variable(kf, section, variable)
             if raw is not None:
@@ -301,6 +301,14 @@ class AMSAdapter(EngineAdapter):
                     return int(np.asarray(raw).ravel()[0])
                 except Exception:
                     pass
+
+        # Selective RKF reads address History variables directly. When an old
+        # file omits nEntries, the largest requested index is enough to issue
+        # those reads; scanning all preceding Coords(n) values just to count
+        # frames would defeat lazy loading.
+        if frame_indices is not None:
+            selected = [int(i) for i in frame_indices if int(i) >= 0]
+            return max(selected, default=-1) + 1
 
         n = 0
         while True:
@@ -313,25 +321,64 @@ class AMSAdapter(EngineAdapter):
         return n
 
     @staticmethod
-    def _direct_coordinate_entries(kf, *, dtype=float, reporter=None) -> list[np.ndarray]:
+    def _normalized_frame_indices(frame_indices, n_frames: int) -> list[int]:
+        """Normalize optional zero-based source-frame indices."""
+        if frame_indices is None:
+            return list(range(max(0, int(n_frames))))
+        return list(
+            dict.fromkeys(
+                int(i)
+                for i in frame_indices
+                if 0 <= int(i) < int(n_frames)
+            )
+        )
+
+    @staticmethod
+    def _direct_coordinate_entries(
+        kf,
+        *,
+        frame_indices=None,
+        dtype=float,
+        reporter=None,
+    ) -> tuple[list[np.ndarray], list[int], int]:
         """Read RKF coordinate frames directly as ``History/Coords(n)``."""
-        n_frames = AMSAdapter._history_frame_count(kf)
+        n_frames = AMSAdapter._history_frame_count(kf, frame_indices=frame_indices)
+        source_indices = AMSAdapter._normalized_frame_indices(frame_indices, n_frames)
+        progress_message = (
+            "Reading selected AMS RKF coordinates"
+            if frame_indices is not None
+            else "Reading AMS RKF coordinates"
+        )
         entries: list[np.ndarray] = []
-        for frame_no in range(1, n_frames + 1):
+        loaded_source_indices: list[int] = []
+        for done, source_index in enumerate(source_indices, start=1):
+            frame_no = source_index + 1
             raw = AMSAdapter._read_kf_variable(kf, "History", f"Coords({frame_no})")
             if raw is None:
                 raw = AMSAdapter._read_kf_variable(kf, "History", f"Coordinates({frame_no})")
             if raw is None:
                 continue
             entries.append(np.asarray(raw, dtype=dtype).ravel())
+            loaded_source_indices.append(source_index)
             if callable(reporter):
-                reporter("load", frame_no, n_frames, "Reading AMS RKF coordinates")
-        return entries
+                reporter("load", done, len(source_indices), progress_message)
+        return entries, loaded_source_indices, n_frames
 
     @staticmethod
-    def _direct_connectivity_entries(kf, *, reporter=None) -> tuple[dict[str, list[np.ndarray]], int]:
+    def _direct_connectivity_entries(
+        kf,
+        *,
+        frame_indices=None,
+        reporter=None,
+    ) -> tuple[dict[str, list[np.ndarray]], int, list[int]]:
         """Read AMS connectivity series frame-by-frame from ``History`` keys."""
-        n_frames = AMSAdapter._history_frame_count(kf)
+        n_frames = AMSAdapter._history_frame_count(kf, frame_indices=frame_indices)
+        source_indices = AMSAdapter._normalized_frame_indices(frame_indices, n_frames)
+        progress_message = (
+            "Reading selected AMS RKF connectivity"
+            if frame_indices is not None
+            else "Reading AMS RKF connectivity"
+        )
         series: dict[str, list[np.ndarray]] = {
             "neighbors": [],
             "bond_orders": [],
@@ -340,12 +387,14 @@ class AMSAdapter(EngineAdapter):
             "lone_pairs": [],
         }
 
-        first_bond_index = AMSAdapter._read_history_frame_variable(kf, "Bonds.Index", 1)
-        first_bond_atoms = AMSAdapter._read_history_frame_variable(kf, "Bonds.Atoms", 1)
-        first_bond_orders = AMSAdapter._read_history_frame_variable(kf, "Bonds.Orders", 1)
+        probe_frame_no = source_indices[0] + 1 if source_indices else 1
+        first_bond_index = AMSAdapter._read_history_frame_variable(kf, "Bonds.Index", probe_frame_no)
+        first_bond_atoms = AMSAdapter._read_history_frame_variable(kf, "Bonds.Atoms", probe_frame_no)
+        first_bond_orders = AMSAdapter._read_history_frame_variable(kf, "Bonds.Orders", probe_frame_no)
         if first_bond_index is not None and first_bond_atoms is not None and first_bond_orders is not None:
-            for frame_no in range(1, n_frames + 1):
-                if frame_no == 1:
+            for done, source_index in enumerate(source_indices, start=1):
+                frame_no = source_index + 1
+                if frame_no == probe_frame_no:
                     bi_raw = first_bond_index
                     ba_raw = first_bond_atoms
                     bo_raw = first_bond_orders
@@ -360,7 +409,7 @@ class AMSAdapter(EngineAdapter):
                     series["total_bo"].append(np.asarray([], dtype=float))
                     series["lone_pairs"].append(np.asarray([], dtype=float))
                     if callable(reporter):
-                        reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
+                        reporter("load", done, len(source_indices), progress_message)
                     continue
 
                 bi = np.asarray(bi_raw, dtype=int).ravel()
@@ -386,8 +435,8 @@ class AMSAdapter(EngineAdapter):
                 series["total_bo"].append(total_bo)
                 series["lone_pairs"].append(np.full((counts.size,), np.nan, dtype=float))
                 if callable(reporter):
-                    reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
-            return series, n_frames
+                    reporter("load", done, len(source_indices), progress_message)
+            return series, n_frames, source_indices
 
         specs = (
             ("neighbors", "ConnTab neighbors", int),
@@ -397,7 +446,8 @@ class AMSAdapter(EngineAdapter):
             ("lone_pairs", "Lone pairs", float),
         )
         found_any = False
-        for frame_no in range(1, n_frames + 1):
+        for done, source_index in enumerate(source_indices, start=1):
+            frame_no = source_index + 1
             frame_found = False
             for key, prefix, dtype in specs:
                 raw = AMSAdapter._read_history_frame_variable(kf, prefix, frame_no)
@@ -409,14 +459,18 @@ class AMSAdapter(EngineAdapter):
                 frame_found = True
                 found_any = True
             if frame_found and callable(reporter):
-                reporter("load", frame_no, n_frames, "Reading AMS RKF connectivity")
+                reporter("load", done, len(source_indices), progress_message)
 
             # If the RKF lacks direct ConnTab frame keys, avoid probing every
             # frame before falling back to the section-based legacy reader.
-            if frame_no == 1 and not frame_found:
-                return {key: [] for key in series}, 0
+            if done == 1 and not frame_found:
+                return {key: [] for key in series}, 0, []
 
-        return (series if found_any else {key: [] for key in series}, n_frames if found_any else 0)
+        return (
+            series if found_any else {key: [] for key in series},
+            n_frames if found_any else 0,
+            source_indices if found_any else [],
+        )
 
     @classmethod
     def _minimal_simulation_context(
@@ -791,19 +845,30 @@ class AMSAdapter(EngineAdapter):
         ```
         """
         kf = self.load_kf(args)
-        direct_coord_entries = self._direct_coordinate_entries(kf, dtype=float, reporter=reporter)
+        requested_frame_indices = args.get("_frame_indices")
+        direct_coord_entries, source_indices, source_n_frames = self._direct_coordinate_entries(
+            kf,
+            frame_indices=requested_frame_indices,
+            dtype=float,
+            reporter=reporter,
+        )
         if direct_coord_entries:
             history_data = {}
             coord_entries = direct_coord_entries
         else:
             history_data = kf.read_section("History")
-            coord_entries = self._coordinate_entries(history_data, dtype=float)
+            all_coord_entries = self._coordinate_entries(history_data, dtype=float)
+            source_n_frames = len(all_coord_entries)
+            source_indices = self._normalized_frame_indices(requested_frame_indices, source_n_frames)
+            coord_entries = [all_coord_entries[i] for i in source_indices]
         frames: list[np.ndarray] = []
-        for flat in coord_entries:
+        loaded_source_indices: list[int] = []
+        for source_index, flat in zip(source_indices, coord_entries):
             if flat.size % 3 != 0:
                 continue
             coords = flat.reshape(-1, 3) * BOHR_TO_ANG
             frames.append(coords)
+            loaded_source_indices.append(source_index)
 
         if not frames:
             raise RuntimeError("No 'Coords*' or 'Coordinates*' entries were found in AMS History section.")
@@ -818,7 +883,8 @@ class AMSAdapter(EngineAdapter):
                 reporter("load", fi + 1, n_frames, "Reading AMS coordinates from History")
 
         elements = self._elements_from_history(kf, history_data, n_atoms)
-        iterations = self._iterations_from_general(kf, n_frames)
+        all_iterations = self._iterations_from_general(kf, source_n_frames)
+        iterations = np.asarray([all_iterations[i] for i in loaded_source_indices], dtype=int)
         atom_ids = list(range(1, n_atoms + 1))
         atom_labels = np.tile(np.asarray(elements, dtype=object), (n_frames, 1))
         simulation = self._minimal_simulation_context(
@@ -836,6 +902,11 @@ class AMSAdapter(EngineAdapter):
             atom_labels=atom_labels,
             iterations=iterations,
             simulation=simulation,
+            source_frame_indices=(
+                np.asarray(loaded_source_indices, dtype=int)
+                if requested_frame_indices is not None
+                else None
+            ),
         )
 
     def load_connectivity(self, args: dict, reporter=None) -> ConnectivityData:
@@ -860,7 +931,13 @@ class AMSAdapter(EngineAdapter):
         ```
         """
         kf = self.load_kf(args)
-        direct_entries, direct_n_frames = self._direct_connectivity_entries(kf, reporter=reporter)
+        requested_frame_indices = args.get("_frame_indices")
+        direct_entries, source_n_frames, source_indices = self._direct_connectivity_entries(
+            kf,
+            frame_indices=requested_frame_indices,
+            reporter=reporter,
+        )
+        direct_n_frames = source_n_frames
         if direct_n_frames > 0:
             history_data = {}
             neighbors_entries = direct_entries["neighbors"]
@@ -873,11 +950,31 @@ class AMSAdapter(EngineAdapter):
                 reporter("load", 0, 0, "Reading AMS connectivity History section")
             history_data = kf.read_section("History")
 
-            neighbors_entries = self._history_entries(history_data, "ConnTab neighbors", dtype=int)
-            bond_order_entries = self._history_entries(history_data, "ConnTab bond order", dtype=float)
-            num_neighb_entries = self._history_entries(history_data, "ConnTab num neighb", dtype=int)
-            total_bo_entries = self._history_entries(history_data, "Total bond orders", dtype=float)
-            lone_pairs_entries = self._history_entries(history_data, "Lone pairs", dtype=float)
+            all_neighbors_entries = self._history_entries(history_data, "ConnTab neighbors", dtype=int)
+            all_bond_order_entries = self._history_entries(history_data, "ConnTab bond order", dtype=float)
+            all_num_neighb_entries = self._history_entries(history_data, "ConnTab num neighb", dtype=int)
+            all_total_bo_entries = self._history_entries(history_data, "Total bond orders", dtype=float)
+            all_lone_pairs_entries = self._history_entries(history_data, "Lone pairs", dtype=float)
+            source_n_frames = max(
+                len(all_neighbors_entries),
+                len(all_bond_order_entries),
+                len(all_num_neighb_entries),
+                len(all_total_bo_entries),
+                len(all_lone_pairs_entries),
+            )
+            source_indices = self._normalized_frame_indices(requested_frame_indices, source_n_frames)
+
+            def _selected(entries: list[np.ndarray], dtype) -> list[np.ndarray]:
+                return [
+                    entries[i] if i < len(entries) else np.asarray([], dtype=dtype)
+                    for i in source_indices
+                ]
+
+            neighbors_entries = _selected(all_neighbors_entries, int)
+            bond_order_entries = _selected(all_bond_order_entries, float)
+            num_neighb_entries = _selected(all_num_neighb_entries, int)
+            total_bo_entries = _selected(all_total_bo_entries, float)
+            lone_pairs_entries = _selected(all_lone_pairs_entries, float)
 
         n_frames = max(
             len(neighbors_entries),
@@ -906,7 +1003,8 @@ class AMSAdapter(EngineAdapter):
 
         elements = self._elements_from_history(kf, history_data, n_atoms)
         atom_ids = list(range(1, n_atoms + 1))
-        iterations = self._iterations_from_general(kf, n_frames)
+        all_iterations = self._iterations_from_general(kf, source_n_frames)
+        iterations = np.asarray([all_iterations[i] for i in source_indices], dtype=int)
 
         if num_neighb_entries:
             connectivity = self._reshape_conntab_by_num_neighb(
@@ -955,6 +1053,11 @@ class AMSAdapter(EngineAdapter):
             atom_ids=atom_ids,
             elements=elements,
             iterations=iterations,
+            source_frame_indices=(
+                np.asarray(source_indices, dtype=int)
+                if requested_frame_indices is not None
+                else None
+            ),
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:

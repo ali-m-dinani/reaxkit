@@ -8,12 +8,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from reaxkit.domain.data_models import ConnectivityTrajectoryData
+from reaxkit.domain.data_models import ConnectivityData, ConnectivityTrajectoryData, TrajectoryData
 from reaxkit.engine.ams.adapter import AMSAdapter
 
 
 class _FakeKF:
     def __init__(self):
+        self.coordinate_reads: list[int] = []
         self.frames = {
             1: [0.0, 0.0, 0.0, 2.0, 0.0, 0.0],
             2: [1.0, 0.0, 0.0, 3.0, 0.0, 0.0],
@@ -34,6 +35,7 @@ class _FakeKF:
             match = variable.startswith("Coords(") and variable.endswith(")")
             if match:
                 frame_no = int(variable.removeprefix("Coords(").removesuffix(")"))
+                self.coordinate_reads.append(frame_no)
                 return self.frames[frame_no]
         raise KeyError(f"{section}%{variable}")
 
@@ -43,9 +45,17 @@ class _FakeKF:
         raise KeyError(key)
 
 
+class _FakeKFWithoutFrameCount(_FakeKF):
+    def read(self, section: str, variable: str):
+        if variable == "nEntries":
+            raise KeyError(f"{section}%{variable}")
+        return super().read(section, variable)
+
+
 class _FakeConnectivityKF:
     def __init__(self):
         self.n_frames = 3
+        self.connectivity_reads: list[tuple[str, int]] = []
 
     def read_section(self, section: str):
         raise AssertionError(f"read_section({section!r}) should not be used for direct RKF connectivity")
@@ -64,6 +74,7 @@ class _FakeConnectivityKF:
             ):
                 if variable.startswith(f"{prefix}(") and variable.endswith(")"):
                     frame_no = int(variable.removeprefix(f"{prefix}(").removesuffix(")"))
+                    self.connectivity_reads.append((prefix, frame_no))
                     if not 1 <= frame_no <= self.n_frames:
                         raise KeyError(f"{section}%{variable}")
                     if prefix == "Bonds.Index":
@@ -185,7 +196,7 @@ def test_ams_load_connectivity_reads_direct_rkf_frames_without_history_section(m
 
     assert len(connectivity.connectivity) == 3
     assert connectivity.connectivity[0].tolist() == [[2], [1]]
-    assert connectivity.bond_orders[2].tolist() == pytest.approx([[0.78], [0.78]])
+    assert np.allclose(connectivity.bond_orders[2], [[0.78], [0.78]])
     assert connectivity.sum_bond_orders.shape == (3, 2)
     assert connectivity.elements == ["C", "O"]
     assert connectivity.iterations.tolist() == [10, 20, 30]
@@ -194,6 +205,59 @@ def test_ams_load_connectivity_reads_direct_rkf_frames_without_history_section(m
         ("load", 2, 3, "Reading AMS RKF connectivity"),
         ("load", 3, 3, "Reading AMS RKF connectivity"),
     ]
+
+
+def test_ams_load_trajectory_reads_only_selected_rkf_frames(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    trajectory = adapter.load(
+        TrajectoryData,
+        {"input": "fake.rkf", "frames": [2, 0]},
+    )
+
+    assert fake.coordinate_reads == [3, 1]
+    assert trajectory.positions.shape == (2, 2, 3)
+    assert trajectory.iterations.tolist() == [30, 10]
+    assert trajectory.source_frame_indices.tolist() == [2, 0]
+
+
+def test_ams_selective_trajectory_does_not_scan_coords_when_nentries_is_missing(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeKFWithoutFrameCount()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    trajectory = adapter.load(
+        TrajectoryData,
+        {"input": "fake.rkf", "frames": [2]},
+    )
+
+    assert fake.coordinate_reads == [3]
+    assert trajectory.source_frame_indices.tolist() == [2]
+
+
+def test_ams_load_connectivity_reads_only_selected_rkf_frames(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeConnectivityKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    connectivity = adapter.load(
+        ConnectivityData,
+        {"input": "fake.rkf", "frame_indices": [2, 0]},
+    )
+
+    assert fake.connectivity_reads == [
+        ("Bonds.Index", 3),
+        ("Bonds.Atoms", 3),
+        ("Bonds.Orders", 3),
+        ("Bonds.Index", 1),
+        ("Bonds.Atoms", 1),
+        ("Bonds.Orders", 1),
+    ]
+    assert len(connectivity.connectivity) == 2
+    assert connectivity.iterations.tolist() == [30, 10]
+    assert connectivity.source_frame_indices.tolist() == [2, 0]
 
 
 def test_ams_resolve_kf_path_prefers_explicit_input_over_rewritten_run_dir(tmp_path):

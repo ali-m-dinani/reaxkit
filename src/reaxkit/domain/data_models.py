@@ -171,6 +171,8 @@ class TrajectoryData:
         Optional 1D iteration array aligned to frame count.
     atom_labels : Optional[np.ndarray]
         Optional 2D per-frame/per-atom labels.
+    source_frame_indices : Optional[np.ndarray]
+        Original file-frame indices when this is a compact partial load.
     """
 
     positions: np.ndarray  # (n_frames, n_atoms_max, 3), padded with NaN when an atom is absent
@@ -179,6 +181,7 @@ class TrajectoryData:
     simulation: Optional[SimulationData] = None
     iterations: Optional[np.ndarray] = None
     atom_labels: Optional[np.ndarray] = None  # (n_frames, n_atoms_max) per-frame labels, padded with ""
+    source_frame_indices: Optional[np.ndarray] = None  # compact frame -> original file frame
 
     def __post_init__(self):
         self.validate()
@@ -204,6 +207,15 @@ class TrajectoryData:
             labels = np.asarray(self.atom_labels, dtype=object)
             if labels.shape != (n_frames, n_atoms):
                 raise ValueError("TrajectoryData.atom_labels must have shape (n_frames, n_atoms).")
+
+        if self.source_frame_indices is not None:
+            source_indices = _as_1d(
+                "TrajectoryData.source_frame_indices",
+                self.source_frame_indices,
+                dtype=int,
+            )
+            if source_indices.shape[0] != n_frames:
+                raise ValueError("TrajectoryData.source_frame_indices length must match positions frame dimension.")
 
         if self.simulation is not None:
             self.simulation.validate()
@@ -280,6 +292,8 @@ class ConnectivityData:
         Optional 1D frame index array.
     metadata : Optional[dict[str, Any]], optional
         Optional parser/source metadata.
+    source_frame_indices : Optional[np.ndarray]
+        Original file-frame indices when this is a compact partial load.
 
     Notes
     -----
@@ -302,6 +316,7 @@ class ConnectivityData:
     simulation: Optional[SimulationData] = None
     iterations: Optional[np.ndarray] = None
     metadata: Optional[dict[str, Any]] = None
+    source_frame_indices: Optional[np.ndarray] = None
 
     def __post_init__(self):
         self.validate()
@@ -325,6 +340,17 @@ class ConnectivityData:
                 n_frames = it.shape[0]
             elif it.shape[0] != n_frames:
                 raise ValueError("ConnectivityData.iterations length must match frame count.")
+
+        if self.source_frame_indices is not None:
+            source_indices = _as_1d(
+                "ConnectivityData.source_frame_indices",
+                self.source_frame_indices,
+                dtype=int,
+            )
+            if n_frames is None:
+                n_frames = source_indices.shape[0]
+            elif source_indices.shape[0] != n_frames:
+                raise ValueError("ConnectivityData.source_frame_indices length must match frame count.")
 
         if self.atom_ids is not None:
             atom_ids = _ensure_int_list("ConnectivityData.atom_ids", self.atom_ids)

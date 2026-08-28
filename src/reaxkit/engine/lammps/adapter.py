@@ -190,8 +190,14 @@ class LAMMPSAdapter(EngineAdapter):
         ```
         """
         dump_path = self._resolve_dump_path(args)
-        handler = LAMMPSDumpHandler(dump_path, reporter=reporter)
+        handler = LAMMPSDumpHandler(
+            dump_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        )
         sim_df = handler.dataframe()
+        handler_meta = handler.metadata()
+        source_frame_indices = handler_meta.get("source_frame_indices")
         n_frames = handler.n_frames()
         if n_frames <= 0:
             raise RuntimeError(f"No trajectory frames found in LAMMPS dump file: {dump_path}")
@@ -253,6 +259,11 @@ class LAMMPSAdapter(EngineAdapter):
             simulation=simulation,
             iterations=iterations,
             atom_labels=atom_labels,
+            source_frame_indices=(
+                np.asarray(source_frame_indices, dtype=int)
+                if source_frame_indices is not None
+                else None
+            ),
         )
 
     def load_simulation(self, args: dict, reporter=None) -> SimulationData:
@@ -337,8 +348,22 @@ class LAMMPSAdapter(EngineAdapter):
         conn = LAMMPSAdapter().load_connectivity({})
         ```
         """
-        _ = (args, reporter)
-        return ConnectivityData(connectivity=np.empty((0, 0), dtype=int))
+        _ = reporter
+        requested = args.get("_frame_indices")
+        if requested is None:
+            return ConnectivityData(connectivity=np.empty((0, 0), dtype=int))
+        source_frame_indices = np.asarray(
+            list(dict.fromkeys(int(i) for i in requested if int(i) >= 0)),
+            dtype=int,
+        )
+        return ConnectivityData(
+            connectivity=[],
+            bond_orders=[],
+            sum_bond_orders=np.empty((len(source_frame_indices), 0), dtype=float),
+            iterations=source_frame_indices.copy(),
+            source_frame_indices=source_frame_indices,
+            metadata={"source": "lammps", "connectivity_available": False},
+        )
 
     def load_connectivity_trajectory(self, args: dict, reporter=None) -> ConnectivityTrajectoryData:
         """Load connectivity and trajectory together as one composite object.

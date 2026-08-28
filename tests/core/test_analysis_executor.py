@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.domain.data_models import TrajectoryData
 
 
 def test_engine_detection_path_prefers_explicit_input_over_snapshot_source():
@@ -33,3 +39,83 @@ def test_engine_detection_path_ignores_storage_synthesized_input():
     }
 
     assert AnalysisExecutor._engine_detection_path(args) == "run_directory"
+
+
+@dataclass
+class _FrameRequest:
+    frames: list[int]
+    every: int = 1
+
+
+@dataclass
+class _FrameResult:
+    table: pd.DataFrame
+    request: _FrameRequest
+
+
+class _FrameTask:
+    required_data = TrajectoryData
+
+    def run(self, _data, request):
+        assert request.frames == [0, 1]
+        return _FrameResult(
+            table=pd.DataFrame({"frame_index": request.frames, "value": [1.0, 2.0]}),
+            request=request,
+        )
+
+
+def test_partial_frame_execution_uses_compact_indices_and_restores_source_indices():
+    request = _FrameRequest(frames=[0, 50])
+    data = TrajectoryData(
+        positions=np.zeros((2, 1, 3), dtype=float),
+        elements=["Al"],
+        atom_ids=[1],
+        iterations=np.asarray([0, 500], dtype=int),
+        source_frame_indices=np.asarray([0, 50], dtype=int),
+    )
+
+    result = AnalysisExecutor._run_task(_FrameTask(), data, request, reporter=None)
+
+    assert result.table["frame_index"].tolist() == [0, 50]
+    assert result.request is request
+
+
+def test_executor_builds_selective_load_plan_only_for_explicit_frames():
+    assert AnalysisExecutor._requested_frame_indices(_FrameRequest([0, 50, 100]), TrajectoryData) == [0, 50, 100]
+    assert AnalysisExecutor._requested_frame_indices(_FrameRequest([]), TrajectoryData) is None
+
+
+def test_selective_sources_are_not_copied_into_the_run_snapshot(tmp_path):
+    xmolout = tmp_path / "xmolout"
+    xmolout.write_text("trajectory", encoding="utf-8")
+    args = {"_snapshot_source_dir": str(tmp_path)}
+
+    remaining, borrowed = AnalysisExecutor._use_selective_sources(
+        args,
+        ("xmolout", "summary.txt"),
+    )
+
+    assert remaining == ("summary.txt",)
+    assert borrowed == {"xmolout": str(xmolout.resolve())}
+    assert args["xmolout"] == str(xmolout.resolve())
+
+
+def test_ams_and_lammps_selective_sources_are_not_copied(tmp_path):
+    rkf = tmp_path / "reaxout.rkf"
+    dump = tmp_path / "dump.lammpstrj"
+    rkf.write_text("rkf", encoding="utf-8")
+    dump.write_text("dump", encoding="utf-8")
+    args = {"_snapshot_source_dir": str(tmp_path)}
+
+    remaining, borrowed = AnalysisExecutor._use_selective_sources(
+        args,
+        ("reaxout.kf", "reaxout.rkf", "dump.lammpstrj", "log.lammps"),
+    )
+
+    assert remaining == ("reaxout.kf", "log.lammps")
+    assert borrowed == {
+        "reaxout.rkf": str(rkf.resolve()),
+        "dump.lammpstrj": str(dump.resolve()),
+    }
+    assert args["rkf"] == str(rkf.resolve())
+    assert args["dump"] == str(dump.resolve())

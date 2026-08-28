@@ -35,19 +35,34 @@ class LAMMPSDumpHandler(BaseHandler):
 
     _TIMESTEP_PATTERN = re.compile(r"timestep\s*:\s*([+-]?\d+)", flags=re.IGNORECASE)
 
-    def __init__(self, file_path: str | Path = "dump.xyz", *, reporter=None, progress_every: int = 5000):
+    def __init__(
+        self,
+        file_path: str | Path = "dump.xyz",
+        *,
+        frame_indices: list[int] | None = None,
+        reporter=None,
+        progress_every: int = 5000,
+    ):
         """Initialize dump parser state and optional progress reporter."""
         super().__init__(file_path)
         self._frames: list[pd.DataFrame] = []
         self._box_bounds: list[list[tuple[float, ...]] | None] = []
         self._format: str = "unknown"
         self._n_atoms: int | None = None
+        self._frame_indices = (
+            tuple(dict.fromkeys(int(i) for i in frame_indices if int(i) >= 0))
+            if frame_indices is not None
+            else None
+        )
         self._reporter = reporter
         self._progress_every = max(1, int(progress_every))
         self._last_report_line = -1
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """Parse dump content and return simulation index table plus metadata."""
+        if self._frame_indices is not None:
+            return self._parse_selected_frames()
+
         with open(self.path, "r", encoding="utf-8") as fh:
             lines = fh.readlines()
         non_empty = [ln.strip() for ln in lines if ln.strip()]
@@ -79,6 +94,179 @@ class LAMMPSDumpHandler(BaseHandler):
             "has_box_bounds": any(b is not None for b in self._box_bounds),
         }
         return df, meta
+
+    @staticmethod
+    def _next_non_empty(fh) -> str | None:
+        """Return the next non-empty stripped line from a text stream."""
+        for raw in fh:
+            line = raw.strip()
+            if line:
+                return line
+        return None
+
+    def _parse_selected_frames(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """Stream only requested dump frames into memory."""
+        with open(self.path, "r", encoding="utf-8") as fh:
+            first = self._next_non_empty(fh)
+
+        if first is None:
+            return pd.DataFrame(columns=["num_of_atoms", "iter"]), {
+                "format": "empty",
+                "n_atoms": 0,
+                "n_frames": 0,
+                "has_box_bounds": False,
+                "source_frame_indices": [],
+                "partial": True,
+            }
+        if first.startswith("ITEM:"):
+            rows, records = self._parse_selected_item_dump()
+            fmt = "item_dump"
+        else:
+            rows, records = self._parse_selected_xyz_like()
+            fmt = "xyz_like"
+
+        source_indices = [i for i in list(self._frame_indices or ()) if i in records]
+        self._frames = [records[i][0] for i in source_indices]
+        self._box_bounds = [records[i][1] for i in source_indices]
+        df = pd.DataFrame([rows[i] for i in source_indices])
+        self._format = fmt
+        meta: dict[str, Any] = {
+            "format": fmt,
+            "n_atoms": self._n_atoms,
+            "n_frames": len(self._frames),
+            "has_box_bounds": any(b is not None for b in self._box_bounds),
+            "source_frame_indices": source_indices,
+            "partial": True,
+        }
+        self._report_progress(len(source_indices), len(source_indices), "Finished loading selected LAMMPS frames", force=True)
+        return df, meta
+
+    def _parse_selected_xyz_like(
+        self,
+    ) -> tuple[dict[int, dict[str, Any]], dict[int, tuple[pd.DataFrame, None]]]:
+        """Stream selected frames from an XYZ-like LAMMPS dump."""
+        requested = set(self._frame_indices or ())
+        max_requested = max(requested, default=-1)
+        rows: dict[int, dict[str, Any]] = {}
+        records: dict[int, tuple[pd.DataFrame, None]] = {}
+        source_index = -1
+
+        with open(self.path, "r", encoding="utf-8") as fh:
+            while True:
+                count_line = self._next_non_empty(fh)
+                if count_line is None:
+                    break
+                source_index += 1
+                if source_index > max_requested:
+                    break
+                n_atoms = int(count_line.split()[0])
+                if self._n_atoms is None:
+                    self._n_atoms = n_atoms
+                header = self._next_non_empty(fh)
+                if header is None:
+                    break
+                selected = source_index in requested
+                atom_rows: list[list[Any]] = []
+                for _ in range(n_atoms):
+                    atom_line = self._next_non_empty(fh)
+                    if atom_line is None:
+                        break
+                    if not selected:
+                        continue
+                    parts = atom_line.split()
+                    if len(parts) >= 4:
+                        atom_rows.append([parts[0], float(parts[1]), float(parts[2]), float(parts[3])])
+                if not selected:
+                    continue
+                rows[source_index] = {
+                    "num_of_atoms": n_atoms,
+                    "iter": self._extract_timestep(header, fallback=source_index),
+                }
+                records[source_index] = (
+                    pd.DataFrame(atom_rows, columns=["atom_type", "x", "y", "z"]),
+                    None,
+                )
+                self._report_progress(len(records), len(requested), "Loading selected LAMMPS frames", force=True)
+                if len(records) == len(requested):
+                    break
+        return rows, records
+
+    def _parse_selected_item_dump(
+        self,
+    ) -> tuple[
+        dict[int, dict[str, Any]],
+        dict[int, tuple[pd.DataFrame, list[tuple[float, ...]] | None]],
+    ]:
+        """Stream selected frames from a native ``ITEM:`` LAMMPS dump."""
+        requested = set(self._frame_indices or ())
+        max_requested = max(requested, default=-1)
+        rows: dict[int, dict[str, Any]] = {}
+        records: dict[int, tuple[pd.DataFrame, list[tuple[float, ...]] | None]] = {}
+        source_index = -1
+
+        with open(self.path, "r", encoding="utf-8") as fh:
+            while True:
+                line = self._next_non_empty(fh)
+                if line is None:
+                    break
+                if not line.startswith("ITEM: TIMESTEP"):
+                    continue
+                source_index += 1
+                if source_index > max_requested:
+                    break
+
+                iter_line = self._next_non_empty(fh)
+                number_header = self._next_non_empty(fh)
+                count_line = self._next_non_empty(fh)
+                bounds_header = self._next_non_empty(fh)
+                if None in (iter_line, number_header, count_line, bounds_header):
+                    break
+                if not str(number_header).startswith("ITEM: NUMBER OF ATOMS"):
+                    break
+                if not str(bounds_header).startswith("ITEM: BOX BOUNDS"):
+                    break
+                iter_num = int(float(str(iter_line)))
+                n_atoms = int(float(str(count_line)))
+                if self._n_atoms is None:
+                    self._n_atoms = n_atoms
+                bounds: list[tuple[float, ...]] = []
+                for _ in range(3):
+                    bound_line = self._next_non_empty(fh)
+                    if bound_line is None:
+                        break
+                    bounds.append(tuple(float(v) for v in bound_line.split()))
+                atom_header = self._next_non_empty(fh)
+                if atom_header is None or not atom_header.startswith("ITEM: ATOMS"):
+                    break
+                atom_cols = atom_header.split()[2:]
+                selected = source_index in requested
+                atom_rows_raw: list[list[str]] = []
+                for _ in range(n_atoms):
+                    atom_line = self._next_non_empty(fh)
+                    if atom_line is None:
+                        break
+                    if selected:
+                        atom_rows_raw.append(atom_line.split())
+                if not selected:
+                    continue
+                rows[source_index] = {
+                    "num_of_atoms": n_atoms,
+                    "iter": iter_num,
+                    "xlo": bounds[0][0] if len(bounds) > 0 else math.nan,
+                    "xhi": bounds[0][1] if len(bounds) > 0 and len(bounds[0]) > 1 else math.nan,
+                    "ylo": bounds[1][0] if len(bounds) > 1 else math.nan,
+                    "yhi": bounds[1][1] if len(bounds) > 1 and len(bounds[1]) > 1 else math.nan,
+                    "zlo": bounds[2][0] if len(bounds) > 2 else math.nan,
+                    "zhi": bounds[2][1] if len(bounds) > 2 and len(bounds[2]) > 1 else math.nan,
+                }
+                records[source_index] = (
+                    self._frame_from_item_rows(atom_cols, atom_rows_raw),
+                    bounds if bounds else None,
+                )
+                self._report_progress(len(records), len(requested), "Loading selected LAMMPS frames", force=True)
+                if len(records) == len(requested):
+                    break
+        return rows, records
 
     def _report_progress(self, lines_read: int, total_lines: int, stage: str, *, force: bool = False) -> None:
         """Emit throttled progress events to the optional reporter callback."""
@@ -277,6 +465,7 @@ class LAMMPSDumpHandler(BaseHandler):
         row = df.iloc[i]
         payload: dict[str, Any] = {
             "index": i,
+            "source_index": int(self._meta.get("source_frame_indices", list(range(len(self._frames))))[i]),
             "iter": int(row["iter"]) if "iter" in df.columns else i,
             "coords": frame_df[["x", "y", "z"]].to_numpy(dtype=float),
             "atom_types": frame_df["atom_type"].astype(str).tolist(),

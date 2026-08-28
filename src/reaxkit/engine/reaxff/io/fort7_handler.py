@@ -69,7 +69,13 @@ class Fort7Handler(BaseHandler):
     - Connectivity and bond-order columns are inferred from the header.
     - Extra, file-dependent columns are preserved as ``unknown*`` fields.
     """
-    def __init__(self, file_path: str | Path = "fort.7", reporter=None):
+    def __init__(
+        self,
+        file_path: str | Path = "fort.7",
+        reporter=None,
+        *,
+        frame_indices: Optional[list[int]] = None,
+    ):
         """Initialize a handler for a ReaxFF ``fort.7`` connectivity file.
 
         Works on
@@ -89,6 +95,11 @@ class Fort7Handler(BaseHandler):
         super().__init__(file_path)
         self._frames: List[pd.DataFrame] = []
         self._sim_name: Optional[str] = None
+        self._frame_indices = (
+            tuple(dict.fromkeys(int(i) for i in frame_indices if int(i) >= 0))
+            if frame_indices is not None
+            else None
+        )
         self._reporter = reporter
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -101,6 +112,9 @@ class Fort7Handler(BaseHandler):
             Return value description.
 
         """
+        if self._frame_indices is not None:
+            return self._parse_selected_frames()
+
         sim_rows: List[List[Any]] = []
         frames: List[pd.DataFrame] = []
         totals: List[List[float]] = []
@@ -217,6 +231,143 @@ class Fort7Handler(BaseHandler):
 
         return sim_df, meta
 
+    def _parse_selected_frames(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """Parse only selected connectivity frames and stop after the last one."""
+        requested = list(self._frame_indices or ())
+        requested_set = set(requested)
+        max_requested = max(requested, default=-1)
+        records: dict[int, tuple[list[Any], pd.DataFrame, list[float]]] = {}
+
+        current_index = -1
+        current_selected = False
+        current_row: list[Any] | None = None
+        cur_atoms_rows: list[list[float | int]] = []
+        cur_totals: list[float] = []
+        cur_num_particles: int | None = None
+        cur_nbonds: int | None = None
+        sim_name = ""
+        warned_large_atom_count = False
+
+        def _finalize_iteration() -> None:
+            if (
+                not current_selected
+                or current_row is None
+                or cur_nbonds is None
+                or not cur_atoms_rows
+            ):
+                return
+            nb = int(cur_nbonds)
+            atom_cols = (
+                ["atom_num", "atom_type_num"]
+                + [f"atom_cnn{i}" for i in range(1, nb + 1)]
+                + ["molecule_num"]
+                + [f"BO{i}" for i in range(1, nb + 1)]
+                + ["sum_BOs", "num_LPs", "partial_charge"]
+            )
+            extra = max(0, len(cur_atoms_rows[0]) - len(atom_cols))
+            if extra:
+                atom_cols += [f"unknown{i}" for i in range(1, extra + 1)]
+            records[current_index] = (
+                current_row,
+                pd.DataFrame(cur_atoms_rows, columns=atom_cols),
+                cur_totals[:] if cur_totals else [float("nan")] * 4,
+            )
+            if self._reporter:
+                self._reporter(
+                    "load",
+                    len(records),
+                    len(requested_set),
+                    "Loading selected fort.7 frames",
+                )
+
+        with open(self.path, "r") as fh:
+            for raw in fh:
+                header_match = _FORT7_HEADER_RE.match(raw)
+                if header_match:
+                    _finalize_iteration()
+                    cur_atoms_rows = []
+                    cur_totals = []
+                    current_index += 1
+                    if current_index > max_requested:
+                        break
+
+                    cur_num_particles = int(header_match.group("num_atoms"))
+                    cur_nbonds = int(header_match.group("num_bonds"))
+                    sim_name = header_match.group("simulation_name")
+                    current_selected = current_index in requested_set
+                    current_row = (
+                        [
+                            int(header_match.group("iteration")),
+                            cur_num_particles,
+                            cur_nbonds,
+                        ]
+                        if current_selected
+                        else None
+                    )
+
+                    if cur_num_particles > 9999 and not warned_large_atom_count:
+                        warning_msg = (
+                            "Warning: fort.7 reports > 9999 atoms. ReaxFF fixed-width atom-index fields "
+                            "can overflow at this size, which may concatenate neighbor indices and corrupt "
+                            "fort.7 connectivity parsing. Consider running 'repair_fort7' before analysis."
+                        )
+                        print(warning_msg)
+                        warned_large_atom_count = True
+                    continue
+
+                if not current_selected:
+                    continue
+                values = raw.split()
+                if not values:
+                    continue
+                if len(values) < 6:
+                    cur_totals.extend(map(float, values))
+                else:
+                    if cur_nbonds is None:
+                        continue
+                    nb = int(cur_nbonds)
+                    int_part = list(map(int, values[0:nb + 3]))
+                    float_part = list(map(float, values[nb + 3:]))
+                    cur_atoms_rows.append(int_part + float_part)
+            else:
+                _finalize_iteration()
+
+        source_indices = [i for i in requested if i in records]
+        sim_rows = [records[i][0] for i in source_indices]
+        frames = [records[i][1] for i in source_indices]
+        totals = [records[i][2] for i in source_indices]
+        sim_df = pd.DataFrame(sim_rows, columns=["iter", "num_of_atoms", "num_of_bonds"])
+        if totals:
+            width = len(totals[0])
+            total_cols = (
+                ["total_BO", "total_LP", "total_BO_uncorrected", "total_charge"]
+                if width == 4
+                else [f"total_val{i}" for i in range(1, width + 1)]
+            )
+            sim_df = pd.concat(
+                [sim_df.reset_index(drop=True), pd.DataFrame(totals, columns=total_cols)],
+                axis=1,
+            )
+
+        if not sim_df.empty and "iter" in sim_df.columns:
+            keep_idx = sim_df.drop_duplicates("iter", keep="last").index.tolist()
+            frames = [frames[i] for i in keep_idx]
+            source_indices = [source_indices[i] for i in keep_idx]
+            sim_df = sim_df.iloc[keep_idx].reset_index(drop=True)
+
+        self._frames = frames
+        self._sim_name = sim_name
+        meta: Dict[str, Any] = {
+            "n_frames": len(frames),
+            "n_records": len(sim_df),
+            "simulation_name": sim_name,
+            "source_frame_indices": source_indices,
+            "partial": True,
+        }
+        if self._reporter:
+            self._reporter("load", len(source_indices), len(requested), "Finished loading selected fort.7 frames")
+        return sim_df, meta
+
     def _count_lines(self) -> int:
         """Count lines."""
         with open(self.path, "r") as fh:
@@ -252,7 +403,9 @@ class Fort7Handler(BaseHandler):
         int
             Number of parsed frames (iterations).
         """
-        return len(self._frames) if hasattr(self, "_frames") else 0
+        if not self._parsed:
+            self.parse()
+        return len(self._frames)
 
     def n_atoms(self, frame: int = 0) -> int:
         """
@@ -299,8 +452,8 @@ class Fort7Handler(BaseHandler):
         >>> h = Fort7Handler("fort.7")
         >>> df = h.frame(0)
         """
-        if not hasattr(self, "_frames"):
-            raise RuntimeError("fort.7 has not been parsed yet.")
+        if not self._parsed:
+            self.parse()
         return self._frames[int(i)]
 
     def iter_frames(self, step: int = 1):

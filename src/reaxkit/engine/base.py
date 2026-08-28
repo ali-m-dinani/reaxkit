@@ -53,6 +53,12 @@ class EngineAdapter(ABC):
 
     name: str = "base"
 
+    _FRAME_SELECTIVE_DATA_TYPES = {
+        TrajectoryData,
+        ConnectivityData,
+        ConnectivityTrajectoryData,
+    }
+
     @abstractmethod
     def detect(self, path: str | Path) -> float:
         """Return confidence score [0, 1]."""
@@ -67,6 +73,7 @@ class EngineAdapter(ABC):
 
     def load(self, data_type, args: dict, reporter=None):
         """Load requested domain data type from engine-specific sources."""
+        args = self._args_with_frame_selection(data_type, args)
         if data_type is TrajectoryData:
             return self._invoke_loader("load_trajectory", args, reporter=reporter)
         if data_type is GeometryData:
@@ -130,6 +137,31 @@ class EngineAdapter(ABC):
         if data_type is MolecularAnalysisData:
             return self._invoke_loader("load_molecular_analysis", args, reporter=reporter)
         raise ValueError(f"{self.name} cannot load data type: {data_type}")
+
+    @classmethod
+    def _args_with_frame_selection(cls, data_type, args: dict) -> dict:
+        """Promote public frame selectors to the selective-loader contract.
+
+        ``AnalysisExecutor`` supplies ``_frame_indices`` after inspecting an
+        analyzer request. A few workflows invoke adapters directly, however,
+        so accept their public ``frames``/``frame_indices`` arguments here as
+        well. The copied mapping avoids mutating caller-owned CLI arguments.
+        """
+        if data_type not in cls._FRAME_SELECTIVE_DATA_TYPES or "_frame_indices" in args:
+            return args
+
+        from reaxkit.core.utils.frame_utils import parse_frame_indices
+
+        for name in ("frames", "frame_indices"):
+            raw = args.get(name)
+            if raw is None:
+                continue
+            selected = parse_frame_indices(raw)
+            if selected:
+                load_args = dict(args)
+                load_args["_frame_indices"] = list(dict.fromkeys(i for i in selected if i >= 0))
+                return load_args
+        return args
 
     def write(self, data, out_path, args: dict | None = None):
         """Write a domain data object using an engine-appropriate writer."""
