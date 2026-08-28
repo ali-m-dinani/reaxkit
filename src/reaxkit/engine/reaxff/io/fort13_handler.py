@@ -39,7 +39,7 @@ class Fort13Handler(BaseHandler):
     Summary table
         One row per optimization epoch, returned by ``dataframe()``,
         with columns:
-        ["epoch", "total_ff_error"]
+        ["row_order", "source_line_number", "epoch", "total_ff_error"]
 
     Metadata
         Returned by ``metadata()``, containing:
@@ -51,6 +51,8 @@ class Fort13Handler(BaseHandler):
     - Non-numeric or empty lines are ignored.
     - This handler represents a single-scalar-per-iteration data source.
     """
+
+    _CACHE_VERSION = "3"
 
     def __init__(self, file_path: str | Path = "fort.13", reporter=None):
         """
@@ -87,12 +89,20 @@ class Fort13Handler(BaseHandler):
                 if not line:
                     continue
                 try:
-                    error_value = float(line)
+                    token = line.split()[0]
+                    error_value = float(token.replace("D", "E").replace("d", "e"))
                 except ValueError:
                     continue
-                sim_rows.append([idx, error_value])
+                row_order = len(sim_rows) + 1
+                # Keep the historical epoch interpretation for compatibility,
+                # while exposing the distinct contiguous record order and true
+                # physical source location needed by provenance consumers.
+                sim_rows.append([row_order, idx, idx, error_value])
 
-        df = pd.DataFrame(sim_rows, columns=["epoch", "total_ff_error"])
+        df = pd.DataFrame(
+            sim_rows,
+            columns=["row_order", "source_line_number", "epoch", "total_ff_error"],
+        )
 
         meta: Dict[str, Any] = {
             "n_records": len(df),
@@ -148,6 +158,8 @@ class Fort13Handler(BaseHandler):
         df = self.dataframe()
         for i in range(0, len(df), step):
             yield {
+                "row_order": int(df.iloc[i]["row_order"]),
+                "source_line_number": int(df.iloc[i]["source_line_number"]),
                 "epoch": int(df.iloc[i]["epoch"]),
                 "total_ff_error": float(df.iloc[i]["total_ff_error"]),
             }

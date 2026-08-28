@@ -21,8 +21,16 @@ from reaxkit.presentation.reporting import normalize_report_formats, write_repor
 from reaxkit.presentation.specs import ensure_presentation_spec, spec_to_plot_payload
 
 
-PlotPayloadBuilder = Callable[[str, object, object], dict[str, object] | None]
+PlotPayloadBuilder = Callable[
+    [str, object, object],
+    dict[str, object] | list[dict[str, object]] | None,
+]
 ReportPayloadBuilder = Callable[[str, object, object, Path], dict[str, object] | None]
+ExportHandler = Callable[[str, object, object], list[Path]]
+
+_PLOT_FILE_SUFFIXES = frozenset(
+    {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".tif", ".tiff", ".bmp"}
+)
 
 _RAW_PLOT_DATA_KEYS = frozenset(
     {
@@ -149,6 +157,7 @@ def present_result(
     *,
     plot_payload_builder: PlotPayloadBuilder | None = None,
     report_payload_builder: ReportPayloadBuilder | None = None,
+    export_handler: ExportHandler | None = None,
 ) -> None:
     """
     Dispatch result presentation from CLI-style arguments.
@@ -168,6 +177,9 @@ def present_result(
         Input parameter used by this function.
     report_payload_builder : ReportPayloadBuilder | None, optional
         Input parameter used by this function.
+    export_handler : ExportHandler | None, optional
+        Command-specific CSV export callback. The callback returns output
+        directories to include in the saved-results summary.
     
     Returns
     -----
@@ -203,15 +215,18 @@ def present_result(
     report_mode = str(getattr(args, "report_format", "both") or "both")
 
     if export_csv:
-        export_path = resolve_output_path(
-            export_csv,
-            command,
-            run_id=getattr(args, "run_id", None),
-            project_root=getattr(args, "project_root", "."),
-            analysis_id=getattr(args, "analysis_id", None),
-        )
-        export_result_csv(result, str(export_path))
-        result_dirs.append(export_path.parent)
+        if export_handler is not None:
+            result_dirs.extend(export_handler(command, result, args))
+        else:
+            export_path = resolve_output_path(
+                export_csv,
+                command,
+                run_id=getattr(args, "run_id", None),
+                project_root=getattr(args, "project_root", "."),
+                analysis_id=getattr(args, "analysis_id", None),
+            )
+            export_result_csv(result, str(export_path))
+            result_dirs.append(export_path.parent)
 
     if wants_plot:
         if plot_payload_builder is None:
@@ -221,7 +236,12 @@ def present_result(
             if payload is None:
                 print("No data available for plotting.")
             else:
-                if not _looks_like_raw_plot_payload(payload):
+                payload_batch = (
+                    isinstance(payload, list)
+                    and bool(payload)
+                    and all(_looks_like_raw_plot_payload(item) for item in payload)
+                )
+                if not payload_batch and not _looks_like_raw_plot_payload(payload):
                     # Typed presentation specs are adapted to renderer payloads here.
                     spec = ensure_presentation_spec(payload)
                     if spec is None and isinstance(payload, list):
@@ -235,6 +255,7 @@ def present_result(
                         if payload is None:
                             print("No plot-compatible presentation available for this result.")
                             return
+                plot_payloads = list(payload) if payload_batch else [payload]
                 if save:
                     save_path = resolve_output_path(
                         save,
@@ -243,10 +264,40 @@ def present_result(
                         project_root=getattr(args, "project_root", "."),
                         analysis_id=getattr(args, "analysis_id", None),
                     )
-                    render_plot({**payload, "save": str(save_path)})
-                    result_dirs.append(save_path.parent)
+                    if payload_batch:
+                        if save_path.suffix.lower() in _PLOT_FILE_SUFFIXES:
+                            raise ValueError(
+                                "Saving multiple plots requires a directory path, "
+                                f"not a figure filename: {save_path}"
+                            )
+                        save_path.mkdir(parents=True, exist_ok=True)
+                        for index, item in enumerate(plot_payloads, start=1):
+                            filename = Path(
+                                str(item.get("filename") or f"plot_{index}.png")
+                            ).name
+                            if Path(filename).suffix.lower() not in _PLOT_FILE_SUFFIXES:
+                                filename = f"{filename}.png"
+                            subdirectory = Path(str(item.get("subdirectory") or ""))
+                            if subdirectory.is_absolute() or ".." in subdirectory.parts:
+                                raise ValueError(
+                                    "Plot payload subdirectory must be a safe relative path: "
+                                    f"{subdirectory}"
+                                )
+                            item_path = save_path / subdirectory / filename
+                            item_path.parent.mkdir(parents=True, exist_ok=True)
+                            render_plot(
+                                {
+                                    **item,
+                                    "save": str(item_path),
+                                }
+                            )
+                        result_dirs.append(save_path)
+                    else:
+                        render_plot({**plot_payloads[0], "save": str(save_path)})
+                        result_dirs.append(save_path.parent)
                 if show or (plot_mode and not save):
-                    render_plot(payload)
+                    for item in plot_payloads:
+                        render_plot(item)
 
     if wants_report:
         if report_payload_builder is None:

@@ -11,9 +11,25 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Build energy curves from force-field optimization report data. In `single` mode,
+one figure is created per EOS identifier. If physical volumes are unavailable,
+the numeric scan coordinate encoded in each point identifier is used.
+
+### Examples
+
+```text
+reaxkit get_ffield_opt_eos --iden all --plot single --save eos_plots
+reaxkit get_ffield_opt_eos --iden all --plot subplot --save eos.png
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+| Flag | Required | Default | Help |
+|---|---|---|---|
+| `--iden` | No | all | Identifier to keep; use `all` for every EOS group. |
+| `--flip-sign` | No | false | Flip the energy sign before plotting or export. |
+| `--plot` | No |  | Use `single` for one figure per identifier or `subplot` for one combined figure. |
+| `--save` | No |  | In `single` mode, an output directory; in `subplot` mode, a figure path. |
 
 </div>
 
@@ -107,13 +123,22 @@ The figure below shows an example tornado plot for the sensitivity of force fiel
 
 <a id="get_ffield_diagnostic_data_plot_beeswarm"></a>
 
-An example beeswarm plot for the sensitivity is as follows:
+The diagnostic beeswarm normalizes every sampled parameter value with the lower
+and upper bounds declared in `params`. Marker color represents the objective
+function, from blue for lower values to red for higher values. By default each
+parameter uses its own objective range; `--global-objective-scale` applies one
+range across the full plot. Use `--sort parameter`, `--sort final`, or
+`--sort starting` to order the rows.
 
-<div style="text-align:center;" markdown="1">
-![get_ffield_diagnostic_data_plot_beeswarm](../../../figures/get_ffield_diagnostic_data_plot_beeswarm.png){ style="width:85%; max-width:800px;" }
+```text
+reaxkit get_ffield_diagnostic_data --plot beeswarm --params params \
+  --sort parameter --save diagnostic_beeswarm.png
+```
 
-*Figure: Sample beeswarm plot for the sensitivity of force field optimization error to each parameter*
-</div>
+The rendered plot places the normalized samples on the left, the stored bounds
+and final/starting values in a separate annotation region, and the objective
+color scale on the far right. Interactive plot windows show the interpreted
+force-field parameter name when hovering over a marker.
 
 </div>
 

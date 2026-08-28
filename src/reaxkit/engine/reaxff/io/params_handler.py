@@ -118,19 +118,21 @@ class ParamsHandler(BaseHandler):
                 if not tokens:
                     continue
 
-                # Expect exactly 6 numeric tokens:
+                # Bounds are optional in legacy and generated params files.
                 # ff_section ff_section_line ff_parameter search_interval min_value max_value
-                if len(tokens) != 6:
+                if len(tokens) not in (4, 5, 6):
                     raise ValueError(
-                        f"Expected 6 tokens in params line, got {len(tokens)}: {raw_line!r}"
+                        "Expected 4 to 6 tokens in params line "
+                        f"(three pointer fields, interval, and optional bounds), "
+                        f"got {len(tokens)}: {raw_line!r}"
                     )
 
                 ff_section = int(tokens[0])
                 ff_section_line = int(tokens[1])
                 ff_parameter = int(tokens[2])
                 search_interval = float(tokens[3])
-                min_value = float(tokens[4])
-                max_value = float(tokens[5])
+                min_value = float(tokens[4]) if len(tokens) >= 5 else float("nan")
+                max_value = float(tokens[5]) if len(tokens) >= 6 else float("nan")
 
                 rows.append(
                     {

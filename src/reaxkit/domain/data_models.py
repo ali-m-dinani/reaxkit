@@ -1265,6 +1265,34 @@ class ForceFieldOptimizationDiagnosticBundleData:
 
 
 @dataclass
+class ForceFieldOptimizationDiagnosticPlotData:
+    """Composite inputs for bounded optimization-diagnostic plots.
+
+    The diagnostic samples and force-field tables provide the objective values,
+    descriptive parameter labels, and starting force-field values.  The
+    optimization-parameter definitions provide the stored search bounds used to
+    normalize every parameter onto the shared ``[0, 1]`` plot axis.
+
+    Fields
+    ------
+    diagnostics : ForceFieldOptimizationDiagnosticData
+        Required optimization diagnostic samples.
+    force_field_parameters : ForceFieldParametersData
+        Required force-field tables used to resolve parameter names and starting
+        values.
+    optimization_parameters : ForceFieldOptimizationParameterData
+        Required optimization declarations containing increments and bounds.
+    metadata : Optional[dict[str, Any]], optional
+        Optional bundle metadata.
+    """
+
+    diagnostics: ForceFieldOptimizationDiagnosticData
+    force_field_parameters: ForceFieldParametersData
+    optimization_parameters: ForceFieldOptimizationParameterData
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
 class ForceFieldOptimizationReportEOSBundleData:
     """Composite data for EOS report tasks.
 
@@ -1283,6 +1311,23 @@ class ForceFieldOptimizationReportEOSBundleData:
 
     report: ForceFieldOptimizationReportData
     geometry_summary: EnergyMinimizationSummaryData
+    metadata: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ForceFieldOptimizationPlotBundleData:
+    """Composite inputs for classifying optimization EOS and restraint curves.
+
+    The report supplies ReaxFF/QM values, the geometry summary supplies volume
+    coordinates, the parsed training set supplies comments, and
+    ``geometry_restraints`` maps structure identifiers to BOND/ANGLE scan
+    coordinates parsed from the ReaxFF ``geo`` file.
+    """
+
+    report: ForceFieldOptimizationReportData
+    geometry_summary: EnergyMinimizationSummaryData
+    training_set: ForceFieldOptimizationTrainingSetData
+    geometry_restraints: pd.DataFrame = field(default_factory=pd.DataFrame)
     metadata: Optional[dict[str, Any]] = None
 
 

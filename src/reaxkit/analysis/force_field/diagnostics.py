@@ -161,7 +161,11 @@ def _interpret_identifier_details(
     sec_row = sec_df.iloc[row_idx]
     out["component"] = param_name
     out["ffield_value"] = sec_row.get(param_name, pd.NA)
-    out["term"] = sec_row.get("term", pd.NA)
+    out["term"] = (
+        sec_row.get("symbol", pd.NA)
+        if section_key == "atom"
+        else sec_row.get("term", pd.NA)
+    )
     return out
 
 

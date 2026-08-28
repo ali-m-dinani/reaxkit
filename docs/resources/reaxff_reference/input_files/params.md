@@ -34,10 +34,13 @@ Results of each optimization step are written to **`fort.79`**.
 ## File format
 
 Each non-comment line defines **one optimizable force field parameter**.
+ReaxKit accepts the four required pointer/search fields followed by zero, one,
+or two bound values. Omitted bounds are returned as missing values; they are
+not replaced with invented limits.
 
 **Line format**
 ```
-<section> <type> <parameter> <step> <max> <min>
+<section> <type> <parameter> <step> <min> <max>
 ```
 
 Using fixed-width formatting:
@@ -55,8 +58,13 @@ Using fixed-width formatting:
 | `type` | Atom/bond/angle/torsion type index |
 | `parameter` | Parameter index within that type |
 | `step` | Relative perturbation factor |
-| `max` | Maximum allowed value |
 | `min` | Minimum allowed value |
+| `max` | Maximum allowed value |
+
+The historical files in circulation are not consistent about whether the two
+declared bound values are ordered numerically. ReaxKit therefore preserves
+their source positions in `min_value` and `max_value` and leaves scientific
+validation of a particular file to the consuming workflow.
 
 ---
 

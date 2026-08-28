@@ -44,6 +44,7 @@ Analysis docs are grouped by domain:
 ### Force Field
 
 - [diagnostics](force_field/diagnostics_analysis.md)
+- [diagnostic_beeswarm](force_field/diagnostic_beeswarm_analysis.md)
 - [force_field](force_field/force_field_analysis.md)
 - [MM_summary](force_field/MM_summary_analysis.md)
 - [optimization_progress](force_field/optimization_progress_analysis.md)

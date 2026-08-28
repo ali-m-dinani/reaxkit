@@ -3,19 +3,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from reaxkit.engine.reaxff.generators.ffielld_generator import add_element_to_ffield, merge_ffields
+import pytest
+
+from reaxkit.engine.common.generators.ffield_generator import add_element_to_ffield, add_term_to_ffield, merge_ffields
 from reaxkit.engine.common.io.ffield_handler import FFieldHandler
-from reaxkit.workflows.file_tools import ffield_workflow
 
 
 _SRC_FFIELD = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[3]
     / "full_sim_examples"
     / "heatfo_trainset_generation_babo_case"
     / "ffield"
 )
 _MERGE_SOURCE_FFIELD = (
-    Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[3]
     / "examples_to_test"
     / "params_interpret_test"
     / "ffield"
@@ -57,6 +58,9 @@ def test_add_element_to_ffield_column_strategy_projects_b_like_terms(tmp_path: P
 
 
 def test_build_parser_add_element_command_accepts_new_flags():
+    pytest.importorskip("seaborn")
+    from reaxkit.workflows.file_tools import ffield_workflow
+
     parser = argparse.ArgumentParser()
     ffield_workflow.build_parser(parser, command="add-element-to-ffield")
     args = parser.parse_args(
@@ -80,6 +84,27 @@ def test_build_parser_add_element_command_accepts_new_flags():
     assert args.similarity == "group"
     assert args.closest_atom == "B"
     assert args.radius_metrics == "all"
+
+
+def test_add_term_to_ffield_structured_summary_baseline(tmp_path: Path):
+    output = tmp_path / "ffield_with_term"
+
+    summary = add_term_to_ffield(
+        destination=_SRC_FFIELD,
+        output=output,
+        field="off_diagonal",
+        term="C-Mg",
+        closest_term="C-O",
+    )
+
+    assert summary.field == "off_diagonal"
+    assert summary.term == "C-Mg"
+    assert summary.template_term == "C-O"
+    assert summary.template_atoms == {"C": "C", "Mg": "O"}
+    assert summary.appended == 1
+    assert summary.updated == 0
+    assert summary.skipped_existing == 0
+    assert output.is_file()
 
 
 def test_merge_fill_missing_with_template_adds_missing_destination_terms(tmp_path: Path):

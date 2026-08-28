@@ -92,17 +92,17 @@ _No command-specific arguments found._
 <div class="analysis-section-indent" markdown="1">
 
 Read trainset entries from one section or all sections and return them as a table.
-There are multiple sections in a training set file such as ENRGY, CHARGET, etc., and they are separated by lines starting with keyword END.
+There are multiple sections in a training set file such as ENERGY, CHARGE, etc., and they are separated by lines starting with keyword END.
 
 ### Examples
 -----
 
 ```text
  1. Getting all training sets in all sections:
-   reaxkit get_trainset_data --section all --export trainset_data.csv
+   reaxkit get_trainset_data --section all --export trainset_data
 
  2. Getting training sets in a specific section, for example geometry:
-  reaxkit get_trainset_data --section geometry --export geometry_trainset_data.csv
+  reaxkit get_trainset_data --section geometry --export geometry_trainset_data
 ```
 
 ### Arguments
@@ -115,7 +115,7 @@ There are multiple sections in a training set file such as ENRGY, CHARGET, etc.,
 | `--plot` | No |  | Render a plot | single, subplot |
 | `--show` | No |  | Show the generated plot window |  |
 | `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
+| `--export [DIRECTORY]` | No |  | Write one CSV per selected trainset section to DIRECTORY. If DIRECTORY is omitted, use `trainset_data`. |  |
 | `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
 | `--xaxis` | No |  | Optional x-axis column override |  |
 | `--section` | No | all | Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. |  |

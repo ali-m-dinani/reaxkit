@@ -36,6 +36,9 @@ _SECTION_TO_ATTR = {
 }
 
 _SECTION_ALIASES = {
+    "general": "general",
+    "atom": "atom",
+    "atoms": "atom",
     "bond": "bond",
     "bonds": "bond",
     "off_diagonal": "off_diagonal",

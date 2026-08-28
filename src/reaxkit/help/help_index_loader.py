@@ -1663,7 +1663,7 @@ def _workflow_links_for_task(task_name: str, task_module: str) -> Tuple[Tuple[st
     if str(task_module_base).startswith("reaxkit.analysis.timeseries."):
         kind, help_text, module_path = _command_entry("timeseries")
         if not module_path:
-            module_path = "reaxkit.workflows.timeseries_workflow"
+            module_path = "reaxkit.workflows.timeseries.timeseries_workflow"
         key = ("timeseries", module_path)
         if key not in seen:
             seen.add(key)

@@ -344,6 +344,15 @@ def _safe_float(value) -> float | None:
     return out
 
 
+def _is_float_token(value: str) -> bool:
+    """Return whether a token can be parsed as a floating-point value."""
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
     """Atom maps."""
     if atom_df.empty or "symbol" not in atom_df.columns:
@@ -356,6 +365,47 @@ def _atom_maps(atom_df: pd.DataFrame) -> tuple[dict[int, str], dict[str, int]]:
         idx_to_sym[atom_idx] = symbol
         sym_to_idx[symbol] = atom_idx
     return idx_to_sym, sym_to_idx
+
+
+def _keep_destination_atoms(
+    sections: dict[str, pd.DataFrame],
+    atom_types: Iterable[str],
+) -> dict[str, pd.DataFrame]:
+    """Keep selected destination atoms and remove/remap dependent terms."""
+    kept_symbols = _normalize_atom_types(atom_types)
+    atom_df = sections["atom"].copy()
+    idx_to_sym, sym_to_idx = _atom_maps(atom_df)
+
+    missing = [symbol for symbol in kept_symbols if symbol not in sym_to_idx]
+    if missing:
+        raise KeyError(
+            f"Destination ffield missing atom type(s) requested by keep filter: {', '.join(missing)}"
+        )
+
+    kept_old_indices = [idx for idx, symbol in idx_to_sym.items() if symbol in kept_symbols]
+    old_to_new = {old_idx: new_idx for new_idx, old_idx in enumerate(kept_old_indices, start=1)}
+
+    filtered = {name: df.copy() for name, df in sections.items()}
+    filtered_atom_df = atom_df.loc[kept_old_indices].copy()
+    filtered_atom_df.index = range(1, len(filtered_atom_df) + 1)
+    filtered["atom"] = filtered_atom_df
+
+    for section, atom_cols in SECTION_ATOM_COLS.items():
+        section_df = sections[section].copy()
+        keep_mask = pd.Series(True, index=section_df.index)
+        for col in atom_cols:
+            values = pd.to_numeric(section_df[col], errors="coerce").astype("Int64")
+            # Atom index 0 is the ReaxFF torsion wildcard, not a destination atom.
+            keep_mask &= values.eq(0) | values.isin(old_to_new)
+        section_df = section_df.loc[keep_mask].copy()
+        for col in atom_cols:
+            section_df[col] = section_df[col].map(
+                lambda value: 0 if _safe_int(value) == 0 else old_to_new[int(value)]
+            )
+        section_df.index = range(1, len(section_df) + 1)
+        filtered[section] = section_df
+
+    return filtered
 
 
 def _format_general(general_df: pd.DataFrame, names: list[str]) -> str:
@@ -381,7 +431,7 @@ def _format_atom(atom_df: pd.DataFrame, names: list[str]) -> str:
         for block in range(4):
             start = block * 8
             end = start + 8
-            lead = f"{int(idx):3d} {symbol:<2} " if block == 0 else "       "
+            lead = f" {symbol:<2} " if block == 0 else "    "
             tail = "".join(f"{value:9.4f}" for value in values[start:end])
             lines.append(f"{lead}{tail}".rstrip())
     return "\n".join(lines) + ("\n" if lines else "")
@@ -435,7 +485,7 @@ def _format_section_rows(section: str, df: pd.DataFrame, row_indices: list[int],
     current: list[str] = []
     for line in txt.strip("\n").splitlines():
         if section in {"atom", "bond"}:
-            if section == "atom" and line[:3].strip():
+            if section == "atom" and not _is_float_token(line.split()[0]):
                 if current:
                     blocks.append("\n".join(current))
                     current = []
@@ -842,6 +892,7 @@ def merge_ffields(
     template_similarity_mode: str = "group",
     template_closest_atom: str | None = None,
     template_radius_metrics: Iterable[str] | None = None,
+    keep_atoms_in_destination: Iterable[str] | None = None,
 ) -> FFieldMergeSummary:
     """Merge ffields.
 
@@ -869,6 +920,10 @@ def merge_ffields(
         Keyword-only parameter.
     template_radius_metrics : Iterable[str] | None, optional
         Keyword-only parameter.
+    keep_atoms_in_destination : Iterable[str] | None, optional
+        Destination atom symbols to retain before merging. All destination
+        atoms not listed, and every parameter row that references them, are
+        removed. Retained atom indices and dependent rows are remapped.
 
     Returns
     -------
@@ -889,6 +944,9 @@ def merge_ffields(
     dst_handler = FFieldHandler(destination)
     src_sections = src_handler.sections
     dst_sections = {name: df.copy() for name, df in dst_handler.sections.items()}
+
+    if keep_atoms_in_destination is not None:
+        dst_sections = _keep_destination_atoms(dst_sections, keep_atoms_in_destination)
 
     src_atom_df = src_sections["atom"].copy()
     dst_atom_df = dst_sections["atom"].copy()

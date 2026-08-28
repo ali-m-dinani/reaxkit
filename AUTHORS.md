@@ -15,6 +15,7 @@ Parts of this codebase were inspired by or adapted from work contributed by:
 - **[Seyed Mahmoud Mortazavi]** – helped with developing the LAMMPS support in `engines/lammps`
 - **[Anirban Phukan]** – developed the initial version of `active_sites` analysis
 - **[Jupjeet Dhingra]** – developed the initial version of `isomer_detection.py` 
+- **[Swarit Dwivedi]** – developed the initial version of `merge_ffields` used in `ffield_generator.py`  
 
 Their original contributions have been modified and integrated with permission.
 

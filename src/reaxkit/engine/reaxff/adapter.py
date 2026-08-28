@@ -40,6 +40,8 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationData,
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationDiagnosticBundleData,
+    ForceFieldOptimizationDiagnosticPlotData,
+    ForceFieldOptimizationPlotBundleData,
     ForceFieldOptimizationReportEOSBundleData,
     ForceFieldOptimizationParameterData,
     ForceFieldOptimizationReportData,
@@ -72,11 +74,13 @@ from reaxkit.engine.reaxff.adapter_parts.loaders_forcefield import (
     load_force_field_optimization_data as _load_force_field_optimization_data_impl,
     load_force_field_optimization_parameter_bundle as _load_force_field_optimization_parameter_bundle_impl,
     load_force_field_optimization_parameters as _load_force_field_optimization_parameters_impl,
+    load_force_field_optimization_plot_bundle as _load_force_field_optimization_plot_bundle_impl,
     load_force_field_optimization_report as _load_force_field_optimization_report_impl,
     load_force_field_optimization_report_eos_bundle as _load_force_field_optimization_report_eos_bundle_impl,
     load_force_field_optimization_training_set as _load_force_field_optimization_training_set_impl,
     load_parameter_optimization_diagnostic as _load_parameter_optimization_diagnostic_impl,
     load_parameter_optimization_diagnostic_bundle as _load_parameter_optimization_diagnostic_bundle_impl,
+    load_parameter_optimization_diagnostic_plot_data as _load_parameter_optimization_diagnostic_plot_data_impl,
 )
 from reaxkit.engine.reaxff.adapter_parts.loaders_properties import (
     load_atomic_kinematics as _load_atomic_kinematics_impl,
@@ -203,6 +207,8 @@ class ReaxFFAdapter(EngineAdapter):
             ForceFieldOptimizationData: ("ffield", "params"),
             ForceFieldOptimizationParameterBundleData: ("params", "ffield"),
             ForceFieldOptimizationDiagnosticBundleData: ("fort.79", "ffield"),
+            ForceFieldOptimizationDiagnosticPlotData: ("fort.79", "ffield", "params"),
+            ForceFieldOptimizationPlotBundleData: ("fort.99", "fort.74", "trainset.in", "geo"),
             ForceFieldOptimizationReportEOSBundleData: ("fort.99", "fort.74"),
             ForceFieldOptimizationParameterData: ("params",),
             ForceFieldOptimizationReportData: ("fort.99",),
@@ -361,6 +367,14 @@ class ReaxFFAdapter(EngineAdapter):
         """Load parameter-optimization diagnostic bundle data."""
         return _load_parameter_optimization_diagnostic_bundle_impl(self, args, reporter=reporter)
 
+    def load_parameter_optimization_diagnostic_plot_data(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationDiagnosticPlotData:
+        """Load bounded parameter-diagnostic plot inputs."""
+        return _load_parameter_optimization_diagnostic_plot_data_impl(self, args, reporter=reporter)
+
     def load_force_field_optimization_report_eos_bundle(
         self,
         args: dict,
@@ -368,6 +382,14 @@ class ReaxFFAdapter(EngineAdapter):
     ) -> ForceFieldOptimizationReportEOSBundleData:
         """Load force-field optimization EOS bundle data."""
         return _load_force_field_optimization_report_eos_bundle_impl(self, args, reporter=reporter)
+
+    def load_force_field_optimization_plot_bundle(
+        self,
+        args: dict,
+        reporter=None,
+    ) -> ForceFieldOptimizationPlotBundleData:
+        """Load force-field optimization curve-classification inputs."""
+        return _load_force_field_optimization_plot_bundle_impl(self, args, reporter=reporter)
 
     def load_structure_summary(self, args: dict, reporter=None) -> EnergyMinimizationSummaryData:
         """Load structure-summary data."""

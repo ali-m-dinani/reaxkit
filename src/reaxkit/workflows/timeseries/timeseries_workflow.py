@@ -39,6 +39,7 @@ from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import present_result
+from reaxkit.workflows.timeseries.common import build_plot_payload
 
 ALL_COMMANDS = ("timeseries",)
 ALL_LEGACY_COMMANDS = ()
@@ -404,8 +405,6 @@ def _resolve_task_and_request(args: argparse.Namespace):
             "molecular_totals_series",
             MolecularTotalsSeriesRequest(
                 quantities=tuple(_split_csv_tokens(match.group("quantities"))),
-                xaxis=args.xaxis,
-                control_file=args.control,
                 frames=frames,
                 every=int(args.every),
             ),
@@ -416,8 +415,6 @@ def _resolve_task_and_request(args: argparse.Namespace):
             "molecular_totals_series",
             MolecularTotalsSeriesRequest(
                 quantities=(field_key,),
-                xaxis=args.xaxis,
-                control_file=args.control,
                 frames=frames,
                 every=int(args.every),
             ),
@@ -428,7 +425,7 @@ def _resolve_task_and_request(args: argparse.Namespace):
         return (
             "geometry_optimization_data",
             GeometryOptimizationRequest(
-                cols=tuple(_split_csv_tokens(match.group("cols"))),
+                component=tuple(_split_csv_tokens(match.group("cols"))),
                 include_geo_descriptor=bool(args.include_geo_descriptor),
             ),
         )
@@ -440,14 +437,14 @@ def _resolve_task_and_request(args: argparse.Namespace):
             return (
                 "geometry_optimization_data",
                 GeometryOptimizationRequest(
-                    cols=_GEO_OPT_ALL_COLUMNS,
+                    component=_GEO_OPT_ALL_COLUMNS,
                     include_geo_descriptor=bool(args.include_geo_descriptor),
                 ),
             )
         return (
             "geometry_optimization_data",
             GeometryOptimizationRequest(
-                cols=(col,),
+                component=(col,),
                 include_geo_descriptor=bool(args.include_geo_descriptor),
             ),
         )
@@ -614,92 +611,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": len(plot_series) > 1,
         }
 
-    if command == "geometry_optimization_data":
-        table = result.table
-        if table.empty or "iter" not in table.columns:
-            return None
-        xvals, xlabel = convert_xaxis(table["iter"].to_numpy(dtype=int), args.xaxis, control_file=args.control)
-        y_cols = [col for col in table.columns if col not in {"iter", "geo_descriptor"}]
-        if not y_cols:
-            return None
-        series = []
-        for col in y_cols:
-            y = pd.to_numeric(table[col], errors="coerce").to_numpy(dtype=float)
-            series.append({"x": np.asarray(xvals).tolist(), "y": y.tolist(), "label": str(col)})
-        if getattr(args, "plot", None) == "subplot":
-            return {
-                "plot_type": "multi_subplots",
-                "subplots": [[item] for item in series],
-                "xlabel": xlabel,
-                "ylabel": "geometry_optimization",
-                "title": "Geometry Optimization Data",
-                "legend": False,
-                "grid": getattr(args, "grid", None),
-            }
-        return {
-            "plot_type": "single_plot",
-            "series": series,
-            "xlabel": xlabel,
-            "ylabel": "geometry_optimization",
-            "title": "Geometry Optimization Data",
-            "legend": len(series) > 1,
-        }
-
-    if command in {"trajectory_coordinate_series", "trajectory_displacement_series"}:
-        table = getattr(result, "table", None)
-        if table is None or not isinstance(table, pd.DataFrame) or table.empty:
-            return None
-        if "coord" not in table.columns:
-            return None
-        if "iter" in table.columns:
-            x_col = "iter"
-            xlabel = "iter"
-        elif "frame_index" in table.columns:
-            x_col = "frame_index"
-            xlabel = "frame_index"
-        else:
-            return None
-
-        series_key_cols = [col for col in ("atom_id", "atom_type", "dim") if col in table.columns]
-        if not series_key_cols:
-            series_key_cols = [x_col]
-
-        series_payload: list[dict[str, object]] = []
-        grouped = table.sort_values(series_key_cols + [x_col], kind="stable").groupby(series_key_cols, dropna=False)
-        for keys, group in grouped:
-            if not isinstance(keys, tuple):
-                keys = (keys,)
-            label_parts = [f"{col}={val}" for col, val in zip(series_key_cols, keys)]
-            label = ", ".join(label_parts) if label_parts else "coord"
-            x = pd.to_numeric(group[x_col], errors="coerce").to_numpy(dtype=float)
-            y = pd.to_numeric(group["coord"], errors="coerce").to_numpy(dtype=float)
-            series_payload.append({"x": x.tolist(), "y": y.tolist(), "label": label})
-
-        if not series_payload:
-            return None
-        is_displacement = command == "trajectory_displacement_series"
-        ylabel = "displacement" if is_displacement else "coord"
-        title = "Trajectory Displacement Series" if is_displacement else "Trajectory Coordinate Series"
-        if getattr(args, "plot", None) == "subplot":
-            return {
-                "plot_type": "multi_subplots",
-                "subplots": [[s] for s in series_payload],
-                "xlabel": xlabel,
-                "ylabel": ylabel,
-                "title": title,
-                "legend": False,
-                "grid": getattr(args, "grid", None),
-            }
-        return {
-            "plot_type": "single_plot",
-            "series": series_payload,
-            "xlabel": xlabel,
-            "ylabel": ylabel,
-            "title": title,
-            "legend": len(series_payload) > 1,
-        }
-
-    return None
+    return build_plot_payload(command, result, args)
 
 
 def run_main(args: argparse.Namespace) -> int:

@@ -94,6 +94,7 @@ nav:
       - Electrostatics: api/analysis/electrostatics/electrostatics_analysis.md
     - Force Field:
       - Diagnostics: api/analysis/force_field/diagnostics_analysis.md
+      - Diagnostic Beeswarm: api/analysis/force_field/diagnostic_beeswarm_analysis.md
       - Force Field: api/analysis/force_field/force_field_analysis.md
       - MM Summary: api/analysis/force_field/MM_summary_analysis.md
       - Optimization Progress: api/analysis/force_field/optimization_progress_analysis.md

@@ -25,15 +25,11 @@ from reaxkit.core.runtime.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
-from reaxkit.engine.reaxff.generators.trainset_heatfo import (
-    gen_heatfo_trainset,
-)
-from reaxkit.engine.reaxff.generators.trainset_yaml import (
-    gen_elastic_trainset,
-    gen_template_yaml_for_elastic_settings,
-    gen_template_yaml_for_heatfo_settings,
-)
 from reaxkit.presentation.dispatcher import present_result
+from reaxkit.workflows.file_tools.trainset_export import (
+    add_trainset_export_argument,
+    export_trainset_section_csvs,
+)
 
 ALL_COMMANDS = (
     "gen_template_yaml_for_elastic_settings",
@@ -87,13 +83,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     if command == "get_trainset_data":
         parser.description = (
             "Read trainset entries from one section or all sections and return them as a table.\n"
-            "There are multiple sections in a training set file such as ENRGY, CHARGET, etc., and they are "
+            "There are multiple sections in a training set file such as ENERGY, CHARGE, etc., and they are "
             "separated by lines starting with keyword END. \n"
             "Examples:\n"
             " 1. Getting all training sets in all sections:\n"
-            "   reaxkit get_trainset_data --section all --export trainset_data.csv\n\n"
+            "   reaxkit get_trainset_data --section all --export trainset_data\n\n"
             " 2. Getting training sets in a specific section, for example geometry:\n"
-            "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data.csv\n\n"
+            "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data\n\n"
         )
         parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
         parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
@@ -101,7 +97,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
         parser.add_argument("--show", action="store_true", help="Show the generated plot window")
         parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-        parser.add_argument("--export", default=None, help="Write the result table to CSV")
+        add_trainset_export_argument(parser)
         parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
         parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
         parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy.")
@@ -110,7 +106,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
     if command == "get_trainset_group_comments":
         parser.description = (
-            "Read grouped/comment metadata from trainset sections.\n"
+            "Read every grouped/comment occurrence from trainset sections, including repeated and empty comments.\n"
             "In each section of training set files, different data are separated by line comments above them which shows "
             "what those data are exactly (for example separating the EOS data for a material from the reaction barriers in "
             "the ENERGY seciton.\n"
@@ -219,7 +215,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
-            default="to-primitive",
+            default="to-conventional",
             help="Convert fetched crystal structure setting before generating files",
         )
         parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes.")
@@ -227,7 +223,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--skip-not-orthogonal",
             action="store_true",
+            default=True,
             help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90).",
+        )
+        parser.add_argument(
+            "--skip-negative-elastic-data",
+            action="store_true",
+            help="Skip materials whose elastic tensor contains negative cij values.",
         )
         parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for elastic ENERGY lines in the training set.")
@@ -301,7 +303,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
-            default="to-primitive",
+            default="to-conventional",
             help="Convert fetched crystal structure setting before generating files.",
         )
         parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set.")
@@ -320,6 +322,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) -> int:
     """Run make trainset settings."""
+    from reaxkit.engine.reaxff.generators.trainset_yaml import (
+        gen_template_yaml_for_elastic_settings,
+    )
+
     out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     gen_template_yaml_for_elastic_settings(out_path=str(out))
     persist_generator_metadata(
@@ -334,11 +340,18 @@ def _run_make_trainset_settings(args: argparse.Namespace, *, command_name: str) 
     if copied is not None:
         dirs.append(copied.parent)
     print_saved_dirs(dirs)
+    negative_ids = extra.get("negative_tensor_material_ids", []) if isinstance(extra, dict) else []
+    if negative_ids:
+        print("\n[Warning] Successful materials with negative elastic tensor values: " + ", ".join(negative_ids))
     return 0
 
 
 def _run_make_trainset_settings_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
     """Run make trainset settings heatfo."""
+    from reaxkit.engine.reaxff.generators.trainset_yaml import (
+        gen_template_yaml_for_heatfo_settings,
+    )
+
     out, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     gen_template_yaml_for_heatfo_settings(out_path=str(out))
     persist_generator_metadata(
@@ -358,6 +371,8 @@ def _run_make_trainset_settings_heatfo(args: argparse.Namespace, *, command_name
 
 def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -> int:
     """Run make trainset elastic."""
+    from reaxkit.engine.reaxff.generators.trainset_yaml import gen_elastic_trainset
+
     out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -376,6 +391,7 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
         out_yaml=str(args.out_yaml),
         structure_dir=args.structure_dir,
         skip_no_orthogonal=bool(getattr(args, "skip_not_orthogonal", False)),
+        skip_negative_elastic_data=bool(getattr(args, "skip_negative_elastic_data", False)),
         verbose=bool(args.verbose),
         weight=float(args.weight),
     )
@@ -398,6 +414,8 @@ def _run_make_trainset_elastic(args: argparse.Namespace, *, command_name: str) -
 
 def _run_make_trainset_heatfo(args: argparse.Namespace, *, command_name: str) -> int:
     """Run make trainset heatfo."""
+    from reaxkit.engine.reaxff.generators.trainset_heatfo import gen_heatfo_trainset
+
     out_dir, layout = prepare_generator_output(args, command=command_name, output_value=str(args.output))
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -469,7 +487,8 @@ def _run_trainset_analysis_main(command: str, args: argparse.Namespace) -> int:
     request = REQUEST_BUILDERS[command](args)
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
-    present_result(command, result, args)
+    export_handler = export_trainset_section_csvs if command == "get_trainset_data" else None
+    present_result(command, result, args, export_handler=export_handler)
     return 0
 
 

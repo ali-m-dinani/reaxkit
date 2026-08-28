@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import csv
 import os
+import re
 import shutil
 
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import (
@@ -42,6 +43,12 @@ DEFAULT_CIJ_GPA = {
     "c55": 76,
     "c66": 50,
 }
+
+
+def _filesystem_safe_material_id(material_id: str) -> str:
+    """Return a shell-friendly material ID for directory and file names."""
+    return re.sub(r"[^A-Za-z0-9_]+", "_", str(material_id).strip()).strip("_")
+
 
 DEFAULT_CELL = CellSpec(a=2.85086, b=2.85086, c=3.49456, alpha=90.0, beta=90.0, gamma=90.0)
 DEFAULT_TABLES = {
@@ -73,6 +80,89 @@ def _concat_geo_strained(out_dir: Path) -> Path | None:
             if text:
                 fout.write(text + "\n\n")
     return all_geo_file
+
+
+def _rename_material_geometry_outputs(out_dir: Path, material_id: str) -> None:
+    """Add a material-specific suffix to generated bulk geometry identifiers."""
+    material_suffix = re.sub(r"[^A-Za-z0-9]+", "_", str(material_id).strip()).strip("_")
+    if not material_suffix:
+        return
+
+    def rename_identifier(identifier: str) -> str:
+        # Normalize generated labels such as ``c11_c0006`` to ``c11_c6``
+        # and append the material identifier to every elastic/bulk label.
+        identifier = re.sub(
+            r"^(bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_([ce])0+(\d+)$",
+            r"\1_\2\3",
+            identifier,
+        )
+        mode_prefixes = ("bulk", "c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
+        if identifier in {f"{prefix}_0" for prefix in mode_prefixes} or identifier.startswith(mode_prefixes):
+            return f"{identifier}_" + material_suffix
+        return identifier
+
+    trainset_files = list(out_dir.glob("trainset*.in"))
+    for trainset_path in trainset_files:
+        text = trainset_path.read_text(encoding="utf-8")
+        text = re.sub(
+            r"\b(?:bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_(?:0|[ce]0*\d+)\b",
+            lambda m: rename_identifier(m.group(0)),
+            text,
+        )
+        trainset_path.write_text(text, encoding="utf-8")
+
+    geo_dir = out_dir / "structures" / "geo_strained"
+    if not geo_dir.exists():
+        return
+    identifier_pattern = re.compile(
+        r"\b(?:bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_(?:0|[ce]0*\d+)\b"
+    )
+    for geo_path in list(geo_dir.glob("*.bgf")) + list(geo_dir.glob("*.geo")):
+        geo_text = geo_path.read_text(encoding="utf-8")
+        renamed_geo_text = identifier_pattern.sub(
+            lambda match: rename_identifier(match.group(0)), geo_text
+        )
+        if renamed_geo_text != geo_text:
+            geo_path.write_text(renamed_geo_text, encoding="utf-8")
+        new_name = rename_identifier(geo_path.stem) + geo_path.suffix
+        if new_name != geo_path.name:
+            geo_path.rename(geo_path.with_name(new_name))
+
+
+def _merge_successful_elastic_trainsets(successful_root: Path, out_dir: Path) -> None:
+    """Merge successful batch geometry and elastic trainset files."""
+    trainset_paths = sorted(successful_root.glob("*/trainset_elastic.in"))
+    geo_paths = sorted(successful_root.glob("*/geo"))
+    if not trainset_paths and not geo_paths:
+        return
+
+    if geo_paths:
+        merged_geo = out_dir / "geo"
+        with merged_geo.open("w", encoding="utf-8") as fout:
+            for geo_path in geo_paths:
+                text = geo_path.read_text(encoding="utf-8").strip()
+                if text:
+                    fout.write(text + "\n\n")
+
+    if trainset_paths:
+        energy_blocks: list[str] = []
+        for trainset_path in trainset_paths:
+            lines = trainset_path.read_text(encoding="utf-8").splitlines()
+            try:
+                start = next(i for i, line in enumerate(lines) if line.strip() == "ENERGY")
+                end = next(i for i in range(start + 1, len(lines)) if lines[i].strip() == "ENDENERGY")
+            except StopIteration:
+                continue
+            block = "\n".join(lines[start + 1 : end]).strip()
+            if block:
+                energy_blocks.append(block)
+
+        if energy_blocks:
+            merged_trainset = out_dir / "trainset_elastic.in"
+            merged_trainset.write_text(
+                "ENERGY\n" + "\n".join(energy_blocks) + "\nENDENERGY\n",
+                encoding="utf-8",
+            )
 
 
 def _normalize_formula_for_eos_label(formula: str) -> str:
@@ -131,6 +221,28 @@ def _extract_material_metadata_from_yaml(yaml_path: str | Path) -> Dict[str, str
     }
 
 
+def _extract_cell_parameters_from_yaml(yaml_path: str | Path) -> Dict[str, str]:
+    """Extract the bulk-cell lengths and angles used to generate a trainset."""
+    empty = {key: "" for key in ("a", "b", "c", "alpha", "beta", "gamma")}
+    try:
+        import yaml
+    except ImportError:
+        return empty
+    path = Path(yaml_path)
+    if not path.exists():
+        return empty
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return empty
+    cell = (data.get("bulk", {}) or {}).get("cell", {}) or {}
+    if not isinstance(cell, dict):
+        return empty
+    return {
+        key: str(cell.get(key, "") if cell.get(key) is not None else "").strip()
+        for key in empty
+    }
+
+
 def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
     """Collect cell warnings from yaml."""
     try:
@@ -170,6 +282,27 @@ def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
     except Exception:
         pass
     return warnings_list
+
+
+def _collect_negative_elastic_tensor_warning(yaml_path: str | Path) -> str | None:
+    """Return a warning describing negative elastic tensor components."""
+    try:
+        import yaml
+    except ImportError:
+        return None
+    path = Path(yaml_path)
+    if not path.exists():
+        return None
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return None
+    cij = (data.get("elastic", {}) or {}).get("cij_gpa", {})
+    if not isinstance(cij, dict):
+        return None
+    negative = [f"{key}={value} GPa" for key, value in cij.items() if float(value) < 0]
+    if not negative:
+        return None
+    return "Negative elastic tensor component(s): " + ", ".join(negative)
 
 
 def _is_orthogonal_cell(cell: CellSpec, *, tol: float = 1e-6) -> bool:
@@ -608,6 +741,9 @@ def _generate_trainset_from_yaml(
     material_prefix = f"for material ID [{material_id}] " if material_id else ""
     bulk_cell = CellSpec(**bulk_cfg["cell"])
     elastic_cell = CellSpec(**elastic_cfg.get("cell", bulk_cfg["cell"]))
+    negative_tensor_warning = _collect_negative_elastic_tensor_warning(yaml_path)
+    if negative_tensor_warning:
+        print(f"[Warning] {material_prefix}{negative_tensor_warning}")
 
     if skip_no_orthogonal:
         is_elastic_ortho = _is_orthogonal_cell(elastic_cell)
@@ -655,7 +791,7 @@ def _generate_trainset_from_yaml(
         out_dir=out_dir_p,
         trainset_filename=cfg.get("output", {}).get("trainset_file", "trainset_elastic.in"),
     )
-    dat_dir = out_dir_p / "volume energy data"
+    dat_dir = out_dir_p / "volume_energy_data"
     dat_dir.mkdir(parents=True, exist_ok=True)
     for key, path in written_energy_paths.items():
         if key == "trainset":
@@ -703,6 +839,7 @@ def _generate_trainset_from_yaml(
         )
     )
     _write_strained_geometries(geometry_result, out_dir=structures_dir, sort_by=geo_cfg.get("sort_by"))
+    _rename_material_geometry_outputs(out_dir_p, material_id)
     return True
 
 
@@ -824,6 +961,7 @@ def _gen_elastic_trainset_batch_mode(
     crystallographic_setting_conversion: str,
     api_key: str,
     skip_no_orthogonal: bool,
+    skip_negative_elastic_data: bool,
     verbose: bool,
     weight: float | None,
 ) -> dict[str, Any]:
@@ -849,11 +987,13 @@ def _gen_elastic_trainset_batch_mode(
     ok = 0
     skipped = 0
     skipped_non_orthogonal = 0
+    negative_tensor_material_ids: list[str] = []
     status_rows: list[dict[str, str]] = []
     for idx, mat_id in enumerate(mat_ids):
         if idx > 0:
             print("")
-        target_dir = successful_root / mat_id
+        filesystem_mat_id = _filesystem_safe_material_id(mat_id)
+        target_dir = successful_root / filesystem_mat_id
         try:
             yaml_path, generated = _run_single_material_id_elastic_trainset(
                 source_adapter=source_adapter,
@@ -869,22 +1009,45 @@ def _gen_elastic_trainset_batch_mode(
                 weight=weight,
             )
             meta = _extract_material_metadata_from_yaml(yaml_path)
+            cell_parameters = _extract_cell_parameters_from_yaml(yaml_path)
             warnings_list = _collect_cell_warnings_from_yaml(yaml_path)
             warning_text = " | ".join(warnings_list)
+            negative_warning = _collect_negative_elastic_tensor_warning(yaml_path)
+            if generated and skip_negative_elastic_data and negative_warning:
+                generated = False
+                skipped += 1
+                skipped_target = skipped_root / filesystem_mat_id
+                if skipped_target.exists():
+                    shutil.rmtree(skipped_target)
+                if target_dir.exists():
+                    shutil.move(str(target_dir), str(skipped_target))
+                status_rows.append({
+                    "chemical_formula": meta.get("formula_pretty", ""),
+                    "crystal_system": meta.get("crystal_system", ""),
+                    "material_id": meta.get("mp_id", mat_id) or mat_id,
+                    **cell_parameters,
+                    "status": "skip",
+                    "warning": negative_warning + " (skipped by --skip-negative-elastic-data)",
+                })
+                continue
             if generated:
                 ok += 1
+                if negative_warning:
+                    warning_text = " | ".join(filter(None, [warning_text, negative_warning]))
+                    negative_tensor_material_ids.append(meta.get("mp_id", mat_id) or mat_id)
                 status_rows.append(
                     {
                         "chemical_formula": meta.get("formula_pretty", ""),
                         "crystal_system": meta.get("crystal_system", ""),
                         "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        **cell_parameters,
                         "status": "success",
                         "warning": warning_text,
                     }
                 )
             else:
                 skipped_non_orthogonal += 1
-                skipped_target = skipped_root / mat_id
+                skipped_target = skipped_root / filesystem_mat_id
                 if skipped_target.exists():
                     shutil.rmtree(skipped_target)
                 if target_dir.exists():
@@ -894,13 +1057,14 @@ def _gen_elastic_trainset_batch_mode(
                         "chemical_formula": meta.get("formula_pretty", ""),
                         "crystal_system": meta.get("crystal_system", ""),
                         "material_id": meta.get("mp_id", mat_id) or mat_id,
+                        **cell_parameters,
                         "status": "skip",
                         "warning": warning_text,
                     }
                 )
         except Exception as exc:
             skipped += 1
-            skipped_target = skipped_root / mat_id
+            skipped_target = skipped_root / filesystem_mat_id
             if skipped_target.exists():
                 shutil.rmtree(skipped_target)
             if target_dir.exists():
@@ -924,6 +1088,7 @@ def _gen_elastic_trainset_batch_mode(
                     "chemical_formula": formula,
                     "crystal_system": crystal,
                     "material_id": material_id_for_row,
+                    **{key: "" for key in ("a", "b", "c", "alpha", "beta", "gamma")},
                     "status": "skip",
                     "warning": "",
                 }
@@ -935,7 +1100,19 @@ def _gen_elastic_trainset_batch_mode(
     with csv_path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(
             fh,
-            fieldnames=["chemical_formula", "crystal_system", "material_id", "status", "warning"],
+            fieldnames=[
+                "chemical_formula",
+                "crystal_system",
+                "material_id",
+                "a",
+                "b",
+                "c",
+                "alpha",
+                "beta",
+                "gamma",
+                "status",
+                "warning",
+            ],
         )
         writer.writeheader()
         writer.writerows(status_rows)
@@ -945,6 +1122,11 @@ def _gen_elastic_trainset_batch_mode(
         f"success={ok}, skipped={skipped}, skipped_non_orthogonal={skipped_non_orthogonal}, total={len(mat_ids)}"
     )
     print(f"[Done] Saved material status CSV: {csv_path}")
+    _merge_successful_elastic_trainsets(successful_root, out_dir)
+    if (out_dir / "geo").exists():
+        print(f"[Done] Merged successful geometries written to: {out_dir / 'geo'}")
+    if (out_dir / "trainset_elastic.in").exists():
+        print(f"[Done] Merged successful trainset written to: {out_dir / 'trainset_elastic.in'}")
     return {
         "mode": "batch",
         "elements": elements,
@@ -953,6 +1135,13 @@ def _gen_elastic_trainset_batch_mode(
         "mat_ids_skipped": skipped,
         "mat_ids_skipped_non_orthogonal": skipped_non_orthogonal,
         "status_csv": str(csv_path),
+        "merged_geo": str(out_dir / "geo") if (out_dir / "geo").exists() else None,
+        "merged_trainset": (
+            str(out_dir / "trainset_elastic.in")
+            if (out_dir / "trainset_elastic.in").exists()
+            else None
+        ),
+        "negative_tensor_material_ids": negative_tensor_material_ids,
     }
 
 
@@ -972,6 +1161,7 @@ def gen_elastic_trainset(
     out_yaml: str = "trainset_settings_source.yaml",
     structure_dir: str | Path | None = None,
     skip_no_orthogonal: bool = False,
+    skip_negative_elastic_data: bool = False,
     verbose: bool = False,
     weight: float | None = None,
 ) -> dict[str, Any]:
@@ -1080,6 +1270,7 @@ def gen_elastic_trainset(
             crystallographic_setting_conversion=crystallographic_setting_conversion,
             api_key=resolved_api_key,
             skip_no_orthogonal=bool(skip_no_orthogonal),
+            skip_negative_elastic_data=bool(skip_negative_elastic_data),
             verbose=bool(verbose),
             weight=weight,
         )

@@ -12,8 +12,6 @@ This module implements CLI workflow orchestration for its command family, includ
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-
 from reaxkit.core.runtime.generator_runtime import (
     maybe_copy_output_to_dot,
     persist_generator_metadata,
@@ -21,6 +19,7 @@ from reaxkit.core.runtime.generator_runtime import (
     print_saved_dirs,
 )
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
+from reaxkit.engine.reaxff.io.fort83_handler import Fort83Handler
 
 ALL_COMMANDS = ("get-optimized-ffield",)
 ALL_LEGACY_COMMANDS = ("get_optimized_ffield", "extract-optimized-ffield", "extract_optimized_ffield")
@@ -57,7 +56,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "from optimization output.\n\n"
         "Examples:\n"
         "  1. Extract from a specific `fort.83` file with explicit output name:\n"
-        "   reaxkit get-optimized-ffield --fort83 fort.83 --output ffield_optimized\n\n"
+        "   reaxkit get-optimized-ffield --fort83 fort.83 --output fort83_optimized_ffield\n\n"
         "  2. Extract using a custom output filename:\n"
         "   reaxkit get-optimized-ffield --output trained_ffield"
     )
@@ -68,7 +67,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     )
     parser.add_argument(
         "--output",
-        default="ffield_optimized",
+        default="fort83_optimized_ffield",
         help="Output path for the extracted force field. Example: --output trained_ffield, which writes extracted parameters to that filename.",
     )
     parser.add_argument(
@@ -103,19 +102,11 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     >>> # See workflow CLI usage for concrete examples.
     """
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    fort83_path = Path(args.fort83)
-    lines = fort83_path.read_text(encoding="utf-8").splitlines(keepends=True)
-
-    start_index = None
-    for idx, line in enumerate(lines):
-        if "Error force field" in line:
-            start_index = idx
-
-    if start_index is None:
-        print("[Warning] 'Error force field' not found in fort.83.")
+    try:
+        Fort83Handler(args.fort83).write_optimized_ffield(out_path)
+    except ValueError as exc:
+        print(f"[Warning] {exc}")
         return 1
-
-    out_path.write_text("".join(lines[start_index + 1 :]), encoding="utf-8")
     persist_generator_metadata(
         args,
         command=command,

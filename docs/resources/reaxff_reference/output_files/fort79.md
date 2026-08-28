@@ -122,6 +122,13 @@ Difference belonging to new parameter value 0.9139091180E+02
 
 ---
 
+## Handler provenance columns
+
+`Fort79Handler.dataframe()` also retains contiguous `row_order`, the physical
+`source_line_number` where each record begins, `raw_identifier`, and the
+normalized `identifier`. This permits database consumers to preserve collapsed
+identifier text and wrapped-record provenance without reparsing the source.
+
 ## ReaxKit Context
 
 In ReaxKit, `fort.79` is especially useful for:

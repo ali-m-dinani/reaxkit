@@ -19,8 +19,10 @@ from reaxkit.domain.data_models import (
     ForceFieldOptimizationData,
     ForceFieldOptimizationDiagnosticBundleData,
     ForceFieldOptimizationDiagnosticData,
+    ForceFieldOptimizationDiagnosticPlotData,
     ForceFieldOptimizationParameterBundleData,
     ForceFieldOptimizationParameterData,
+    ForceFieldOptimizationPlotBundleData,
     ForceFieldOptimizationProgressData,
     ForceFieldOptimizationReportData,
     ForceFieldOptimizationReportEOSBundleData,
@@ -414,6 +416,19 @@ def load_parameter_optimization_diagnostic_bundle(
     )
 
 
+def load_parameter_optimization_diagnostic_plot_data(
+    adapter: ReaxFFAdapter,
+    args: dict,
+    reporter=None,
+) -> ForceFieldOptimizationDiagnosticPlotData:
+    """Load diagnostics, force-field values, and optimization bounds for plotting."""
+    return ForceFieldOptimizationDiagnosticPlotData(
+        diagnostics=adapter.load_parameter_optimization_diagnostic(args, reporter=reporter),
+        force_field_parameters=adapter.load_force_field(args, reporter=reporter),
+        optimization_parameters=adapter.load_force_field_optimization_parameters(args, reporter=reporter),
+    )
+
+
 def load_force_field_optimization_report_eos_bundle(
     adapter: ReaxFFAdapter,
     args: dict,
@@ -445,4 +460,36 @@ def load_force_field_optimization_report_eos_bundle(
     return ForceFieldOptimizationReportEOSBundleData(
         report=adapter.load_force_field_optimization_report(args, reporter=reporter),
         geometry_summary=adapter.load_structure_summary(args, reporter=reporter),
+    )
+
+
+def load_force_field_optimization_plot_bundle(
+    adapter: ReaxFFAdapter,
+    args: dict,
+    reporter=None,
+) -> ForceFieldOptimizationPlotBundleData:
+    """Load report, summaries, training terms, and geo restraint coordinates."""
+    from reaxkit.engine.reaxff.io.geo_restraint_handler import GeoRestraintHandler
+
+    raw_geo = args.get("geo") or args.get("geometry") or args.get("input") or "geo"
+    geo_candidate = Path(raw_geo)
+    geo_path = geo_candidate / "geo" if geo_candidate.is_dir() else geo_candidate
+    geo_path = adapter._resolve_against_run_dir(args, geo_path)
+    geo_handler = adapter._build_handler(
+        args,
+        handler_name="GeoRestraintHandler",
+        source_path=geo_path,
+        factory=lambda: GeoRestraintHandler(geo_path, reporter=reporter),
+    )
+    geometry_restraints = adapter._time_source(
+        args,
+        handler_name="GeoRestraintHandler",
+        source_path=geo_path,
+        loader=lambda: geo_handler.dataframe().copy(),
+    )
+    return ForceFieldOptimizationPlotBundleData(
+        report=adapter.load_force_field_optimization_report(args, reporter=reporter),
+        geometry_summary=adapter.load_structure_summary(args, reporter=reporter),
+        training_set=adapter.load_force_field_optimization_training_set(args, reporter=reporter),
+        geometry_restraints=geometry_restraints,
     )

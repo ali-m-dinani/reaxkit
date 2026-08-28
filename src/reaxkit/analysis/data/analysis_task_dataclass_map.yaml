@@ -2,7 +2,7 @@ _meta:
   version: '1.0'
   source: analysis task required_data declarations
   purpose: Maps analysis tasks to the dataclass each task consumes.
-  last_updated: '2026-05-21'
+  last_updated: '2026-08-26'
 tasks:
   get_active_site_events:
     consumes_dataclass: ConnectivityTrajectoryData
@@ -126,7 +126,7 @@ tasks:
     description: Returns time series for simulation cell lengths, angles, and related
       box dimensions. Use it to inspect expansion, compression, deformation, or volume-coupled
       behavior in ReaxFF runs.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - cell dimensions
@@ -138,7 +138,7 @@ tasks:
     description: Returns time series of selected atomic charges from parsed ReaxFF
       charge output. It is useful for following charge transfer, local oxidation changes,
       and atom-specific electrostatic behavior.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - charges
@@ -308,7 +308,7 @@ tasks:
     description: Returns electric-field component and magnitude time series from parsed
       field data. Use it to inspect applied-field schedules and align field changes
       with polarization, charge, or structural response.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field
@@ -319,7 +319,7 @@ tasks:
     description: Returns time series fields parsed from eregime schedules. It connects
       generated electric-field regime inputs to analysis-ready tables that can be
       compared with simulation response.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - electric field regime
@@ -414,7 +414,7 @@ tasks:
     - reaxkit help "force field optimization report bulk modulus"
     - run force field optimization report bulk modulus
   get_ffield_opt_eos:
-    consumes_dataclass: ForceFieldOptimizationResultsData
+    consumes_dataclass: ForceFieldOptimizationPlotBundleData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_eos'
     description: Derives equation-of-state relationships from force-field optimization
       report data. It is intended for energy-volume, pressure-volume, and related
@@ -431,13 +431,28 @@ tasks:
     help_search_examples:
     - reaxkit help "force field optimization report equation of state"
     - run force field optimization report equation of state
+  force_field_optimization_report_restraints:
+    consumes_dataclass: ForceFieldOptimizationPlotBundleData
+    implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_restraints'
+    description: Classifies repeated two-structure ENERGY expressions whose training-set comments identify
+      restraints and returns paired ReaxFF and QM/literature scan data.
+    related_workflow_module: reaxkit.workflows.force_field_opt.get_ffield_opt_plots
+    tags:
+    - force field optimization
+    - restraint plots
+    - training set comments
+    notes: []
+    aliases:
+    - force field optimization restraints
+    help_search_examples:
+    - reaxkit help "force field optimization restraint plots"
   geometry_optimization_data:
     consumes_dataclass: GeometryOptimizationProgressData
     implementation_module: 'reaxkit.analysis.timeseries.geometry_optimization: geometry_optimization_data'
     description: Returns geometry-minimization progress series such as potential energy,
       gradient metrics, and convergence indicators. Use it to inspect optimization
       stability and final relaxation quality.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - geometry optimization
@@ -501,7 +516,7 @@ tasks:
     description: Returns species-frequency time series from molecular analysis data.
       Use it to follow how counts of selected molecules, products, or intermediates
       change across frames.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular frequency
@@ -513,7 +528,7 @@ tasks:
     description: Returns totals series such as molecule count, atom count, and molecular
       mass from molecular analysis data. It provides compact aggregate trends for
       reaction or decomposition studies.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - molecular totals
@@ -593,13 +608,45 @@ tasks:
     - run parameter optimization most sensitive
     - reaxkit help "parameter optimization tornado"
     - run parameter optimization tornado
+  get_ffield_diagnostics_sensitivity:
+    consumes_dataclass: ForceFieldOptimizationDiagnosticBundleData
+    implementation_module: 'reaxkit.analysis.force_field.diagnostics: parameter_optimization_diagnostic'
+    description: Builds tornado or beeswarm views of relative objective-response
+      sensitivities from force-field optimization diagnostics.
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_diagnostics_sensitivity'
+    tags:
+    - force field
+    - diagnostics
+    - sensitivity
+    aliases:
+    - force field diagnostics sensitivity
+    - ffield sensitivity diagnostics
+    help_search_examples:
+    - reaxkit help "ffield diagnostics sensitivity"
+    - plot force field sensitivity beeswarm
+  get_ffield_diagnostics_evolution:
+    consumes_dataclass: ForceFieldOptimizationDiagnosticPlotData
+    implementation_module: 'reaxkit.analysis.force_field.diagnostic_beeswarm: parameter_optimization_diagnostic_beeswarm'
+    description: Builds bounded beeswarm or epoch-wise scatter-and-line parameter-evolution
+      views from diagnostic samples, optimization bounds, force-field values, and objective responses.
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_diagnostics_evolution'
+    tags:
+    - force field
+    - diagnostics
+    - parameter evolution
+    aliases:
+    - force field diagnostics evolution
+    - ffield parameter evolution
+    help_search_examples:
+    - reaxkit help "ffield diagnostics evolution"
+    - plot force field parameter evolution
   partial_energy_series:
     consumes_dataclass: PartialEnergyData
     implementation_module: 'reaxkit.analysis.timeseries.timeseries: partial_energy_series'
     description: Returns series for selected partial-energy components from parsed
       ReaxFF energy output. Use it to inspect how bond, angle, torsion, van der Waals,
       Coulomb, or other terms evolve over time.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - partial energy
@@ -679,7 +726,7 @@ tasks:
     description: Returns restraint-related time series such as restraint energies,
       distances, angles, or other restraint measures parsed from fort.76. Use it to
       evaluate restraints created in GEO input workflows.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - restraint data
@@ -691,7 +738,7 @@ tasks:
     description: Returns simulation-level scalar series such as temperature, pressure,
       volume, energy, density, and timestep values. It is the general time-series
       task for ReaxFF log-style simulation data.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - simulation data
@@ -718,9 +765,9 @@ tasks:
   get_trainset_group_comments:
     consumes_dataclass: ForceFieldOptimizationTrainingSetData
     implementation_module: 'reaxkit.analysis.force_field.trainset: trainset_group_comments'
-    description: Extracts and groups comments or category labels from training-set
-      definitions. It helps understand how force-field training targets are organized
-      by system, property, or reference-data source.
+    description: Lists every comment-block occurrence from training-set definitions,
+      retaining repeated and empty comments with source lines, referenced identifiers,
+      entry counts, and inferred data types such as EOS, HeatFO, charge, and geometry.
     related_workflow_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_group_comments'
     tags:
     - force field
@@ -759,7 +806,7 @@ tasks:
     description: Returns coordinate trajectories for selected atoms and axes from
       trajectory data. Use it to track atom positions, displacement paths, or coordinate
       components as time-series output.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - trajectory coordinates
@@ -779,7 +826,7 @@ tasks:
     description: Returns displacement trajectories for selected atoms and axes from
       trajectory data using a reference frame. Use it to track dx/dy/dz or vector-magnitude
       displacement as time-series output.
-    related_workflow_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
+    related_workflow_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
     tags:
     - time series
     - trajectory displacement
@@ -932,6 +979,10 @@ dataclass_usage_across_tasks:
   - polarization_field
   ForceFieldOptimizationDiagnosticData:
   - get_ffield_diagnostic_data
+  ForceFieldOptimizationDiagnosticBundleData:
+  - get_ffield_diagnostics_sensitivity
+  ForceFieldOptimizationDiagnosticPlotData:
+  - get_ffield_diagnostics_evolution
   ForceFieldOptimizationParameterData:
   - force_field_optimization_parameters
   ForceFieldOptimizationProgressData:
@@ -939,7 +990,9 @@ dataclass_usage_across_tasks:
   ForceFieldOptimizationResultsData:
   - get_ffield_opt_results
   - ffield_opt_bulk_modulus
+  ForceFieldOptimizationPlotBundleData:
   - get_ffield_opt_eos
+  - force_field_optimization_report_restraints
   ForceFieldOptimizationTrainingSetData:
   - get_trainset_data
   - get_trainset_group_comments

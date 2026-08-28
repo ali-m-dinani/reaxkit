@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import csv
 import os
 import re
 
@@ -150,6 +151,10 @@ class _WrittenStructure:
     geo_path: Path
     composition_counts: Dict[str, int]
     total_atoms: int
+    chemical_formula: str
+    crystal_system: str
+    material_id: str
+    cell_parameters: Dict[str, float]
 
 
 def _parse_elements_csv(value: str) -> List[str]:
@@ -375,6 +380,17 @@ def _write_structure_triplet(
         geo_path=geo_path,
         composition_counts=composition_counts,
         total_atoms=total_atoms,
+        chemical_formula=formula_pretty,
+        crystal_system=crystal_system,
+        material_id=material_id,
+        cell_parameters={
+            "a": float(lattice.a),
+            "b": float(lattice.b),
+            "c": float(lattice.c),
+            "alpha": float(lattice.alpha),
+            "beta": float(lattice.beta),
+            "gamma": float(lattice.gamma),
+        },
     )
 
 
@@ -438,6 +454,7 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
     energy_lines: List[str] = []
     generated_geo_paths: List[Path] = []
     written_geo_seen: set[Path] = set()
+    material_status_rows: List[Dict[str, Any]] = []
 
     collected = _mp_collect_heatfo_docs(
         api_key=api_key,
@@ -514,6 +531,14 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
                 )
             )
             generated_identifiers.append(written.identifier)
+            material_status_rows.append(
+                {
+                    "chemical_formula": written.chemical_formula,
+                    "crystal_system": written.crystal_system,
+                    "material_id": written.material_id,
+                    **written.cell_parameters,
+                }
+            )
             if written.geo_path not in written_geo_seen:
                 generated_geo_paths.append(written.geo_path)
                 written_geo_seen.add(written.geo_path)
@@ -541,6 +566,25 @@ def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> Mater
             text = geo_path.read_text(encoding="utf-8").rstrip()
             if text:
                 fout.write(text + "\n\n")
+
+    status_csv_path = out_dir / "materials_status.csv"
+    with status_csv_path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(
+            fh,
+            fieldnames=[
+                "chemical_formula",
+                "crystal_system",
+                "material_id",
+                "a",
+                "b",
+                "c",
+                "alpha",
+                "beta",
+                "gamma",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(material_status_rows)
 
     return MaterialsProjectHeatFoResult(
         out_dir=out_dir,

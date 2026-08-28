@@ -19,15 +19,18 @@ parameters, and energies.
 
 from __future__ import annotations
 
+import math
 from typing import Dict, Any, List, Optional
 import pandas as pd
 
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 # Map raw section labels in the file to canonical section names
 SECTION_MAP = {
     "CHARGE": "CHARGE",
+    "CHARGES": "CHARGE",
     "HEATFO": "HEATFO",
     "GEOMETRY": "GEOMETRY",
     "CELL PARAMETERS": "CELL_PARAMETERS",
@@ -67,6 +70,30 @@ def _unpack_line_item(item: str | tuple[int, str]) -> tuple[int, str]:
     return -1, str(item)
 
 
+def _advance_group_comment(
+    *,
+    current: str,
+    text: str,
+    last_was_comment: bool,
+    current_line_number: object,
+    occurrence: int,
+    line_number: int,
+) -> tuple[str, bool, object, int]:
+    """Update one comment block while preserving its source occurrence."""
+    if last_was_comment:
+        if current and text:
+            current = f"{current} /// {text}"
+        elif text:
+            current = text
+        return current, True, current_line_number, occurrence
+    return (
+        text,
+        True,
+        line_number if line_number >= 0 else pd.NA,
+        occurrence + 1,
+    )
+
+
 def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
     """
     CHARGE block:
@@ -89,6 +116,8 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track previous processed line
 
     for item in lines:
@@ -109,12 +138,19 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
             # If previous line was comment → append
             # If previous line was data/start → new block
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → the next comment block should replace, not append
@@ -135,6 +171,8 @@ def _parse_charge(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "atom": atom,
@@ -155,10 +193,14 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
         # group line 1
         # group line 2
         benzene  1.0  -19.82  !heat of formation
+        cyclohexane  2.0      !reference may be supplied by fort.99
         ...
         ENDHEATFO
 
     Columns: section, iden, weight, lit, inline_comment, group_comment
+
+    ``lit`` is optional because some ReaxFF trainsets omit it while fort.99
+    still reports the QM/literature target used by the optimization.
 
     group_comment behavior:
     - Consecutive '#' lines are concatenated with " /// ".
@@ -167,6 +209,8 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -186,12 +230,19 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
                 continue
 
             # Same block → append; new block → overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comment block should overwrite, not append
@@ -199,18 +250,20 @@ def _parse_heatfo(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
         data, inline_comment = _split_inline_comment(line)
         tokens = data.split()
-        if len(tokens) < 3:
+        if len(tokens) < 2:
             continue
 
         iden = tokens[0]
         weight = float(tokens[1])
-        lit = float(tokens[2])
+        lit = float(tokens[2]) if len(tokens) >= 3 else pd.NA
 
         rows.append(
             {
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "lit": lit,
@@ -246,6 +299,8 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -264,12 +319,19 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
                 continue
 
             # Same block → append; new block → overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comment block should overwrite, not append
@@ -297,6 +359,8 @@ def _parse_geometry(lines: List[str | tuple[int, str]], section_name: str) -> pd
             "lit": lit,
             "inline_comment": inline_comment,
             "group_comment": group_comment,
+            "group_comment_line_number": group_comment_line_number,
+            "group_comment_occurrence": group_comment_occurrence,
         }
 
         # Fill at1–at4 only if present
@@ -336,6 +400,8 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
     """
     rows = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track whether previous processed line was a comment
 
     for item in lines:
@@ -356,12 +422,19 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
 
             # If previous line was also a comment, append (same block)
             # If previous line was data or start of section, start a new block
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # data line → next comments should be treated as a new block
@@ -382,6 +455,8 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
                 "section": section_name,
                 "line_number": line_number if line_number >= 0 else pd.NA,
                 "group_comment": group_comment,
+                "group_comment_line_number": group_comment_line_number,
+                "group_comment_occurrence": group_comment_occurrence,
                 "iden": iden,
                 "weight": weight,
                 "type": type_,
@@ -393,7 +468,13 @@ def _parse_cell_parameters(lines: List[str | tuple[int, str]], section_name: str
     return pd.DataFrame(rows)
 
 
-def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.DataFrame:
+def _parse_energy(
+    lines: List[str | tuple[int, str]],
+    section_name: str,
+    *,
+    strict: bool = False,
+    source_path: str = "<unknown>",
+) -> pd.DataFrame:
     """
      parse energy.
 
@@ -412,6 +493,8 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
     """
     rows: List[Dict[str, Any]] = []
     group_comment = ""
+    group_comment_line_number: object = pd.NA
+    group_comment_occurrence = 0
     last_was_comment = False  # track if previous processed line was a comment
 
     for item in lines:
@@ -432,12 +515,19 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
             # If previous line was also a comment → same block, append
             # If previous line was data or start → new block, overwrite
-            if last_was_comment and group_comment:
-                group_comment += " /// " + text
-            else:
-                group_comment = text
-
-            last_was_comment = True
+            (
+                group_comment,
+                last_was_comment,
+                group_comment_line_number,
+                group_comment_occurrence,
+            ) = _advance_group_comment(
+                current=group_comment,
+                text=text,
+                last_was_comment=last_was_comment,
+                current_line_number=group_comment_line_number,
+                occurrence=group_comment_occurrence,
+                line_number=line_number,
+            )
             continue
 
         # ---- data line ----
@@ -445,26 +535,36 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
 
         data, inline_comment = _split_inline_comment(line)
         tokens = data.split()
-        if len(tokens) < 3:
-            # need at least weight, something, lit
+
+        def reject(reason: str) -> None:
+            if strict:
+                raise ParseError(
+                    f"Invalid ENERGY entry in '{source_path}' at line {line_number}: "
+                    f"{reason}."
+                )
+
+        if len(tokens) < 4:
+            reject("expected weight, at least one operand, and literature value")
             continue
 
         # first token: weight
         try:
             weight = float(tokens[0])
         except ValueError:
-            # not a valid energy line
+            reject(f"weight '{tokens[0]}' is not numeric")
             continue
 
         # last token: lit (target energy)
         try:
             lit = float(tokens[-1])
         except ValueError:
+            reject(f"literature value '{tokens[-1]}' is not numeric")
             continue
 
         # middle_part: everything between weight and lit
         middle_part = " ".join(tokens[1:-1]).strip()
         if not middle_part:
+            reject("missing ENERGY operand")
             continue
 
         middle_tokens = middle_part.split()
@@ -482,10 +582,60 @@ def _parse_energy(lines: List[str | tuple[int, str]], section_name: str) -> pd.D
             else:
                 norm.append(tok)
 
+        normalized_operands: List[str] = []
+        operand_index = 1
+        i = 0
+        valid = True
+        while i < len(norm):
+            if i + 1 >= len(norm):
+                reject(f"operand {operand_index} is missing its identifier")
+                valid = False
+                break
+            normalized_operands.extend((norm[i], norm[i + 1]))
+            i += 2
+            if i < len(norm) and norm[i].startswith("/"):
+                normalized_operands.append(norm[i])
+                i += 1
+            else:
+                normalized_operands.append("/1")
+            operand_index += 1
+        if not valid:
+            continue
+        norm = normalized_operands
+        valid = True
+        for operand_index in range(0, len(norm), 3):
+            op, iden, divisor = norm[operand_index : operand_index + 3]
+            if op == "\u2013":
+                op = "-"
+            if op not in {"+", "-"}:
+                reject(f"operand {operand_index // 3 + 1} has invalid operator '{norm[operand_index]}'")
+                valid = False
+                break
+            if not iden or any(char in iden for char in "+-/"):
+                reject(f"operand {operand_index // 3 + 1} has invalid identifier '{iden}'")
+                valid = False
+                break
+            divisor_value = divisor[1:] if divisor.startswith("/") else ""
+            try:
+                parsed_divisor = float(divisor_value)
+            except ValueError:
+                parsed_divisor = 0.0
+            if not math.isfinite(parsed_divisor) or parsed_divisor <= 0:
+                reject(
+                    f"operand {operand_index // 3 + 1} has invalid divisor '{divisor}'; "
+                    "expected / followed by a positive number"
+                )
+                valid = False
+                break
+        if not valid:
+            continue
+
         row: Dict[str, Any] = {
             "section": section_name,
             "line_number": line_number if line_number >= 0 else pd.NA,
             "group_comment": group_comment,
+            "group_comment_line_number": group_comment_line_number,
+            "group_comment_occurrence": group_comment_occurrence,
             "weight": weight,
         }
 
@@ -599,13 +749,20 @@ class TrainsetHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
-    _CACHE_VERSION = "3"
+    _CACHE_VERSION = "7"
     filetype = "trainset"
 
-    def __init__(self, file_path: str = "trainset.in", reporter=None):
+    def __init__(
+        self,
+        file_path: str = "trainset.in",
+        reporter=None,
+        *,
+        strict: bool = False,
+    ):
         """Init."""
         super().__init__(file_path)
         self._reporter = reporter
+        self.strict = strict
 
     def _parse(self) -> tuple[pd.DataFrame, Dict[str, Any]]:
         """
@@ -621,8 +778,11 @@ class TrainsetHandler(BaseHandler):
         current_raw_label: Optional[str] = None
         current_canonical: Optional[str] = None
         buffer: List[tuple[int, str]] = []
+        section_occurrences: List[Dict[str, Any]] = []
+        occurrence_counts: Dict[str, int] = {}
+        current_section_start_line: Optional[int] = None
 
-        def flush_section():
+        def flush_section(end_line_number: Optional[int] = None):
             """Flush section.
 
             Parameters
@@ -643,7 +803,7 @@ class TrainsetHandler(BaseHandler):
             """
             nonlocal buffer, current_canonical, tables
 
-            if not current_canonical or not buffer:
+            if not current_canonical:
                 buffer = []
                 return
 
@@ -658,7 +818,12 @@ class TrainsetHandler(BaseHandler):
             elif name == "CELL_PARAMETERS":
                 df = _parse_cell_parameters(buffer, name)
             elif name == "ENERGY":
-                df = _parse_energy(buffer, name)
+                df = _parse_energy(
+                    buffer,
+                    name,
+                    strict=self.strict,
+                    source_path=str(self.path),
+                )
             else:
                 df = pd.DataFrame()
 
@@ -667,6 +832,19 @@ class TrainsetHandler(BaseHandler):
                 tables[name] = pd.concat([tables[name], df], ignore_index=True)
             else:
                 tables[name] = df
+
+            occurrence = occurrence_counts.get(name, 0) + 1
+            occurrence_counts[name] = occurrence
+            section_occurrences.append(
+                {
+                    "section": name,
+                    "occurrence": occurrence,
+                    "section_order": len(section_occurrences) + 1,
+                    "start_line_number": current_section_start_line,
+                    "end_line_number": end_line_number,
+                    "entry_count": len(df),
+                }
+            )
 
             buffer = []
 
@@ -681,10 +859,11 @@ class TrainsetHandler(BaseHandler):
 
             # SECTION START?
             if upper in SECTION_MAP:
-                flush_section()
+                flush_section(line_i - 1)
                 current_raw_label = stripped
                 current_canonical = SECTION_MAP[upper]
                 buffer = []
+                current_section_start_line = line_i
                 continue
 
             # INSIDE A SECTION
@@ -692,16 +871,17 @@ class TrainsetHandler(BaseHandler):
                 end_token = "END" + current_raw_label.replace(" ", "").upper()
 
                 if upper.startswith(end_token):
-                    flush_section()
+                    flush_section(line_i)
                     current_raw_label = None
                     current_canonical = None
                     buffer = []
+                    current_section_start_line = None
                     continue
 
                 buffer.append((line_i, raw))
 
         # Final flush
-        flush_section()
+        flush_section(total_lines if current_canonical else None)
         if self._reporter:
             self._reporter("load", total_lines, total_lines, "Finished parsing trainset")
 
@@ -709,6 +889,7 @@ class TrainsetHandler(BaseHandler):
         return pd.DataFrame(), {
             "sections": list(tables.keys()),
             "tables": tables,
+            "section_occurrences": section_occurrences,
         }
 
     # ------------------------------------------------------------------

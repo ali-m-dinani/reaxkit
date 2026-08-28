@@ -15,12 +15,14 @@ from reaxkit.presentation.plot.renderers.directed import DirectedPlotRenderer
 from reaxkit.presentation.plot.renderers.dual_yaxis import DualYaxisPlotRenderer
 from reaxkit.presentation.plot.renderers.errorbar import ErrorbarPlotRenderer
 from reaxkit.presentation.plot.renderers.heatmap2d import Heatmap2DRenderer
+from reaxkit.presentation.plot.renderers.grouped_bar import GroupedBarPlotRenderer
 from reaxkit.presentation.plot.renderers.multi_subplots import MultiSubplotsRenderer
 from reaxkit.presentation.plot.renderers.scatter3d import Scatter3DRenderer
 from reaxkit.presentation.plot.renderers.single import SinglePlotRenderer
 from reaxkit.presentation.plot.renderers.tornado import TornadoPlotRenderer
 from reaxkit.presentation.plot.renderers.boxplot import BoxWhiskerPlotRenderer
 from reaxkit.presentation.plot.renderers.beeswarm import BeeswarmPlotRenderer
+from reaxkit.presentation.plot.renderers.diagnostic_evolution import DiagnosticEvolutionPlotRenderer
 from reaxkit.presentation.plot.renderers.wireframe3d import Wireframe3DRenderer
 from reaxkit.presentation.plot.renderers.wireframe3d_subplots import Wireframe3DSubplotsRenderer
 
@@ -34,9 +36,11 @@ PLOT_REGISTRY = {
     "wireframe3d_plot": Wireframe3DRenderer(),
     "wireframe3d_subplots": Wireframe3DSubplotsRenderer(),
     "heatmap2d_from_3d": Heatmap2DRenderer(),
+    "grouped_bar_plot": GroupedBarPlotRenderer(),
     "errorbar_plot": ErrorbarPlotRenderer(),
     "box_whisker_plot": BoxWhiskerPlotRenderer(),
     "beeswarm_plot": BeeswarmPlotRenderer(),
+    "diagnostic_evolution_plot": DiagnosticEvolutionPlotRenderer(),
     # backward-compatible aliases
     "line": SinglePlotRenderer(),
     "multicurve": SinglePlotRenderer(),

@@ -1,9 +1,9 @@
 ﻿_meta:
   version: '1.0'
   source: workflow registries + analysis task dataclass map + workflow module docstrings
-  purpose: Maps workflow modules to related analysis and generator implementation
-    modules.
-  last_updated: '2026-05-21'
+  purpose: Maps workflow families and independently invocable workflow commands
+    to related analysis and generator implementation modules.
+  last_updated: '2026-08-28'
 workflows:
   active_site_workflow:
     implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
@@ -149,10 +149,10 @@ workflows:
     - reaxkit help "spatial property workflow"
     - run atom property plot3d workflow
   timeseries_workflow:
-    implementation_module: 'reaxkit.workflows.timeseries_workflow: timeseries'
-    description: Dispatcher workflow for time-series analyses. this supports multiple
-      time-series analysis tasks (like restraint time series data) and routes to the
-      appropriate one based on user intent and command context.
+    implementation_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
+    module_prefix: reaxkit.workflows.timeseries
+    description: Time-series workflow family with a generic field dispatcher and dedicated
+      commands for every supported scalar or analysis family.
     dispatch_mode: kind_runner
     related_commands:
       analysis: []
@@ -165,7 +165,7 @@ workflows:
     notes:
     - Routes to analysis tasks registered in reaxkit.analysis.timeseries.timeseries
       and geometry_optimization.
-    - 'How to use the workflow: reaxkit <X> -h where <X> can be timeseries'
+    - 'Use reaxkit timeseries --field <expression> or a dedicated reaxkit get_<name> command.'
     aliases:
     - time series
     - series workflow
@@ -341,13 +341,34 @@ workflows:
     notes:
     - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield,
       add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results,
-      ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data, get_energy_min_summary_data'
+      ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data,
+      get_ffield_diagnostics_sensitivity, get_ffield_diagnostics_evolution, get_energy_min_summary_data'
     aliases:
     - ffield workflow
     - force field file workflow
     help_search_examples:
     - reaxkit help "merge ffield"
     - reaxkit help "add term to ffield"
+  force_field_opt_workflow:
+    implementation_module: 'reaxkit.workflows.force_field_opt.get_ffield_opt_plots: get_ffield_opt_plots'
+    description: Classify and plot equation-of-state and restraint curves from force-field optimization outputs.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.force_field.report
+      generator: []
+    tags:
+    - force field optimization
+    - equation of state
+    - restraint plots
+    - optimization plots
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_opt_plots -h'
+    aliases:
+    - force field optimization plot workflow
+    - ffield optimization plots
+    help_search_examples:
+    - reaxkit help "force field optimization plots"
+    - reaxkit get_ffield_opt_plots -h
   geo_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
     description: Direct command workflows for GEO and structure file utilities.
@@ -623,6 +644,2175 @@ workflows:
     help_search_examples:
     - reaxkit help "workspace cleanup"
     - manage workspace workflow
+  # BEGIN GENERATED COMMAND WORKFLOWS
+  get_active_site_events:
+    parent_workflow: active_site_workflow
+    implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
+    command: get_active_site_events
+    command_kind: analysis
+    analysis_task: get_active_site_events
+    description: Detects time-resolved active-site events from connectivity trajectories by comparing bonded
+      environments across frames. Use it to identify when selected sites form, break, or reorganize bonds
+      during reactive simulations.
+    tags:
+    - active site
+    - connectivity trajectory
+    - get active site events
+    - active site workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_active_site_events -h'
+    aliases:
+    - get-active-site-events
+    - active site events
+    - active-site-events
+    help_search_examples:
+    - reaxkit help "active site events"
+    - run active site events
+    - reaxkit help "get active site events"
+    - reaxkit get_active_site_events -h
+  get_active_site_structural:
+    parent_workflow: active_site_workflow
+    implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_structural'
+    command: get_active_site_structural
+    command_kind: analysis
+    analysis_task: get_active_site_structural
+    description: Computes structural descriptors for active sites across frames using trajectory-aligned
+      connectivity data. It summarizes local neighbor counts, bonding patterns, and structural states around
+      selected reactive sites.
+    tags:
+    - active site
+    - connectivity trajectory
+    - get active site structural
+    - active site workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_active_site_structural -h'
+    aliases:
+    - get-active-site-structural
+    - active site structural
+    - active-site-structural
+    help_search_examples:
+    - reaxkit help "active site structural"
+    - run active site structural
+    - reaxkit help "get active site structural"
+    - reaxkit get_active_site_structural -h
+  add-alias:
+    parent_workflow: command_alias_workflow
+    implementation_module: 'reaxkit.workflows.meta.command_alias_workflow: add-alias'
+    command: add-alias
+    command_kind: generator
+    description: Run the add alias workflow command provided by command_alias_workflow.
+    tags:
+    - add alias
+    - command alias workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit add-alias -h'
+    aliases:
+    - add_alias
+    help_search_examples:
+    - reaxkit help "add alias"
+    - reaxkit add-alias -h
+  add-element-to-ffield:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-element-to-ffield'
+    command: add-element-to-ffield
+    command_kind: generator
+    description: Run the add element to ffield workflow command provided by ffield_workflow.
+    tags:
+    - add element to ffield
+    - ffield workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit add-element-to-ffield -h'
+    aliases:
+    - add_element_to_ffield
+    help_search_examples:
+    - reaxkit help "add element to ffield"
+    - reaxkit add-element-to-ffield -h
+  add-term-to-ffield:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: add-term-to-ffield'
+    command: add-term-to-ffield
+    command_kind: generator
+    description: Run the add term to ffield workflow command provided by ffield_workflow.
+    tags:
+    - add term to ffield
+    - ffield workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit add-term-to-ffield -h'
+    aliases:
+    - add_term_to_ffield
+    help_search_examples:
+    - reaxkit help "add term to ffield"
+    - reaxkit add-term-to-ffield -h
+  add_restraints_to_geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: add_restraints_to_geo'
+    command: add_restraints_to_geo
+    command_kind: generator
+    description: Run the add restraints to geo workflow command provided by geo_workflow.
+    tags:
+    - add restraints to geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit add_restraints_to_geo -h'
+    aliases:
+    - add-restraints-to-geo
+    help_search_examples:
+    - reaxkit help "add restraints to geo"
+    - reaxkit add_restraints_to_geo -h
+  add_molcharge_to_geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: add_molcharge_to_geo'
+    command: add_molcharge_to_geo
+    command_kind: generator
+    description: Run the add molcharge to geo workflow command provided by geo_workflow.
+    tags:
+    - add molcharge to geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit add_molcharge_to_geo -h'
+    aliases:
+    - add-molcharge-to-geo
+    help_search_examples:
+    - reaxkit help "add molcharge to geo"
+    - reaxkit add_molcharge_to_geo -h
+  plot_atom_property:
+    parent_workflow: plot_atom_property_workflow
+    implementation_module: 'reaxkit.workflows.meta.plot_atom_property_workflow: plot_atom_property'
+    command: plot_atom_property
+    command_kind: analysis
+    analysis_task: plot_atom_property
+    description: Plots atom-level properties as either 2D heatmaps or 3D scatter maps using one command
+      selected by --type. Use it to visualize spatial gradients, hotspots, and property distributions in
+      trajectory frames.
+    tags:
+    - spatial property
+    - heatmap2d
+    - scatter3d
+    - trajectory
+    - plot atom property
+    - plot atom property workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit plot_atom_property -h'
+    aliases:
+    - plot-atom-property
+    - atom property plot
+    help_search_examples:
+    - reaxkit help "plot atom property"
+    - run plot atom property
+    - reaxkit plot_atom_property -h
+  charge_table:
+    parent_workflow: electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge_table'
+    command: charge_table
+    command_kind: analysis
+    analysis_task: charge_table
+    description: Builds tabular views of atomic charge values with atom-indexed rows and frame-aware values.
+      Use it to inspect, filter, export, or plot charge data outside the raw ReaxFF output format.
+    tags:
+    - electrostatics
+    - charges
+    - charge
+    - charge table
+    - electrostatics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit charge_table -h'
+    aliases:
+    - charge-table
+    - charge table
+    - charge_table
+    help_search_examples:
+    - reaxkit help "charge table"
+    - run charge table
+    - reaxkit charge_table -h
+  dipole:
+    parent_workflow: electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
+    command: dipole
+    command_kind: analysis
+    analysis_task: dipole
+    description: Computes dipole-moment metrics from electrostatics inputs that combine coordinates, charges,
+      connectivity, and optional field data. Use it to quantify molecular or system-level charge separation
+      over time.
+    tags:
+    - electrostatics
+    - dipole
+    - electrostatics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit dipole -h'
+    aliases:
+    - dipole
+    help_search_examples:
+    - reaxkit help "dipole"
+    - run dipole
+    - reaxkit dipole -h
+  repair_fort7:
+    parent_workflow: fort7_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.fort7_workflow: repair_fort7'
+    command: repair_fort7
+    command_kind: generator
+    description: Run the repair fort7 workflow command provided by fort7_workflow.
+    tags:
+    - repair fort7
+    - fort7 workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit repair_fort7 -h'
+    aliases:
+    - repair-fort7
+    help_search_examples:
+    - reaxkit help "repair fort7"
+    - reaxkit repair_fort7 -h
+  get_ffield_data:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_data'
+    command: get_ffield_data
+    command_kind: analysis
+    analysis_task: get_ffield_data
+    description: Extracts and structures force-field parameter sections from ffield-style data. Use it to
+      inspect atom, bond, angle, torsion, and other ReaxFF parameter groups in a table-friendly form.
+    tags:
+    - force field
+    - force field parameters
+    - get ffield data
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_data -h'
+    aliases:
+    - get-ffield-data
+    - force field data
+    - force-field-data
+    help_search_examples:
+    - reaxkit help "force field data"
+    - run force field data
+    - reaxkit help "get ffield data"
+    - reaxkit get_ffield_data -h
+  get_ffield_opt_progress_data:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_progress_data'
+    command: get_ffield_opt_progress_data
+    command_kind: analysis
+    analysis_task: get_ffield_opt_progress_data
+    description: Analyzes force-field optimization progress across iterations using parsed training or optimization
+      output. It helps evaluate convergence, objective changes, and the progression of fitted parameter
+      sets.
+    tags:
+    - force field
+    - force field optimization progress
+    - get ffield opt progress data
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_opt_progress_data -h'
+    aliases:
+    - get-ffield-opt-progress-data
+    - force field optimization
+    - force-field-optimization
+    help_search_examples:
+    - reaxkit help "force field optimization"
+    - run force field optimization
+    - reaxkit help "get ffield opt progress data"
+    - reaxkit get_ffield_opt_progress_data -h
+  get_ffield_opt_results:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_results'
+    command: get_ffield_opt_results
+    command_kind: analysis
+    analysis_task: get_ffield_opt_results
+    description: Builds report tables from final optimization outputs, including target comparisons, reference
+      values, predicted values, and errors. It supports review of final force-field training quality.
+    tags:
+    - force field
+    - force field optimization report
+    - get ffield opt results
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_opt_results -h'
+    aliases:
+    - get-ffield-opt-results
+    - force field optimization report
+    - force-field-optimization-report
+    help_search_examples:
+    - reaxkit help "force field optimization report"
+    - run force field optimization report
+    - reaxkit help "get ffield opt results"
+    - reaxkit get_ffield_opt_results -h
+  ffield_opt_bulk_modulus:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_opt_bulk_modulus'
+    command: ffield_opt_bulk_modulus
+    command_kind: analysis
+    analysis_task: ffield_opt_bulk_modulus
+    description: Derives bulk-modulus metrics from optimization report data. Use it when training or validation
+      includes elastic response, equation-of-state points, or pressure-volume behavior.
+    tags:
+    - force field
+    - bulk modulus
+    - force field optimization report
+    - ffield opt bulk modulus
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit ffield_opt_bulk_modulus -h'
+    aliases:
+    - ffield-opt-bulk-modulus
+    - force field optimization report bulk modulus
+    - force-field-optimization-report-bulk-modulus
+    help_search_examples:
+    - reaxkit help "force field optimization report bulk modulus"
+    - run force field optimization report bulk modulus
+    - reaxkit help "ffield opt bulk modulus"
+    - reaxkit ffield_opt_bulk_modulus -h
+  get_ffield_opt_eos:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_eos'
+    command: get_ffield_opt_eos
+    command_kind: analysis
+    analysis_task: get_ffield_opt_eos
+    description: Derives equation-of-state relationships from force-field optimization report data. It is
+      intended for energy-volume, pressure-volume, and related property curves in fitted force fields.
+    tags:
+    - force field
+    - equation of state
+    - force field optimization report
+    - get ffield opt eos
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_opt_eos -h'
+    aliases:
+    - get-ffield-opt-eos
+    - force field optimization report eos
+    - force-field-optimization-report-eos
+    help_search_examples:
+    - reaxkit help "force field optimization report equation of state"
+    - run force field optimization report equation of state
+    - reaxkit help "get ffield opt eos"
+    - reaxkit get_ffield_opt_eos -h
+  get_ffield_opt_plots:
+    parent_workflow: force_field_opt_workflow
+    implementation_module: 'reaxkit.workflows.force_field_opt.get_ffield_opt_plots: get_ffield_opt_plots'
+    command: get_ffield_opt_plots
+    command_kind: analysis
+    description: Run the get ffield opt plots workflow command provided by force_field_opt_workflow.
+    tags:
+    - get ffield opt plots
+    - force field opt workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_opt_plots -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "get ffield opt plots"
+    - reaxkit get_ffield_opt_plots -h
+  get-params:
+    parent_workflow: params_workflow
+    implementation_module: 'reaxkit.workflows.params_workflow: get-params'
+    command: get-params
+    command_kind: analysis
+    analysis_task: force_field_optimization_parameters
+    description: Extracts optimizable parameter definitions, bounds, and metadata from params-style input.
+      Use it to understand which ReaxFF parameters are active during force-field training.
+    tags:
+    - optimization parameters
+    - force field
+    - force field optimization parameter
+    - get params
+    - params workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-params -h'
+    aliases:
+    - get_params
+    - get params
+    - read params
+    help_search_examples:
+    - reaxkit help "get optimization parameters"
+    - get optimization parameters
+    - reaxkit help "get params"
+    - reaxkit get-params -h
+  gui:
+    parent_workflow: gui_workflow
+    implementation_module: 'reaxkit.workflows.meta.gui_workflow: gui'
+    command: gui
+    command_kind: workflow
+    description: Run the gui workflow command provided by gui_workflow.
+    tags:
+    - gui
+    - gui workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gui -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "gui"
+    - reaxkit gui -h
+  help:
+    parent_workflow: help_workflow
+    implementation_module: 'reaxkit.workflows.meta.help_workflow: help'
+    command: help
+    command_kind: workflow
+    description: Run the help workflow command provided by help_workflow.
+    tags:
+    - help
+    - help workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit help -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "help"
+    - reaxkit help -h
+  intspec:
+    parent_workflow: introspection_workflow
+    implementation_module: 'reaxkit.workflows.meta.introspection_workflow: intspec'
+    command: intspec
+    command_kind: workflow
+    description: Run the intspec workflow command provided by introspection_workflow.
+    tags:
+    - intspec
+    - introspection workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit intspec -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "intspec"
+    - reaxkit intspec -h
+  kinematics_heatmap2d:
+    parent_workflow: kinematics_workflow
+    implementation_module: 'reaxkit.workflows.kinematics_workflow: kinematics_heatmap2d'
+    command: kinematics_heatmap2d
+    command_kind: analysis
+    description: Run the kinematics heatmap2d workflow command provided by kinematics_workflow.
+    tags:
+    - kinematics heatmap2d
+    - kinematics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit kinematics_heatmap2d -h'
+    aliases:
+    - kinematics-heatmap2d
+    help_search_examples:
+    - reaxkit help "kinematics heatmap2d"
+    - reaxkit kinematics_heatmap2d -h
+  kinematics_plot3d:
+    parent_workflow: kinematics_workflow
+    implementation_module: 'reaxkit.workflows.kinematics_workflow: kinematics_plot3d'
+    command: kinematics_plot3d
+    command_kind: analysis
+    description: Run the kinematics plot3d workflow command provided by kinematics_workflow.
+    tags:
+    - kinematics plot3d
+    - kinematics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit kinematics_plot3d -h'
+    aliases:
+    - kinematics-plot3d
+    help_search_examples:
+    - reaxkit help "kinematics plot3d"
+    - reaxkit kinematics_plot3d -h
+  make-addmol:
+    parent_workflow: addmol_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: make-addmol'
+    command: make-addmol
+    command_kind: generator
+    description: Run the make addmol workflow command provided by addmol_workflow.
+    tags:
+    - make addmol
+    - addmol workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-addmol -h'
+    aliases:
+    - make_addmol
+    help_search_examples:
+    - reaxkit help "make addmol"
+    - reaxkit make-addmol -h
+  make-charges:
+    parent_workflow: charges_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.charges_workflow: make-charges'
+    command: make-charges
+    command_kind: generator
+    description: Run the make charges workflow command provided by charges_workflow.
+    tags:
+    - make charges
+    - charges workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-charges -h'
+    aliases:
+    - make_charges
+    help_search_examples:
+    - reaxkit help "make charges"
+    - reaxkit make-charges -h
+  make-control:
+    parent_workflow: control_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: make-control'
+    command: make-control
+    command_kind: generator
+    description: Run the make control workflow command provided by control_workflow.
+    tags:
+    - make control
+    - control workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-control -h'
+    aliases:
+    - make_control
+    help_search_examples:
+    - reaxkit help "make control"
+    - reaxkit make-control -h
+  make-eregime:
+    parent_workflow: eregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.eregime_workflow: make-eregime'
+    command: make-eregime
+    command_kind: generator
+    description: Run the make eregime workflow command provided by eregime_workflow.
+    tags:
+    - make eregime
+    - eregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-eregime -h'
+    aliases:
+    - make_eregime
+    help_search_examples:
+    - reaxkit help "make eregime"
+    - reaxkit make-eregime -h
+  make-geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: make-geo'
+    command: make-geo
+    command_kind: generator
+    description: Run the make geo workflow command provided by geo_workflow.
+    tags:
+    - make geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-geo -h'
+    aliases:
+    - make_geo
+    help_search_examples:
+    - reaxkit help "make geo"
+    - reaxkit make-geo -h
+  make-kopple2:
+    parent_workflow: kopple2_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.kopple2_workflow: make-kopple2'
+    command: make-kopple2
+    command_kind: generator
+    description: Run the make kopple2 workflow command provided by kopple2_workflow.
+    tags:
+    - make kopple2
+    - kopple2 workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-kopple2 -h'
+    aliases:
+    - make_kopple2
+    help_search_examples:
+    - reaxkit help "make kopple2"
+    - reaxkit make-kopple2 -h
+  merge-ffield:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: merge-ffield'
+    command: merge-ffield
+    command_kind: generator
+    description: Run the merge ffield workflow command provided by ffield_workflow.
+    tags:
+    - merge ffield
+    - ffield workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit merge-ffield -h'
+    aliases:
+    - merge_ffield
+    help_search_examples:
+    - reaxkit help "merge ffield"
+    - reaxkit merge-ffield -h
+  make-trainset-elastic:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-elastic'
+    command: make-trainset-elastic
+    command_kind: generator
+    description: Run the make trainset elastic workflow command provided by trainset_workflow.
+    tags:
+    - make trainset elastic
+    - trainset workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-trainset-elastic -h'
+    aliases:
+    - make_trainset_elastic
+    help_search_examples:
+    - reaxkit help "make trainset elastic"
+    - reaxkit make-trainset-elastic -h
+  make-trainset-heatfo:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-heatfo'
+    command: make-trainset-heatfo
+    command_kind: generator
+    description: Run the make trainset heatfo workflow command provided by trainset_workflow.
+    tags:
+    - make trainset heatfo
+    - trainset workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-trainset-heatfo -h'
+    aliases:
+    - make_trainset_heatfo
+    help_search_examples:
+    - reaxkit help "make trainset heatfo"
+    - reaxkit make-trainset-heatfo -h
+  make-trainset-settings:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-settings'
+    command: make-trainset-settings
+    command_kind: generator
+    description: Run the make trainset settings workflow command provided by trainset_workflow.
+    tags:
+    - make trainset settings
+    - trainset workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-trainset-settings -h'
+    aliases:
+    - make_trainset_settings
+    help_search_examples:
+    - reaxkit help "make trainset settings"
+    - reaxkit make-trainset-settings -h
+  make-trainset-settings-heatfo:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: make-trainset-settings-heatfo'
+    command: make-trainset-settings-heatfo
+    command_kind: generator
+    description: Run the make trainset settings heatfo workflow command provided by trainset_workflow.
+    tags:
+    - make trainset settings heatfo
+    - trainset workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-trainset-settings-heatfo -h'
+    aliases:
+    - make_trainset_settings_heatfo
+    help_search_examples:
+    - reaxkit help "make trainset settings heatfo"
+    - reaxkit make-trainset-settings-heatfo -h
+  make-tregime:
+    parent_workflow: tregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.tregime_workflow: make-tregime'
+    command: make-tregime
+    command_kind: generator
+    description: Run the make tregime workflow command provided by tregime_workflow.
+    tags:
+    - make tregime
+    - tregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-tregime -h'
+    aliases:
+    - make_tregime
+    help_search_examples:
+    - reaxkit help "make tregime"
+    - reaxkit make-tregime -h
+  make-vregime:
+    parent_workflow: vregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.vregime_workflow: make-vregime'
+    command: make-vregime
+    command_kind: generator
+    description: Run the make vregime workflow command provided by vregime_workflow.
+    tags:
+    - make vregime
+    - vregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit make-vregime -h'
+    aliases:
+    - make_vregime
+    help_search_examples:
+    - reaxkit help "make vregime"
+    - reaxkit make-vregime -h
+  manage-workspace:
+    parent_workflow: manage_workspace
+    implementation_module: 'reaxkit.workflows.meta.manage_workspace_workflow: manage-workspace'
+    command: manage-workspace
+    command_kind: generator
+    description: Run the manage workspace workflow command provided by manage_workspace.
+    tags:
+    - manage workspace
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit manage-workspace -h'
+    aliases:
+    - manage_workspace
+    help_search_examples:
+    - reaxkit help "manage workspace"
+    - reaxkit manage-workspace -h
+  orthogonalize-geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: orthogonalize-geo'
+    command: orthogonalize-geo
+    command_kind: generator
+    description: Run the orthogonalize geo workflow command provided by geo_workflow.
+    tags:
+    - orthogonalize geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit orthogonalize-geo -h'
+    aliases:
+    - orthogonalize_geo
+    help_search_examples:
+    - reaxkit help "orthogonalize geo"
+    - reaxkit orthogonalize-geo -h
+  get_ffield_diagnostic_data:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_diagnostic_data'
+    command: get_ffield_diagnostic_data
+    command_kind: analysis
+    analysis_task: get_ffield_diagnostic_data
+    description: Summarizes per-parameter optimization diagnostics from force-field fitting output. It helps
+      explain trial values, sensitivity behavior, fitted curves, and error changes for individual parameters.
+    tags:
+    - force field
+    - diagnostics
+    - force field optimization diagnostic
+    - get ffield diagnostic data
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_diagnostic_data -h'
+    aliases:
+    - get-ffield-diagnostic-data
+    - parameter optimization diagnostic
+    - parameter-optimization-diagnostic
+    - parameter optimization most sensitive
+    - parameter-optimization-most-sensitive
+    - parameter optimization tornado
+    - parameter-optimization-tornado
+    help_search_examples:
+    - reaxkit help "parameter optimization diagnostic"
+    - run parameter optimization diagnostic
+    - reaxkit help "parameter optimization most sensitive"
+    - run parameter optimization most sensitive
+    - reaxkit help "parameter optimization tornado"
+    - run parameter optimization tornado
+    - reaxkit help "get ffield diagnostic data"
+    - reaxkit get_ffield_diagnostic_data -h
+  get_ffield_diagnostics_sensitivity:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_diagnostics_sensitivity'
+    command: get_ffield_diagnostics_sensitivity
+    command_kind: analysis
+    analysis_task: get_ffield_diagnostics_sensitivity
+    description: Builds tornado or beeswarm views of relative objective-response sensitivities from force-field
+      optimization diagnostics.
+    tags:
+    - force field
+    - diagnostics
+    - sensitivity
+    - get ffield diagnostics sensitivity
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_diagnostics_sensitivity -h'
+    aliases:
+    - get-ffield-diagnostics-sensitivity
+    - force field diagnostics sensitivity
+    - ffield sensitivity diagnostics
+    help_search_examples:
+    - reaxkit help "ffield diagnostics sensitivity"
+    - plot force field sensitivity beeswarm
+    - reaxkit help "get ffield diagnostics sensitivity"
+    - reaxkit get_ffield_diagnostics_sensitivity -h
+  get_ffield_diagnostics_evolution:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_diagnostics_evolution'
+    command: get_ffield_diagnostics_evolution
+    command_kind: analysis
+    analysis_task: get_ffield_diagnostics_evolution
+    description: Builds bounded beeswarm or epoch-wise scatter-and-line parameter-evolution views from diagnostic
+      samples, optimization bounds, force-field values, and objective responses.
+    tags:
+    - force field
+    - diagnostics
+    - parameter evolution
+    - get ffield diagnostics evolution
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_ffield_diagnostics_evolution -h'
+    aliases:
+    - get-ffield-diagnostics-evolution
+    - force field diagnostics evolution
+    - ffield parameter evolution
+    help_search_examples:
+    - reaxkit help "ffield diagnostics evolution"
+    - plot force field parameter evolution
+    - reaxkit help "get ffield diagnostics evolution"
+    - reaxkit get_ffield_diagnostics_evolution -h
+  place-geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: place-geo'
+    command: place-geo
+    command_kind: generator
+    description: Run the place geo workflow command provided by geo_workflow.
+    tags:
+    - place geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit place-geo -h'
+    aliases:
+    - place_geo
+    help_search_examples:
+    - reaxkit help "place geo"
+    - reaxkit place-geo -h
+  polarization:
+    parent_workflow: electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
+    command: polarization
+    command_kind: analysis
+    analysis_task: polarization
+    description: Computes polarization metrics from electrostatics data built from charges, coordinates,
+      connectivity, and optional field values. It supports dielectric-response and field-driven charge-separation
+      studies.
+    tags:
+    - electrostatics
+    - polarization
+    - electrostatics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit polarization -h'
+    aliases:
+    - polarization
+    help_search_examples:
+    - reaxkit help "polarization"
+    - run polarization
+    - reaxkit polarization -h
+  polarization_field:
+    parent_workflow: electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization_field'
+    command: polarization_field
+    command_kind: analysis
+    analysis_task: polarization_field
+    description: Analyzes polarization response versus applied electric field. Use it to relate field schedules
+      to polarization curves, hysteresis behavior, or field-dependent electrostatic response.
+    tags:
+    - electrostatics
+    - polarization
+    - polarization field
+    - electrostatics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit polarization_field -h'
+    aliases:
+    - polarization-field
+    - hyst
+    help_search_examples:
+    - reaxkit help "hysteresis"
+    - run hysteresis
+    - reaxkit help "polarization field"
+    - reaxkit polarization_field -h
+  sort-geo:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: sort-geo'
+    command: sort-geo
+    command_kind: generator
+    description: Run the sort geo workflow command provided by geo_workflow.
+    tags:
+    - sort geo
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit sort-geo -h'
+    aliases:
+    - sort_geo
+    help_search_examples:
+    - reaxkit help "sort geo"
+    - reaxkit sort-geo -h
+  get_energy_min_summary_data:
+    parent_workflow: ffield_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_energy_min_summary_data'
+    command: get_energy_min_summary_data
+    command_kind: analysis
+    analysis_task: get_energy_min_summary_data
+    description: Extracts structure-level summary quantities from optimization outputs, including energy,
+      heat of formation, volume, density, or related structural metrics. Use it to compare training-set
+      structures.
+    tags:
+    - force field
+    - structure summary
+    - geometry summary
+    - get energy min summary data
+    - ffield workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_energy_min_summary_data -h'
+    aliases:
+    - get-energy-min-summary-data
+    - structure summary data
+    - structure-summary-data
+    help_search_examples:
+    - reaxkit help "structure summary data"
+    - run structure summary data
+    - reaxkit help "get energy min summary data"
+    - reaxkit get_energy_min_summary_data -h
+  study:
+    parent_workflow: study_workflow
+    implementation_module: 'reaxkit.workflows.study_design.study_workflow: study'
+    command: study
+    command_kind: generator
+    description: Run the study workflow command provided by study_workflow.
+    tags:
+    - study
+    - study workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit study -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "study"
+    - reaxkit study -h
+  timeseries:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.timeseries_workflow: timeseries'
+    command: timeseries
+    command_kind: workflow
+    analysis_task: cell_dimensions
+    description: Returns time series for simulation cell lengths, angles, and related box dimensions. Use
+      it to inspect expansion, compression, deformation, or volume-coupled behavior in ReaxFF runs.
+    tags:
+    - time series
+    - cell dimensions
+    - simulation
+    - timeseries
+    - timeseries workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit timeseries -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "timeseries"
+    - reaxkit timeseries -h
+  get_potential_energy:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_potential_energy: get_potential_energy'
+    command: get_potential_energy
+    command_kind: analysis
+    description: Run the get potential energy workflow command provided by timeseries_workflow.
+    tags:
+    - get potential energy
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_potential_energy -h'
+    aliases:
+    - get-potential-energy
+    help_search_examples:
+    - reaxkit help "get potential energy"
+    - reaxkit get_potential_energy -h
+  get_num_of_atoms:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_num_of_atoms: get_num_of_atoms'
+    command: get_num_of_atoms
+    command_kind: analysis
+    description: Run the get num of atoms workflow command provided by timeseries_workflow.
+    tags:
+    - get num of atoms
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_num_of_atoms -h'
+    aliases:
+    - get-num-of-atoms
+    help_search_examples:
+    - reaxkit help "get num of atoms"
+    - reaxkit get_num_of_atoms -h
+  get_volume:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_volume: get_volume'
+    command: get_volume
+    command_kind: analysis
+    description: Run the get volume workflow command provided by timeseries_workflow.
+    tags:
+    - get volume
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_volume -h'
+    aliases:
+    - get-volume
+    help_search_examples:
+    - reaxkit help "get volume"
+    - reaxkit get_volume -h
+  get_temperature:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_temperature: get_temperature'
+    command: get_temperature
+    command_kind: analysis
+    description: Run the get temperature workflow command provided by timeseries_workflow.
+    tags:
+    - get temperature
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_temperature -h'
+    aliases:
+    - get-temperature
+    help_search_examples:
+    - reaxkit help "get temperature"
+    - reaxkit get_temperature -h
+  get_pressure:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_pressure: get_pressure'
+    command: get_pressure
+    command_kind: analysis
+    description: Run the get pressure workflow command provided by timeseries_workflow.
+    tags:
+    - get pressure
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_pressure -h'
+    aliases:
+    - get-pressure
+    help_search_examples:
+    - reaxkit help "get pressure"
+    - reaxkit get_pressure -h
+  get_density:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_density: get_density'
+    command: get_density
+    command_kind: analysis
+    description: Run the get density workflow command provided by timeseries_workflow.
+    tags:
+    - get density
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_density -h'
+    aliases:
+    - get-density
+    help_search_examples:
+    - reaxkit help "get density"
+    - reaxkit get_density -h
+  get_elapsed_time:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_elapsed_time: get_elapsed_time'
+    command: get_elapsed_time
+    command_kind: analysis
+    description: Run the get elapsed time workflow command provided by timeseries_workflow.
+    tags:
+    - get elapsed time
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_elapsed_time -h'
+    aliases:
+    - get-elapsed-time
+    help_search_examples:
+    - reaxkit help "get elapsed time"
+    - reaxkit get_elapsed_time -h
+  get_a:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_a: get_a'
+    command: get_a
+    command_kind: analysis
+    description: Run the get a workflow command provided by timeseries_workflow.
+    tags:
+    - get a
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_a -h'
+    aliases:
+    - get-a
+    help_search_examples:
+    - reaxkit help "get a"
+    - reaxkit get_a -h
+  get_b:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_b: get_b'
+    command: get_b
+    command_kind: analysis
+    description: Run the get b workflow command provided by timeseries_workflow.
+    tags:
+    - get b
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_b -h'
+    aliases:
+    - get-b
+    help_search_examples:
+    - reaxkit help "get b"
+    - reaxkit get_b -h
+  get_c:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_c: get_c'
+    command: get_c
+    command_kind: analysis
+    description: Run the get c workflow command provided by timeseries_workflow.
+    tags:
+    - get c
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_c -h'
+    aliases:
+    - get-c
+    help_search_examples:
+    - reaxkit help "get c"
+    - reaxkit get_c -h
+  get_alpha:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_alpha: get_alpha'
+    command: get_alpha
+    command_kind: analysis
+    description: Run the get alpha workflow command provided by timeseries_workflow.
+    tags:
+    - get alpha
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_alpha -h'
+    aliases:
+    - get-alpha
+    help_search_examples:
+    - reaxkit help "get alpha"
+    - reaxkit get_alpha -h
+  get_beta:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_beta: get_beta'
+    command: get_beta
+    command_kind: analysis
+    description: Run the get beta workflow command provided by timeseries_workflow.
+    tags:
+    - get beta
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_beta -h'
+    aliases:
+    - get-beta
+    help_search_examples:
+    - reaxkit help "get beta"
+    - reaxkit get_beta -h
+  get_gamma:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_gamma: get_gamma'
+    command: get_gamma
+    command_kind: analysis
+    description: Run the get gamma workflow command provided by timeseries_workflow.
+    tags:
+    - get gamma
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_gamma -h'
+    aliases:
+    - get-gamma
+    help_search_examples:
+    - reaxkit help "get gamma"
+    - reaxkit get_gamma -h
+  get_trajectory:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_trajectory: get_trajectory'
+    command: get_trajectory
+    command_kind: analysis
+    description: Run the get trajectory workflow command provided by timeseries_workflow.
+    tags:
+    - get trajectory
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_trajectory -h'
+    aliases:
+    - get-trajectory
+    help_search_examples:
+    - reaxkit help "get trajectory"
+    - reaxkit get_trajectory -h
+  get_displacement:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_displacement: get_displacement'
+    command: get_displacement
+    command_kind: analysis
+    description: Run the get displacement workflow command provided by timeseries_workflow.
+    tags:
+    - get displacement
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_displacement -h'
+    aliases:
+    - get-displacement
+    help_search_examples:
+    - reaxkit help "get displacement"
+    - reaxkit get_displacement -h
+  get_charge:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_charge: get_charge'
+    command: get_charge
+    command_kind: analysis
+    description: Run the get charge workflow command provided by timeseries_workflow.
+    tags:
+    - get charge
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_charge -h'
+    aliases:
+    - get-charge
+    help_search_examples:
+    - reaxkit help "get charge"
+    - reaxkit get_charge -h
+  get_cell_dimensions:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_cell_dimensions: get_cell_dimensions'
+    command: get_cell_dimensions
+    command_kind: analysis
+    description: Run the get cell dimensions workflow command provided by timeseries_workflow.
+    tags:
+    - get cell dimensions
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_cell_dimensions -h'
+    aliases:
+    - get-cell-dimensions
+    help_search_examples:
+    - reaxkit help "get cell dimensions"
+    - reaxkit get_cell_dimensions -h
+  get_electric_field:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_electric_field: get_electric_field'
+    command: get_electric_field
+    command_kind: analysis
+    description: Run the get electric field workflow command provided by timeseries_workflow.
+    tags:
+    - get electric field
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_electric_field -h'
+    aliases:
+    - get-electric-field
+    help_search_examples:
+    - reaxkit help "get electric field"
+    - reaxkit get_electric_field -h
+  get_eregime:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_eregime: get_eregime'
+    command: get_eregime
+    command_kind: analysis
+    description: Run the get eregime workflow command provided by timeseries_workflow.
+    tags:
+    - get eregime
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_eregime -h'
+    aliases:
+    - get-eregime
+    help_search_examples:
+    - reaxkit help "get eregime"
+    - reaxkit get_eregime -h
+  get_partial_energy:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_partial_energy: get_partial_energy'
+    command: get_partial_energy
+    command_kind: analysis
+    description: Run the get partial energy workflow command provided by timeseries_workflow.
+    tags:
+    - get partial energy
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_partial_energy -h'
+    aliases:
+    - get-partial-energy
+    help_search_examples:
+    - reaxkit help "get partial energy"
+    - reaxkit get_partial_energy -h
+  get_restraint:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_restraint: get_restraint'
+    command: get_restraint
+    command_kind: analysis
+    description: Run the get restraint workflow command provided by timeseries_workflow.
+    tags:
+    - get restraint
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_restraint -h'
+    aliases:
+    - get-restraint
+    help_search_examples:
+    - reaxkit help "get restraint"
+    - reaxkit get_restraint -h
+  get_molecular_frequency:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_molecular_frequency: get_molecular_frequency'
+    command: get_molecular_frequency
+    command_kind: analysis
+    description: Run the get molecular frequency workflow command provided by timeseries_workflow.
+    tags:
+    - get molecular frequency
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_molecular_frequency -h'
+    aliases:
+    - get-molecular-frequency
+    help_search_examples:
+    - reaxkit help "get molecular frequency"
+    - reaxkit get_molecular_frequency -h
+  get_molecular_totals:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_molecular_totals: get_molecular_totals'
+    command: get_molecular_totals
+    command_kind: analysis
+    description: Run the get molecular totals workflow command provided by timeseries_workflow.
+    tags:
+    - get molecular totals
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_molecular_totals -h'
+    aliases:
+    - get-molecular-totals
+    help_search_examples:
+    - reaxkit help "get molecular totals"
+    - reaxkit get_molecular_totals -h
+  get_total_molecules:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_molecules: get_total_molecules'
+    command: get_total_molecules
+    command_kind: analysis
+    description: Run the get total molecules workflow command provided by timeseries_workflow.
+    tags:
+    - get total molecules
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_molecules -h'
+    aliases:
+    - get-total-molecules
+    help_search_examples:
+    - reaxkit help "get total molecules"
+    - reaxkit get_total_molecules -h
+  get_total_atoms:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_atoms: get_total_atoms'
+    command: get_total_atoms
+    command_kind: analysis
+    description: Run the get total atoms workflow command provided by timeseries_workflow.
+    tags:
+    - get total atoms
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_atoms -h'
+    aliases:
+    - get-total-atoms
+    help_search_examples:
+    - reaxkit help "get total atoms"
+    - reaxkit get_total_atoms -h
+  get_total_molecular_mass:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_total_molecular_mass: get_total_molecular_mass'
+    command: get_total_molecular_mass
+    command_kind: analysis
+    description: Run the get total molecular mass workflow command provided by timeseries_workflow.
+    tags:
+    - get total molecular mass
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_total_molecular_mass -h'
+    aliases:
+    - get-total-molecular-mass
+    help_search_examples:
+    - reaxkit help "get total molecular mass"
+    - reaxkit get_total_molecular_mass -h
+  get_geometry_optimization:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_geometry_optimization: get_geometry_optimization'
+    command: get_geometry_optimization
+    command_kind: analysis
+    description: Run the get geometry optimization workflow command provided by timeseries_workflow.
+    tags:
+    - get geometry optimization
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_geometry_optimization -h'
+    aliases:
+    - get-geometry-optimization
+    help_search_examples:
+    - reaxkit help "get geometry optimization"
+    - reaxkit get_geometry_optimization -h
+  get_trainset_data:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_data'
+    command: get_trainset_data
+    command_kind: analysis
+    analysis_task: get_trainset_data
+    description: Returns trainset rows for one selected section or all sections. Use it to inspect CHARGE,
+      HEATFO, GEOMETRY, CELL_PARAMETERS, and ENERGY entries from training-set definitions in a table form.
+    tags:
+    - force field
+    - training set
+    - force field optimization training set
+    - get trainset data
+    - trainset workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_trainset_data -h'
+    aliases:
+    - get-trainset-data
+    - trainset data
+    - training set data
+    - trainset-data
+    help_search_examples:
+    - show training set data
+    - inspect trainset rows by section
+    - reaxkit help "get trainset data"
+    - reaxkit get_trainset_data -h
+  get_trainset_group_comments:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: get_trainset_group_comments'
+    command: get_trainset_group_comments
+    command_kind: analysis
+    analysis_task: get_trainset_group_comments
+    description: Lists every comment-block occurrence from training-set definitions, retaining repeated
+      and empty comments with source lines, referenced identifiers, entry counts, and inferred data types
+      such as EOS, HeatFO, charge, and geometry.
+    tags:
+    - force field
+    - training set
+    - force field optimization training set
+    - get trainset group comments
+    - trainset workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_trainset_group_comments -h'
+    aliases:
+    - get-trainset-group-comments
+    - trainset comments
+    - training set comments
+    - trainset groups
+    help_search_examples:
+    - show training set group comments
+    - inspect training set categories
+    - reaxkit help "get trainset group comments"
+    - reaxkit get_trainset_group_comments -h
+  trim-xmolout:
+    parent_workflow: xmolout_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.xmolout_workflow: trim-xmolout'
+    command: trim-xmolout
+    command_kind: generator
+    description: Run the trim xmolout workflow command provided by xmolout_workflow.
+    tags:
+    - trim xmolout
+    - xmolout workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit trim-xmolout -h'
+    aliases:
+    - trim_xmolout
+    help_search_examples:
+    - reaxkit help "trim xmolout"
+    - reaxkit trim-xmolout -h
+  xtob:
+    parent_workflow: geo_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: xtob'
+    command: xtob
+    command_kind: generator
+    description: Run the xtob workflow command provided by geo_workflow.
+    tags:
+    - xtob
+    - geo workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit xtob -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "xtob"
+    - reaxkit xtob -h
+  gen_eregime:
+    parent_workflow: eregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.eregime_workflow: gen_eregime'
+    command: gen_eregime
+    command_kind: generator
+    description: Run the gen eregime workflow command provided by eregime_workflow.
+    tags:
+    - gen eregime
+    - eregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_eregime -h'
+    aliases:
+    - gen-eregime
+    help_search_examples:
+    - reaxkit help "gen eregime"
+    - reaxkit gen_eregime -h
+  gen_template_charges:
+    parent_workflow: charges_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.charges_workflow: gen_template_charges'
+    command: gen_template_charges
+    command_kind: generator
+    description: Run the gen template charges workflow command provided by charges_workflow.
+    tags:
+    - gen template charges
+    - charges workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_charges -h'
+    aliases:
+    - gen-template-charges
+    help_search_examples:
+    - reaxkit help "gen template charges"
+    - reaxkit gen_template_charges -h
+  gen_template_addmol:
+    parent_workflow: addmol_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: gen_template_addmol'
+    command: gen_template_addmol
+    command_kind: generator
+    description: Run the gen template addmol workflow command provided by addmol_workflow.
+    tags:
+    - gen template addmol
+    - addmol workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_addmol -h'
+    aliases:
+    - gen-template-addmol
+    help_search_examples:
+    - reaxkit help "gen template addmol"
+    - reaxkit gen_template_addmol -h
+  gen_template_kopple2:
+    parent_workflow: kopple2_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.kopple2_workflow: gen_template_kopple2'
+    command: gen_template_kopple2
+    command_kind: generator
+    description: Run the gen template kopple2 workflow command provided by kopple2_workflow.
+    tags:
+    - gen template kopple2
+    - kopple2 workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_kopple2 -h'
+    aliases:
+    - gen-template-kopple2
+    help_search_examples:
+    - reaxkit help "gen template kopple2"
+    - reaxkit gen_template_kopple2 -h
+  gen_template_tregime:
+    parent_workflow: tregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.tregime_workflow: gen_template_tregime'
+    command: gen_template_tregime
+    command_kind: generator
+    description: Run the gen template tregime workflow command provided by tregime_workflow.
+    tags:
+    - gen template tregime
+    - tregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_tregime -h'
+    aliases:
+    - gen-template-tregime
+    help_search_examples:
+    - reaxkit help "gen template tregime"
+    - reaxkit gen_template_tregime -h
+  gen_template_vregime:
+    parent_workflow: vregime_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.vregime_workflow: gen_template_vregime'
+    command: gen_template_vregime
+    command_kind: generator
+    description: Run the gen template vregime workflow command provided by vregime_workflow.
+    tags:
+    - gen template vregime
+    - vregime workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_vregime -h'
+    aliases:
+    - gen-template-vregime
+    help_search_examples:
+    - reaxkit help "gen template vregime"
+    - reaxkit gen_template_vregime -h
+  gen_template_yaml_for_elastic_settings:
+    parent_workflow: trainset_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.trainset_workflow: gen_template_yaml_for_elastic_settings'
+    command: gen_template_yaml_for_elastic_settings
+    command_kind: generator
+    description: Run the gen template yaml for elastic settings workflow command provided by trainset_workflow.
+    tags:
+    - gen template yaml for elastic settings
+    - trainset workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_yaml_for_elastic_settings -h'
+    aliases:
+    - gen-template-yaml-for-elastic-settings
+    help_search_examples:
+    - reaxkit help "gen template yaml for elastic settings"
+    - reaxkit gen_template_yaml_for_elastic_settings -h
+  gen-video:
+    parent_workflow: make_video_workflow
+    implementation_module: 'reaxkit.workflows.meta.gen_video_workflow: gen-video'
+    command: gen-video
+    command_kind: generator
+    description: Run the gen video workflow command provided by make_video_workflow.
+    tags:
+    - gen video
+    - make video workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen-video -h'
+    aliases:
+    - gen_video
+    help_search_examples:
+    - reaxkit help "gen video"
+    - reaxkit gen-video -h
+  gen-plot:
+    parent_workflow: plotter_workflow
+    implementation_module: 'reaxkit.workflows.meta.gen_plot_workflow: gen-plot'
+    command: gen-plot
+    command_kind: generator
+    description: Run the gen plot workflow command provided by plotter_workflow.
+    tags:
+    - gen plot
+    - plotter workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen-plot -h'
+    aliases:
+    - gen_plot
+    help_search_examples:
+    - reaxkit help "gen plot"
+    - reaxkit gen-plot -h
+  gen_template_control:
+    parent_workflow: control_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: gen_template_control'
+    command: gen_template_control
+    command_kind: generator
+    description: Run the gen template control workflow command provided by control_workflow.
+    tags:
+    - gen template control
+    - control workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen_template_control -h'
+    aliases:
+    - gen-template-control
+    help_search_examples:
+    - reaxkit help "gen template control"
+    - reaxkit gen_template_control -h
+  gen-control:
+    parent_workflow: control_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: gen-control'
+    command: gen-control
+    command_kind: generator
+    description: Run the gen control workflow command provided by control_workflow.
+    tags:
+    - gen control
+    - control workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit gen-control -h'
+    aliases:
+    - gen_control
+    help_search_examples:
+    - reaxkit help "gen control"
+    - reaxkit gen-control -h
+  get_control_data:
+    parent_workflow: control_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.control_workflow: get_control_data'
+    command: get_control_data
+    command_kind: generator
+    analysis_task: get_control_data
+    description: Reads and returns values for control-file keywords from structured control-parameter data.
+      Use it to verify simulation settings, compare control files, or expose individual ReaxFF options in
+      scripts.
+    tags:
+    - control file
+    - control parameters
+    - get control data
+    - control workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_control_data -h'
+    aliases:
+    - get-control_data
+    help_search_examples:
+    - reaxkit help "get control data"
+    - reaxkit get_control_data -h
+  get-optimized-ffield:
+    parent_workflow: fort83_workflow
+    implementation_module: 'reaxkit.workflows.file_tools.fort83_workflow: get-optimized-ffield'
+    command: get-optimized-ffield
+    command_kind: generator
+    description: Run the get optimized ffield workflow command provided by fort83_workflow.
+    tags:
+    - get optimized ffield
+    - fort83 workflow
+    - generator workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-optimized-ffield -h'
+    aliases:
+    - get_optimized_ffield
+    help_search_examples:
+    - reaxkit help "get optimized ffield"
+    - reaxkit get-optimized-ffield -h
+  get_bond_events:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_bond_events'
+    command: get_bond_events
+    command_kind: analysis
+    analysis_task: get_bond_events
+    description: Identifies bond formation and bond breaking events by comparing connectivity records. It
+      helps convert raw bond-order snapshots into reaction-event tables for later filtering and interpretation.
+    tags:
+    - connectivity
+    - bond order
+    - get bond events
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_bond_events -h'
+    aliases:
+    - get-bond-events
+    - bond events
+    - bond-events
+    help_search_examples:
+    - reaxkit help "bond events"
+    - run bond events
+    - reaxkit help "get bond events"
+    - reaxkit get_bond_events -h
+  get_connection_list:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_connection_list'
+    command: get_connection_list
+    command_kind: analysis
+    analysis_task: get_connection_list
+    description: Outputs connectivity neighbor lists and bond-order pairs from parsed ReaxFF connectivity
+      data. It exposes the raw bonded relationships that feed get_coordination, get_hybridization, and bond-event
+      analyses.
+    tags:
+    - connectivity
+    - connections
+    - get connection list
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_connection_list -h'
+    aliases:
+    - get-connection-list
+    - connection list
+    - connection-list
+    help_search_examples:
+    - reaxkit help "connection list"
+    - run connection list
+    - reaxkit help "get connection list"
+    - reaxkit get_connection_list -h
+  get_connection_stats:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_connection_stats'
+    command: get_connection_stats
+    command_kind: analysis
+    analysis_task: get_connection_stats
+    description: Computes summary statistics over connectivity data, including bond counts, neighbor counts,
+      and bond-order-derived measures. Use it for compact comparisons across frames or simulations.
+    tags:
+    - connectivity
+    - connections
+    - get connection stats
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_connection_stats -h'
+    aliases:
+    - get-connection-stats
+    - connection stats
+    - connection-stats
+    help_search_examples:
+    - reaxkit help "connection stats"
+    - run connection stats
+    - reaxkit help "get connection stats"
+    - reaxkit get_connection_stats -h
+  get_connection_table:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_connection_table'
+    command: get_connection_table
+    command_kind: analysis
+    analysis_task: get_connection_table
+    description: Builds a table representation of connectivity records with atoms, neighbors, bond orders,
+      and frame context. This makes connectivity output easier to query, export, and join with other atom-level
+      data.
+    tags:
+    - connectivity
+    - connections
+    - get connection table
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_connection_table -h'
+    aliases:
+    - get-connection-table
+    - connection table
+    - connection-table
+    help_search_examples:
+    - reaxkit help "connection table"
+    - run connection table
+    - reaxkit help "get connection table"
+    - reaxkit get_connection_table -h
+  get_coordination:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_coordination'
+    command: get_coordination
+    command_kind: analysis
+    analysis_task: get_coordination
+    description: Computes get_coordination numbers and local neighbor environments from connectivity data.
+      It labels atom environments by neighbor counts or bonding context for structural classification and
+      downstream relabeling.
+    tags:
+    - connectivity
+    - get_coordination
+    - get coordination
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_coordination -h'
+    aliases:
+    - get-coordination
+    - get_coordination
+    help_search_examples:
+    - reaxkit help "get_coordination"
+    - run get_coordination
+    - reaxkit help "get coordination"
+    - reaxkit get_coordination -h
+  relabel_traj_using_coordination:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: relabel_traj_using_coordination'
+    command: relabel_traj_using_coordination
+    command_kind: analysis
+    analysis_task: get_bond_events
+    description: Identifies bond formation and bond breaking events by comparing connectivity records. It
+      helps convert raw bond-order snapshots into reaction-event tables for later filtering and interpretation.
+    tags:
+    - connectivity
+    - bond order
+    - relabel traj using coordination
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit relabel_traj_using_coordination -h'
+    aliases:
+    - relabel-traj-using-coordination
+    - bond events
+    - bond-events
+    help_search_examples:
+    - reaxkit help "bond events"
+    - run bond events
+    - reaxkit help "relabel traj using coordination"
+    - reaxkit relabel_traj_using_coordination -h
+  get_hybridization:
+    parent_workflow: connectivity_workflow
+    implementation_module: 'reaxkit.workflows.connectivity_workflow: get_hybridization'
+    command: get_hybridization
+    command_kind: analysis
+    analysis_task: get_hybridization
+    description: Assigns get_hybridization-like states from connectivity patterns and local neighbor environments.
+      It provides a structural label useful for carbon-rich systems, bonding-state analysis, and atom relabeling.
+    tags:
+    - connectivity
+    - get_hybridization
+    - get hybridization
+    - connectivity workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_hybridization -h'
+    aliases:
+    - get-hybridization
+    - get_hybridization
+    help_search_examples:
+    - reaxkit help "get_hybridization"
+    - run get_hybridization
+    - reaxkit help "get hybridization"
+    - reaxkit get_hybridization -h
+  get_kinematics:
+    parent_workflow: kinematics_workflow
+    implementation_module: 'reaxkit.workflows.kinematics_workflow: get_kinematics'
+    command: get_kinematics
+    command_kind: analysis
+    analysis_task: get_kinematics
+    description: Extracts per-atom kinematic quantities from velocity or restart-derived data. Use it to
+      analyze atom-level motion, velocity components, acceleration-like values, and spatially resolved dynamics.
+    tags:
+    - atomic kinematics
+    - analysis
+    - get kinematics
+    - kinematics workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_kinematics -h'
+    aliases:
+    - get-kinematics
+    - kinematics
+    - kinematics heatmap2d
+    - kinematics-heatmap2d
+    - kinematics plot3d
+    - kinematics-plot3d
+    help_search_examples:
+    - reaxkit help "atomic kinematics"
+    - run atomic kinematics
+    - reaxkit help "atomic kinematics heatmap2d"
+    - run atomic kinematics heatmap2d
+    - reaxkit help "atomic kinematics plot3d"
+    - run atomic kinematics plot3d
+    - reaxkit help "get kinematics"
+    - reaxkit get_kinematics -h
+  get_dominant_species:
+    parent_workflow: molecular_analysis_workflow
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: get_dominant_species'
+    command: get_dominant_species
+    command_kind: analysis
+    analysis_task: get_dominant_species
+    description: Finds the most frequent molecular species over time from molecular analysis output. It
+      highlights dominant reactants, products, or persistent species in reactive simulations.
+    tags:
+    - molecular analysis
+    - dominant species
+    - get dominant species
+    - molecular analysis workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_dominant_species -h'
+    aliases:
+    - get-dominant-species
+    - dominant species
+    - dominant-species
+    help_search_examples:
+    - reaxkit help "dominant species"
+    - run dominant species
+    - reaxkit help "get dominant species"
+    - reaxkit get_dominant_species -h
+  get_largest_molecule_by_mass:
+    parent_workflow: molecular_analysis_workflow
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: get_largest_molecule_by_mass'
+    command: get_largest_molecule_by_mass
+    command_kind: analysis
+    analysis_task: get_largest_molecule_by_mass
+    description: Tracks the largest molecule by mass over time from molecular analysis data. Use it to study
+      aggregation, polymerization, cluster growth, or fragmentation in reactive trajectories.
+    tags:
+    - molecular analysis
+    - largest molecule
+    - get largest molecule by mass
+    - molecular analysis workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_largest_molecule_by_mass -h'
+    aliases:
+    - get-largest-molecule-by-mass
+    - largest molecule by mass
+    - largest-molecule-by-mass
+    help_search_examples:
+    - reaxkit help "largest molecule by mass"
+    - run largest molecule by mass
+    - reaxkit help "get largest molecule by mass"
+    - reaxkit get_largest_molecule_by_mass -h
+  get_largest_molecule_composition:
+    parent_workflow: molecular_analysis_workflow
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: get_largest_molecule_composition'
+    command: get_largest_molecule_composition
+    command_kind: analysis
+    analysis_task: get_largest_molecule_composition
+    description: Reports composition of the largest molecule over time, including atom counts or formula-like
+      summaries where available. It complements largest-mass tracking by explaining what the dominant cluster
+      contains.
+    tags:
+    - molecular analysis
+    - largest molecule
+    - get largest molecule composition
+    - molecular analysis workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_largest_molecule_composition -h'
+    aliases:
+    - get-largest-molecule-composition
+    - largest molecule composition
+    - largest-molecule-composition
+    help_search_examples:
+    - reaxkit help "largest molecule composition"
+    - run largest molecule composition
+    - reaxkit help "get largest molecule composition"
+    - reaxkit get_largest_molecule_composition -h
+  get_molecule_lifetime:
+    parent_workflow: molecular_analysis_workflow
+    implementation_module: 'reaxkit.workflows.molecular_analysis_workflow: get_molecule_lifetime'
+    command: get_molecule_lifetime
+    command_kind: analysis
+    analysis_task: get_molecule_lifetime
+    description: Estimates lifetimes of molecular species occurrences across frames or iterations. It is
+      useful for separating transient intermediates from stable products in molecular analysis output.
+    tags:
+    - molecular analysis
+    - molecule lifetime
+    - get molecule lifetime
+    - molecular analysis workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_molecule_lifetime -h'
+    aliases:
+    - get-molecule-lifetime
+    - molecule lifetime
+    - molecule-lifetime
+    help_search_examples:
+    - reaxkit help "molecule lifetime"
+    - run molecule lifetime
+    - reaxkit help "get molecule lifetime"
+    - reaxkit get_molecule_lifetime -h
+  get_diffusivity:
+    parent_workflow: trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_diffusivity'
+    command: get_diffusivity
+    command_kind: analysis
+    analysis_task: get_diffusivity
+    description: Estimates get_diffusivity from trajectory displacement statistics, typically using mean-squared
+      displacement behavior. Use it to turn atom motion into diffusion coefficients for selected species
+      or atom groups.
+    tags:
+    - trajectory
+    - get_diffusivity
+    - get diffusivity
+    - trajectory workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_diffusivity -h'
+    aliases:
+    - get-diffusivity
+    - diffusion-coefficient
+    - diffusion_coefficient
+    help_search_examples:
+    - reaxkit help "get_diffusivity"
+    - run get_diffusivity
+    - reaxkit help "get diffusivity"
+    - reaxkit get_diffusivity -h
+  get_msd:
+    parent_workflow: trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_msd'
+    command: get_msd
+    command_kind: analysis
+    analysis_task: get_msd
+    description: Computes mean-squared displacement time series from trajectory coordinates. Use it to quantify
+      atom or species mobility and to prepare displacement data for get_diffusivity estimation.
+    tags:
+    - trajectory
+    - mean squared displacement
+    - get msd
+    - trajectory workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_msd -h'
+    aliases:
+    - get-msd
+    - mean-square-displacement
+    - mean_square_displacement
+    - mean square displacement
+    help_search_examples:
+    - calculate mean squared displacement from coordinates
+    - reaxkit help "get msd"
+    - reaxkit get_msd -h
+  get_rdf:
+    parent_workflow: trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_rdf'
+    command: get_rdf
+    command_kind: analysis
+    analysis_task: get_rdf
+    description: Computes radial distribution functions from trajectory coordinates and atom selections.
+      It measures pair-correlation structure, local ordering, and neighbor-shell distances.
+    tags:
+    - trajectory
+    - radial distribution function
+    - get rdf
+    - trajectory workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_rdf -h'
+    aliases:
+    - get-rdf
+    - radial-distribution-function
+    - radial_distribution_function
+    - radial distribution function
+    help_search_examples:
+    - compute radial distribution function from trajectory
+    - reaxkit help "get rdf"
+    - reaxkit get_rdf -h
+  get_rdf_property:
+    parent_workflow: trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_rdf_property'
+    command: get_rdf_property
+    command_kind: analysis
+    analysis_task: get_rdf_property
+    description: Computes property-resolved radial distribution functions from trajectory coordinates and
+      atom-level properties. It combines structural distance distributions with values such as charge, type,
+      or selected labels.
+    tags:
+    - trajectory
+    - get_rdf property
+    - radial distribution function
+    - get rdf property
+    - trajectory workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_rdf_property -h'
+    aliases:
+    - get-rdf-property
+    - get_rdf-property
+    - rdfproperty
+    - rdfprop
+    - get_rdf-prop
+    help_search_examples:
+    - reaxkit help "get_rdf property"
+    - run get_rdf property
+    - reaxkit help "get rdf property"
+    - reaxkit get_rdf_property -h
+  get_voronoi:
+    parent_workflow: trajectory_workflow
+    implementation_module: 'reaxkit.workflows.trajectory_workflow: get_voronoi'
+    command: get_voronoi
+    command_kind: analysis
+    description: Run the get voronoi workflow command provided by trajectory_workflow.
+    tags:
+    - get voronoi
+    - trajectory workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_voronoi -h'
+    aliases:
+    - get-voronoi
+    help_search_examples:
+    - reaxkit help "get voronoi"
+    - reaxkit get_voronoi -h
+  # END GENERATED COMMAND WORKFLOWS
 dataclass_usage:
   AtomicKinematicsData:
   - kinematics_workflow
@@ -645,6 +2835,9 @@ dataclass_usage:
   - params_workflow
   ForceFieldOptimizationProgressData:
   - ffield_workflow
+  ForceFieldOptimizationPlotBundleData:
+  - ffield_workflow
+  - force_field_opt_workflow
   ForceFieldOptimizationResultsData:
   - ffield_workflow
   ForceFieldOptimizationTrainingSetData:
@@ -686,6 +2879,7 @@ command_to_workflow_module:
   get_ffield_opt_results: reaxkit.workflows.file_tools.ffield_workflow
   ffield_opt_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_eos: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_opt_plots: reaxkit.workflows.force_field_opt.get_ffield_opt_plots
   get-params: reaxkit.workflows.params_workflow
   gui: reaxkit.workflows.meta.gui_workflow
   help: reaxkit.workflows.meta.help_workflow
@@ -708,13 +2902,69 @@ command_to_workflow_module:
   manage-workspace: reaxkit.workflows.meta.manage_workspace_workflow
   orthogonalize-geo: reaxkit.workflows.file_tools.geo_workflow
   get_ffield_diagnostic_data: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_diagnostics_sensitivity: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_diagnostics_evolution: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
   polarization: reaxkit.workflows.electrostatics_workflow
   polarization_field: reaxkit.workflows.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.study_design.study_workflow
-  timeseries: reaxkit.workflows.timeseries_workflow
+  timeseries: reaxkit.workflows.timeseries.timeseries_workflow
+  get_potential_energy: reaxkit.workflows.timeseries.get_potential_energy
+  get-potential-energy: reaxkit.workflows.timeseries.get_potential_energy
+  get_num_of_atoms: reaxkit.workflows.timeseries.get_num_of_atoms
+  get-num-of-atoms: reaxkit.workflows.timeseries.get_num_of_atoms
+  get_volume: reaxkit.workflows.timeseries.get_volume
+  get-volume: reaxkit.workflows.timeseries.get_volume
+  get_temperature: reaxkit.workflows.timeseries.get_temperature
+  get-temperature: reaxkit.workflows.timeseries.get_temperature
+  get_pressure: reaxkit.workflows.timeseries.get_pressure
+  get-pressure: reaxkit.workflows.timeseries.get_pressure
+  get_density: reaxkit.workflows.timeseries.get_density
+  get-density: reaxkit.workflows.timeseries.get_density
+  get_elapsed_time: reaxkit.workflows.timeseries.get_elapsed_time
+  get-elapsed-time: reaxkit.workflows.timeseries.get_elapsed_time
+  get_a: reaxkit.workflows.timeseries.get_a
+  get-a: reaxkit.workflows.timeseries.get_a
+  get_b: reaxkit.workflows.timeseries.get_b
+  get-b: reaxkit.workflows.timeseries.get_b
+  get_c: reaxkit.workflows.timeseries.get_c
+  get-c: reaxkit.workflows.timeseries.get_c
+  get_alpha: reaxkit.workflows.timeseries.get_alpha
+  get-alpha: reaxkit.workflows.timeseries.get_alpha
+  get_beta: reaxkit.workflows.timeseries.get_beta
+  get-beta: reaxkit.workflows.timeseries.get_beta
+  get_gamma: reaxkit.workflows.timeseries.get_gamma
+  get-gamma: reaxkit.workflows.timeseries.get_gamma
+  get_trajectory: reaxkit.workflows.timeseries.get_trajectory
+  get-trajectory: reaxkit.workflows.timeseries.get_trajectory
+  get_displacement: reaxkit.workflows.timeseries.get_displacement
+  get-displacement: reaxkit.workflows.timeseries.get_displacement
+  get_charge: reaxkit.workflows.timeseries.get_charge
+  get-charge: reaxkit.workflows.timeseries.get_charge
+  get_cell_dimensions: reaxkit.workflows.timeseries.get_cell_dimensions
+  get-cell-dimensions: reaxkit.workflows.timeseries.get_cell_dimensions
+  get_electric_field: reaxkit.workflows.timeseries.get_electric_field
+  get-electric-field: reaxkit.workflows.timeseries.get_electric_field
+  get_eregime: reaxkit.workflows.timeseries.get_eregime
+  get-eregime: reaxkit.workflows.timeseries.get_eregime
+  get_partial_energy: reaxkit.workflows.timeseries.get_partial_energy
+  get-partial-energy: reaxkit.workflows.timeseries.get_partial_energy
+  get_restraint: reaxkit.workflows.timeseries.get_restraint
+  get-restraint: reaxkit.workflows.timeseries.get_restraint
+  get_molecular_frequency: reaxkit.workflows.timeseries.get_molecular_frequency
+  get-molecular-frequency: reaxkit.workflows.timeseries.get_molecular_frequency
+  get_molecular_totals: reaxkit.workflows.timeseries.get_molecular_totals
+  get-molecular-totals: reaxkit.workflows.timeseries.get_molecular_totals
+  get_total_molecules: reaxkit.workflows.timeseries.get_total_molecules
+  get-total-molecules: reaxkit.workflows.timeseries.get_total_molecules
+  get_total_atoms: reaxkit.workflows.timeseries.get_total_atoms
+  get-total-atoms: reaxkit.workflows.timeseries.get_total_atoms
+  get_total_molecular_mass: reaxkit.workflows.timeseries.get_total_molecular_mass
+  get-total-molecular-mass: reaxkit.workflows.timeseries.get_total_molecular_mass
+  get_geometry_optimization: reaxkit.workflows.timeseries.get_geometry_optimization
+  get-geometry-optimization: reaxkit.workflows.timeseries.get_geometry_optimization
   get_trainset_data: reaxkit.workflows.file_tools.trainset_workflow
   get_trainset_group_comments: reaxkit.workflows.file_tools.trainset_workflow
   trim-xmolout: reaxkit.workflows.file_tools.xmolout_workflow
@@ -781,6 +3031,8 @@ command_to_workflow_module:
   manage_workspace: reaxkit.workflows.meta.manage_workspace_workflow
   orthogonalize_geo: reaxkit.workflows.file_tools.geo_workflow
   get-ffield-diagnostic-data: reaxkit.workflows.file_tools.ffield_workflow
+  get-ffield-diagnostics-sensitivity: reaxkit.workflows.file_tools.ffield_workflow
+  get-ffield-diagnostics-evolution: reaxkit.workflows.file_tools.ffield_workflow
   place_geo: reaxkit.workflows.file_tools.geo_workflow
   polarization-field: reaxkit.workflows.electrostatics_workflow
   sort_geo: reaxkit.workflows.file_tools.geo_workflow
@@ -1612,4 +3864,3 @@ flags_across_all_workflows:
     - gen_plot_workflow: gen_plot, gen-plot
   "--z":
     - gen_plot_workflow: gen_plot, gen-plot
-

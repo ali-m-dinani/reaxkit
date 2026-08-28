@@ -92,6 +92,14 @@ Each of these runs produces one line in `fort.13`.
 
 ---
 
+## Handler provenance columns
+
+`Fort13Handler.dataframe()` returns `row_order`, `source_line_number`, `epoch`,
+and `total_ff_error`. Record order is contiguous across accepted numeric
+records, while source line and epoch preserve physical line positions even when
+blank or invalid lines occur. Fortran `D` exponents and trailing comments are
+accepted.
+
 ## ReaxKit Usage
 
 In ReaxKit, `fort.13` is typically used to:

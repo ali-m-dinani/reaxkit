@@ -89,7 +89,7 @@ class Fort79Handler(BaseHandler):
     Summary table
         One row per optimized parameter, returned by ``dataframe()``,
         with columns:
-        ["identifier",
+        ["row_order", "source_line_number", "raw_identifier", "identifier",
          "value1", "value2", "value3",
          "diff1", "diff2", "diff3",
          "a", "b", "c",
@@ -112,7 +112,7 @@ class Fort79Handler(BaseHandler):
       tokens are converted to ``NaN`` by design.
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
-    _CACHE_VERSION = "2"
+    _CACHE_VERSION = "3"
 
     def __init__(self, file_path: str | Path = "fort.79", reporter=None):
         """
@@ -150,7 +150,9 @@ class Fort79Handler(BaseHandler):
                 self._reporter("load", i + 1, n, "Parsing fort.79")
             line = lines[i]
             if line.strip().startswith("Values used for parameter"):
-                ident = _normalize_identifier(line.split("parameter", 1)[1].strip())
+                source_line_number = i + 1
+                raw_identifier = line.split("parameter", 1)[1].strip()
+                ident = _normalize_identifier(raw_identifier)
 
                 # ---- three "Values used..." numbers (may wrap) ----
                 v1 = v2 = v3 = math.nan
@@ -239,6 +241,9 @@ class Fort79Handler(BaseHandler):
 
                 rows.append(
                     {
+                        "row_order": len(rows) + 1,
+                        "source_line_number": source_line_number,
+                        "raw_identifier": raw_identifier,
                         "identifier": ident,
                         "value1": v1, "value2": v2, "value3": v3,
                         "diff1": d1, "diff2": d2, "diff3": d3,
@@ -254,7 +259,7 @@ class Fort79Handler(BaseHandler):
         df = pd.DataFrame(
             rows,
             columns=[
-                "identifier",
+                "row_order", "source_line_number", "raw_identifier", "identifier",
                 "value1", "value2", "value3",
                 "diff1", "diff2", "diff3",
                 "a", "b", "c",
