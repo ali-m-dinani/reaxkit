@@ -13,7 +13,7 @@ label assignment and tabular output, and it does not infer hybridization states.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
@@ -431,6 +431,29 @@ class CoordinationStatusTask(AnalysisTask):
         if reporter:
             reporter("analyze", total, total, "Finished coordination status")
         return CoordinationStatusResult(table=out, request=request)
+
+    def run_stream(self, frames, request: CoordinationStatusRequest, reporter=None) -> CoordinationStatusResult:
+        """Classify coordination from streamed connectivity bundles."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.connectivity.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming coordination analysis")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
+        return CoordinationStatusResult(table=table, request=request)
 
 
 __all__ = [

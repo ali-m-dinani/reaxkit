@@ -347,7 +347,11 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
         args,
         handler_name="Fort7Handler",
         source_path=fort7_path,
-        factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        factory=lambda: Fort7Handler(
+            fort7_path,
+            reporter=reporter,
+            frame_indices=args.get("_frame_indices"),
+        ),
     )
     sim = _merge_simulation_data(
         adapter._load_simulation_from_xmolout(args, reporter=reporter),

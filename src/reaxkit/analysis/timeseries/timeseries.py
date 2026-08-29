@@ -13,7 +13,7 @@ series construction and normalization rather than higher-level event logic.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Literal, Optional, Sequence, Union
 
 import numpy as np
@@ -1110,6 +1110,29 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         )
         return TrajectoryCoordinateSeriesResult(table=table, request=request)
 
+    def run_stream(self, frames, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TrajectoryCoordinateSeriesResult:
+        """Build coordinate rows while retaining only the current trajectory frame."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming trajectory coordinate series")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
+        return TrajectoryCoordinateSeriesResult(table=table, request=request)
+
 
 @register_task("trajectory_displacement_series", label="Trajectory Displacement Series")
 class TrajectoryDisplacementSeriesTask(AnalysisTask):
@@ -1170,6 +1193,86 @@ class TrajectoryDisplacementSeriesTask(AnalysisTask):
             reference_frame=request.reference_frame,
             reporter=reporter,
         )
+        return TrajectoryDisplacementSeriesResult(table=table, request=request)
+
+    def run_stream(self, frames, request: TrajectoryDisplacementSeriesRequest, reporter=None) -> TrajectoryDisplacementSeriesResult:
+        """Build displacement rows without materializing unselected atom coordinates."""
+        dims = tuple(str(dim).lower() for dim in request.dims)
+        dim_to_cols = {
+            "x": (0,), "y": (1,), "z": (2,), "xy": (0, 1),
+            "xz": (0, 2), "yz": (1, 2), "xyz": (0, 1, 2),
+        }
+        if not dims or any(dim not in dim_to_cols for dim in dims):
+            raise ValueError("dims must contain x/y/z/xy/xz/yz/xyz.")
+
+        atom_indices: list[int] | None = None
+        atom_ids: list[int] = []
+        atom_types: list[str] = []
+        sampled: list[tuple[int, int, np.ndarray]] = []
+        reference_positions: np.ndarray | None = None
+        reference_index = int(request.reference_frame)
+        processed = 0
+
+        for stream_index, data in enumerate(frames):
+            positions = np.asarray(data.positions, dtype=float)
+            if positions.ndim != 3 or positions.shape[0] != 1:
+                raise ValueError("Streamed TrajectoryData must contain exactly one frame.")
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+
+            if atom_indices is None:
+                n_atoms = positions.shape[1]
+                if request.atom_ids is not None:
+                    requested_ids = [int(value) for value in request.atom_ids]
+                    id_to_index = {int(value): index for index, value in enumerate(data.atom_ids)}
+                    missing = [value for value in requested_ids if value not in id_to_index]
+                    if missing:
+                        raise ValueError(f"atom_id {missing[0]} not found in TrajectoryData.")
+                    atom_indices = [id_to_index[value] for value in requested_ids]
+                elif request.atom_types:
+                    chosen = {str(value) for value in request.atom_types}
+                    atom_indices = [index for index, value in enumerate(data.elements) if str(value) in chosen]
+                else:
+                    atom_indices = list(range(n_atoms))
+                atom_ids = [int(data.atom_ids[index]) for index in atom_indices]
+                atom_types = [str(data.elements[index]) for index in atom_indices]
+            elif positions.shape[1] != len(data.atom_ids):
+                raise ValueError("Streamed trajectory atom dimension changed between frames.")
+
+            selected = np.asarray(positions[0, atom_indices, :], dtype=float)
+            if source_index == reference_index:
+                reference_positions = selected.copy()
+            if stream_index % max(1, int(request.every)) == 0:
+                iteration = int(np.asarray(data.iterations).reshape(-1)[0]) if data.iterations is not None else source_index
+                sampled.append((source_index, iteration, selected.copy()))
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming trajectory displacement series")
+
+        if reference_positions is None:
+            raise ValueError(f"reference_frame {reference_index} was not found in the trajectory stream.")
+
+        rows: list[dict[str, object]] = []
+        for source_index, iteration, positions in sampled:
+            displacement = positions - reference_positions
+            for local_atom, (atom_id, atom_type) in enumerate(zip(atom_ids, atom_types)):
+                for dim in dims:
+                    cols = dim_to_cols[dim]
+                    vector = displacement[local_atom, list(cols)]
+                    value = float(vector[0]) if len(cols) == 1 else float(np.sqrt(np.sum(np.square(vector))))
+                    rows.append(
+                        {
+                            "frame_index": source_index,
+                            "iter": iteration,
+                            "atom_id": atom_id,
+                            "atom_type": atom_type,
+                            "dim": dim,
+                            "coord": value,
+                        }
+                    )
+        table = pd.DataFrame(rows)
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
         return TrajectoryDisplacementSeriesResult(table=table, request=request)
 
 
@@ -1394,6 +1497,29 @@ class ChargeSeriesTask(AnalysisTask):
             request=request,
             table=table,
         )
+
+    def run_stream(self, frames, request: ChargeSeriesRequest, reporter=None) -> ChargeSeriesResult:
+        """Build per-atom charge series from one charge frame at a time."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = (data.metadata or {}).get("source_frame_indices")
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming charge series")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id"], kind="stable").reset_index(drop=True)
+        return ChargeSeriesResult(request=request, table=table)
 
 
 def _electric_field_group(

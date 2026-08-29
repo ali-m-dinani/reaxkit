@@ -68,6 +68,10 @@ from reaxkit.engine.reaxff.adapter_parts.loaders_dynamics import (
     load_simulation as _load_simulation_impl,
     load_trajectory as _load_trajectory_impl,
 )
+from reaxkit.engine.reaxff.adapter_parts.streaming import (
+    STREAMABLE_REAXFF_TYPES,
+    iter_reaxff_data,
+)
 from reaxkit.engine.reaxff.adapter_parts.loaders_forcefield import (
     load_force_field as _load_force_field_impl,
     load_force_field_optimization as _load_force_field_optimization_impl,
@@ -135,6 +139,15 @@ class ReaxFFAdapter(EngineAdapter):
     def quick_n_frames(cls, args: dict) -> int | None:
         """Fast frame-count probe for Web UI metadata updates."""
         return _quick_n_frames_helper(args)
+
+    def supports_streaming(self, data_type, args: dict | None = None) -> bool:
+        """Return whether ReaxFF has a constant-memory frame reader."""
+        _ = args
+        return data_type in STREAMABLE_REAXFF_TYPES
+
+    def iter_data(self, data_type, args: dict, reporter=None):
+        """Yield canonical ReaxFF frames without materializing full files."""
+        yield from iter_reaxff_data(self, data_type, args, reporter=reporter)
 
     def detect(self, path: str | Path) -> float:
         """Detect.

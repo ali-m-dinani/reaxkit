@@ -14,7 +14,7 @@ geometric descriptors outside bond-order-derived relationships.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Literal, Optional, Sequence
 
 import numpy as np
@@ -363,6 +363,34 @@ class ConnectionListTask(AnalysisTask):
 
         out = out.sort_values(["frame_idx", "source", "destination"], kind="stable").reset_index(drop=True)
         return ConnectionListResult(table=out, request=request)
+
+    def run_stream(self, frames, request: ConnectionListRequest, reporter=None) -> ConnectionListResult:
+        """Build a connection list from one connectivity frame at a time."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_idx"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming connection-list analysis")
+        if not tables:
+            table = pd.DataFrame(
+                columns=["frame_idx", "iteration", "source", "source_type", "destination", "destination_type", "BO"]
+            )
+        else:
+            table = pd.concat(tables, ignore_index=True).sort_values(
+                ["frame_idx", "source", "destination"], kind="stable"
+            ).reset_index(drop=True)
+        return ConnectionListResult(table=table, request=request)
 
 
 @dataclass
@@ -792,6 +820,33 @@ class ConnectionStatsTask(AnalysisTask):
                 request=request,
             )
 
+        by = ["source", "source_type", "destination", "destination_type"]
+        if request.how == "count":
+            out = edges.groupby(by, as_index=False).size().rename(columns={"size": "value"})
+        elif request.how == "max":
+            out = edges.groupby(by, as_index=False)["BO"].max().rename(columns={"BO": "value"})
+        else:
+            out = edges.groupby(by, as_index=False)["BO"].mean().rename(columns={"BO": "value"})
+        out = out.sort_values(["source", "destination"], kind="stable").reset_index(drop=True)
+        return ConnectionStatsResult(table=out, request=request)
+
+    def run_stream(self, frames, request: ConnectionStatsRequest, reporter=None) -> ConnectionStatsResult:
+        """Aggregate streamed connectivity without retaining dense matrices."""
+        edges = ConnectionListTask().run_stream(
+            frames,
+            ConnectionListRequest(
+                frames=None,
+                every=request.every,
+                min_bo=request.min_bo,
+                undirected=request.undirected,
+            ),
+            reporter=reporter,
+        ).table
+        if edges.empty:
+            return ConnectionStatsResult(
+                table=pd.DataFrame(columns=["source", "source_type", "destination", "destination_type", "value"]),
+                request=request,
+            )
         by = ["source", "source_type", "destination", "destination_type"]
         if request.how == "count":
             out = edges.groupby(by, as_index=False).size().rename(columns={"size": "value"})

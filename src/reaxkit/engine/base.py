@@ -55,8 +55,11 @@ class EngineAdapter(ABC):
 
     _FRAME_SELECTIVE_DATA_TYPES = {
         TrajectoryData,
+        ChargeData,
         ConnectivityData,
         ConnectivityTrajectoryData,
+        CoordinationStatusBundleData,
+        ElectrostaticsData,
     }
 
     @abstractmethod
@@ -74,6 +77,20 @@ class EngineAdapter(ABC):
     def load(self, data_type, args: dict, reporter=None):
         """Load requested domain data type from engine-specific sources."""
         args = self._args_with_frame_selection(data_type, args)
+        from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
+
+        resolved_reporter = reporter if callable(reporter) else resolve_reporter(args)
+        data_name = getattr(data_type, "__name__", str(data_type))
+        with progress_operation(
+            resolved_reporter,
+            "load",
+            f"Loading {data_name} with {self.__class__.__name__}",
+            f"Loaded {data_name}",
+        ) as load_reporter:
+            return self._load_with_reporter(data_type, args, reporter=load_reporter)
+
+    def _load_with_reporter(self, data_type, args: dict, reporter=None):
+        """Dispatch a typed load using a lifecycle-aware reporter."""
         if data_type is TrajectoryData:
             return self._invoke_loader("load_trajectory", args, reporter=reporter)
         if data_type is GeometryData:
@@ -138,6 +155,36 @@ class EngineAdapter(ABC):
             return self._invoke_loader("load_molecular_analysis", args, reporter=reporter)
         raise ValueError(f"{self.name} cannot load data type: {data_type}")
 
+    def supports_streaming(self, data_type, args: dict | None = None) -> bool:
+        """Return whether this adapter can yield bounded-memory frame data."""
+        _ = (data_type, args)
+        return False
+
+    def stream(self, data_type, args: dict, reporter=None):
+        """Yield canonical one-frame payloads with a shared progress lifecycle."""
+        if not self.supports_streaming(data_type, args):
+            raise ValueError(f"{self.name} cannot stream data type: {data_type}")
+        load_args = self._args_with_frame_selection(data_type, args)
+        from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
+
+        resolved_reporter = reporter if callable(reporter) else resolve_reporter(load_args)
+
+        def _iterator():
+            with progress_operation(
+                resolved_reporter,
+                "stream",
+                f"Streaming {getattr(data_type, '__name__', str(data_type))} with {self.__class__.__name__}",
+                f"Finished streaming {getattr(data_type, '__name__', str(data_type))}",
+            ) as stream_reporter:
+                yield from self.iter_data(data_type, load_args, reporter=stream_reporter)
+
+        return _iterator()
+
+    def iter_data(self, data_type, args: dict, reporter=None):
+        """Engine-specific implementation for :meth:`stream`."""
+        _ = (data_type, args, reporter)
+        raise ValueError(f"{self.name} cannot stream data type: {data_type}")
+
     @classmethod
     def _args_with_frame_selection(cls, data_type, args: dict) -> dict:
         """Promote public frame selectors to the selective-loader contract.
@@ -152,7 +199,7 @@ class EngineAdapter(ABC):
 
         from reaxkit.core.utils.frame_utils import parse_frame_indices
 
-        for name in ("frames", "frame_indices"):
+        for name in ("frames", "frame_indices", "frame"):
             raw = args.get(name)
             if raw is None:
                 continue

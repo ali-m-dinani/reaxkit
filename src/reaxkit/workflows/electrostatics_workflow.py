@@ -557,8 +557,6 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct electrostatics command."""
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
-    if canonical in {"dipole", "polarization"} and not getattr(args, "frames", None):
-        raise ValueError("Provide --frames selector (for example --frames 0:20:2).")
 
     task_cls = TASK_REGISTRY[canonical]
     request = REQUEST_BUILDERS[canonical](args)

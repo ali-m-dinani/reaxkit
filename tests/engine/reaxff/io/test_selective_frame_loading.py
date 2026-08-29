@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from reaxkit.domain.data_models import ChargeData
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
@@ -106,3 +107,23 @@ def test_reaxff_connectivity_adapter_preserves_source_frame_mapping(tmp_path: Pa
     assert data.iterations.tolist() == [30, 0]
     assert data.source_frame_indices.tolist() == [3, 0]
     assert len(data.bond_orders) == 2
+
+
+def test_reaxff_charge_adapter_preserves_source_frame_mapping(tmp_path: Path):
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    xmolout.write_text(_xmolout(5), encoding="utf-8")
+    fort7.write_text(_fort7(5), encoding="utf-8")
+
+    data = ReaxFFAdapter().load(
+        ChargeData,
+        {
+            "fort7": str(fort7),
+            "xmolout": str(xmolout),
+            "frames": [3, 0],
+        },
+    )
+
+    assert data.iterations.tolist() == [30, 0]
+    assert data.charges.shape == (2, 2)
+    assert data.metadata["source_frame_indices"] == [3, 0]

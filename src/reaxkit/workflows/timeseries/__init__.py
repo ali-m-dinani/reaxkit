@@ -14,6 +14,7 @@ ALL_COMMANDS = (
     "get_alpha",
     "get_beta",
     "get_gamma",
+    "get_frames_count",
     "get_trajectory",
     "get_displacement",
     "get_charge",

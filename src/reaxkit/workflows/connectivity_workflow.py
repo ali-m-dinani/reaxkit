@@ -32,6 +32,7 @@ from reaxkit.analysis.connectivity.coordination import CoordinationStatusRequest
 from reaxkit.analysis.connectivity.hybridization import HybridizationStatusRequest
 from reaxkit.analysis.trajectory.relabel import TrajectoryRelabelByCoordinationRequest
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
@@ -569,15 +570,26 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
     if canonical == "relabel_traj_using_coordination":
         normalized = normalize_storage_args(vars(args))
+        reporter = resolve_reporter(normalized)
         adapter = resolve_engine(
             normalized.get("input") or normalized.get("run_dir") or normalized.get("xmolout") or ".",
             engine=getattr(args, "engine", None),
         )
-        composite = adapter.load(ConnectivityTrajectoryData, normalized)
+        composite = adapter.load(ConnectivityTrajectoryData, normalized, reporter=reporter)
 
         relabel_task_cls = TASK_REGISTRY["trajectory_relabel_by_coordination"]
         relabel_request = _build_coordination_relabel_request(args)
-        relabel_result = relabel_task_cls().run(composite, relabel_request)
+        with progress_operation(
+            reporter,
+            "analyze",
+            "Running trajectory relabeling by coordination",
+            "Finished trajectory relabeling by coordination",
+        ) as analysis_reporter:
+            relabel_result = relabel_task_cls().run(
+                composite,
+                relabel_request,
+                reporter=analysis_reporter,
+            )
         if args.export:
             out = resolve_output_path(
                 args.export,

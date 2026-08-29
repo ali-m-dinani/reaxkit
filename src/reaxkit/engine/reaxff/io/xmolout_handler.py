@@ -301,6 +301,88 @@ class XmoloutHandler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
+    def stream_file_frames(self) -> Iterator[Dict[str, Any]]:
+        """Yield coordinate frames directly from ``xmolout`` without caching them.
+
+        Unlike :meth:`iter_frames`, this method does not call ``parse()`` and
+        never populates ``self._frames``.  At most one atom table is retained
+        while the caller consumes the iterator.
+        """
+        requested = set(self._frame_indices) if self._frame_indices is not None else None
+        max_requested = max(requested, default=-1) if requested is not None else None
+        source_index = -1
+        emitted = 0
+
+        with open(self.path, "r", encoding="utf-8") as fh:
+            while True:
+                count_line = next((raw.strip() for raw in fh if raw.strip()), None)
+                if count_line is None:
+                    break
+                values = count_line.split()
+                if len(values) != 1 or not values[0].isdigit():
+                    continue
+
+                source_index += 1
+                if max_requested is not None and source_index > max_requested:
+                    break
+                n_atoms = int(values[0])
+                header = next((raw.strip() for raw in fh if raw.strip()), None)
+                if header is None:
+                    break
+                header_values = header.split()
+                selected = requested is None or source_index in requested
+
+                atom_rows: list[list[Any]] = []
+                atom_columns: list[str] | None = None
+                for _ in range(n_atoms):
+                    atom_line = next((raw.strip() for raw in fh if raw.strip()), None)
+                    if atom_line is None:
+                        break
+                    if not selected:
+                        continue
+                    atom_values = atom_line.split()
+                    if len(atom_values) < 4:
+                        continue
+                    if atom_columns is None:
+                        n_extras = max(0, len(atom_values) - 4)
+                        if self._extra_atom_cols:
+                            extra_names = list(self._extra_atom_cols)[:n_extras]
+                            extra_names.extend(
+                                f"unknown_{i + 1}"
+                                for i in range(len(extra_names), n_extras)
+                            )
+                        else:
+                            extra_names = [f"unknown_{i + 1}" for i in range(n_extras)]
+                        atom_columns = ["atom_type", "x", "y", "z", *extra_names]
+                    extras = [float(value) for value in atom_values[4:len(atom_columns)]]
+                    extras.extend([float("nan")] * (len(atom_columns) - 4 - len(extras)))
+                    atom_rows.append(
+                        [atom_values[0], *[float(value) for value in atom_values[1:4]], *extras]
+                    )
+
+                if not selected:
+                    continue
+                if len(header_values) != 9 or not header_values[1].lstrip("-").isdigit():
+                    continue
+                if not self.simulation_name:
+                    self.simulation_name = header_values[0]
+                emitted += 1
+                if callable(self._reporter):
+                    total = len(requested) if requested is not None else 0
+                    self._reporter("stream", emitted, total, "Streaming xmolout frames")
+                yield {
+                    "source_index": source_index,
+                    "iter": int(header_values[1]),
+                    "num_of_atoms": n_atoms,
+                    "potential_energy": float(header_values[2]),
+                    "cell_lengths": [float(value) for value in header_values[3:6]],
+                    "cell_angles": [float(value) for value in header_values[6:9]],
+                    "frame": pd.DataFrame(
+                        atom_rows,
+                        columns=atom_columns or ["atom_type", "x", "y", "z"],
+                    ),
+                }
+
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:
         """Disk cache dir."""

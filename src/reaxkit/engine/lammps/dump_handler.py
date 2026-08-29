@@ -268,6 +268,121 @@ class LAMMPSDumpHandler(BaseHandler):
                     break
         return rows, records
 
+    def stream_file_frames(self) -> Iterator[dict[str, Any]]:
+        """Yield dump frames directly from disk without populating ``_frames``."""
+        with open(self.path, "r", encoding="utf-8") as fh:
+            first = self._next_non_empty(fh)
+        if first is None:
+            return
+        if first.startswith("ITEM:"):
+            yield from self._stream_item_frames()
+        else:
+            yield from self._stream_xyz_frames()
+
+    def _stream_xyz_frames(self) -> Iterator[dict[str, Any]]:
+        """Stream XYZ-like LAMMPS frames with constant memory usage."""
+        requested = set(self._frame_indices) if self._frame_indices is not None else None
+        max_requested = max(requested, default=-1) if requested is not None else None
+        source_index = -1
+        emitted = 0
+        with open(self.path, "r", encoding="utf-8") as fh:
+            while True:
+                count_line = self._next_non_empty(fh)
+                if count_line is None:
+                    break
+                source_index += 1
+                if max_requested is not None and source_index > max_requested:
+                    break
+                n_atoms = int(count_line.split()[0])
+                header = self._next_non_empty(fh)
+                if header is None:
+                    break
+                selected = requested is None or source_index in requested
+                atom_rows: list[list[Any]] = []
+                for _ in range(n_atoms):
+                    atom_line = self._next_non_empty(fh)
+                    if atom_line is None:
+                        break
+                    if not selected:
+                        continue
+                    values = atom_line.split()
+                    if len(values) >= 4:
+                        atom_rows.append(
+                            [values[0], float(values[1]), float(values[2]), float(values[3])]
+                        )
+                if not selected:
+                    continue
+                emitted += 1
+                if callable(self._reporter):
+                    total = len(requested) if requested is not None else 0
+                    self._reporter("stream", emitted, total, "Streaming LAMMPS frames")
+                yield {
+                    "source_index": source_index,
+                    "iter": self._extract_timestep(header, fallback=source_index),
+                    "num_of_atoms": n_atoms,
+                    "frame": pd.DataFrame(atom_rows, columns=["atom_type", "x", "y", "z"]),
+                    "box_bounds": None,
+                }
+
+    def _stream_item_frames(self) -> Iterator[dict[str, Any]]:
+        """Stream native ``ITEM:`` LAMMPS frames with constant memory usage."""
+        requested = set(self._frame_indices) if self._frame_indices is not None else None
+        max_requested = max(requested, default=-1) if requested is not None else None
+        source_index = -1
+        emitted = 0
+        with open(self.path, "r", encoding="utf-8") as fh:
+            while True:
+                line = self._next_non_empty(fh)
+                if line is None:
+                    break
+                if not line.startswith("ITEM: TIMESTEP"):
+                    continue
+                source_index += 1
+                if max_requested is not None and source_index > max_requested:
+                    break
+                iter_line = self._next_non_empty(fh)
+                number_header = self._next_non_empty(fh)
+                count_line = self._next_non_empty(fh)
+                bounds_header = self._next_non_empty(fh)
+                if None in (iter_line, number_header, count_line, bounds_header):
+                    break
+                if not str(number_header).startswith("ITEM: NUMBER OF ATOMS"):
+                    raise ValueError("Malformed LAMMPS dump: expected NUMBER OF ATOMS header.")
+                if not str(bounds_header).startswith("ITEM: BOX BOUNDS"):
+                    raise ValueError("Malformed LAMMPS dump: expected BOX BOUNDS header.")
+                n_atoms = int(float(str(count_line)))
+                bounds: list[tuple[float, ...]] = []
+                for _ in range(3):
+                    bound_line = self._next_non_empty(fh)
+                    if bound_line is None:
+                        break
+                    bounds.append(tuple(float(value) for value in bound_line.split()))
+                atom_header = self._next_non_empty(fh)
+                if atom_header is None or not atom_header.startswith("ITEM: ATOMS"):
+                    raise ValueError("Malformed LAMMPS dump: expected ATOMS header.")
+                atom_columns = atom_header.split()[2:]
+                selected = requested is None or source_index in requested
+                atom_rows: list[list[str]] = []
+                for _ in range(n_atoms):
+                    atom_line = self._next_non_empty(fh)
+                    if atom_line is None:
+                        break
+                    if selected:
+                        atom_rows.append(atom_line.split())
+                if not selected:
+                    continue
+                emitted += 1
+                if callable(self._reporter):
+                    total = len(requested) if requested is not None else 0
+                    self._reporter("stream", emitted, total, "Streaming LAMMPS frames")
+                yield {
+                    "source_index": source_index,
+                    "iter": int(float(str(iter_line))),
+                    "num_of_atoms": n_atoms,
+                    "frame": self._frame_from_item_rows(atom_columns, atom_rows),
+                    "box_bounds": bounds if bounds else None,
+                }
+
     def _report_progress(self, lines_read: int, total_lines: int, stage: str, *, force: bool = False) -> None:
         """Emit throttled progress events to the optional reporter callback."""
         if not callable(self._reporter):

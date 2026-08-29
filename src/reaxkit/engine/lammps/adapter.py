@@ -30,6 +30,75 @@ from reaxkit.engine.lammps.lammps_log_handler import LAMMPSLogHandler
 class LAMMPSAdapter(EngineAdapter):
     """Adapter scaffold for LAMMPS trajectory formats."""
 
+    def supports_streaming(self, data_type, args: dict | None = None) -> bool:
+        """LAMMPS dumps can be consumed one frame at a time."""
+        _ = args
+        return data_type in {TrajectoryData, ConnectivityTrajectoryData}
+
+    @staticmethod
+    def _stream_trajectory_frame(record: dict) -> TrajectoryData:
+        table = record["frame"]
+        coordinates = table[["x", "y", "z"]].to_numpy(dtype=float)
+        elements = table["atom_type"].astype(str).tolist()
+        atom_ids = list(range(1, len(elements) + 1))
+        iteration = int(record["iter"])
+        source_index = int(record["source_index"])
+        cell_lengths = None
+        bounds = record.get("box_bounds")
+        if bounds and len(bounds) >= 3:
+            cell_lengths = np.asarray(
+                [[
+                    float(bounds[0][1] - bounds[0][0]),
+                    float(bounds[1][1] - bounds[1][0]),
+                    float(bounds[2][1] - bounds[2][0]),
+                ]],
+                dtype=float,
+            )
+        simulation = SimulationData(
+            atom_ids=atom_ids,
+            iterations=np.asarray([iteration], dtype=int),
+            elements=elements,
+            num_of_atoms=np.asarray([len(atom_ids)], dtype=int),
+            cell_lengths=cell_lengths,
+            cell_angles=np.full((1, 3), 90.0, dtype=float) if cell_lengths is not None else None,
+        )
+        return TrajectoryData(
+            positions=coordinates[np.newaxis, :, :],
+            elements=elements,
+            atom_ids=atom_ids,
+            simulation=simulation,
+            iterations=np.asarray([iteration], dtype=int),
+            atom_labels=np.asarray([elements], dtype=object),
+            source_frame_indices=np.asarray([source_index], dtype=int),
+        )
+
+    def iter_data(self, data_type, args: dict, reporter=None):
+        """Yield canonical LAMMPS frames without retaining prior frames."""
+        handler = LAMMPSDumpHandler(
+            self._resolve_dump_path(args),
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        )
+        for record in handler.stream_file_frames():
+            trajectory = self._stream_trajectory_frame(record)
+            if data_type is TrajectoryData:
+                yield trajectory
+                continue
+            n_atoms = len(trajectory.atom_ids)
+            source_indices = trajectory.source_frame_indices
+            connectivity = ConnectivityData(
+                connectivity=[],
+                bond_orders=[],
+                sum_bond_orders=np.full((1, n_atoms), np.nan, dtype=float),
+                atom_ids=trajectory.atom_ids,
+                elements=trajectory.elements,
+                simulation=trajectory.simulation,
+                iterations=trajectory.iterations,
+                source_frame_indices=source_indices,
+                metadata={"source": "lammps", "connectivity_available": False, "streaming": True},
+            )
+            yield ConnectivityTrajectoryData(connectivity=connectivity, trajectory=trajectory)
+
     def detect(self, path: str | Path) -> float:
         """Score whether a path likely refers to a LAMMPS run location.
 
@@ -145,6 +214,50 @@ class LAMMPSAdapter(EngineAdapter):
         if found is not None:
             return found
         return initial
+
+    @staticmethod
+    def _quick_n_frames_from_dump(path: Path) -> int | None:
+        """Count LAMMPS dump frame headers without constructing frame tables."""
+        if not path.exists() or not path.is_file():
+            return None
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                first = next((raw.strip() for raw in fh if raw.strip()), None)
+                if first is None:
+                    return 0
+                if first.startswith("ITEM:"):
+                    count = int(first.startswith("ITEM: TIMESTEP"))
+                    count += sum(1 for raw in fh if raw.strip().startswith("ITEM: TIMESTEP"))
+                    return count
+
+            count = 0
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                while True:
+                    count_line = next((raw.strip() for raw in fh if raw.strip()), None)
+                    if count_line is None:
+                        break
+                    values = count_line.split()
+                    if len(values) != 1 or not values[0].isdigit():
+                        return None
+                    n_atoms = int(values[0])
+                    header = next((raw for raw in fh if raw.strip()), None)
+                    if header is None:
+                        break
+                    complete = True
+                    for _ in range(n_atoms):
+                        if next((raw for raw in fh if raw.strip()), None) is None:
+                            complete = False
+                            break
+                    if not complete:
+                        break
+                    count += 1
+            return count
+        except (OSError, ValueError):
+            return None
+
+    def quick_n_frames(self, args: dict) -> int | None:
+        """Return a streaming frame count for XYZ-like or native LAMMPS dumps."""
+        return self._quick_n_frames_from_dump(self._resolve_dump_path(args))
 
     def _resolve_log_path(self, args: dict) -> Path:
         """Resolve best candidate ``log.lammps`` path from adapter arguments."""

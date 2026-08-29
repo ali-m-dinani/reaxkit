@@ -14,7 +14,7 @@ or event-detection logic.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
@@ -400,6 +400,29 @@ class HybridizationStatusTask(AnalysisTask):
         if reporter:
             reporter("analyze", total, total, "Finished hybridization status")
         return HybridizationStatusResult(table=out, request=request)
+
+    def run_stream(self, frames, request: HybridizationStatusRequest, reporter=None) -> HybridizationStatusResult:
+        """Classify hybridization from one connectivity frame at a time."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming hybridization analysis")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values(["frame_index", "atom_id"], kind="mergesort").reset_index(drop=True)
+        return HybridizationStatusResult(table=table, request=request)
 
 
 __all__ = [

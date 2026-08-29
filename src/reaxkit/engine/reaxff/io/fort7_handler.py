@@ -25,7 +25,7 @@ from pathlib import Path
 import pickle
 import re
 import shutil
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Iterator, Optional
 import pandas as pd
 
 from reaxkit.engine.reaxff.io.base import BaseHandler
@@ -372,6 +372,87 @@ class Fort7Handler(BaseHandler):
         """Count lines."""
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
+
+    def stream_file_frames(self) -> Iterator[Dict[str, Any]]:
+        """Yield ``fort.7`` frames without materializing the trajectory.
+
+        The generator retains only the rows and totals for the current
+        iteration.  It intentionally bypasses the handler parse/cache path so
+        streaming analysis does not create a second full in-memory copy.
+        """
+        requested = set(self._frame_indices) if self._frame_indices is not None else None
+        max_requested = max(requested, default=-1) if requested is not None else None
+        source_index = -1
+        emitted = 0
+        current: dict[str, Any] | None = None
+        atom_rows: list[list[float | int]] = []
+        totals: list[float] = []
+
+        def finalize() -> Dict[str, Any] | None:
+            nonlocal emitted
+            if current is None or not current["selected"] or not atom_rows:
+                return None
+            num_bonds = int(current["num_of_bonds"])
+            columns = (
+                ["atom_num", "atom_type_num"]
+                + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
+                + ["molecule_num"]
+                + [f"BO{i}" for i in range(1, num_bonds + 1)]
+                + ["sum_BOs", "num_LPs", "partial_charge"]
+            )
+            extra = max(0, len(atom_rows[0]) - len(columns))
+            columns.extend(f"unknown{i}" for i in range(1, extra + 1))
+            emitted += 1
+            if callable(self._reporter):
+                total = len(requested) if requested is not None else 0
+                self._reporter("stream", emitted, total, "Streaming fort.7 frames")
+            return {
+                "source_index": int(current["source_index"]),
+                "iter": int(current["iter"]),
+                "num_of_atoms": int(current["num_of_atoms"]),
+                "num_of_bonds": num_bonds,
+                "simulation_name": str(current["simulation_name"]),
+                "totals": list(totals),
+                "frame": pd.DataFrame(atom_rows, columns=columns),
+            }
+
+        with open(self.path, "r", encoding="utf-8") as fh:
+            for raw in fh:
+                header = _FORT7_HEADER_RE.match(raw)
+                if header:
+                    record = finalize()
+                    if record is not None:
+                        yield record
+                    source_index += 1
+                    if max_requested is not None and source_index > max_requested:
+                        return
+                    atom_rows = []
+                    totals = []
+                    current = {
+                        "source_index": source_index,
+                        "selected": requested is None or source_index in requested,
+                        "iter": int(header.group("iteration")),
+                        "num_of_atoms": int(header.group("num_atoms")),
+                        "num_of_bonds": int(header.group("num_bonds")),
+                        "simulation_name": header.group("simulation_name"),
+                    }
+                    continue
+                if current is None or not current["selected"]:
+                    continue
+                values = raw.split()
+                if not values:
+                    continue
+                if len(values) < 6:
+                    totals.extend(map(float, values))
+                else:
+                    num_bonds = int(current["num_of_bonds"])
+                    int_part = list(map(int, values[0:num_bonds + 3]))
+                    float_part = list(map(float, values[num_bonds + 3:]))
+                    atom_rows.append(int_part + float_part)
+
+        record = finalize()
+        if record is not None:
+            yield record
 
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:

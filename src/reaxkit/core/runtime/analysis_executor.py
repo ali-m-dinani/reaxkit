@@ -24,7 +24,7 @@ from reaxkit.core.storage.cache_manager import CacheConfig, CacheManager
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import ParseError, AnalysisError
 from reaxkit.core.platform.log import get_logger, configure_file_logging
-from reaxkit.core.runtime.progress import resolve_reporter
+from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.core.runtime.provenance import user_settings_from_args
 from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
@@ -38,8 +38,11 @@ class AnalysisExecutor:
 
     FRAME_SELECTIVE_DATA_TYPES = {
         "TrajectoryData",
+        "ChargeData",
         "ConnectivityData",
         "ConnectivityTrajectoryData",
+        "CoordinationStatusBundleData",
+        "ElectrostaticsData",
     }
 
     DETECTION_HINT_KEYS = (
@@ -61,6 +64,13 @@ class AnalysisExecutor:
         "eregime",
         "vels",
         "molfra",
+        "dump",
+        "rkf",
+        "ams",
+        "trajectory",
+        "connectivity",
+        "charges",
+        "electric_field",
         "input",
         "run_dir",
     )
@@ -214,16 +224,17 @@ class AnalysisExecutor:
             return None
 
         primary = None
-        for name in ("frames", "frame_indices"):
+        for name in ("frames", "frame_indices", "frame"):
             value = getattr(request, name, None)
-            if value is not None and not isinstance(value, (str, bytes)):
-                try:
-                    values = [int(i) for i in value]
-                except TypeError:
-                    continue
-                if values:
-                    primary = values
-                    break
+            if value is None or isinstance(value, (str, bytes)):
+                continue
+            try:
+                values = [int(value)] if np.isscalar(value) else [int(i) for i in value]
+            except TypeError:
+                continue
+            if values:
+                primary = values
+                break
         if not primary:
             return None
 
@@ -244,6 +255,10 @@ class AnalysisExecutor:
             if candidate is None:
                 continue
             values = getattr(candidate, "source_frame_indices", None)
+            if values is None:
+                metadata = getattr(candidate, "metadata", None)
+                if isinstance(metadata, dict):
+                    values = metadata.get("source_frame_indices")
             if values is None:
                 continue
             return [int(i) for i in np.asarray(values, dtype=int).reshape(-1)]
@@ -268,7 +283,8 @@ class AnalysisExecutor:
                 key = "dump"
             else:
                 key = None
-            candidate = source_dir / str(name)
+            explicit = Path(str(args.get(key))) if key is not None and args.get(key) else None
+            candidate = explicit if explicit is not None and explicit.is_file() else source_dir / str(name)
             if key is not None and candidate.is_file():
                 resolved = str(candidate.resolve())
                 args[key] = resolved
@@ -297,6 +313,10 @@ class AnalysisExecutor:
                 name,
                 [source_to_local[int(i)] for i in values if int(i) in source_to_local],
             )
+        if hasattr(request, "frame"):
+            frame_value = getattr(request, "frame")
+            if frame_value is not None and int(frame_value) in source_to_local:
+                setattr(execution_request, "frame", source_to_local[int(frame_value)])
         if hasattr(request, "reference_frame"):
             reference_value = getattr(request, "reference_frame")
             if reference_value is not None:
@@ -341,12 +361,88 @@ class AnalysisExecutor:
         Run task.
         """
         execution_request, source_indices = cls._request_for_loaded_frames(request, data)
-        params = inspect.signature(task.run).parameters
-        if "reporter" in params:
-            result = task.run(data, execution_request, reporter=reporter)
-        else:
-            result = task.run(data, execution_request)
+        task_name = task.__class__.__name__
+        with progress_operation(
+            reporter,
+            "analyze",
+            f"Running {task_name}",
+            f"Finished {task_name}",
+        ) as analysis_reporter:
+            params = inspect.signature(task.run).parameters
+            if "reporter" in params:
+                result = task.run(data, execution_request, reporter=analysis_reporter)
+            else:
+                result = task.run(data, execution_request)
         return cls._restore_result_frame_indices(result, source_indices, request)
+
+    @staticmethod
+    def _streaming_enabled(task, adapter, required_data, args: dict, requested_frame_indices) -> bool:
+        """Select streaming for all-frame tasks with explicit opt-in support."""
+        return bool(
+            args.get("stream", True)
+            and requested_frame_indices is None
+            and callable(getattr(task, "run_stream", None))
+            and adapter.supports_streaming(required_data, args)
+        )
+
+    @classmethod
+    def _run_stream_task(cls, task, frames, request, reporter):
+        """Execute an incremental task against a canonical frame iterator."""
+        task_name = task.__class__.__name__
+        with progress_operation(
+            reporter,
+            "stream",
+            f"Streaming {task_name}",
+            f"Finished {task_name}",
+        ) as stream_reporter:
+            params = inspect.signature(task.run_stream).parameters
+            if "reporter" in params:
+                return task.run_stream(frames, request, reporter=stream_reporter)
+            return task.run_stream(frames, request)
+
+    @classmethod
+    def _stream_source_identity(cls, adapter, required_data, args: dict, required_names) -> dict:
+        """Build a cache identity from source paths without reading file data."""
+        candidates: list[Path] = []
+        for key in cls.DETECTION_HINT_KEYS:
+            value = args.get(key)
+            if not value:
+                continue
+            path = Path(str(value))
+            if path.is_file():
+                candidates.append(path)
+            elif path.is_dir():
+                candidates.extend(path / str(name) for name in tuple(required_names or ()))
+        for value in dict(args.get("_selective_source_files") or {}).values():
+            candidates.append(Path(str(value)))
+        source_dir = Path(str(args.get("_snapshot_source_dir") or args.get("run_dir") or "."))
+        candidates.extend(source_dir / str(name) for name in tuple(required_names or ()))
+
+        sources: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+                if not resolved.is_file() or str(resolved) in seen:
+                    continue
+                seen.add(str(resolved))
+                stat = resolved.stat()
+                sources.append(
+                    {
+                        "path": str(resolved),
+                        "size": int(stat.st_size),
+                        "mtime_ns": int(stat.st_mtime_ns),
+                    }
+                )
+            except OSError:
+                continue
+        return {
+            "adapter": adapter.__class__.__name__,
+            "data_type": getattr(required_data, "__name__", str(required_data)),
+            "sources": sorted(sources, key=lambda item: str(item["path"])),
+            "cwd": str(Path.cwd().resolve()),
+            "streaming": True,
+        }
 
     @classmethod
     def _detection_path(cls, args: dict) -> str:
@@ -478,8 +574,17 @@ class AnalysisExecutor:
         self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
         snapshot_names = adapter.required_input_files(required_data, args)
+        required_source_names = tuple(snapshot_names or ())
+        streaming = self._streaming_enabled(
+            task,
+            adapter,
+            required_data,
+            args,
+            requested_frame_indices,
+        )
+        args["_streaming"] = streaming
         selective_sources: dict[str, str] = {}
-        if requested_frame_indices is not None:
+        if requested_frame_indices is not None or streaming:
             snapshot_names, selective_sources = self._use_selective_sources(args, snapshot_names)
         self._console_step(args, "Snapshotting raw inputs")
         snapshot_storage_inputs(args, names=snapshot_names)
@@ -512,7 +617,7 @@ class AnalysisExecutor:
         # 4) If run-scoped layout is active, pre-register parsed dataset
         #    metadata (best effort) before loading/parsing input data.
         # ---------------------------------------------------------------------
-        if layout is not None and requested_frame_indices is None:
+        if layout is not None and requested_frame_indices is None and not streaming:
             try:
                 handler_version = str(getattr(adapter, "HANDLER_VERSION", "1"))
                 engine_name = adapter.__class__.__name__.replace("Adapter", "").lower()
@@ -546,6 +651,68 @@ class AnalysisExecutor:
         use_cache = bool(args.get("cache", True)) and not bool(args.get("no_cache", False))
         self._console_step(args, f"Analysis cache={'enabled' if use_cache else 'disabled'} root={cache_root}")
         analysis_id = None
+        if streaming:
+            identity = self._stream_source_identity(
+                adapter,
+                required_data,
+                args,
+                required_source_names,
+            )
+            analysis_id = cache.analysis_id_for(
+                task=task,
+                data=identity,
+                request=request,
+                task_version=task_version,
+            )
+            args["_analysis_id"] = analysis_id
+            if use_cache and cache.exists(analysis_id):
+                self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
+                cached = cache.load(analysis_id)
+                return enrich_result_with_time(
+                    cached,
+                    None,
+                    control_file=str(args.get("control") or "control"),
+                )
+
+            self._console_step(args, f"Streaming data and running task={task_name}")
+            t_stream0 = perf_counter()
+            try:
+                frames = adapter.stream(required_data, args, reporter=reporter)
+                result = self._run_stream_task(task, frames, request, reporter)
+            except (ParseError, AnalysisError):
+                raise
+            except Exception as exc:
+                raise AnalysisError(
+                    f"Task '{task_name}' failed during streaming analysis: {exc}"
+                ) from exc
+            result = enrich_result_with_time(
+                result,
+                None,
+                control_file=str(args.get("control") or "control"),
+            )
+            elapsed = perf_counter() - t_stream0
+            self._record_timing(
+                args,
+                phase="stream_analyze",
+                task_name=task_name,
+                seconds=elapsed,
+            )
+            if use_cache:
+                cache.store(analysis_id, result, task_name=task_name)
+                self._console_step(args, f"Stored analysis result in cache analysis_id={analysis_id[:12]}")
+            self._record_general(
+                args,
+                event="analysis_done",
+                task_name=task_name,
+                extra={
+                    "analysis_id": analysis_id,
+                    "analysis_dir": str(self._analysis_output_dir(args)),
+                    "status": "success",
+                    "execution": "streaming",
+                },
+            )
+            self._console_step(args, f"Completed streaming task={task_name} analysis_id={analysis_id[:12]}")
+            return result
         if parsed_id is not None:
             data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
@@ -686,7 +853,6 @@ class AnalysisExecutor:
         # ---------------------------------------------------------------------
         t_load0 = perf_counter()
         self._console_step(args, f"Loading data via adapter={adapter.__class__.__name__} data_type={data_name}")
-        reporter("load", 0, 0, f"Loading {data_name} via {adapter.__class__.__name__}")
         try:
             data = adapter.load(required_data, args, reporter=reporter)
         except ParseError:

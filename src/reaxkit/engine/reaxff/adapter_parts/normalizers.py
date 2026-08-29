@@ -942,13 +942,17 @@ def _charges_from_fort7_handler(
 ) -> ChargeData:
     """Normalize fort.7 partial charges into ``ChargeData``."""
     sim_df = handler.dataframe()
+    handler_meta = handler.metadata()
     frames_df = [handler.frame(i) for i in range(handler.n_frames())]
     if not frames_df:
         return ChargeData(
             charges=np.empty((0, 0), dtype=float),
             simulation=simulation,
             iterations=np.empty((0,), dtype=int),
-            metadata={"source": "fort7"},
+            metadata={
+                "source": "fort7",
+                "source_frame_indices": handler_meta.get("source_frame_indices"),
+            },
         )
 
     discovered_atom_ids = _union_atom_ids_from_frames(frames_df)
@@ -997,7 +1001,10 @@ def _charges_from_fort7_handler(
         total_charge=sim_df["total_charge"].to_numpy(dtype=float) if "total_charge" in sim_df.columns else None,
         simulation=simulation,
         iterations=iterations,
-        metadata={"source": "fort7"},
+        metadata={
+            "source": "fort7",
+            "source_frame_indices": handler_meta.get("source_frame_indices"),
+        },
     )
 
 

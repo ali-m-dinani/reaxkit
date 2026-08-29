@@ -36,6 +36,7 @@ from reaxkit.analysis.force_field.MM_summary import MMSummaryRequest
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.resolve.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.platform.engine_resolver import resolve_engine
@@ -2074,29 +2075,48 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
     data = _load_force_field_data(args)
     request = REQUEST_BUILDERS["get_ffield_data"](args)
     task = FFieldDataTask()
-    if args.term:
-        if request.section is None:
-            raise ValueError("--term requires exactly one selected section via --field.")
-        selected_section = request.section
-        raw_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=False))
-        raw_table = raw_result.table
-        filtered_raw = _filter_force_field_table_by_term(
-            data,
-            selected_section,
-            raw_table,
-            term=args.term,
-            unordered_2body=not args.ordered_2body,
-            any_order=args.any_order,
-        )
-        if request.interpret:
-            interpreted_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=True))
-            table = interpreted_result.table.loc[filtered_raw.index].copy()
+    reporter = resolve_reporter(vars(args))
+    with progress_operation(
+        reporter,
+        "analyze",
+        "Preparing force-field data",
+        "Finished force-field data analysis",
+    ) as analysis_reporter:
+        if args.term:
+            if request.section is None:
+                raise ValueError("--term requires exactly one selected section via --field.")
+            selected_section = request.section
+            raw_result = task.run(
+                data,
+                FFieldDataRequest(section=selected_section, interpret=False),
+                reporter=analysis_reporter,
+            )
+            raw_table = raw_result.table
+            filtered_raw = _filter_force_field_table_by_term(
+                data,
+                selected_section,
+                raw_table,
+                term=args.term,
+                unordered_2body=not args.ordered_2body,
+                any_order=args.any_order,
+            )
+            if request.interpret:
+                interpreted_result = task.run(
+                    data,
+                    FFieldDataRequest(section=selected_section, interpret=True),
+                    reporter=analysis_reporter,
+                )
+                table = interpreted_result.table.loc[filtered_raw.index].copy()
+            else:
+                table = filtered_raw
+            result = task.run(
+                data,
+                FFieldDataRequest(section=selected_section, interpret=request.interpret),
+                reporter=analysis_reporter,
+            )
+            result.table = table
         else:
-            table = filtered_raw
-        result = task.run(data, FFieldDataRequest(section=selected_section, interpret=request.interpret))
-        result.table = table
-    else:
-        result = task.run(data, request)
+            result = task.run(data, request, reporter=analysis_reporter)
     result = _prepare_result("get_ffield_data", result)
     if args.outdir:
         export_tables: dict[str, pd.DataFrame] = {}

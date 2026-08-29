@@ -184,6 +184,24 @@ def test_ams_load_trajectory_prefers_direct_coords_over_single_history_section_f
     assert trajectory.positions[2, 1, 0] == pytest.approx(4.0 * 0.529177210903)
 
 
+def test_ams_adapter_streams_history_as_one_frame_payloads(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    frames = list(
+        adapter.stream(
+            TrajectoryData,
+            {"input": "fake.rkf", "progress": False},
+        )
+    )
+
+    assert fake.coordinate_reads == [1, 2, 3]
+    assert [frame.source_frame_indices.tolist() for frame in frames] == [[0], [1], [2]]
+    assert [frame.iterations.tolist() for frame in frames] == [[10], [20], [30]]
+    assert all(frame.positions.shape == (1, 2, 3) for frame in frames)
+
+
 def test_ams_load_connectivity_reads_direct_rkf_frames_without_history_section(monkeypatch):
     adapter = AMSAdapter()
     monkeypatch.setattr(adapter, "load_kf", lambda _args: _FakeConnectivityKF())

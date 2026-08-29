@@ -13,7 +13,7 @@ to Voronoi-derived descriptors and does not compute bond-order connectivity.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Optional, Sequence
 
 import numpy as np
@@ -630,6 +630,36 @@ def _run_voronoi_geometry(data: TrajectoryData, request: VoronoiRequest, *, back
     return VoronoiGeometryResult(table=table, request=request)
 
 
+def _run_voronoi_stream(frames, request: VoronoiRequest, *, backend: str, geometry: bool, reporter=None):
+    """Run a Voronoi backend against one canonical frame at a time."""
+    local_request = replace(request, frames=None, every=1)
+    tables: list[pd.DataFrame] = []
+    processed = 0
+    for stream_index, data in enumerate(frames):
+        if stream_index % max(1, int(request.every)):
+            continue
+        result = (
+            _run_voronoi_geometry(data, local_request, backend=backend, reporter=None)
+            if geometry
+            else _run_voronoi(data, local_request, backend=backend, reporter=None)
+        )
+        source = data.source_frame_indices
+        source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+        if not result.table.empty:
+            table = result.table.copy()
+            table["frame_index"] = source_index
+            tables.append(table)
+        processed += 1
+        if callable(reporter):
+            reporter("stream", processed, 0, "Streaming Voronoi analysis")
+    table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+    if not table.empty:
+        columns = [name for name in ("frame_index", "atom_id") if name in table.columns]
+        table = table.sort_values(columns, kind="stable").reset_index(drop=True)
+    result_type = VoronoiGeometryResult if geometry else VoronoiResult
+    return result_type(table=table, request=request)
+
+
 @register_task("get_voronoi_scipy", label="Voronoi (SciPy)")
 class VoronoiScipyTask(AnalysisTask):
     """Compute per-atom Voronoi metrics using SciPy.
@@ -674,6 +704,10 @@ class VoronoiScipyTask(AnalysisTask):
         One row is produced per selected atom and frame.
         """
         return _run_voronoi(data, request, backend="scipy", reporter=reporter)
+
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiResult:
+        """Compute SciPy Voronoi metrics from a bounded frame stream."""
+        return _run_voronoi_stream(frames, request, backend="scipy", geometry=False, reporter=reporter)
 
 
 @register_task("get_voronoi_pyvoro", label="Voronoi (pyvoro)")
@@ -722,6 +756,10 @@ class VoronoiPyvoroTask(AnalysisTask):
         """
         return _run_voronoi(data, request, backend="pyvoro", reporter=reporter)
 
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiResult:
+        """Compute pyvoro metrics from a bounded frame stream."""
+        return _run_voronoi_stream(frames, request, backend="pyvoro", geometry=False, reporter=reporter)
+
 
 @register_task("get_voronoi_geometry_scipy", label="Voronoi Geometry (SciPy)")
 class VoronoiGeometryScipyTask(AnalysisTask):
@@ -767,6 +805,10 @@ class VoronoiGeometryScipyTask(AnalysisTask):
         """
         return _run_voronoi_geometry(data, request, backend="scipy", reporter=reporter)
 
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
+        """Compute SciPy Voronoi geometry from a bounded frame stream."""
+        return _run_voronoi_stream(frames, request, backend="scipy", geometry=True, reporter=reporter)
+
 
 @register_task("get_voronoi_geometry_pyvoro", label="Voronoi Geometry (pyvoro)")
 class VoronoiGeometryPyvoroTask(AnalysisTask):
@@ -807,6 +849,10 @@ class VoronoiGeometryPyvoroTask(AnalysisTask):
         The output is suitable for geometry-aware Voronoi visualization.
         """
         return _run_voronoi_geometry(data, request, backend="pyvoro", reporter=reporter)
+
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
+        """Compute pyvoro geometry from a bounded frame stream."""
+        return _run_voronoi_stream(frames, request, backend="pyvoro", geometry=True, reporter=reporter)
 
 
 __all__ = [

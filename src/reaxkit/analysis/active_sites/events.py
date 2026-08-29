@@ -569,6 +569,228 @@ class ActiveSiteEventsTask(AnalysisTask):
         tract_table = to_tract_events_table(table, strict=bool(request.strict_tract))
         return ActiveSiteEventsResult(table=table, tract_table=tract_table, summary=summary, request=request)
 
+    def run_stream(self, frames, request: ActiveSiteEventsRequest, reporter=None) -> ActiveSiteEventsResult:
+        """Extract persistent events while retaining one trajectory frame.
+
+        Only persistence counters, event aggregates, and per-carbon running
+        contact sums survive between frames.
+        """
+        state: dict[str, Any] | None = None
+        analyzed = 0
+        frame_first: int | None = None
+        frame_last: int | None = None
+        use_bo = False
+        every = max(1, int(request.every))
+
+        for stream_index, data in enumerate(frames):
+            if stream_index % every:
+                continue
+            if isinstance(data, ConnectivityTrajectoryData):
+                trajectory = data.trajectory
+                connectivity_data = data
+            elif isinstance(data, TrajectoryData):
+                trajectory = data
+                connectivity_data = None
+            else:
+                raise TypeError("ActiveSiteEventsTask stream expects trajectory frame payloads.")
+
+            positions = np.asarray(trajectory.positions, dtype=float)
+            if positions.ndim != 3 or positions.shape[0] != 1:
+                raise ValueError("Streaming trajectory payloads must contain exactly one frame.")
+            xyz = positions[0]
+            elements = np.asarray([str(value) for value in trajectory.elements], dtype=object)
+            atom_ids = np.asarray(trajectory.atom_ids, dtype=int)
+            if xyz.shape[0] != len(elements) or xyz.shape[0] != len(atom_ids):
+                raise ValueError("Streaming trajectory identity must match its atom dimension.")
+
+            if state is None:
+                carbon = np.where(elements == str(request.carbon_element))[0]
+                oxygen = np.where(elements == str(request.oxygen_element))[0]
+                silicon = np.where(elements == str(request.silicon_element))[0]
+                n_carbon = len(carbon)
+                mode = str(request.mode).lower()
+                has_bo = bool(
+                    connectivity_data is not None
+                    and connectivity_data.connectivity.bond_orders is not None
+                )
+                if mode == "auto":
+                    use_bo = has_bo
+                elif mode == "bo":
+                    if not has_bo:
+                        raise ValueError("mode='bo' requested but bond_orders are unavailable.")
+                    use_bo = True
+                elif mode == "dist":
+                    use_bo = False
+                else:
+                    raise ValueError("mode must be one of: auto, bo, dist")
+                state = {
+                    "elements": elements,
+                    "atom_ids": atom_ids,
+                    "carbon": carbon,
+                    "oxygen": oxygen,
+                    "silicon": silicon,
+                    "consec_o": np.zeros(n_carbon, dtype=int),
+                    "consec_si": np.zeros(n_carbon, dtype=int),
+                    "in_event_o": np.zeros(n_carbon, dtype=bool),
+                    "in_event_si": np.zeros(n_carbon, dtype=bool),
+                    "n_events_o": np.zeros(n_carbon, dtype=int),
+                    "n_events_si": np.zeros(n_carbon, dtype=int),
+                    "first_o": np.full(n_carbon, -1, dtype=int),
+                    "first_si": np.full(n_carbon, -1, dtype=int),
+                    "total_bound_o": np.zeros(n_carbon, dtype=int),
+                    "total_bound_si": np.zeros(n_carbon, dtype=int),
+                    "sum_contact_o": np.zeros(n_carbon, dtype=float),
+                    "sum_contact_si": np.zeros(n_carbon, dtype=float),
+                    "n_contact_o": np.zeros(n_carbon, dtype=int),
+                    "n_contact_si": np.zeros(n_carbon, dtype=int),
+                }
+            elif not np.array_equal(atom_ids, state["atom_ids"]) or not np.array_equal(elements, state["elements"]):
+                raise ValueError("Atom identities changed during active-site streaming.")
+
+            source = trajectory.source_frame_indices
+            marker = (
+                int(np.asarray(source, dtype=int).reshape(-1)[0])
+                if source is not None
+                else stream_index
+            )
+            if trajectory.iterations is not None:
+                marker = int(np.asarray(trajectory.iterations, dtype=int).reshape(-1)[0])
+            frame_first = marker if frame_first is None else frame_first
+            frame_last = marker
+
+            carbon = state["carbon"]
+            oxygen = state["oxygen"]
+            silicon = state["silicon"]
+            valid = np.isfinite(xyz).all(axis=1)
+            valid_carbon = valid[carbon]
+            cell = frame_cell_matrix(data, 0)
+            if use_bo:
+                if connectivity_data is None:
+                    raise ValueError("mode='bo' requires connectivity for every streamed frame.")
+                bo = _bond_order_frame(connectivity_data, 0)
+                if bo.shape != (len(atom_ids), len(atom_ids)):
+                    raise ValueError("Bond-order frame shape must match the trajectory atom dimension.")
+                bo = np.maximum(bo, bo.T)
+                bo[~np.isfinite(bo)] = 0.0
+                bo[~valid, :] = 0.0
+                bo[:, ~valid] = 0.0
+                np.fill_diagonal(bo, 0.0)
+                bound_o, metric_o = self._stream_bo_contacts(
+                    bo, carbon, oxygen, valid_carbon, float(request.bo_threshold)
+                )
+                bound_si, metric_si = self._stream_bo_contacts(
+                    bo, carbon, silicon, valid_carbon, float(request.bo_threshold)
+                )
+            else:
+                bound_o, metric_o = self._stream_distance_contacts(
+                    xyz, carbon, oxygen, valid_carbon, float(request.r_CO), cell
+                )
+                bound_si, metric_si = self._stream_distance_contacts(
+                    xyz, carbon, silicon, valid_carbon, float(request.r_CSi), cell
+                )
+
+            persist = max(1, int(request.persist))
+            for suffix, bound, metric in (
+                ("o", bound_o, metric_o),
+                ("si", bound_si, metric_si),
+            ):
+                consecutive = state[f"consec_{suffix}"]
+                in_event = state[f"in_event_{suffix}"]
+                consecutive[bound] += 1
+                consecutive[~bound] = 0
+                new_events = (consecutive == persist) & (~in_event)
+                state[f"n_events_{suffix}"][new_events] += 1
+                first = state[f"first_{suffix}"]
+                first[new_events & (first < 0)] = marker
+                in_event |= new_events
+                in_event &= bound
+                state[f"total_bound_{suffix}"][bound] += 1
+                finite = bound & np.isfinite(metric)
+                state[f"sum_contact_{suffix}"][finite] += metric[finite]
+                state[f"n_contact_{suffix}"][finite] += 1
+
+            analyzed += 1
+            if callable(reporter):
+                reporter("stream", analyzed, 0, "Streaming active-site event analysis")
+
+        if state is None or analyzed == 0:
+            raise ValueError("No frames selected for event extraction.")
+
+        n_carbon = len(state["carbon"])
+        mean_o = np.full(n_carbon, np.nan, dtype=float)
+        mean_si = np.full(n_carbon, np.nan, dtype=float)
+        for suffix, target in (("o", mean_o), ("si", mean_si)):
+            counts = state[f"n_contact_{suffix}"]
+            mask = counts > 0
+            target[mask] = state[f"sum_contact_{suffix}"][mask] / counts[mask]
+        carbon = state["carbon"]
+        table = pd.DataFrame(
+            {
+                "atom_id": state["atom_ids"][carbon],
+                "element": state["elements"][carbon],
+                "n_events_O": state["n_events_o"],
+                "n_events_Si": state["n_events_si"],
+                "first_event_frame_O": state["first_o"],
+                "first_event_frame_Si": state["first_si"],
+                "is_reactive_O": state["n_events_o"] > 0,
+                "is_reactive_Si": state["n_events_si"] > 0,
+                "is_reactive_any": (state["n_events_o"] + state["n_events_si"]) > 0,
+                "total_bound_frames_O": state["total_bound_o"],
+                "total_bound_frames_Si": state["total_bound_si"],
+                "mean_contact_O_when_bound": mean_o,
+                "mean_contact_Si_when_bound": mean_si,
+                "contact_metric": "bo" if use_bo else "distance_ang",
+            }
+        )
+        summary = {
+            "mode": "bo" if use_bo else "dist",
+            "frames_analyzed": analyzed,
+            "frame_first": int(frame_first),
+            "frame_last": int(frame_last),
+            "every": int(request.every),
+            "persist": max(1, int(request.persist)),
+            "n_carbon": n_carbon,
+            "n_reactive_O": int(table["is_reactive_O"].sum()),
+            "n_reactive_Si": int(table["is_reactive_Si"].sum()),
+            "n_reactive_any": int(table["is_reactive_any"].sum()),
+        }
+        if use_bo:
+            summary["bo_threshold"] = float(request.bo_threshold)
+        else:
+            summary["r_CO"] = float(request.r_CO)
+            summary["r_CSi"] = float(request.r_CSi)
+        tract_table = to_tract_events_table(table, strict=bool(request.strict_tract))
+        return ActiveSiteEventsResult(
+            table=table,
+            tract_table=tract_table,
+            summary=summary,
+            request=request,
+        )
+
+    @staticmethod
+    def _stream_bo_contacts(bo, source, targets, valid_source, threshold):
+        """Return bound mask and mean bond order for one target element."""
+        count = len(source)
+        if len(targets) == 0:
+            return np.zeros(count, dtype=bool), np.full(count, np.nan, dtype=float)
+        values = bo[np.ix_(source, targets)]
+        contacts = values > threshold
+        bound = contacts.any(axis=1) & valid_source
+        metric = np.full(count, np.nan, dtype=float)
+        if contacts.any():
+            metric[bound] = np.nanmean(np.where(contacts[bound], values[bound], np.nan), axis=1)
+        return bound, metric
+
+    @staticmethod
+    def _stream_distance_contacts(xyz, source, targets, valid_source, threshold, cell):
+        """Return bound mask and nearest distance for one target element."""
+        count = len(source)
+        if len(targets) == 0:
+            return np.zeros(count, dtype=bool), np.full(count, np.nan, dtype=float)
+        distances = pairwise_min_image_distances(xyz[source], xyz[targets], cell)
+        metric = np.nanmin(distances, axis=1)
+        return (metric < threshold) & valid_source, metric
+
 
 __all__ = [
     "ActiveSiteEventsRequest",

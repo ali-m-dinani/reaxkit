@@ -94,3 +94,19 @@ def test_lammps_connectivity_placeholder_is_aligned_to_selected_frames():
     assert connectivity.sum_bond_orders.shape == (2, 0)
     assert connectivity.source_frame_indices.tolist() == [5, 1]
     assert np.array_equal(connectivity.iterations, connectivity.source_frame_indices)
+
+
+def test_lammps_adapter_streams_all_frames_without_handler_materialization(tmp_path: Path):
+    path = tmp_path / "dump.xyz"
+    path.write_text(_xyz_dump(4), encoding="utf-8")
+
+    frames = list(
+        LAMMPSAdapter().stream(
+            TrajectoryData,
+            {"dump": str(path), "progress": False},
+        )
+    )
+
+    assert [frame.source_frame_indices.tolist() for frame in frames] == [[0], [1], [2], [3]]
+    assert [frame.iterations.tolist() for frame in frames] == [[0], [10], [20], [30]]
+    assert all(frame.positions.shape == (1, 2, 3) for frame in frames)

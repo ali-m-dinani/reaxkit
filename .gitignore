@@ -69,6 +69,7 @@ src/reaxkit/under_development/
 ../other/under_dev
 site/
 tests/analysis_tasks/artifacts/
+tests/artifacts
 
 # Project-local files to ignore
 README.txt

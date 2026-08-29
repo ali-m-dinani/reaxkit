@@ -350,8 +350,15 @@ def main() -> int:
     )
     parser.add_argument(
         "--progress",
-        action="store_true",
-        help="Enable progress reporting for supported handlers and analysis tasks.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable dynamic progress reporting (default: enabled; use --no-progress to disable).",
+    )
+    parser.add_argument(
+        "--stream",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Stream all-frame analyses with bounded memory (default: enabled; use --no-stream for compatibility).",
     )
     parser.add_argument(
         "--log-in-terminal",

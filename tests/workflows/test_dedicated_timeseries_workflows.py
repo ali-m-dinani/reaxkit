@@ -76,6 +76,72 @@ def test_family_getters_build_requests_without_field_expressions() -> None:
             assert getattr(request, name) == value
 
 
+def test_get_frames_count_accepts_general_and_engine_specific_paths() -> None:
+    module = import_module("reaxkit.workflows.timeseries.get_frames_count")
+    default_args = _parser_for("get_frames_count").parse_args([])
+    module._normalize_trajectory_source(default_args)
+    assert default_args.input == "."
+
+    for argv, expected in (
+        (["trajectory.dat"], "trajectory.dat"),
+        (["--input", "trajectory.dat"], "trajectory.dat"),
+        (["--file", "trajectory.dat"], "trajectory.dat"),
+    ):
+        args = _parser_for("get_frames_count").parse_args(argv)
+        module._normalize_trajectory_source(args)
+        assert args.input == expected
+        assert args.xmolout == expected
+        assert args.dump == expected
+        assert args.rkf == expected
+
+    args = _parser_for("get_frames_count").parse_args(["--engine", "lammps", "--dump", "dump.lammpstrj"])
+    module._normalize_trajectory_source(args)
+    assert args.input == "dump.lammpstrj"
+    assert args.dump == "dump.lammpstrj"
+
+
+def test_get_frames_count_uses_fast_engine_probe_without_loading_trajectory(monkeypatch, capsys) -> None:
+    module = import_module("reaxkit.workflows.timeseries.get_frames_count")
+
+    class FastAdapter:
+        @staticmethod
+        def quick_n_frames(runtime_args):
+            assert runtime_args["input"] == "trajectory.dat"
+            return 7
+
+    monkeypatch.setattr(module, "resolve_engine", lambda *_args, **_kwargs: FastAdapter())
+    monkeypatch.setattr(
+        module.AnalysisExecutor,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("TrajectoryData should not be loaded")),
+    )
+    args = _parser_for("get_frames_count").parse_args(["trajectory.dat"])
+
+    assert module.run_main("get_frames_count", args) == 0
+    assert capsys.readouterr().out == "7\n"
+
+
+def test_get_frames_count_falls_back_to_trajectory_analysis(monkeypatch, capsys) -> None:
+    module = import_module("reaxkit.workflows.timeseries.get_frames_count")
+
+    class NoFastCountAdapter:
+        @staticmethod
+        def quick_n_frames(_runtime_args):
+            return None
+
+    def fake_run(_self, task, request, runtime_args):
+        assert task.required_data.__name__ == "TrajectoryData"
+        assert runtime_args["input"] == "trajectory.dat"
+        return module.FramesCountResult(count=9, request=request)
+
+    monkeypatch.setattr(module, "resolve_engine", lambda *_args, **_kwargs: NoFastCountAdapter())
+    monkeypatch.setattr(module.AnalysisExecutor, "run", fake_run)
+    args = _parser_for("get_frames_count").parse_args(["trajectory.dat"])
+
+    assert module.run_main("get_frames_count", args) == 0
+    assert capsys.readouterr().out == "9\n"
+
+
 def test_dedicated_commands_are_in_workflow_metadata() -> None:
     resource = ir.files("reaxkit.workflows.data").joinpath("workflow_dataclass_map.yaml")
     with resource.open("r", encoding="utf-8") as handle:

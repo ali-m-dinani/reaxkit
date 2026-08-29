@@ -284,6 +284,22 @@ tasks:
     help_search_examples:
     - reaxkit help "get_diffusivity"
     - run get_diffusivity
+  get_frames_count:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.frame_count: get_frames_count'
+    description: Counts the frames in canonical TrajectoryData, independent of the
+      simulation engine or source trajectory format.
+    related_workflow_module: 'reaxkit.workflows.timeseries.get_frames_count: get_frames_count'
+    tags:
+    - trajectory
+    - frame count
+    notes:
+    - The result is the size of the TrajectoryData positions frame dimension.
+    aliases:
+    - get-frames-count
+    help_search_examples:
+    - reaxkit help "frame count"
+    - reaxkit get-frames-count --input trajectory-file
   get_dominant_species:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:

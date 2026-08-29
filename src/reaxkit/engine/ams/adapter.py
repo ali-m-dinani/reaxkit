@@ -69,6 +69,27 @@ class AMSAdapter(EngineAdapter):
         "E_thermostat",  # 17: Thermostat
     )
 
+    def supports_streaming(self, data_type, args: dict | None = None) -> bool:
+        """AMS History variables support bounded frame-indexed reads."""
+        _ = args
+        return data_type in {TrajectoryData, ConnectivityData, ConnectivityTrajectoryData}
+
+    def iter_data(self, data_type, args: dict, reporter=None):
+        """Yield selected AMS History frames as one-frame canonical payloads."""
+        kf = self.load_kf(args)
+        requested = args.get("_frame_indices")
+        n_frames = self._history_frame_count(kf, frame_indices=requested)
+        source_indices = self._normalized_frame_indices(requested, n_frames)
+        total = len(source_indices)
+        for done, source_index in enumerate(source_indices, start=1):
+            frame_args = dict(args)
+            frame_args["_frame_indices"] = [int(source_index)]
+            # The outer stream owns progress. Inner one-frame loaders remain
+            # silent so their 1/1 callbacks do not continually reset the bar.
+            yield self._load_with_reporter(data_type, frame_args, reporter=None)
+            if callable(reporter):
+                reporter("stream", done, total, "Streaming AMS History frames")
+
     def detect(self, path: str | Path) -> float:
         """Score whether a path appears to be an AMS run input/output location.
 
@@ -292,8 +313,8 @@ class AMSAdapter(EngineAdapter):
         return None
 
     @staticmethod
-    def _history_frame_count(kf, *, frame_indices=None) -> int:
-        """Return RKF frame count without scanning coordinates for partial reads."""
+    def _history_frame_count_from_metadata(kf) -> int | None:
+        """Read the RKF history-entry count without loading coordinate arrays."""
         for section, variable in (("MDHistory", "nEntries"), ("History", "nEntries")):
             raw = AMSAdapter._read_kf_variable(kf, section, variable)
             if raw is not None:
@@ -301,6 +322,18 @@ class AMSAdapter(EngineAdapter):
                     return int(np.asarray(raw).ravel()[0])
                 except Exception:
                     pass
+        return None
+
+    def quick_n_frames(self, args: dict) -> int | None:
+        """Return the RKF history-entry count without reading trajectory frames."""
+        return self._history_frame_count_from_metadata(self.load_kf(args))
+
+    @staticmethod
+    def _history_frame_count(kf, *, frame_indices=None) -> int:
+        """Return RKF frame count without scanning coordinates for partial reads."""
+        metadata_count = AMSAdapter._history_frame_count_from_metadata(kf)
+        if metadata_count is not None:
+            return metadata_count
 
         # Selective RKF reads address History variables directly. When an old
         # file omits nEntries, the largest requested index is enough to issue

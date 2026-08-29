@@ -266,6 +266,169 @@ class ActiveSiteEventDiagnosticsTask(AnalysisTask):
             request=request,
         )
 
+    def run_stream(
+        self,
+        frames,
+        request: ActiveSiteEventDiagnosticsRequest,
+        reporter=None,
+    ) -> ActiveSiteEventDiagnosticsResult:
+        """Diagnose sampled frames without retaining the input trajectory."""
+        elements: np.ndarray | None = None
+        atom_ids: np.ndarray | None = None
+        carbon = oxygen = silicon = np.asarray([], dtype=int)
+        distance_rows: list[dict[str, Any]] = []
+        episode_rows: list[dict[str, Any]] = []
+        min_distances: dict[str, list[float]] = {"C-O": [], "C-Si": []}
+        episode_lengths: dict[str, list[int]] = {"C-O": [], "C-Si": []}
+        counters: dict[str, np.ndarray] = {}
+        analyzed = 0
+        first_marker: int | None = None
+        last_marker: int | None = None
+        every = max(1, int(request.every))
+        limit = max(1, int(request.max_diag_frames))
+
+        for stream_index, data in enumerate(frames):
+            if stream_index % every:
+                continue
+            if analyzed >= limit:
+                break
+            if isinstance(data, ConnectivityTrajectoryData):
+                trajectory = data.trajectory
+                cell_source: ConnectivityTrajectoryData | TrajectoryData = data
+            elif isinstance(data, TrajectoryData):
+                trajectory = data
+                cell_source = data
+            else:
+                raise TypeError("Event diagnostics stream expects trajectory frame payloads.")
+            positions = np.asarray(trajectory.positions, dtype=float)
+            if positions.ndim != 3 or positions.shape[0] != 1:
+                raise ValueError("Streaming diagnostics payloads must contain exactly one frame.")
+            xyz = positions[0]
+            frame_elements = np.asarray([str(value) for value in trajectory.elements], dtype=object)
+            frame_atom_ids = np.asarray(trajectory.atom_ids, dtype=int)
+            if elements is None:
+                elements = frame_elements
+                atom_ids = frame_atom_ids
+                carbon = np.where(elements == str(request.carbon_element))[0]
+                oxygen = np.where(elements == str(request.oxygen_element))[0]
+                silicon = np.where(elements == str(request.silicon_element))[0]
+                counters = {
+                    "C-O": np.zeros(len(carbon), dtype=int),
+                    "C-Si": np.zeros(len(carbon), dtype=int),
+                }
+            elif not np.array_equal(elements, frame_elements) or not np.array_equal(atom_ids, frame_atom_ids):
+                raise ValueError("Atom identities changed during event-diagnostics streaming.")
+
+            source = trajectory.source_frame_indices
+            source_index = (
+                int(np.asarray(source, dtype=int).reshape(-1)[0])
+                if source is not None
+                else stream_index
+            )
+            marker = source_index
+            if trajectory.iterations is not None:
+                marker = int(np.asarray(trajectory.iterations, dtype=int).reshape(-1)[0])
+            first_marker = marker if first_marker is None else first_marker
+            last_marker = marker
+            valid = np.isfinite(xyz).all(axis=1)
+            valid_carbon = valid[carbon]
+            carbon_positions = xyz[carbon]
+            cell = frame_cell_matrix(cell_source, 0)
+
+            for species, targets in (("C-O", oxygen), ("C-Si", silicon)):
+                valid_targets = valid[targets] if targets.size else np.asarray([], dtype=bool)
+                if carbon.size == 0 or targets.size == 0 or not valid_targets.any():
+                    bound = np.zeros(len(carbon), dtype=bool)
+                    ending = (~bound) & (counters[species] > 0)
+                    episode_lengths[species].extend(
+                        int(value) for value in counters[species][ending] if int(value) > 0
+                    )
+                    counters[species][~bound] = 0
+                    continue
+                distances = pairwise_min_image_distances(
+                    carbon_positions,
+                    xyz[targets][valid_targets],
+                    cell,
+                )
+                minimum = np.nanmin(distances, axis=1)
+                finite = np.isfinite(minimum) & valid_carbon
+                min_distances[species].extend(minimum[finite].astype(float).tolist())
+                for local_index, distance in enumerate(minimum):
+                    if finite[local_index]:
+                        distance_rows.append(
+                            {
+                                "species": species,
+                                "frame_index": source_index,
+                                "frame_marker": marker,
+                                "atom_id": int(atom_ids[carbon[local_index]]),
+                                "min_distance": float(distance),
+                            }
+                        )
+                bound = (minimum < float(request.r_probe)) & finite
+                ending = (~bound) & (counters[species] > 0)
+                episode_lengths[species].extend(
+                    int(value) for value in counters[species][ending] if int(value) > 0
+                )
+                counters[species][bound] += 1
+                counters[species][~bound] = 0
+
+            analyzed += 1
+            if callable(reporter):
+                reporter("stream", analyzed, limit, "Streaming active-site event diagnostics")
+
+        if analyzed == 0 or elements is None or atom_ids is None:
+            raise ValueError("No frames selected for event diagnostics.")
+        duration_factor = every * float(request.timestep_fs) * 1.0e-3
+        for species, lengths in episode_lengths.items():
+            episode_rows.extend(
+                {
+                    "species": species,
+                    "duration_frames": int(length),
+                    "duration_ps": float(length) * duration_factor,
+                    "r_probe": float(request.r_probe),
+                }
+                for length in lengths
+            )
+        species_summary: dict[str, dict[str, Any]] = {}
+        for species in ("C-O", "C-Si"):
+            suggested_r = _valley_cutoff(min_distances[species])
+            suggested_persist = _persist_suggestion(episode_lengths[species])
+            durations = np.asarray(episode_lengths[species], dtype=float) * duration_factor
+            species_summary[species] = {
+                "n_distance_samples": len(min_distances[species]),
+                "n_episodes": len(episode_lengths[species]),
+                "n_thermal_episodes_lt_1ps": int(np.sum(durations < 1.0)) if durations.size else 0,
+                "n_stable_episodes_ge_1ps": int(np.sum(durations >= 1.0)) if durations.size else 0,
+                "suggested_r_cut": suggested_r,
+                "suggested_persist_frames": suggested_persist,
+                "suggested_persist_ps": (
+                    float(suggested_persist) * duration_factor if suggested_persist is not None else None
+                ),
+            }
+        summary = {
+            "diagnostic": True,
+            "frames_analyzed": analyzed,
+            "frame_first": int(first_marker),
+            "frame_last": int(last_marker),
+            "every": int(request.every),
+            "r_probe": float(request.r_probe),
+            "max_diag_frames": int(request.max_diag_frames),
+            "timestep_fs": float(request.timestep_fs),
+            "duration_scale": "physical",
+            "duration_ps_factor": float(duration_factor),
+            "n_carbon": len(carbon),
+            "n_oxygen": len(oxygen),
+            "n_silicon": len(silicon),
+            "species": species_summary,
+        }
+        return ActiveSiteEventDiagnosticsResult(
+            table=_summary_table(summary),
+            distance_table=pd.DataFrame(distance_rows),
+            episode_table=pd.DataFrame(episode_rows),
+            summary=summary,
+            request=request,
+        )
+
 
 __all__ = [
     "ActiveSiteEventDiagnosticsRequest",

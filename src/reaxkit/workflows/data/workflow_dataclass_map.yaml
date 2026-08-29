@@ -1829,6 +1829,29 @@ workflows:
     help_search_examples:
     - reaxkit help "get gamma"
     - reaxkit get_gamma -h
+  get_frames_count:
+    parent_workflow: timeseries_workflow
+    implementation_module: 'reaxkit.workflows.timeseries.get_frames_count: get_frames_count'
+    command: get_frames_count
+    command_kind: analysis
+    analysis_task: get_frames_count
+    description: Counts the frames in canonical TrajectoryData, independent of the simulation engine or
+      source trajectory format.
+    tags:
+    - trajectory
+    - frame count
+    - get frames count
+    - timeseries workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_frames_count -h'
+    aliases:
+    - get-frames-count
+    help_search_examples:
+    - reaxkit help "frame count"
+    - reaxkit get-frames-count --input trajectory-file
+    - reaxkit help "get frames count"
+    - reaxkit get_frames_count -h
   get_trajectory:
     parent_workflow: timeseries_workflow
     implementation_module: 'reaxkit.workflows.timeseries.get_trajectory: get_trajectory'
@@ -2937,6 +2960,8 @@ command_to_workflow_module:
   get-beta: reaxkit.workflows.timeseries.get_beta
   get_gamma: reaxkit.workflows.timeseries.get_gamma
   get-gamma: reaxkit.workflows.timeseries.get_gamma
+  get_frames_count: reaxkit.workflows.timeseries.get_frames_count
+  get-frames-count: reaxkit.workflows.timeseries.get_frames_count
   get_trajectory: reaxkit.workflows.timeseries.get_trajectory
   get-trajectory: reaxkit.workflows.timeseries.get_trajectory
   get_displacement: reaxkit.workflows.timeseries.get_displacement
