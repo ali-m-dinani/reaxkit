@@ -411,19 +411,21 @@ tasks:
     help_search_examples:
     - reaxkit help "force field optimization report"
     - run force field optimization report
-  ffield_opt_bulk_modulus:
+  get_ffield_opt_bulk_modulus:
     consumes_dataclass: ForceFieldOptimizationResultsData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_bulk_modulus'
     description: Derives bulk-modulus metrics from optimization report data. Use it
       when training or validation includes elastic response, equation-of-state points,
       or pressure-volume behavior.
-    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_opt_bulk_modulus'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_bulk_modulus'
     tags:
     - force field
     - bulk modulus
     - force field optimization report
     notes: []
     aliases:
+    - ffield_opt_bulk_modulus
+    - ffield-opt-bulk-modulus
     - force field optimization report bulk modulus
     - force-field-optimization-report-bulk-modulus
     help_search_examples:
@@ -1005,7 +1007,7 @@ dataclass_usage_across_tasks:
   - get_ffield_opt_progress_data
   ForceFieldOptimizationResultsData:
   - get_ffield_opt_results
-  - ffield_opt_bulk_modulus
+  - get_ffield_opt_bulk_modulus
   ForceFieldOptimizationPlotBundleData:
   - get_ffield_opt_eos
   - force_field_optimization_report_restraints

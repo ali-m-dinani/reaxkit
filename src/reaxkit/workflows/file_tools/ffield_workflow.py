@@ -216,25 +216,26 @@ ALL_COMMANDS = (
     "get_ffield_diagnostics_evolution",
     "get_ffield_opt_results",
     "get_ffield_opt_eos",
-    "ffield_opt_bulk_modulus",
+    "get_ffield_opt_bulk_modulus",
 )
 ALL_LEGACY_COMMANDS = ()
 
-FFIELD_ANALYSIS_COMMANDS = tuple(c for c in ALL_COMMANDS if c.startswith("get_") or c == "ffield_opt_bulk_modulus")
+FFIELD_ANALYSIS_COMMANDS = tuple(c for c in ALL_COMMANDS if c.startswith("get_"))
 
 LEGACY_FORCE_FIELD_ALIASES = {
+    "ffield_opt_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "force_field_data": "get_ffield_data",
     "force_field_optimization": "get_ffield_opt_progress_data",
     "force_field_optimization_report": "get_ffield_opt_results",
     "force_field_optimization_report_eos": "get_ffield_opt_eos",
-    "force_field_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "force_field_optimization_report_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "ffield_data": "get_ffield_data",
     "ffield_optimization": "get_ffield_opt_progress_data",
     "structure_summary_data": "get_energy_min_summary_data",
     "parameter_optimization_diagnostic": "get_ffield_diagnostic_data",
     "ffield_optimization_report": "get_ffield_opt_results",
     "ffield_optimization_report_eos": "get_ffield_opt_eos",
-    "ffield_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "ffield_optimization_report_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
     "parameter_optimization_tornado": "get_ffield_diagnostics_sensitivity",
 }
@@ -249,7 +250,7 @@ WORKFLOW_TASK_NAME_MAP = {
     "get_ffield_diagnostics_evolution": "parameter_optimization_diagnostic_beeswarm",
     "get_ffield_opt_results": "force_field_optimization_report",
     "get_ffield_opt_eos": "force_field_optimization_report_eos",
-    "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
+    "get_ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
 }
 
 def _resolve_workflow_command(command: str) -> str:
@@ -545,18 +546,18 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 action="store_true",
                 help="Flip sign of energy values before plotting/export.",
             )
-        elif command == "ffield_opt_bulk_modulus":
+        elif command == "get_ffield_opt_bulk_modulus":
             parser.description = (
                 "Fit a Vinet bulk modulus from optimization report energy-volume data.\n\n"
                 "Examples:\n"
                 "  1. Fitting bulk modulus for a specific identifier (for example, MgO) and plotting the fitted curve:\n"
-                "  reaxkit ffield_opt_bulk_modulus --iden bulk_0\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --iden bulk_0\n\n"
                 "  2. Fitting bulk modulus for all available identifiers, exporting the fitted parameters to CSV:\n"
-                "  reaxkit ffield_opt_bulk_modulus --iden all --export bulk_modulus.csv\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --iden all --export bulk_modulus.csv\n\n"
                 "  3. Fitting bulk modulus for all available identifiers, plotting the fitted curves, and saving the plot.\n"
                 "Here we have used --flip-sign flag since some values where negative (sign convention) and we couldn't "
                 "get the bulk modulus from them:\n"
-                "  reaxkit ffield_opt_bulk_modulus --flip-sign --iden all --plot subplot --save bulk_modulus.png\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --flip-sign --iden all --plot subplot --save bulk_modulus.png\n\n"
             )
             parser.add_argument(
                 "--iden",
@@ -1380,7 +1381,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "get_ffield_diagnostic_data": _build_parameter_optimization_diagnostic_request,
     "get_ffield_opt_results": _build_force_field_optimization_report_request,
     "get_ffield_opt_eos": _build_force_field_optimization_report_eos_request,
-    "ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
+    "get_ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
 }
 
 def _prepare_result(command: str, result) -> object:

@@ -341,7 +341,7 @@ workflows:
     notes:
     - 'How to use the workflow: reaxkit <X> -h where <X> can be merge-ffield, add-element-to-ffield,
       add-term-to-ffield, get_ffield_data, get_ffield_opt_progress_data, get_ffield_opt_results,
-      ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data,
+      get_ffield_opt_bulk_modulus, get_ffield_opt_eos, get_ffield_diagnostic_data,
       get_ffield_diagnostics_sensitivity, get_ffield_diagnostics_evolution, get_energy_min_summary_data'
     aliases:
     - ffield workflow
@@ -351,6 +351,7 @@ workflows:
     - reaxkit help "add term to ffield"
   force_field_opt_workflow:
     implementation_module: 'reaxkit.workflows.force_field_opt.get_ffield_opt_plots: get_ffield_opt_plots'
+    module_prefix: reaxkit.workflows.force_field_opt
     description: Classify and plot equation-of-state and restraint curves from force-field optimization outputs.
     related_commands:
       analysis:
@@ -948,32 +949,33 @@ workflows:
     - run force field optimization report
     - reaxkit help "get ffield opt results"
     - reaxkit get_ffield_opt_results -h
-  ffield_opt_bulk_modulus:
+  get_ffield_opt_bulk_modulus:
     parent_workflow: ffield_workflow
-    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_opt_bulk_modulus'
-    command: ffield_opt_bulk_modulus
+    implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_bulk_modulus'
+    command: get_ffield_opt_bulk_modulus
     command_kind: analysis
-    analysis_task: ffield_opt_bulk_modulus
+    analysis_task: get_ffield_opt_bulk_modulus
     description: Derives bulk-modulus metrics from optimization report data. Use it when training or validation
       includes elastic response, equation-of-state points, or pressure-volume behavior.
     tags:
     - force field
     - bulk modulus
     - force field optimization report
-    - ffield opt bulk modulus
+    - get ffield opt bulk modulus
     - ffield workflow
     - analysis workflow command
     notes:
-    - 'How to use the workflow: reaxkit ffield_opt_bulk_modulus -h'
+    - 'How to use the workflow: reaxkit get_ffield_opt_bulk_modulus -h'
     aliases:
+    - ffield_opt_bulk_modulus
     - ffield-opt-bulk-modulus
     - force field optimization report bulk modulus
     - force-field-optimization-report-bulk-modulus
     help_search_examples:
     - reaxkit help "force field optimization report bulk modulus"
     - run force field optimization report bulk modulus
-    - reaxkit help "ffield opt bulk modulus"
-    - reaxkit ffield_opt_bulk_modulus -h
+    - reaxkit help "get ffield opt bulk modulus"
+    - reaxkit get_ffield_opt_bulk_modulus -h
   get_ffield_opt_eos:
     parent_workflow: ffield_workflow
     implementation_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_eos'
@@ -1016,6 +1018,23 @@ workflows:
     help_search_examples:
     - reaxkit help "get ffield opt plots"
     - reaxkit get_ffield_opt_plots -h
+  get-ffield-opt-report:
+    parent_workflow: force_field_opt_workflow
+    implementation_module: 'reaxkit.workflows.force_field_opt.get_ffield_opt_report: get-ffield-opt-report'
+    command: get-ffield-opt-report
+    command_kind: analysis
+    description: Run the get ffield opt report workflow command provided by force_field_opt_workflow.
+    tags:
+    - get ffield opt report
+    - force field opt workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-ffield-opt-report -h'
+    aliases:
+    - get_ffield_opt_report
+    help_search_examples:
+    - reaxkit help "get ffield opt report"
+    - reaxkit get-ffield-opt-report -h
   get-params:
     parent_workflow: params_workflow
     implementation_module: 'reaxkit.workflows.params_workflow: get-params'
@@ -2900,9 +2919,11 @@ command_to_workflow_module:
   get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_progress_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_results: reaxkit.workflows.file_tools.ffield_workflow
-  ffield_opt_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
+  get_ffield_opt_bulk_modulus: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_eos: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_plots: reaxkit.workflows.force_field_opt.get_ffield_opt_plots
+  get-ffield-opt-report: reaxkit.workflows.force_field_opt.get_ffield_opt_report
+  get_ffield_opt_report: reaxkit.workflows.force_field_opt.get_ffield_opt_report
   get-params: reaxkit.workflows.params_workflow
   gui: reaxkit.workflows.meta.gui_workflow
   help: reaxkit.workflows.meta.help_workflow
@@ -3035,7 +3056,6 @@ command_to_workflow_module:
   get-ffield-data: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-opt-progress-data: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-opt-results: reaxkit.workflows.file_tools.ffield_workflow
-  ffield-opt-bulk-modulus: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-opt-eos: reaxkit.workflows.file_tools.ffield_workflow
   get_params: reaxkit.workflows.params_workflow
   kinematics-heatmap2d: reaxkit.workflows.kinematics_workflow

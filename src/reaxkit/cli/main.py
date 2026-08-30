@@ -270,8 +270,15 @@ def _canonicalize_direct_command(argv: list[str]) -> list[str]:
         **get_registered_analysis_commands(),
         **get_registered_generators(),
     }
+    aliases = {
+        name: tuple(getattr(spec, "aliases", ()))
+        for name, spec in direct_commands.items()
+        if getattr(spec, "aliases", ())
+    }
     try:
-        out[1] = resolve_command_name(out[1], task_names=direct_commands.keys())
+        out[1] = resolve_command_name(
+            out[1], task_names=direct_commands.keys(), aliases=aliases
+        )
     except KeyError:
         pass
     return out

@@ -10,6 +10,7 @@ Registry for routing top-level analysis commands to workflow modules.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -24,16 +25,24 @@ class AnalysisCommandSpec:
         Field value used by this structured record.
     module_path : str
         Field value used by this structured record.
+    aliases : tuple[str, ...], optional
+        Backward-compatible command names resolved to ``name``.
     """
 
     name: str
     module_path: str
+    aliases: tuple[str, ...] = ()
 
 
 ANALYSIS_COMMAND_REGISTRY: dict[str, AnalysisCommandSpec] = {}
 
 
-def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommandSpec:
+def register_analysis_command(
+    name: str,
+    *,
+    module_path: str,
+    aliases: Iterable[str] = (),
+) -> AnalysisCommandSpec:
     """
     Register a direct analysis command route.
     
@@ -46,6 +55,8 @@ def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommand
         Input parameter used by this function.
     module_path : str
         Input parameter used by this function.
+    aliases : Iterable[str], optional
+        Backward-compatible command names that resolve to ``name``.
     
     Returns
     -----
@@ -66,7 +77,11 @@ def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommand
     ```
     The output type reflects the return contract for this API call.
     """
-    spec = AnalysisCommandSpec(name=name, module_path=module_path)
+    spec = AnalysisCommandSpec(
+        name=name,
+        module_path=module_path,
+        aliases=tuple(str(alias) for alias in aliases),
+    )
     ANALYSIS_COMMAND_REGISTRY[name] = spec
     return spec
 
@@ -146,12 +161,18 @@ register_analysis_command(
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command(
-    "ffield_opt_bulk_modulus",
+    "get_ffield_opt_bulk_modulus",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
+    aliases=("ffield_opt_bulk_modulus",),
 )
 register_analysis_command(
     "get_ffield_opt_plots",
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
+)
+register_analysis_command(
+    "get-ffield-opt-report",
+    module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_report",
+    aliases=("get_ffield_opt_report",),
 )
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
