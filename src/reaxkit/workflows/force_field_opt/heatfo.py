@@ -311,7 +311,7 @@ def heatfo_plot_payloads(
                         "values": pd.to_numeric(
                             chunk["qm_value"], errors="coerce"
                         ).tolist(),
-                        "color": "tab:orange",
+                        "color": "#C0504D",
                     },
                 ],
                 "xlabel": "Structure identifier",

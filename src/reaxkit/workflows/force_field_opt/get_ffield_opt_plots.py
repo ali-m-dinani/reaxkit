@@ -62,6 +62,8 @@ from reaxkit.workflows.file_tools.ffield_workflow import (
 ALL_COMMANDS = ("get_ffield_opt_plots",)
 ALL_LEGACY_COMMANDS: tuple[str, ...] = ()
 FIGURE_GENERATOR_TEMPLATE_FILENAME = "template_ffield_opt_figure_generator.xlsx"
+REAXFF_PLOT_COLOR = "tab:blue"
+QM_PLOT_COLOR = "#C0504D"
 
 NOT_PLOTTED_COLUMNS = [
     "report_line_number",
@@ -188,6 +190,7 @@ def _series(group: dict[str, object]) -> list[dict[str, object]]:
                 "y": group["reaxff_y"],
                 "label": "ReaxFF",
                 "marker": "o",
+                "color": REAXFF_PLOT_COLOR,
             }
         )
     if group["qm_x"]:
@@ -197,6 +200,7 @@ def _series(group: dict[str, object]) -> list[dict[str, object]]:
                 "y": group["qm_y"],
                 "label": "QM/Literature",
                 "marker": "o",
+                "color": QM_PLOT_COLOR,
             }
         )
     return series

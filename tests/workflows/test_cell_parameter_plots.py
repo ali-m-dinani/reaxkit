@@ -86,7 +86,7 @@ def test_cell_payloads_limit_entries_and_keep_series_colors() -> None:
     ]
     assert all(
         [series["color"] for series in payload["series"]]
-        == ["tab:blue", "tab:orange"]
+        == ["tab:blue", "#C0504D"]
         for payload in payloads
     )
     assert all(payload["grid"] is False for payload in payloads)

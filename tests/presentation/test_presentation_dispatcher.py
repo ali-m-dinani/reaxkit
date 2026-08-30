@@ -4,9 +4,11 @@ import argparse
 from pathlib import Path
 from types import SimpleNamespace
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 from reaxkit.presentation.dispatcher import present_result
+from reaxkit.presentation.plot.renderers.single import SinglePlotRenderer
 
 
 def test_present_result_prints_table_when_no_output_flags(capsys):
@@ -64,3 +66,22 @@ def test_present_result_saves_plot_payload_batch_to_directory(monkeypatch, tmp_p
     ]
     assert Path(rendered[0]["save"]).parent == tmp_path / "eos_plots" / "material_a"
     assert Path(rendered[1]["save"]).parent == tmp_path / "eos_plots"
+
+
+def test_single_plot_renderer_applies_per_series_colors(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda: None)
+
+    figure = SinglePlotRenderer().render(
+        {
+            "series": [
+                {"x": [1, 2], "y": [2, 3], "color": "tab:blue"},
+                {"x": [1, 2], "y": [3, 4], "color": "#C0504D"},
+            ]
+        }
+    )
+
+    assert [line.get_color() for line in figure.axes[0].lines] == [
+        "tab:blue",
+        "#C0504D",
+    ]
+    plt.close(figure)

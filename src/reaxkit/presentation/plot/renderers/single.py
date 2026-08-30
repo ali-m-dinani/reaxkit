@@ -88,6 +88,8 @@ class SinglePlotRenderer(PlotRenderer):
                 ms = s.get("markersize", 4)
                 al = s.get("alpha", 1.0)
                 kwargs = dict(linewidth=lw, marker=mk, alpha=al)
+                if s.get("color") is not None:
+                    kwargs["color"] = s["color"]
                 if plot_type == "scatter":
                     kwargs["s"] = ms
                 else:

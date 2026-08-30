@@ -14,6 +14,7 @@ from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
     _restraint_plot_groups,
     _safe_name,
     _scan_plot_groups,
+    _series,
     _not_plotted_entries,
     build_parser,
 )
@@ -48,6 +49,19 @@ def test_custom_figure_generator_template_is_packaged() -> None:
     assert template.read_bytes().startswith(b"PK")
 
 
+def test_curve_series_use_reaxff_blue_and_qm_red() -> None:
+    series = _series(
+        {
+            "reaxff_x": [1.0, 2.0],
+            "reaxff_y": [3.0, 4.0],
+            "qm_x": [1.0, 2.0],
+            "qm_y": [3.5, 4.5],
+        }
+    )
+
+    assert [item["color"] for item in series] == ["tab:blue", "#C0504D"]
+
+
 def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:
     table = pd.DataFrame(
         {
@@ -64,7 +78,7 @@ def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:
     assert [len(payload["labels"]) for payload in payloads] == [3, 3, 3, 3, 1]
     assert all(
         [series["color"] for series in payload["series"]]
-        == ["tab:blue", "tab:orange"]
+        == ["tab:blue", "#C0504D"]
         for payload in payloads
     )
     assert all(
@@ -93,7 +107,7 @@ def test_charge_payloads_limit_entries_and_keep_series_colors() -> None:
     assert [len(payload["labels"]) for payload in payloads] == [5, 5, 5, 5, 5, 5, 1]
     assert all(
         [series["color"] for series in payload["series"]]
-        == ["tab:blue", "tab:orange"]
+        == ["tab:blue", "#C0504D"]
         for payload in payloads
     )
     assert all(
