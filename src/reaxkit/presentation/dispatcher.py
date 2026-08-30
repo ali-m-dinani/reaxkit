@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Callable
 
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.runtime.generator_runtime import maybe_copy_output_to_dot
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 from reaxkit.presentation.persist import append_artifacts_to_settings, persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
@@ -203,6 +204,7 @@ def present_result(
     for key, value in normalized.items():
         setattr(args, key, value)
     result_dirs: list[Path] = []
+    output_artifacts: list[Path] = []
     export_csv = getattr(args, "export", None)
     analysis_dir = persist_analysis_result(command, result, args, write_csv=not bool(export_csv))
     result_dirs.append(analysis_dir)
@@ -227,6 +229,7 @@ def present_result(
             )
             export_result_csv(result, str(export_path))
             result_dirs.append(export_path.parent)
+            output_artifacts.append(export_path)
 
     if wants_plot:
         if plot_payload_builder is None:
@@ -292,9 +295,11 @@ def present_result(
                                 }
                             )
                         result_dirs.append(save_path)
+                        output_artifacts.append(save_path)
                     else:
                         render_plot({**plot_payloads[0], "save": str(save_path)})
                         result_dirs.append(save_path.parent)
+                        output_artifacts.append(save_path)
                 if show or (plot_mode and not save):
                     for item in plot_payloads:
                         render_plot(item)
@@ -328,6 +333,12 @@ def present_result(
                     result_dirs.append(report_dir)
                 for note in report_notes:
                     print(f"[report] {note}")
+
+    if bool(getattr(args, "copy_to_dot", False)):
+        for artifact in output_artifacts:
+            copied = maybe_copy_output_to_dot(artifact, enabled=True)
+            if copied is not None:
+                result_dirs.append(copied if copied.is_dir() else copied.parent)
 
     if not (wants_plot or export_csv or wants_report):
         print_result_table(result)

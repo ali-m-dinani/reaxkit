@@ -68,6 +68,47 @@ def test_present_result_saves_plot_payload_batch_to_directory(monkeypatch, tmp_p
     assert Path(rendered[1]["save"]).parent == tmp_path / "eos_plots"
 
 
+def test_present_result_copy_to_dot_copies_saved_plot(monkeypatch, tmp_path):
+    working_dir = tmp_path / "working"
+    working_dir.mkdir()
+    monkeypatch.chdir(working_dir)
+
+    def fake_render(payload):
+        output = Path(payload["save"])
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(b"plot-data")
+
+    monkeypatch.setattr(
+        "reaxkit.presentation.dispatcher.render_plot",
+        fake_render,
+    )
+    args = argparse.Namespace(
+        plot="single",
+        show=False,
+        save="electric-field.png",
+        export=None,
+        copy_to_dot=True,
+        project_root=str(tmp_path / "workspace"),
+        run_id="run-1",
+        analysis_id="analysis-1",
+    )
+    result = SimpleNamespace(table=pd.DataFrame({"value": [1, 2]}))
+
+    present_result(
+        "get_electric_field",
+        result,
+        args,
+        plot_payload_builder=lambda _command, _result, _args: {
+            "plot_type": "single_plot",
+            "x": [0, 1],
+            "y": [1, 2],
+        },
+    )
+
+    copied = working_dir / "electric-field.png"
+    assert copied.read_bytes() == b"plot-data"
+
+
 def test_single_plot_renderer_applies_per_series_colors(monkeypatch):
     monkeypatch.setattr(plt, "show", lambda: None)
 

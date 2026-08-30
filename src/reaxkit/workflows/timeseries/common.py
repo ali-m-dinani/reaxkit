@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -86,7 +87,14 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--export", default=None)
     parser.add_argument("--grid", default=None, help="Subplot grid such as 2x2.")
     parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter")
-    parser.add_argument("--control", default="control", help="Control file used for time-axis conversion.")
+    parser.add_argument(
+        "--control",
+        default="control",
+        help=(
+            "Control file used for frame (iout2) and time conversion. "
+            "The default also searches beside the selected fort.* input."
+        ),
+    )
 
 
 def configure_parser(
@@ -193,6 +201,11 @@ def build_geometry_optimization_request(args: argparse.Namespace) -> GeometryOpt
 
 def _plot_axis(table: pd.DataFrame, args: argparse.Namespace) -> tuple[np.ndarray, str, str]:
     mode = str(getattr(args, "xaxis", "iter"))
+    if mode == "frame" and "iter" in table:
+        control_file = _axis_control_file(args)
+        iterations = pd.to_numeric(table["iter"], errors="coerce").to_numpy(dtype=int)
+        values, label = convert_xaxis(iterations, "frame", control_file=control_file)
+        return np.asarray(values), label, "iter"
     if mode == "frame" and "frame_index" in table:
         return pd.to_numeric(table["frame_index"], errors="coerce").to_numpy(dtype=float), "frame", "frame_index"
     if "iter" not in table:
@@ -201,9 +214,28 @@ def _plot_axis(table: pd.DataFrame, args: argparse.Namespace) -> tuple[np.ndarra
         return pd.to_numeric(table["frame_index"], errors="coerce").to_numpy(dtype=float), "frame", "frame_index"
     iterations = pd.to_numeric(table["iter"], errors="coerce").to_numpy(dtype=int)
     if mode == "time":
-        values, label = convert_xaxis(iterations, "time", control_file=getattr(args, "control", "control"))
+        values, label = convert_xaxis(iterations, "time", control_file=_axis_control_file(args))
         return np.asarray(values), label, "iter"
     return iterations, "iter", "iter"
+
+
+def _axis_control_file(args: argparse.Namespace) -> str:
+    """Resolve a default control file beside a file-backed time-series input."""
+
+    configured = Path(str(getattr(args, "control", "control")))
+    if configured != Path("control"):
+        return str(configured)
+
+    for input_name in ("fort78", "fort76", "fort73", "fort7"):
+        raw_path = getattr(args, input_name, None)
+        if raw_path is None:
+            continue
+        input_path = Path(str(raw_path))
+        directory = input_path if input_path.is_dir() else input_path.parent
+        candidate = directory / "control"
+        if candidate.is_file():
+            return str(candidate)
+    return str(configured)
 
 
 def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:

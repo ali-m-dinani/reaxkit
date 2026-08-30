@@ -32,7 +32,8 @@ These are shared workflow-level CLI flags added before command-specific options,
 | `--V` | No | 1 | Voltage index. Example: --V 2, which writes the field under voltage channel/index 2. |  |
 | `--start-iter` | No | 0 | Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000. |  |
 | `--max-magnitude` | No |  | Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength. |  |
-| `--step-angle` | No |  | Angular sampling step for sin profile (radians). Example: --step-angle 0.05, which controls sine sampling density per cycle. |  |
+| `--points-per-cycle` | No |  | Preferred equal-increment sampling control for sin profiles. Counts the start and end rows of one cycle; the start, half-cycle, and end equal --dc-offset. Example: --points-per-cycle 17. Adjacent cycles share their boundary, so consecutive duplicate baseline rows are omitted. |  |
+| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. |  |
 | `--num-cycles` | No |  | Number of cycles for sin or pulse profile. Example: --num-cycles 3, which repeats the waveform for three cycles. |  |
 | `--phase` | No | 0.0 | Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2. |  |
 | `--dc-offset` | No | 0.0 | DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform. |  |

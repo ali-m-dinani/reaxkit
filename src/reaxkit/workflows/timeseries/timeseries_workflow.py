@@ -39,7 +39,7 @@ from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import present_result
-from reaxkit.workflows.timeseries.common import build_plot_payload
+from reaxkit.workflows.timeseries.common import _axis_control_file, build_plot_payload
 
 ALL_COMMANDS = ("timeseries",)
 ALL_LEGACY_COMMANDS = ()
@@ -547,7 +547,8 @@ def _series_with_xaxis(command: str, result: TimeSeriesResult, args: argparse.Na
     iterations = np.asarray(meta.get("iterations", np.empty((0,), dtype=int)), dtype=int)
     if iterations.size == 0 and result.series:
         iterations = np.asarray(result.series[0].x, dtype=int)
-    xvals, xlabel = convert_xaxis(iterations, args.xaxis, control_file=args.control)
+    control_file = _axis_control_file(args) if args.xaxis in {"frame", "time"} else args.control
+    xvals, xlabel = convert_xaxis(iterations, args.xaxis, control_file=control_file)
     out = []
     for series in result.series:
         out.append({"x": np.asarray(xvals).tolist(), "y": np.asarray(series.y, dtype=float).tolist(), "label": series.label})

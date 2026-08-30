@@ -39,18 +39,33 @@ Common flags:
 ## Profile 1: Sinusoidal field
 
 ```bash
-reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1
+reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.35 --points-per-cycle 17 --iteration-step 500 --num-cycles 2 --direction z --V 1 --copy-to-dot
 ```
 
 Meaning:
-- `--max-magnitude`: peak amplitude (about +0.004 to -0.004 V/A around offset)
-- `--step-angle`: angular sampling density (smaller = denser sampling)
+- `--max-magnitude`: exact positive and negative extrema around the offset
+- `--points-per-cycle`: number of rows in one complete piecewise-linear cycle, including its start and end
 - `--iteration-step`: MD iterations between consecutive rows
-- `--num-cycles`: number of sine cycles
+- `--num-cycles`: number of complete cycles
+
+Each cycle returns exactly to `--dc-offset` at its start, half-cycle, and end.
+Adjacent cycles share that boundary row, preventing consecutive duplicate
+field values. The total row count is
+`num_cycles * (points_per_cycle - 1) + 1`.
+
+Within each quarter-cycle, the magnitude changes by an equal amount at every
+row. This produces linear ramps between zero and each extremum. It is therefore
+a triangular, piecewise-linear sampled profile rather than exact sine values.
+Use legacy `--step-angle` when exact sine-value sampling is required.
+
+For equal-duration positive and negative halves, use an odd count such as 9 or
+11. With 10 points there are nine time intervals, so one half necessarily has
+one additional interval.
 
 Optional sin-only controls:
-- `--phase`
 - `--dc-offset`
+- `--phase` (must be zero or a whole multiple of `2*pi` in points-per-cycle mode)
+- `--step-angle` (legacy alternative to `--points-per-cycle`)
 
 ---
 

@@ -3233,6 +3233,7 @@ flags_across_all_workflows:
     - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
     - timeseries_workflow: timeseries
   "--copy-to-dot":
+    - timeseries_workflow: get_electric_field, get-electric-field
     - addmol_workflow: gen_template_addmol, gen-template-addmol, make_addmol, make-addmol
     - charges_workflow: gen_template_charges, gen-template-charges, make_charges, make-charges
     - control_workflow: gen_control, gen_template_control, gen-control, gen-template-control, get_control_data, get-control_data, make_control, make-control
@@ -3627,6 +3628,8 @@ flags_across_all_workflows:
     - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
   "--plot-target":
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--points-per-cycle":
+    - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
   "--precision":
     - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
   "--present":

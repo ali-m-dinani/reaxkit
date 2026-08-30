@@ -100,13 +100,15 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         
         "Examples:\n"
         "  1. Sinusoidal profile:\n"
-        "   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.004 --step-angle 0.05 --iteration-step 500 --num-cycles 2 --direction z --V 1\n"
-        "   Meaning: generates a sine-wave electric field along z. --max-magnitude 0.004 means the field swings up to about +0.004 and down to about "
-        "-0.004 V/A. --step-angle 0.05 controls how finely the sine curve is sampled (smaller means denser points). "
-        "--iteration-step 500 maps each sampled point to every 500 MD iterations. --num-cycles 2 writes two full sine cycles. --V 1 writes to voltage index 1.\n"
-        "[Note] as mentioned above, you can have a maximum of 100 entry points in eregime.in file. In order to know how many points will be in the output "
-        "eregime.in file when using this command, you can use this formula:\n"
-        "  number_of_points = (2 * num_of_cycles * pi) / (step_angle) - 1 \n\n"
+        "   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.35 --points-per-cycle 17 --iteration-step 500 --num-cycles 2 --direction z --V 1 --copy-to-dot\n"
+        "   Meaning: generates an equal-increment, piecewise-linear electric-field cycle along z. --max-magnitude 0.35 means the field reaches +0.35 and "
+        "-0.35 V/A. --points-per-cycle 17 writes 17 points in one complete cycle, including the starting and ending baseline. "
+        "Every cycle returns to the baseline at its start, half-cycle, and end. "
+        "--iteration-step 500 maps each sampled point to every 500 MD iterations. --num-cycles 2 writes two full cycles. --V 1 writes to voltage index 1.\n"
+        "[Note] Adjacent cycles share their zero-field boundary, preventing duplicate consecutive field values. "
+        "Total rows = num_cycles * (points_per_cycle - 1) + 1. "
+        "For equal-duration positive and negative halves, use an odd count such as 9 or 11. With 10 points there are nine time intervals, so one half necessarily has one additional interval. "
+        "Use legacy --step-angle instead when true sine-value sampling is required.\n\n"
         
         "  2. Pulse profile:\n"
         "   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1\n"
@@ -156,11 +158,22 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         default=None,
         help="Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength.",
     )
-    parser.add_argument(
+    sin_sampling_group = parser.add_mutually_exclusive_group()
+    sin_sampling_group.add_argument(
+        "--points-per-cycle",
+        type=int,
+        default=None,
+        help=(
+            "Preferred equal-increment sampling control for sin profiles. Counts the start and end rows of one cycle; "
+            "the start, half-cycle, and end equal --dc-offset. Example: --points-per-cycle 17. "
+            "Adjacent cycles share their boundary, so consecutive duplicate baseline rows are omitted."
+        ),
+    )
+    sin_sampling_group.add_argument(
         "--step-angle",
         type=float,
         default=None,
-        help="Angular sampling step for sin profile (radians). Example: --step-angle 0.05, which controls sine sampling density per cycle.",
+        help="Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries.",
     )
     parser.add_argument(
         "--num-cycles",
@@ -278,6 +291,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         voltage_idx=args.V,
         start_iter=args.start_iter,
         max_magnitude=args.max_magnitude,
+        points_per_cycle=args.points_per_cycle,
         step_angle=args.step_angle,
         num_cycles=args.num_cycles,
         phase=args.phase,

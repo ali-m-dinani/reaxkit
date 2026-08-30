@@ -5,9 +5,12 @@ from importlib import import_module, resources as ir
 
 import yaml
 
+import pandas as pd
+
 from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.workflows.timeseries import ALL_COMMANDS
+from reaxkit.workflows.timeseries import common
 
 
 SCALAR_FIELDS = {
@@ -74,6 +77,34 @@ def test_family_getters_build_requests_without_field_expressions() -> None:
         request = module.build_request(_parser_for(command).parse_args(argv))
         for name, value in expected.items():
             assert getattr(request, name) == value
+
+
+def test_get_electric_field_accepts_copy_to_dot() -> None:
+    args = _parser_for("get_electric_field").parse_args(
+        ["--components", "field_z", "--copy-to-dot"]
+    )
+
+    assert args.copy_to_dot is True
+
+
+def test_electric_field_frame_axis_uses_sibling_control_iout2(tmp_path) -> None:
+    fort78 = tmp_path / "fort.78"
+    fort78.write_text("", encoding="utf-8")
+    (tmp_path / "control").write_text("# MD\n5 iout2\n", encoding="utf-8")
+    args = argparse.Namespace(
+        xaxis="frame",
+        control="control",
+        fort78=str(fort78),
+    )
+    table = pd.DataFrame(
+        {"frame_index": [0, 1, 2, 3], "iter": [0, 4, 5, 10]}
+    )
+
+    values, label, source = common._plot_axis(table, args)
+
+    assert values.tolist() == [0, 0, 1, 2]
+    assert label == "Frame"
+    assert source == "iter"
 
 
 def test_get_frames_count_accepts_general_and_engine_specific_paths() -> None:

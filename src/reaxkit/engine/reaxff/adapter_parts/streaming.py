@@ -146,7 +146,12 @@ def _fort7_frame(
         elements=labels,
         simulation=simulation,
         iterations=np.asarray([iteration], dtype=int),
-        metadata={"source": "fort7", "streaming": True, "bond_orders_format": "sparse_frame_list"},
+        metadata={
+            "source": "fort7",
+            "streaming": True,
+            "bond_orders_format": "sparse_frame_list",
+            "connectivity_incomplete": bool(record.get("connectivity_incomplete", False)),
+        },
         source_frame_indices=np.asarray([source_index], dtype=int),
     )
     charge_data = ChargeData(
@@ -211,7 +216,15 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         fort7_path,
         frame_indices=selected,
         reporter=None,
-    ).stream_file_frames()
+    ).stream_file_frames(
+        charges_only=(
+            data_type is ChargeData
+            or (
+                data_type is ElectrostaticsData
+                and str(args.get("scope") or "total").strip().lower() == "total"
+            )
+        )
+    )
 
     electric_field = None
     if data_type is ElectrostaticsData:

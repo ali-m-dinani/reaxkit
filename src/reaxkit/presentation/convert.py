@@ -17,9 +17,9 @@ Typical use cases include:
 - Reuse the public APIs here to keep output formatting and artifact behavior consistent.
 """
 
-import numpy as np
+from pathlib import Path
 
-from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+import numpy as np
 
 
 def convert_xaxis(iters, xaxis, control_file: str = "control"):
@@ -37,7 +37,8 @@ def convert_xaxis(iters, xaxis, control_file: str = "control"):
     xaxis : {'iter', 'frame', 'time'}
         Target x-axis representation.
     control_file : str, optional
-        Path to the ReaxFF control file used to determine the time step.
+        Path to the ReaxFF control file. Frame conversion uses ``iout2``;
+        time conversion uses the time step.
 
     Returns
     -------
@@ -47,8 +48,8 @@ def convert_xaxis(iters, xaxis, control_file: str = "control"):
     Raises
     ------
     ValueError
-        If the requested x-axis is unknown or the time step cannot be
-        determined from the control file.
+        If the requested x-axis is unknown or the required control keyword
+        cannot be determined.
 
     Examples
     --------
@@ -59,9 +60,41 @@ def convert_xaxis(iters, xaxis, control_file: str = "control"):
         return iters, "iter"
 
     elif xaxis == "frame":
-        return np.arange(len(iters)), "Frame"
+        from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+
+        control_path = Path(control_file)
+        if not control_path.is_file():
+            raise FileNotFoundError(
+                "A ReaxFF control file is required for --xaxis frame so "
+                f"'iout2' can be read. Control file not found: {control_path}"
+            )
+
+        handler = ControlHandler(control_path)
+        iout2 = (
+            handler.general_parameters.get("iout2")
+            or handler.md_parameters.get("iout2")
+        )
+        if iout2 is None:
+            raise ValueError(
+                f"Could not find 'iout2' in control file: {control_path}"
+            )
+        try:
+            output_interval = int(iout2)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Control keyword 'iout2' must be a positive integer; got {iout2!r}."
+            ) from exc
+        if output_interval <= 0 or output_interval != iout2:
+            raise ValueError(
+                f"Control keyword 'iout2' must be a positive integer; got {iout2!r}."
+            )
+
+        frames = np.floor_divide(np.asarray(iters, dtype=int), output_interval)
+        return frames, "Frame"
 
     elif xaxis == "time":
+        from reaxkit.engine.reaxff.io.control_handler import ControlHandler
+
         handler = ControlHandler(control_file)
         tstep = (
             handler.general_parameters.get("tstep")

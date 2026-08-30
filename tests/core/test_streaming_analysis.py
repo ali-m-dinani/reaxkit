@@ -86,6 +86,29 @@ def test_reaxff_file_streams_do_not_populate_handler_frame_caches():
     assert not fort7._parsed
 
 
+def test_charge_only_fort7_stream_recovers_fused_large_neighbor_ids(tmp_path):
+    fort7_path = tmp_path / "fort.7"
+    fort7_path.write_text(
+        """    28880 slab Iteration: 0 #Bonds: 5
+    1    2    3    8   8827364    0    1  0.537  0.546  0.546  0.545  0.000  4.013  0.000  1.188
+ 0.0 0.0 0.0 0.0
+""",
+        encoding="utf-8",
+    )
+
+    with np.testing.assert_raises(ValueError):
+        list(Fort7Handler(fort7_path).stream_file_frames())
+
+    records = list(Fort7Handler(fort7_path).stream_file_frames(charges_only=True))
+    assert len(records) == 1
+    assert records[0]["connectivity_incomplete"] is True
+    row = records[0]["frame"].iloc[0]
+    assert int(row["atom_num"]) == 1
+    assert int(row["atom_type_num"]) == 2
+    assert all(int(row[f"atom_cnn{slot}"]) == 0 for slot in range(1, 6))
+    assert float(row["partial_charge"]) == 1.188
+
+
 def test_dipole_stream_matches_materialized_result():
     positions = np.asarray(
         [

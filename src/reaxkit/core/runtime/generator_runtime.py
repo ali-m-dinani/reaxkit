@@ -194,6 +194,8 @@ def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None
     if not enabled:
         return None
     dst = Path.cwd() / output_path.name
+    if output_path.resolve() == dst.resolve():
+        return dst
     if output_path.is_dir():
         if dst.exists():
             shutil.rmtree(dst)

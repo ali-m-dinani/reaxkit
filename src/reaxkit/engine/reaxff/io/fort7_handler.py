@@ -373,12 +373,18 @@ class Fort7Handler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
-    def stream_file_frames(self) -> Iterator[Dict[str, Any]]:
+    def stream_file_frames(self, *, charges_only: bool = False) -> Iterator[Dict[str, Any]]:
         """Yield ``fort.7`` frames without materializing the trajectory.
 
         The generator retains only the rows and totals for the current
         iteration.  It intentionally bypasses the handler parse/cache path so
         streaming analysis does not create a second full in-memory copy.
+
+        When ``charges_only`` is true, rows whose large fixed-width neighbor
+        ids have fused together are recovered without connectivity: atom id,
+        atom type, bond-order values, and partial charge remain aligned, while
+        unavailable neighbor ids are represented by zeros.  Total dipole,
+        polarization, and charge analyses do not consume connectivity.
         """
         requested = set(self._frame_indices) if self._frame_indices is not None else None
         max_requested = max(requested, default=-1) if requested is not None else None
@@ -414,6 +420,7 @@ class Fort7Handler(BaseHandler):
                 "simulation_name": str(current["simulation_name"]),
                 "totals": list(totals),
                 "frame": pd.DataFrame(atom_rows, columns=columns),
+                "connectivity_incomplete": bool(current.get("connectivity_incomplete", False)),
             }
 
         with open(self.path, "r", encoding="utf-8") as fh:
@@ -435,6 +442,7 @@ class Fort7Handler(BaseHandler):
                         "num_of_atoms": int(header.group("num_atoms")),
                         "num_of_bonds": int(header.group("num_bonds")),
                         "simulation_name": header.group("simulation_name"),
+                        "connectivity_incomplete": False,
                     }
                     continue
                 if current is None or not current["selected"]:
@@ -446,8 +454,40 @@ class Fort7Handler(BaseHandler):
                     totals.extend(map(float, values))
                 else:
                     num_bonds = int(current["num_of_bonds"])
-                    int_part = list(map(int, values[0:num_bonds + 3]))
-                    float_part = list(map(float, values[num_bonds + 3:]))
+                    integer_count = num_bonds + 3
+                    try:
+                        int_part = list(map(int, values[0:integer_count]))
+                        float_part = list(map(float, values[integer_count:]))
+                    except ValueError:
+                        if not charges_only:
+                            raise
+                        float_index = next(
+                            (
+                                index
+                                for index, token in enumerate(values)
+                                if any(marker in token.lower() for marker in (".", "e"))
+                            ),
+                            -1,
+                        )
+                        expected_float_count = num_bonds + 3
+                        if (
+                            float_index < 2
+                            or len(values) - float_index < expected_float_count
+                        ):
+                            raise ValueError(
+                                "Could not recover charge fields from a fused fort.7 atom row. "
+                                "Run 'reaxkit repair_fort7' for this file."
+                            )
+                        atom_num = int(values[0])
+                        atom_type_token = values[1]
+                        if not atom_type_token or not atom_type_token[0].isdigit():
+                            raise ValueError(
+                                "Could not recover atom type from a fused fort.7 atom row."
+                            )
+                        atom_type_num = int(atom_type_token[0])
+                        int_part = [atom_num, atom_type_num, *([0] * num_bonds), 0]
+                        float_part = list(map(float, values[float_index:]))
+                        current["connectivity_incomplete"] = True
                     atom_rows.append(int_part + float_part)
 
         record = finalize()
