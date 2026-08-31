@@ -865,6 +865,11 @@ class SimulationScalarSeriesTask(AnalysisTask):
     required_data = SimulationData
 
     @staticmethod
+    def required_data_fields_for(request: SimulationScalarSeriesRequest, _args: dict) -> tuple[str, ...]:
+        """Declare the simulation field that must be populated by the loader."""
+        return (str(request.field),)
+
+    @staticmethod
     def recommended_presentations(_result: SimulationScalarSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
         """Recommend default table/plot views for simulation scalar series.
 
@@ -1281,6 +1286,11 @@ class CellDimensionsTask(AnalysisTask):
     """Build cell-dimension time series from ``SimulationData``."""
 
     required_data = SimulationData
+
+    @staticmethod
+    def required_data_fields_for(request: CellDimensionsRequest, _args: dict) -> tuple[str, ...]:
+        """Declare the requested cell fields so loaders can avoid unrelated sources."""
+        return tuple(str(field) for field in request.fields)
 
     @staticmethod
     def recommended_presentations(_result: CellDimensionsResult, payload: dict[str, Any]) -> list[PresentationSpec]:

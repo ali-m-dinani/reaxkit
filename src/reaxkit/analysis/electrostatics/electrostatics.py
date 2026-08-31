@@ -966,35 +966,84 @@ def _run_electrostatics_stream(
 ) -> pd.DataFrame:
     """Compute electrostatics while retaining only one canonical frame."""
     tables: list[pd.DataFrame] = []
+    total_rows: list[dict[str, Any]] = []
     processed = 0
     every = max(1, int(request.every))
     for stream_index, data in enumerate(frames):
         if stream_index % every:
             continue
-        table = _run_electrostatics(
-            data,
-            mode=mode,
-            scope=request.scope,
-            atom_ids=request.atom_ids,
-            atom_types=request.atom_types,
-            frames=None,
-            every=1,
-            volume_method=getattr(request, "volume_method", None),
-            reporter=None,
-        )
+        if request.scope == "total":
+            coords = np.asarray(data.trajectory.positions[0], dtype=float)
+            q = np.asarray(data.charges.charges[0], dtype=float)
+            if coords.ndim != 2 or coords.shape[1] != 3 or q.shape != coords.shape[:1]:
+                raise ValueError("Streamed total electrostatics requires aligned XYZ coordinates and charges.")
+            # Matrix-vector multiplication performs all three component sums
+            # in compiled NumPy code without allocating coords * q[:, None].
+            mu_ea = q @ coords
+            mu_debye = mu_ea * const("ea_to_debye")
+            iteration_values = data.trajectory.iterations
+            iteration = int(iteration_values[0]) if iteration_values is not None else stream_index
+            row: dict[str, Any] = {
+                "iter": iteration,
+                "mu_x (debye)": float(mu_debye[0]),
+                "mu_y (debye)": float(mu_debye[1]),
+                "mu_z (debye)": float(mu_debye[2]),
+            }
+            if mode == "polarization":
+                volume_method = getattr(request, "volume_method", None) or "hull"
+                if volume_method == "cell":
+                    simulation = data.trajectory.simulation
+                    volume = _cell_volume(simulation.cell_lengths if simulation else None, 0)
+                elif volume_method == "bbox":
+                    volume = _bbox_volume(coords)
+                else:
+                    volume = _convex_hull_volume(coords)
+                if np.isfinite(volume) and volume > 0:
+                    p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
+                    row.update({
+                        "P_x (uC/cm^2)": float(p_vec[0]),
+                        "P_y (uC/cm^2)": float(p_vec[1]),
+                        "P_z (uC/cm^2)": float(p_vec[2]),
+                    })
+                else:
+                    row.update({
+                        "P_x (uC/cm^2)": np.nan,
+                        "P_y (uC/cm^2)": np.nan,
+                        "P_z (uC/cm^2)": np.nan,
+                    })
+                row["volume (angstrom^3)"] = float(volume)
+            table = None
+        else:
+            table = _run_electrostatics(
+                data,
+                mode=mode,
+                scope=request.scope,
+                atom_ids=request.atom_ids,
+                atom_types=request.atom_types,
+                frames=None,
+                every=1,
+                volume_method=getattr(request, "volume_method", None),
+                reporter=None,
+            )
         source_indices = data.trajectory.source_frame_indices
         source_index = (
             int(np.asarray(source_indices, dtype=int).reshape(-1)[0])
             if source_indices is not None
             else stream_index
         )
-        if not table.empty:
+        if request.scope == "total":
+            row["frame_index"] = source_index
+            # Preserve the public column order of the materialized path.
+            total_rows.append({"frame_index": row.pop("frame_index"), **row})
+        elif table is not None and not table.empty:
             table = table.copy()
             table["frame_index"] = source_index
             tables.append(table)
         processed += 1
         if callable(reporter):
             reporter("stream", processed, 0, f"Streaming {mode} analysis")
+    if request.scope == "total":
+        return pd.DataFrame(total_rows)
     if not tables:
         return pd.DataFrame()
     out = pd.concat(tables, ignore_index=True)

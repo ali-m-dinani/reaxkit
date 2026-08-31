@@ -22,6 +22,7 @@ from pathlib import Path
 import pickle
 import shutil
 from typing import List, Optional, Iterator, Dict, Any
+import numpy as np
 import pandas as pd
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
@@ -301,12 +302,14 @@ class XmoloutHandler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
-    def stream_file_frames(self) -> Iterator[Dict[str, Any]]:
+    def stream_file_frames(self, *, coordinates_only: bool = False) -> Iterator[Dict[str, Any]]:
         """Yield coordinate frames directly from ``xmolout`` without caching them.
 
         Unlike :meth:`iter_frames`, this method does not call ``parse()`` and
         never populates ``self._frames``.  At most one atom table is retained
-        while the caller consumes the iterator.
+        while the caller consumes the iterator.  ``coordinates_only`` avoids
+        building a pandas table and parsing unused per-atom columns.  It is
+        intended for total electrostatics, which consumes only XYZ positions.
         """
         requested = set(self._frame_indices) if self._frame_indices is not None else None
         max_requested = max(requested, default=-1) if requested is not None else None
@@ -333,15 +336,25 @@ class XmoloutHandler(BaseHandler):
                 selected = requested is None or source_index in requested
 
                 atom_rows: list[list[Any]] = []
+                coordinates = np.empty((n_atoms, 3), dtype=float) if coordinates_only else None
+                elements: list[str] = []
                 atom_columns: list[str] | None = None
-                for _ in range(n_atoms):
+                for atom_index in range(n_atoms):
                     atom_line = next((raw.strip() for raw in fh if raw.strip()), None)
                     if atom_line is None:
                         break
                     if not selected:
                         continue
-                    atom_values = atom_line.split()
+                    atom_values = atom_line.split(None, 4) if coordinates_only else atom_line.split()
                     if len(atom_values) < 4:
+                        continue
+                    if coordinates_only:
+                        elements.append(atom_values[0])
+                        coordinates[atom_index] = (
+                            float(atom_values[1]),
+                            float(atom_values[2]),
+                            float(atom_values[3]),
+                        )
                         continue
                     if atom_columns is None:
                         n_extras = max(0, len(atom_values) - 4)
@@ -370,18 +383,23 @@ class XmoloutHandler(BaseHandler):
                 if callable(self._reporter):
                     total = len(requested) if requested is not None else 0
                     self._reporter("stream", emitted, total, "Streaming xmolout frames")
-                yield {
+                record = {
                     "source_index": source_index,
                     "iter": int(header_values[1]),
                     "num_of_atoms": n_atoms,
                     "potential_energy": float(header_values[2]),
                     "cell_lengths": [float(value) for value in header_values[3:6]],
                     "cell_angles": [float(value) for value in header_values[6:9]],
-                    "frame": pd.DataFrame(
+                }
+                if coordinates_only:
+                    record["coordinates"] = coordinates
+                    record["elements"] = elements
+                else:
+                    record["frame"] = pd.DataFrame(
                         atom_rows,
                         columns=atom_columns or ["atom_type", "x", "y", "z"],
-                    ),
-                }
+                    )
+                yield record
 
     # ---- disk-cache override (parquet + json) -------------------
     def _disk_cache_dir(self, key: str) -> Path:

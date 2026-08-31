@@ -77,6 +77,29 @@ def test_full_load_behavior_remains_available(tmp_path: Path):
     assert Fort7Handler(fort7).dataframe()["iter"].tolist() == [0, 10, 20]
 
 
+def test_numeric_streaming_paths_avoid_per_frame_dataframes(tmp_path: Path):
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    xmolout.write_text(_xmolout(1), encoding="utf-8")
+    fort7.write_text(_fort7(1), encoding="utf-8")
+
+    coordinate_record = next(
+        XmoloutHandler(xmolout).stream_file_frames(coordinates_only=True)
+    )
+    charge_record = next(
+        Fort7Handler(fort7).stream_file_frames(charge_arrays_only=True)
+    )
+
+    assert "frame" not in coordinate_record
+    assert "frame" not in charge_record
+    assert coordinate_record["coordinates"].tolist() == [
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+    ]
+    assert charge_record["charge_atom_ids"].tolist() == [1, 2]
+    assert charge_record["charges"].tolist() == [0.0, 0.0]
+
+
 def test_reaxff_adapter_preserves_source_frame_mapping(tmp_path: Path):
     path = tmp_path / "xmolout"
     path.write_text(_xmolout(5), encoding="utf-8")

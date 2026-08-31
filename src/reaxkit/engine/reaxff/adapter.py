@@ -105,6 +105,15 @@ from reaxkit.engine.reaxff.adapter_parts.normalizers import (
     trajectory_from_xmolout_handler,
 )
 
+_SUMMARY_SIMULATION_FIELDS = {
+    "potential_energy",
+    "volume",
+    "temperature",
+    "pressure",
+    "density",
+    "elapsed_time",
+}
+
 # Backward-compatible aliases for older imports.
 _charges_from_fort7_handler = charges_from_fort7_handler
 _connectivity_from_fort7_handler = connectivity_from_fort7_handler
@@ -202,10 +211,15 @@ class ReaxFFAdapter(EngineAdapter):
         required_input_files(...)
         ```
         """
+        if data_type is SimulationData:
+            requested_fields = {str(field) for field in args.get("_required_data_fields", ())}
+            if requested_fields and requested_fields <= _SUMMARY_SIMULATION_FIELDS:
+                return ("summary.txt",)
+
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("xmolout", "summary.txt"),
             GeometryData: ("geo", "fort.90"),
-            SimulationData: ("xmolout", "summary.txt"),
+            SimulationData: ("summary.txt", "xmolout"),
             ConnectivityData: ("fort.7", "xmolout", "summary.txt"),
             ConnectivityTrajectoryData: ("fort.7", "xmolout", "summary.txt", "ffield"),
             CoordinationStatusBundleData: ("fort.7", "xmolout", "summary.txt", "ffield"),

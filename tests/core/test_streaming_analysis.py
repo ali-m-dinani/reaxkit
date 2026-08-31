@@ -108,6 +108,14 @@ def test_charge_only_fort7_stream_recovers_fused_large_neighbor_ids(tmp_path):
     assert all(int(row[f"atom_cnn{slot}"]) == 0 for slot in range(1, 6))
     assert float(row["partial_charge"]) == 1.188
 
+    fast_records = list(
+        Fort7Handler(fort7_path).stream_file_frames(charge_arrays_only=True)
+    )
+    assert len(fast_records) == 1
+    assert "frame" not in fast_records[0]
+    np.testing.assert_array_equal(fast_records[0]["charge_atom_ids"], [1])
+    np.testing.assert_allclose(fast_records[0]["charges"], [1.188])
+
 
 def test_dipole_stream_matches_materialized_result():
     positions = np.asarray(

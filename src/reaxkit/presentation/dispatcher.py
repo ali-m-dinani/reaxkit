@@ -96,6 +96,22 @@ def export_result_csv(result, path: str) -> None:
     """
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
+    csv_tables = getattr(result, "csv_tables", None)
+    if isinstance(csv_tables, dict) and csv_tables:
+        all_frames = csv_tables.get("all_frames")
+        if not hasattr(all_frames, "to_csv"):
+            all_frames = result.table
+        all_frames.to_csv(out, index=False)
+        for name, table in csv_tables.items():
+            if name == "all_frames" or not hasattr(table, "to_csv"):
+                continue
+            safe = "".join(
+                ch if (ch.isalnum() or ch in {"_", "-"}) else "_"
+                for ch in str(name)
+            ).strip("_") or "table"
+            sibling = out.with_name(f"{out.stem}_{safe}{out.suffix or '.csv'}")
+            table.to_csv(sibling, index=False)
+        return
     result.table.to_csv(out, index=False)
 
 

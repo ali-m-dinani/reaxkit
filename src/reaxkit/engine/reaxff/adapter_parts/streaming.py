@@ -34,9 +34,13 @@ STREAMABLE_REAXFF_TYPES = {
 
 
 def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
-    table = record["frame"]
-    coords = table[["x", "y", "z"]].to_numpy(dtype=float)
-    elements = table["atom_type"].astype(str).tolist()
+    if "coordinates" in record:
+        coords = np.asarray(record["coordinates"], dtype=float)
+        elements = list(record["elements"])
+    else:
+        table = record["frame"]
+        coords = table[["x", "y", "z"]].to_numpy(dtype=float)
+        elements = table["atom_type"].astype(str).tolist()
     atom_ids = list(range(1, len(elements) + 1))
     iteration = int(record["iter"])
     source_index = int(record["source_index"])
@@ -57,7 +61,7 @@ def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
         atom_ids=atom_ids,
         simulation=simulation,
         iterations=np.asarray([iteration], dtype=int),
-        atom_labels=np.asarray([elements], dtype=object),
+        atom_labels=None if "coordinates" in record else np.asarray([elements], dtype=object),
         source_frame_indices=np.asarray([source_index], dtype=int),
     )
 
@@ -168,6 +172,39 @@ def _fort7_frame(
     return connectivity_data, charge_data
 
 
+def _fort7_charge_array_frame(
+    record: dict[str, Any],
+    *,
+    n_atoms: int,
+) -> ChargeData:
+    """Build only the aligned charge model needed by total electrostatics."""
+    atom_ids = np.asarray(record["charge_atom_ids"], dtype=int)
+    values = np.asarray(record["charges"], dtype=float)
+    if atom_ids.shape != values.shape:
+        raise ValueError("fort.7 charge atom ids and values must have matching shapes.")
+    expected_ids = np.arange(1, n_atoms + 1, dtype=int)
+    if atom_ids.shape == expected_ids.shape and np.array_equal(atom_ids, expected_ids):
+        charges = values
+    else:
+        charges = np.full(n_atoms, np.nan, dtype=float)
+        valid = (atom_ids >= 1) & (atom_ids <= n_atoms)
+        charges[atom_ids[valid] - 1] = values[valid]
+    iteration = int(record["iter"])
+    source_index = int(record["source_index"])
+    totals = list(record.get("totals") or [])
+    return ChargeData(
+        charges=charges[np.newaxis, :],
+        total_charge=np.asarray([totals[3]], dtype=float) if len(totals) > 3 else None,
+        iterations=np.asarray([iteration], dtype=int),
+        metadata={
+            "source": "fort7",
+            "streaming": True,
+            "source_frame_indices": [source_index],
+            "charges_only": True,
+        },
+    )
+
+
 def _aligned_records(
     coordinate_records: Iterator[dict[str, Any]],
     connectivity_records: Iterator[dict[str, Any]],
@@ -191,12 +228,16 @@ def _aligned_records(
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
+    total_electrostatics = (
+        data_type is ElectrostaticsData
+        and str(args.get("scope") or "total").strip().lower() == "total"
+    )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
     coordinate_records = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
         reporter=reporter,
-    ).stream_file_frames()
+    ).stream_file_frames(coordinates_only=total_electrostatics)
 
     if data_type is TrajectoryData:
         for coordinate_record in coordinate_records:
@@ -223,7 +264,8 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
                 data_type is ElectrostaticsData
                 and str(args.get("scope") or "total").strip().lower() == "total"
             )
-        )
+        ),
+        charge_arrays_only=total_electrostatics,
     )
 
     electric_field = None
@@ -262,6 +304,20 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         iter(connectivity_records),
     ):
         trajectory = _trajectory_frame(coordinate_record)
+        if total_electrostatics:
+            charges = _fort7_charge_array_frame(
+                connectivity_record,
+                n_atoms=trajectory.positions.shape[1],
+            )
+            charges.iterations = trajectory.iterations
+            charges.simulation = trajectory.simulation
+            yield ElectrostaticsData(
+                trajectory=trajectory,
+                charges=charges,
+                connectivity=None,
+                electric_field=electric_field,
+            )
+            continue
         connectivity, charges = _fort7_frame(
             connectivity_record,
             atom_ids=list(trajectory.atom_ids),

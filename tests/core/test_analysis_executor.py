@@ -100,6 +100,47 @@ def test_selective_sources_are_not_copied_into_the_run_snapshot(tmp_path):
     assert args["xmolout"] == str(xmolout.resolve())
 
 
+def test_executor_passes_requested_data_fields_to_adapter(monkeypatch):
+    captured = {}
+
+    class DummyAdapter:
+        def supports_streaming(self, data_type, args):
+            return False
+
+        def required_input_files(self, data_type, args):
+            captured["snapshot_fields"] = args.get("_required_data_fields")
+            return ()
+
+        def load(self, data_type, args, reporter=None):
+            captured["load_fields"] = args.get("_required_data_fields")
+            return "payload"
+
+    class FieldAwareTask:
+        required_data = object
+
+        @staticmethod
+        def required_data_fields_for(request, args):
+            return (request,)
+
+        def run(self, data, request):
+            return data
+
+    monkeypatch.setattr(
+        "reaxkit.core.runtime.analysis_executor.resolve_engine",
+        lambda path, engine=None: DummyAdapter(),
+    )
+
+    result = AnalysisExecutor().run(
+        FieldAwareTask(),
+        request="potential_energy",
+        args={"engine": "reaxff", "no_cache": True},
+    )
+
+    assert result == "payload"
+    assert captured["snapshot_fields"] == ("potential_energy",)
+    assert captured["load_fields"] == ("potential_energy",)
+
+
 def test_ams_and_lammps_selective_sources_are_not_copied(tmp_path):
     rkf = tmp_path / "reaxout.rkf"
     dump = tmp_path / "dump.lammpstrj"

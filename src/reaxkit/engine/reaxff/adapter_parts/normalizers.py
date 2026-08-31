@@ -233,7 +233,11 @@ def _merge_simulation_data(
     if extra is None:
         return base
     return SimulationData(
-        atom_ids=base.atom_ids if base.atom_ids is not None else extra.atom_ids,
+        atom_ids=(
+            base.atom_ids
+            if base.atom_ids is not None and len(base.atom_ids) > 0
+            else extra.atom_ids
+        ),
         iterations=base.iterations if base.iterations is not None else extra.iterations,
         time=_pick(
             base.time,

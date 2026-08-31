@@ -92,7 +92,24 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
         default="control",
         help=(
             "Control file used for frame (iout2) and time conversion. "
-            "The default also searches beside the selected fort.* input."
+            "The default also searches beside the selected input files."
+        ),
+    )
+    parser.add_argument(
+        "--frame-source",
+        default=None,
+        help=(
+            "Trajectory file whose headers define frame iterations when no control "
+            "file exists. By default, the configured or sibling xmolout is used."
+        ),
+    )
+    parser.add_argument(
+        "--frame-count",
+        type=int,
+        default=None,
+        help=(
+            "Total trajectory frame count used to infer frame spacing only when neither "
+            "a control file nor a trajectory frame source exists."
         ),
     )
 
@@ -204,7 +221,13 @@ def _plot_axis(table: pd.DataFrame, args: argparse.Namespace) -> tuple[np.ndarra
     if mode == "frame" and "iter" in table:
         control_file = _axis_control_file(args)
         iterations = pd.to_numeric(table["iter"], errors="coerce").to_numpy(dtype=int)
-        values, label = convert_xaxis(iterations, "frame", control_file=control_file)
+        values, label = convert_xaxis(
+            iterations,
+            "frame",
+            control_file=control_file,
+            trajectory_file=_axis_frame_source(args),
+            frame_count=getattr(args, "frame_count", None),
+        )
         return np.asarray(values), label, "iter"
     if mode == "frame" and "frame_index" in table:
         return pd.to_numeric(table["frame_index"], errors="coerce").to_numpy(dtype=float), "frame", "frame_index"
@@ -219,23 +242,71 @@ def _plot_axis(table: pd.DataFrame, args: argparse.Namespace) -> tuple[np.ndarra
     return iterations, "iter", "iter"
 
 
-def _axis_control_file(args: argparse.Namespace) -> str:
-    """Resolve a default control file beside a file-backed time-series input."""
+def _axis_input_directories(args: argparse.Namespace) -> list[Path]:
+    """Return ordered source directories that may contain axis metadata."""
 
-    configured = Path(str(getattr(args, "control", "control")))
-    if configured != Path("control"):
-        return str(configured)
+    directories: list[Path] = []
+    seen: set[str] = set()
 
-    for input_name in ("fort78", "fort76", "fort73", "fort7"):
+    for input_name in ("summary", "xmolout", "fort78", "fort76", "fort73", "fort7"):
         raw_path = getattr(args, input_name, None)
         if raw_path is None:
             continue
         input_path = Path(str(raw_path))
         directory = input_path if input_path.is_dir() else input_path.parent
+        key = str(directory.resolve())
+        if key not in seen:
+            seen.add(key)
+            directories.append(directory)
+
+    for input_name in ("_snapshot_source_dir", "run_dir", "input"):
+        raw_path = getattr(args, input_name, None)
+        if raw_path is None:
+            continue
+        directory = Path(str(raw_path))
+        if directory.is_file():
+            directory = directory.parent
+        key = str(directory.resolve())
+        if key not in seen:
+            seen.add(key)
+            directories.append(directory)
+    return directories
+
+
+def _axis_control_file(args: argparse.Namespace) -> str:
+    """Resolve a default control file beside any time-series input source."""
+
+    configured = Path(str(getattr(args, "control", "control")))
+    if configured != Path("control"):
+        return str(configured)
+
+    for directory in _axis_input_directories(args):
         candidate = directory / "control"
         if candidate.is_file():
             return str(candidate)
     return str(configured)
+
+
+def _axis_frame_source(args: argparse.Namespace) -> str | None:
+    """Resolve an explicit or sibling trajectory used for frame cadence."""
+
+    configured = getattr(args, "frame_source", None)
+    if configured:
+        return str(configured)
+
+    configured_xmolout = getattr(args, "xmolout", None)
+    if configured_xmolout:
+        xmolout_path = Path(str(configured_xmolout))
+        if xmolout_path.is_dir():
+            xmolout_path = xmolout_path / "xmolout"
+        if xmolout_path.is_file():
+            return str(xmolout_path)
+
+    for directory in _axis_input_directories(args):
+        candidate = directory / "xmolout"
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
@@ -304,10 +375,53 @@ def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[s
     }
 
 
+def _apply_frame_axis_to_result(
+    command: str,
+    result: object,
+    args: argparse.Namespace,
+) -> None:
+    """Put the resolved frame coordinate in the table before persistence/export."""
+
+    if str(getattr(args, "xaxis", "iter")) != "frame":
+        return
+    table = getattr(result, "table", None)
+    if not isinstance(table, pd.DataFrame):
+        return
+
+    frame_values, _label, _source = _plot_axis(table, args)
+    if len(frame_values) != len(table):
+        raise ValueError("Resolved frame axis length does not match the result table.")
+    converted = table.copy()
+    converted["frame_index"] = frame_values
+    setattr(result, "table", converted)
+    if command == "get_electric_field":
+        numeric_frames = pd.to_numeric(converted["frame_index"], errors="coerce").to_numpy(
+            dtype=float
+        )
+        rounded_frames = np.rint(numeric_frames)
+        integer_mask = np.isfinite(numeric_frames) & np.isclose(
+            numeric_frames,
+            rounded_frames,
+            rtol=0.0,
+            atol=1.0e-9,
+        )
+        integer_frames = converted.loc[integer_mask].copy()
+        integer_frames["frame_index"] = rounded_frames[integer_mask].astype(int)
+        setattr(
+            result,
+            "csv_tables",
+            {
+                "all_frames": converted,
+                "integer_frames": integer_frames,
+            },
+        )
+
+
 def run_task(command: str, task_name: str, request: object, args: argparse.Namespace) -> int:
     """Execute and present one dedicated time-series workflow."""
     task_cls = TASK_REGISTRY[task_name]
     result = AnalysisExecutor().run(task_cls(), request, vars(args))
+    _apply_frame_axis_to_result(command, result, args)
     present_result(command, result, args, plot_payload_builder=build_plot_payload)
     return 0
 

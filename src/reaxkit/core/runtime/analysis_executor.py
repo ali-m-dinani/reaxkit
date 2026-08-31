@@ -529,6 +529,10 @@ class AnalysisExecutor:
         required_data = (
             task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
         )
+        if hasattr(task, "required_data_fields_for"):
+            required_fields = task.required_data_fields_for(request, args)
+            if required_fields:
+                args["_required_data_fields"] = tuple(str(field) for field in required_fields)
         requested_frame_indices = self._requested_frame_indices(request, required_data)
         if requested_frame_indices is not None:
             args["_frame_indices"] = requested_frame_indices

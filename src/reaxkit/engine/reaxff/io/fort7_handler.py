@@ -26,12 +26,16 @@ import pickle
 import re
 import shutil
 from typing import List, Dict, Any, Iterator, Optional
+import numpy as np
 import pandas as pd
 
 from reaxkit.engine.reaxff.io.base import BaseHandler
 
 _FORT7_HEADER_RE = re.compile(
     r"^\s*(?P<num_atoms>\d+)\s+(?P<simulation_name>\S+)\s+Iteration:\s*(?P<iteration>\d+)\s+#Bonds:\s*(?P<num_bonds>\d+)\s*$"
+)
+_FORT7_FLOAT_FIELD_RE = re.compile(
+    r"(?<!\S)[+-]?(?:\d*\.\d+|\d+\.?\d*[Ee][+-]?\d+)(?=\s|$)"
 )
 
 
@@ -373,7 +377,12 @@ class Fort7Handler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
-    def stream_file_frames(self, *, charges_only: bool = False) -> Iterator[Dict[str, Any]]:
+    def stream_file_frames(
+        self,
+        *,
+        charges_only: bool = False,
+        charge_arrays_only: bool = False,
+    ) -> Iterator[Dict[str, Any]]:
         """Yield ``fort.7`` frames without materializing the trajectory.
 
         The generator retains only the rows and totals for the current
@@ -385,43 +394,58 @@ class Fort7Handler(BaseHandler):
         atom type, bond-order values, and partial charge remain aligned, while
         unavailable neighbor ids are represented by zeros.  Total dipole,
         polarization, and charge analyses do not consume connectivity.
+
+        ``charge_arrays_only`` is the low-overhead total-electrostatics path:
+        it extracts the atom id and partial-charge field from each atom row
+        without converting the unused connectivity/bond-order fields or
+        constructing a pandas table.
         """
+        if charge_arrays_only:
+            charges_only = True
         requested = set(self._frame_indices) if self._frame_indices is not None else None
         max_requested = max(requested, default=-1) if requested is not None else None
         source_index = -1
         emitted = 0
         current: dict[str, Any] | None = None
         atom_rows: list[list[float | int]] = []
+        charge_atom_ids: list[int] = []
+        charge_values: list[float] = []
         totals: list[float] = []
 
         def finalize() -> Dict[str, Any] | None:
             nonlocal emitted
-            if current is None or not current["selected"] or not atom_rows:
+            has_atoms = bool(charge_values) if charge_arrays_only else bool(atom_rows)
+            if current is None or not current["selected"] or not has_atoms:
                 return None
             num_bonds = int(current["num_of_bonds"])
-            columns = (
-                ["atom_num", "atom_type_num"]
-                + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
-                + ["molecule_num"]
-                + [f"BO{i}" for i in range(1, num_bonds + 1)]
-                + ["sum_BOs", "num_LPs", "partial_charge"]
-            )
-            extra = max(0, len(atom_rows[0]) - len(columns))
-            columns.extend(f"unknown{i}" for i in range(1, extra + 1))
             emitted += 1
             if callable(self._reporter):
                 total = len(requested) if requested is not None else 0
                 self._reporter("stream", emitted, total, "Streaming fort.7 frames")
-            return {
+            record = {
                 "source_index": int(current["source_index"]),
                 "iter": int(current["iter"]),
                 "num_of_atoms": int(current["num_of_atoms"]),
                 "num_of_bonds": num_bonds,
                 "simulation_name": str(current["simulation_name"]),
                 "totals": list(totals),
-                "frame": pd.DataFrame(atom_rows, columns=columns),
                 "connectivity_incomplete": bool(current.get("connectivity_incomplete", False)),
             }
+            if charge_arrays_only:
+                record["charge_atom_ids"] = np.asarray(charge_atom_ids, dtype=int)
+                record["charges"] = np.asarray(charge_values, dtype=float)
+            else:
+                columns = (
+                    ["atom_num", "atom_type_num"]
+                    + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
+                    + ["molecule_num"]
+                    + [f"BO{i}" for i in range(1, num_bonds + 1)]
+                    + ["sum_BOs", "num_LPs", "partial_charge"]
+                )
+                extra = max(0, len(atom_rows[0]) - len(columns))
+                columns.extend(f"unknown{i}" for i in range(1, extra + 1))
+                record["frame"] = pd.DataFrame(atom_rows, columns=columns)
+            return record
 
         with open(self.path, "r", encoding="utf-8") as fh:
             for raw in fh:
@@ -434,6 +458,8 @@ class Fort7Handler(BaseHandler):
                     if max_requested is not None and source_index > max_requested:
                         return
                     atom_rows = []
+                    charge_atom_ids = []
+                    charge_values = []
                     totals = []
                     current = {
                         "source_index": source_index,
@@ -443,9 +469,40 @@ class Fort7Handler(BaseHandler):
                         "num_of_bonds": int(header.group("num_bonds")),
                         "simulation_name": header.group("simulation_name"),
                         "connectivity_incomplete": False,
+                        "charge_trailing_fields": None,
                     }
                     continue
                 if current is None or not current["selected"]:
+                    continue
+                if charge_arrays_only and len(charge_values) < int(current["num_of_atoms"]):
+                    # Atom rows are the first num_of_atoms records after a
+                    # header.  Skip the wide integer connectivity section and
+                    # split only the short floating-point tail.  This also
+                    # keeps partial_charge correctly positioned if a producer
+                    # appends nonstandard extra fields after it.
+                    stripped = raw.strip()
+                    if stripped:
+                        leading_fields = stripped.split(None, 5)
+                        if len(leading_fields) < 6:
+                            # A truncated frame can transition to its short
+                            # totals row before the advertised atom count.
+                            totals.extend(map(float, leading_fields))
+                            continue
+                        trailing_count = current["charge_trailing_fields"]
+                        if trailing_count is None:
+                            float_match = _FORT7_FLOAT_FIELD_RE.search(stripped)
+                            float_fields = stripped[float_match.start():].split() if float_match else []
+                            charge_offset = int(current["num_of_bonds"]) + 2
+                            if len(float_fields) <= charge_offset:
+                                raise ValueError("Could not recover partial charge from a fort.7 atom row.")
+                            trailing_count = len(float_fields) - charge_offset - 1
+                            current["charge_trailing_fields"] = trailing_count
+                            charge_token = float_fields[charge_offset]
+                        else:
+                            ending = stripped.rsplit(None, int(trailing_count) + 1)
+                            charge_token = ending[-int(trailing_count) - 1]
+                        charge_atom_ids.append(int(leading_fields[0]))
+                        charge_values.append(float(charge_token))
                     continue
                 values = raw.split()
                 if not values:
