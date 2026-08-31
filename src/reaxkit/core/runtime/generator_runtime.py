@@ -13,8 +13,10 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
+from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import configure_file_logging
 from reaxkit.core.runtime.provenance import (
     effective_settings_from_args,
@@ -60,6 +62,7 @@ def prepare_generator_output(args: Any, *, command: str, output_value: str) -> t
     ```
     The output type reflects the return contract for this API call.
     """
+    started = perf_counter()
     run_id = str(getattr(args, "run_id", None) or generate_run_id())
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
 
@@ -74,6 +77,15 @@ def prepare_generator_output(args: Any, *, command: str, output_value: str) -> t
     filename = requested.name or "output"
     out_path = layout.input_run_dir(run_id) / filename
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    trace = current_human_log()
+    if trace is not None:
+        trace.completed_step(
+            "Prepare generator output",
+            seconds=perf_counter() - started,
+            details={"command": command, "run_id": run_id},
+            results={"generator output": out_path},
+        )
+        trace.result("generator output", out_path)
     return out_path, layout
 
 
@@ -126,6 +138,7 @@ def persist_generator_metadata(
     ```
     The output type reflects the return contract for this API call.
     """
+    started = perf_counter()
     run_id = str(getattr(args, "run_id"))
     settings_path = output_path.parent / "settings.json"
     user_settings = user_settings_from_args(args)
@@ -148,13 +161,25 @@ def persist_generator_metadata(
     if extra:
         payload["extra"] = json_safe(extra)
     settings_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    layout.record_run_generator(
+    run_index_path = layout.record_run_generator(
         run_id=run_id,
         command=command,
         output_path=output_path,
         settings_path=settings_path,
         user_settings=user_settings,
     )
+    trace = current_human_log()
+    if trace is not None:
+        trace.completed_step(
+            "Save generator metadata",
+            seconds=perf_counter() - started,
+            details={"command": command, "run_id": run_id},
+            results={
+                "settings": settings_path,
+                "run index": run_index_path,
+            },
+        )
+        trace.result("generator settings", settings_path)
     return settings_path
 
 
@@ -193,6 +218,7 @@ def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None
     """
     if not enabled:
         return None
+    started = perf_counter()
     dst = Path.cwd() / output_path.name
     if output_path.resolve() == dst.resolve():
         return dst
@@ -202,6 +228,14 @@ def maybe_copy_output_to_dot(output_path: Path, *, enabled: bool) -> Path | None
         shutil.copytree(output_path, dst)
     else:
         shutil.copy2(output_path, dst)
+    trace = current_human_log()
+    if trace is not None:
+        trace.completed_step(
+            "Copy generated output to current directory",
+            seconds=perf_counter() - started,
+            results={"copied output": dst},
+        )
+        trace.result("copied generator output", dst)
     return dst
 
 

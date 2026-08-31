@@ -23,6 +23,7 @@ import pandas as pd
 from reaxkit.core.storage.cache_manager import CacheConfig, CacheManager
 from reaxkit.core.platform.engine_resolver import resolve_engine
 from reaxkit.core.platform.exceptions import ParseError, AnalysisError
+from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import get_logger, configure_file_logging
 from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.core.runtime.provenance import user_settings_from_args
@@ -165,6 +166,37 @@ class AnalysisExecutor:
             with open(path, "a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
 
+        trace = current_human_log()
+        if trace is None:
+            return
+        event_details = dict(extra or {})
+        event_details["task"] = task_name
+        if event == "snapshot_raw_ready":
+            trace.completed_step("Snapshot raw input files", seconds=None, details=event_details)
+        elif event == "parsed_dataset_registered":
+            parsed_dir = event_details.pop("parsed_dir", None)
+            trace.completed_step(
+                "Register parsed data",
+                seconds=None,
+                details=event_details,
+                results={"parsed data directory": parsed_dir} if parsed_dir else None,
+            )
+        elif event == "parsed_artifact_saved":
+            artifact_path = event_details.pop("path", None)
+            trace.completed_step(
+                "Save parsed data artifact",
+                seconds=None,
+                details=event_details,
+                results={"parsed artifact": artifact_path} if artifact_path else None,
+            )
+        elif event in {"analysis_cache_hit", "analysis_cache_miss"}:
+            event_details["cache result"] = "hit" if event.endswith("hit") else "miss"
+            trace.completed_step("Check analysis result cache", seconds=None, details=event_details)
+        elif event == "analysis_done":
+            analysis_dir = event_details.pop("analysis_dir", None)
+            if analysis_dir:
+                trace.result("analysis directory", analysis_dir)
+
     @classmethod
     def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float, extra: dict | None = None) -> None:
         """
@@ -196,6 +228,43 @@ class AnalysisExecutor:
             human_path.parent.mkdir(parents=True, exist_ok=True)
             with open(human_path, "a", encoding="utf-8") as fh:
                 fh.write(human_line + "\n")
+
+        trace = current_human_log()
+        if trace is None:
+            return
+        details = {"task": task_name, **dict(extra or {})}
+        if phase == "load_handler":
+            source = details.get("source") or details.get("source_path") or details.get("handler")
+            trace.completed_step(
+                f"Read {source}",
+                seconds=seconds,
+                details=details,
+                parent=f"Read input data for {task_name}",
+            )
+        elif phase == "load_total":
+            trace.completed_step(
+                f"Read input data for {task_name}",
+                seconds=seconds,
+                details=details,
+            )
+        elif phase == "analyze":
+            trace.completed_step(
+                f"Run analysis {task_name}",
+                seconds=seconds,
+                details=details,
+            )
+        elif phase == "stream_analyze":
+            trace.completed_step(
+                f"Stream input and run analysis {task_name}",
+                seconds=seconds,
+                details=details,
+            )
+        else:
+            trace.completed_step(
+                phase.replace("_", " ").title(),
+                seconds=seconds,
+                details=details,
+            )
 
     @classmethod
     def _load_timing_callback(cls, args: dict, *, task_name: str):

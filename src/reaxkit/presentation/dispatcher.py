@@ -10,9 +10,11 @@ Shared presentation dispatch for tabular workflow results.
 from __future__ import annotations
 
 from pathlib import Path
+from time import perf_counter
 from typing import Callable
 
 from reaxkit.cli.path import resolve_output_path
+from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.runtime.generator_runtime import maybe_copy_output_to_dot
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args
 from reaxkit.presentation.persist import append_artifacts_to_settings, persist_analysis_result
@@ -216,6 +218,8 @@ def present_result(
     ```
     The output type reflects the return contract for this API call.
     """
+    presentation_started = perf_counter()
+    human_trace = current_human_log()
     normalized = normalize_storage_args(vars(args), snapshot=False)
     for key, value in normalized.items():
         setattr(args, key, value)
@@ -224,6 +228,8 @@ def present_result(
     export_csv = getattr(args, "export", None)
     analysis_dir = persist_analysis_result(command, result, args, write_csv=not bool(export_csv))
     result_dirs.append(analysis_dir)
+    if human_trace is not None:
+        human_trace.result("stored analysis data", analysis_dir)
 
     save = getattr(args, "save", None)
     plot_mode = getattr(args, "plot", None)
@@ -246,6 +252,8 @@ def present_result(
             export_result_csv(result, str(export_path))
             result_dirs.append(export_path.parent)
             output_artifacts.append(export_path)
+            if human_trace is not None:
+                human_trace.result("CSV export", export_path)
 
     if wants_plot:
         if plot_payload_builder is None:
@@ -312,10 +320,14 @@ def present_result(
                             )
                         result_dirs.append(save_path)
                         output_artifacts.append(save_path)
+                        if human_trace is not None:
+                            human_trace.result("plots", save_path)
                     else:
                         render_plot({**plot_payloads[0], "save": str(save_path)})
                         result_dirs.append(save_path.parent)
                         output_artifacts.append(save_path)
+                        if human_trace is not None:
+                            human_trace.result("plot", save_path)
                 if show or (plot_mode and not save):
                     for item in plot_payloads:
                         render_plot(item)
@@ -347,6 +359,9 @@ def present_result(
                 if report_files:
                     append_artifacts_to_settings(analysis_dir, reports=report_files)
                     result_dirs.append(report_dir)
+                    if human_trace is not None:
+                        for report_file in report_files:
+                            human_trace.result("report", report_file)
                 for note in report_notes:
                     print(f"[report] {note}")
 
@@ -359,3 +374,14 @@ def present_result(
     if not (wants_plot or export_csv or wants_report):
         print_result_table(result)
     _print_output_dirs(result_dirs)
+    if human_trace is not None:
+        human_trace.completed_step(
+            "Save and present results",
+            seconds=perf_counter() - presentation_started,
+            details={
+                "command": command,
+                "plot requested": wants_plot,
+                "CSV export requested": bool(export_csv),
+                "report requested": wants_report,
+            },
+        )

@@ -1,8 +1,23 @@
 import argparse
 from pathlib import Path
 
+from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.engine.reaxff.io.fort83_handler import DEFAULT_OPTIMIZED_FFIELD_NAME
 from reaxkit.workflows.file_tools import fort83_workflow
+
+
+def test_fort83_optimized_ffield_command_aliases_are_registered() -> None:
+    registered_commands = get_registered_generators()
+
+    assert resolve_command_name(
+        "get_optimized_force_field_fort83",
+        task_names=registered_commands,
+    ) == "get-optimized-force-field-fort83"
+    assert resolve_command_name(
+        "get_optimized_ffield_fort83",
+        task_names=registered_commands,
+    ) == "get-optimized-ffield-fort83"
 
 
 def test_parser_uses_fort83_optimized_ffield_as_default_output() -> None:

@@ -15,16 +15,20 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import subprocess
 import sys
 import textwrap
 from importlib import import_module
+from pathlib import Path
 
 from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.registry.command_catalog import get_registered_commands
 from reaxkit.core.platform.exceptions import AnalysisError, ParseError
+from reaxkit.core.platform.human_log import HumanReadableRunLog
 from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
 from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
+from reaxkit.core.storage.storage_layout import default_project_root
 
 
 class _ReaxKitArgumentParser(argparse.ArgumentParser):
@@ -407,20 +411,54 @@ def main() -> int:
             module.register_tasks(tasks)
 
     args = parser.parse_args(sys_argv[1:])
-    try:
-        return args._run(args)
-    except ParseError as exc:
-        print(f"[Parse error] {exc}", file=sys.stderr)
-        return 2
-    except AnalysisError as exc:
-        print(f"[Analysis error] {exc}", file=sys.stderr)
-        return 3
-    except FileNotFoundError as exc:
-        _print_error_with_hints("File not found", str(exc), hints=_hints_for_filenotfound(exc, args))
-        return 4
-    except OSError as exc:
-        _print_error_with_hints("OS error", str(exc), hints=_hints_for_oserror(exc, args))
-        return 5
-    except Exception as exc:
-        _print_error_with_hints("Error", str(exc))
-        return 1
+    project_root = Path(getattr(args, "project_root", None) or default_project_root())
+    trace = HumanReadableRunLog(
+        project_root / "logs",
+        command=subprocess.list2cmdline(["reaxkit", *sys.argv[1:]]),
+        run_id=getattr(args, "run_id", None),
+        request_name=f"ReaxKit CLI command: {getattr(args, 'command', selected_command)}",
+    )
+    if getattr(args, "run_id", None) is None:
+        setattr(args, "run_id", trace.run_id)
+    if getattr(args, "project_root", None) is None:
+        setattr(args, "project_root", str(project_root))
+
+    with trace:
+        try:
+            with trace.step(
+                f"Execute {getattr(args, 'command', selected_command)} command"
+            ) as execution_step:
+                exit_code = args._run(args)
+                execution_step.detail("exit code", exit_code)
+            if exit_code != 0:
+                trace.fail(f"Command returned exit code {exit_code}")
+        except ParseError as exc:
+            trace.fail(exc)
+            print(f"[Parse error] {exc}", file=sys.stderr)
+            exit_code = 2
+        except AnalysisError as exc:
+            trace.fail(exc)
+            print(f"[Analysis error] {exc}", file=sys.stderr)
+            exit_code = 3
+        except FileNotFoundError as exc:
+            trace.fail(exc)
+            _print_error_with_hints("File not found", str(exc), hints=_hints_for_filenotfound(exc, args))
+            exit_code = 4
+        except OSError as exc:
+            trace.fail(exc)
+            _print_error_with_hints("OS error", str(exc), hints=_hints_for_oserror(exc, args))
+            exit_code = 5
+        except Exception as exc:
+            trace.fail(exc)
+            _print_error_with_hints("Error", str(exc))
+            exit_code = 1
+        finally:
+            for key, label in (
+                ("run_id", "runtime run_id"),
+                ("_parsed_id", "parsed data id"),
+                ("_analysis_id", "analysis id"),
+            ):
+                value = getattr(args, key, None)
+                if value:
+                    trace.detail(label, value)
+    return exit_code
