@@ -21,6 +21,18 @@ _COLUMNS = [
     "restraint_line_number",
 ]
 
+_CELL_COLUMNS = [
+    "descriptor",
+    "a",
+    "b",
+    "c",
+    "alpha",
+    "beta",
+    "gamma",
+    "descriptor_line_number",
+    "crystx_line_number",
+]
+
 
 class GeoRestraintHandler(BaseHandler):
     """Return one row per BOND or ANGLE restraint in a multi-structure geo file."""
@@ -28,9 +40,11 @@ class GeoRestraintHandler(BaseHandler):
     def __init__(self, file_path: str | Path = "geo", reporter=None):
         super().__init__(file_path)
         self._reporter = reporter
+        self._cell_df: pd.DataFrame | None = None
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         rows: list[dict[str, Any]] = []
+        cell_rows: list[dict[str, Any]] = []
         descriptor = ""
         descriptor_line_number: int | None = None
         with self.path.open("r", encoding="utf-8", errors="replace") as handle:
@@ -40,6 +54,26 @@ class GeoRestraintHandler(BaseHandler):
                 if upper.startswith("DESCRP"):
                     descriptor = stripped[6:].strip()
                     descriptor_line_number = line_number
+                    continue
+                if descriptor and upper.startswith("CRYSTX"):
+                    parts = stripped.split()
+                    try:
+                        a, b, c, alpha, beta, gamma = map(float, parts[1:7])
+                    except (TypeError, ValueError):
+                        continue
+                    cell_rows.append(
+                        {
+                            "descriptor": descriptor,
+                            "a": a,
+                            "b": b,
+                            "c": c,
+                            "alpha": alpha,
+                            "beta": beta,
+                            "gamma": gamma,
+                            "descriptor_line_number": descriptor_line_number,
+                            "crystx_line_number": line_number,
+                        }
+                    )
                     continue
                 if not descriptor or not (
                     upper.startswith("BOND RESTRAINT")
@@ -73,9 +107,14 @@ class GeoRestraintHandler(BaseHandler):
                 )
 
         table = pd.DataFrame(rows, columns=_COLUMNS)
+        cell_table = pd.DataFrame(cell_rows, columns=_CELL_COLUMNS)
+        self._cell_df = cell_table
+        structure_descriptors = set(table["descriptor"].astype(str))
+        structure_descriptors.update(cell_table["descriptor"].astype(str))
         metadata = {
             "n_restraints": len(table),
-            "n_structures": int(table["descriptor"].nunique()) if not table.empty else 0,
+            "n_structures": len(structure_descriptors),
+            "n_cell_records": len(cell_table),
             "restraint_types": (
                 sorted(table["restraint_type"].dropna().astype(str).unique().tolist())
                 if not table.empty
@@ -85,6 +124,14 @@ class GeoRestraintHandler(BaseHandler):
         if self._reporter:
             self._reporter("load", 1, 1, "Finished parsing geo restraints")
         return table, metadata
+
+    def cell_dataframe(self) -> pd.DataFrame:
+        """Return one row of ``CRYSTX`` parameters per described structure."""
+        if not self._parsed:
+            self.parse()
+        if self._cell_df is None:
+            return pd.DataFrame(columns=_CELL_COLUMNS)
+        return self._cell_df.copy()
 
 
 __all__ = ["GeoRestraintHandler"]

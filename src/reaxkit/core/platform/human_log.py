@@ -12,6 +12,7 @@ from threading import Lock
 from time import perf_counter
 from typing import Any
 
+from reaxkit.core.platform.paths import io_path
 from reaxkit.core.storage.storage_layout import generate_run_id
 
 
@@ -214,7 +215,7 @@ class HumanReadableRunLog(AbstractContextManager["HumanReadableRunLog"]):
             self.status = "SUCCESS"
         block = self.render()
         machine_line = json.dumps(self.to_record(), sort_keys=True) + "\n"
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        io_path(self.logs_dir).mkdir(parents=True, exist_ok=True)
         run_log_name = (
             f"{self.run_id}.human.log"
             if self.run_id.startswith("run_")
@@ -231,10 +232,10 @@ class HumanReadableRunLog(AbstractContextManager["HumanReadableRunLog"]):
         )
         with _WRITE_LOCK:
             for path in human_paths:
-                with path.open("a", encoding="utf-8", newline="\n") as stream:
+                with io_path(path).open("a", encoding="utf-8", newline="\n") as stream:
                     stream.write(block)
             for path in machine_paths:
-                with path.open("a", encoding="utf-8", newline="\n") as stream:
+                with io_path(path).open("a", encoding="utf-8", newline="\n") as stream:
                     stream.write(machine_line)
         self._written = True
 

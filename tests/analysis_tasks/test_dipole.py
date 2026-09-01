@@ -92,6 +92,20 @@ def test_dipole_saves_artifacts() -> None:
     assert (out_dir / "dipole_head.txt").exists()
 
 
+@pytest.mark.parametrize(
+    ("scope", "expected"),
+    [
+        ("total", ("trajectory", "charges")),
+        ("local", ("trajectory", "charges", "connectivity")),
+    ],
+)
+def test_dipole_declares_only_required_data_fields(scope: str, expected: tuple[str, ...]) -> None:
+    request = DipoleRequest(scope=scope)
+
+    assert DipoleTask.required_data_fields_for(request, {}) == expected
+    assert DipoleTask.supports_selective_streaming is True
+
+
 def main() -> None:
     if not RUN_DIR.exists():
         return

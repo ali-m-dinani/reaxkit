@@ -565,15 +565,16 @@ class ChargeSeriesRequest(BaseRequest):
 
     Fields
     -----
-    atom_ids : Sequence[int]
-        1-based atom IDs to include in output.
+    atom_ids : Optional[Sequence[int]]
+        Optional 1-based atom IDs to include. ``None`` includes all atoms.
     frames : Optional[Sequence[int]]
         Optional frame indices to sample; defaults to all frames.
     every : int
         Sampling stride applied after frame selection.
     """
-    atom_ids: Sequence[int] = dc_field(
-        metadata={'label': 'Atom Ids', 'help': 'Atom Ids parameter for ChargeSeriesRequest.', 'units': 'index'},
+    atom_ids: Optional[Sequence[int]] = dc_field(
+        default=None,
+        metadata={'label': 'Atom Ids', 'help': 'Optional atom IDs; omit to include all atoms.', 'units': 'index'},
     )
     frames: Optional[Sequence[int]] = dc_field(
         default=None,
@@ -1480,8 +1481,9 @@ class ChargeSeriesTask(AnalysisTask):
             elements = [""] * n_atoms
 
         atom_id_to_idx = {atom_id: i for i, atom_id in enumerate(available_atom_ids)}
+        selected_atom_ids = available_atom_ids if request.atom_ids is None else request.atom_ids
         rows: list[dict[str, object]] = []
-        for atom_id in request.atom_ids:
+        for atom_id in selected_atom_ids:
             atom_id_int = int(atom_id)
             if atom_id_int not in atom_id_to_idx:
                 raise ValueError(f"atom_id {atom_id_int} not found in ChargeData.")

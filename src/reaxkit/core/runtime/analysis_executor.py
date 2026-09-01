@@ -446,10 +446,13 @@ class AnalysisExecutor:
 
     @staticmethod
     def _streaming_enabled(task, adapter, required_data, args: dict, requested_frame_indices) -> bool:
-        """Select streaming for all-frame tasks with explicit opt-in support."""
+        """Select streaming for all frames or task-approved frame selections."""
         return bool(
             args.get("stream", True)
-            and requested_frame_indices is None
+            and (
+                requested_frame_indices is None
+                or bool(getattr(task, "supports_selective_streaming", False))
+            )
             and callable(getattr(task, "run_stream", None))
             and adapter.supports_streaming(required_data, args)
         )

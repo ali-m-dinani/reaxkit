@@ -487,9 +487,11 @@ def load_force_field_optimization_plot_bundle(
         source_path=geo_path,
         loader=lambda: geo_handler.dataframe().copy(),
     )
+    geometry_cells = geo_handler.cell_dataframe()
     return ForceFieldOptimizationPlotBundleData(
         report=adapter.load_force_field_optimization_report(args, reporter=reporter),
         geometry_summary=adapter.load_structure_summary(args, reporter=reporter),
         training_set=adapter.load_force_field_optimization_training_set(args, reporter=reporter),
         geometry_restraints=geometry_restraints,
+        geometry_cells=geometry_cells,
     )

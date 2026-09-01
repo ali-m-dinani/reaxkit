@@ -240,22 +240,23 @@ tasks:
     help_search_examples:
     - reaxkit help "get_coordination"
     - run get_coordination
-  dipole:
+  get-dipole:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: dipole'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get-dipole'
     description: Computes dipole-moment metrics from electrostatics inputs that combine
       coordinates, charges, connectivity, and optional field data. Use it to quantify
       molecular or system-level charge separation over time.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-dipole'
     tags:
     - electrostatics
     - dipole
     notes: []
     aliases:
+    - get_dipole
     - dipole
     help_search_examples:
-    - reaxkit help "dipole"
-    - run dipole
+    - reaxkit help "get-dipole"
+    - run get-dipole
   get_dihedral:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.get_dihedral: get_dihedral'
@@ -685,18 +686,19 @@ tasks:
     help_search_examples:
     - reaxkit help "polarization"
     - run polarization
-  polarization_field:
+  get_polarization_field:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization_field'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get_polarization_field'
     description: Analyzes polarization response versus applied electric field. Use
       it to relate field schedules to polarization curves, hysteresis behavior, or
       field-dependent electrostatic response.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization_field'
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
     tags:
     - electrostatics
     - polarization
     notes: []
     aliases:
+    - polarization_field
     - hyst
     help_search_examples:
     - reaxkit help "hysteresis"
@@ -994,7 +996,7 @@ dataclass_usage_across_tasks:
   ElectrostaticsData:
   - dipole
   - polarization
-  - polarization_field
+  - get_polarization_field
   ForceFieldOptimizationDiagnosticData:
   - get_ffield_diagnostic_data
   ForceFieldOptimizationDiagnosticBundleData:

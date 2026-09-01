@@ -26,6 +26,7 @@ from reaxkit.analysis.electrostatics.electrostatics import (
     DipoleRequest,
     PolarizationFieldRequest,
     PolarizationRequest,
+    polarization_field_axis_label,
 )
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
@@ -43,8 +44,36 @@ from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 from reaxkit.presentation.plot import plot as render_plot
 
-ALL_COMMANDS = ("charge_table", "dipole", "polarization", "polarization_field")
-ALL_LEGACY_COMMANDS = ("charge-table",)
+POLARIZATION_FIELD_COMMAND = "get_polarization_field"
+ALL_COMMANDS = ("charge_table", "get-dipole", "polarization", POLARIZATION_FIELD_COMMAND)
+ALL_LEGACY_COMMANDS = ("charge-table", "get_dipole", "dipole", "polarization_field")
+POLARIZATION_COLUMNS = ("P_x (uC/cm^2)", "P_y (uC/cm^2)", "P_z (uC/cm^2)")
+
+
+def _positive_scale(value: str) -> float:
+    """Parse a finite, positive output scale factor."""
+    factor = float(value)
+    if not np.isfinite(factor) or factor <= 0.0:
+        raise argparse.ArgumentTypeError("--scale-by must be a finite number greater than zero.")
+    return factor
+
+
+def _apply_polarization_scale(command: str, result, factor: float) -> None:
+    """Scale polarization-valued result columns before presentation/export."""
+    if factor == 1.0:
+        return
+    table_names = ("table",) if command == "polarization" else ("full_table", "aggregated_table")
+    for table_name in table_names:
+        table = getattr(result, table_name, None)
+        if not isinstance(table, pd.DataFrame):
+            continue
+        scaled = table.copy()
+        for column in POLARIZATION_COLUMNS:
+            if column in scaled.columns:
+                scaled[column] = scaled[column].astype(float) * factor
+        setattr(result, table_name, scaled)
+    if command == POLARIZATION_FIELD_COMMAND:
+        result.field_zero_crossings = [float(value) * factor for value in result.field_zero_crossings]
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
@@ -185,6 +214,7 @@ def _build_polarization_field_request(args: argparse.Namespace) -> PolarizationF
     return PolarizationFieldRequest(
         field_direction="z",
         aggregate=args.aggregate,
+        volume_method=args.volume_method,
         dipole_or_polaization_direction="p_z",
     )
 
@@ -203,9 +233,9 @@ def _build_charge_table_request(args: argparse.Namespace) -> ChargeTableRequest:
 
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "charge_table": _build_charge_table_request,
-    "dipole": _build_dipole_request,
+    "get-dipole": _build_dipole_request,
     "polarization": _build_polarization_request,
-    "polarization_field": _build_polarization_field_request,
+    POLARIZATION_FIELD_COMMAND: _build_polarization_field_request,
 }
 
 
@@ -305,7 +335,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             "legend": len(series) > 1,
         }
 
-    if command != "polarization_field":
+    if command != POLARIZATION_FIELD_COMMAND:
         return None
 
     canonical_x = normalize_choice(args.xaxis or "field_z", domain="xaxis")
@@ -316,14 +346,47 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
     x_col = _resolve_alias(table, canonical_x)
     y_col = _resolve_alias(table, canonical_y)
+    x_label = polarization_field_axis_label(x_col)
+    y_label = polarization_field_axis_label(y_col)
     return {
         "plot_type": "single_plot",
-        "x": table[x_col].tolist(),
-        "y": table[y_col].tolist(),
-        "xlabel": x_col,
-        "ylabel": y_col,
-        "title": f"{y_col} vs {x_col}",
+        "series": [
+            {
+                "x": table[x_col].tolist(),
+                "y": table[y_col].tolist(),
+                "marker": "o",
+                "markersize": 4,
+            }
+        ],
+        "hlines": [{"y": 0.0, "color": "black", "linestyle": "--"}],
+        "vlines": [{"x": 0.0, "color": "black", "linestyle": "--"}],
+        "xlabel": x_label,
+        "ylabel": y_label,
+        "title": f"{y_label} vs {x_label}",
     }
+
+
+def _polarization_summary_path(command: str, args: argparse.Namespace) -> Path:
+    """Resolve a summary beside the hysteresis plot unless explicitly located."""
+    summary_value = str(args.summary)
+    summary = Path(summary_value)
+    storage_args = {
+        "run_id": getattr(args, "run_id", None),
+        "project_root": getattr(args, "project_root", "."),
+        "analysis_id": getattr(args, "analysis_id", None),
+    }
+    if summary.is_absolute() or summary.parent != Path("."):
+        return resolve_output_path(summary_value, command, **storage_args)
+
+    save_value = getattr(args, "save", None)
+    if save_value:
+        save_path = resolve_output_path(str(save_value), command, **storage_args)
+        plot_suffixes = {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".tif", ".tiff", ".bmp"}
+        plot_dir = save_path.parent if save_path.suffix.lower() in plot_suffixes else save_path
+        plot_dir.mkdir(parents=True, exist_ok=True)
+        return plot_dir / summary.name
+
+    return resolve_output_path(summary_value, command, **storage_args)
 
 
 def _default_component_for(command: str) -> str:
@@ -468,7 +531,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
     _add_runtime_arguments(parser)
 
-    if canonical in {"dipole", "polarization"}:
+    if canonical in {"get-dipole", "polarization"}:
         parser.description = (
             f"Compute {canonical} data for selected frames.\n"
             "This command supports total and local scope. Local scope requires core atom types and can\n"
@@ -485,12 +548,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument(
             "--frames",
+            "--frame",
             nargs="*",
             default=None,
             help='Frames to analyze. Example: --frames 0:20:2, which selects every second frame from 0 to 20.',
         )
         parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope. Example: --scope local, which computes per-core local contributions.")
         parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope. Example: --core Al,Mg, which limits local analysis to those core types.")
+        if canonical == "polarization":
+            parser.add_argument(
+                "--scale-by",
+                type=_positive_scale,
+                default=1.0,
+                help="Multiply polarization output values by this factor before plotting/exporting. Example: --scale-by 10.",
+            )
         _add_scalar_presentation_arguments(parser)
     elif canonical == "charge_table":
         parser.description = (
@@ -516,18 +587,20 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by 5.")
         parser.add_argument("--control", default="control", help="Control file for time-axis conversion. Example: --control control, which provides timestep metadata for time conversion.")
         _add_table_presentation_arguments(parser)
-    elif canonical == "polarization_field":
+    elif canonical == POLARIZATION_FIELD_COMMAND:
         parser.description = (
             "Analyze polarization-field hysteresis behavior from trajectory-level data.\n"
             "This command aggregates hysteresis points, plots response curves, exports tables, and can\n"
             "report coercive/remnant roots.\n\n"
             "Examples:\n"
             "  1. Plot and save aggregated hysteresis curve:\n"
-            "   reaxkit polarization_field --plot --save hysteresis.png\n\n"
+            "   reaxkit get_polarization_field --plot --save hysteresis.png\n\n"
             "  2. Customize axes and aggregation, then export:\n"
-            "   reaxkit polarization_field --xaxis field_z --yaxis pol_z --aggregate mean --export hysteresis.csv\n\n"
+            "   reaxkit get_polarization_field --xaxis field_z --yaxis pol_z --aggregate last --export hysteresis.csv\n\n"
             "  3. Print roots and write a summary text report:\n"
-            "   reaxkit polarization_field --roots --summary hysteresis_summary.txt"
+            "   reaxkit get_polarization_field --roots --summary hysteresis_summary.txt\n\n"
+            "  4. Exclude vacuum using the occupied coordinate extents:\n"
+            "   reaxkit get_polarization_field --volume-method bbox --export hysteresis.csv"
         )
         parser.add_argument("--fort78", default="fort.78", help="Path to fort.78 file. Example: --fort78 runs/job1/fort.78, which reads field-response source data from that file.")
         parser.add_argument("--control", default="control", help="Path to control file. Example: --control runs/job1/control, which provides simulation timing/control metadata.")
@@ -545,7 +618,26 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--aggregate",
             choices=["mean", "max", "min", "last"],
             default="mean",
-            help="Aggregation method. Example: --aggregate mean, which averages values at each field point.",
+            help=(
+                "Aggregation within each contiguous constant-field section. "
+                "Example: --aggregate mean averages each plateau without merging "
+                "later visits to the same field."
+            ),
+        )
+        parser.add_argument(
+            "--volume-method",
+            choices=["hull", "bbox", "cell"],
+            default="hull",
+            help=(
+                "Volume used to normalize polarization. 'bbox' excludes vacuum "
+                "outside the occupied coordinate extents; default: hull."
+            ),
+        )
+        parser.add_argument(
+            "--scale-by",
+            type=_positive_scale,
+            default=1.0,
+            help="Multiply polarization output values by this factor before plotting/exporting. Example: --scale-by 10.",
         )
         parser.add_argument("--roots", action="store_true", help="Also print coercive and remnant values to stdout. Example: --roots, which prints root metrics directly in CLI output.")
     else:
@@ -564,6 +656,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
 
+    if canonical in {"polarization", POLARIZATION_FIELD_COMMAND}:
+        _apply_polarization_scale(canonical, result, float(getattr(args, "scale_by", 1.0)))
+
     if canonical == "charge_table" and isinstance(getattr(result, "table", None), pd.DataFrame):
         if "time" not in result.table.columns and "iter" in result.table.columns:
             try:
@@ -578,7 +673,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
                 result.table = result.table.copy()
                 result.table["time"] = np.asarray(converted, dtype=float)
 
-    if canonical == "polarization_field":
+    if canonical == POLARIZATION_FIELD_COMMAND:
         result.table = result.aggregated_table
         if "time" not in result.full_table.columns and "iter" in result.full_table.columns:
             converted, _ = convert_xaxis(
@@ -589,7 +684,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             result.full_table = result.full_table.copy()
             result.full_table["time"] = np.asarray(converted, dtype=float)
 
-    local_plot_requested = canonical in {"dipole", "polarization"} and getattr(args, "plot", None) in {"plot3d", "heatmap2d"}
+    local_plot_requested = canonical in {"get-dipole", "polarization"} and getattr(args, "plot", None) in {"plot3d", "heatmap2d"}
     args_for_present = args
     if local_plot_requested:
         args_for_present = argparse.Namespace(**vars(args))
@@ -610,7 +705,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         for payload in payloads:
             render_plot(payload)
 
-    if canonical == "polarization_field":
+    if canonical == POLARIZATION_FIELD_COMMAND:
         if getattr(args, "export", None):
             out_csv = resolve_output_path(
                 args.export,
@@ -622,7 +717,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             full_save_path = out_csv.parent / "hysteresis_full_data.csv"
             export_result_csv(SimpleNamespace(table=result.full_table), str(full_save_path))
         if getattr(args, "summary", None):
-            summary_path = Path(args.summary)
+            summary_path = _polarization_summary_path(canonical, args)
             summary_path.parent.mkdir(parents=True, exist_ok=True)
             summary_path.write_text(_summary_text(result), encoding="utf-8")
         if getattr(args, "roots", False):

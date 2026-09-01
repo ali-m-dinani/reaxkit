@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from importlib import import_module
@@ -25,6 +26,77 @@ def test_canonicalize_direct_command_diffusivity_alias():
     out = cli_main._canonicalize_direct_command(argv)
 
     assert out[1] == "diffusivity"
+
+
+@pytest.mark.parametrize("command", ["get-dipole", "get_dipole", "dipole"])
+def test_canonicalize_get_dipole_aliases(command: str):
+    argv = ["reaxkit", command, "--scope", "total", "--export", "dipole.csv"]
+
+    out = cli_main._canonicalize_direct_command(argv)
+
+    assert out[1] == "get-dipole"
+
+
+def test_get_dipole_is_the_registered_command_and_task():
+    from reaxkit.analysis.electrostatics.electrostatics import DipoleTask
+    from reaxkit.core.registry.analysis_cli_routing_registry import (
+        get_registered_analysis_commands,
+    )
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+
+    spec = get_registered_analysis_commands()["get-dipole"]
+
+    assert spec.aliases == ("get_dipole", "dipole")
+    assert "dipole" not in get_registered_analysis_commands()
+    assert TASK_REGISTRY["get-dipole"] is DipoleTask
+
+
+def test_get_dipole_accepts_frame_option_alias():
+    from reaxkit.workflows import electrostatics_workflow
+
+    parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(parser, command="get-dipole")
+
+    args = parser.parse_args(["--scope", "total", "--frame", "0:200:1"])
+
+    assert args.frames == ["0:200:1"]
+
+
+@pytest.mark.parametrize("command", ["get_polarization_field", "polarization_field"])
+def test_canonicalize_polarization_field_aliases(command: str):
+    argv = ["reaxkit", command, "--aggregate", "mean"]
+
+    out = cli_main._canonicalize_direct_command(argv)
+
+    assert out[1] == "get_polarization_field"
+
+
+def test_get_polarization_field_is_the_registered_command_and_task():
+    from reaxkit.analysis.electrostatics.electrostatics import PolarizationFieldTask
+    from reaxkit.core.registry.analysis_cli_routing_registry import (
+        get_registered_analysis_commands,
+    )
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+
+    spec = get_registered_analysis_commands()["get_polarization_field"]
+
+    assert spec.aliases == ("polarization_field",)
+    assert "polarization_field" not in get_registered_analysis_commands()
+    assert TASK_REGISTRY["get_polarization_field"] is PolarizationFieldTask
+
+
+def test_get_polarization_field_accepts_volume_method():
+    from reaxkit.workflows import electrostatics_workflow
+
+    parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(parser, command="get_polarization_field")
+
+    default_request = electrostatics_workflow._build_polarization_field_request(parser.parse_args([]))
+    args = parser.parse_args(["--volume-method", "bbox"])
+    request = electrostatics_workflow._build_polarization_field_request(args)
+
+    assert default_request.volume_method == "hull"
+    assert request.volume_method == "bbox"
 
 
 def test_unknown_flag_for_existing_command_has_custom_message(

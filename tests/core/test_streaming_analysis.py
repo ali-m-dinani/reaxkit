@@ -320,6 +320,25 @@ def test_executor_uses_streaming_for_all_frame_dipole():
     assert result.table["frame_index"].is_monotonic_increasing
 
 
+def test_executor_uses_charge_only_streaming_for_selected_dipole_frames():
+    args = {
+        "run_dir": str(FIXTURE_DIR),
+        "xmolout": str(FIXTURE_DIR / "xmolout"),
+        "fort7": str(FIXTURE_DIR / "fort.7"),
+        "engine": "reaxff",
+        "cache": False,
+        "progress": False,
+    }
+    result = AnalysisExecutor().run(
+        DipoleTask(),
+        DipoleRequest(scope="total", frames=[0, 2]),
+        args,
+    )
+
+    assert args["_streaming"] is True
+    assert result.table["frame_index"].tolist() == [0, 2]
+
+
 def test_stream_cache_identity_includes_explicit_lammps_and_ams_paths(tmp_path):
     dump = tmp_path / "trajectory.dump"
     rkf = tmp_path / "ams.rkf"

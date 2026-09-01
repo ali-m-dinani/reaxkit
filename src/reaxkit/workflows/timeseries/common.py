@@ -157,7 +157,8 @@ def build_displacement_request(args: argparse.Namespace) -> TrajectoryDisplaceme
 
 
 def build_charge_request(args: argparse.Namespace) -> ChargeSeriesRequest:
-    return ChargeSeriesRequest(atom_ids=tuple(args.atom_ids), frames=_frames(args), every=int(args.every))
+    atom_ids = tuple(args.atom_ids) if args.atom_ids else None
+    return ChargeSeriesRequest(atom_ids=atom_ids, frames=_frames(args), every=int(args.every))
 
 
 def build_cell_dimensions_request(args: argparse.Namespace) -> CellDimensionsRequest:

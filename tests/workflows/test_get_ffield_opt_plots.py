@@ -6,10 +6,12 @@ import argparse
 from types import SimpleNamespace
 
 import pandas as pd
+import reaxkit.workflows.force_field_opt.get_ffield_opt_plots as plots_module
 
 from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
     FIGURE_GENERATOR_TEMPLATE_FILENAME,
     _figure_generator_template_source,
+    _render_groups,
     _restraint_coordinate,
     _restraint_plot_groups,
     _safe_name,
@@ -18,6 +20,7 @@ from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
     _not_plotted_entries,
     build_parser,
 )
+from reaxkit.workflows.file_tools.ffield_workflow import EOS_SINGLE_FIGSIZE
 from reaxkit.workflows.force_field_opt.heatfo import (
     _plot_identifier,
     heatfo_plot_payloads,
@@ -34,11 +37,16 @@ def test_build_parser_documents_examples_and_defaults_to_workspace() -> None:
     assert "reaxkit get_ffield_opt_plots --output ffield_opt_plots" in str(
         parser.description
     )
+    assert "reaxkit get_ffield_opt_plots --flip-sign-for-eos" in str(
+        parser.description
+    )
     assert parser.parse_args([]).output is None
     assert parser.parse_args([]).entry_per_figure == 6
     assert parser.parse_args([]).geo == "geo"
     assert parser.parse_args([]).progress is True
+    assert parser.parse_args([]).flip_sign_for_eos is False
     assert parser.parse_args(["--entry-per-figure", "3"]).entry_per_figure == 3
+    assert parser.parse_args(["--flip-sign-for-eos"]).flip_sign_for_eos is True
 
 
 def test_custom_figure_generator_template_is_packaged() -> None:
@@ -60,6 +68,108 @@ def test_curve_series_use_reaxff_blue_and_qm_red() -> None:
     )
 
     assert [item["color"] for item in series] == ["tab:blue", "#C0504D"]
+
+
+def test_eos_group_renderer_uses_word_table_friendly_dimensions(
+    monkeypatch, tmp_path
+) -> None:
+    rendered_payloads: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "reaxkit.workflows.force_field_opt.get_ffield_opt_plots.render_plot",
+        rendered_payloads.append,
+    )
+    groups = [
+        {
+            "identifier": "bulk_0_mgo",
+            "xlabel": "Volume (Å³)",
+            "reaxff_x": [9.0, 10.0],
+            "reaxff_y": [-4.0, -5.0],
+            "qm_x": [9.0, 10.0],
+            "qm_y": [-4.1, -5.1],
+        }
+    ]
+
+    _render_groups(groups, tmp_path, curve_type="eos")
+
+    assert rendered_payloads[0]["figsize"] == EOS_SINGLE_FIGSIZE == (6.0, 5.0)
+
+
+def test_aggregate_workflow_skips_empty_eos_and_finishes(
+    monkeypatch, tmp_path, capsys
+) -> None:
+    empty = pd.DataFrame()
+    empty_result = lambda: SimpleNamespace(table=empty.copy())
+    fake_task = lambda: SimpleNamespace(run=lambda *_args, **_kwargs: empty_result())
+
+    monkeypatch.setattr(plots_module, "normalize_storage_args", lambda values: values)
+    monkeypatch.setattr(plots_module, "resolve_reporter", lambda _values: lambda *_args: None)
+    monkeypatch.setattr(plots_module, "_load_plot_bundle", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(plots_module, "FFieldOptimizationReportEOSTask", fake_task)
+    monkeypatch.setattr(plots_module, "FFieldOptimizationReportRestraintTask", fake_task)
+    monkeypatch.setattr(
+        plots_module,
+        "_force_field_optimization_curve_tables",
+        lambda _data: {name: empty.copy() for name in ("bond", "angle", "other_curve")},
+    )
+    for name in (
+        "build_heatfo_table",
+        "build_charge_table",
+        "build_cell_parameter_table",
+        "build_geometry_target_table",
+    ):
+        monkeypatch.setattr(plots_module, name, lambda _data: empty.copy())
+    monkeypatch.setattr(
+        plots_module,
+        "build_energy_category_tables",
+        lambda _data: {
+            name: empty.copy()
+            for name in (
+                "energy_curve",
+                "energy_difference",
+                "reaction_energy",
+                "single_energy",
+            )
+        },
+    )
+    monkeypatch.setattr(plots_module, "build_report_trainset_links", lambda _data: {})
+    monkeypatch.setattr(
+        plots_module,
+        "add_trainset_links",
+        lambda table, _links: table,
+    )
+    monkeypatch.setattr(
+        plots_module,
+        "_not_plotted_entries",
+        lambda _data, _tables: empty.copy(),
+    )
+    monkeypatch.setattr(
+        plots_module,
+        "_copy_figure_generator_template",
+        lambda root: root / plots_module.FIGURE_GENERATOR_TEMPLATE_FILENAME,
+    )
+    for name in (
+        "_render_groups",
+        "_render_charge",
+        "_render_cell_parameters",
+        "_render_geometry_targets",
+        "_render_heatfo",
+        "_render_energy_bars",
+    ):
+        monkeypatch.setattr(plots_module, name, lambda *_args, **_kwargs: [])
+
+    result = plots_module.run_main(
+        "get_ffield_opt_plots",
+        argparse.Namespace(
+            output=str(tmp_path / "plots"),
+            entry_per_figure=6,
+            flip_sign_for_eos=False,
+        ),
+    )
+
+    output = capsys.readouterr().out
+    assert result == 0
+    assert "[Skipped] EOS: no plottable expressions" in output
+    assert "[Done] Restraints: 0 images" in output
 
 
 def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:

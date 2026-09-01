@@ -64,7 +64,7 @@ workflows:
     - polarization
     notes:
     - 'How to use the workflow: reaxkit <X> -h where <X> can be charge-table, dipole,
-      polarization, polarization_field'
+      polarization, get_polarization_field'
     aliases:
     - electrostatics workflow
     - charge analysis workflow
@@ -838,23 +838,17 @@ workflows:
     parent_workflow: electrostatics_workflow
     implementation_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
     command: dipole
-    command_kind: analysis
-    analysis_task: dipole
-    description: Computes dipole-moment metrics from electrostatics inputs that combine coordinates, charges,
-      connectivity, and optional field data. Use it to quantify molecular or system-level charge separation
-      over time.
+    command_kind: workflow
+    description: Run the dipole workflow command provided by electrostatics_workflow.
     tags:
-    - electrostatics
     - dipole
     - electrostatics workflow
-    - analysis workflow command
+    - workflow workflow command
     notes:
     - 'How to use the workflow: reaxkit dipole -h'
-    aliases:
-    - dipole
+    aliases: []
     help_search_examples:
     - reaxkit help "dipole"
-    - run dipole
     - reaxkit dipole -h
   repair_fort7:
     parent_workflow: fort7_workflow
@@ -1522,30 +1516,30 @@ workflows:
     - reaxkit help "polarization"
     - run polarization
     - reaxkit polarization -h
-  polarization_field:
+  get_polarization_field:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization_field'
-    command: polarization_field
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
+    command: get_polarization_field
     command_kind: analysis
-    analysis_task: polarization_field
+    analysis_task: get_polarization_field
     description: Analyzes polarization response versus applied electric field. Use it to relate field schedules
       to polarization curves, hysteresis behavior, or field-dependent electrostatic response.
     tags:
     - electrostatics
     - polarization
-    - polarization field
+    - get polarization field
     - electrostatics workflow
     - analysis workflow command
     notes:
-    - 'How to use the workflow: reaxkit polarization_field -h'
+    - 'How to use the workflow: reaxkit get_polarization_field -h'
     aliases:
-    - polarization-field
+    - polarization_field
     - hyst
     help_search_examples:
     - reaxkit help "hysteresis"
     - run hysteresis
-    - reaxkit help "polarization field"
-    - reaxkit polarization_field -h
+    - reaxkit help "get polarization field"
+    - reaxkit get_polarization_field -h
   sort-geo:
     parent_workflow: geo_workflow
     implementation_module: 'reaxkit.workflows.file_tools.geo_workflow: sort-geo'
@@ -2854,6 +2848,22 @@ workflows:
     help_search_examples:
     - reaxkit help "get voronoi"
     - reaxkit get_voronoi -h
+  polarization-field:
+    parent_workflow: electrostatics_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization-field'
+    command: polarization-field
+    command_kind: workflow
+    description: Run the polarization field workflow command provided by electrostatics_workflow.
+    tags:
+    - polarization field
+    - electrostatics workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit polarization-field -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "polarization field"
+    - reaxkit polarization-field -h
   # END GENERATED COMMAND WORKFLOWS
 dataclass_usage:
   AtomicKinematicsData:
@@ -2950,7 +2960,7 @@ command_to_workflow_module:
   get_ffield_diagnostics_evolution: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
   polarization: reaxkit.workflows.electrostatics_workflow
-  polarization_field: reaxkit.workflows.electrostatics_workflow
+  get_polarization_field: reaxkit.workflows.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.study_design.study_workflow

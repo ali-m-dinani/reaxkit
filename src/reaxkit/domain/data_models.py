@@ -1347,13 +1347,15 @@ class ForceFieldOptimizationPlotBundleData:
     The report supplies ReaxFF/QM values, the geometry summary supplies volume
     coordinates, the parsed training set supplies comments, and
     ``geometry_restraints`` maps structure identifiers to BOND/ANGLE scan
-    coordinates parsed from the ReaxFF ``geo`` file.
+    coordinates, while ``geometry_cells`` stores the per-structure ``CRYSTX``
+    cell parameters parsed from the ReaxFF ``geo`` file.
     """
 
     report: ForceFieldOptimizationReportData
     geometry_summary: EnergyMinimizationSummaryData
     training_set: ForceFieldOptimizationTrainingSetData
     geometry_restraints: pd.DataFrame = field(default_factory=pd.DataFrame)
+    geometry_cells: pd.DataFrame = field(default_factory=pd.DataFrame)
     metadata: Optional[dict[str, Any]] = None
 
 

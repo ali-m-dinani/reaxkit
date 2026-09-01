@@ -31,6 +31,7 @@ from reaxkit.analysis.force_field.report import (
     FFieldOptimizationReportBulkModulusRequest,
     FFieldOptimizationReportEOSRequest,
     FFieldOptimizationReportRequest,
+    elastic_family,
 )
 from reaxkit.analysis.force_field.MM_summary import MMSummaryRequest
 from reaxkit.cli.path import resolve_output_path
@@ -58,6 +59,11 @@ from reaxkit.engine.common.generators.ffield_generator import (
     merge_ffields,
 )
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
+
+
+REAXFF_PLOT_COLOR = "tab:blue"
+QM_PLOT_COLOR = "#C0504D"
+EOS_SINGLE_FIGSIZE = (6.0, 5.0)
 
 
 def _parse_csv_items(value: str) -> list[str]:
@@ -1603,7 +1609,7 @@ def _eos_identifier_coordinate(base_iden: object, other_iden: object) -> float |
 
 
 def _eos_plot_groups(table: pd.DataFrame) -> list[dict[str, object]]:
-    """Build paired ReaxFF/QM EOS groups with a shared x-axis."""
+    """Build paired energy curves using volume or elastic strain coordinates."""
     required = {
         "base_iden",
         "other_iden",
@@ -1618,24 +1624,41 @@ def _eos_plot_groups(table: pd.DataFrame) -> list[dict[str, object]]:
     work["V_other_iden"] = pd.to_numeric(work["V_other_iden"], errors="coerce")
     work["ffield_value"] = pd.to_numeric(work["ffield_value"], errors="coerce")
     work["qm_value"] = pd.to_numeric(work["qm_value"], errors="coerce")
+    if "strain_percent" in work.columns:
+        work["strain_percent"] = pd.to_numeric(work["strain_percent"], errors="coerce")
     groups: list[dict[str, object]] = []
     for iden, raw_group in work.groupby("base_iden", dropna=False, sort=False):
         group = raw_group.copy()
         has_energy = group[["ffield_value", "qm_value"]].notna().any(axis=1)
-        volume_rows = group.loc[group["V_other_iden"].notna() & has_energy].copy()
-        if not volume_rows.empty:
-            plotted = volume_rows.sort_values("V_other_iden", kind="stable")
-            x_col = "V_other_iden"
-            xlabel = "Volume (Å³)"
+        family = elastic_family(iden)
+        strain_rows = (
+            group.loc[group["strain_percent"].notna() & has_energy].copy()
+            if family is not None and "strain_percent" in group.columns
+            else pd.DataFrame()
+        )
+        if not strain_rows.empty:
+            plotted = strain_rows.sort_values("strain_percent", kind="stable")
+            x_col = "strain_percent"
+            xlabel = (
+                "Orthorhombic strain δ (%)"
+                if family in {"c12", "c13", "c23"}
+                else "Shear angle change (%)"
+            )
         else:
-            group["scan_coordinate"] = [
-                _eos_identifier_coordinate(iden, other)
-                for other in group["other_iden"]
-            ]
-            plotted = group.loc[group["scan_coordinate"].notna() & has_energy].copy()
-            plotted = plotted.sort_values("scan_coordinate", kind="stable")
-            x_col = "scan_coordinate"
-            xlabel = "Scan coordinate"
+            volume_rows = group.loc[group["V_other_iden"].notna() & has_energy].copy()
+            if not volume_rows.empty:
+                plotted = volume_rows.sort_values("V_other_iden", kind="stable")
+                x_col = "V_other_iden"
+                xlabel = "Volume (Å³)"
+            else:
+                group["scan_coordinate"] = [
+                    _eos_identifier_coordinate(iden, other)
+                    for other in group["other_iden"]
+                ]
+                plotted = group.loc[group["scan_coordinate"].notna() & has_energy].copy()
+                plotted = plotted.sort_values("scan_coordinate", kind="stable")
+                x_col = "scan_coordinate"
+                xlabel = "Scan coordinate"
         if plotted.empty:
             continue
 
@@ -1984,6 +2007,7 @@ def _plot_payload(
                         "y": group["reaxff_y"],
                         "label": "ReaxFF",
                         "marker": "o",
+                        "color": REAXFF_PLOT_COLOR,
                     }
                 )
             if group["qm_x"]:
@@ -1993,6 +2017,7 @@ def _plot_payload(
                         "y": group["qm_y"],
                         "label": "QM/Literature",
                         "marker": "o",
+                        "color": QM_PLOT_COLOR,
                     }
                 )
             return series
@@ -2015,6 +2040,7 @@ def _plot_payload(
                 "ylabel": "Energy",
                 "title": f"EOS {group['identifier']}",
                 "legend": True,
+                "figsize": EOS_SINGLE_FIGSIZE,
                 "filename": _eos_plot_filename(str(group["identifier"])),
                 "subdirectory": _eos_material_name(group["identifier"]),
             }

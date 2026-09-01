@@ -141,6 +141,26 @@ def test_executor_passes_requested_data_fields_to_adapter(monkeypatch):
     assert captured["load_fields"] == ("potential_energy",)
 
 
+def test_selective_streaming_requires_task_opt_in():
+    class DummyAdapter:
+        @staticmethod
+        def supports_streaming(data_type, args):
+            return True
+
+    class StreamTask:
+        @staticmethod
+        def run_stream(frames, request):
+            return None
+
+    adapter = DummyAdapter()
+    selected = [0, 1, 2]
+
+    assert not AnalysisExecutor._streaming_enabled(StreamTask(), adapter, object, {}, selected)
+
+    StreamTask.supports_selective_streaming = True
+    assert AnalysisExecutor._streaming_enabled(StreamTask(), adapter, object, {}, selected)
+
+
 def test_ams_and_lammps_selective_sources_are_not_copied(tmp_path):
     rkf = tmp_path / "reaxout.rkf"
     dump = tmp_path / "dump.lammpstrj"

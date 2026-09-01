@@ -349,7 +349,9 @@ class PolarizationFieldRequest(BaseRequest):
     every : int
         Frame stride after selection. Must be `>= 1`.
     aggregate : AggregateKind
-        Optional grouping aggregation over identical field values.
+        Optional grouping aggregation over contiguous runs of identical field values.
+    volume_method : VolumeMethod
+        Volume estimator used for polarization normalization.
     field_direction : FieldDirection
         Electric-field axis used for hysteresis x-axis (`x`, `y`, or `z`).
     dipole_or_polaization_direction : DipoleOrPolarizationDirection
@@ -373,13 +375,19 @@ class PolarizationFieldRequest(BaseRequest):
     every
         Frame stride after selection. Example: ``every=5``.
     aggregate
-        Optional aggregation applied after pairing field and response values.
+        Optional aggregation applied to each contiguous constant-field section
+        after pairing field and response values. Separate visits to the same
+        field value remain separate.
         Choices:
         - ``mean``: average all rows sharing the same field value
         - ``max``: maximum over grouped rows
         - ``min``: minimum over grouped rows
         - ``last``: keep the last row by iteration per field value
         - ``None``: no aggregation
+    volume_method
+        Volume estimator for polarization normalization. ``"hull"`` uses the
+        atomic convex hull, ``"bbox"`` uses the occupied coordinate extents,
+        and ``"cell"`` uses the simulation-cell lengths. Defaults to ``"hull"``.
     field_direction
         Electric-field axis used for hysteresis x-axis, mapped to
         ``field_x`` / ``field_y`` / ``field_z``. Example: ``"z"``.
@@ -411,8 +419,16 @@ class PolarizationFieldRequest(BaseRequest):
         default=None,
         metadata={
             'label': 'Aggregate',
-            'help': "Optional aggregation over rows sharing the same field value. Example: 'mean'.",
+            'help': "Aggregate each contiguous constant-field section. Example: 'mean'.",
             'choices': ['mean', 'max', 'min', 'last'],
+        },
+    )
+    volume_method: VolumeMethod = dc_field(
+        default="hull",
+        metadata={
+            'label': 'Volume Method',
+            'help': "Polarization normalization volume: 'hull', 'bbox', or 'cell'.",
+            'choices': ['hull', 'bbox', 'cell'],
         },
     )
     field_direction: FieldDirection = dc_field(
@@ -806,7 +822,8 @@ def _polarization_field_result(
     request: "PolarizationFieldRequest",
 ) -> "PolarizationFieldResult":
     """Pair an already-computed polarization table with the field series."""
-    pol = polarization_table.sort_values("iter").reset_index(drop=True)
+    order_col = "frame_index" if "frame_index" in polarization_table.columns else "iter"
+    pol = polarization_table.sort_values(order_col, kind="stable").reset_index(drop=True)
     iters = pol["iter"].to_numpy(dtype=int)
     field_col = f"field_{str(request.field_direction).strip().lower()}"
     field = _field_component_series(field_data, component=field_col, target_iters=iters)
@@ -819,14 +836,27 @@ def _polarization_field_result(
     else:
         if request.aggregate not in {"mean", "max", "min", "last"}:
             raise ValueError("aggregate must be one of: mean|max|min|last (or None).")
+        # A field value may be visited more than once during a hysteresis sweep.
+        # Aggregate only contiguous plateaus so the chronological sweep path is
+        # retained instead of merging separate branches of the loop.
+        grouped = full.sort_values(order_col, kind="stable").reset_index(drop=True).copy()
+        grouped["__field_section"] = grouped[field_col].ne(grouped[field_col].shift()).cumsum()
+        group_cols = ["__field_section", field_col]
         if request.aggregate == "mean":
-            agg = full.groupby(field_col, as_index=False).mean(numeric_only=True)
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).mean(numeric_only=True)
         elif request.aggregate == "max":
-            agg = full.groupby(field_col, as_index=False).max(numeric_only=True)
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).max(numeric_only=True)
         elif request.aggregate == "min":
-            agg = full.groupby(field_col, as_index=False).min(numeric_only=True)
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).min(numeric_only=True)
         else:
-            agg = full.sort_values("iter").groupby(field_col, as_index=False).tail(1).reset_index(drop=True)
+            agg = grouped.groupby(group_cols, sort=False, dropna=False).tail(1).reset_index(drop=True)
+        agg = agg.drop(columns="__field_section")
         preferred_cols = [column for column in full.columns if column in agg.columns]
         trailing_cols = [column for column in agg.columns if column not in preferred_cols]
         agg = agg.loc[:, preferred_cols + trailing_cols]
@@ -852,6 +882,18 @@ def _polarization_field_result(
         field_zero_crossings=find_zero_crossings(y, x),
         request=request,
     )
+
+
+def polarization_field_axis_label(column: str) -> str:
+    """Return a publication-style label for a polarization-field column."""
+    value = str(column)
+    if value.startswith("field_") and value[-1:] in {"x", "y", "z"}:
+        return rf"$E_{{{value[-1]}}}$ (MV/cm)"
+    if value.startswith("P_") and value[2:3] in {"x", "y", "z"}:
+        return rf"$P_{{{value[2]}}}$ ($\mu$C/cm$^2$)"
+    if value.startswith("mu_") and value[3:4] in {"x", "y", "z"}:
+        return rf"$\mu_{{{value[3]}}}$ (debye)"
+    return value
 
 
 def _electrostatics_data_from_handlers(xh, f7) -> ElectrostaticsData:
@@ -1051,11 +1093,20 @@ def _run_electrostatics_stream(
     return out.sort_values(sort_columns, kind="stable").reset_index(drop=True) if sort_columns else out
 
 
-@register_task("dipole", label="Dipole")
+@register_task("get-dipole", label="Dipole")
 class DipoleTask(AnalysisTask):
     """Compute dipole series as total or local."""
 
     required_data = ElectrostaticsData
+    supports_selective_streaming = True
+
+    @staticmethod
+    def required_data_fields_for(request: DipoleRequest, _args: dict) -> tuple[str, ...]:
+        """Declare only the electrostatics inputs used by the selected scope."""
+        fields = ["trajectory", "charges"]
+        if request.scope == "local":
+            fields.append("connectivity")
+        return tuple(fields)
 
     @staticmethod
     def recommended_presentations(
@@ -1279,7 +1330,7 @@ class PolarizationTask(AnalysisTask):
         )
 
 
-@register_task("polarization_field", label="Polarization Field")
+@register_task("get_polarization_field", label="Polarization Field")
 class PolarizationFieldTask(AnalysisTask):
     """Compute polarization-field data and hysteresis roots."""
 
@@ -1354,16 +1405,22 @@ class PolarizationFieldTask(AnalysisTask):
         y_col = y_map.get(y_key, "P_z (uC/cm^2)")
         if x_col not in sample or y_col not in sample:
             return views
+        x_label = polarization_field_axis_label(x_col)
+        y_label = polarization_field_axis_label(y_col)
 
         views.append(
             PresentationSpec(
                 renderer="single_plot",
-                label=f"{y_col} vs {x_col}",
+                label=f"{y_label} vs {x_label}",
                 mapping={"x_col": x_col, "y_col": y_col, "group_by_col": ""},
                 options={
                     "title": "Hysteresis",
-                    "xlabel": x_col,
-                    "ylabel": y_col,
+                    "xlabel": x_label,
+                    "ylabel": y_label,
+                    "marker": "o",
+                    "markersize": 4,
+                    "hlines": [{"y": 0.0, "color": "black", "linestyle": "--"}],
+                    "vlines": [{"x": 0.0, "color": "black", "linestyle": "--"}],
                     "legend": False,
                     "source_key": "aggregated_table",
                 },
@@ -1410,7 +1467,7 @@ class PolarizationFieldTask(AnalysisTask):
                 scope="total",
                 frames=request.frames,
                 every=request.every,
-                volume_method="hull",
+                volume_method=request.volume_method,
             ),
             reporter=reporter,
         ).table
@@ -1424,7 +1481,7 @@ class PolarizationFieldTask(AnalysisTask):
             scope="total",
             frames=None,
             every=1,
-            volume_method="hull",
+            volume_method=request.volume_method,
         )
         tables: list[pd.DataFrame] = []
         field_data: ElectricFieldData | None = None
@@ -1462,4 +1519,5 @@ __all__ = [
     "PolarizationFieldRequest",
     "PolarizationFieldResult",
     "PolarizationFieldTask",
+    "polarization_field_axis_label",
 ]

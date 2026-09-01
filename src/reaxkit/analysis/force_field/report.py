@@ -254,6 +254,9 @@ _CURVE_COLUMNS = [
     "iden2",
     "V_other_iden",
     "E_other_iden",
+    "strain_percent",
+    "strain_type",
+    "strain_definition",
     "scan_type",
     "scan_coordinate",
     "scan_unit",
@@ -267,6 +270,117 @@ _CURVE_COLUMNS = [
     "report_line_number",
     "trainset_line_number",
 ]
+
+
+_ORTHORHOMBIC_STRAIN_AXES = {
+    "c12": ("a", "b"),
+    "c13": ("a", "c"),
+    "c23": ("b", "c"),
+}
+_SHEAR_STRAIN_ANGLES = {
+    "c44": "alpha",
+    "c55": "beta",
+    "c66": "gamma",
+}
+
+
+def elastic_family(identifier: object) -> str | None:
+    """Return the supported elastic family encoded at the identifier start."""
+    match = re.match(
+        r"^(c(?:12|13|23|44|55|66))(?:[_\-.]|$)",
+        str(identifier).strip(),
+        re.IGNORECASE,
+    )
+    return match.group(1).lower() if match else None
+
+
+def _normalized_elastic_identifier(identifier: object) -> str:
+    """Collapse generator zero-padding in elastic point identifiers."""
+    text = str(identifier).strip()
+    return re.sub(
+        r"^(c(?:12|13|23|44|55|66)[_\-.][ce])0+(\d+)(?=[_\-.]|$)",
+        lambda match: f"{match.group(1)}{int(match.group(2))}",
+        text,
+        flags=re.IGNORECASE,
+    ).lower()
+
+
+def _elastic_strain_metadata(
+    base_iden: object,
+    other_iden: object,
+    geometry_cells: pd.DataFrame | None,
+) -> dict[str, Any]:
+    """Calculate orthorhombic or shear strain from paired ``CRYSTX`` cells."""
+    family = elastic_family(base_iden)
+    empty = {
+        "strain_percent": pd.NA,
+        "strain_type": "",
+        "strain_definition": "",
+    }
+    if family is None:
+        return empty
+
+    if family in _ORTHORHOMBIC_STRAIN_AXES:
+        first_axis, second_axis = _ORTHORHOMBIC_STRAIN_AXES[family]
+        strain_type = "orthorhombic"
+        definition = (
+            f"0.5 * (({first_axis}-{first_axis}0)/{first_axis}0 - "
+            f"({second_axis}-{second_axis}0)/{second_axis}0) * 100"
+        )
+    else:
+        angle = _SHEAR_STRAIN_ANGLES[family]
+        strain_type = "shear_angle"
+        definition = f"radians({angle}-{angle}0) * 100"
+
+    unavailable = {
+        "strain_percent": pd.NA,
+        "strain_type": strain_type,
+        "strain_definition": definition,
+    }
+    required = {"descriptor", "a", "b", "c", "alpha", "beta", "gamma"}
+    if (
+        geometry_cells is None
+        or geometry_cells.empty
+        or not required.issubset(geometry_cells.columns)
+    ):
+        return unavailable
+
+    cells = geometry_cells.drop_duplicates("descriptor", keep="first").copy()
+    cells["_elastic_key"] = cells["descriptor"].map(_normalized_elastic_identifier)
+    cells = cells.drop_duplicates("_elastic_key", keep="first").set_index("_elastic_key")
+    base_key = _normalized_elastic_identifier(base_iden)
+    other_key = _normalized_elastic_identifier(other_iden)
+    if base_key not in cells.index or other_key not in cells.index:
+        return unavailable
+
+    base_cell, other_cell = cells.loc[base_key], cells.loc[other_key]
+    if family in _ORTHORHOMBIC_STRAIN_AXES:
+        first_axis, second_axis = _ORTHORHOMBIC_STRAIN_AXES[family]
+        first_0 = pd.to_numeric(base_cell[first_axis], errors="coerce")
+        second_0 = pd.to_numeric(base_cell[second_axis], errors="coerce")
+        first = pd.to_numeric(other_cell[first_axis], errors="coerce")
+        second = pd.to_numeric(other_cell[second_axis], errors="coerce")
+        values = np.asarray([first_0, second_0, first, second], dtype=float)
+        if not np.isfinite(values).all() or first_0 == 0.0 or second_0 == 0.0:
+            return unavailable
+        strain_percent = 50.0 * (
+            (float(first) - float(first_0)) / float(first_0)
+            - (float(second) - float(second_0)) / float(second_0)
+        )
+    else:
+        angle = _SHEAR_STRAIN_ANGLES[family]
+        angle_0 = pd.to_numeric(base_cell[angle], errors="coerce")
+        distorted_angle = pd.to_numeric(other_cell[angle], errors="coerce")
+        values = np.asarray([angle_0, distorted_angle], dtype=float)
+        if not np.isfinite(values).all():
+            return unavailable
+        strain_percent = float(np.deg2rad(float(distorted_angle) - float(angle_0)) * 100.0)
+
+    return {
+        "strain_percent": strain_percent,
+        "strain_type": strain_type,
+        "strain_definition": definition,
+    }
 
 
 def _two_body_expression_key(
@@ -486,6 +600,7 @@ def _curve_table_from_classified_rows(
     rows: pd.DataFrame,
     geometry_summary: EnergyMinimizationSummaryData,
     geometry_restraints: pd.DataFrame | None = None,
+    geometry_cells: pd.DataFrame | None = None,
     *,
     curve_type: str,
 ) -> pd.DataFrame:
@@ -504,7 +619,6 @@ def _curve_table_from_classified_rows(
     restraint_lookup = _geo_restraint_lookup(
         geometry_restraints if geometry_restraints is not None else pd.DataFrame()
     )
-
     def scan_metadata(identifier: str) -> dict[str, Any]:
         record = restraint_lookup.get(identifier)
         if record is not None:
@@ -559,6 +673,7 @@ def _curve_table_from_classified_rows(
                 seen_other.add(other_iden)
                 volume, energy = geo_map.get(other_iden, (pd.NA, pd.NA))
                 scan = scan_metadata(other_iden)
+                strain = _elastic_strain_metadata(base_iden, other_iden, geometry_cells)
                 output_rows.append(
                     {
                         "curve_type": curve_type,
@@ -568,6 +683,7 @@ def _curve_table_from_classified_rows(
                         "iden2": iden2,
                         "V_other_iden": volume,
                         "E_other_iden": energy,
+                        **strain,
                         **scan,
                         "ffield_value": row.get("ffield_value", pd.NA),
                         "qm_value": row.get("qm_value", pd.NA),
@@ -582,6 +698,7 @@ def _curve_table_from_classified_rows(
             if base_iden not in seen_other:
                 volume, energy = geo_map.get(base_iden, (pd.NA, pd.NA))
                 scan = scan_metadata(base_iden)
+                strain = _elastic_strain_metadata(base_iden, base_iden, geometry_cells)
                 first = component.iloc[0]
                 output_rows.append(
                     {
@@ -592,6 +709,7 @@ def _curve_table_from_classified_rows(
                         "iden2": base_iden,
                         "V_other_iden": volume,
                         "E_other_iden": energy,
+                        **strain,
                         **scan,
                         "ffield_value": 0.0,
                         "qm_value": 0.0,
@@ -625,6 +743,7 @@ def _force_field_optimization_curve_tables(
             classified,
             data.geometry_summary,
             data.geometry_restraints,
+            getattr(data, "geometry_cells", pd.DataFrame()),
             curve_type=curve_type,
         )
         for curve_type in ("eos", "bond", "angle", "other_curve")
@@ -641,6 +760,7 @@ def _force_field_optimization_curve_tables(
         legacy,
         data.geometry_summary,
         data.geometry_restraints,
+        getattr(data, "geometry_cells", pd.DataFrame()),
         curve_type="restraint",
     )
     return tables

@@ -57,6 +57,7 @@ class SinglePlotRenderer(PlotRenderer):
         y = cfg.get("y")
         series = cfg.get("series")
         hlines = cfg.get("hlines")
+        vlines = cfg.get("vlines")
         title = cfg.get("title")
         xlabel = cfg.get("xlabel")
         ylabel = cfg.get("ylabel")
@@ -101,7 +102,13 @@ class SinglePlotRenderer(PlotRenderer):
             if plot_type == "scatter":
                 ax.scatter(x, y, label=None)
             else:
-                ax.plot(x, y, label=None)
+                ax.plot(
+                    x,
+                    y,
+                    label=None,
+                    marker=cfg.get("marker"),
+                    markersize=cfg.get("markersize", 4),
+                )
 
         if hlines:
             for h in hlines:
@@ -113,12 +120,52 @@ class SinglePlotRenderer(PlotRenderer):
                     ls = h.get("linestyle", "--")
                     lw = h.get("linewidth", 1.0)
                     al = h.get("alpha", 1.0)
-                    ax.axhline(yv, linestyle=ls, linewidth=lw, alpha=al, color="gray", label=lbl)
+                    color = h.get("color", "gray")
+                    ax.axhline(
+                        yv,
+                        linestyle=ls,
+                        linewidth=lw,
+                        alpha=al,
+                        color=color,
+                        label=lbl,
+                    )
                 elif isinstance(h, tuple):
                     yv, lbl = h[0], (h[1] if len(h) > 1 else None)
                     ax.axhline(yv, linestyle="--", linewidth=1.0, alpha=1.0, color="gray", label=lbl)
                 else:
                     ax.axhline(float(h), linestyle="--", linewidth=1.0, alpha=1.0, color="gray")
+
+        if vlines:
+            for v in vlines:
+                if isinstance(v, Mapping):
+                    xv = v.get("x")
+                    if xv is None:
+                        continue
+                    lbl = v.get("label")
+                    ls = v.get("linestyle", "--")
+                    lw = v.get("linewidth", 1.0)
+                    al = v.get("alpha", 1.0)
+                    color = v.get("color", "gray")
+                    ax.axvline(
+                        xv,
+                        linestyle=ls,
+                        linewidth=lw,
+                        alpha=al,
+                        color=color,
+                        label=lbl,
+                    )
+                elif isinstance(v, tuple):
+                    xv, lbl = v[0], (v[1] if len(v) > 1 else None)
+                    ax.axvline(
+                        xv,
+                        linestyle="--",
+                        linewidth=1.0,
+                        alpha=1.0,
+                        color="gray",
+                        label=lbl,
+                    )
+                else:
+                    ax.axvline(float(v), linestyle="--", linewidth=1.0, alpha=1.0, color="gray")
 
         if title:
             ax.set_title(title)

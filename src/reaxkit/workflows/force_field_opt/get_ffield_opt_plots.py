@@ -54,17 +54,18 @@ from reaxkit.workflows.force_field_opt.report_linkage import (
     build_report_trainset_links,
 )
 from reaxkit.workflows.file_tools.ffield_workflow import (
+    EOS_SINGLE_FIGSIZE,
+    QM_PLOT_COLOR,
+    REAXFF_PLOT_COLOR,
     _eos_material_name,
     _eos_plot_filename,
     _eos_plot_groups,
+    _prepare_eos_table,
 )
 
 ALL_COMMANDS = ("get_ffield_opt_plots",)
 ALL_LEGACY_COMMANDS: tuple[str, ...] = ()
 FIGURE_GENERATOR_TEMPLATE_FILENAME = "template_ffield_opt_figure_generator.xlsx"
-REAXFF_PLOT_COLOR = "tab:blue"
-QM_PLOT_COLOR = "#C0504D"
-
 NOT_PLOTTED_COLUMNS = [
     "report_line_number",
     "section",
@@ -251,6 +252,7 @@ def _render_groups(
                 "title": title,
                 "legend": True,
                 "save": path,
+                **({"figsize": EOS_SINGLE_FIGSIZE} if curve_type == "eos" else {}),
             }
         )
         paths.append(path)
@@ -440,7 +442,9 @@ def build_parser(
         "       reaxkit get_ffield_opt_plots --run-dir run --fort99 run/fort.99 "
         "--fort74 run/fort.74 --trainset run/trainset.in --geo run/geo\n\n"
         "  4. Limit each grouped-bar figure to three entries (six paired bars):\n"
-        "       reaxkit get_ffield_opt_plots --entry-per-figure 3"
+        "       reaxkit get_ffield_opt_plots --entry-per-figure 3\n\n"
+        "  5. Flip the sign of EOS energies before exporting and plotting them:\n"
+        "       reaxkit get_ffield_opt_plots --flip-sign-for-eos"
     )
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
     parser.add_argument("--input", default=".", help="Input path used for engine detection")
@@ -462,6 +466,14 @@ def build_parser(
         help=(
             "Maximum entries per grouped-bar figure; every entry contributes "
             "one ReaxFF and one QM/literature bar (default: 6)."
+        ),
+    )
+    parser.add_argument(
+        "--flip-sign-for-eos",
+        action="store_true",
+        help=(
+            "Flip the sign of EOS energy values before exporting and plotting; "
+            "equivalent to get_ffield_opt_eos --flip-sign."
         ),
     )
     parser.add_argument(
@@ -497,6 +509,10 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     reporter(progress_stage, 1, progress_total, "Classifying training data")
     eos_result = FFieldOptimizationReportEOSTask().run(
         data, FFieldOptimizationReportEOSRequest(iden="all")
+    )
+    _prepare_eos_table(
+        eos_result,
+        flip_sign=bool(getattr(args, "flip_sign_for_eos", False)),
     )
     restraint_result = FFieldOptimizationReportRestraintTask().run(
         data, FFieldOptimizationReportRestraintRequest(iden="all")
@@ -698,9 +714,6 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         title="Reaction Energies",
         ylabel="Reaction energy (kcal/mol)",
     )
-    if not eos_images:
-        raise ValueError("No plottable EOS expressions were detected.")
-
     reporter(progress_stage, 18, progress_total, "Finalizing result metadata")
     if uses_workspace:
         settings_path = root / "settings.json"
@@ -747,7 +760,10 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         )
 
     reporter(progress_stage, progress_total, progress_total, "Finished plot generation")
-    print(f"[Done] EOS: {len(eos_images)} images and {eos_csv}")
+    if eos_images:
+        print(f"[Done] EOS: {len(eos_images)} images and {eos_csv}")
+    else:
+        print(f"[Skipped] EOS: no plottable expressions; wrote {eos_csv}")
     print(f"[Done] Restraints: {len(restraint_images)} images and {restraint_csv}")
     print(f"[Done] Bond scans: {len(bond_images)} images and {bond_csv}")
     print(f"[Done] Angle scans: {len(angle_images)} images and {angle_csv}")

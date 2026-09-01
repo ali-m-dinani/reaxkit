@@ -390,18 +390,26 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
     --------
     >>> es = adapter.load_electrostatics({"run_dir": "run", "command": "hyst"})
     """
+    required_fields = {str(field) for field in args.get("_required_data_fields", ())}
+    load_all_fields = not required_fields
+
     trajectory = adapter.load_trajectory(args, reporter=reporter)
     charges = adapter.load_charges(args, reporter=reporter)
-    connectivity = adapter.load_connectivity(args, reporter=reporter)
+    connectivity = (
+        adapter.load_connectivity(args, reporter=reporter)
+        if load_all_fields or "connectivity" in required_fields
+        else None
+    )
     electric_field = None
-    command = str(args.get("command") or "").strip().lower()
-    fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
-    if command == "hyst" or fort78_path.exists():
-        try:
-            electric_field = adapter.load_electric_field(args, reporter=reporter)
-        except FileNotFoundError:
-            if command == "hyst":
-                raise
+    if load_all_fields or "electric_field" in required_fields:
+        command = str(args.get("command") or "").strip().lower()
+        fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
+        if command == "hyst" or fort78_path.exists():
+            try:
+                electric_field = adapter.load_electric_field(args, reporter=reporter)
+            except FileNotFoundError:
+                if command == "hyst":
+                    raise
     return ElectrostaticsData(
         trajectory=trajectory,
         charges=charges,

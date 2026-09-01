@@ -126,3 +126,23 @@ def test_single_plot_renderer_applies_per_series_colors(monkeypatch):
         "#C0504D",
     ]
     plt.close(figure)
+
+
+def test_single_plot_renderer_draws_markers_and_black_zero_reference_lines(monkeypatch):
+    monkeypatch.setattr(plt, "show", lambda: None)
+
+    figure = SinglePlotRenderer().render(
+        {
+            "series": [{"x": [-1, 0, 1], "y": [-2, 1, 2], "marker": "o"}],
+            "hlines": [{"y": 0.0, "color": "black", "linestyle": "--"}],
+            "vlines": [{"x": 0.0, "color": "black", "linestyle": "--"}],
+        }
+    )
+
+    data_line, horizontal_zero, vertical_zero = figure.axes[0].lines
+    assert data_line.get_marker() == "o"
+    assert horizontal_zero.get_color() == "black"
+    assert horizontal_zero.get_linestyle() == "--"
+    assert vertical_zero.get_color() == "black"
+    assert vertical_zero.get_linestyle() == "--"
+    plt.close(figure)

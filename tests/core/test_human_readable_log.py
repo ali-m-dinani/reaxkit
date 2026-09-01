@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from reaxkit.core.platform.human_log import HumanReadableRunLog, current_human_log
+from reaxkit.core.platform.paths import io_path
 from reaxkit.core.runtime.generator_runtime import (
     persist_generator_metadata,
     prepare_generator_output,
@@ -81,6 +82,39 @@ def test_human_log_records_failed_step_and_request(tmp_path: Path) -> None:
         (tmp_path / "logs" / "machine_readable.jsonl").read_text(encoding="utf-8")
     )
     assert machine_record["request"]["status"] == "failed"
+
+
+def test_human_log_writes_run_file_beyond_windows_max_path(tmp_path: Path) -> None:
+    logs_dir = tmp_path
+    index = 0
+    while len(str((logs_dir / "run_20260831_085903_ef0c65.machine.jsonl").resolve())) <= 260:
+        logs_dir /= f"nested_{index:02d}_xxxxxxxxxxxxxxxxxxxx"
+        index += 1
+
+    trace = HumanReadableRunLog(
+        logs_dir,
+        command="python analysis.py",
+        run_id="run_20260831_085903_ef0c65",
+    )
+    run_machine_log = logs_dir / "run_20260831_085903_ef0c65.machine.jsonl"
+
+    try:
+        with trace:
+            trace.detail("path length", len(str(run_machine_log.resolve())))
+
+        assert io_path(run_machine_log).is_file()
+        record = json.loads(io_path(run_machine_log).read_text(encoding="utf-8"))
+        assert record["run"]["run_id"] == "run_20260831_085903_ef0c65"
+    finally:
+        for name in (
+            "human_readable.log",
+            "run_20260831_085903_ef0c65.human.log",
+            "machine_readable.jsonl",
+            "run_20260831_085903_ef0c65.machine.jsonl",
+        ):
+            candidate = io_path(logs_dir / name)
+            if candidate.exists():
+                candidate.unlink()
 
 
 def test_generator_runtime_adds_nested_steps_to_both_log_formats(tmp_path: Path) -> None:

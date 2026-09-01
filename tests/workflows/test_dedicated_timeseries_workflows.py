@@ -7,11 +7,14 @@ from types import SimpleNamespace
 
 import yaml
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from reaxkit.analysis.timeseries.timeseries import ChargeSeriesTask
 from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.domain.data_models import ChargeData
 from reaxkit.workflows.timeseries import ALL_COMMANDS
 from reaxkit.workflows.timeseries import common
 
@@ -80,6 +83,21 @@ def test_family_getters_build_requests_without_field_expressions() -> None:
         request = module.build_request(_parser_for(command).parse_args(argv))
         for name, value in expected.items():
             assert getattr(request, name) == value
+
+
+def test_get_charge_without_atom_ids_selects_all_atoms() -> None:
+    module = import_module("reaxkit.workflows.timeseries.get_charge")
+    request = module.build_request(
+        _parser_for("get_charge").parse_args(["--frames", "0", "--export", "charges.csv"])
+    )
+
+    assert request.atom_ids is None
+    result = ChargeSeriesTask().run(
+        ChargeData(charges=np.asarray([[0.1, -0.2, 0.3]]), iterations=np.asarray([0])),
+        request,
+    )
+    assert result.table["atom_id"].tolist() == [1, 2, 3]
+    assert result.table["charge"].tolist() == [0.1, -0.2, 0.3]
 
 
 def test_get_electric_field_accepts_copy_to_dot() -> None:
