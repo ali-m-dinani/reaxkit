@@ -167,9 +167,11 @@ def test_aggregate_workflow_skips_empty_eos_and_finishes(
     )
 
     output = capsys.readouterr().out
+    summary_path = tmp_path / "plots" / "plot_summary.txt"
     assert result == 0
     assert "[Skipped] EOS: no plottable expressions" in output
     assert "[Done] Restraints: 0 images" in output
+    assert summary_path.read_text(encoding="utf-8") == output
 
 
 def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:

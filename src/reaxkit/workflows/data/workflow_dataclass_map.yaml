@@ -197,6 +197,27 @@ workflows:
     - reaxkit help "trajectory workflow"
     - run trajectory workflow
     - mean square displacement workflow
+  stress_strain_workflow:
+    implementation_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_top_bottom_strain'
+    module_prefix: reaxkit.workflows.stress_strain
+    description: Direct command workflow for z-binned geometric and finite-strain analyses.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.stress_strain.z_binned_strain_using_top_bottom_atoms
+      - reaxkit.analysis.stress_strain.z_binned_deformation_gradient_strain
+      generator: []
+    tags:
+    - stress strain
+    - trajectory
+    - z bins
+    notes:
+    - 'How to use the workflow: reaxkit <X> -h where <X> can be get_z_binned_top_bottom_strain,
+      get_z_binned_deformation_gradient_strain'
+    aliases:
+    - stress strain workflow
+    - z binned strain workflow
+    help_search_examples:
+    - reaxkit help "z binned strain"
   addmol_workflow:
     implementation_module: 'reaxkit.workflows.file_tools.addmol_workflow: gen_template_addmol'
     description: Direct command workflow for generating addmol files.
@@ -2848,6 +2869,56 @@ workflows:
     help_search_examples:
     - reaxkit help "get voronoi"
     - reaxkit get_voronoi -h
+  get_z_binned_top_bottom_strain:
+    parent_workflow: stress_strain_workflow
+    implementation_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_top_bottom_strain'
+    command: get_z_binned_top_bottom_strain
+    command_kind: analysis
+    analysis_task: get_z_binned_top_bottom_strain
+    description: Computes robust per-bin normal strains from averaged top and bottom coordinate spans relative
+      to frame zero.
+    tags:
+    - stress strain
+    - trajectory
+    - z bins
+    - get z binned top bottom strain
+    - stress strain workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_z_binned_top_bottom_strain -h'
+    aliases:
+    - get-z-binned-top-bottom-strain
+    - z binned strain using top bottom atoms
+    - z-binned-strain-using-top-bottom-atoms
+    help_search_examples:
+    - reaxkit help "z binned top bottom strain"
+    - reaxkit help "get z binned top bottom strain"
+    - reaxkit get_z_binned_top_bottom_strain -h
+  get_z_binned_deformation_gradient_strain:
+    parent_workflow: stress_strain_workflow
+    implementation_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_deformation_gradient_strain'
+    command: get_z_binned_deformation_gradient_strain
+    command_kind: analysis
+    analysis_task: get_z_binned_deformation_gradient_strain
+    description: Fits per-bin affine deformation gradients and reports Green-Lagrange strain, engineering
+      shear, principal strain, volume change, and diagnostics.
+    tags:
+    - stress strain
+    - deformation gradient
+    - z bins
+    - get z binned deformation gradient strain
+    - stress strain workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get_z_binned_deformation_gradient_strain -h'
+    aliases:
+    - get-z-binned-deformation-gradient-strain
+    - z binned deformation gradient strain
+    - z-binned-deformation-gradient-strain
+    help_search_examples:
+    - reaxkit help "z binned deformation gradient strain"
+    - reaxkit help "get z binned deformation gradient strain"
+    - reaxkit get_z_binned_deformation_gradient_strain -h
   polarization-field:
     parent_workflow: electrostatics_workflow
     implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization-field'
@@ -2912,6 +2983,7 @@ dataclass_usage:
   TrajectoryData:
   - timeseries_workflow
   - trajectory_workflow
+  - stress_strain_workflow
 command_to_workflow_module:
   get_active_site_events: reaxkit.workflows.active_site_workflow
   get_active_site_structural: reaxkit.workflows.active_site_workflow
@@ -3055,6 +3127,10 @@ command_to_workflow_module:
   get_rdf: reaxkit.workflows.trajectory_workflow
   get_rdf_property: reaxkit.workflows.trajectory_workflow
   get_voronoi: reaxkit.workflows.trajectory_workflow
+  get_z_binned_top_bottom_strain: reaxkit.workflows.stress_strain.z_binned_strain_workflow
+  get-z-binned-top-bottom-strain: reaxkit.workflows.stress_strain.z_binned_strain_workflow
+  get_z_binned_deformation_gradient_strain: reaxkit.workflows.stress_strain.z_binned_strain_workflow
+  get-z-binned-deformation-gradient-strain: reaxkit.workflows.stress_strain.z_binned_strain_workflow
   get-active-site-events: reaxkit.workflows.active_site_workflow
   get-active-site-structural: reaxkit.workflows.active_site_workflow
   add_alias: reaxkit.workflows.meta.command_alias_workflow
@@ -3183,6 +3259,7 @@ flags_across_all_workflows:
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - timeseries_workflow: timeseries
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--atom-types-a":
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
   "--atom-types-b":
@@ -3203,6 +3280,8 @@ flags_across_all_workflows:
     - gen_plot_workflow: gen_plot, gen-plot
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+  "--bin-range":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--bond":
     - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
   "--bond-mode":
@@ -3235,6 +3314,7 @@ flags_across_all_workflows:
     - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
   "--component":
     - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--compress":
     - manage_workspace_workflow: manage_workspace, manage-workspace
   "--control":
@@ -3334,6 +3414,7 @@ flags_across_all_workflows:
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - timeseries_workflow: timeseries
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--epochs":
     - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
   "--eregime":
@@ -3346,6 +3427,9 @@ flags_across_all_workflows:
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - timeseries_workflow: timeseries
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--gen-plots":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--exact-match":
     - help_workflow: help
   "--expand":
@@ -3362,6 +3446,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--export-all":
     - ffield_workflow: add_element_to_ffield, add_term_to_ffield, add-element-to-ffield, add-term-to-ffield, ffield_opt_bulk_modulus, ffield-opt-bulk-modulus, get_energy_min_summary_data, get_ffield_data, get_ffield_diagnostic_data, get_ffield_opt_eos, get_ffield_opt_progress_data, get_ffield_opt_results, get-energy-min-summary-data, get-ffield-data, get-ffield-diagnostic-data, get-ffield-opt-eos, get-ffield-opt-progress-data, get-ffield-opt-results, merge_ffield, merge-ffield
   "--expr":
@@ -3443,6 +3528,7 @@ flags_across_all_workflows:
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - timeseries_workflow: timeseries
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--gap-deg":
     - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
   "--gen-yaml":
@@ -3460,6 +3546,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--how":
     - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
   "--hybridizations":
@@ -3519,6 +3606,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--make-yaml":
     - study_workflow: study
   "--manage":
@@ -3531,6 +3619,8 @@ flags_across_all_workflows:
     - gen_plot_workflow: gen_plot, gen-plot
   "--maxattempt":
     - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
+  "--max-condition-number":
+    - stress_strain_workflow: get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--max-magnitude":
     - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
   "--max-materials":
@@ -3539,6 +3629,8 @@ flags_across_all_workflows:
     - gen_plot_workflow: gen_plot, gen-plot
   "--min":
     - gen_plot_workflow: gen_plot, gen-plot
+  "--minimum-atoms":
+    - stress_strain_workflow: get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--min-bo":
     - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
   "--mindist":
@@ -3567,6 +3659,7 @@ flags_across_all_workflows:
     - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
   "--no-unwrap":
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--number":
     - manage_workspace_workflow: manage_workspace, manage-workspace
   "--num-cycles":
@@ -3621,6 +3714,8 @@ flags_across_all_workflows:
     - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
     - gen_plot_workflow: gen_plot, gen-plot
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
+  "--periodic":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--plot":
     - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
     - connectivity_workflow: get_bond_events, get_connection_list, get_connection_stats, get_connection_table, get_coordination, get_hybridization, get-bond-events, get-connection-list, get-connection-stats, get-connection-table, get-coordination, get-hybridization, relabel_traj_using_coordination, relabel-traj-using-coordination
@@ -3634,6 +3729,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--plot-frames":
     - electrostatics_workflow: charge_table, charge-table, dipole, polarization, polarization_field, polarization-field
   "--plot-target":
@@ -3706,6 +3802,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--run-geometry-generator":
     - study_workflow: study
   "--same-general-order":
@@ -3723,6 +3820,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--scatter":
     - gen_plot_workflow: gen_plot, gen-plot
   "--scope":
@@ -3742,6 +3840,7 @@ flags_across_all_workflows:
     - timeseries_workflow: timeseries
     - trainset_workflow: gen_template_yaml_for_elastic_settings, gen-template-yaml-for-elastic-settings, get_trainset_data, get_trainset_group_comments, get-trainset-data, get-trainset-group-comments, make_trainset_elastic, make_trainset_heatfo, make_trainset_settings, make_trainset_settings_heatfo, make-trainset-elastic, make-trainset-heatfo, make-trainset-settings, make-trainset-settings-heatfo
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--silicon-element":
     - active_site_workflow: get_active_site_events, get_active_site_structural, get-active-site-events, get-active-site-structural
   "--similarity":
@@ -3829,6 +3928,20 @@ flags_across_all_workflows:
     - help_workflow: help
   "--top-n":
     - molecular_analysis_workflow: get_dominant_species, get_largest_molecule_by_mass, get_largest_molecule_composition, get_molecule_lifetime, get-dominant-species, get-largest-molecule-by-mass, get-largest-molecule-composition, get-molecule-lifetime
+  "--top-bottom-count":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain
+  "--n-extreme-atoms":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain
+  "--output-dir":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--plot-every":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--dpi":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--wrapped":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--y-scale":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--torsion":
     - geo_workflow: add_molcharge_to_geo, add_restraints_to_geo, add-molcharge-to-geo, add-restraints-to-geo, make_geo, make-geo, orthogonalize_geo, orthogonalize-geo, place_geo, place-geo, sort_geo, sort-geo, xtob
   "--trainset":
@@ -3846,6 +3959,7 @@ flags_across_all_workflows:
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
   "--unwrap":
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--V":
     - eregime_workflow: gen_eregime, gen-eregime, make_eregime, make-eregime
   "--vacuum":
@@ -3903,6 +4017,7 @@ flags_across_all_workflows:
     - plot_atom_property_workflow: plot_atom_property, plot-atom-property
     - timeseries_workflow: timeseries
     - trajectory_workflow: get_diffusivity, get_msd, get_rdf, get_rdf_property, get_voronoi, get-diffusivity, get-msd, get-rdf, get-rdf-property, get-voronoi
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
   "--y":
     - gen_plot_workflow: gen_plot, gen-plot
   "--y1":
@@ -3922,3 +4037,7 @@ flags_across_all_workflows:
     - gen_plot_workflow: gen_plot, gen-plot
   "--z":
     - gen_plot_workflow: gen_plot, gen-plot
+  "--z-bins":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain, get_z_binned_deformation_gradient_strain, get-z-binned-deformation-gradient-strain
+  "--zero-tolerance":
+    - stress_strain_workflow: get_z_binned_top_bottom_strain, get-z-binned-top-bottom-strain

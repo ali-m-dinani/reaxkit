@@ -15,6 +15,7 @@ Analysis docs are grouped by domain:
 - `kinematics`
 - `molecular_analysis`
 - `params`
+- `stress_strain`
 - `timeseries`
 - `trajectory`
 
@@ -63,6 +64,11 @@ Analysis docs are grouped by domain:
 ### Params
 
 - [params](params/params_analysis.md)
+
+### Stress and Strain
+
+- [z-binned top/bottom strain](stress_strain/z_binned_strain_using_top_bottom_atoms_analysis.md)
+- [z-binned deformation-gradient strain](stress_strain/z_binned_deformation_gradient_strain_analysis.md)
 
 ### Time Series
 

@@ -584,6 +584,38 @@ tasks:
     help_search_examples:
     - reaxkit help "molecule lifetime"
     - run molecule lifetime
+  get_z_binned_top_bottom_strain:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.stress_strain.z_binned_strain_using_top_bottom_atoms: ZBinnedTopBottomStrainTask'
+    description: Computes robust per-bin normal strains from averaged top and bottom
+      coordinate spans relative to frame zero.
+    related_workflow_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_top_bottom_strain'
+    tags:
+    - stress strain
+    - trajectory
+    - z bins
+    notes: []
+    aliases:
+    - z binned strain using top bottom atoms
+    - z-binned-strain-using-top-bottom-atoms
+    help_search_examples:
+    - reaxkit help "z binned top bottom strain"
+  get_z_binned_deformation_gradient_strain:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.stress_strain.z_binned_deformation_gradient_strain: ZBinnedDeformationGradientStrainTask'
+    description: Fits per-bin affine deformation gradients and reports Green-Lagrange
+      strain, engineering shear, principal strain, volume change, and diagnostics.
+    related_workflow_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_deformation_gradient_strain'
+    tags:
+    - stress strain
+    - deformation gradient
+    - z bins
+    notes: []
+    aliases:
+    - z binned deformation gradient strain
+    - z-binned-deformation-gradient-strain
+    help_search_examples:
+    - reaxkit help "z binned deformation gradient strain"
   get_msd:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.get_msd: get_msd'

@@ -714,6 +714,61 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         title="Reaction Energies",
         ylabel="Reaction energy (kcal/mol)",
     )
+
+    eos_summary = (
+        f"[Done] EOS: {len(eos_images)} images and {eos_csv}"
+        if eos_images
+        else f"[Skipped] EOS: no plottable expressions; wrote {eos_csv}"
+    )
+    summary_lines = [
+        eos_summary,
+        f"[Done] Restraints: {len(restraint_images)} images and {restraint_csv}",
+        f"[Done] Bond scans: {len(bond_images)} images and {bond_csv}",
+        f"[Done] Angle scans: {len(angle_images)} images and {angle_csv}",
+        (
+            f"[Done] Other curves: {len(other_curve_images)} images and "
+            f"{other_curve_csv}"
+        ),
+        f"[Done] Charges: {len(charge_images)} images and {charge_csv}",
+        (
+            f"[Done] Cell parameters: {len(cell_parameter_images)} images and "
+            f"{cell_parameter_csv}"
+        ),
+        (
+            f"[Done] Geometry targets: {len(geometry_target_images)} images and "
+            f"{geometry_target_csv}"
+        ),
+        f"[Done] Heat of formation: {len(heatfo_images)} images and {heatfo_csv}",
+        (
+            f"[Done] Energy curves: {len(energy_curve_images)} images and "
+            f"{energy_curve_csv}"
+        ),
+        (
+            f"[Done] Energy differences: {len(energy_difference_images)} images "
+            f"and {energy_difference_csv}"
+        ),
+        (
+            f"[Done] Single-identifier energies: {len(single_energy_images)} "
+            f"images and {single_energy_csv}"
+        ),
+        (
+            f"[Done] Reaction energies: {len(reaction_energy_images)} images and "
+            f"{reaction_energy_csv}"
+        ),
+        (
+            f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
+            f"{not_plotted_csv}"
+        ),
+        (
+            f"[Info] Custom plots: use {figure_generator_template} with the dedicated "
+            "CSV files in each plot subfolder."
+        ),
+        f"Results saved in:\n  {root}",
+    ]
+    summary_text = "\n".join(summary_lines)
+    summary_path = root / "plot_summary.txt"
+    summary_path.write_text(summary_text + "\n", encoding="utf-8")
+
     reporter(progress_stage, 18, progress_total, "Finalizing result metadata")
     if uses_workspace:
         settings_path = root / "settings.json"
@@ -755,58 +810,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         settings["artifacts"]["workbooks"] = [
             figure_generator_template.relative_to(root).as_posix()
         ]
+        settings["artifacts"]["text"] = [summary_path.relative_to(root).as_posix()]
         settings_path.write_text(
             json.dumps(settings, indent=2, sort_keys=True), encoding="utf-8"
         )
 
     reporter(progress_stage, progress_total, progress_total, "Finished plot generation")
-    if eos_images:
-        print(f"[Done] EOS: {len(eos_images)} images and {eos_csv}")
-    else:
-        print(f"[Skipped] EOS: no plottable expressions; wrote {eos_csv}")
-    print(f"[Done] Restraints: {len(restraint_images)} images and {restraint_csv}")
-    print(f"[Done] Bond scans: {len(bond_images)} images and {bond_csv}")
-    print(f"[Done] Angle scans: {len(angle_images)} images and {angle_csv}")
-    print(
-        f"[Done] Other curves: {len(other_curve_images)} images and {other_curve_csv}"
-    )
-    print(f"[Done] Charges: {len(charge_images)} images and {charge_csv}")
-    print(
-        f"[Done] Cell parameters: {len(cell_parameter_images)} images and "
-        f"{cell_parameter_csv}"
-    )
-    print(
-        f"[Done] Geometry targets: {len(geometry_target_images)} images and "
-        f"{geometry_target_csv}"
-    )
-    print(
-        f"[Done] Heat of formation: {len(heatfo_images)} images and {heatfo_csv}"
-    )
-    print(
-        f"[Done] Energy curves: {len(energy_curve_images)} images and "
-        f"{energy_curve_csv}"
-    )
-    print(
-        f"[Done] Energy differences: {len(energy_difference_images)} images and "
-        f"{energy_difference_csv}"
-    )
-    print(
-        f"[Done] Single-identifier energies: {len(single_energy_images)} images and "
-        f"{single_energy_csv}"
-    )
-    print(
-        f"[Done] Reaction energies: {len(reaction_energy_images)} images and "
-        f"{reaction_energy_csv}"
-    )
-    print(
-        f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
-        f"{not_plotted_csv}"
-    )
-    print(
-        f"[Info] Custom plots: use {figure_generator_template} with the dedicated "
-        "CSV files in each plot subfolder."
-    )
-    print(f"Results saved in:\n  {root}")
+    print(summary_text)
     return 0
 
 

@@ -178,6 +178,11 @@ register_analysis_command(
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
 )
 register_analysis_command(
+    "get_force_field_opt_geo_files",
+    module_path="reaxkit.workflows.force_field_opt.get_force_field_opt_geo_files",
+    aliases=("get-force-field-opt-geo-files",),
+)
+register_analysis_command(
     "get-ffield-opt-report",
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_report",
     aliases=("get_ffield_opt_report",),
@@ -196,6 +201,16 @@ register_analysis_command("get_rdf_property", module_path="reaxkit.workflows.tra
 register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_dihedral", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_voronoi", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_z_binned_top_bottom_strain",
+    module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
+    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms", "z-binned-strain-using-top-bottom-atoms"),
+)
+register_analysis_command(
+    "get_z_binned_deformation_gradient_strain",
+    module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
+    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain", "z-binned-deformation-gradient-strain"),
+)
 register_analysis_command("connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("connection_table", module_path="reaxkit.workflows.connectivity_workflow")
