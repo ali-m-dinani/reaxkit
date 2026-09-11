@@ -243,7 +243,21 @@ class BaseHandler(ABC):
         }
         try:
             resolved = self.path.resolve()
-            identity["source"] = self._file_fingerprint(resolved)
+            # A frame-selective parser intentionally avoids reading the whole
+            # source. Hashing a multi-GB trajectory here would defeat that
+            # contract before parsing even starts. Size + mtime + resolved
+            # path still gives selective cache entries deterministic and
+            # practical invalidation, while full parses retain the stronger
+            # content-addressed fingerprint used historically.
+            if getattr(self, "_frame_indices", None) is not None:
+                stat = resolved.stat()
+                identity["source"] = {
+                    "path": str(resolved),
+                    "size": int(stat.st_size),
+                    "mtime_ns": int(stat.st_mtime_ns),
+                }
+            else:
+                identity["source"] = self._file_fingerprint(resolved)
         except OSError:
             identity["source"] = {"path": str(self.path), "missing": True}
         blob = json.dumps(identity, sort_keys=True, separators=(",", ":"), ensure_ascii=True)

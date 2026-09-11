@@ -13,7 +13,7 @@ and does not perform broader structural classification.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Optional, Sequence
 
 import numpy as np
@@ -710,6 +710,32 @@ class RDFTask(AnalysisTask):
             table = table.sort_values(["frame_index", "r"], kind="stable").reset_index(drop=True)
         return RDFResult(table=table, request=request)
 
+    def run_stream(self, frames, request: RDFRequest, reporter=None) -> RDFResult:
+        """Compute per-frame RDF curves without retaining the trajectory."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming RDF analysis")
+        if not tables:
+            table = pd.DataFrame(columns=["frame_index", "iter", "r", "g"])
+        else:
+            table = pd.concat(tables, ignore_index=True).sort_values(
+                ["frame_index", "r"], kind="stable"
+            ).reset_index(drop=True)
+        return RDFResult(table=table, request=request)
+
 
 @register_task("get_rdf_property", label="RDF Property")
 class RDFPropertyTask(AnalysisTask):
@@ -825,6 +851,29 @@ class RDFPropertyTask(AnalysisTask):
         if properties_table.empty:
             return RDFPropertyResult(table=pd.DataFrame(), request=request)
         return RDFPropertyResult(table=properties_table.copy(), request=request)
+
+    def run_stream(self, frames, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
+        """Compute RDF-derived properties from one trajectory frame at a time."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming RDF property analysis")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values("frame_index", kind="stable").reset_index(drop=True)
+        return RDFPropertyResult(table=table, request=request)
 
 
 __all__ = [

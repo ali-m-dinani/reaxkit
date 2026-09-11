@@ -10,15 +10,29 @@ These tests validate the explicit-row writer:
 
 from __future__ import annotations
 
+import argparse
+import math
 from pathlib import Path
 import re
 import pytest
 
-from reaxkit.io.generators.eregime_generator import write_a_given_eregime
+from reaxkit.engine.reaxff.generators.eregime_generator import (
+    _write_a_given_eregime as write_a_given_eregime,
+    gen_eregime,
+)
+from reaxkit.workflows.file_tools.eregime_workflow import build_parser
 
 
 def _read_lines(p: Path) -> list[str]:
     return p.read_text(encoding="utf-8").splitlines()
+
+
+def _read_data(p: Path) -> list[tuple[int, int, str, float]]:
+    return [
+        (int(parts[0]), int(parts[1]), parts[2], float(parts[3]))
+        for line in _read_lines(p)[2:]
+        if (parts := line.split())
+    ]
 
 
 def test_write_a_given_eregime_writes_header_and_rows(tmp_path: Path):
@@ -79,3 +93,138 @@ def test_format_contains_fixed_columns(tmp_path: Path):
     assert m.group(2) == "3"
     assert m.group(3) == "x"
     assert m.group(4) == "1.234568"
+
+
+def test_sinusoid_ten_points_returns_to_baseline_three_times(tmp_path: Path):
+    out = tmp_path / "eregime.in"
+
+    gen_eregime(
+        out,
+        profile_type="sin",
+        max_magnitude=0.35,
+        points_per_cycle=10,
+        iteration_step=500,
+        num_cycles=1,
+        direction="z",
+    )
+
+    rows = _read_data(out)
+    assert len(rows) == 10
+    assert [row[0] for row in rows] == list(range(0, 5000, 500))
+    assert [index for index, row in enumerate(rows) if row[3] == 0.0] == [0, 4, 9]
+    assert all(row[3] > 0.0 for row in rows[1:4])
+    assert all(row[3] < 0.0 for row in rows[5:9])
+    assert max(row[3] for row in rows) == pytest.approx(0.35)
+    assert min(row[3] for row in rows) == pytest.approx(-0.35)
+
+
+def test_sinusoid_cycles_share_boundary_without_duplicate_values(tmp_path: Path):
+    out = tmp_path / "eregime.in"
+
+    gen_eregime(
+        out,
+        profile_type="sin",
+        max_magnitude=0.35,
+        points_per_cycle=10,
+        iteration_step=500,
+        num_cycles=2,
+        dc_offset=0.1,
+    )
+
+    rows = _read_data(out)
+    assert len(rows) == 2 * (10 - 1) + 1
+    assert [index for index, row in enumerate(rows) if row[3] == 0.1] == [0, 4, 9, 13, 18]
+    assert all(first[3] != second[3] for first, second in zip(rows, rows[1:]))
+    assert rows[-1][0] == 9000
+
+
+def test_sinusoid_seventeen_points_uses_equal_quarter_cycle_increments(tmp_path: Path):
+    out = tmp_path / "eregime.in"
+
+    gen_eregime(
+        out,
+        profile_type="sin",
+        max_magnitude=0.35,
+        points_per_cycle=17,
+        iteration_step=500,
+        num_cycles=2,
+    )
+
+    rows = _read_data(out)
+    magnitudes = [row[3] for row in rows]
+    assert len(rows) == 2 * (17 - 1) + 1
+    assert [index for index, value in enumerate(magnitudes) if value == 0.0] == [0, 8, 16, 24, 32]
+    assert all(first != second for first, second in zip(magnitudes, magnitudes[1:]))
+    for quarter_start in (0, 4, 8, 12):
+        changes = [
+            magnitudes[index + 1] - magnitudes[index]
+            for index in range(quarter_start, quarter_start + 4)
+        ]
+        assert changes == pytest.approx([changes[0]] * 4)
+
+
+def test_sinusoid_odd_point_count_samples_both_peaks(tmp_path: Path):
+    out = tmp_path / "eregime.in"
+
+    gen_eregime(
+        out,
+        profile_type="sin",
+        max_magnitude=0.35,
+        points_per_cycle=9,
+        iteration_step=500,
+        num_cycles=1,
+    )
+
+    magnitudes = [row[3] for row in _read_data(out)]
+    assert max(magnitudes) == pytest.approx(0.35)
+    assert min(magnitudes) == pytest.approx(-0.35)
+    assert [index for index, value in enumerate(magnitudes) if value == 0.0] == [0, 4, 8]
+
+
+def test_sinusoid_step_angle_remains_available(tmp_path: Path):
+    out = tmp_path / "eregime.in"
+
+    gen_eregime(
+        out,
+        profile_type="sin",
+        max_magnitude=0.35,
+        step_angle=0.4,
+        iteration_step=500,
+        num_cycles=1,
+    )
+
+    assert len(_read_data(out)) == round(2.0 * math.pi / 0.4) + 1
+
+
+def test_sinusoid_sampling_flags_are_mutually_exclusive():
+    parser = build_parser(argparse.ArgumentParser(), command="gen_eregime")
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--type",
+                "sin",
+                "--iteration-step",
+                "500",
+                "--points-per-cycle",
+                "10",
+                "--step-angle",
+                "0.4",
+            ]
+        )
+
+
+def test_sinusoid_help_documents_odd_counts_and_seventeen_point_example():
+    parser = build_parser(argparse.ArgumentParser(), command="gen_eregime")
+    help_text = parser.format_help()
+
+    assert (
+        "For equal-duration positive and negative halves, use an odd count such as 9 or 11. "
+        "With 10 points there are nine time intervals, so one half necessarily has one additional interval."
+        in help_text
+    )
+    assert (
+        "reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.35 "
+        "--points-per-cycle 17 --iteration-step 500 --num-cycles 2 --direction z --V 1 --copy-to-dot"
+        in help_text
+    )

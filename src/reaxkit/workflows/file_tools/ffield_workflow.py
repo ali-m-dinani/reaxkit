@@ -31,11 +31,13 @@ from reaxkit.analysis.force_field.report import (
     FFieldOptimizationReportBulkModulusRequest,
     FFieldOptimizationReportEOSRequest,
     FFieldOptimizationReportRequest,
+    elastic_family,
 )
 from reaxkit.analysis.force_field.MM_summary import MMSummaryRequest
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.resolve.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.platform.engine_resolver import resolve_engine
@@ -57,6 +59,11 @@ from reaxkit.engine.common.generators.ffield_generator import (
     merge_ffields,
 )
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
+
+
+REAXFF_PLOT_COLOR = "tab:blue"
+QM_PLOT_COLOR = "#C0504D"
+EOS_SINGLE_FIGSIZE = (6.0, 5.0)
 
 
 def _parse_csv_items(value: str) -> list[str]:
@@ -215,25 +222,26 @@ ALL_COMMANDS = (
     "get_ffield_diagnostics_evolution",
     "get_ffield_opt_results",
     "get_ffield_opt_eos",
-    "ffield_opt_bulk_modulus",
+    "get_ffield_opt_bulk_modulus",
 )
 ALL_LEGACY_COMMANDS = ()
 
-FFIELD_ANALYSIS_COMMANDS = tuple(c for c in ALL_COMMANDS if c.startswith("get_") or c == "ffield_opt_bulk_modulus")
+FFIELD_ANALYSIS_COMMANDS = tuple(c for c in ALL_COMMANDS if c.startswith("get_"))
 
 LEGACY_FORCE_FIELD_ALIASES = {
+    "ffield_opt_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "force_field_data": "get_ffield_data",
     "force_field_optimization": "get_ffield_opt_progress_data",
     "force_field_optimization_report": "get_ffield_opt_results",
     "force_field_optimization_report_eos": "get_ffield_opt_eos",
-    "force_field_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "force_field_optimization_report_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "ffield_data": "get_ffield_data",
     "ffield_optimization": "get_ffield_opt_progress_data",
     "structure_summary_data": "get_energy_min_summary_data",
     "parameter_optimization_diagnostic": "get_ffield_diagnostic_data",
     "ffield_optimization_report": "get_ffield_opt_results",
     "ffield_optimization_report_eos": "get_ffield_opt_eos",
-    "ffield_optimization_report_bulk_modulus": "ffield_opt_bulk_modulus",
+    "ffield_optimization_report_bulk_modulus": "get_ffield_opt_bulk_modulus",
     "parameter_optimization_most_sensitive": "get_ffield_diagnostic_data",
     "parameter_optimization_tornado": "get_ffield_diagnostics_sensitivity",
 }
@@ -248,7 +256,7 @@ WORKFLOW_TASK_NAME_MAP = {
     "get_ffield_diagnostics_evolution": "parameter_optimization_diagnostic_beeswarm",
     "get_ffield_opt_results": "force_field_optimization_report",
     "get_ffield_opt_eos": "force_field_optimization_report_eos",
-    "ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
+    "get_ffield_opt_bulk_modulus": "force_field_optimization_report_bulk_modulus",
 }
 
 def _resolve_workflow_command(command: str) -> str:
@@ -544,18 +552,18 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 action="store_true",
                 help="Flip sign of energy values before plotting/export.",
             )
-        elif command == "ffield_opt_bulk_modulus":
+        elif command == "get_ffield_opt_bulk_modulus":
             parser.description = (
                 "Fit a Vinet bulk modulus from optimization report energy-volume data.\n\n"
                 "Examples:\n"
                 "  1. Fitting bulk modulus for a specific identifier (for example, MgO) and plotting the fitted curve:\n"
-                "  reaxkit ffield_opt_bulk_modulus --iden bulk_0\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --iden bulk_0\n\n"
                 "  2. Fitting bulk modulus for all available identifiers, exporting the fitted parameters to CSV:\n"
-                "  reaxkit ffield_opt_bulk_modulus --iden all --export bulk_modulus.csv\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --iden all --export bulk_modulus.csv\n\n"
                 "  3. Fitting bulk modulus for all available identifiers, plotting the fitted curves, and saving the plot.\n"
                 "Here we have used --flip-sign flag since some values where negative (sign convention) and we couldn't "
                 "get the bulk modulus from them:\n"
-                "  reaxkit ffield_opt_bulk_modulus --flip-sign --iden all --plot subplot --save bulk_modulus.png\n\n"
+                "  reaxkit get_ffield_opt_bulk_modulus --flip-sign --iden all --plot subplot --save bulk_modulus.png\n\n"
             )
             parser.add_argument(
                 "--iden",
@@ -1379,7 +1387,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "get_ffield_diagnostic_data": _build_parameter_optimization_diagnostic_request,
     "get_ffield_opt_results": _build_force_field_optimization_report_request,
     "get_ffield_opt_eos": _build_force_field_optimization_report_eos_request,
-    "ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
+    "get_ffield_opt_bulk_modulus": _build_force_field_optimization_report_bulk_modulus_request,
 }
 
 def _prepare_result(command: str, result) -> object:
@@ -1601,7 +1609,7 @@ def _eos_identifier_coordinate(base_iden: object, other_iden: object) -> float |
 
 
 def _eos_plot_groups(table: pd.DataFrame) -> list[dict[str, object]]:
-    """Build paired ReaxFF/QM EOS groups with a shared x-axis."""
+    """Build paired energy curves using volume or elastic strain coordinates."""
     required = {
         "base_iden",
         "other_iden",
@@ -1616,24 +1624,41 @@ def _eos_plot_groups(table: pd.DataFrame) -> list[dict[str, object]]:
     work["V_other_iden"] = pd.to_numeric(work["V_other_iden"], errors="coerce")
     work["ffield_value"] = pd.to_numeric(work["ffield_value"], errors="coerce")
     work["qm_value"] = pd.to_numeric(work["qm_value"], errors="coerce")
+    if "strain_percent" in work.columns:
+        work["strain_percent"] = pd.to_numeric(work["strain_percent"], errors="coerce")
     groups: list[dict[str, object]] = []
     for iden, raw_group in work.groupby("base_iden", dropna=False, sort=False):
         group = raw_group.copy()
         has_energy = group[["ffield_value", "qm_value"]].notna().any(axis=1)
-        volume_rows = group.loc[group["V_other_iden"].notna() & has_energy].copy()
-        if not volume_rows.empty:
-            plotted = volume_rows.sort_values("V_other_iden", kind="stable")
-            x_col = "V_other_iden"
-            xlabel = "Volume (Å³)"
+        family = elastic_family(iden)
+        strain_rows = (
+            group.loc[group["strain_percent"].notna() & has_energy].copy()
+            if family is not None and "strain_percent" in group.columns
+            else pd.DataFrame()
+        )
+        if not strain_rows.empty:
+            plotted = strain_rows.sort_values("strain_percent", kind="stable")
+            x_col = "strain_percent"
+            xlabel = (
+                "Orthorhombic strain δ (%)"
+                if family in {"c12", "c13", "c23"}
+                else "Shear angle change (%)"
+            )
         else:
-            group["scan_coordinate"] = [
-                _eos_identifier_coordinate(iden, other)
-                for other in group["other_iden"]
-            ]
-            plotted = group.loc[group["scan_coordinate"].notna() & has_energy].copy()
-            plotted = plotted.sort_values("scan_coordinate", kind="stable")
-            x_col = "scan_coordinate"
-            xlabel = "Scan coordinate"
+            volume_rows = group.loc[group["V_other_iden"].notna() & has_energy].copy()
+            if not volume_rows.empty:
+                plotted = volume_rows.sort_values("V_other_iden", kind="stable")
+                x_col = "V_other_iden"
+                xlabel = "Volume (Å³)"
+            else:
+                group["scan_coordinate"] = [
+                    _eos_identifier_coordinate(iden, other)
+                    for other in group["other_iden"]
+                ]
+                plotted = group.loc[group["scan_coordinate"].notna() & has_energy].copy()
+                plotted = plotted.sort_values("scan_coordinate", kind="stable")
+                x_col = "scan_coordinate"
+                xlabel = "Scan coordinate"
         if plotted.empty:
             continue
 
@@ -1982,6 +2007,7 @@ def _plot_payload(
                         "y": group["reaxff_y"],
                         "label": "ReaxFF",
                         "marker": "o",
+                        "color": REAXFF_PLOT_COLOR,
                     }
                 )
             if group["qm_x"]:
@@ -1991,6 +2017,7 @@ def _plot_payload(
                         "y": group["qm_y"],
                         "label": "QM/Literature",
                         "marker": "o",
+                        "color": QM_PLOT_COLOR,
                     }
                 )
             return series
@@ -2013,6 +2040,7 @@ def _plot_payload(
                 "ylabel": "Energy",
                 "title": f"EOS {group['identifier']}",
                 "legend": True,
+                "figsize": EOS_SINGLE_FIGSIZE,
                 "filename": _eos_plot_filename(str(group["identifier"])),
                 "subdirectory": _eos_material_name(group["identifier"]),
             }
@@ -2074,29 +2102,48 @@ def _run_ffield_data(args: argparse.Namespace) -> int:
     data = _load_force_field_data(args)
     request = REQUEST_BUILDERS["get_ffield_data"](args)
     task = FFieldDataTask()
-    if args.term:
-        if request.section is None:
-            raise ValueError("--term requires exactly one selected section via --field.")
-        selected_section = request.section
-        raw_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=False))
-        raw_table = raw_result.table
-        filtered_raw = _filter_force_field_table_by_term(
-            data,
-            selected_section,
-            raw_table,
-            term=args.term,
-            unordered_2body=not args.ordered_2body,
-            any_order=args.any_order,
-        )
-        if request.interpret:
-            interpreted_result = task.run(data, FFieldDataRequest(section=selected_section, interpret=True))
-            table = interpreted_result.table.loc[filtered_raw.index].copy()
+    reporter = resolve_reporter(vars(args))
+    with progress_operation(
+        reporter,
+        "analyze",
+        "Preparing force-field data",
+        "Finished force-field data analysis",
+    ) as analysis_reporter:
+        if args.term:
+            if request.section is None:
+                raise ValueError("--term requires exactly one selected section via --field.")
+            selected_section = request.section
+            raw_result = task.run(
+                data,
+                FFieldDataRequest(section=selected_section, interpret=False),
+                reporter=analysis_reporter,
+            )
+            raw_table = raw_result.table
+            filtered_raw = _filter_force_field_table_by_term(
+                data,
+                selected_section,
+                raw_table,
+                term=args.term,
+                unordered_2body=not args.ordered_2body,
+                any_order=args.any_order,
+            )
+            if request.interpret:
+                interpreted_result = task.run(
+                    data,
+                    FFieldDataRequest(section=selected_section, interpret=True),
+                    reporter=analysis_reporter,
+                )
+                table = interpreted_result.table.loc[filtered_raw.index].copy()
+            else:
+                table = filtered_raw
+            result = task.run(
+                data,
+                FFieldDataRequest(section=selected_section, interpret=request.interpret),
+                reporter=analysis_reporter,
+            )
+            result.table = table
         else:
-            table = filtered_raw
-        result = task.run(data, FFieldDataRequest(section=selected_section, interpret=request.interpret))
-        result.table = table
-    else:
-        result = task.run(data, request)
+            result = task.run(data, request, reporter=analysis_reporter)
     result = _prepare_result("get_ffield_data", result)
     if args.outdir:
         export_tables: dict[str, pd.DataFrame] = {}

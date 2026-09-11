@@ -349,7 +349,9 @@ class PolarizationFieldRequest(BaseRequest):
     every : int
         Frame stride after selection. Must be `>= 1`.
     aggregate : AggregateKind
-        Optional grouping aggregation over identical field values.
+        Optional grouping aggregation over contiguous runs of identical field values.
+    volume_method : VolumeMethod
+        Volume estimator used for polarization normalization.
     field_direction : FieldDirection
         Electric-field axis used for hysteresis x-axis (`x`, `y`, or `z`).
     dipole_or_polaization_direction : DipoleOrPolarizationDirection
@@ -373,13 +375,19 @@ class PolarizationFieldRequest(BaseRequest):
     every
         Frame stride after selection. Example: ``every=5``.
     aggregate
-        Optional aggregation applied after pairing field and response values.
+        Optional aggregation applied to each contiguous constant-field section
+        after pairing field and response values. Separate visits to the same
+        field value remain separate.
         Choices:
         - ``mean``: average all rows sharing the same field value
         - ``max``: maximum over grouped rows
         - ``min``: minimum over grouped rows
         - ``last``: keep the last row by iteration per field value
         - ``None``: no aggregation
+    volume_method
+        Volume estimator for polarization normalization. ``"hull"`` uses the
+        atomic convex hull, ``"bbox"`` uses the occupied coordinate extents,
+        and ``"cell"`` uses the simulation-cell lengths. Defaults to ``"hull"``.
     field_direction
         Electric-field axis used for hysteresis x-axis, mapped to
         ``field_x`` / ``field_y`` / ``field_z``. Example: ``"z"``.
@@ -411,8 +419,16 @@ class PolarizationFieldRequest(BaseRequest):
         default=None,
         metadata={
             'label': 'Aggregate',
-            'help': "Optional aggregation over rows sharing the same field value. Example: 'mean'.",
+            'help': "Aggregate each contiguous constant-field section. Example: 'mean'.",
             'choices': ['mean', 'max', 'min', 'last'],
+        },
+    )
+    volume_method: VolumeMethod = dc_field(
+        default="hull",
+        metadata={
+            'label': 'Volume Method',
+            'help': "Polarization normalization volume: 'hull', 'bbox', or 'cell'.",
+            'choices': ['hull', 'bbox', 'cell'],
         },
     )
     field_direction: FieldDirection = dc_field(
@@ -800,6 +816,86 @@ def _field_component_series(
     return by_iter.reindex(target_iters).to_numpy(dtype=float)
 
 
+def _polarization_field_result(
+    polarization_table: pd.DataFrame,
+    field_data: ElectricFieldData,
+    request: "PolarizationFieldRequest",
+) -> "PolarizationFieldResult":
+    """Pair an already-computed polarization table with the field series."""
+    order_col = "frame_index" if "frame_index" in polarization_table.columns else "iter"
+    pol = polarization_table.sort_values(order_col, kind="stable").reset_index(drop=True)
+    iters = pol["iter"].to_numpy(dtype=int)
+    field_col = f"field_{str(request.field_direction).strip().lower()}"
+    field = _field_component_series(field_data, component=field_col, target_iters=iters)
+    field = np.asarray(field, dtype=float) * float(const("electric_field_VA_to_MVcm"))
+
+    full = pol.copy()
+    full[field_col] = field
+    if request.aggregate is None:
+        agg = full.copy()
+    else:
+        if request.aggregate not in {"mean", "max", "min", "last"}:
+            raise ValueError("aggregate must be one of: mean|max|min|last (or None).")
+        # A field value may be visited more than once during a hysteresis sweep.
+        # Aggregate only contiguous plateaus so the chronological sweep path is
+        # retained instead of merging separate branches of the loop.
+        grouped = full.sort_values(order_col, kind="stable").reset_index(drop=True).copy()
+        grouped["__field_section"] = grouped[field_col].ne(grouped[field_col].shift()).cumsum()
+        group_cols = ["__field_section", field_col]
+        if request.aggregate == "mean":
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).mean(numeric_only=True)
+        elif request.aggregate == "max":
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).max(numeric_only=True)
+        elif request.aggregate == "min":
+            agg = grouped.groupby(
+                group_cols, as_index=False, sort=False, dropna=False
+            ).min(numeric_only=True)
+        else:
+            agg = grouped.groupby(group_cols, sort=False, dropna=False).tail(1).reset_index(drop=True)
+        agg = agg.drop(columns="__field_section")
+        preferred_cols = [column for column in full.columns if column in agg.columns]
+        trailing_cols = [column for column in agg.columns if column not in preferred_cols]
+        agg = agg.loc[:, preferred_cols + trailing_cols]
+
+    y_map = {
+        "mu_x": "mu_x (debye)", "mu_y": "mu_y (debye)", "mu_z": "mu_z (debye)",
+        "p_x": "P_x (uC/cm^2)", "p_y": "P_y (uC/cm^2)", "p_z": "P_z (uC/cm^2)",
+    }
+    y_col = y_map.get(str(request.dipole_or_polaization_direction).strip().lower())
+    if y_col is None:
+        raise KeyError(
+            f"Unsupported dipole_or_polaization_direction='{request.dipole_or_polaization_direction}'."
+        )
+    if field_col not in agg.columns or y_col not in agg.columns:
+        raise KeyError(f"Missing required columns '{field_col}' or '{y_col}' in aggregated data.")
+
+    x = agg[field_col].to_numpy(float)
+    y = agg[y_col].to_numpy(float)
+    return PolarizationFieldResult(
+        full_table=full.reset_index(drop=True),
+        aggregated_table=agg.reset_index(drop=True),
+        polarization_zero_crossings=find_zero_crossings(x, y),
+        field_zero_crossings=find_zero_crossings(y, x),
+        request=request,
+    )
+
+
+def polarization_field_axis_label(column: str) -> str:
+    """Return a publication-style label for a polarization-field column."""
+    value = str(column)
+    if value.startswith("field_") and value[-1:] in {"x", "y", "z"}:
+        return rf"$E_{{{value[-1]}}}$ (MV/cm)"
+    if value.startswith("P_") and value[2:3] in {"x", "y", "z"}:
+        return rf"$P_{{{value[2]}}}$ ($\mu$C/cm$^2$)"
+    if value.startswith("mu_") and value[3:4] in {"x", "y", "z"}:
+        return rf"$\mu_{{{value[3]}}}$ (debye)"
+    return value
+
+
 def _electrostatics_data_from_handlers(xh, f7) -> ElectrostaticsData:
     traj = _trajectory_from_xmolout_handler(xh)
     n_frames, n_atoms = traj.positions.shape[:2]
@@ -903,11 +999,114 @@ def _run_electrostatics(
     return table.sort_values(["frame_index", "core_atom_id"], kind="stable").reset_index(drop=True)
 
 
-@register_task("dipole", label="Dipole")
+def _run_electrostatics_stream(
+    frames,
+    request: DipoleRequest | PolarizationRequest,
+    *,
+    mode: Mode,
+    reporter=None,
+) -> pd.DataFrame:
+    """Compute electrostatics while retaining only one canonical frame."""
+    tables: list[pd.DataFrame] = []
+    total_rows: list[dict[str, Any]] = []
+    processed = 0
+    every = max(1, int(request.every))
+    for stream_index, data in enumerate(frames):
+        if stream_index % every:
+            continue
+        if request.scope == "total":
+            coords = np.asarray(data.trajectory.positions[0], dtype=float)
+            q = np.asarray(data.charges.charges[0], dtype=float)
+            if coords.ndim != 2 or coords.shape[1] != 3 or q.shape != coords.shape[:1]:
+                raise ValueError("Streamed total electrostatics requires aligned XYZ coordinates and charges.")
+            # Matrix-vector multiplication performs all three component sums
+            # in compiled NumPy code without allocating coords * q[:, None].
+            mu_ea = q @ coords
+            mu_debye = mu_ea * const("ea_to_debye")
+            iteration_values = data.trajectory.iterations
+            iteration = int(iteration_values[0]) if iteration_values is not None else stream_index
+            row: dict[str, Any] = {
+                "iter": iteration,
+                "mu_x (debye)": float(mu_debye[0]),
+                "mu_y (debye)": float(mu_debye[1]),
+                "mu_z (debye)": float(mu_debye[2]),
+            }
+            if mode == "polarization":
+                volume_method = getattr(request, "volume_method", None) or "hull"
+                if volume_method == "cell":
+                    simulation = data.trajectory.simulation
+                    volume = _cell_volume(simulation.cell_lengths if simulation else None, 0)
+                elif volume_method == "bbox":
+                    volume = _bbox_volume(coords)
+                else:
+                    volume = _convex_hull_volume(coords)
+                if np.isfinite(volume) and volume > 0:
+                    p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
+                    row.update({
+                        "P_x (uC/cm^2)": float(p_vec[0]),
+                        "P_y (uC/cm^2)": float(p_vec[1]),
+                        "P_z (uC/cm^2)": float(p_vec[2]),
+                    })
+                else:
+                    row.update({
+                        "P_x (uC/cm^2)": np.nan,
+                        "P_y (uC/cm^2)": np.nan,
+                        "P_z (uC/cm^2)": np.nan,
+                    })
+                row["volume (angstrom^3)"] = float(volume)
+            table = None
+        else:
+            table = _run_electrostatics(
+                data,
+                mode=mode,
+                scope=request.scope,
+                atom_ids=request.atom_ids,
+                atom_types=request.atom_types,
+                frames=None,
+                every=1,
+                volume_method=getattr(request, "volume_method", None),
+                reporter=None,
+            )
+        source_indices = data.trajectory.source_frame_indices
+        source_index = (
+            int(np.asarray(source_indices, dtype=int).reshape(-1)[0])
+            if source_indices is not None
+            else stream_index
+        )
+        if request.scope == "total":
+            row["frame_index"] = source_index
+            # Preserve the public column order of the materialized path.
+            total_rows.append({"frame_index": row.pop("frame_index"), **row})
+        elif table is not None and not table.empty:
+            table = table.copy()
+            table["frame_index"] = source_index
+            tables.append(table)
+        processed += 1
+        if callable(reporter):
+            reporter("stream", processed, 0, f"Streaming {mode} analysis")
+    if request.scope == "total":
+        return pd.DataFrame(total_rows)
+    if not tables:
+        return pd.DataFrame()
+    out = pd.concat(tables, ignore_index=True)
+    sort_columns = [name for name in ("frame_index", "core_atom_id") if name in out.columns]
+    return out.sort_values(sort_columns, kind="stable").reset_index(drop=True) if sort_columns else out
+
+
+@register_task("get-dipole", label="Dipole")
 class DipoleTask(AnalysisTask):
     """Compute dipole series as total or local."""
 
     required_data = ElectrostaticsData
+    supports_selective_streaming = True
+
+    @staticmethod
+    def required_data_fields_for(request: DipoleRequest, _args: dict) -> tuple[str, ...]:
+        """Declare only the electrostatics inputs used by the selected scope."""
+        fields = ["trajectory", "charges"]
+        if request.scope == "local":
+            fields.append("connectivity")
+        return tuple(fields)
 
     @staticmethod
     def recommended_presentations(
@@ -1008,6 +1207,13 @@ class DipoleTask(AnalysisTask):
             reporter=reporter,
         )
         return DipoleResult(table=out, request=request)
+
+    def run_stream(self, frames, request: DipoleRequest, reporter=None) -> DipoleResult:
+        """Compute dipoles from a bounded-memory electrostatics stream."""
+        return DipoleResult(
+            table=_run_electrostatics_stream(frames, request, mode="dipole", reporter=reporter),
+            request=request,
+        )
 
 
 @register_task("polarization", label="Polarization")
@@ -1116,8 +1322,15 @@ class PolarizationTask(AnalysisTask):
         )
         return PolarizationResult(table=out, request=request)
 
+    def run_stream(self, frames, request: PolarizationRequest, reporter=None) -> PolarizationResult:
+        """Compute polarization from a bounded-memory electrostatics stream."""
+        return PolarizationResult(
+            table=_run_electrostatics_stream(frames, request, mode="polarization", reporter=reporter),
+            request=request,
+        )
 
-@register_task("polarization_field", label="Polarization Field")
+
+@register_task("get_polarization_field", label="Polarization Field")
 class PolarizationFieldTask(AnalysisTask):
     """Compute polarization-field data and hysteresis roots."""
 
@@ -1192,16 +1405,22 @@ class PolarizationFieldTask(AnalysisTask):
         y_col = y_map.get(y_key, "P_z (uC/cm^2)")
         if x_col not in sample or y_col not in sample:
             return views
+        x_label = polarization_field_axis_label(x_col)
+        y_label = polarization_field_axis_label(y_col)
 
         views.append(
             PresentationSpec(
                 renderer="single_plot",
-                label=f"{y_col} vs {x_col}",
+                label=f"{y_label} vs {x_label}",
                 mapping={"x_col": x_col, "y_col": y_col, "group_by_col": ""},
                 options={
                     "title": "Hysteresis",
-                    "xlabel": x_col,
-                    "ylabel": y_col,
+                    "xlabel": x_label,
+                    "ylabel": y_label,
+                    "marker": "o",
+                    "markersize": 4,
+                    "hlines": [{"y": 0.0, "color": "black", "linestyle": "--"}],
+                    "vlines": [{"x": 0.0, "color": "black", "linestyle": "--"}],
                     "legend": False,
                     "source_key": "aggregated_table",
                 },
@@ -1210,7 +1429,7 @@ class PolarizationFieldTask(AnalysisTask):
         )
         return views
 
-    def run(self, data: ElectrostaticsData, request: PolarizationFieldRequest) -> PolarizationFieldResult:
+    def run(self, data: ElectrostaticsData, request: PolarizationFieldRequest, reporter=None) -> PolarizationFieldResult:
         """Compute field-response hysteresis tables and zero-crossing metrics.
 
         Works on
@@ -1248,72 +1467,46 @@ class PolarizationFieldTask(AnalysisTask):
                 scope="total",
                 frames=request.frames,
                 every=request.every,
-                volume_method="hull",
+                volume_method=request.volume_method,
             ),
+            reporter=reporter,
         ).table
         if pol.empty:
             raise ValueError("No polarization data produced for selected frames.")
+        return _polarization_field_result(pol, data.electric_field, request)
 
-        pol = pol.sort_values("iter").reset_index(drop=True)
-        iters = pol["iter"].to_numpy(dtype=int)
-        field_col = f"field_{str(request.field_direction).strip().lower()}"
-        field = _field_component_series(
-            data.electric_field,
-            component=field_col,
-            target_iters=iters,
+    def run_stream(self, frames, request: PolarizationFieldRequest, reporter=None) -> PolarizationFieldResult:
+        """Compute field-response rows while retaining one electrostatics frame."""
+        polarization_request = PolarizationRequest(
+            scope="total",
+            frames=None,
+            every=1,
+            volume_method=request.volume_method,
         )
-        field = np.asarray(field, dtype=float) * float(const("electric_field_VA_to_MVcm"))
-
-        full = pol.copy()
-        full[field_col] = field
-
-        if request.aggregate is None:
-            agg = full.copy()
-        else:
-            if request.aggregate not in {"mean", "max", "min", "last"}:
-                raise ValueError("aggregate must be one of: mean|max|min|last (or None).")
-            group_col = field_col
-            if request.aggregate == "mean":
-                agg = full.groupby(group_col, as_index=False).mean(numeric_only=True)
-            elif request.aggregate == "max":
-                agg = full.groupby(group_col, as_index=False).max(numeric_only=True)
-            elif request.aggregate == "min":
-                agg = full.groupby(group_col, as_index=False).min(numeric_only=True)
-            else:
-                agg = full.sort_values("iter").groupby(group_col, as_index=False).tail(1).reset_index(drop=True)
-            # Keep aggregated table column order aligned with full table.
-            preferred_cols = [c for c in full.columns if c in agg.columns]
-            trailing_cols = [c for c in agg.columns if c not in preferred_cols]
-            agg = agg.loc[:, preferred_cols + trailing_cols]
-
-        y_map = {
-            "mu_x": "mu_x (debye)",
-            "mu_y": "mu_y (debye)",
-            "mu_z": "mu_z (debye)",
-            "p_x": "P_x (uC/cm^2)",
-            "p_y": "P_y (uC/cm^2)",
-            "p_z": "P_z (uC/cm^2)",
-        }
-        y_col = y_map.get(str(request.dipole_or_polaization_direction).strip().lower())
-        if y_col is None:
-            raise KeyError(
-                f"Unsupported dipole_or_polaization_direction='{request.dipole_or_polaization_direction}'."
-            )
-        if field_col not in agg.columns or y_col not in agg.columns:
-            raise KeyError(f"Missing required columns '{field_col}' or '{y_col}' in aggregated data.")
-
-        x = agg[field_col].to_numpy(float)
-        y = agg[y_col].to_numpy(float)
-        y_zeros = find_zero_crossings(x, y)
-        x_zeros = find_zero_crossings(y, x)
-
-        return PolarizationFieldResult(
-            full_table=full.reset_index(drop=True),
-            aggregated_table=agg.reset_index(drop=True),
-            polarization_zero_crossings=y_zeros,
-            field_zero_crossings=x_zeros,
-            request=request,
-        )
+        tables: list[pd.DataFrame] = []
+        field_data: ElectricFieldData | None = None
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if data.electric_field is not None and field_data is None:
+                field_data = data.electric_field
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = PolarizationTask().run(data, polarization_request, reporter=None).table
+            source = data.trajectory.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming polarization-field analysis")
+        if field_data is None:
+            raise ValueError("Polarization field analysis requires ElectrostaticsData.electric_field.")
+        pol = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if pol.empty:
+            raise ValueError("No polarization data produced for selected frames.")
+        return _polarization_field_result(pol, field_data, request)
 
 
 __all__ = [
@@ -1326,4 +1519,5 @@ __all__ = [
     "PolarizationFieldRequest",
     "PolarizationFieldResult",
     "PolarizationFieldTask",
+    "polarization_field_axis_label",
 ]

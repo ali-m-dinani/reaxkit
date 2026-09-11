@@ -233,7 +233,11 @@ def _merge_simulation_data(
     if extra is None:
         return base
     return SimulationData(
-        atom_ids=base.atom_ids if base.atom_ids is not None else extra.atom_ids,
+        atom_ids=(
+            base.atom_ids
+            if base.atom_ids is not None and len(base.atom_ids) > 0
+            else extra.atom_ids
+        ),
         iterations=base.iterations if base.iterations is not None else extra.iterations,
         time=_pick(
             base.time,
@@ -376,6 +380,8 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
     """Normalize an ``XmoloutHandler`` into ``TrajectoryData``."""
     n_frames = handler.n_frames()
     frames = [handler.frame(i) for i in range(n_frames)]
+    handler_meta = handler.metadata()
+    source_frame_indices = handler_meta.get("source_frame_indices")
     if not frames:
         positions = np.empty((0, 0, 3), dtype=float)
         atom_labels = np.empty((0, 0), dtype=object)
@@ -430,6 +436,11 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
             cell_angles=cell_angles,
         ),
         iterations=iterations,
+        source_frame_indices=(
+            np.asarray(source_frame_indices, dtype=int)
+            if source_frame_indices is not None
+            else None
+        ),
     )
 
 
@@ -473,13 +484,20 @@ def _connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> Co
     """Normalize a ``Fort7Handler`` into ``ConnectivityData``."""
     sim_df = handler.dataframe()
     frames_df = [handler.frame(i) for i in range(handler.n_frames())]
+    handler_meta = handler.metadata()
+    source_frame_indices = handler_meta.get("source_frame_indices")
 
     if not frames_df:
         return ConnectivityData(
             connectivity=[],
             bond_orders=[],
             sum_bond_orders=np.empty((0, 0), dtype=float),
-            metadata={"source": "fort7", "simulation_name": handler.metadata().get("simulation_name", "")},
+            metadata={"source": "fort7", "simulation_name": handler_meta.get("simulation_name", "")},
+            source_frame_indices=(
+                np.asarray(source_frame_indices, dtype=int)
+                if source_frame_indices is not None
+                else None
+            ),
         )
 
     atom_ids = np.asarray(_union_atom_ids_from_frames(frames_df), dtype=int)
@@ -527,7 +545,7 @@ def _connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> Co
 
     sum_arr = np.vstack(sum_rows) if sum_rows else np.empty((0, 0), dtype=float)
     iterations = sim_df["iter"].to_numpy(dtype=int) if "iter" in sim_df.columns else np.arange(len(bo_frames), dtype=int)
-    meta = handler.metadata()
+    meta = handler_meta
     return ConnectivityData(
         connectivity=connectivity_frames,
         bond_orders=bo_frames,
@@ -548,6 +566,11 @@ def _connectivity_from_fort7_handler(handler: Fort7Handler, reporter=None) -> Co
         ),
         iterations=iterations,
         metadata={"source": "fort7", "simulation_name": meta.get("simulation_name", ""), "bond_orders_format": "sparse_frame_list"},
+        source_frame_indices=(
+            np.asarray(source_frame_indices, dtype=int)
+            if source_frame_indices is not None
+            else None
+        ),
     )
 
 
@@ -923,13 +946,17 @@ def _charges_from_fort7_handler(
 ) -> ChargeData:
     """Normalize fort.7 partial charges into ``ChargeData``."""
     sim_df = handler.dataframe()
+    handler_meta = handler.metadata()
     frames_df = [handler.frame(i) for i in range(handler.n_frames())]
     if not frames_df:
         return ChargeData(
             charges=np.empty((0, 0), dtype=float),
             simulation=simulation,
             iterations=np.empty((0,), dtype=int),
-            metadata={"source": "fort7"},
+            metadata={
+                "source": "fort7",
+                "source_frame_indices": handler_meta.get("source_frame_indices"),
+            },
         )
 
     discovered_atom_ids = _union_atom_ids_from_frames(frames_df)
@@ -978,7 +1005,10 @@ def _charges_from_fort7_handler(
         total_charge=sim_df["total_charge"].to_numpy(dtype=float) if "total_charge" in sim_df.columns else None,
         simulation=simulation,
         iterations=iterations,
-        metadata={"source": "fort7"},
+        metadata={
+            "source": "fort7",
+            "source_frame_indices": handler_meta.get("source_frame_indices"),
+        },
     )
 
 

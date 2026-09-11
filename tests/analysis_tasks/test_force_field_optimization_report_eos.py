@@ -14,6 +14,7 @@ from reaxkit.analysis.force_field.report import (
     _base_other_energy_volume_table,
     _classify_curve_rows,
     _curve_table_from_classified_rows,
+    _elastic_strain_metadata,
     _force_field_optimization_curve_tables,
 )
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
@@ -32,6 +33,128 @@ RUN_DIR = Path(
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
 
 
+@pytest.mark.parametrize(
+    ("family", "distorted_values", "strain_type"),
+    [
+        ("c12", {"a": 10.1, "b": 19.8}, "orthorhombic"),
+        ("c13", {"a": 10.1, "c": 29.7}, "orthorhombic"),
+        ("c23", {"b": 20.2, "c": 29.7}, "orthorhombic"),
+        ("c44", {"alpha": 90.572957795}, "shear_angle"),
+        ("c55", {"beta": 90.572957795}, "shear_angle"),
+        ("c66", {"gamma": 90.572957795}, "shear_angle"),
+    ],
+)
+def test_elastic_strain_uses_family_specific_crystx_components(
+    family: str,
+    distorted_values: dict[str, float],
+    strain_type: str,
+) -> None:
+    base = {
+        "a": 10.0,
+        "b": 20.0,
+        "c": 30.0,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 90.0,
+    }
+    distorted = {**base, **distorted_values}
+    cells = pd.DataFrame(
+        [
+            {"descriptor": f"{family}_0", **base},
+            {"descriptor": f"{family}_e0001", **distorted},
+        ]
+    )
+
+    strain = _elastic_strain_metadata(f"{family}_0", f"{family}_e1", cells)
+
+    assert strain["strain_percent"] == pytest.approx(1.0, abs=1.0e-9)
+    assert strain["strain_type"] == strain_type
+
+
+def test_c66_rounded_angle_example_converts_to_one_percent() -> None:
+    cells = pd.DataFrame(
+        {
+            "descriptor": ["c66_0_mp_2604", "c66_c1_mp_2604"],
+            "a": [7.08745, 7.08760],
+            "b": [7.08745, 7.08760],
+            "c": [7.08745, 7.08751],
+            "alpha": [90.0, 90.0],
+            "beta": [90.0, 90.0],
+            "gamma": [90.0, 90.57295],
+        }
+    )
+
+    strain = _elastic_strain_metadata("c66_0_mp_2604", "c66_c1_mp_2604", cells)
+
+    assert strain["strain_percent"] == pytest.approx(1.0, abs=2.0e-5)
+
+
+def test_eos_task_propagates_crystx_orthorhombic_strain() -> None:
+    report = ForceFieldOptimizationReportData(
+        linenos=np.array([1, 2]),
+        sections=np.array(["ENERGY", "ENERGY"], dtype=object),
+        titles=np.array(
+            [
+                "Energy +c12_c1_mp_2604/1 -c12_0_mp_2604/1",
+                "Energy +c12_e1_mp_2604/1 -c12_0_mp_2604/1",
+            ],
+            dtype=object,
+        ),
+        ffield_values=np.array([1.1, 1.2]),
+        qm_values=np.array([1.0, 1.0]),
+        weights=np.ones(2),
+        errors=np.zeros(2),
+        total_ff_error=np.zeros(2),
+    )
+    identifiers = ["c12_0_mp_2604", "c12_c1_mp_2604", "c12_e1_mp_2604"]
+    summary = EnergyMinimizationSummaryData(
+        identifiers=np.asarray(identifiers, dtype=object),
+        minimum_energy=np.array([-10.0, -9.0, -9.0]),
+        volume=np.array([1000.0, 999.9, 999.9]),
+    )
+    energy = pd.DataFrame(
+        {
+            "line_number": [10, 11],
+            "op1": [1, 1],
+            "id1": identifiers[1:],
+            "n1": [1.0, 1.0],
+            "op2": [-1, -1],
+            "id2": [identifiers[0], identifiers[0]],
+            "n2": [1.0, 1.0],
+            "group_comment": ["EOS orthorhombic c12", "EOS orthorhombic c12"],
+            "inline_comment": ["compression", "extension"],
+        }
+    )
+    cells = pd.DataFrame(
+        {
+            "descriptor": identifiers,
+            "a": [10.0, 9.9, 10.1],
+            "b": [20.0, 20.2, 19.8],
+            "c": [30.0, 30.0, 30.0],
+            "alpha": [90.0, 90.0, 90.0],
+            "beta": [90.0, 90.0, 90.0],
+            "gamma": [90.0, 90.0, 90.0],
+        }
+    )
+    data = ForceFieldOptimizationPlotBundleData(
+        report=report,
+        geometry_summary=summary,
+        training_set=ForceFieldOptimizationTrainingSetData(
+            sections=("ENERGY",),
+            energy=energy,
+        ),
+        geometry_cells=cells,
+    )
+
+    table = FFieldOptimizationReportEOSTask().run(
+        data,
+        FFieldOptimizationReportEOSRequest(iden="all"),
+    ).table
+
+    strains = table.set_index("other_iden")["strain_percent"]
+    assert strains["c12_c1_mp_2604"] == pytest.approx(-1.0)
+    assert strains["c12_0_mp_2604"] == pytest.approx(0.0)
+    assert strains["c12_e1_mp_2604"] == pytest.approx(1.0)
 def test_eos_table_preserves_reaxff_and_qm_values() -> None:
     report = ForceFieldOptimizationReportData(
         linenos=np.array([1, 2]),

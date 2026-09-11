@@ -9,10 +9,21 @@ def build_parser(parser, *, command: str):
     configure_parser(
         parser,
         command=command,
-        description="Get charge time series for selected atoms.\n\nExample:\n  reaxkit get_charge --atom-ids 1 2 --fort7 fort.7 --export charges.csv",
+        description=(
+            "Get charge time series for all atoms or a selected subset.\n\n"
+            "Examples:\n"
+            "  reaxkit get_charge --frames 0 --export charges.csv\n"
+            "  reaxkit get_charge --atom-ids 1 2 --fort7 fort.7 --export charges.csv"
+        ),
         inputs=("fort7", "xmolout", "summary"),
     )
-    parser.add_argument("--atom-ids", type=int, nargs="+", required=True, help="One or more 1-based atom IDs.")
+    parser.add_argument(
+        "--atom-ids",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Optional 1-based atom IDs. If omitted, all atoms are included.",
+    )
     return parser
 
 

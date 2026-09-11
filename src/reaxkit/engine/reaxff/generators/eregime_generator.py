@@ -83,20 +83,28 @@ class SinusoidalERegimeSpec:
 
     Notes
     -----
-    As mentioned above, you can have a maximum of 100 entry points in eregime.in file. In order to know how
-    many points will be in the output eregime.in file when using this command, you can use this formula:
-        number_of_points = (2 * num_of_cycles * pi) / (step_angle) - 1
+    In points-per-cycle mode, adjacent cycles share their baseline boundary,
+    so the total number of rows is
+    ``num_cycles * (points_per_cycle - 1) + 1``. Magnitudes change linearly
+    within each quarter-cycle. Legacy step-angle mode samples a true sine.
 
     Fields
     ------
     max_magnitude : float
         Peak sinusoidal amplitude (V/A) around ``dc_offset``.
-    step_angle : float
-        Angular increment (radians) between consecutive samples.
+    step_angle : float | None
+        Legacy angular increment (radians) between consecutive samples. Use
+        ``points_per_cycle`` for schedules that land exactly on each half-cycle
+        and full-cycle baseline.
     iteration_step : int
         MD-iteration increment between consecutive output rows.
     num_cycles : float
         Number of sinusoidal cycles to generate.
+    points_per_cycle : int | None
+        Number of rows in one complete piecewise-linear cycle, counting both
+        boundary rows. The start, half-cycle, and end are exactly
+        ``dc_offset``. Odd values produce equally sampled positive and negative
+        half-cycles; even values place the extra interval in the negative half.
     direction : str
         Field axis label (``"x"``, ``"y"``, or ``"z"``).
     voltage_idx : int
@@ -113,9 +121,10 @@ class SinusoidalERegimeSpec:
     ```python
     spec = SinusoidalERegimeSpec(
         max_magnitude=0.4,
-        step_angle=0.05,
+        step_angle=None,
         iteration_step=100,
         num_cycles=2.0,
+        points_per_cycle=9,
         direction="z",
         voltage_idx=1,
         phase=0.0,
@@ -125,7 +134,8 @@ class SinusoidalERegimeSpec:
     ```
     Plain-language meaning of each value:
     ``max_magnitude=0.4`` means the signal gets as high or as low as about 0.4 V/A
-    around the offset. ``step_angle=0.05`` sets how finely the sine wave is sampled.
+    around the offset. ``points_per_cycle=9`` samples each complete
+    piecewise-linear cycle at nine rows, including its boundaries.
     ``iteration_step=100`` means each sampled point is 100 MD steps apart.
     ``num_cycles=2.0`` means generate two full sine cycles.
     ``direction="z"`` applies the field along z.
@@ -135,9 +145,10 @@ class SinusoidalERegimeSpec:
     ``start_iter=0`` starts writing rows at MD iteration 0.
     """
     max_magnitude: float
-    step_angle: float
+    step_angle: float | None
     iteration_step: int
     num_cycles: float
+    points_per_cycle: int | None = None
     direction: str = "z"
     voltage_idx: int = 1
     phase: float = 0.0
@@ -330,22 +341,86 @@ def _write_a_given_eregime(
 
 def _generate_eregime_sinusoidal(spec: SinusoidalERegimeSpec) -> str:
     """
-    Generate a sinusoidal electric-field schedule as ``eregime.in`` text.
+    Generate a sine-sampled or equal-increment electric-field schedule.
     """
-    if spec.step_angle <= 0:
-        raise ValueError("step_angle must be > 0")
     if spec.iteration_step <= 0:
         raise ValueError("iteration_step must be > 0")
+    if spec.points_per_cycle is not None and spec.step_angle is not None:
+        raise ValueError("Use either points_per_cycle or step_angle, not both")
+    if spec.points_per_cycle is None and spec.step_angle is None:
+        raise ValueError("points_per_cycle or step_angle is required")
 
     direction = _normalize_direction(spec.direction)
-    npts = int(round((2.0 * spec.num_cycles * math.pi) / spec.step_angle)) + 1
-
     rows: list[tuple[int, int, str, float]] = []
-    for k in range(npts):
-        ang = spec.phase + k * spec.step_angle
-        mag = spec.dc_offset + spec.max_magnitude * math.sin(ang)
-        it = spec.start_iter + k * spec.iteration_step
-        rows.append((it, spec.voltage_idx, direction, float(mag)))
+
+    if spec.points_per_cycle is not None:
+        points_per_cycle = spec.points_per_cycle
+        if isinstance(points_per_cycle, bool) or not isinstance(points_per_cycle, int):
+            raise ValueError("points_per_cycle must be an integer")
+        if points_per_cycle < 5:
+            raise ValueError(
+                "points_per_cycle must be >= 5 to include a positive sample, "
+                "a negative sample, and three baseline points"
+            )
+        if spec.num_cycles <= 0 or not float(spec.num_cycles).is_integer():
+            raise ValueError("num_cycles must be a positive integer with points_per_cycle")
+        if not math.isclose(
+            math.remainder(spec.phase, 2.0 * math.pi),
+            0.0,
+            abs_tol=1.0e-12,
+        ):
+            raise ValueError(
+                "phase must be 0 (or a whole multiple of 2*pi) with points_per_cycle "
+                "so cycle and half-cycle rows return to dc_offset"
+            )
+
+        # Both halves include their endpoints and are divided into two linear
+        # quarter-cycle ramps. This gives equal magnitude changes while rising
+        # or falling, and includes the exact positive/negative extrema.
+        positive_half_points = (points_per_cycle + 1) // 2
+        negative_half_points = points_per_cycle - positive_half_points + 1
+
+        def half_cycle_magnitudes(sign: float, point_count: int) -> list[float]:
+            interval_count = point_count - 1
+            first_quarter_intervals = interval_count // 2
+            second_quarter_intervals = interval_count - first_quarter_intervals
+            peak = spec.dc_offset + sign * spec.max_magnitude
+            magnitudes = [
+                spec.dc_offset
+                + (peak - spec.dc_offset) * index / first_quarter_intervals
+                for index in range(first_quarter_intervals + 1)
+            ]
+            magnitudes.extend(
+                peak
+                + (spec.dc_offset - peak) * index / second_quarter_intervals
+                for index in range(1, second_quarter_intervals + 1)
+            )
+            return magnitudes
+
+        cycle_magnitudes = half_cycle_magnitudes(1.0, positive_half_points)
+        cycle_magnitudes.extend(half_cycle_magnitudes(-1.0, negative_half_points)[1:])
+
+        sample_index = 0
+        baseline_indexes = {0, positive_half_points - 1, points_per_cycle - 1}
+        for cycle_index in range(int(spec.num_cycles)):
+            for cycle_sample_index, magnitude in enumerate(cycle_magnitudes):
+                if cycle_index > 0 and cycle_sample_index == 0:
+                    continue
+                if cycle_sample_index in baseline_indexes:
+                    magnitude = spec.dc_offset
+                iteration = spec.start_iter + sample_index * spec.iteration_step
+                rows.append((iteration, spec.voltage_idx, direction, float(magnitude)))
+                sample_index += 1
+    else:
+        assert spec.step_angle is not None
+        if spec.step_angle <= 0:
+            raise ValueError("step_angle must be > 0")
+        npts = int(round((2.0 * spec.num_cycles * math.pi) / spec.step_angle)) + 1
+        for k in range(npts):
+            angle = spec.phase + k * spec.step_angle
+            magnitude = spec.dc_offset + spec.max_magnitude * math.sin(angle)
+            iteration = spec.start_iter + k * spec.iteration_step
+            rows.append((iteration, spec.voltage_idx, direction, float(magnitude)))
 
     return _format_eregime_text(rows)
 
@@ -354,9 +429,10 @@ def _write_eregime_sinusoidal(
     file_path: str | Path,
     *,
     max_magnitude: float,
-    step_angle: float,
     iteration_step: int,
     num_cycles: float,
+    points_per_cycle: int | None = None,
+    step_angle: float | None = None,
     direction: str = "z",
     voltage_idx: int = 1,
     phase: float = 0.0,
@@ -371,6 +447,7 @@ def _write_eregime_sinusoidal(
         step_angle=step_angle,
         iteration_step=iteration_step,
         num_cycles=num_cycles,
+        points_per_cycle=points_per_cycle,
         direction=direction,
         voltage_idx=voltage_idx,
         phase=phase,
@@ -548,6 +625,7 @@ def gen_eregime(
     voltage_idx: int = 1,
     start_iter: int = 0,
     max_magnitude: float | None = None,
+    points_per_cycle: int | None = None,
     step_angle: float | None = None,
     num_cycles: float | None = None,
     phase: float = 0.0,
@@ -580,8 +658,13 @@ def gen_eregime(
         Iteration index assigned to the first row.
     max_magnitude : float | None, optional
         Sinusoidal amplitude (required when ``profile_type="sin"``).
+    points_per_cycle : int | None, optional
+        Preferred equal-increment sampling control. Counts both endpoints of
+        one cycle and guarantees baseline rows at the start, half-cycle, and
+        end. Adjacent cycles share their boundary row.
     step_angle : float | None, optional
-        Angular sample spacing in radians (required for ``"sin"``).
+        Legacy angular sample spacing in radians. Mutually exclusive with
+        ``points_per_cycle``.
     num_cycles : float | None, optional
         Number of cycles for ``"sin"``/``"pulse"`` profiles.
     phase : float, optional
@@ -621,11 +704,16 @@ def gen_eregime(
     """
     kind = str(profile_type).strip().lower()
     if kind == "sin":
-        if max_magnitude is None or step_angle is None or num_cycles is None:
-            raise ValueError("sin profile requires max_magnitude, step_angle, and num_cycles.")
+        if max_magnitude is None or num_cycles is None:
+            raise ValueError("sin profile requires max_magnitude and num_cycles.")
+        if points_per_cycle is None and step_angle is None:
+            raise ValueError("sin profile requires points_per_cycle or legacy step_angle.")
+        if points_per_cycle is not None and step_angle is not None:
+            raise ValueError("Use either points_per_cycle or step_angle, not both.")
         return _write_eregime_sinusoidal(
             out_path,
             max_magnitude=max_magnitude,
+            points_per_cycle=points_per_cycle,
             step_angle=step_angle,
             iteration_step=iteration_step,
             num_cycles=num_cycles,

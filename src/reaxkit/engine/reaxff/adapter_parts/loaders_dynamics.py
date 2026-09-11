@@ -69,7 +69,11 @@ def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Trajec
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     trj = adapter._time_source(
         args,
@@ -189,8 +193,10 @@ def load_final_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Ge
 def load_simulation(adapter: ReaxFFAdapter, args: dict, reporter=None) -> SimulationData:
     """Load merged simulation metadata for ReaxFF runs.
 
-    Attempts to load simulation metadata from trajectory and summary sources,
-    then merges both records. Raises when neither source is available.
+    Loads the lightweight summary source first. If it contains every field
+    requested by the analysis, it is returned immediately; otherwise xmolout
+    is loaded to fill the missing simulation metadata. Raises when neither
+    source is available.
 
     Parameters
     ----------
@@ -210,11 +216,34 @@ def load_simulation(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Simula
     --------
     >>> sim = adapter.load_simulation({"run_dir": "run"})
     """
-    sim = adapter._load_simulation_from_xmolout(args, reporter=reporter)
-    sim = _merge_simulation_data(sim, adapter._load_simulation_from_summary(args, reporter=reporter))
+    sim = adapter._load_simulation_from_summary(args, reporter=reporter)
+    requested_fields = tuple(str(field) for field in args.get("_required_data_fields", ()))
+    if sim is not None and requested_fields and _simulation_has_fields(sim, requested_fields):
+        return sim
+
+    sim = _merge_simulation_data(
+        sim,
+        adapter._load_simulation_from_xmolout(args, reporter=reporter),
+    )
     if sim is None:
         raise FileNotFoundError("SimulationData for reaxff currently requires xmolout or summary.txt.")
     return sim
+
+
+def _simulation_has_fields(simulation: SimulationData, fields: tuple[str, ...]) -> bool:
+    """Return whether ``simulation`` already contains all requested fields."""
+    cell_length_fields = {"a", "b", "c"}
+    cell_angle_fields = {"alpha", "beta", "gamma"}
+    for field in fields:
+        if field in cell_length_fields:
+            values = simulation.cell_lengths
+        elif field in cell_angle_fields:
+            values = simulation.cell_angles
+        else:
+            values = getattr(simulation, field, None)
+        if values is None:
+            return False
+    return True
 
 
 def _load_simulation_from_xmolout(adapter_cls: type[ReaxFFAdapter], args: dict, reporter=None) -> SimulationData | None:
@@ -228,7 +257,11 @@ def _load_simulation_from_xmolout(adapter_cls: type[ReaxFFAdapter], args: dict, 
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     trj = adapter_cls._time_source(
         args,
@@ -309,7 +342,11 @@ def load_connectivity(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Conn
         args,
         handler_name="Fort7Handler",
         source_path=fort7_path,
-        factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        factory=lambda: Fort7Handler(
+            fort7_path,
+            reporter=reporter,
+            frame_indices=args.get("_frame_indices"),
+        ),
     )
     conn = adapter._time_source(
         args,
@@ -396,13 +433,21 @@ def load_connectivity_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=No
         args,
         handler_name="Fort7Handler",
         source_path=fort7_path,
-        factory=lambda: Fort7Handler(fort7_path, reporter=reporter),
+        factory=lambda: Fort7Handler(
+            fort7_path,
+            reporter=reporter,
+            frame_indices=args.get("_frame_indices"),
+        ),
     )
     xmol_handler = adapter._build_handler(
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(xmol_path, reporter=reporter),
+        factory=lambda: XmoloutHandler(
+            xmol_path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+        ),
     )
     summary_simulation = adapter._load_simulation_from_summary(args, reporter=reporter)
     force_field_parameters: ForceFieldParametersData | None = None

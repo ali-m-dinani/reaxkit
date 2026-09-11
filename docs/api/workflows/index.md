@@ -11,6 +11,7 @@ Workflow docs are organized into:
 - `file_tools` workflows, which are specific to file-based tasks (e.g. file conversion, file generation, data extraction)
 - `meta` workflows, which are cross-cutting workflows related to CLI management, help, and introspection
 - `presentation` workflows, which are focused on visualizing and presenting data
+- `stress_strain` workflows for trajectory-resolved deformation analysis
 - `study_design` workflows, which is a new category focused on study design (i.e., systematically generating and executing a series of simulations along with their analyses)
 
 ## Module Index
@@ -23,6 +24,10 @@ Workflow docs are organized into:
 - [molecular_analysis_workflow](molecular_analysis_workflow.md)
 - [timeseries_workflow](timeseries_workflow.md)
 - [trajectory_workflow](trajectory_workflow.md)
+
+### Stress and Strain
+
+- [z_binned_strain_workflow](stress_strain/z_binned_strain_workflow.md)
 
 ### File Tools
 

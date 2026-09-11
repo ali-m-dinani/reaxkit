@@ -14,6 +14,7 @@ from reaxkit.analysis.molecular_analysis.isomer_representative_detection import 
     IsomerRepresentativeDetectionTask,
 )
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
 from reaxkit.domain.data_models import ConnectivityTrajectoryData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 
@@ -92,14 +93,22 @@ def parse_legacy_isomer_representative_control(path: str | Path) -> LegacyIsomer
 def _write_representative_outputs(
     result: IsomerRepresentativeDetectionResult,
     *,
-    data: ConnectivityTrajectoryData,
+    data: ConnectivityTrajectoryData | None,
     output_xmolout_isomers: Path,
     isomer_dir: Path | None,
 ) -> None:
     """Write representative structures from canonical trajectory data."""
-    trajectory = data.trajectory
-    atom_id_to_index = {int(atom_id): idx for idx, atom_id in enumerate(trajectory.atom_ids)}
-    molecule_nums = np.asarray(data.connectivity.simulation.molecule_nums, dtype=int)
+    trajectory = data.trajectory if data is not None else None
+    atom_id_to_index = (
+        {int(atom_id): idx for idx, atom_id in enumerate(trajectory.atom_ids)}
+        if trajectory is not None
+        else {}
+    )
+    molecule_nums = (
+        np.asarray(data.connectivity.simulation.molecule_nums, dtype=int)
+        if data is not None and data.connectivity.simulation is not None
+        else None
+    )
 
     output_xmolout_isomers.parent.mkdir(parents=True, exist_ok=True)
     if isomer_dir is not None:
@@ -107,14 +116,29 @@ def _write_representative_outputs(
 
     with output_xmolout_isomers.open("w", encoding="utf-8") as combined:
         for record in result.records:
-            atom_indices = [atom_id_to_index[int(atom_id)] for atom_id in record.atom_ids]
             combined.write(f"{record.atom_count}\n")
             combined.write(f"{record.structure_name}\n")
             selected_lines: list[str] = []
-            for atom_index in atom_indices:
-                coords = trajectory.positions[record.frame_index, atom_index]
-                element = str(trajectory.elements[atom_index])
-                molecule_id = int(molecule_nums[record.frame_index, atom_index])
+            if record.coordinates and record.elements:
+                values = zip(
+                    record.elements,
+                    record.coordinates,
+                    record.molecule_numbers or (record.molecule_id,) * len(record.coordinates),
+                    strict=False,
+                )
+            elif trajectory is not None and molecule_nums is not None:
+                atom_indices = [atom_id_to_index[int(atom_id)] for atom_id in record.atom_ids]
+                values = (
+                    (
+                        str(trajectory.elements[atom_index]),
+                        trajectory.positions[record.frame_index, atom_index],
+                        int(molecule_nums[record.frame_index, atom_index]),
+                    )
+                    for atom_index in atom_indices
+                )
+            else:
+                raise ValueError("Representative coordinates are unavailable for output writing.")
+            for element, coords, molecule_id in values:
                 line_with_molecule = (
                     f"{element:<2} {coords[0]:10.5f} {coords[1]:10.5f} {coords[2]:10.5f}"
                     f" {molecule_id:8d}"
@@ -157,6 +181,7 @@ def detect_isomer_representatives_from_reaxff_files(
     max_representatives: int | None = None,
     output_name: str = "xmolout_isomers",
     log_name: str = "isomer_run_log.txt",
+    reporter=None,
 ) -> IsomerRepresentativeFileWorkflowResult:
     """Run representative detection for ReaxFF files through canonical data."""
     fort7 = Path(fort7_path)
@@ -167,15 +192,28 @@ def detect_isomer_representatives_from_reaxff_files(
         raise FileNotFoundError(f"xmolout file not found: {xmolout}")
 
     control = parse_legacy_isomer_representative_control(control_path)
-    data = ReaxFFAdapter().load_connectivity_trajectory(
+    adapter = ReaxFFAdapter()
+    stream = adapter.stream(
+        ConnectivityTrajectoryData,
         {"fort7": str(fort7), "xmolout": str(xmolout)},
+        reporter=reporter,
     )
     request = IsomerRepresentativeDetectionRequest(
         target_formula=control.input_formula,
         structure_prefix=control.isomer_prefixname,
         max_representatives=max_representatives,
     )
-    detection = IsomerRepresentativeDetectionTask().run(data, request)
+    with progress_operation(
+        reporter,
+        "analyze",
+        "Detecting isomer representatives",
+        "Finished isomer representative detection",
+    ) as analysis_reporter:
+        detection = IsomerRepresentativeDetectionTask().run_stream(
+            stream,
+            request,
+            reporter=analysis_reporter,
+        )
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -184,7 +222,7 @@ def detect_isomer_representatives_from_reaxff_files(
     output_xmolout = out_dir / output_name
     _write_representative_outputs(
         detection,
-        data=data,
+        data=None,
         output_xmolout_isomers=output_xmolout,
         isomer_dir=isomer_dir,
     )
@@ -202,6 +240,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     """Build the parser for isomer representative detection."""
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
+    parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Detect coarse target-formula isomer representatives using canonical ReaxKit data.\n"
@@ -249,6 +288,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     if bool(getattr(args, "no_isomer_dirs", False)):
         write_isomer_dirs = False
 
+    reporter = resolve_reporter(vars(args))
     result = detect_isomer_representatives_from_reaxff_files(
         fort7_path=args.fort7,
         xmolout_path=args.xmolout,
@@ -256,6 +296,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         output_dir=args.output_dir,
         write_isomer_dirs=write_isomer_dirs,
         max_representatives=getattr(args, "max_representatives", None),
+        reporter=reporter,
     )
     print(
         f"{canonical}: detected {len(result.detection.records)} isomer representatives; "

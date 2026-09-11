@@ -36,3 +36,49 @@ END
     ]
     assert handler.metadata()["n_structures"] == 2
     assert handler.metadata()["restraint_types"] == ["angle", "bond"]
+
+
+def test_geo_restraint_handler_extracts_crystx_cells_without_restraints(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "geo"
+    path.write_text(
+        """XTLGRF 200
+DESCRP c66_0_mp_2604
+CRYSTX 7.08745 7.08745 7.08745 90.0 90.0 90.0
+END
+XTLGRF 200
+DESCRP c66_c1_mp_2604
+CRYSTX 7.08760 7.08760 7.08751 90.0 90.0 90.57295
+END
+""",
+        encoding="utf-8",
+    )
+
+    handler = GeoRestraintHandler(path)
+    cells = handler.cell_dataframe()
+
+    assert cells[["descriptor", "a", "b", "c", "alpha", "beta", "gamma"]].to_dict(
+        orient="records"
+    ) == [
+        {
+            "descriptor": "c66_0_mp_2604",
+            "a": 7.08745,
+            "b": 7.08745,
+            "c": 7.08745,
+            "alpha": 90.0,
+            "beta": 90.0,
+            "gamma": 90.0,
+        },
+        {
+            "descriptor": "c66_c1_mp_2604",
+            "a": 7.08760,
+            "b": 7.08760,
+            "c": 7.08751,
+            "alpha": 90.0,
+            "beta": 90.0,
+            "gamma": 90.57295,
+        },
+    ]
+    assert handler.metadata()["n_cell_records"] == 2
+    assert handler.metadata()["n_structures"] == 2

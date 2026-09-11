@@ -18,6 +18,7 @@ Defines command/workflow orchestration that connects CLI inputs to core runtime,
 - `meta/`: help/introspection/study/workspace workflows.
 - `presentation/`: plot/video/plot-atom-property workflows.
 - `timeseries/`: the generic `timeseries` dispatcher plus dedicated `get_*` workflows for every supported series family and scalar.
+- `stress_strain/`: z-binned geometric and deformation-gradient strain workflows.
 - `data/`: workflow dataclass mapping metadata.
 - Top-level workflows: `active_site_workflow.py`, `connectivity_workflow.py`, `electrostatics_workflow.py`, `kinematics_workflow.py`, `molecular_analysis_workflow.py`, `timeseries/timeseries_workflow.py`, `trajectory_workflow.py`.
 

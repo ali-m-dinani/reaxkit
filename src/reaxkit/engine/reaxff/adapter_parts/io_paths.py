@@ -82,43 +82,24 @@ def _quick_n_frames_from_control(control_path: Path) -> int | None:
 
 
 def _quick_n_frames_from_geo_xmol(geo_path: Path, xmol_path: Path) -> int | None:
-    """Estimate frame count by scanning xmolout iteration headers."""
+    """Count xmolout frame-start lines without parsing frame contents."""
+    _ = geo_path  # Retained for compatibility with the existing helper API.
     if not xmol_path.exists() or not xmol_path.is_file():
         return None
-    descriptor = ""
-    if geo_path.exists() and geo_path.is_file():
-        try:
-            from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
-
-            descriptor = str(GeoHandler(geo_path).metadata().get("descriptor") or "").strip()
-        except Exception:
-            descriptor = ""
-    iterations: set[int] = set()
+    count = 0
     try:
         with open(xmol_path, "r", encoding="utf-8", errors="replace") as fh:
             for raw in fh:
-                if descriptor and descriptor not in raw:
-                    continue
-                vals = raw.strip().split()
-                if len(vals) != 9:
-                    continue
-                try:
-                    iterations.add(int(float(vals[1])))
-                except Exception:
-                    continue
+                # Each xmolout frame starts with a line containing only n_atoms.
+                if raw.strip().isdigit():
+                    count += 1
     except Exception:
         return None
-    return len(iterations) if iterations else None
+    return count
 
 
 def _quick_n_frames(args: dict) -> int | None:
     """Run fast frame-count probes for metadata-aware UI and workflows."""
-    control_path = _resolve_reaxff_path(args, "control", "control_file", default="control")
-    control_path = _resolve_against_run_dir(args, control_path)
-    n_from_control = _quick_n_frames_from_control(control_path)
-    if n_from_control is not None:
-        return n_from_control
-
     geo_raw = args.get("geo") or args.get("geometry") or args.get("run_dir") or args.get("input") or "geo"
     geo_path = Path(geo_raw)
     geo_path = geo_path / "geo" if geo_path.is_dir() else geo_path
@@ -126,4 +107,11 @@ def _quick_n_frames(args: dict) -> int | None:
 
     xmol_path = _resolve_reaxff_path(args, "xmolout", default="xmolout")
     xmol_path = _resolve_against_run_dir(args, xmol_path)
-    return _quick_n_frames_from_geo_xmol(geo_path, xmol_path)
+    n_from_xmolout = _quick_n_frames_from_geo_xmol(geo_path, xmol_path)
+    if n_from_xmolout is not None:
+        return n_from_xmolout
+
+    # A control-file estimate is useful only when no trajectory is available.
+    control_path = _resolve_reaxff_path(args, "control", "control_file", default="control")
+    control_path = _resolve_against_run_dir(args, control_path)
+    return _quick_n_frames_from_control(control_path)

@@ -138,6 +138,6 @@ def test_energy_curve_and_bar_payloads_pair_reaxff_with_qm() -> None:
     assert [len(payload["labels"]) for payload in payloads] == [2, 1]
     assert [series["color"] for series in payloads[0]["series"]] == [
         "tab:blue",
-        "tab:orange",
+        "#C0504D",
     ]
     assert all(payload["minimum_category_slots"] == 2 for payload in payloads)

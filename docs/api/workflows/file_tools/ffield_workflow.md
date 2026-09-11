@@ -172,7 +172,7 @@ The figure below shows an example plot for the equation of state obtained using 
 
 </div>
 
-## Command: `ffield_opt_bulk_modulus`
+## Command: `get_ffield_opt_bulk_modulus`
 
 <div class="analysis-section-indent" markdown="1">
 

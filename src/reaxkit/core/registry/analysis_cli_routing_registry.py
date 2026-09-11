@@ -10,6 +10,7 @@ Registry for routing top-level analysis commands to workflow modules.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -24,16 +25,24 @@ class AnalysisCommandSpec:
         Field value used by this structured record.
     module_path : str
         Field value used by this structured record.
+    aliases : tuple[str, ...], optional
+        Backward-compatible command names resolved to ``name``.
     """
 
     name: str
     module_path: str
+    aliases: tuple[str, ...] = ()
 
 
 ANALYSIS_COMMAND_REGISTRY: dict[str, AnalysisCommandSpec] = {}
 
 
-def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommandSpec:
+def register_analysis_command(
+    name: str,
+    *,
+    module_path: str,
+    aliases: Iterable[str] = (),
+) -> AnalysisCommandSpec:
     """
     Register a direct analysis command route.
     
@@ -46,6 +55,8 @@ def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommand
         Input parameter used by this function.
     module_path : str
         Input parameter used by this function.
+    aliases : Iterable[str], optional
+        Backward-compatible command names that resolve to ``name``.
     
     Returns
     -----
@@ -66,7 +77,11 @@ def register_analysis_command(name: str, *, module_path: str) -> AnalysisCommand
     ```
     The output type reflects the return contract for this API call.
     """
-    spec = AnalysisCommandSpec(name=name, module_path=module_path)
+    spec = AnalysisCommandSpec(
+        name=name,
+        module_path=module_path,
+        aliases=tuple(str(alias) for alias in aliases),
+    )
     ANALYSIS_COMMAND_REGISTRY[name] = spec
     return spec
 
@@ -104,11 +119,19 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
     return dict(ANALYSIS_COMMAND_REGISTRY)
 
 
-register_analysis_command("dipole", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command(
+    "get-dipole",
+    module_path="reaxkit.workflows.electrostatics_workflow",
+    aliases=("get_dipole", "dipole"),
+)
 register_analysis_command("polarization", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("charge-table", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("charge_table", module_path="reaxkit.workflows.electrostatics_workflow")
-register_analysis_command("polarization_field", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command(
+    "get_polarization_field",
+    module_path="reaxkit.workflows.electrostatics_workflow",
+    aliases=("polarization_field",),
+)
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.kinematics_workflow")
@@ -146,12 +169,23 @@ register_analysis_command(
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
 )
 register_analysis_command(
-    "ffield_opt_bulk_modulus",
+    "get_ffield_opt_bulk_modulus",
     module_path="reaxkit.workflows.file_tools.ffield_workflow",
+    aliases=("ffield_opt_bulk_modulus",),
 )
 register_analysis_command(
     "get_ffield_opt_plots",
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
+)
+register_analysis_command(
+    "get_force_field_opt_geo_files",
+    module_path="reaxkit.workflows.force_field_opt.get_force_field_opt_geo_files",
+    aliases=("get-force-field-opt-geo-files",),
+)
+register_analysis_command(
+    "get-ffield-opt-report",
+    module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_report",
+    aliases=("get_ffield_opt_report",),
 )
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
@@ -167,6 +201,16 @@ register_analysis_command("get_rdf_property", module_path="reaxkit.workflows.tra
 register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_dihedral", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_voronoi", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_z_binned_top_bottom_strain",
+    module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
+    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms", "z-binned-strain-using-top-bottom-atoms"),
+)
+register_analysis_command(
+    "get_z_binned_deformation_gradient_strain",
+    module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
+    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain", "z-binned-deformation-gradient-strain"),
+)
 register_analysis_command("connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("connection_table", module_path="reaxkit.workflows.connectivity_workflow")
@@ -199,6 +243,7 @@ _TIMESERIES_WORKFLOW_COMMANDS = (
     "get_alpha",
     "get_beta",
     "get_gamma",
+    "get_frames_count",
     "get_trajectory",
     "get_displacement",
     "get_charge",

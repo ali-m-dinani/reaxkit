@@ -15,7 +15,7 @@ Implements analyzers and analysis task modules that transform parsed engine/doma
 
 ## Structure
 - `active_sites/`: structural/event active-site analysis modules.
-- `connectivity/`, `trajectory/`, `timeseries/`, `kinematics/`, `electrostatics/`, `force_field/`, `molecular_analysis/`, `params/`, `control/`: domain analyzers.
+- `connectivity/`, `trajectory/`, `timeseries/`, `kinematics/`, `electrostatics/`, `force_field/`, `molecular_analysis/`, `stress_strain/`, `params/`, `control/`: domain analyzers.
 - `data/`: analyzer dataclass mapping metadata (`analysis_task_dataclass_map.yaml`).
 - `base.py`, `validation.py`: shared analyzer/task scaffolding.
 

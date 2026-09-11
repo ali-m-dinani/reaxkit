@@ -13,7 +13,7 @@ It is limited to geometric dihedral calculations and does not infer bonding.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass, field as dc_field, replace
 from typing import Any, Optional, Sequence
 
 import numpy as np
@@ -401,6 +401,29 @@ class DihedralTask(AnalysisTask):
         table = pd.DataFrame(rows).sort_values("frame_index", kind="stable").reset_index(drop=True)
         if reporter:
             reporter("analyze", total, total, "Finished dihedral")
+        return DihedralResult(table=table, request=request)
+
+    def run_stream(self, frames, request: DihedralRequest, reporter=None) -> DihedralResult:
+        """Compute torsions from one trajectory frame at a time."""
+        local_request = replace(request, frames=None, every=1)
+        tables: list[pd.DataFrame] = []
+        processed = 0
+        for stream_index, data in enumerate(frames):
+            if stream_index % max(1, int(request.every)):
+                continue
+            table = self.run(data, local_request, reporter=None).table
+            source = data.source_frame_indices
+            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            if not table.empty:
+                table = table.copy()
+                table["frame_index"] = source_index
+                tables.append(table)
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming dihedral analysis")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
+        if not table.empty:
+            table = table.sort_values("frame_index", kind="stable").reset_index(drop=True)
         return DihedralResult(table=table, request=request)
 
 

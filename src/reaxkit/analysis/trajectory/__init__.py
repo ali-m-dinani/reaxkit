@@ -2,6 +2,7 @@
 
 from reaxkit.analysis.trajectory.dihedral import DihedralRequest, DihedralResult, DihedralTask
 from reaxkit.analysis.trajectory.diffusivity import DiffusivityRequest, DiffusivityResult, DiffusivityTask
+from reaxkit.analysis.trajectory.frame_count import FramesCountRequest, FramesCountResult, FramesCountTask
 from reaxkit.analysis.trajectory.msd import MSDRequest, MSDResult, MSDTask
 from reaxkit.analysis.trajectory.relabel import (
     TrajectoryRelabelByCoordinationRequest,
@@ -33,6 +34,9 @@ __all__ = [
     "DiffusivityRequest",
     "DiffusivityResult",
     "DiffusivityTask",
+    "FramesCountRequest",
+    "FramesCountResult",
+    "FramesCountTask",
     "MSDRequest",
     "MSDResult",
     "MSDTask",

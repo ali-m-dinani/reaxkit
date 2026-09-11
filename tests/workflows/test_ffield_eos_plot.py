@@ -59,7 +59,10 @@ def test_eos_single_plot_builds_one_populated_payload_per_identifier() -> None:
     assert payloads[0]["series"][0]["y"] == [-3.8, -4.9]
     assert payloads[0]["series"][1]["x"] == [9.0, 10.0]
     assert payloads[0]["series"][1]["y"] == [-4.0, -5.0]
+    assert payloads[0]["series"][0]["color"] == "tab:blue"
+    assert payloads[0]["series"][1]["color"] == "#C0504D"
     assert payloads[0]["xlabel"] == "Volume (Å³)"
+    assert payloads[0]["figsize"] == (6.0, 5.0)
     assert payloads[1]["series"][0]["x"] == [1.0, 2.0]
     assert payloads[1]["series"][0]["y"] == [2.2, 1.1]
     assert payloads[1]["series"][1]["x"] == [1.0, 2.0]
@@ -67,6 +70,40 @@ def test_eos_single_plot_builds_one_populated_payload_per_identifier() -> None:
     assert payloads[1]["xlabel"] == "Scan coordinate"
     assert payloads[1]["filename"] == "eos_molecule.opt.png"
     assert payloads[1]["subdirectory"] == "molecule.opt"
+
+
+def test_eos_elastic_families_plot_strain_percent_instead_of_volume() -> None:
+    result = SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "base_iden": ["c12_0_mp_2604"] * 3 + ["c66_0_mp_2604"] * 3,
+                "other_iden": [
+                    "c12_c1_mp_2604",
+                    "c12_0_mp_2604",
+                    "c12_e1_mp_2604",
+                    "c66_c1_mp_2604",
+                    "c66_0_mp_2604",
+                    "c66_e1_mp_2604",
+                ],
+                "V_other_iden": [350.1, 350.0, 350.1, 356.0, 355.9, 356.0],
+                "E_other_iden": [1.0, 0.0, 1.0, 2.0, 0.0, 2.0],
+                "strain_percent": [-1.0, 0.0, 1.0, -1.0, 0.0, 1.0],
+                "ffield_value": [1.1, 0.0, 1.1, 2.1, 0.0, 2.1],
+                "qm_value": [1.0, 0.0, 1.0, 2.0, 0.0, 2.0],
+            }
+        )
+    )
+
+    payloads = _plot_payload(
+        "get_ffield_opt_eos",
+        result,
+        argparse.Namespace(plot="single", grid=None),
+    )
+
+    assert payloads[0]["series"][0]["x"] == [-1.0, 0.0, 1.0]
+    assert payloads[0]["xlabel"] == "Orthorhombic strain δ (%)"
+    assert payloads[1]["series"][0]["x"] == [-1.0, 0.0, 1.0]
+    assert payloads[1]["xlabel"] == "Shear angle change (%)"
 
 
 def test_eos_single_plot_requires_save_directory() -> None:

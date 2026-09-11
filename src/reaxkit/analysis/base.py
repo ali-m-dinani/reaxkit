@@ -112,7 +112,7 @@ _TASK_VIEW_HINTS: dict[str, dict[str, Any]] = {
         "x_candidates": ("iter", "frame_index", "frame_idx"),
         "y_candidates": ("P_z (uC/cm^2)", "P_z", "polarization_z", "polarization"),
     },
-    "polarization_field": {
+    "get_polarization_field": {
         "x_candidates": ("field_z", "field", "E"),
         "y_candidates": ("P_z (uC/cm^2)", "P_z", "polarization_z"),
     },

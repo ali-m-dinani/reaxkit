@@ -22,7 +22,13 @@ from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.engine.reaxff.io.fort83_handler import Fort83Handler
 
 ALL_COMMANDS = ("get-optimized-ffield",)
-ALL_LEGACY_COMMANDS = ("get_optimized_ffield", "extract-optimized-ffield", "extract_optimized_ffield")
+ALL_LEGACY_COMMANDS = (
+    "get_optimized_ffield",
+    "get_optimized_force_field_fort83",
+    "get_optimized_ffield_fort83",
+    "extract-optimized-ffield",
+    "extract_optimized_ffield",
+)
 
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:

@@ -240,22 +240,23 @@ tasks:
     help_search_examples:
     - reaxkit help "get_coordination"
     - run get_coordination
-  dipole:
+  get-dipole:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: dipole'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get-dipole'
     description: Computes dipole-moment metrics from electrostatics inputs that combine
       coordinates, charges, connectivity, and optional field data. Use it to quantify
       molecular or system-level charge separation over time.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-dipole'
     tags:
     - electrostatics
     - dipole
     notes: []
     aliases:
+    - get_dipole
     - dipole
     help_search_examples:
-    - reaxkit help "dipole"
-    - run dipole
+    - reaxkit help "get-dipole"
+    - run get-dipole
   get_dihedral:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.get_dihedral: get_dihedral'
@@ -284,6 +285,22 @@ tasks:
     help_search_examples:
     - reaxkit help "get_diffusivity"
     - run get_diffusivity
+  get_frames_count:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.trajectory.frame_count: get_frames_count'
+    description: Counts the frames in canonical TrajectoryData, independent of the
+      simulation engine or source trajectory format.
+    related_workflow_module: 'reaxkit.workflows.timeseries.get_frames_count: get_frames_count'
+    tags:
+    - trajectory
+    - frame count
+    notes:
+    - The result is the size of the TrajectoryData positions frame dimension.
+    aliases:
+    - get-frames-count
+    help_search_examples:
+    - reaxkit help "frame count"
+    - reaxkit get-frames-count --input trajectory-file
   get_dominant_species:
     consumes_dataclass: MolecularAnalysisData
     implementation_module: 'reaxkit.analysis.molecular_analysis.molecular_analysis:
@@ -395,19 +412,21 @@ tasks:
     help_search_examples:
     - reaxkit help "force field optimization report"
     - run force field optimization report
-  ffield_opt_bulk_modulus:
+  get_ffield_opt_bulk_modulus:
     consumes_dataclass: ForceFieldOptimizationResultsData
     implementation_module: 'reaxkit.analysis.force_field.report: force_field_optimization_report_bulk_modulus'
     description: Derives bulk-modulus metrics from optimization report data. Use it
       when training or validation includes elastic response, equation-of-state points,
       or pressure-volume behavior.
-    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: ffield_opt_bulk_modulus'
+    related_workflow_module: 'reaxkit.workflows.file_tools.ffield_workflow: get_ffield_opt_bulk_modulus'
     tags:
     - force field
     - bulk modulus
     - force field optimization report
     notes: []
     aliases:
+    - ffield_opt_bulk_modulus
+    - ffield-opt-bulk-modulus
     - force field optimization report bulk modulus
     - force-field-optimization-report-bulk-modulus
     help_search_examples:
@@ -565,6 +584,38 @@ tasks:
     help_search_examples:
     - reaxkit help "molecule lifetime"
     - run molecule lifetime
+  get_z_binned_top_bottom_strain:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.stress_strain.z_binned_strain_using_top_bottom_atoms: ZBinnedTopBottomStrainTask'
+    description: Computes robust per-bin normal strains from averaged top and bottom
+      coordinate spans relative to frame zero.
+    related_workflow_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_top_bottom_strain'
+    tags:
+    - stress strain
+    - trajectory
+    - z bins
+    notes: []
+    aliases:
+    - z binned strain using top bottom atoms
+    - z-binned-strain-using-top-bottom-atoms
+    help_search_examples:
+    - reaxkit help "z binned top bottom strain"
+  get_z_binned_deformation_gradient_strain:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.stress_strain.z_binned_deformation_gradient_strain: ZBinnedDeformationGradientStrainTask'
+    description: Fits per-bin affine deformation gradients and reports Green-Lagrange
+      strain, engineering shear, principal strain, volume change, and diagnostics.
+    related_workflow_module: 'reaxkit.workflows.stress_strain.z_binned_strain_workflow: get_z_binned_deformation_gradient_strain'
+    tags:
+    - stress strain
+    - deformation gradient
+    - z bins
+    notes: []
+    aliases:
+    - z binned deformation gradient strain
+    - z-binned-deformation-gradient-strain
+    help_search_examples:
+    - reaxkit help "z binned deformation gradient strain"
   get_msd:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.trajectory.get_msd: get_msd'
@@ -667,18 +718,19 @@ tasks:
     help_search_examples:
     - reaxkit help "polarization"
     - run polarization
-  polarization_field:
+  get_polarization_field:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization_field'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get_polarization_field'
     description: Analyzes polarization response versus applied electric field. Use
       it to relate field schedules to polarization curves, hysteresis behavior, or
       field-dependent electrostatic response.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization_field'
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
     tags:
     - electrostatics
     - polarization
     notes: []
     aliases:
+    - polarization_field
     - hyst
     help_search_examples:
     - reaxkit help "hysteresis"
@@ -976,7 +1028,7 @@ dataclass_usage_across_tasks:
   ElectrostaticsData:
   - dipole
   - polarization
-  - polarization_field
+  - get_polarization_field
   ForceFieldOptimizationDiagnosticData:
   - get_ffield_diagnostic_data
   ForceFieldOptimizationDiagnosticBundleData:
@@ -989,7 +1041,7 @@ dataclass_usage_across_tasks:
   - get_ffield_opt_progress_data
   ForceFieldOptimizationResultsData:
   - get_ffield_opt_results
-  - ffield_opt_bulk_modulus
+  - get_ffield_opt_bulk_modulus
   ForceFieldOptimizationPlotBundleData:
   - get_ffield_opt_eos
   - force_field_optimization_report_restraints

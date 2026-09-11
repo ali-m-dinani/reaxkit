@@ -21,6 +21,7 @@ import reaxkit.engine  # noqa: F401
 
 from reaxkit.cli.path import resolve_output_path
 from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.core.runtime.progress import resolve_reporter
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.utils.frame_utils import parse_frame_indices
 from reaxkit.core.storage.storage_layout import add_storage_cli_arguments, normalize_storage_args
@@ -137,9 +138,14 @@ def _load_domain_data(
     """Load domain data."""
     adapter = _resolve_adapter(args)
     load_args = _normalized_args(args)
-    trajectory = adapter.load(TrajectoryData, load_args)
-    charges = adapter.load(ChargeData, load_args) if property_name == "charge" else None
-    connectivity = adapter.load(ConnectivityData, load_args) if property_name == "sum_BOs" else None
+    reporter = resolve_reporter(load_args)
+    trajectory = adapter.load(TrajectoryData, load_args, reporter=reporter)
+    charges = adapter.load(ChargeData, load_args, reporter=reporter) if property_name == "charge" else None
+    connectivity = (
+        adapter.load(ConnectivityData, load_args, reporter=reporter)
+        if property_name == "sum_BOs"
+        else None
+    )
     return trajectory, charges, connectivity
 
 

@@ -32,6 +32,16 @@ def _result_frames(result: Any) -> dict[str, pd.DataFrame]:
     """
     Result frames.
     """
+    csv_tables = getattr(result, "csv_tables", None)
+    if isinstance(csv_tables, dict):
+        named_frames = {
+            str(name): frame
+            for name, frame in csv_tables.items()
+            if isinstance(frame, pd.DataFrame)
+        }
+        if named_frames:
+            return named_frames
+
     frames: dict[str, pd.DataFrame] = {}
     if hasattr(result, "table") and isinstance(getattr(result, "table"), pd.DataFrame):
         frames["table"] = getattr(result, "table")

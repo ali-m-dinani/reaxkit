@@ -122,6 +122,9 @@ class IsomerRepresentativeRecord:
     atom_ids: tuple[int, ...]
     bond_type_counts: dict[tuple[str, str], int] = dc_field(default_factory=dict)
     bond_label_counts: dict[str, int] = dc_field(default_factory=dict)
+    elements: tuple[str, ...] = ()
+    coordinates: tuple[tuple[float, float, float], ...] = ()
+    molecule_numbers: tuple[int, ...] = ()
 
 
 @dataclass
@@ -388,6 +391,101 @@ class IsomerRepresentativeDetectionTask(AnalysisTask):
 
         table = _records_table(records)
         return IsomerRepresentativeDetectionResult(table=table, records=records, request=request)
+
+    def run_stream(
+        self,
+        frames,
+        request: IsomerRepresentativeDetectionRequest,
+        reporter=None,
+    ) -> IsomerRepresentativeDetectionResult:
+        """Detect representatives while retaining only selected structures."""
+        formula = _normalize_formula_counts(request.target_formula)
+        total_atoms = int(sum(formula.values()))
+        prefix = str(request.structure_prefix or _formula_label(formula)).strip() or _formula_label(formula)
+        if request.max_representatives is not None and int(request.max_representatives) < 1:
+            raise ValueError("max_representatives must be a positive integer when provided.")
+        max_count = int(request.max_representatives) if request.max_representatives is not None else None
+        requested = set(int(value) for value in request.frame_indices) if request.frame_indices is not None else None
+        records: list[IsomerRepresentativeRecord] = []
+        seen_signatures: set[tuple[tuple[tuple[str, str], int], ...]] = set()
+        processed = 0
+
+        for stream_index, data in enumerate(frames):
+            if not isinstance(data, ConnectivityTrajectoryData):
+                raise TypeError("Isomer representative streaming requires ConnectivityTrajectoryData frames.")
+            trajectory = data.trajectory
+            positions = np.asarray(trajectory.positions, dtype=float)
+            if positions.ndim != 3 or positions.shape[0] != 1:
+                raise ValueError("Streaming isomer payloads must contain exactly one frame.")
+            source_values = trajectory.source_frame_indices
+            source_index = (
+                int(np.asarray(source_values, dtype=int).reshape(-1)[0])
+                if source_values is not None
+                else stream_index
+            )
+            if requested is not None and source_index not in requested:
+                continue
+            n_atoms = positions.shape[1]
+            if len(trajectory.atom_ids) != n_atoms or len(trajectory.elements) != n_atoms:
+                raise ValueError("Trajectory atom metadata must match the streamed atom dimension.")
+            molecule_nums = _molecule_nums(data)
+            if molecule_nums.shape != (1, n_atoms):
+                raise ValueError("Streamed molecule numbers must have shape (1, n_atoms).")
+            connectivity_matrix = _frame_matrix(
+                data.connectivity.connectivity,
+                0,
+                n_atoms=n_atoms,
+                field_name="connectivity",
+            )
+            valid = np.isfinite(positions[0]).all(axis=1)
+            molecule_to_indices: dict[int, list[int]] = defaultdict(list)
+            for atom_index, molecule_id in enumerate(molecule_nums[0].tolist()):
+                molecule_id = int(molecule_id)
+                if valid[atom_index] and molecule_id > 0:
+                    molecule_to_indices[molecule_id].append(atom_index)
+
+            iteration = _iteration_for_frame(data, 0)
+            for molecule_id, atom_indices in molecule_to_indices.items():
+                if len(atom_indices) != total_atoms:
+                    continue
+                if _element_counts(atom_indices, trajectory.elements) != formula:
+                    continue
+                bond_counts = _bond_type_counts(atom_indices, trajectory.elements, connectivity_matrix)
+                signature = tuple(sorted(bond_counts.items()))
+                if signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+                isomer_index = len(records)
+                records.append(
+                    IsomerRepresentativeRecord(
+                        isomer_index=isomer_index,
+                        structure_name=f"{prefix}_{isomer_index}",
+                        frame_index=source_index,
+                        iteration=iteration,
+                        molecule_id=int(molecule_id),
+                        atom_count=total_atoms,
+                        atom_ids=tuple(int(trajectory.atom_ids[index]) for index in atom_indices),
+                        bond_type_counts=bond_counts,
+                        bond_label_counts=_bond_label_counts(bond_counts),
+                        elements=tuple(str(trajectory.elements[index]) for index in atom_indices),
+                        coordinates=tuple(
+                            tuple(float(value) for value in positions[0, index])
+                            for index in atom_indices
+                        ),
+                        molecule_numbers=tuple(int(molecule_nums[0, index]) for index in atom_indices),
+                    )
+                )
+                if max_count is not None and len(records) >= max_count:
+                    return IsomerRepresentativeDetectionResult(
+                        table=_records_table(records), records=records, request=request
+                    )
+            processed += 1
+            if callable(reporter):
+                reporter("stream", processed, 0, "Streaming isomer representative detection")
+
+        return IsomerRepresentativeDetectionResult(
+            table=_records_table(records), records=records, request=request
+        )
 
 
 __all__ = [

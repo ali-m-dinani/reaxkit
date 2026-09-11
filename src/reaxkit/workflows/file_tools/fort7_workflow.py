@@ -74,10 +74,15 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         help="Output repaired fort.7 file. Example: --output fort7_repaired, which writes repaired content using that output name.",
     )
     parser.add_argument(
+        "--xmolout",
+        default="xmolout",
+        help="Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist).",
+    )
+    parser.add_argument(
         "--progress-every",
         type=int,
         default=5000,
-        help="Progress interval in lines (stored for metadata compatibility). Example: --progress-every 10000, which records progress in larger line-step chunks.",
+        help="Number of input lines between progress-bar updates (default: 5000).",
     )
     parser.add_argument(
         "--copy-to-dot",
@@ -111,7 +116,12 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     >>> # See workflow CLI usage for concrete examples.
     """
     out_path, layout = prepare_generator_output(args, command=command, output_value=str(args.output))
-    stats = repair_fort7(input_file=args.file, output_file=out_path, progress_every=int(args.progress_every))
+    stats = repair_fort7(
+        input_file=args.file,
+        output_file=out_path,
+        xmolout_file=args.xmolout,
+        progress_every=int(args.progress_every),
+    )
     persist_generator_metadata(
         args,
         command=command,
