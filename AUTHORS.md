@@ -16,6 +16,8 @@ Parts of this codebase were inspired by or adapted from work contributed by:
 - **[Anirban Phukan]** – developed the initial version of `active_sites` analysis
 - **[Jupjeet Dhingra]** – developed the initial version of `isomer_detection.py` 
 - **[Swarit Dwivedi]** – developed the initial version of `merge_ffields` used in `ffield_generator.py`  
+- **[Asma Ul Hosna]** – developed the isomer identification and automated ReaxFF training-data generation
+- **[Mozhdeh Mirakhory]** – helped with debugging the ReaxKit  
 
 Their original contributions have been modified and integrated with permission.
 
