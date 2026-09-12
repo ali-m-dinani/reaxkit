@@ -21,7 +21,10 @@ from reaxkit.domain.data_models import (
 from reaxkit.engine.reaxff.adapter_parts.normalizers import _SparseFrame
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
-
+from reaxkit.engine.reaxff.quick_io import (
+    iter_charge_data_quick,
+    iter_fort7_charge_frames,
+)
 
 STREAMABLE_REAXFF_TYPES = {
     TrajectoryData,
@@ -67,10 +70,10 @@ def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
 
 
 def _fort7_frame(
-    record: dict[str, Any],
-    *,
-    atom_ids: list[int] | None = None,
-    elements: list[str] | None = None,
+        record: dict[str, Any],
+        *,
+        atom_ids: list[int] | None = None,
+        elements: list[str] | None = None,
 ) -> tuple[ConnectivityData, ChargeData]:
     table: pd.DataFrame = record["frame"]
     discovered = (
@@ -173,9 +176,9 @@ def _fort7_frame(
 
 
 def _fort7_charge_array_frame(
-    record: dict[str, Any],
-    *,
-    n_atoms: int,
+        record: dict[str, Any],
+        *,
+        n_atoms: int,
 ) -> ChargeData:
     """Build only the aligned charge model needed by total electrostatics."""
     atom_ids = np.asarray(record["charge_atom_ids"], dtype=int)
@@ -206,8 +209,8 @@ def _fort7_charge_array_frame(
 
 
 def _aligned_records(
-    coordinate_records: Iterator[dict[str, Any]],
-    connectivity_records: Iterator[dict[str, Any]],
+        coordinate_records: Iterator[dict[str, Any]],
+        connectivity_records: Iterator[dict[str, Any]],
 ) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     """Merge two source-index ordered iterators while retaining two frames."""
     coordinates = next(coordinate_records, None)
@@ -228,9 +231,24 @@ def _aligned_records(
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
+    if data_type is ChargeData:
+        fort7_path = adapter._resolve_reaxff_path(
+            args, "fort7", "connectivity", "charges", default="fort.7"
+        )
+        if not Path(fort7_path).is_file():
+            raise FileNotFoundError(f"ReaxFF streaming requires fort.7: {fort7_path}")
+        xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        yield from iter_charge_data_quick(
+            fort7_path,
+            xmolout_path=xmol_path,
+            frame_indices=selected,
+            reporter=reporter,
+        )
+        return
+
     total_electrostatics = (
-        data_type is ElectrostaticsData
-        and str(args.get("scope") or "total").strip().lower() == "total"
+            data_type is ElectrostaticsData
+            and str(args.get("scope") or "total").strip().lower() == "total"
     )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
     coordinate_records = XmoloutHandler(
@@ -253,26 +271,32 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     )
     if not Path(fort7_path).is_file():
         raise FileNotFoundError(f"ReaxFF streaming requires fort.7: {fort7_path}")
-    connectivity_records = Fort7Handler(
-        fort7_path,
-        frame_indices=selected,
-        reporter=None,
-    ).stream_file_frames(
-        charges_only=(
-            data_type is ChargeData
-            or (
-                data_type is ElectrostaticsData
-                and str(args.get("scope") or "total").strip().lower() == "total"
-            )
-        ),
-        charge_arrays_only=total_electrostatics,
-    )
+    if total_electrostatics and args.get("_quick_charge_only"):
+        connectivity_records = iter_fort7_charge_frames(
+            fort7_path,
+            frame_indices=selected,
+            reporter=None,
+        )
+    else:
+        connectivity_records = Fort7Handler(
+            fort7_path,
+            frame_indices=selected,
+            reporter=None,
+        ).stream_file_frames(
+            charges_only=total_electrostatics,
+            charge_arrays_only=total_electrostatics,
+        )
 
     electric_field = None
     if data_type is ElectrostaticsData:
         command = str(args.get("command") or "").strip().lower()
         fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
-        if command == "hyst" or fort78_path.exists():
+        needs_field = bool(args.get("include_electric_field")) or command not in {
+            "write_trajectory_with_charges",
+            "generate_charge_extxyz",
+            "charge_extxyz",
+        }
+        if command == "hyst" or (needs_field and fort78_path.exists()):
             try:
                 electric_field = adapter.load_electric_field(
                     {**args, "fort78": str(fort78_path)}, reporter=None
@@ -300,8 +324,8 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         return
 
     for coordinate_record, connectivity_record in _aligned_records(
-        iter(coordinate_records),
-        iter(connectivity_records),
+            iter(coordinate_records),
+            iter(connectivity_records),
     ):
         trajectory = _trajectory_frame(coordinate_record)
         if total_electrostatics:

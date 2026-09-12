@@ -59,12 +59,16 @@ def _write_csvs(out_dir: Path, result: Any) -> list[str]:
     """
     frames = _result_frames(result)
     written: list[str] = []
+    for raw_path in getattr(result, "prewritten_csvs", ()) or ():
+        path = Path(str(raw_path))
+        if path.is_file() and path.parent.resolve() == out_dir.resolve():
+            written.append(path.name)
     if not frames:
         return written
     if set(frames.keys()) == {"table"}:
         path = out_dir / "result.csv"
         frames["table"].to_csv(path, index=False)
-        return [path.name]
+        return [*written, path.name]
     for key, frame in frames.items():
         safe = "".join(ch if (ch.isalnum() or ch in {"_", "-"}) else "_" for ch in key).strip("_") or "table"
         path = out_dir / f"{safe}.csv"

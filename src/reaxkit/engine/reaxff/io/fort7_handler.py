@@ -409,6 +409,7 @@ class Fort7Handler(BaseHandler):
         current: dict[str, Any] | None = None
         atom_rows: list[list[float | int]] = []
         charge_atom_ids: list[int] = []
+        charge_atom_type_nums: list[int] = []
         charge_values: list[float] = []
         totals: list[float] = []
 
@@ -433,6 +434,7 @@ class Fort7Handler(BaseHandler):
             }
             if charge_arrays_only:
                 record["charge_atom_ids"] = np.asarray(charge_atom_ids, dtype=int)
+                record["charge_atom_type_nums"] = np.asarray(charge_atom_type_nums, dtype=int)
                 record["charges"] = np.asarray(charge_values, dtype=float)
             else:
                 columns = (
@@ -459,6 +461,7 @@ class Fort7Handler(BaseHandler):
                         return
                     atom_rows = []
                     charge_atom_ids = []
+                    charge_atom_type_nums = []
                     charge_values = []
                     totals = []
                     current = {
@@ -502,6 +505,7 @@ class Fort7Handler(BaseHandler):
                             ending = stripped.rsplit(None, int(trailing_count) + 1)
                             charge_token = ending[-int(trailing_count) - 1]
                         charge_atom_ids.append(int(leading_fields[0]))
+                        charge_atom_type_nums.append(int(leading_fields[1]))
                         charge_values.append(float(charge_token))
                     continue
                 values = raw.split()

@@ -216,6 +216,13 @@ class ReaxFFAdapter(EngineAdapter):
             if requested_fields and requested_fields <= _SUMMARY_SIMULATION_FIELDS:
                 return ("summary.txt",)
 
+        if data_type is ElectrostaticsData:
+            files = ["xmolout", "fort.7", "summary.txt"]
+            requested_fields = {str(field) for field in args.get("_required_data_fields", ())}
+            if "electric_field" in requested_fields:
+                files.append("fort.78")
+            return tuple(files)
+
         mapping: dict[object, tuple[str, ...]] = {
             TrajectoryData: ("xmolout", "summary.txt"),
             GeometryData: ("geo", "fort.90"),
@@ -224,7 +231,6 @@ class ReaxFFAdapter(EngineAdapter):
             ConnectivityTrajectoryData: ("fort.7", "xmolout", "summary.txt", "ffield"),
             CoordinationStatusBundleData: ("fort.7", "xmolout", "summary.txt", "ffield"),
             ChargeData: ("fort.7", "xmolout", "summary.txt"),
-            ElectrostaticsData: ("xmolout", "fort.7", "summary.txt"),
             AtomicKinematicsData: ("vels",),
             ElectricFieldData: ("fort.78",),
             EregimeData: ("eregime.in",),
@@ -249,27 +255,29 @@ class ReaxFFAdapter(EngineAdapter):
         }
         if data_type is ElectrostaticsData and str(args.get("command") or "").strip().lower() == "hyst":
             return ("xmolout", "fort.7", "fort.78", "summary.txt")
+        if data_type is ChargeData and str(args.get("command") or "").strip().lower() == "get_charge_vs_electric_field":
+            return ("fort.7", "fort.78", "xmolout", "summary.txt")
         return mapping.get(data_type)
 
     @staticmethod
     def _emit_load_timing(
-        args: dict,
-        *,
-        handler: str,
-        source_path: Path | str | None,
-        seconds: float,
+            args: dict,
+            *,
+            handler: str,
+            source_path: Path | str | None,
+            seconds: float,
     ) -> None:
         """Emit load timing."""
         _emit_load_timing_helper(args, handler=handler, source_path=source_path, seconds=seconds)
 
     @classmethod
     def _build_handler(
-        cls,
-        args: dict,
-        *,
-        handler_name: str,
-        source_path: Path | str | None,
-        factory,
+            cls,
+            args: dict,
+            *,
+            handler_name: str,
+            source_path: Path | str | None,
+            factory,
     ):
         """Build handler."""
         return _build_handler_helper(
@@ -281,12 +289,12 @@ class ReaxFFAdapter(EngineAdapter):
 
     @classmethod
     def _time_source(
-        cls,
-        args: dict,
-        *,
-        handler_name: str,
-        source_path: Path | str | None,
-        loader,
+            cls,
+            args: dict,
+            *,
+            handler_name: str,
+            source_path: Path | str | None,
+            loader,
     ):
         """Time source."""
         return _time_source_helper(
@@ -347,73 +355,73 @@ class ReaxFFAdapter(EngineAdapter):
         return _load_force_field_optimization_report_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_training_set(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationTrainingSetData:
         """Load force-field optimization training-set data."""
         return _load_force_field_optimization_training_set_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_parameters(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationParameterData:
         """Load force-field optimization parameter data."""
         return _load_force_field_optimization_parameters_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_data(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationData:
         """Load combined force-field optimization data."""
         return _load_force_field_optimization_data_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_parameter_bundle(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationParameterBundleData:
         """Load force-field optimization parameter bundle data."""
         return _load_force_field_optimization_parameter_bundle_impl(self, args, reporter=reporter)
 
     def load_parameter_optimization_diagnostic(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationDiagnosticData:
         """Load parameter-optimization diagnostic data."""
         return _load_parameter_optimization_diagnostic_impl(self, args, reporter=reporter)
 
     def load_parameter_optimization_diagnostic_bundle(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationDiagnosticBundleData:
         """Load parameter-optimization diagnostic bundle data."""
         return _load_parameter_optimization_diagnostic_bundle_impl(self, args, reporter=reporter)
 
     def load_parameter_optimization_diagnostic_plot_data(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationDiagnosticPlotData:
         """Load bounded parameter-diagnostic plot inputs."""
         return _load_parameter_optimization_diagnostic_plot_data_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_report_eos_bundle(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationReportEOSBundleData:
         """Load force-field optimization EOS bundle data."""
         return _load_force_field_optimization_report_eos_bundle_impl(self, args, reporter=reporter)
 
     def load_force_field_optimization_plot_bundle(
-        self,
-        args: dict,
-        reporter=None,
+            self,
+            args: dict,
+            reporter=None,
     ) -> ForceFieldOptimizationPlotBundleData:
         """Load force-field optimization curve-classification inputs."""
         return _load_force_field_optimization_plot_bundle_impl(self, args, reporter=reporter)
@@ -463,10 +471,10 @@ class ReaxFFAdapter(EngineAdapter):
         return _load_molecular_analysis_impl(self, args, reporter=reporter)
 
     def write_control(
-        self,
-        data: ControlParametersData,
-        out_path: str | Path,
-        args: dict | None = None,
+            self,
+            data: ControlParametersData,
+            out_path: str | Path,
+            args: dict | None = None,
     ):
         """Write control data in ReaxFF control-file format."""
         return _write_control_data(data=data, out_path=out_path, args=args)

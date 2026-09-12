@@ -38,10 +38,10 @@ ANALYSIS_COMMAND_REGISTRY: dict[str, AnalysisCommandSpec] = {}
 
 
 def register_analysis_command(
-    name: str,
-    *,
-    module_path: str,
-    aliases: Iterable[str] = (),
+        name: str,
+        *,
+        module_path: str,
+        aliases: Iterable[str] = (),
 ) -> AnalysisCommandSpec:
     """
     Register a direct analysis command route.
@@ -132,13 +132,34 @@ register_analysis_command(
     module_path="reaxkit.workflows.electrostatics_workflow",
     aliases=("polarization_field",),
 )
+register_analysis_command(
+    "get_dynamic_charge_changes",
+    module_path="reaxkit.workflows.ferroelectrics.dynamic_charge_workflow",
+    aliases=("dynamic_charge_changes", "dynamic-charge-changes"),
+)
+register_analysis_command(
+    "get_binned_dynamic_charges",
+    module_path="reaxkit.workflows.ferroelectrics.binned_dynamic_charge_workflow",
+    aliases=("binned_dynamic_charges", "binned-dynamic-charges"),
+)
+register_analysis_command(
+    "get_charge_vs_electric_field",
+    module_path="reaxkit.workflows.ferroelectrics.charge_field_workflow",
+    aliases=("charge_vs_electric_field", "charge-field"),
+)
+register_analysis_command(
+    "write_trajectory_with_charges",
+    module_path="reaxkit.workflows.ferroelectrics.charge_extxyz_workflow",
+    aliases=("generate_charge_extxyz", "charge_extxyz", "charge-extended-xyz"),
+)
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_heatmap2d", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_dominant_species", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("get_largest_molecule_by_mass", module_path="reaxkit.workflows.molecular_analysis_workflow")
-register_analysis_command("get_largest_molecule_composition", module_path="reaxkit.workflows.molecular_analysis_workflow")
+register_analysis_command("get_largest_molecule_composition",
+                          module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("get_molecule_lifetime", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("largest_molecule_by_mass", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("largest_molecule_composition", module_path="reaxkit.workflows.molecular_analysis_workflow")
@@ -204,12 +225,14 @@ register_analysis_command("get_voronoi", module_path="reaxkit.workflows.trajecto
 register_analysis_command(
     "get_z_binned_top_bottom_strain",
     module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
-    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms", "z-binned-strain-using-top-bottom-atoms"),
+    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms",
+             "z-binned-strain-using-top-bottom-atoms"),
 )
 register_analysis_command(
     "get_z_binned_deformation_gradient_strain",
     module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
-    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain", "z-binned-deformation-gradient-strain"),
+    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain",
+             "z-binned-deformation-gradient-strain"),
 )
 register_analysis_command("connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_connection_list", module_path="reaxkit.workflows.connectivity_workflow")

@@ -339,10 +339,24 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
     >>> charges = adapter.load_charges({"fort7": "run/fort.7"})
     """
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+    from reaxkit.engine.reaxff.quick_io import load_charge_data_quick
 
     raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
     p = Path(raw)
     fort7_path = p / "fort.7" if p.is_dir() else p
+    if args.get("_quick_charge_only"):
+        xmolout_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        return adapter._time_source(
+            args,
+            handler_name="Fort7ChargeOnlyReader",
+            source_path=fort7_path,
+            loader=lambda: load_charge_data_quick(
+                fort7_path,
+                xmolout_path=xmolout_path,
+                frame_indices=args.get("_frame_indices"),
+                reporter=reporter,
+            ),
+        )
     handler = adapter._build_handler(
         args,
         handler_name="Fort7Handler",
