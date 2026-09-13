@@ -118,13 +118,14 @@ def test_analysis_executor_guarantees_analysis_progress_for_quiet_tasks():
 
 def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
     created = []
+    created_kwargs = []
 
     class FakeBar:
         def __init__(self, total=None, **kwargs):
-            _ = kwargs
             self.total = total
             self.n = 0
             created.append(self)
+            created_kwargs.append(kwargs)
 
         def set_description_str(self, desc):
             self.desc = desc
@@ -150,3 +151,6 @@ def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
     reporter("load", 3, 3, "Finished parsing frames")
 
     assert len(created) == 1
+    assert created_kwargs[0]["ascii"] is True
+    assert created_kwargs[0]["dynamic_ncols"] is False
+    assert 20 <= created_kwargs[0]["ncols"] <= 120

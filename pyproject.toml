@@ -81,7 +81,7 @@ all = [
 ]
 
 [project.scripts]
-reaxkit = "reaxkit.cli:main"
+reaxkit = "reaxkit.cli_startup:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

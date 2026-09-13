@@ -9,6 +9,7 @@ Shared progress reporting helpers.
 
 from __future__ import annotations
 
+import shutil
 from typing import Any, Callable
 
 from reaxkit.core.platform.log import get_logger
@@ -184,6 +185,10 @@ def tqdm_reporter_factory() -> ProgressReporter:
     last_seen: dict[str, int] = {}
     completed_events: dict[str, tuple[int, int]] = {}
 
+    def _bar_width() -> int:
+        columns = shutil.get_terminal_size(fallback=(100, 24)).columns
+        return max(20, min(int(columns) - 1, 120))
+
     def _report(stage: str, current: int, total: int, message: str | None = None) -> None:
         key = str(stage or "progress")
         cur = max(0, int(current))
@@ -204,7 +209,13 @@ def tqdm_reporter_factory() -> ProgressReporter:
                 unit="step",
                 leave=True,
                 mininterval=0.2,
-                dynamic_ncols=True,
+                # ASCII avoids mojibake in HPC terminals whose display path does
+                # not preserve Unicode even when the remote locale is UTF-8.
+                ascii=True,
+                # A bounded width prevents redraws from wrapping into new lines
+                # when a remote terminal reports an inaccurate column count.
+                ncols=_bar_width(),
+                dynamic_ncols=False,
             )
             last_seen[key] = 0
         bar = bars[key]

@@ -9,6 +9,8 @@ from typing import Any, cast
 
 import pytest
 
+from reaxkit import cli_startup
+
 cli_main = import_module("reaxkit.cli.main")
 
 
@@ -26,6 +28,55 @@ def test_canonicalize_direct_command_diffusivity_alias():
     out = cli_main._canonicalize_direct_command(argv)
 
     assert out[1] == "diffusivity"
+
+
+def test_cli_announces_command_immediately_on_stderr(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    monkeypatch.setattr(sys, "argv", ["reaxkit", "--no-stream", "get-dipole"])
+
+    cli_startup.announce_command_start(sys.argv)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "[ReaxKit] Command 'get-dipole' received; starting work...\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["reaxkit"],
+        ["reaxkit", "--help"],
+        ["reaxkit", "get-dipole", "--help"],
+    ],
+)
+def test_cli_does_not_announce_for_help_only_invocations(
+    argv,
+    capsys: pytest.CaptureFixture[str],
+):
+    cli_startup.announce_command_start(argv)
+
+    assert capsys.readouterr().err == ""
+
+
+def test_cli_bootstrap_announces_before_loading_full_dispatcher(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    monkeypatch.setattr(sys, "argv", ["reaxkit", "get-dipole"])
+
+    def fake_run_cli():
+        assert capsys.readouterr().err == (
+            "[ReaxKit] Command 'get-dipole' received; starting work...\n"
+        )
+        return 0
+
+    monkeypatch.setattr(cli_startup, "_run_cli", fake_run_cli)
+
+    assert cli_startup.main() == 0
 
 
 @pytest.mark.parametrize("command", ["get-dipole", "get_dipole", "dipole"])

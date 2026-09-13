@@ -21,6 +21,7 @@ import textwrap
 from importlib import import_module
 from pathlib import Path
 
+from reaxkit.cli_startup import announce_command_start
 from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.registry.command_catalog import get_registered_commands
@@ -297,7 +298,7 @@ def _direct_command_runner(module, command: str):
     return _runner
 
 
-def main() -> int:
+def main(*, announce: bool = True) -> int:
     """
     Build and execute the ``reaxkit`` CLI dispatcher.
 
@@ -307,7 +308,9 @@ def main() -> int:
 
     Parameters
     -----
-    None
+    announce : bool, optional
+        Emit the startup notice when called directly. The lightweight console
+        bootstrap passes ``False`` because it has already emitted the notice.
 
     Returns
     -----
@@ -335,6 +338,8 @@ def main() -> int:
     ```
     The command lists matching help entries for the query.
     """
+    if announce:
+        announce_command_start(sys.argv)
     sys_argv = _canonicalize_direct_command(sys.argv)
 
     probe = argparse.ArgumentParser(add_help=False)
