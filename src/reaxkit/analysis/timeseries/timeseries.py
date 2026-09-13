@@ -404,6 +404,8 @@ class SimulationScalarSeriesRequest(BaseRequest):
         Optional frame indices to sample; defaults to all frames.
     every : int
         Sampling stride applied after frame selection.
+    per_atom : bool
+        Divide potential energy by the atom count in each selected frame.
     """
     field: str = dc_field(
         metadata={
@@ -433,6 +435,13 @@ class SimulationScalarSeriesRequest(BaseRequest):
     every: int = dc_field(
         default=1,
         metadata={'label': 'Every', 'help': 'Every parameter for SimulationScalarSeriesRequest.', 'min': 1, 'units': 'frames'},
+    )
+    per_atom: bool = dc_field(
+        default=False,
+        metadata={
+            "label": "Per atom",
+            "help": "Normalize potential energy by the atom count in each frame.",
+        },
     )
 
 
@@ -868,6 +877,10 @@ class SimulationScalarSeriesTask(AnalysisTask):
     @staticmethod
     def required_data_fields_for(request: SimulationScalarSeriesRequest, _args: dict) -> tuple[str, ...]:
         """Declare the simulation field that must be populated by the loader."""
+        if request.per_atom:
+            if request.field != "potential_energy":
+                raise ValueError("Per-atom normalization is only supported for potential energy.")
+            return (str(request.field), "num_of_atoms")
         return (str(request.field),)
 
     @staticmethod
@@ -939,12 +952,34 @@ class SimulationScalarSeriesTask(AnalysisTask):
         if iterations.shape[0] != n_frames:
             raise ValueError("SimulationData.iterations length must match simulation scalar length.")
 
+        sampled_values = np.asarray(values[frame_idx], dtype=float)
+        if request.per_atom:
+            if request.field != "potential_energy":
+                raise ValueError("Per-atom normalization is only supported for potential energy.")
+            if data.num_of_atoms is None:
+                raise ValueError(
+                    "Per-atom potential energy requires an atom count for every frame."
+                )
+            atom_counts = np.asarray(data.num_of_atoms, dtype=float)
+            if atom_counts.shape[0] != n_frames:
+                raise ValueError(
+                    "SimulationData.num_of_atoms length must match potential-energy length."
+                )
+            sampled_counts = atom_counts[frame_idx]
+            if np.any(~np.isfinite(sampled_counts)) or np.any(sampled_counts <= 0):
+                raise ValueError(
+                    "Per-atom potential energy requires a positive, finite atom count "
+                    "in every selected frame."
+                )
+            sampled_values = sampled_values / sampled_counts
+            label = "potential_energy_per_atom"
+
         table = pd.DataFrame(
             {
                 "frame_index": np.asarray(frame_idx, dtype=int),
                 "iter": iterations[frame_idx],
                 "field": label,
-                "value": np.asarray(values[frame_idx], dtype=float),
+                "value": sampled_values,
             }
         )
         return SimulationScalarSeriesResult(

@@ -81,7 +81,15 @@ def _add_sampling_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None)
+    parser.add_argument(
+        "--plot",
+        choices=["single", "subplot", "separate"],
+        default=None,
+        help=(
+            "Plot all series together (single), in one multi-panel figure (subplot), "
+            "or as one figure file per series (separate)."
+        ),
+    )
     parser.add_argument("--show", action="store_true")
     parser.add_argument("--save", default=None)
     parser.add_argument("--export", default=None)
@@ -132,7 +140,12 @@ def configure_parser(
 
 
 def build_simulation_request(args: argparse.Namespace, field: str) -> SimulationScalarSeriesRequest:
-    return SimulationScalarSeriesRequest(field=field, frames=_frames(args), every=int(args.every))
+    return SimulationScalarSeriesRequest(
+        field=field,
+        frames=_frames(args),
+        every=int(args.every),
+        per_atom=bool(getattr(args, "per_atom", False)),
+    )
 
 
 def build_trajectory_request(args: argparse.Namespace) -> TrajectoryCoordinateSeriesRequest:
@@ -310,7 +323,11 @@ def _axis_frame_source(args: argparse.Namespace) -> str | None:
     return None
 
 
-def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+def build_plot_payload(
+    command: str,
+    result,
+    args: argparse.Namespace,
+) -> dict[str, object] | list[dict[str, object]] | None:
     """Build a table-driven plot payload for any dedicated time-series result."""
     table = getattr(result, "table", None)
     if not isinstance(table, pd.DataFrame) or table.empty:
@@ -356,12 +373,63 @@ def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[s
         return None
 
     title = command.removeprefix("get_").replace("_", " ").title()
+    ylabel = y_col
+    if command == "get_potential_energy":
+        if bool(getattr(args, "per_atom", False)):
+            title = "Potential Energy per Atom"
+            ylabel = "Potential Energy per Atom (kcal/mole/atom)"
+        else:
+            ylabel = "Potential Energy (kcal/mole)"
+    elif command == "get_partial_energy":
+        ylabel = "Partial Energy (kcal/mole)"
+    if getattr(args, "plot", None) == "separate":
+        payloads: list[dict[str, object]] = []
+        used_filenames: set[str] = set()
+        for index, item in enumerate(series, start=1):
+            label = str(item.get("label") or f"series_{index}")
+            filename_label = label
+            item_ylabel = ylabel
+            if command == "get_partial_energy" and label.startswith("component="):
+                filename_label = label.partition("=")[2]
+                item_ylabel = f"{filename_label} (kcal/mole)"
+            # Keep generated filenames portable and prevent labels from becoming paths.
+            stem = "".join(
+                character if character.isalnum() or character in {"-", "_"} else "_"
+                for character in filename_label
+            ).strip("_") or f"series_{index}"
+            filename = f"{stem}.png"
+            if filename.casefold() in used_filenames:
+                filename = f"{stem}_{index}.png"
+            used_filenames.add(filename.casefold())
+            payloads.append(
+                {
+                    "plot_type": "single_plot",
+                    "series": [item],
+                    "xlabel": xlabel,
+                    "ylabel": item_ylabel,
+                    "title": label,
+                    "legend": False,
+                    "filename": filename,
+                }
+            )
+        return payloads
     if getattr(args, "plot", None) == "subplot":
+        subplot_ylabels: str | list[str] = ylabel
+        if command == "get_partial_energy":
+            subplot_ylabels = []
+            for index, item in enumerate(series, start=1):
+                label = str(item.get("label") or f"series_{index}")
+                component = (
+                    label.partition("=")[2]
+                    if label.startswith("component=")
+                    else label
+                )
+                subplot_ylabels.append(f"{component} (kcal/mole)")
         return {
             "plot_type": "multi_subplots",
             "subplots": [[item] for item in series],
             "xlabel": xlabel,
-            "ylabel": y_col,
+            "ylabel": subplot_ylabels,
             "title": title,
             "legend": False,
             "grid": getattr(args, "grid", None),
@@ -370,7 +438,7 @@ def build_plot_payload(command: str, result, args: argparse.Namespace) -> dict[s
         "plot_type": "single_plot",
         "series": series,
         "xlabel": xlabel,
-        "ylabel": y_col,
+        "ylabel": ylabel,
         "title": title,
         "legend": len(series) > 1,
     }

@@ -15,11 +15,11 @@ def build_parser(parser, *, command: str):
             "during a simulation.\n"
             "Omit --components to include every available component.\n\n"
             "Examples:\n"
-            "  1. Plot bond and atomic energy components against physical time:\n"
-            "     reaxkit get-partial-energy --fort73 fort.73 --components Ebond Eatom "
-            "--xaxis time --plot single\n"
-            "     Reads only Ebond and Eatom from fort.73 and plots both series using "
-            "the physical-time x-axis."
+            "  1. Save every partial-energy component as its own plot:\n"
+            "     reaxkit get-partial-energy --fort73 .\\energylog "
+            "--save partial_energies --plot separate\n"
+            "     Reads all components from energylog and saves one figure per "
+            "component in the partial_energies directory."
         ),
         inputs=("fort73",),
     )
