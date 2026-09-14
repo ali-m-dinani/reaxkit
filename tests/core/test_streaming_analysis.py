@@ -16,6 +16,8 @@ from reaxkit.analysis.active_sites import (
 from reaxkit.analysis.electrostatics.electrostatics import (
     DipoleRequest,
     DipoleTask,
+    PolarizationRequest,
+    PolarizationTask,
     PolarizationFieldRequest,
     PolarizationFieldTask,
 )
@@ -116,6 +118,14 @@ def test_charge_only_fort7_stream_recovers_fused_large_neighbor_ids(tmp_path):
     np.testing.assert_array_equal(fast_records[0]["charge_atom_ids"], [1])
     np.testing.assert_allclose(fast_records[0]["charges"], [1.188])
 
+    total_only_records = list(
+        Fort7Handler(fort7_path).stream_file_frames(
+            charge_arrays_only=True,
+            include_atom_types=False,
+        )
+    )
+    assert "charge_atom_type_nums" not in total_only_records[0]
+
 
 def test_dipole_stream_matches_materialized_result():
     positions = np.asarray(
@@ -154,6 +164,54 @@ def test_dipole_stream_matches_materialized_result():
     expected = DipoleTask().run(full, request).table
     actual = DipoleTask().run_stream(stream(), request).table
     pd.testing.assert_frame_equal(actual, expected)
+    np.testing.assert_allclose(actual["mu_x (debye)"], [4.80320427, 9.60640854])
+    np.testing.assert_allclose(actual[["mu_y (debye)", "mu_z (debye)"]], 0.0)
+
+
+def test_total_polarization_stream_matches_materialized_result():
+    positions = np.asarray(
+        [
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            [[0.0, 0.0, 0.0], [1.2, 0.0, 0.0], [0.0, 1.2, 0.0], [0.0, 0.0, 1.2]],
+        ],
+        dtype=float,
+    )
+    charges = np.asarray([[-1.0, 0.2, 0.3, 0.5]] * 2, dtype=float)
+    elements = ["C", "H", "H", "H"]
+    iterations = [0, 10]
+    full_sim = SimulationData(atom_ids=[1, 2, 3, 4], iterations=np.asarray(iterations), elements=elements)
+    full = ElectrostaticsData(
+        trajectory=TrajectoryData(
+            positions=positions,
+            elements=elements,
+            atom_ids=[1, 2, 3, 4],
+            iterations=np.asarray(iterations),
+            simulation=full_sim,
+        ),
+        charges=ChargeData(charges=charges, iterations=np.asarray(iterations), simulation=full_sim),
+    )
+
+    def stream():
+        for index, trajectory in enumerate(_trajectory_frames(positions, elements, iterations)):
+            yield ElectrostaticsData(
+                trajectory=trajectory,
+                charges=ChargeData(
+                    charges=charges[index:index + 1],
+                    iterations=np.asarray([iterations[index]]),
+                    simulation=trajectory.simulation,
+                ),
+            )
+
+    request = PolarizationRequest(scope="total", frames=None, volume_method="hull")
+    expected = PolarizationTask().run(full, request).table
+    actual = PolarizationTask().run_stream(stream(), request).table
+
+    pd.testing.assert_frame_equal(actual, expected)
+    np.testing.assert_allclose(actual["volume (angstrom^3)"], [1.0 / 6.0, 1.2**3 / 6.0])
+    np.testing.assert_allclose(
+        actual["P_z (uC/cm^2)"],
+        [0.5 / (1.0 / 6.0) * 1602.176634, 0.6 / (1.2**3 / 6.0) * 1602.176634],
+    )
 
 
 def test_polarization_field_stream_matches_materialized_result():

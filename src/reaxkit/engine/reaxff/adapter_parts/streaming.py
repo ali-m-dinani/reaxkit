@@ -271,11 +271,12 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     )
     if not Path(fort7_path).is_file():
         raise FileNotFoundError(f"ReaxFF streaming requires fort.7: {fort7_path}")
-    if total_electrostatics and args.get("_quick_charge_only"):
+    if total_electrostatics:
         connectivity_records = iter_fort7_charge_frames(
             fort7_path,
             frame_indices=selected,
             reporter=None,
+            include_atom_types=False,
         )
     else:
         connectivity_records = Fort7Handler(
@@ -295,6 +296,12 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             "write_trajectory_with_charges",
             "generate_charge_extxyz",
             "charge_extxyz",
+            "get-wurtzite-neighbors",
+            "get_wurtzite_neighbors",
+            "get-wurtzite-polarity",
+            "get_wurtzite_polarity",
+            "write-trajectory-with-polarity",
+            "write_trajectory_with_polarity",
         }
         if command == "hyst" or (needs_field and fort78_path.exists()):
             try:

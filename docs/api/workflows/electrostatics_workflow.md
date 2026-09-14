@@ -77,7 +77,7 @@ _No command-specific arguments found._
 
 </div>
 
-## Command: `polarization`
+## Command: `get-polarization`
 
 <div class="analysis-section-indent" markdown="1">
 

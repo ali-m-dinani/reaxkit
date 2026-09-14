@@ -44,9 +44,10 @@ from reaxkit.presentation.convert import convert_xaxis
 from reaxkit.presentation.dispatcher import export_result_csv, present_result
 from reaxkit.presentation.plot import plot as render_plot
 
+POLARIZATION_COMMAND = "get-polarization"
 POLARIZATION_FIELD_COMMAND = "get_polarization_field"
-ALL_COMMANDS = ("charge_table", "get-dipole", "polarization", POLARIZATION_FIELD_COMMAND)
-ALL_LEGACY_COMMANDS = ("charge-table", "get_dipole", "dipole", "polarization_field")
+ALL_COMMANDS = ("charge_table", "get-dipole", POLARIZATION_COMMAND, POLARIZATION_FIELD_COMMAND)
+ALL_LEGACY_COMMANDS = ("charge-table", "get_dipole", "dipole", "polarization", "polarization_field")
 POLARIZATION_COLUMNS = ("P_x (uC/cm^2)", "P_y (uC/cm^2)", "P_z (uC/cm^2)")
 
 
@@ -62,7 +63,7 @@ def _apply_polarization_scale(command: str, result, factor: float) -> None:
     """Scale polarization-valued result columns before presentation/export."""
     if factor == 1.0:
         return
-    table_names = ("table",) if command == "polarization" else ("full_table", "aggregated_table")
+    table_names = ("table",) if command == POLARIZATION_COMMAND else ("full_table", "aggregated_table")
     for table_name in table_names:
         table = getattr(result, table_name, None)
         if not isinstance(table, pd.DataFrame):
@@ -234,7 +235,7 @@ def _build_charge_table_request(args: argparse.Namespace) -> ChargeTableRequest:
 REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
     "charge_table": _build_charge_table_request,
     "get-dipole": _build_dipole_request,
-    "polarization": _build_polarization_request,
+    POLARIZATION_COMMAND: _build_polarization_request,
     POLARIZATION_FIELD_COMMAND: _build_polarization_field_request,
 }
 
@@ -391,7 +392,7 @@ def _polarization_summary_path(command: str, args: argparse.Namespace) -> Path:
 
 def _default_component_for(command: str) -> str:
     """Default component for."""
-    return "P_z (uC/cm^2)" if command == "polarization" else "mu_z (debye)"
+    return "P_z (uC/cm^2)" if command == POLARIZATION_COMMAND else "mu_z (debye)"
 
 
 def _local_result_with_coords(
@@ -531,20 +532,21 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
     _add_runtime_arguments(parser)
 
-    if canonical in {"get-dipole", "polarization"}:
+    if canonical in {"get-dipole", POLARIZATION_COMMAND}:
+        analysis_name = "polarization" if canonical == POLARIZATION_COMMAND else canonical
         parser.description = (
-            f"Compute {canonical} data for selected frames.\n"
+            f"Compute {analysis_name} data for selected frames.\n"
             "This command supports total and local scope. Local scope requires core atom types and can\n"
             "optionally render per-frame spatial plots.\n\n"
             "Examples:\n"
             f"  1. Compute one-frame total values and export:\n"
-            f"   reaxkit {canonical} --frames 10 --scope total --export {canonical}_frame10.csv\n\n"
+            f"   reaxkit {canonical} --frames 10 --scope total --export {analysis_name}_frame10.csv\n\n"
             f"  2. Compute a frame series in total scope:\n"
-            f"   reaxkit {canonical} --frames 0:20:2 --scope total --export {canonical}_series.csv\n\n"
+            f"   reaxkit {canonical} --frames 0:20:2 --scope total --export {analysis_name}_series.csv\n\n"
             f"  3. Compute local values for selected core types:\n"
-            f"   reaxkit {canonical} --frames 10 --scope local --core Al --export local_{canonical}_frame10.csv\n\n"
+            f"   reaxkit {canonical} --frames 10 --scope local --core Al --export local_{analysis_name}_frame10.csv\n\n"
             f"  4. Render local 3D plots per frame:\n"
-            f"   reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {canonical}_plots"
+            f"   reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {analysis_name}_plots"
         )
         parser.add_argument(
             "--frames",
@@ -555,7 +557,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope. Example: --scope local, which computes per-core local contributions.")
         parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope. Example: --core Al,Mg, which limits local analysis to those core types.")
-        if canonical == "polarization":
+        if canonical == POLARIZATION_COMMAND:
             parser.add_argument(
                 "--scale-by",
                 type=_positive_scale,
@@ -656,7 +658,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
 
-    if canonical in {"polarization", POLARIZATION_FIELD_COMMAND}:
+    if canonical in {POLARIZATION_COMMAND, POLARIZATION_FIELD_COMMAND}:
         _apply_polarization_scale(canonical, result, float(getattr(args, "scale_by", 1.0)))
 
     if canonical == "charge_table" and isinstance(getattr(result, "table", None), pd.DataFrame):
@@ -684,7 +686,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             result.full_table = result.full_table.copy()
             result.full_table["time"] = np.asarray(converted, dtype=float)
 
-    local_plot_requested = canonical in {"get-dipole", "polarization"} and getattr(args, "plot", None) in {"plot3d", "heatmap2d"}
+    local_plot_requested = canonical in {"get-dipole", POLARIZATION_COMMAND} and getattr(args, "plot", None) in {"plot3d", "heatmap2d"}
     args_for_present = args
     if local_plot_requested:
         args_for_present = argparse.Namespace(**vars(args))

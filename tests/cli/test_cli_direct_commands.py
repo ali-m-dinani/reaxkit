@@ -113,6 +113,30 @@ def test_get_dipole_accepts_frame_option_alias():
     assert args.frames == ["0:200:1"]
 
 
+@pytest.mark.parametrize("command", ["get-polarization", "get_polarization", "polarization"])
+def test_canonicalize_polarization_aliases(command: str):
+    argv = ["reaxkit", command, "--scope", "total"]
+
+    out = cli_main._canonicalize_direct_command(argv)
+
+    assert out[1] == "get-polarization"
+
+
+def test_get_polarization_is_the_registered_command_and_task():
+    from reaxkit.analysis.electrostatics.electrostatics import PolarizationTask
+    from reaxkit.core.registry.analysis_cli_routing_registry import (
+        get_registered_analysis_commands,
+    )
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+
+    commands = get_registered_analysis_commands()
+    spec = commands["get-polarization"]
+
+    assert spec.aliases == ("polarization",)
+    assert "polarization" not in commands
+    assert TASK_REGISTRY["get-polarization"] is PolarizationTask
+
+
 @pytest.mark.parametrize("command", ["get_polarization_field", "polarization_field"])
 def test_canonicalize_polarization_field_aliases(command: str):
     argv = ["reaxkit", command, "--aggregate", "mean"]

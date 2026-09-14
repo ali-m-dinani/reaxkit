@@ -26,6 +26,20 @@ from reaxkit.analysis.ferroelectrics.dynamic_charge import (
     DynamicChargeChangeTask,
     calculate_dynamic_charge_changes,
 )
+from reaxkit.analysis.ferroelectrics.four_folded_wurtzite import (
+    PolarityExtendedXYZRequest,
+    PolarityExtendedXYZResult,
+    PolarityExtendedXYZTask,
+    WurtziteNeighborRequest,
+    WurtziteNeighborResult,
+    WurtziteNeighborTask,
+    WurtzitePolarityRequest,
+    WurtzitePolarityResult,
+    WurtzitePolarityTask,
+    calculate_wurtzite_polarity,
+    extract_wurtzite_neighbors,
+    plot_site_resolved_polarity,
+)
 
 __all__ = [
     "BinnedDynamicChargeRequest",
@@ -45,4 +59,16 @@ __all__ = [
     "DynamicChargeChangeResult",
     "DynamicChargeChangeTask",
     "calculate_dynamic_charge_changes",
+    "PolarityExtendedXYZRequest",
+    "PolarityExtendedXYZResult",
+    "PolarityExtendedXYZTask",
+    "WurtziteNeighborRequest",
+    "WurtziteNeighborResult",
+    "WurtziteNeighborTask",
+    "WurtzitePolarityRequest",
+    "WurtzitePolarityResult",
+    "WurtzitePolarityTask",
+    "calculate_wurtzite_polarity",
+    "extract_wurtzite_neighbors",
+    "plot_site_resolved_polarity",
 ]

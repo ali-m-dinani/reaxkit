@@ -1515,28 +1515,30 @@ workflows:
     help_search_examples:
     - reaxkit help "place geo"
     - reaxkit place-geo -h
-  polarization:
+  get-polarization:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
-    command: polarization
+    implementation_module: 'reaxkit.workflows.electrostatics_workflow: get-polarization'
+    command: get-polarization
     command_kind: analysis
-    analysis_task: polarization
+    analysis_task: get-polarization
     description: Computes polarization metrics from electrostatics data built from charges, coordinates,
       connectivity, and optional field values. It supports dielectric-response and field-driven charge-separation
       studies.
     tags:
     - electrostatics
     - polarization
+    - get polarization
     - electrostatics workflow
     - analysis workflow command
     notes:
-    - 'How to use the workflow: reaxkit polarization -h'
+    - 'How to use the workflow: reaxkit get-polarization -h'
     aliases:
     - polarization
     help_search_examples:
     - reaxkit help "polarization"
     - run polarization
-    - reaxkit polarization -h
+    - reaxkit help "get polarization"
+    - reaxkit get-polarization -h
   get_polarization_field:
     parent_workflow: electrostatics_workflow
     implementation_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
@@ -3031,7 +3033,7 @@ command_to_workflow_module:
   get_ffield_diagnostics_sensitivity: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_diagnostics_evolution: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
-  polarization: reaxkit.workflows.electrostatics_workflow
+  get-polarization: reaxkit.workflows.electrostatics_workflow
   get_polarization_field: reaxkit.workflows.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow

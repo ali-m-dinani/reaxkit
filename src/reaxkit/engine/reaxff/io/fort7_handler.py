@@ -382,6 +382,7 @@ class Fort7Handler(BaseHandler):
         *,
         charges_only: bool = False,
         charge_arrays_only: bool = False,
+        include_atom_types: bool = True,
     ) -> Iterator[Dict[str, Any]]:
         """Yield ``fort.7`` frames without materializing the trajectory.
 
@@ -399,6 +400,11 @@ class Fort7Handler(BaseHandler):
         it extracts the atom id and partial-charge field from each atom row
         without converting the unused connectivity/bond-order fields or
         constructing a pandas table.
+
+        ``include_atom_types=False`` makes that path skip atom-type conversion
+        as well. Total dipole and polarization calculations need only atom ids,
+        coordinates, and charges, and skipping the field also avoids ambiguity
+        when fixed-width neighbor ids above 9999 are concatenated to it.
         """
         if charge_arrays_only:
             charges_only = True
@@ -434,7 +440,11 @@ class Fort7Handler(BaseHandler):
             }
             if charge_arrays_only:
                 record["charge_atom_ids"] = np.asarray(charge_atom_ids, dtype=int)
-                record["charge_atom_type_nums"] = np.asarray(charge_atom_type_nums, dtype=int)
+                if include_atom_types:
+                    record["charge_atom_type_nums"] = np.asarray(
+                        charge_atom_type_nums,
+                        dtype=int,
+                    )
                 record["charges"] = np.asarray(charge_values, dtype=float)
             else:
                 columns = (
@@ -505,7 +515,14 @@ class Fort7Handler(BaseHandler):
                             ending = stripped.rsplit(None, int(trailing_count) + 1)
                             charge_token = ending[-int(trailing_count) - 1]
                         charge_atom_ids.append(int(leading_fields[0]))
-                        charge_atom_type_nums.append(int(leading_fields[1]))
+                        if include_atom_types:
+                            # The first two fort.7 fields are fixed-width. Once
+                            # neighbor ids exceed 9999, whitespace splitting can
+                            # merge the atom type with every full-width neighbor.
+                            atom_type_token = raw[5:10].strip()
+                            if not atom_type_token.lstrip("+-").isdigit():
+                                atom_type_token = leading_fields[1]
+                            charge_atom_type_nums.append(int(atom_type_token))
                         charge_values.append(float(charge_token))
                     continue
                 values = raw.split()

@@ -18,6 +18,7 @@ def iter_fort7_charge_frames(
     *,
     frame_indices: Sequence[int] | None = None,
     reporter=None,
+    include_atom_types: bool = True,
 ) -> Iterator[dict[str, Any]]:
     """Yield compact records containing only ids, types, charges, and frame metadata."""
 
@@ -25,7 +26,10 @@ def iter_fort7_charge_frames(
         path,
         frame_indices=frame_indices,
         reporter=reporter,
-    ).stream_file_frames(charge_arrays_only=True)
+    ).stream_file_frames(
+        charge_arrays_only=True,
+        include_atom_types=include_atom_types,
+    )
 
 
 def charge_data_from_record(

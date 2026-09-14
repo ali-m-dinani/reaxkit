@@ -136,7 +136,7 @@ def test_charge_stream_never_uses_full_xmolout_frame_parser(monkeypatch) -> None
     assert frames[0].metadata["charges_only"] is True
 
 
-def test_total_electrostatics_uses_public_quick_io_when_requested(monkeypatch) -> None:
+def test_total_electrostatics_always_uses_public_charge_only_quick_io(monkeypatch) -> None:
     original = streaming.iter_fort7_charge_frames
     calls = []
 
@@ -152,7 +152,6 @@ def test_total_electrostatics_uses_public_quick_io_when_requested(monkeypatch) -
                 "fort7": str(FIXTURE_DIR / "fort.7"),
                 "xmolout": str(FIXTURE_DIR / "xmolout"),
                 "scope": "total",
-                "_quick_charge_only": True,
                 "_frame_indices": [0, 1],
                 "progress": False,
             },
@@ -160,5 +159,25 @@ def test_total_electrostatics_uses_public_quick_io_when_requested(monkeypatch) -
     )
 
     assert len(calls) == 1
+    assert calls[0][1]["include_atom_types"] is False
     assert len(frames) == 2
     assert frames[0].charges.metadata["charges_only"] is True
+
+
+def test_total_electrostatics_quick_reader_skips_fused_atom_type_field(tmp_path) -> None:
+    fort7 = tmp_path / "fort.7"
+    fort7.write_text(
+        """    28880 slab Iteration: 0 #Bonds: 10
+10002    2100071001210087115211152311529    0    0    0    0    1  0.426  0.551  0.517  0.342  0.547  0.321  0.000  0.000  0.000  0.000  3.988  0.000  1.177
+ 0.0 0.0 0.0 0.0
+""",
+        encoding="utf-8",
+    )
+
+    record = next(
+        iter_fort7_charge_frames(fort7, include_atom_types=False)
+    )
+
+    assert "charge_atom_type_nums" not in record
+    np.testing.assert_array_equal(record["charge_atom_ids"], [10002])
+    np.testing.assert_allclose(record["charges"], [1.177])

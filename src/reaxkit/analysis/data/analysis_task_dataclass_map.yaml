@@ -702,13 +702,13 @@ tasks:
     - time series
     - partial energy
     notes: []
-  polarization:
+  get-polarization:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get-polarization'
     description: Computes polarization metrics from electrostatics data built from
       charges, coordinates, connectivity, and optional field values. It supports dielectric-response
       and field-driven charge-separation studies.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
+    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-polarization'
     tags:
     - electrostatics
     - polarization

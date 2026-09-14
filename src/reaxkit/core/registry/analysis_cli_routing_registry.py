@@ -124,7 +124,11 @@ register_analysis_command(
     module_path="reaxkit.workflows.electrostatics_workflow",
     aliases=("get_dipole", "dipole"),
 )
-register_analysis_command("polarization", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command(
+    "get-polarization",
+    module_path="reaxkit.workflows.electrostatics_workflow",
+    aliases=("polarization",),
+)
 register_analysis_command("charge-table", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command("charge_table", module_path="reaxkit.workflows.electrostatics_workflow")
 register_analysis_command(
@@ -151,6 +155,28 @@ register_analysis_command(
     "write_trajectory_with_charges",
     module_path="reaxkit.workflows.ferroelectrics.charge_extxyz_workflow",
     aliases=("generate_charge_extxyz", "charge_extxyz", "charge-extended-xyz"),
+)
+register_analysis_command(
+    "get-wurtzite-neighbors",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite.neighbors_workflow"
+    ),
+    aliases=("get_wurtzite_neighbors", "wurtzite-neighbors"),
+)
+register_analysis_command(
+    "get-wurtzite-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite.polarity_workflow"
+    ),
+    aliases=("get_wurtzite_polarity", "wurtzite-polarity"),
+)
+register_analysis_command(
+    "write-trajectory-with-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite."
+        "polarity_trajectory_workflow"
+    ),
+    aliases=("write_trajectory_with_polarity", "polarity-extxyz"),
 )
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")

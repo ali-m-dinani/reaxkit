@@ -1216,7 +1216,7 @@ class DipoleTask(AnalysisTask):
         )
 
 
-@register_task("polarization", label="Polarization")
+@register_task("get-polarization", label="Polarization")
 class PolarizationTask(AnalysisTask):
     """Compute polarization series as total or local."""
 
