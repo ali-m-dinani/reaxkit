@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "3.0.2"
+version = "3.0.3"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
   { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
@@ -50,7 +50,6 @@ trajectory = [
     "MDAnalysis",
     "freud-analysis",
     "ovito",
-    "pyvoro",
 ]
 materials = [
     "ase",
