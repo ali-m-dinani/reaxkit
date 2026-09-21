@@ -1,7 +1,8 @@
 """Polarization relative to a replicated hexagonal AlN reference."""
 
 from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
-    DEFAULT_PBE_BORN_EFFECTIVE_CHARGES,
+    ChargeSource,
+    DEFAULT_FORMAL_CHARGES,
     HBNReferencePolarizationRequest,
     HBNReferencePolarizationResult,
     HBNReferencePolarizationTask,
@@ -14,7 +15,8 @@ from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
 )
 
 __all__ = [
-    "DEFAULT_PBE_BORN_EFFECTIVE_CHARGES",
+    "ChargeSource",
+    "DEFAULT_FORMAL_CHARGES",
     "HBNReferencePolarizationRequest",
     "HBNReferencePolarizationResult",
     "HBNReferencePolarizationTask",

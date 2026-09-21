@@ -10,12 +10,17 @@ Shared progress reporting helpers.
 from __future__ import annotations
 
 import shutil
+from threading import Event, RLock, Thread
 from typing import Any, Callable
 
 from reaxkit.core.platform.log import get_logger
 from tqdm.auto import tqdm
 
 ProgressReporter = Callable[[str, int, int, str | None], None]
+
+_INDETERMINATE_STEPS = 24
+_INDETERMINATE_INTERVAL_SECONDS = 0.15
+_INDETERMINATE_BAR_FORMAT = "{desc}: |{bar}| [{elapsed}, working]"
 
 
 class ProgressOperation:
@@ -184,60 +189,102 @@ def tqdm_reporter_factory() -> ProgressReporter:
     bars: dict[str, tqdm] = {}
     last_seen: dict[str, int] = {}
     completed_events: dict[str, tuple[int, int]] = {}
+    animations: dict[str, Event] = {}
+    lock = RLock()
 
     def _bar_width() -> int:
         columns = shutil.get_terminal_size(fallback=(100, 24)).columns
         return max(20, min(int(columns) - 1, 120))
 
+    def _stop_animation(key: str) -> None:
+        stop = animations.pop(key, None)
+        if stop is not None:
+            stop.set()
+
+    def _start_animation(key: str, bar: tqdm) -> None:
+        """Animate a bounded working bar until a real total becomes available."""
+        stop = Event()
+        animations[key] = stop
+
+        def _animate() -> None:
+            while not stop.wait(_INDETERMINATE_INTERVAL_SECONDS):
+                with lock:
+                    if stop.is_set() or bars.get(key) is not bar:
+                        return
+                    if int(bar.n) >= _INDETERMINATE_STEPS:
+                        bar.reset(total=_INDETERMINATE_STEPS)
+                    bar.update(1)
+                    bar.refresh()
+
+        Thread(
+            target=_animate,
+            name=f"reaxkit-progress-{key}",
+            daemon=True,
+        ).start()
+
     def _report(stage: str, current: int, total: int, message: str | None = None) -> None:
-        key = str(stage or "progress")
-        cur = max(0, int(current))
-        tot = max(0, int(total))
-        msg = (message or "").strip()
-        desc = f"{key}: {msg}" if msg else key
+        with lock:
+            key = str(stage or "progress")
+            cur = max(0, int(current))
+            tot = max(0, int(total))
+            msg = (message or "").strip()
+            desc = f"{key}: {msg}" if msg else key
 
-        completion = (cur, tot)
-        if cur == 0 or (tot > 0 and cur < tot):
-            completed_events.pop(key, None)
-        if key not in bars and tot > 0 and cur >= tot and completed_events.get(key) == completion:
-            return
+            completion = (cur, tot)
+            if cur == 0 or (tot > 0 and cur < tot):
+                completed_events.pop(key, None)
+            if key not in bars and tot > 0 and cur >= tot and completed_events.get(key) == completion:
+                return
 
-        if key not in bars:
-            bars[key] = tqdm(
-                total=tot if tot > 0 else None,
-                desc=desc,
-                unit="step",
-                leave=True,
-                mininterval=0.2,
-                # ASCII avoids mojibake in HPC terminals whose display path does
-                # not preserve Unicode even when the remote locale is UTF-8.
-                ascii=True,
-                # A bounded width prevents redraws from wrapping into new lines
-                # when a remote terminal reports an inaccurate column count.
-                ncols=_bar_width(),
-                dynamic_ncols=False,
-            )
-            last_seen[key] = 0
-        bar = bars[key]
-        bar.set_description_str(desc)
-        if tot > 0 and bar.total != tot:
-            bar.total = tot
-            bar.refresh()
+            if key not in bars:
+                indeterminate = tot <= 0
+                bars[key] = tqdm(
+                    total=_INDETERMINATE_STEPS if indeterminate else tot,
+                    desc=desc,
+                    unit="step",
+                    leave=True,
+                    mininterval=0.2,
+                    # ASCII avoids mojibake in HPC terminals whose display path does
+                    # not preserve Unicode even when the remote locale is UTF-8.
+                    ascii=True,
+                    # A bounded width prevents redraws from wrapping into new lines
+                    # when a remote terminal reports an inaccurate column count.
+                    ncols=_bar_width(),
+                    dynamic_ncols=False,
+                    bar_format=_INDETERMINATE_BAR_FORMAT if indeterminate else None,
+                )
+                last_seen[key] = 0
+                if indeterminate:
+                    _start_animation(key, bars[key])
+            bar = bars[key]
+            bar.set_description_str(desc)
 
-        prev = int(last_seen.get(key, 0))
-        if cur < prev:
-            bar.reset(total=tot if tot > 0 else None)
-            prev = 0
-        delta = cur - prev
-        if delta > 0:
-            bar.update(delta)
-        last_seen[key] = cur
+            if tot > 0 and key in animations:
+                _stop_animation(key)
+                bar.bar_format = None
+                bar.reset(total=tot)
+                last_seen[key] = 0
+                bar.refresh()
+            elif tot > 0 and bar.total != tot:
+                bar.total = tot
+                bar.refresh()
 
-        if tot > 0 and cur >= tot:
-            bar.close()
-            bars.pop(key, None)
-            last_seen.pop(key, None)
-            completed_events[key] = completion
+            if tot > 0:
+                prev = int(last_seen.get(key, 0))
+                if cur < prev:
+                    bar.reset(total=tot)
+                    prev = 0
+                delta = cur - prev
+                if delta > 0:
+                    bar.update(delta)
+            last_seen[key] = cur
+
+            if tot > 0 and cur >= tot:
+                _stop_animation(key)
+                bar.close()
+                bars.pop(key, None)
+                last_seen.pop(key, None)
+                completed_events[key] = completion
 
     return _report
 

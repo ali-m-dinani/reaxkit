@@ -121,19 +121,25 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
 
 register_analysis_command(
     "get-dipole",
-    module_path="reaxkit.workflows.electrostatics_workflow",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("get_dipole", "dipole"),
 )
 register_analysis_command(
     "get-polarization",
-    module_path="reaxkit.workflows.electrostatics_workflow",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("polarization",),
 )
-register_analysis_command("charge-table", module_path="reaxkit.workflows.electrostatics_workflow")
-register_analysis_command("charge_table", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command(
+    "charge-table",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
+)
+register_analysis_command(
+    "charge_table",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
+)
 register_analysis_command(
     "get_polarization_field",
-    module_path="reaxkit.workflows.electrostatics_workflow",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("polarization_field",),
 )
 register_analysis_command(

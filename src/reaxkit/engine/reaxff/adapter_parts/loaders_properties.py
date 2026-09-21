@@ -316,9 +316,9 @@ def load_eregime(adapter: ReaxFFAdapter, args: dict, reporter=None) -> EregimeDa
 def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeData:
     """Load atomic-charge trajectories.
 
-    Resolves a charge source, parses it through `Fort7Handler`, and enriches
-    the output with merged simulation metadata when available. If the ReaxFF
-    engine is used, then this file would usually be `fort.7`.
+    Resolves a charge source and reads ``fort.7``. Charge-only callers use the
+    lightweight quick-I/O path; callers that also need connectivity retain the
+    full ``Fort7Handler`` parse and its richer metadata.
 
     Parameters
     ----------
@@ -344,7 +344,13 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
     raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
     p = Path(raw)
     fort7_path = p / "fort.7" if p.is_dir() else p
-    if args.get("_quick_charge_only"):
+    required_fields = {str(field) for field in args.get("_required_data_fields", ())}
+    inferred_charge_only = bool(
+        required_fields
+        and "charges" in required_fields
+        and "connectivity" not in required_fields
+    )
+    if args.get("_quick_charge_only") or inferred_charge_only:
         xmolout_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
         return adapter._time_source(
             args,
@@ -408,10 +414,12 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
     load_all_fields = not required_fields
 
     trajectory = adapter.load_trajectory(args, reporter=reporter)
-    charges = adapter.load_charges(args, reporter=reporter)
+    needs_connectivity = load_all_fields or "connectivity" in required_fields
+    charge_args = args if needs_connectivity else {**args, "_quick_charge_only": True}
+    charges = adapter.load_charges(charge_args, reporter=reporter)
     connectivity = (
         adapter.load_connectivity(args, reporter=reporter)
-        if load_all_fields or "connectivity" in required_fields
+        if needs_connectivity
         else None
     )
     electric_field = None

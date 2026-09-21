@@ -93,14 +93,18 @@ def test_dipole_saves_artifacts() -> None:
 
 
 @pytest.mark.parametrize(
-    ("scope", "expected"),
+    ("scope", "charge_source", "expected"),
     [
-        ("total", ("trajectory", "charges")),
-        ("local", ("trajectory", "charges", "connectivity")),
+        ("total", "reaxff", ("trajectory", "charges")),
+        ("local", "reaxff", ("trajectory", "charges", "connectivity")),
+        ("total", "formal", ("trajectory",)),
+        ("local", "formal", ("trajectory", "connectivity")),
     ],
 )
-def test_dipole_declares_only_required_data_fields(scope: str, expected: tuple[str, ...]) -> None:
-    request = DipoleRequest(scope=scope)
+def test_dipole_declares_only_required_data_fields(
+    scope: str, charge_source: str, expected: tuple[str, ...]
+) -> None:
+    request = DipoleRequest(scope=scope, charge_source=charge_source)
 
     assert DipoleTask.required_data_fields_for(request, {}) == expected
     assert DipoleTask.supports_selective_streaming is True

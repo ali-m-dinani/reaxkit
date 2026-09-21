@@ -1,4 +1,4 @@
-﻿_meta:
+_meta:
   version: '1.0'
   source: workflow registries + analysis task dataclass map + workflow module docstrings
   purpose: Maps workflow families and independently invocable workflow commands
@@ -51,7 +51,7 @@ workflows:
     - reaxkit help "connectivity workflow"
     - run connectivity workflow
   electrostatics_workflow:
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge-table'
     description: Command workflow for electrostatics analyses and local visualizations.
     related_commands:
       analysis:
@@ -1203,7 +1203,7 @@ workflows:
     - reaxkit plot_atom_property -h
   charge_table:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge_table'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge_table'
     command: charge_table
     command_kind: analysis
     analysis_task: charge_table
@@ -1228,7 +1228,7 @@ workflows:
     - reaxkit charge_table -h
   dipole:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: dipole'
     command: dipole
     command_kind: workflow
     description: Run the dipole workflow command provided by electrostatics_workflow.
@@ -1888,7 +1888,7 @@ workflows:
     - reaxkit place-geo -h
   get-polarization:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: get-polarization'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-polarization'
     command: get-polarization
     command_kind: analysis
     analysis_task: get-polarization
@@ -1912,7 +1912,7 @@ workflows:
     - reaxkit get-polarization -h
   get_polarization_field:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get_polarization_field'
     command: get_polarization_field
     command_kind: analysis
     analysis_task: get_polarization_field
@@ -3294,7 +3294,7 @@ workflows:
     - reaxkit get_z_binned_deformation_gradient_strain -h
   polarization-field:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization-field'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: polarization-field'
     command: polarization-field
     command_kind: workflow
     description: Run the polarization field workflow command provided by electrostatics_workflow.
@@ -3393,8 +3393,8 @@ command_to_workflow_module:
   add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
   add_molcharge_to_geo: reaxkit.workflows.file_tools.geo_workflow
   plot_atom_property: reaxkit.workflows.meta.plot_atom_property_workflow
-  charge-table: reaxkit.workflows.electrostatics_workflow
-  dipole: reaxkit.workflows.electrostatics_workflow
+  charge-table: reaxkit.workflows.electrostatics.electrostatics_workflow
+  dipole: reaxkit.workflows.electrostatics.electrostatics_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
   get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_progress_data: reaxkit.workflows.file_tools.ffield_workflow
@@ -3429,8 +3429,8 @@ command_to_workflow_module:
   get_ffield_diagnostics_sensitivity: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_diagnostics_evolution: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
-  get-polarization: reaxkit.workflows.electrostatics_workflow
-  get_polarization_field: reaxkit.workflows.electrostatics_workflow
+  get-polarization: reaxkit.workflows.electrostatics.electrostatics_workflow
+  get_polarization_field: reaxkit.workflows.electrostatics.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.study_design.study_workflow
@@ -3535,7 +3535,7 @@ command_to_workflow_module:
   add-restraints-to-geo: reaxkit.workflows.file_tools.geo_workflow
   add-molcharge-to-geo: reaxkit.workflows.file_tools.geo_workflow
   plot-atom-property: reaxkit.workflows.meta.plot_atom_property_workflow
-  charge_table: reaxkit.workflows.electrostatics_workflow
+  charge_table: reaxkit.workflows.electrostatics.electrostatics_workflow
   repair-fort7: reaxkit.workflows.file_tools.fort7_workflow
   get-ffield-data: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-opt-progress-data: reaxkit.workflows.file_tools.ffield_workflow
@@ -3563,7 +3563,7 @@ command_to_workflow_module:
   get-ffield-diagnostics-sensitivity: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-diagnostics-evolution: reaxkit.workflows.file_tools.ffield_workflow
   place_geo: reaxkit.workflows.file_tools.geo_workflow
-  polarization-field: reaxkit.workflows.electrostatics_workflow
+  polarization-field: reaxkit.workflows.electrostatics.electrostatics_workflow
   sort_geo: reaxkit.workflows.file_tools.geo_workflow
   get-energy-min-summary-data: reaxkit.workflows.file_tools.ffield_workflow
   get-trainset-data: reaxkit.workflows.file_tools.trainset_workflow

@@ -16,19 +16,36 @@ def test_command_routes_to_hbn_reference_workflow() -> None:
     assert route.module_path.endswith("hbn_refernce.polarization_workflow")
 
 
-def test_parser_builds_pbe_request() -> None:
+def test_parser_builds_default_charge_request() -> None:
     parser = polarization_workflow.build_parser(
         argparse.ArgumentParser(), command=polarization_workflow.COMMAND
     )
     args = parser.parse_args(["--replication", "2", "3", "4"])
     request = polarization_workflow.build_request(args)
 
-    assert request.born_effective_charges == {"Al": 2.52, "N": -2.52}
+    assert request.charge_source == "auto"
+    assert request.formal_charges == {"Al": 3.0, "N": -3.0}
     assert request.reference_species == {"B": "Al"}
     assert request.orthogonalize == "auto"
     assert request.replication == (2, 3, 4)
     assert request.max_reference_strain == 0.15
     assert request.volume_method == "hull"
+
+
+def test_parser_accepts_charge_source_and_formal_charge_options() -> None:
+    parser = polarization_workflow.build_parser(
+        argparse.ArgumentParser(), command=polarization_workflow.COMMAND
+    )
+    args = parser.parse_args([
+        "--replication", "2", "3", "4",
+        "--charge-source", "formal",
+        "--formal-charge", "B=3",
+    ])
+
+    request = polarization_workflow.build_request(args)
+
+    assert request.charge_source == "formal"
+    assert request.formal_charges == {"Al": 3.0, "N": -3.0, "B": 3.0}
 
 
 def test_parser_supports_explicit_reference_orthogonalization() -> None:

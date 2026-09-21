@@ -11,7 +11,12 @@ from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
     calculate_hbn_reference_polarization,
 )
 from reaxkit.core.platform.constants import const
-from reaxkit.domain.data_models import SimulationData, TrajectoryData
+from reaxkit.domain.data_models import (
+    ChargeData,
+    ElectrostaticsData,
+    SimulationData,
+    TrajectoryData,
+)
 from reaxkit.engine.common.generators.structure_transformers import (
     orthogonalize_hexagonal_cell,
 )
@@ -81,7 +86,7 @@ def test_vacuum_is_not_applied_as_reference_strain(reference_path) -> None:
     assert np.max(np.abs(result.displacements["displacement_c (angstrom)"])) < 1.0e-10
 
 
-def test_relative_cation_displacement_produces_bec_dipole(reference_path) -> None:
+def test_relative_cation_displacement_produces_formal_charge_dipole(reference_path) -> None:
     trajectory = _trajectory_from_reference(reference_path)
     positions = trajectory.positions.copy()
     labels = np.asarray(trajectory.elements)
@@ -103,13 +108,61 @@ def test_relative_cation_displacement_produces_bec_dipole(reference_path) -> Non
     )
 
     # Removing rigid translation gives +0.05 A on Al and -0.05 A on N.
-    expected_dipole = 8 * 2.52 * 0.1
+    expected_dipole = -8 * 3.0 * 0.1
     volume = abs(np.linalg.det(result.reference.atoms.cell.array))
     assert result.table.iloc[0]["dipole_c (e*angstrom)"] == pytest.approx(expected_dipole)
     factor = const("ea3_to_uC_cm2")
     assert factor is not None
     assert result.table.iloc[0]["P_c (uC/cm^2)"] == pytest.approx(
         expected_dipole / volume * factor
+    )
+    for axis in "xyz":
+        assert f"dipole_{axis} (e*angstrom)" in result.table.columns
+        assert f"dipole_{axis} (debye)" in result.table.columns
+        assert f"P_{axis} (uC/cm^2)" in result.table.columns
+        assert f"dipole_{axis} (e*angstrom)" in result.displacements.columns
+        assert f"dipole_{axis} (debye)" in result.displacements.columns
+    assert result.table.iloc[0]["dipole_z (e*angstrom)"] == pytest.approx(
+        expected_dipole
+    )
+    assert result.table.iloc[0]["P_z (uC/cm^2)"] == pytest.approx(
+        expected_dipole / volume * factor
+    )
+    assert result.table.iloc[0]["electron_charge_sign"] == -1.0
+
+
+def test_reports_cartesian_and_selected_c_axis_components(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    positions = trajectory.positions.copy()
+    labels = np.asarray(trajectory.elements)
+    shift = np.asarray([0.04, 0.06, 0.08])
+    positions[0, labels == "Al"] += shift
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=trajectory.elements,
+        atom_ids=trajectory.atom_ids,
+        iterations=trajectory.iterations,
+        simulation=trajectory.simulation,
+    )
+    c_axis = np.asarray([1.0, 1.0, 1.0])
+    result = calculate_hbn_reference_polarization(
+        trajectory,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            c_axis=c_axis,
+            volume_method="cell",
+        ),
+    )
+
+    expected = -8 * 3.0 * shift
+    row = result.table.iloc[0]
+    for component, axis in enumerate("xyz"):
+        assert row[f"dipole_{axis} (e*angstrom)"] == pytest.approx(
+            expected[component]
+        )
+    assert row["dipole_c (e*angstrom)"] == pytest.approx(
+        expected @ (c_axis / np.linalg.norm(c_axis))
     )
 
 
@@ -125,7 +178,7 @@ def test_slab_polarization_supports_hull_bbox_and_cell_volumes(reference_path) -
         iterations=trajectory.iterations,
         simulation=trajectory.simulation,
     )
-    expected_dipole = 8 * 2.52 * 0.1
+    expected_dipole = -8 * 3.0 * 0.1
     factor = const("ea3_to_uC_cm2")
     assert factor is not None
     rows = {}
@@ -154,7 +207,7 @@ def test_slab_polarization_supports_hull_bbox_and_cell_volumes(reference_path) -
     )
 
 
-def test_substitution_requires_its_own_born_charge(reference_path) -> None:
+def test_substitution_requires_its_own_formal_charge(reference_path) -> None:
     trajectory = _trajectory_from_reference(reference_path)
     elements = list(trajectory.elements)
     elements[elements.index("Al")] = "B"
@@ -166,13 +219,50 @@ def test_substitution_requires_its_own_born_charge(reference_path) -> None:
         simulation=trajectory.simulation,
     )
 
-    with pytest.raises(ValueError, match="Missing longitudinal Born effective charge.*B"):
+    with pytest.raises(ValueError, match="Missing formal charge.*B"):
         calculate_hbn_reference_polarization(
             trajectory,
             HBNReferencePolarizationRequest(
                 reference_path=reference_path, replication=(2, 1, 1)
             ),
         )
+
+
+def test_reaxff_charge_source_uses_per_frame_charges(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    positions = trajectory.positions.copy()
+    labels = np.asarray(trajectory.elements)
+    positions[0, labels == "Al", 2] += 0.1
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=trajectory.elements,
+        atom_ids=trajectory.atom_ids,
+        iterations=trajectory.iterations,
+        simulation=trajectory.simulation,
+    )
+    charges = np.where(labels == "Al", 4.0, -4.0)[None, :]
+    data = ElectrostaticsData(
+        trajectory=trajectory,
+        charges=ChargeData(
+            charges=charges,
+            iterations=trajectory.iterations,
+            simulation=trajectory.simulation,
+        ),
+    )
+
+    result = calculate_hbn_reference_polarization(
+        data,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            charge_source="reaxff",
+            volume_method="cell",
+        ),
+    )
+
+    assert result.table.iloc[0]["charge_source"] == "reaxff"
+    assert result.table.iloc[0]["dipole_c (e*angstrom)"] == pytest.approx(-8 * 4.0 * 0.1)
+    assert set(result.displacements["charge (e)"]) == {-4.0, 4.0}
 
 
 def test_replication_must_match_trajectory_atom_count(reference_path) -> None:

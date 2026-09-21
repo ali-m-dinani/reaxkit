@@ -168,6 +168,198 @@ def test_dipole_stream_matches_materialized_result():
     np.testing.assert_allclose(actual[["mu_y (debye)", "mu_z (debye)"]], 0.0)
 
 
+def test_formal_charge_dipole_uses_trajectory_without_charge_data():
+    positions = np.asarray(
+        [
+            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]],
+        ]
+    )
+    elements = ["O", "H"]
+    iterations = [0, 10]
+    simulation = SimulationData(atom_ids=[1, 2], iterations=np.asarray(iterations), elements=elements)
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=elements,
+        atom_ids=[1, 2],
+        iterations=np.asarray(iterations),
+        simulation=simulation,
+    )
+    request = DipoleRequest(
+        scope="total",
+        charge_source="formal",
+        formal_charges={"o": -2.0, "H": 1.0},
+    )
+
+    materialized = DipoleTask().run(trajectory, request).table
+    streamed = DipoleTask().run_stream(
+        _trajectory_frames(positions, elements, iterations), request
+    ).table
+
+    pd.testing.assert_frame_equal(streamed, materialized)
+    np.testing.assert_allclose(materialized["mu_x (debye)"], [4.80320427, 9.60640854])
+    assert DipoleTask().required_data_for(request) is TrajectoryData
+    assert DipoleTask.required_data_fields_for(request, {}) == ("trajectory",)
+
+
+def test_formal_charge_polarization_uses_cell_volume():
+    elements = ["O", "H"]
+    simulation = SimulationData(
+        atom_ids=[1, 2],
+        iterations=np.asarray([0]),
+        elements=elements,
+        cell_lengths=np.asarray([[2.0, 2.0, 2.0]]),
+        cell_angles=np.asarray([[90.0, 90.0, 90.0]]),
+    )
+    trajectory = TrajectoryData(
+        positions=np.asarray([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]]),
+        elements=elements,
+        atom_ids=[1, 2],
+        iterations=np.asarray([0]),
+        simulation=simulation,
+    )
+    request = PolarizationRequest(
+        scope="total",
+        volume_method="cell",
+        charge_source="formal",
+        formal_charges={"O": -2.0, "H": 1.0},
+    )
+
+    result = PolarizationTask().run(trajectory, request)
+
+    np.testing.assert_allclose(result.table["volume (angstrom^3)"], [8.0])
+    np.testing.assert_allclose(result.table["P_x (uC/cm^2)"], [1602.176634 / 8.0])
+    assert PolarizationTask().required_data_for(request) is TrajectoryData
+    assert PolarizationTask.required_data_fields_for(request, {}) == ("trajectory",)
+
+
+def test_dipole_reports_requested_volume_without_normalizing_moment():
+    elements = ["C", "H", "H", "H"]
+    simulation = SimulationData(
+        atom_ids=[1, 2, 3, 4],
+        iterations=np.asarray([0]),
+        elements=elements,
+        cell_lengths=np.asarray([[2.0, 3.0, 4.0]]),
+    )
+    trajectory = TrajectoryData(
+        positions=np.asarray([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]]),
+        elements=elements,
+        atom_ids=[1, 2, 3, 4],
+        iterations=np.asarray([0]),
+        simulation=simulation,
+    )
+    data = ElectrostaticsData(
+        trajectory=trajectory,
+        charges=ChargeData(
+            charges=np.asarray([[-1.0, 0.2, 0.3, 0.5]]),
+            iterations=np.asarray([0]),
+            simulation=simulation,
+        ),
+    )
+
+    baseline = DipoleTask().run(data, DipoleRequest(scope="total")).table
+    result = DipoleTask().run(
+        data, DipoleRequest(scope="total", volume_method="cell")
+    ).table
+
+    np.testing.assert_allclose(result["volume (angstrom^3)"], [24.0])
+    np.testing.assert_allclose(
+        result[["mu_x (debye)", "mu_y (debye)", "mu_z (debye)"]],
+        baseline[["mu_x (debye)", "mu_y (debye)", "mu_z (debye)"]],
+    )
+
+
+def test_local_polarization_supports_cell_volume():
+    elements = ["O", "H"]
+    simulation = SimulationData(
+        atom_ids=[1, 2],
+        iterations=np.asarray([0]),
+        elements=elements,
+        cell_lengths=np.asarray([[2.0, 3.0, 4.0]]),
+        cell_angles=np.asarray([[90.0, 90.0, 90.0]]),
+    )
+    trajectory = TrajectoryData(
+        positions=np.asarray([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]]),
+        elements=elements,
+        atom_ids=[1, 2],
+        iterations=np.asarray([0]),
+        simulation=simulation,
+    )
+    data = ConnectivityTrajectoryData(
+        trajectory=trajectory,
+        connectivity=ConnectivityData(
+            connectivity=np.asarray([[0, 1], [1, 0]], dtype=int),
+            atom_ids=[1, 2],
+            elements=elements,
+            iterations=np.asarray([0]),
+        ),
+    )
+
+    result = PolarizationTask().run(
+        data,
+        PolarizationRequest(
+            scope="local",
+            atom_types=["O"],
+            volume_method="cell",
+            charge_source="formal",
+            formal_charges={"O": -2.0, "H": 1.0},
+        ),
+    )
+
+    np.testing.assert_allclose(result.table["volume (angstrom^3)"], [24.0])
+
+
+def test_local_formal_charge_dipole_uses_connectivity_without_charge_data():
+    trajectory = next(
+        _trajectory_frames(
+            np.asarray([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]]),
+            ["O", "H"],
+            [0],
+        )
+    )
+    data = ConnectivityTrajectoryData(
+        trajectory=trajectory,
+        connectivity=ConnectivityData(
+            connectivity=np.asarray([[0, 1], [1, 0]], dtype=int),
+            atom_ids=[1, 2],
+            elements=["O", "H"],
+            iterations=np.asarray([0]),
+        ),
+    )
+    request = DipoleRequest(
+        scope="local",
+        atom_types=["O"],
+        charge_source="formal",
+        formal_charges={"O": -2.0, "H": 1.0},
+    )
+
+    result = DipoleTask().run(data, request)
+
+    np.testing.assert_allclose(result.table["mu_x (debye)"], [4.80320427])
+    assert result.table["core_atom_type"].tolist() == ["O"]
+    assert DipoleTask().required_data_for(request) is ConnectivityTrajectoryData
+
+
+def test_formal_charge_analysis_reports_unconfigured_species():
+    trajectory = next(
+        _trajectory_frames(
+            np.asarray([[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]]),
+            ["O", "H"],
+            [0],
+        )
+    )
+
+    with np.testing.assert_raises_regex(ValueError, "missing: H"):
+        DipoleTask().run(
+            trajectory,
+            DipoleRequest(
+                scope="total",
+                charge_source="formal",
+                formal_charges={"O": -2.0},
+            ),
+        )
+
+
 def test_total_polarization_stream_matches_materialized_result():
     positions = np.asarray(
         [

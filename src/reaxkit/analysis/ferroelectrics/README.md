@@ -247,25 +247,23 @@ per-frame scaling.
 
 ## `hbn_refernce`
 
-This method calculates longitudinal polarization from the displacement of a
+This method calculates vector polarization from the displacement of a
 trajectory relative to a nonpolar, layered hexagonal AlN structure. The
 reference is bundled as
 `hbn_refernce/AlN_hbn.cif`, so an installed ReaxKit package does not depend on
 the repository's `examples_to_test` directory. A different CIF can be selected
 with `--reference`.
 
-The calculation follows the displacement/Born-effective-charge expression
-used by Hayden et al.:
+The calculation follows the displacement expression used by Hayden et al.,
+with the selected formal or ReaxFF charge and the electron-charge sign:
 
 \[
-P_c=\frac{|e|}{\Omega}\sum_{k=1}^{N}
-Z^{*}_{k,cc}\,\Delta u_{k,c}.
+\mathbf{P}=\frac{|e|}{\Omega}\sum_{k=1}^{N}
+\left(-q_k\Delta\mathbf{u}_k\right).
 \]
 
-Here (c) is the normalized direction selected by `--c-axis`,
-(Z^{*}_{k,cc}) is the longitudinal Born effective charge assigned to atom
-(k), and \(\Delta u_{k,c}\) is that atom's minimum-image displacement from
-its matched reference site projected onto (c).
+The output contains Cartesian x, y, and z components. The c component is the
+projection onto the normalized direction selected by `--c-axis`.
 
 ### Which atoms contribute
 
@@ -273,16 +271,18 @@ its matched reference site projected onto (c).
 frame, the implementation calculates
 
 \[
-\mu_{k,c}=Z^{*}_{k,cc}\Delta u_{k,c},
+\boldsymbol{\mu}_k=-q_k\Delta\mathbf{u}_k,
 \qquad
-\mu_c=\sum_{k=1}^{N}\mu_{k,c}.
+\boldsymbol{\mu}=\sum_{k=1}^{N}\boldsymbol{\mu}_k.
 \]
 
 Thus Al and N both contribute, and B contributes when it is present and has a
-Born charge supplied with `--born-charge B=...`. The per-atom values are
-written to `hbn_reference_displacements.csv`; the `dipole_c (e*angstrom)`
-column in `hbn_reference_polarization.csv` is their sum. With equal and
-opposite cation and anion Born charges, this all-ion sum is equivalent to a
+formal charge supplied with `--formal-charge B=...`, or when ReaxFF charges are
+selected. The per-atom dipole components are written to
+`hbn_reference_displacements.csv`. The x, y, z, and c-projected dipole and
+polarization components in `hbn_reference_polarization.csv` are their sums.
+With equal and
+opposite cation and anion charges, this all-ion sum is equivalent to a
 relative cation-anion sublattice displacement, and a common rigid translation
 cancels by charge neutrality.
 
@@ -346,20 +346,22 @@ thickness convention; `hull`, `bbox`, and `cell` make that choice explicit.
 The total dipole per in-plane area is the corresponding thickness-independent
 slab quantity.
 
-### Born charges and interpretation
+### Charge source and interpretation
 
-`--born-charge` expects longitudinal Born effective charges, not ReaxFF partial
-charges. ReaxKit supplies the scalar defaults `Al=2.52` and `N=-2.52`; values
-passed on the command line replace those defaults. All elements in the
-trajectory need a value. The charges should satisfy the acoustic sum rule over
-the complete cell closely enough that the dipole is independent of origin.
+`--charge-source auto` uses ReaxFF partial charges from `fort.7` when available
+and otherwise uses formal charges. `--charge-source reaxff` requires `fort.7`;
+`--charge-source formal` uses `--formal-charge` values. ReaxKit supplies the
+formal defaults `Al=3` and `N=-3`. All trajectory elements need a configured
+formal value when formal charges are selected. Charges should sum closely to
+zero over the complete cell so that the dipole is independent of origin.
 
 This displacement calculation is a linearized approximation to polarization
 relative to the selected nonpolar reference. It is not a Berry-phase
 calculation, and it does not select a different polarization branch. Results
-can consequently differ from first-principles values because of the selected
-Born charges, finite-temperature or strained coordinates, surfaces and
-defects, and nonlinear electronic contributions.
+can consequently differ from first-principles values because formal or ReaxFF
+charges replace Born effective charges, and because of finite-temperature or
+strained coordinates, surfaces, defects, and nonlinear electronic
+contributions.
 
 For the 19 by 19 by 10 orthogonal reference used in the example trajectory:
 
@@ -368,7 +370,8 @@ reaxkit get-hbn-reference-polarization `
   --engine reaxff `
   --input . `
   --xmolout .\xmolout `
-  --born-charge Al=3 N=-3 `
+  --charge-source formal `
+  --formal-charge Al=3 N=-3 `
   --replication 19 19 10 `
   --orthogonalize-reference `
   --volume-method hull `

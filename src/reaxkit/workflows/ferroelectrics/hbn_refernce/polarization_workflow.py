@@ -1,4 +1,4 @@
-"""CLI for longitudinal polarization relative to a hexagonal AlN reference."""
+"""CLI for vector polarization relative to a hexagonal AlN reference."""
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import cast
 
 from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
-    DEFAULT_PBE_BORN_EFFECTIVE_CHARGES,
+    ChargeSource,
+    DEFAULT_FORMAL_CHARGES,
     HBNReferencePolarizationRequest,
     OrthogonalizeMode,
     REFERENCE_STRUCTURE_PATH,
@@ -70,13 +71,14 @@ The command optionally applies ReaxKit's hexagonal-to-orthogonal transform to
 AlN_hbn.cif, repeats it by the explicitly supplied replication counts, maps it
 into each instantaneous cell, preserves large vacuum gaps, and removes a
 periodic rigid translation. It then matches atoms one-to-one and evaluates
-P_c = e/Omega sum(Z*_cc Delta u_c). Omega is selected with --volume-method;
-hull is the default and excludes slab vacuum.
+mu = -q Delta u and P = e/Omega sum(mu). The output reports x, y, z, and
+the selected c-axis projection. Omega is selected with --volume-method; hull
+is the default and excludes slab vacuum.
 
 Examples:
-  reaxkit get-hbn-reference-polarization --xmolout ./xmolout --orthogonalize-reference --replication 19 19 10
+  reaxkit get-hbn-reference-polarization --orthogonalize-reference --replication 19 19 10
 
-  reaxkit get-hbn-reference-polarization --replication 4 4 3 --born-charge Al=2.52 N=-2.52 B=2.10 --reference-species B=Al
+  reaxkit get-hbn-reference-polarization --replication 4 4 3 --charge-source formal --formal-charge Al=3 N=-3 B=3 --reference-species B=Al
 """
     add_input_arguments(parser)
     add_storage_cli_arguments(parser)
@@ -91,12 +93,20 @@ Examples:
             "19 19 10 repeats an orthogonalized AlN_hbn cell by those counts."
         ),
     )
-    defaults = [f"{key}={value}" for key, value in DEFAULT_PBE_BORN_EFFECTIVE_CHARGES.items()]
     parser.add_argument(
-        "--born-charge", action="append", nargs="+", default=[defaults], metavar="ELEMENT=Z33",
+        "--charge-source", choices=["auto", "reaxff", "formal"], default="auto",
         help=(
-            "Set longitudinal Born effective charges in e. The PBE AlN defaults are "
-            "Al=2.52 N=-2.52; provide explicit DFPT values for alloy species."
+            "Choose ReaxFF or formal charges. Example: --charge-source formal "
+            "--formal-charge Al=3 N=-3, uses the configured species charges; auto "
+            "uses fort.7 when available."
+        ),
+    )
+    defaults = [f"{key}={value}" for key, value in DEFAULT_FORMAL_CHARGES.items()]
+    parser.add_argument(
+        "--formal-charge", action="append", nargs="+", default=[defaults], metavar="ELEMENT=CHARGE",
+        help=(
+            "Assign species formal charges in e. Defaults: Al=3 N=-3; provide "
+            "values for additional trajectory species."
         ),
     )
     parser.add_argument(
@@ -174,8 +184,8 @@ Examples:
 
 
 def build_request(args: argparse.Namespace) -> HBNReferencePolarizationRequest:
-    charges = _parse_assignments(
-        args.born_charge, option="--born-charge", value_type=float
+    formal_charges = _parse_assignments(
+        args.formal_charge, option="--formal-charge", value_type=float
     )
     species = _parse_assignments(
         args.reference_species, option="--reference-species", value_type=str
@@ -188,7 +198,8 @@ def build_request(args: argparse.Namespace) -> HBNReferencePolarizationRequest:
     return HBNReferencePolarizationRequest(
         reference_path=Path(args.reference),
         replication=tuple(int(value) for value in args.replication),
-        born_effective_charges=charges,
+        charge_source=cast(ChargeSource, str(args.charge_source)),
+        formal_charges=formal_charges,
         reference_species=species,
         c_axis=tuple(float(value) for value in args.c_axis),
         periodic=tuple(axis in str(args.periodic).lower() for axis in "xyz"),

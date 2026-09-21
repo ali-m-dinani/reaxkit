@@ -24,7 +24,45 @@ import shutil
 from typing import List, Optional, Iterator, Dict, Any
 import numpy as np
 import pandas as pd
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.engine.reaxff.io.base import BaseHandler
+from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
+
+
+def _parse_xmolout_header(
+    raw: str,
+    *,
+    path: str | Path,
+    frame_index: int,
+    line_number: int | None,
+) -> tuple[str, int, list[float]]:
+    """Parse one xmolout frame header and provide a format-specific error."""
+    values = raw.split()
+    location = f"frame {frame_index}"
+    if line_number is not None:
+        location += f", line {line_number}"
+    if len(values) != 9 or not values[1].lstrip("-").isdigit():
+        raise ParseError(
+            f"Malformed xmolout frame header in '{Path(path)}' ({location}). "
+            "Expected: geometry_name iteration energy a b c alpha beta gamma. "
+            f"Header: {raw.strip()!r}"
+        )
+    name = validate_geometry_name(
+        values[0],
+        file_kind="xmolout",
+        path=path,
+        frame_index=frame_index,
+        line_number=line_number,
+        header=raw,
+    )
+    try:
+        numeric_values = [float(value) for value in values[2:]]
+    except ValueError as exc:
+        raise ParseError(
+            f"Malformed xmolout frame header in '{Path(path)}' ({location}): "
+            f"energy or cell fields are not numeric. Header: {raw.strip()!r}"
+        ) from exc
+    return name, int(values[1]), numeric_values
 
 class XmoloutHandler(BaseHandler):
     """
@@ -123,6 +161,8 @@ class XmoloutHandler(BaseHandler):
             n_atoms: Optional[int] = None
             lines_read = 0
 
+            frame_index = -1
+            expecting_header = False
             for line in fh:
                 lines_read += 1
                 if self._reporter and (lines_read % 5000 == 0 or lines_read == total_lines):
@@ -133,19 +173,28 @@ class XmoloutHandler(BaseHandler):
 
                 # #atoms line
                 if len(vals) == 1 and vals[0].isdigit():
+                    frame_index += 1
                     n_atoms = int(vals[0])
                     self._n_atoms = n_atoms
                     sim_rows.append([n_atoms])  # placeholder row; will complete after header line
                     atom_buf, atom_count = [], 0
                     current_atom_cols = None
+                    expecting_header = True
                     continue
 
                 # header line (name iter E a b c alpha beta gamma)
-                if len(vals) == 9 and self._n_atoms and vals[1].lstrip("-").isdigit():
+                if expecting_header:
+                    name, iteration, numeric_values = _parse_xmolout_header(
+                        line,
+                        path=self.path,
+                        frame_index=frame_index,
+                        line_number=lines_read,
+                    )
                     if not self.simulation_name:
-                        self.simulation_name = vals[0]
-                    row = [self._n_atoms, int(vals[1])] + list(map(float, vals[2:]))
+                        self.simulation_name = name
+                    row = [self._n_atoms, iteration, *numeric_values]
                     sim_rows[-1] = row
+                    expecting_header = False
                     continue
 
                 # atom coordinates (optionally with extra columns)
@@ -214,7 +263,10 @@ class XmoloutHandler(BaseHandler):
         current_atom_cols: list[str] | None = None
 
         with open(self.path, "r") as fh:
+            line_number = 0
+            expecting_header = False
             for line in fh:
+                line_number += 1
                 vals = line.strip().split()
                 if not vals:
                     continue
@@ -229,13 +281,21 @@ class XmoloutHandler(BaseHandler):
                     atom_buf = []
                     atom_count = 0
                     current_atom_cols = None
+                    expecting_header = True
                     continue
 
-                if len(vals) == 9 and self._n_atoms and vals[1].lstrip("-").isdigit():
+                if expecting_header:
+                    name, iteration, numeric_values = _parse_xmolout_header(
+                        line,
+                        path=self.path,
+                        frame_index=current_index,
+                        line_number=line_number,
+                    )
                     if not self.simulation_name:
-                        self.simulation_name = vals[0]
+                        self.simulation_name = name
                     if current_selected:
-                        current_summary = [self._n_atoms, int(vals[1])] + list(map(float, vals[2:]))
+                        current_summary = [self._n_atoms, iteration, *numeric_values]
+                    expecting_header = False
                     continue
 
                 if not current_selected or not self._n_atoms or len(vals) < 4:
@@ -332,7 +392,12 @@ class XmoloutHandler(BaseHandler):
                 header = next((raw.strip() for raw in fh if raw.strip()), None)
                 if header is None:
                     break
-                header_values = header.split()
+                name, iteration, numeric_values = _parse_xmolout_header(
+                    header,
+                    path=self.path,
+                    frame_index=source_index,
+                    line_number=None,
+                )
                 selected = requested is None or source_index in requested
 
                 atom_rows: list[list[Any]] = []
@@ -375,21 +440,19 @@ class XmoloutHandler(BaseHandler):
 
                 if not selected:
                     continue
-                if len(header_values) != 9 or not header_values[1].lstrip("-").isdigit():
-                    continue
                 if not self.simulation_name:
-                    self.simulation_name = header_values[0]
+                    self.simulation_name = name
                 emitted += 1
                 if callable(self._reporter):
                     total = len(requested) if requested is not None else 0
                     self._reporter("stream", emitted, total, "Streaming xmolout frames")
                 record = {
                     "source_index": source_index,
-                    "iter": int(header_values[1]),
+                    "iter": iteration,
                     "num_of_atoms": n_atoms,
-                    "potential_energy": float(header_values[2]),
-                    "cell_lengths": [float(value) for value in header_values[3:6]],
-                    "cell_angles": [float(value) for value in header_values[6:9]],
+                    "potential_energy": numeric_values[0],
+                    "cell_lengths": numeric_values[1:4],
+                    "cell_angles": numeric_values[4:7],
                 }
                 if coordinates_only:
                     record["coordinates"] = coordinates

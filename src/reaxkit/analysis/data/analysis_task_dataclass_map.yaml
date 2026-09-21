@@ -150,7 +150,7 @@ tasks:
     description: Builds tabular views of atomic charge values with atom-indexed rows
       and frame-aware values. Use it to inspect, filter, export, or plot charge data
       outside the raw ReaxFF output format.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge-table'
     tags:
     - electrostatics
     - charges
@@ -246,7 +246,7 @@ tasks:
     description: Computes dipole-moment metrics from electrostatics inputs that combine
       coordinates, charges, connectivity, and optional field data. Use it to quantify
       molecular or system-level charge separation over time.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-dipole'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-dipole'
     tags:
     - electrostatics
     - dipole
@@ -708,7 +708,7 @@ tasks:
     description: Computes polarization metrics from electrostatics data built from
       charges, coordinates, connectivity, and optional field values. It supports dielectric-response
       and field-driven charge-separation studies.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-polarization'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-polarization'
     tags:
     - electrostatics
     - polarization
@@ -724,7 +724,7 @@ tasks:
     description: Analyzes polarization response versus applied electric field. Use
       it to relate field schedules to polarization curves, hysteresis behavior, or
       field-dependent electrostatic response.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get_polarization_field'
     tags:
     - electrostatics
     - polarization

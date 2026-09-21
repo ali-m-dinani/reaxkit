@@ -3,10 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import pytest
 
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.domain.data_models import ChargeData, ElectrostaticsData
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
 from reaxkit.engine.reaxff.adapter_parts import streaming
+from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 from reaxkit.engine.reaxff.quick_io import (
     iter_charge_data_quick,
@@ -164,6 +167,26 @@ def test_total_electrostatics_always_uses_public_charge_only_quick_io(monkeypatc
     assert frames[0].charges.metadata["charges_only"] is True
 
 
+def test_materialized_total_electrostatics_uses_quick_charge_io(monkeypatch) -> None:
+    def fail_full_fort7_parse(*_args, **_kwargs):
+        raise AssertionError("Charge-only electrostatics must not fully parse fort.7.")
+
+    monkeypatch.setattr(Fort7Handler, "_parse", fail_full_fort7_parse)
+    data = ReaxFFAdapter().load(
+        ElectrostaticsData,
+        {
+            "fort7": str(FIXTURE_DIR / "fort.7"),
+            "xmolout": str(FIXTURE_DIR / "xmolout"),
+            "_required_data_fields": ("trajectory", "charges"),
+            "progress": False,
+        },
+    )
+
+    assert data.connectivity is None
+    assert data.charges.metadata["charges_only"] is True
+    assert data.charges.charges.shape[0] > 1
+
+
 def test_total_electrostatics_quick_reader_skips_fused_atom_type_field(tmp_path) -> None:
     fort7 = tmp_path / "fort.7"
     fort7.write_text(
@@ -181,3 +204,52 @@ def test_total_electrostatics_quick_reader_skips_fused_atom_type_field(tmp_path)
     assert "charge_atom_type_nums" not in record
     np.testing.assert_array_equal(record["charge_atom_ids"], [10002])
     np.testing.assert_allclose(record["charges"], [1.177])
+
+
+def test_quick_xmolout_reader_rejects_malformed_geometry_name(tmp_path) -> None:
+    xmolout = tmp_path / "xmolout"
+    xmolout.write_text(
+        """1
+Lattice="102.95859867431082 0 -4428142.44 104.96 60.60 78.26 90.00 90.00 90.00
+Al 0.95263 2.39140 14.93730
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ParseError, match="Malformed xmolout frame header.*Lattice="):
+        list(iter_xmolout_atom_identities(xmolout))
+
+
+def test_quick_fort7_reader_rejects_malformed_geometry_name(tmp_path) -> None:
+    fort7 = tmp_path / "fort.7"
+    fort7.write_text(
+        """28880 Lattice="102.95859867431082 Iteration: 0 #Bonds: 10
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ParseError) as error:
+        list(iter_fort7_charge_frames(fort7))
+
+    message = str(error.value)
+    assert "Malformed fort.7 frame header" in message
+    assert "frame 0" in message
+    assert "Lattice=" in message
+    assert "short geometry name" in message
+
+
+def test_full_fort7_handler_rejects_malformed_geometry_name(tmp_path) -> None:
+    fort7 = tmp_path / "fort.7"
+    fort7.write_text(
+        """28880 Lattice="102.95859867431082 Iteration: 0 #Bonds: 10
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ParseError) as error:
+        Fort7Handler(fort7).dataframe()
+
+    message = str(error.value)
+    assert "Malformed fort.7 frame header" in message
+    assert "frame 0, line 1" in message
+    assert "Lattice=" in message

@@ -40,6 +40,15 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         self._selected_command = selected_command
         self._known_commands = known_commands or set()
 
+    def _print_message(self, message: str, file=None) -> None:
+        """Write long help output incrementally for terminals with write limits."""
+        if not message:
+            return
+        destination = file or sys.stdout
+        for line in message.splitlines(keepends=True):
+            destination.write(line)
+        destination.flush()
+
     @staticmethod
     def _term_width() -> int:
         return max(100, min(shutil.get_terminal_size(fallback=(120, 40)).columns, 180))
@@ -110,20 +119,32 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         if natural > width:
             fixed_cols = [i for i in range(n) if i not in wrap_cols]
             fixed_total = sum(col_widths[i] for i in fixed_cols)
-            wrap_total_min = sum(16 for _ in wrap_cols)
+            minimum_wrap_width = 16
+            wrap_total_min = minimum_wrap_width * len(wrap_cols)
             budget = max(width - sep_size - fixed_total, wrap_total_min)
-            current_wrap_total = sum(col_widths[i] for i in wrap_cols)
+            extra_budget = max(0, budget - wrap_total_min)
+            desired_extras = {
+                i: max(0, col_widths[i] - minimum_wrap_width)
+                for i in wrap_cols
+            }
+            desired_extra_total = sum(desired_extras.values())
             for i in wrap_cols:
-                if current_wrap_total <= 0:
-                    col_widths[i] = 16
-                else:
-                    share = int(budget * (col_widths[i] / current_wrap_total))
-                    col_widths[i] = max(16, share)
+                share = (
+                    int(extra_budget * desired_extras[i] / desired_extra_total)
+                    if desired_extra_total > 0
+                    else 0
+                )
+                col_widths[i] = minimum_wrap_width + share
 
         def _wrap_cell(text: str, col: int) -> list[str]:
             if col not in wrap_cols:
                 return [text]
-            return textwrap.wrap(text, width=col_widths[col], break_long_words=False, break_on_hyphens=False) or [""]
+            return textwrap.wrap(
+                text,
+                width=col_widths[col],
+                break_long_words=True,
+                break_on_hyphens=True,
+            ) or [""]
 
         lines: list[str] = []
         lines.append(" | ".join(headers[i].ljust(col_widths[i]) for i in range(n)))
@@ -165,7 +186,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
 
         option_rows: list[list[str]] = []
         for action in self._actions:
-            if not action.option_strings:
+            if not action.option_strings or action.help == argparse.SUPPRESS:
                 continue
             option_rows.append(
                 [
@@ -182,7 +203,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                 headers=["Flag", "Required", "Default", "Help", "Choices"],
                 rows=option_rows,
                 width=width,
-                wrap_cols={3, 4},
+                wrap_cols={0, 2, 3, 4},
             )
             if opt_table:
                 out.append(opt_table)

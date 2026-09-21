@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
 from importlib import import_module
@@ -12,6 +13,27 @@ import pytest
 from reaxkit import cli_startup
 
 cli_main = import_module("reaxkit.cli.main")
+
+
+class _SingleWriteLimitedStream(io.StringIO):
+    """Simulate a terminal that drops text beyond each write-size limit."""
+
+    def __init__(self, limit: int) -> None:
+        super().__init__()
+        self.limit = limit
+
+    def write(self, value: str) -> int:
+        return super().write(value[: self.limit])
+
+
+def test_cli_help_is_written_in_terminal_safe_chunks():
+    parser = cli_main._ReaxKitArgumentParser()
+    message = "".join(f"help row {index}\n" for index in range(1000))
+    stream = _SingleWriteLimitedStream(limit=256)
+
+    parser._print_message(message, stream)
+
+    assert stream.getvalue() == message
 
 
 def test_canonicalize_direct_command_alias():
@@ -103,7 +125,7 @@ def test_get_dipole_is_the_registered_command_and_task():
 
 
 def test_get_dipole_accepts_frame_option_alias():
-    from reaxkit.workflows import electrostatics_workflow
+    from reaxkit.workflows.electrostatics import electrostatics_workflow
 
     parser = argparse.ArgumentParser()
     electrostatics_workflow.build_parser(parser, command="get-dipole")
@@ -111,6 +133,67 @@ def test_get_dipole_accepts_frame_option_alias():
     args = parser.parse_args(["--scope", "total", "--frame", "0:200:1"])
 
     assert args.frames == ["0:200:1"]
+
+
+@pytest.mark.parametrize("command", ["get-dipole", "get-polarization"])
+def test_electrostatics_commands_accept_formal_charges(command: str):
+    from reaxkit.workflows.electrostatics import electrostatics_workflow
+
+    parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(parser, command=command)
+    args = parser.parse_args(
+        ["--charge-source", "formal", "--formal-charge", "Al=3", "N=-3"]
+    )
+    builder = electrostatics_workflow.REQUEST_BUILDERS[command]
+
+    request = builder(args)
+
+    assert request.charge_source == "formal"
+    assert request.formal_charges == {"Al": 3.0, "N": -3.0}
+
+
+@pytest.mark.parametrize("command", ["get-dipole", "get-polarization"])
+@pytest.mark.parametrize("scope", ["total", "local"])
+@pytest.mark.parametrize("volume_method", ["hull", "bbox", "cell"])
+def test_electrostatics_commands_accept_volume_method(
+    command: str, scope: str, volume_method: str
+):
+    from reaxkit.workflows.electrostatics import electrostatics_workflow
+
+    parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(parser, command=command)
+    argv = ["--scope", scope, "--volume-method", volume_method]
+    if scope == "local":
+        argv.extend(["--core", "Al"])
+
+    request = electrostatics_workflow.REQUEST_BUILDERS[command](parser.parse_args(argv))
+
+    assert request.volume_method == volume_method
+
+
+def test_electrostatics_volume_method_defaults_follow_scope():
+    from reaxkit.workflows.electrostatics import electrostatics_workflow
+
+    dipole_parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(dipole_parser, command="get-dipole")
+    polarization_parser = argparse.ArgumentParser()
+    electrostatics_workflow.build_parser(
+        polarization_parser, command="get-polarization"
+    )
+
+    dipole = electrostatics_workflow._build_dipole_request(
+        dipole_parser.parse_args([])
+    )
+    total = electrostatics_workflow._build_polarization_request(
+        polarization_parser.parse_args([])
+    )
+    local = electrostatics_workflow._build_polarization_request(
+        polarization_parser.parse_args(["--scope", "local", "--core", "Al"])
+    )
+
+    assert dipole.volume_method is None
+    assert total.volume_method == "hull"
+    assert local.volume_method == "bbox"
 
 
 @pytest.mark.parametrize("command", ["get-polarization", "get_polarization", "polarization"])
@@ -161,7 +244,7 @@ def test_get_polarization_field_is_the_registered_command_and_task():
 
 
 def test_get_polarization_field_accepts_volume_method():
-    from reaxkit.workflows import electrostatics_workflow
+    from reaxkit.workflows.electrostatics import electrostatics_workflow
 
     parser = argparse.ArgumentParser()
     electrostatics_workflow.build_parser(parser, command="get_polarization_field")

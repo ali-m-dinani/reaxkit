@@ -132,6 +132,25 @@ def _parse_core_types(spec: str | None) -> tuple[str, ...]:
     return tuple(token.strip() for token in spec.split(",") if token.strip())
 
 
+def _parse_formal_charges(values) -> dict[str, float]:
+    """Parse repeated ``--formal-charge ELEMENT=CHARGE`` values."""
+    result: dict[str, float] = {}
+    for group in values or ():
+        items = group if isinstance(group, list) else [group]
+        for item in items:
+            if "=" not in item:
+                raise ValueError(f"Formal charge must use ELEMENT=CHARGE syntax: {item!r}.")
+            label, raw_charge = item.split("=", 1)
+            label = label.strip()
+            if not label:
+                raise ValueError("Formal charge element labels cannot be empty.")
+            charge = float(raw_charge)
+            if not np.isfinite(charge):
+                raise ValueError(f"Formal charge for {label!r} must be finite.")
+            result[label] = charge
+    return result
+
+
 def _parse_bins(spec: str) -> Union[int, tuple[int, int]]:
     """Parse bins."""
     if "," in spec:
@@ -188,10 +207,18 @@ def _build_dipole_request(args: argparse.Namespace) -> DipoleRequest:
     if scope == "local" and not core_types:
         raise ValueError("When --scope local is used, --core must be provided (for example --core Al,Mg).")
     frames = _parse_frame_selector(getattr(args, "frames", None))
+    formal_charges = _parse_formal_charges(getattr(args, "formal_charge", []))
+    if str(args.charge_source) == "formal" and not formal_charges:
+        raise ValueError(
+            "--charge-source formal requires --formal-charge values for every trajectory species."
+        )
     return DipoleRequest(
         scope=scope,
         atom_types=core_types if scope == "local" else None,
         frames=frames,
+        volume_method=args.volume_method,
+        charge_source=str(args.charge_source),
+        formal_charges=formal_charges,
     )
 
 
@@ -202,11 +229,18 @@ def _build_polarization_request(args: argparse.Namespace) -> PolarizationRequest
     if scope == "local" and not core_types:
         raise ValueError("When --scope local is used, --core must be provided (for example --core Al,Mg).")
     frames = _parse_frame_selector(getattr(args, "frames", None))
+    formal_charges = _parse_formal_charges(getattr(args, "formal_charge", []))
+    if str(args.charge_source) == "formal" and not formal_charges:
+        raise ValueError(
+            "--charge-source formal requires --formal-charge values for every trajectory species."
+        )
     return PolarizationRequest(
         scope=scope,
         atom_types=core_types if scope == "local" else None,
         frames=frames,
-        volume_method="bbox" if scope == "local" else "hull",
+        volume_method=args.volume_method or ("bbox" if scope == "local" else "hull"),
+        charge_source=str(args.charge_source),
+        formal_charges=formal_charges,
     )
 
 
@@ -373,10 +407,10 @@ def _polarization_summary_path(command: str, args: argparse.Namespace) -> Path:
     summary = Path(summary_value)
     storage_args = {
         "run_id": getattr(args, "run_id", None),
-        "project_root": getattr(args, "project_root", "."),
+        "project_root": getattr(args, "project_root", ".."),
         "analysis_id": getattr(args, "analysis_id", None),
     }
-    if summary.is_absolute() or summary.parent != Path("."):
+    if summary.is_absolute() or summary.parent != Path(".."):
         return resolve_output_path(summary_value, command, **storage_args)
 
     save_value = getattr(args, "save", None)
@@ -546,7 +580,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             f"  3. Compute local values for selected core types:\n"
             f"   reaxkit {canonical} --frames 10 --scope local --core Al --export local_{analysis_name}_frame10.csv\n\n"
             f"  4. Render local 3D plots per frame:\n"
-            f"   reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {analysis_name}_plots"
+            f"   reaxkit {canonical} --frames 10 --scope local --core Al --plot plot3d --component z --save {analysis_name}_plots\n\n"
+            f"  5. Use explicit formal charges instead of ReaxFF charges:\n"
+            f"   reaxkit {canonical} --scope total --charge-source formal --formal-charge Al=3 N=-3"
         )
         parser.add_argument(
             "--frames",
@@ -557,6 +593,36 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--scope", choices=["total", "local"], default="total", help="Electrostatics scope. Example: --scope local, which computes per-core local contributions.")
         parser.add_argument("--core", default=None, help="Comma-separated core atom types for local scope. Example: --core Al,Mg, which limits local analysis to those core types.")
+        parser.add_argument(
+            "--volume-method",
+            choices=["hull", "bbox", "cell"],
+            default=None,
+            help=(
+                "Choose convex-hull, occupied bounding-box, or simulation-cell volume. "
+                "Polarization is normalized by this volume; dipole output reports it without changing the dipole. "
+                "Defaults for polarization: hull in total scope and bbox in local scope."
+            ),
+        )
+        parser.add_argument(
+            "--charge-source",
+            choices=["reaxff", "formal"],
+            default="reaxff",
+            help=(
+                "Choose per-atom ReaxFF charges or explicit species formal charges. "
+                "Example: --charge-source formal --formal-charge Al=3 N=-3."
+            ),
+        )
+        parser.add_argument(
+            "--formal-charge",
+            action="append",
+            nargs="+",
+            default=[],
+            metavar="ELEMENT=CHARGE",
+            help=(
+                "Assign species formal charges in elementary-charge units. May be repeated. "
+                "Example: --formal-charge Al=3 N=-3."
+            ),
+        )
         if canonical == POLARIZATION_COMMAND:
             parser.add_argument(
                 "--scale-by",
@@ -713,7 +779,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
                 args.export,
                 canonical,
                 run_id=getattr(args, "run_id", None),
-                project_root=getattr(args, "project_root", "."),
+                project_root=getattr(args, "project_root", ".."),
                 analysis_id=getattr(args, "analysis_id", None),
             )
             full_save_path = out_csv.parent / "hysteresis_full_data.csv"

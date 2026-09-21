@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import numpy as np
 
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
@@ -154,3 +156,48 @@ def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
     assert created_kwargs[0]["ascii"] is True
     assert created_kwargs[0]["dynamic_ncols"] is False
     assert 20 <= created_kwargs[0]["ncols"] <= 120
+
+
+def test_tqdm_reporter_animates_indeterminate_operations(monkeypatch):
+    created = []
+
+    class FakeBar:
+        def __init__(self, total=None, **kwargs):
+            self.total = total
+            self.n = 0
+            self.bar_format = kwargs.get("bar_format")
+            created.append(self)
+
+        def set_description_str(self, desc):
+            self.desc = desc
+
+        def refresh(self):
+            pass
+
+        def update(self, delta):
+            self.n += delta
+
+        def reset(self, total=None):
+            self.total = total
+            self.n = 0
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(progress, "tqdm", FakeBar)
+    monkeypatch.setattr(progress, "_INDETERMINATE_INTERVAL_SECONDS", 0.001)
+    reporter = progress.tqdm_reporter_factory()
+
+    reporter("analyze", 0, 0, "Running task")
+    deadline = time.monotonic() + 0.2
+    while created[0].n == 0 and time.monotonic() < deadline:
+        time.sleep(0.001)
+
+    assert created[0].n > 0
+    assert created[0].bar_format == progress._INDETERMINATE_BAR_FORMAT
+
+    reporter("analyze", 1, 1, "Finished task")
+
+    assert created[0].n == 1
+    assert created[0].total == 1
+    assert created[0].bar_format is None

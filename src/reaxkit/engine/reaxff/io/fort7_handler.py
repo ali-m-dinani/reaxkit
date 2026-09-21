@@ -29,7 +29,9 @@ from typing import List, Dict, Any, Iterator, Optional
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.engine.reaxff.io.base import BaseHandler
+from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
 
 _FORT7_HEADER_RE = re.compile(
     r"^\s*(?P<num_atoms>\d+)\s+(?P<simulation_name>\S+)\s+Iteration:\s*(?P<iteration>\d+)\s+#Bonds:\s*(?P<num_bonds>\d+)\s*$"
@@ -37,6 +39,56 @@ _FORT7_HEADER_RE = re.compile(
 _FORT7_FLOAT_FIELD_RE = re.compile(
     r"(?<!\S)[+-]?(?:\d*\.\d+|\d+\.?\d*[Ee][+-]?\d+)(?=\s|$)"
 )
+
+
+def _validate_fort7_header(
+    match: re.Match[str],
+    *,
+    path: str | Path,
+    frame_index: int,
+    line_number: int | None,
+    header: str,
+) -> None:
+    validate_geometry_name(
+        match.group("simulation_name"),
+        file_kind="fort.7",
+        path=path,
+        frame_index=frame_index,
+        line_number=line_number,
+        header=header,
+    )
+
+
+def _match_fort7_header(
+    raw: str,
+    *,
+    path: str | Path,
+    frame_index: int,
+    line_number: int | None,
+) -> re.Match[str] | None:
+    """Match a fort.7 header and reject header-like malformed lines."""
+    match = _FORT7_HEADER_RE.match(raw)
+    if match is not None:
+        _validate_fort7_header(
+            match,
+            path=path,
+            frame_index=frame_index,
+            line_number=line_number,
+            header=raw,
+        )
+        return match
+    if "Iteration:" not in raw and "#Bonds:" not in raw:
+        return None
+
+    location = f"frame {frame_index}"
+    if line_number is not None:
+        location += f", line {line_number}"
+    raise ParseError(
+        f"Malformed fort.7 frame header in '{Path(path)}' ({location}). "
+        "Expected: atom_count geometry_name Iteration: iteration #Bonds: count. "
+        "The geometry name must be a short token without spaces, quotes, or '='. "
+        f"Header: {raw.strip()!r}"
+    )
 
 
 class Fort7Handler(BaseHandler):
@@ -160,7 +212,12 @@ class Fort7Handler(BaseHandler):
                 if not values:
                     continue
 
-                header_match = _FORT7_HEADER_RE.match(raw)
+                header_match = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=len(sim_rows),
+                    line_number=lines_read,
+                )
                 # Header. Some ReaxFF outputs omit the space after
                 # "Iteration:" once iteration numbers grow large.
                 if header_match:
@@ -285,8 +342,15 @@ class Fort7Handler(BaseHandler):
                 )
 
         with open(self.path, "r") as fh:
+            line_number = 0
             for raw in fh:
-                header_match = _FORT7_HEADER_RE.match(raw)
+                line_number += 1
+                header_match = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=current_index + 1,
+                    line_number=line_number,
+                )
                 if header_match:
                     _finalize_iteration()
                     cur_atoms_rows = []
@@ -460,8 +524,13 @@ class Fort7Handler(BaseHandler):
             return record
 
         with open(self.path, "r", encoding="utf-8") as fh:
-            for raw in fh:
-                header = _FORT7_HEADER_RE.match(raw)
+            for line_number, raw in enumerate(fh, start=1):
+                header = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=source_index + 1,
+                    line_number=line_number,
+                )
                 if header:
                     record = finalize()
                     if record is not None:

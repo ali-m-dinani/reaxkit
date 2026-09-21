@@ -3,7 +3,14 @@
 The implementation follows the longitudinal displacement expression used by
 Hayden et al., Phys. Rev. Materials 5, 044412 (2021):
 
-``P_c = e / Omega * sum_k(Z*_[k,cc] * Delta u_[k,c])``.
+``mu_k = -q_k * Delta u_k`` and ``P = e / Omega * sum_k(mu_k)``.
+
+The Cartesian x, y, and z components are reported together with the projection
+onto the user-selected c-axis.
+
+The selected ``q_k`` values are ReaxFF partial charges or user-supplied formal
+charges. They provide a classical approximation to the Born-effective-charge
+expression and do not include an electronic Berry-phase contribution.
 
 The reference is read from a CIF, optionally changed to ReaxKit's orthogonal
 hexagonal supercell, and replicated by explicit user-supplied counts.  Small
@@ -30,7 +37,9 @@ from scipy.spatial import cKDTree
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
+    _trajectory_and_charges,
     cell_matrix_from_lengths_angles,
+    required_wurtzite_data_type,
 )
 from reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarization import (
     VolumeMethod,
@@ -41,7 +50,7 @@ from reaxkit.core.platform.constants import const
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import TrajectoryData
+from reaxkit.domain.data_models import ElectrostaticsData, TrajectoryData
 from reaxkit.engine.common.generators.structure_transformers import (
     orthogonalize_hexagonal_cell,
 )
@@ -51,26 +60,25 @@ from reaxkit.presentation.specs import PresentationSpec
 OrthogonalizeMode = Literal["auto", "always", "never"]
 PeriodicAxes = tuple[bool, bool, bool]
 ORDERED_MATCH_RMS_TOLERANCE_ANGSTROM = 2.0
+ELECTRON_CHARGE_SIGN = -1.0
 
-# Kecik et al., Applied Physics Reviews 5, 011105 (2018), Table II,
-# report |Z*| = 2.52 e for 3D wurtzite AlN calculated with PBE.  Additional
-# alloy species deliberately have no implicit value: their DFPT Z* must be
-# supplied by the caller.
-DEFAULT_PBE_BORN_EFFECTIVE_CHARGES: dict[str, float] = {
-    "Al": 2.52,
-    "N": -2.52,
+ChargeSource = Literal["auto", "reaxff", "formal"]
+DEFAULT_FORMAL_CHARGES: dict[str, float] = {
+    "Al": 3.0,
+    "N": -3.0,
 }
 REFERENCE_STRUCTURE_PATH = Path(__file__).with_name("AlN_hbn.cif")
 
 
 @dataclass
 class HBNReferencePolarizationRequest(BaseRequest):
-    """Configure reference construction, matching, and longitudinal BECs."""
+    """Configure reference construction, matching, and atomic charges."""
 
     reference_path: str | Path
     replication: Sequence[int]
-    born_effective_charges: Mapping[str, float] = field(
-        default_factory=lambda: dict(DEFAULT_PBE_BORN_EFFECTIVE_CHARGES)
+    charge_source: ChargeSource = "auto"
+    formal_charges: Mapping[str, float] = field(
+        default_factory=lambda: dict(DEFAULT_FORMAL_CHARGES)
     )
     reference_species: Mapping[str, str] = field(
         default_factory=lambda: {"B": "Al"}
@@ -615,25 +623,42 @@ def prepare_hbn_reference(
     )
 
 
-def _born_charge_map(values: Mapping[str, float]) -> dict[str, float]:
+def _formal_charge_map(values: Mapping[str, float]) -> dict[str, float]:
     result = {str(key).casefold(): float(value) for key, value in values.items()}
     invalid = [key for key, value in result.items() if not np.isfinite(value)]
     if invalid:
-        raise ValueError(f"Born effective charges must be finite; invalid: {invalid}.")
+        raise ValueError(f"Formal charges must be finite; invalid: {invalid}.")
     return result
 
 
 def calculate_hbn_reference_polarization(
-        trajectory: TrajectoryData,
+        data: TrajectoryData | ElectrostaticsData,
         request: HBNReferencePolarizationRequest,
 ) -> HBNReferencePolarizationResult:
     """Calculate longitudinal dipole and polarization for selected frames."""
+
+    if request.charge_source not in {"auto", "reaxff", "formal"}:
+        raise ValueError("charge_source must be 'auto', 'reaxff', or 'formal'.")
+    trajectory, dynamic_charges = _trajectory_and_charges(data)
+    resolved_charge_source = (
+        "reaxff"
+        if request.charge_source == "reaxff"
+        or (request.charge_source == "auto" and dynamic_charges is not None)
+        else "formal"
+    )
+    if resolved_charge_source == "reaxff" and dynamic_charges is None:
+        raise ValueError("--charge-source reaxff requires per-atom charges from fort.7.")
+    if (
+            dynamic_charges is not None
+            and dynamic_charges.shape != np.asarray(trajectory.positions).shape[:2]
+    ):
+        raise ValueError("Per-atom charges must match the trajectory frame and atom counts.")
 
     prepared = prepare_hbn_reference(trajectory, request)
     selected = _selected_frames(trajectory, request)
     periodic = _periodic_axes(request.periodic)
     c_hat = _unit_vector(request.c_axis, "c_axis")
-    born = _born_charge_map(request.born_effective_charges)
+    formal = _formal_charge_map(request.formal_charges)
     positions = np.asarray(trajectory.positions, dtype=float)
     atom_ids = np.asarray(trajectory.atom_ids, dtype=int)
     assignment = prepared.simulation_to_reference
@@ -649,15 +674,16 @@ def calculate_hbn_reference_polarization(
     output_iterations: list[int] = []
 
     reference_labels = _frame_labels(trajectory, int(request.reference_frame))
-    missing = sorted(
-        {str(value) for value in reference_labels if str(value).casefold() not in born},
-        key=str.casefold,
-    )
-    if missing:
-        raise ValueError(
-            "Missing longitudinal Born effective charge(s) for trajectory species: "
-            f"{', '.join(missing)}. Supply each value with --born-charge ELEMENT=Z33."
+    if resolved_charge_source == "formal":
+        missing = sorted(
+            {str(value) for value in reference_labels if str(value).casefold() not in formal},
+            key=str.casefold,
         )
+        if missing:
+            raise ValueError(
+                "Missing formal charge(s) for trajectory species: "
+                f"{', '.join(missing)}. Supply each value with --formal-charge ELEMENT=CHARGE."
+            )
 
     for frame in selected:
         xyz = positions[frame]
@@ -682,13 +708,18 @@ def calculate_hbn_reference_polarization(
         )
         displacement = delta_fractional @ cell
         displacement_c = displacement @ c_hat
-        charges = np.asarray([born.get(str(label).casefold(), np.nan) for label in labels])
+        charges = (
+            np.asarray(dynamic_charges[frame], dtype=float)
+            if resolved_charge_source == "reaxff"
+            else np.asarray([formal.get(str(label).casefold(), np.nan) for label in labels])
+        )
         if not np.isfinite(charges).all():
             bad = sorted({str(labels[index]) for index in np.flatnonzero(~np.isfinite(charges))})
             raise ValueError(
-                f"Frame {frame} is missing Born effective charge(s): {', '.join(bad)}."
+                f"Frame {frame} has missing or non-finite atomic charge(s): {', '.join(bad)}."
             )
-        dipole_c = charges * displacement_c
+        dipole = ELECTRON_CHARGE_SIGN * charges[:, None] * displacement
+        dipole_c = dipole @ c_hat
         iteration = _iteration(trajectory, frame)
         output_iterations.append(iteration)
         simulation_volume = abs(float(np.linalg.det(cell)))
@@ -697,7 +728,8 @@ def calculate_hbn_reference_polarization(
         else:
             estimator = _hull_volume if request.volume_method == "hull" else _bbox_volume
             volume = float(estimator(xyz))
-        total_dipole = float(np.sum(dipole_c))
+        total_dipole = np.sum(dipole, axis=0)
+        total_dipole_c = float(np.sum(dipole_c))
         rms = float(np.sqrt(np.mean(np.sum(displacement * displacement, axis=1))))
         maximum = float(np.max(np.linalg.norm(displacement, axis=1)))
         summary_rows.append({
@@ -714,12 +746,28 @@ def calculate_hbn_reference_polarization(
             "rms_displacement (angstrom)": rms,
             "max_displacement (angstrom)": maximum,
             "volume_method": request.volume_method,
+            "charge_source": resolved_charge_source,
+            "electron_charge_sign": ELECTRON_CHARGE_SIGN,
             "volume (angstrom^3)": volume,
             "simulation_cell_volume (angstrom^3)": simulation_volume,
-            "dipole_c (e*angstrom)": total_dipole,
-            "dipole_c (debye)": total_dipole * debye_factor,
+            **{
+                quantity: value
+                for component, axis in enumerate("xyz")
+                for quantity, value in (
+                    (f"dipole_{axis} (e*angstrom)", float(total_dipole[component])),
+                    (f"dipole_{axis} (debye)", float(total_dipole[component] * debye_factor)),
+                    (
+                        f"P_{axis} (uC/cm^2)",
+                        float(total_dipole[component] / volume * factor)
+                        if np.isfinite(volume) and volume > 0.0
+                        else np.nan,
+                    ),
+                )
+            },
+            "dipole_c (e*angstrom)": total_dipole_c,
+            "dipole_c (debye)": total_dipole_c * debye_factor,
             "P_c (uC/cm^2)": (
-                total_dipole / volume * factor
+                total_dipole_c / volume * factor
                 if np.isfinite(volume) and volume > 0.0
                 else np.nan
             ),
@@ -735,7 +783,9 @@ def calculate_hbn_reference_polarization(
                 "element": str(labels[atom_index]),
                 "reference_atom_index": ref_index,
                 "reference_element": str(reference_symbols[ref_index]),
-                "Z*_cc (e)": float(charges[atom_index]),
+                "charge_source": resolved_charge_source,
+                "charge (e)": float(charges[atom_index]),
+                "electron_charge_sign": ELECTRON_CHARGE_SIGN,
                 "displacement_c (angstrom)": float(displacement_c[atom_index]),
                 "dipole_c (e*angstrom)": float(dipole_c[atom_index]),
                 "dipole_c (debye)": float(dipole_c[atom_index] * debye_factor),
@@ -744,6 +794,10 @@ def calculate_hbn_reference_polarization(
                 row[f"{axis} (angstrom)"] = float(xyz[atom_index, component])
                 row[f"reference_{axis} (angstrom)"] = float(reference_position[component])
                 row[f"displacement_{axis} (angstrom)"] = float(displacement[atom_index, component])
+                row[f"dipole_{axis} (e*angstrom)"] = float(dipole[atom_index, component])
+                row[f"dipole_{axis} (debye)"] = float(
+                    dipole[atom_index, component] * debye_factor
+                )
             displacement_rows.append(row)
 
     mapping_rows: list[dict[str, object]] = []
@@ -786,17 +840,26 @@ def write_aligned_reference_xyz(
     label="h-BN-reference Polarization",
 )
 class HBNReferencePolarizationTask(AnalysisTask):
-    """Calculate longitudinal polarization relative to replicated h-AlN."""
+    """Calculate vector polarization relative to replicated h-AlN."""
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "2"
+    VERSION = "4"
+
+    def required_data_for(
+            self, request: HBNReferencePolarizationRequest, args: dict | None = None
+    ):
+        return required_wurtzite_data_type(request, args)
 
     @staticmethod
     def required_data_fields_for(
-            _request: HBNReferencePolarizationRequest, _args: dict
+            request: HBNReferencePolarizationRequest, args: dict
     ) -> tuple[str, ...]:
-        return ("trajectory",)
+        return (
+            ("trajectory",)
+            if required_wurtzite_data_type(request, args) is TrajectoryData
+            else ("trajectory", "charges")
+        )
 
     @classmethod
     def recommended_presentations(
@@ -811,7 +874,7 @@ class HBNReferencePolarizationTask(AnalysisTask):
 
     def run(
             self,
-            data: TrajectoryData,
+            data: TrajectoryData | ElectrostaticsData,
             request: HBNReferencePolarizationRequest,
             reporter=None,
     ) -> HBNReferencePolarizationResult:
@@ -820,7 +883,9 @@ class HBNReferencePolarizationTask(AnalysisTask):
 
 
 __all__ = [
-    "DEFAULT_PBE_BORN_EFFECTIVE_CHARGES",
+    "ChargeSource",
+    "DEFAULT_FORMAL_CHARGES",
+    "ELECTRON_CHARGE_SIGN",
     "HBNReferencePolarizationRequest",
     "HBNReferencePolarizationResult",
     "HBNReferencePolarizationTask",

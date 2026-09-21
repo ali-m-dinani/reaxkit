@@ -6,6 +6,8 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
+from reaxkit.engine.reaxff.io.xmolout_handler import _parse_xmolout_header
+
 
 def iter_xmolout_atom_identities(
     path: str | Path,
@@ -39,7 +41,12 @@ def iter_xmolout_atom_identities(
             header = next((line.strip() for line in handle if line.strip()), None)
             if header is None:
                 raise ValueError(f"xmolout frame {source_index} has no header: {source}")
-            header_values = header.split()
+            _, iteration, _ = _parse_xmolout_header(
+                header,
+                path=source,
+                frame_index=source_index,
+                line_number=None,
+            )
             selected = requested is None or source_index in requested
             elements: list[str] = []
             for _ in range(atom_count):
@@ -50,11 +57,6 @@ def iter_xmolout_atom_identities(
                     elements.append(atom_line.split(None, 1)[0])
             if not selected:
                 continue
-            iteration = (
-                int(header_values[1])
-                if len(header_values) > 1 and header_values[1].lstrip("-").isdigit()
-                else source_index
-            )
             emitted += 1
             if callable(reporter):
                 total = len(requested) if requested is not None else 0
