@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "3.0.1"
+version = "3.0.2"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
   { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
@@ -74,7 +74,7 @@ io = [
 ]
 engines = [
     "lammps",
-    "scm-plams",
+    "plams",
 ]
 all = [
     "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines]",
