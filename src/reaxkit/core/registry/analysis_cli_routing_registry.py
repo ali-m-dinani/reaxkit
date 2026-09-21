@@ -178,6 +178,94 @@ register_analysis_command(
     ),
     aliases=("write_trajectory_with_polarity", "polarity-extxyz"),
 )
+register_analysis_command(
+    "get-three-folded-wurtzite-neighbors",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_neighbors",
+        "three-folded-wurtzite-neighbors",
+    ),
+)
+register_analysis_command(
+    "get-three-folded-wurtzite-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_polarity",
+        "three-folded-wurtzite-polarity",
+    ),
+)
+register_analysis_command(
+    "get-three-folded-wurtzite-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite."
+        "polarization_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_polarization",
+        "three-folded-wurtzite-polarization",
+    ),
+)
+register_analysis_command(
+    "write-three-folded-trajectory-with-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite."
+        "polarity_trajectory_workflow"
+    ),
+    aliases=(
+        "write_three_folded_trajectory_with_polarity",
+        "three-folded-polarity-extxyz",
+    ),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-dipole",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.dipole_workflow"
+    ),
+    aliases=("get_basal_plane_displacement_dipole", "basal-plane-dipole"),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.polarization_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_polarization",
+        "basal-plane-polarization",
+    ),
+)
+register_analysis_command(
+    "get-hbn-reference-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_refernce.polarization_workflow"
+    ),
+    aliases=("get_hbn_reference_polarization", "hbn-reference-polarization"),
+)
+register_analysis_command(
+    "get-potential-and-electric-field",
+    module_path=(
+        "reaxkit.workflows.electrostatics.potential_and_electric_field."
+        "potential_and_electric_field_workflow"
+    ),
+    aliases=("get_potential_and_electric_field", "reaxff-local-field"),
+)
+register_analysis_command(
+    "write-trajectory-with-potential-and-electric-field",
+    module_path=(
+        "reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow"
+    ),
+    aliases=("write_trajectory_with_potential_and_electric_field", "local-field-extxyz"),
+)
+register_analysis_command(
+    "get-dielectric-constant",
+    module_path="reaxkit.workflows.electrostatics.dielectric_constant_workflow",
+    aliases=("get_dielectric_constant", "dielectric-constant"),
+)
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.kinematics_workflow")

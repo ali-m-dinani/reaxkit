@@ -1002,6 +1002,78 @@ tasks:
     help_search_examples:
     - reaxkit help "plot atom property"
     - run plot atom property
+  get-potential-and-electric-field:
+    consumes_dataclass: ElectrostaticsData
+    implementation_module: 'reaxkit.analysis.electrostatics.potential_and_electric_field.analysis: PotentialElectricFieldTask'
+    description: Calculates ReaxFF shielded and tapered Coulomb energy, species-probe potential, and local electric field at every atom location.
+    related_workflow_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow: get-potential-and-electric-field'
+    tags: [electrostatics, ReaxFF, potential, electric field]
+    notes: [The evaluated atom is excluded as a source at its own coordinate.]
+    aliases: [get_potential_and_electric_field, reaxff-local-field]
+    help_search_examples: [reaxkit help "local electric field", reaxkit get-potential-and-electric-field -h]
+  write-trajectory-with-potential-and-electric-field:
+    consumes_dataclass: ElectrostaticsData
+    implementation_module: 'reaxkit.analysis.electrostatics.potential_and_electric_field.trajectory: PotentialElectricFieldTrajectoryTask'
+    description: Writes an Extended XYZ trajectory with local ReaxFF potential and electric-field atom properties.
+    related_workflow_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow: write-trajectory-with-potential-and-electric-field'
+    tags: [electrostatics, ReaxFF, trajectory, Extended XYZ]
+    notes: []
+    aliases: [write_trajectory_with_potential_and_electric_field, local-field-extxyz]
+    help_search_examples: [reaxkit help "local field trajectory", reaxkit write-trajectory-with-potential-and-electric-field -h]
+  get-three-folded-wurtzite-neighbors:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.neighbors: WurtziteNeighborTask'
+    description: Finds three basal neighbors and retains remaining in-cutoff atoms as apical candidates for three-folded wurtzite sites.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow: get-three-folded-wurtzite-neighbors'
+    tags: [ferroelectrics, wurtzite, neighbors, surface]
+    notes: [Three basal neighbors are sufficient for a complete geometry site.]
+    aliases: [get_three_folded_wurtzite_neighbors, three-folded-wurtzite-neighbors]
+    help_search_examples: [reaxkit help "three folded neighbors", reaxkit get-three-folded-wurtzite-neighbors -h]
+  get-three-folded-wurtzite-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarity: WurtzitePolarityTask'
+    description: Calculates polarity from three basal bonds and then selects an apical neighbor on the polarity-consistent side.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow: get-three-folded-wurtzite-polarity'
+    tags: [ferroelectrics, wurtzite, polarity, surface]
+    notes: [The apical neighbor is optional and does not determine polarity.]
+    aliases: [get_three_folded_wurtzite_polarity, three-folded-wurtzite-polarity]
+    help_search_examples: [reaxkit help "three folded polarity", reaxkit get-three-folded-wurtzite-polarity -h]
+  get-three-folded-wurtzite-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarization: BinnedPolarizationTask'
+    description: Sums three-folded site dipoles in spatial bins and normalizes them by hull, bounding-box, or cell bin volume.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow: get-three-folded-wurtzite-polarization'
+    tags: [ferroelectrics, wurtzite, polarization, binning, heatmap]
+    notes: [Supports hull, bbox, and cell volume estimators.]
+    aliases: [get_three_folded_wurtzite_polarization, three-folded-wurtzite-polarization]
+    help_search_examples: [reaxkit help "three folded polarization", reaxkit get-three-folded-wurtzite-polarization -h]
+  get-basal-plane-displacement-dipole:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole: BasalPlaneDipoleTask'
+    description: Calculates all center, basal, and apical ionic contributions relative to the mean basal plane using negative electron charge.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow: get-basal-plane-displacement-dipole'
+    tags: [ferroelectrics, wurtzite, dipole, basal plane]
+    notes: [Uses three-folded polarity-aware neighbor selection.]
+    aliases: [get_basal_plane_displacement_dipole, basal-plane-dipole]
+    help_search_examples: [reaxkit help "basal plane dipole", reaxkit get-basal-plane-displacement-dipole -h]
+  get-basal-plane-displacement-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization: BasalPlanePolarizationTask'
+    description: Calculates binned polarization from all ionic displacement contributions relative to the basal plane.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow: get-basal-plane-displacement-polarization'
+    tags: [ferroelectrics, wurtzite, polarization, basal plane, heatmap]
+    notes: [Supports hull, bbox, and cell volume estimators.]
+    aliases: [get_basal_plane_displacement_polarization, basal-plane-polarization]
+    help_search_examples: [reaxkit help "basal plane polarization", reaxkit get-basal-plane-displacement-polarization -h]
+  write-three-folded-trajectory-with-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.trajectory: PolarityExtendedXYZTask'
+    description: Writes a species-preserving Extended XYZ trajectory containing basal-only polarity and apical-presence properties.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow: write-three-folded-trajectory-with-polarity'
+    tags: [ferroelectrics, wurtzite, trajectory, Extended XYZ]
+    notes: []
+    aliases: [write_three_folded_trajectory_with_polarity, three-folded-polarity-extxyz]
+    help_search_examples: [reaxkit help "three folded polarity trajectory", reaxkit write-three-folded-trajectory-with-polarity -h]
 dataclass_usage_across_tasks:
   AtomicKinematicsData:
   - get_kinematics
@@ -1029,6 +1101,8 @@ dataclass_usage_across_tasks:
   - dipole
   - polarization
   - get_polarization_field
+  - get-potential-and-electric-field
+  - write-trajectory-with-potential-and-electric-field
   ForceFieldOptimizationDiagnosticData:
   - get_ffield_diagnostic_data
   ForceFieldOptimizationDiagnosticBundleData:
@@ -1084,6 +1158,12 @@ dataclass_usage_across_tasks:
   - voronoi_geometry_scipy
   - voronoi_geometry_pyvoro
   - plot_atom_property
+  - get-three-folded-wurtzite-neighbors
+  - get-three-folded-wurtzite-polarity
+  - get-three-folded-wurtzite-polarization
+  - get-basal-plane-displacement-dipole
+  - get-basal-plane-displacement-polarization
+  - write-three-folded-trajectory-with-polarity
 
 
 

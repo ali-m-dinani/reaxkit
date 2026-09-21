@@ -25,7 +25,12 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
+from reaxkit.domain.data_models import (
+    ConnectivityData,
+    ElectrostaticsData,
+    ElectricFieldData,
+    TrajectoryData,
+)
 from reaxkit.engine.reaxff.adapter import (
     _charges_from_fort7_handler,
     _connectivity_from_fort7_handler,
@@ -548,6 +553,50 @@ def _cell_volume(cell_lengths: Optional[np.ndarray], frame_index: int) -> float:
     if v.shape != (3,) or np.any(~np.isfinite(v)) or np.any(v <= 0):
         return np.nan
     return float(v[0] * v[1] * v[2])
+
+
+def calculate_trajectory_volumes(
+    trajectory: TrajectoryData,
+    volume_method: VolumeMethod = "hull",
+) -> np.ndarray:
+    """Calculate one material volume per trajectory frame in angstrom cubed.
+
+    ``hull`` and ``bbox`` use the occupied atomic coordinates, so vacuum in the
+    simulation cell does not enter the result. ``cell`` uses the complete
+    simulation-cell lengths and therefore includes any vacuum region.
+    """
+    if volume_method not in {"hull", "bbox", "cell"}:
+        raise ValueError("volume_method must be 'hull', 'bbox', or 'cell'.")
+
+    positions = np.asarray(trajectory.positions, dtype=float)
+    cell_lengths = (
+        trajectory.simulation.cell_lengths
+        if trajectory.simulation is not None
+        else None
+    )
+    if volume_method == "cell" and cell_lengths is None:
+        raise ValueError(
+            "Cell volume requires trajectory simulation-cell lengths. "
+            "Use --volume-method hull or bbox when cell metadata is unavailable."
+        )
+
+    volumes = np.empty(positions.shape[0], dtype=float)
+    for frame_index, frame in enumerate(positions):
+        coordinates = np.asarray(frame, dtype=float)
+        coordinates = coordinates[np.all(np.isfinite(coordinates), axis=1)]
+        if volume_method == "cell":
+            volume = _cell_volume(cell_lengths, frame_index)
+        elif volume_method == "bbox":
+            volume = _bbox_volume(coordinates)
+        else:
+            volume = _convex_hull_volume(coordinates)
+        if not np.isfinite(volume) or volume <= 0.0:
+            raise ValueError(
+                f"Could not calculate a positive {volume_method} volume for "
+                f"trajectory frame {frame_index}."
+            )
+        volumes[frame_index] = volume
+    return volumes
 
 
 def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -> list[int]:
@@ -1519,5 +1568,6 @@ __all__ = [
     "PolarizationFieldRequest",
     "PolarizationFieldResult",
     "PolarizationFieldTask",
+    "calculate_trajectory_volumes",
     "polarization_field_axis_label",
 ]
