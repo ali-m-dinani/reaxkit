@@ -335,6 +335,10 @@ class BaseHandler(ABC):
         """Disk cache h5 path."""
         return self._disk_cache_dir(key) / "cache.h5"
 
+    def _disk_cache_pickle_path(self, key: str) -> Path:
+        """Portable fallback used when the optional HDF5 backend is unavailable."""
+        return self._cache_root() / f"{key}.pkl"
+
     def _cache_index_path(self) -> Path:
         """Cache index path."""
         return self._cache_root().parent / "index" / "handlers.json"
@@ -344,7 +348,7 @@ class BaseHandler(ABC):
         """Utc now iso."""
         return datetime.now(timezone.utc).isoformat()
 
-    def _update_cache_index(self, key: str) -> None:
+    def _update_cache_index(self, key: str, *, cache_path: Path | None = None) -> None:
         """Update cache index."""
         index_path = self._cache_index_path()
         index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -357,7 +361,7 @@ class BaseHandler(ABC):
         payload.setdefault("namespace", "handlers")
         payload.setdefault("entries", {})
         payload["entries"][str(key)] = {
-            "path": str(self._disk_cache_h5_path(key)),
+            "path": str(cache_path or self._disk_cache_h5_path(key)),
             "handler": f"{self.__class__.__module__}.{self.__class__.__qualname__}",
             "updated_at": self._utc_now_iso(),
         }
@@ -409,23 +413,45 @@ class BaseHandler(ABC):
 
     def _load_from_disk_cache(self, key: str) -> bytes | None:
         """Load from disk cache."""
-        if h5py is None:
-            return None
-        path = self._disk_cache_h5_path(key)
-        if not path.exists():
+        h5_path = self._disk_cache_h5_path(key)
+        if h5py is not None and h5_path.exists():
+            try:
+                with h5py.File(h5_path, "r") as h5:
+                    if "payload" in h5:
+                        arr = h5["payload"][...]
+                        return bytes(bytearray(arr.tolist()))
+            except Exception:
+                pass
+
+        pickle_path = self._disk_cache_pickle_path(key)
+        if not pickle_path.exists():
             return None
         try:
-            with h5py.File(path, "r") as h5:
-                if "payload" not in h5:
-                    return None
-                arr = h5["payload"][...]
-            return bytes(bytearray(arr.tolist()))
+            return pickle_path.read_bytes()
         except Exception:
             return None
+
+    def _store_pickle_cache(self, key: str, payload: bytes) -> bool:
+        """Atomically persist a handler payload without optional dependencies."""
+        path = self._disk_cache_pickle_path(key)
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_bytes(payload)
+            tmp.replace(path)
+            self._update_cache_index(key, cache_path=path)
+            return True
+        except Exception:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return False
 
     def _store_in_disk_cache(self, key: str, payload: bytes) -> None:
         """Store in disk cache."""
         if h5py is None:
+            self._store_pickle_cache(key, payload)
             return
         tmp_dir: Path | None = None
         cache_dir = self._disk_cache_dir(key)
@@ -445,10 +471,10 @@ class BaseHandler(ABC):
                 import shutil
                 shutil.rmtree(cache_dir, ignore_errors=True)
             tmp_dir.replace(cache_dir)
-            self._update_cache_index(key)
+            self._update_cache_index(key, cache_path=self._disk_cache_h5_path(key))
             return
         except Exception:
             if tmp_dir is not None and tmp_dir.exists():
                 import shutil
                 shutil.rmtree(tmp_dir, ignore_errors=True)
-            return
+            self._store_pickle_cache(key, payload)

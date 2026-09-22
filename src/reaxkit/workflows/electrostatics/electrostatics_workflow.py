@@ -63,7 +63,8 @@ def _apply_polarization_scale(command: str, result, factor: float) -> None:
     """Scale polarization-valued result columns before presentation/export."""
     if factor == 1.0:
         return
-    table_names = ("table",) if command == POLARIZATION_COMMAND else ("full_table", "aggregated_table")
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    table_names = ("table",) if canonical == POLARIZATION_COMMAND else ("full_table", "aggregated_table")
     for table_name in table_names:
         table = getattr(result, table_name, None)
         if not isinstance(table, pd.DataFrame):
@@ -73,7 +74,7 @@ def _apply_polarization_scale(command: str, result, factor: float) -> None:
             if column in scaled.columns:
                 scaled[column] = scaled[column].astype(float) * factor
         setattr(result, table_name, scaled)
-    if command == POLARIZATION_FIELD_COMMAND:
+    if canonical == POLARIZATION_FIELD_COMMAND:
         result.field_zero_crossings = [float(value) * factor for value in result.field_zero_crossings]
 
 

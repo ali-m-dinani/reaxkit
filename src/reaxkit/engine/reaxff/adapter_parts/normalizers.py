@@ -380,7 +380,8 @@ def _trajectory_from_xmolout_handler(handler: XmoloutHandler) -> TrajectoryData:
     """Normalize an ``XmoloutHandler`` into ``TrajectoryData``."""
     n_frames = handler.n_frames()
     frames = [handler.frame(i) for i in range(n_frames)]
-    handler_meta = handler.metadata()
+    metadata = getattr(handler, "metadata", None)
+    handler_meta = metadata() if callable(metadata) else {}
     source_frame_indices = handler_meta.get("source_frame_indices")
     if not frames:
         positions = np.empty((0, 0, 3), dtype=float)

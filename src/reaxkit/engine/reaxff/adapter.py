@@ -56,6 +56,8 @@ from reaxkit.domain.data_models import (
     TrajectoryData,
 )
 from reaxkit.engine.base import EngineAdapter
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+from reaxkit.engine.reaxff.adapter_parts import loaders_dynamics as _loaders_dynamics
 
 from reaxkit.engine.reaxff.adapter_parts.loaders_dynamics import (
     _load_simulation_from_summary as _load_simulation_from_summary_impl,
@@ -306,6 +308,7 @@ class ReaxFFAdapter(EngineAdapter):
 
     def load_trajectory(self, args: dict, reporter=None) -> TrajectoryData:
         """Load trajectory data from ReaxFF outputs."""
+        _loaders_dynamics.XmoloutHandler = XmoloutHandler
         return _load_trajectory_impl(self, args, reporter=reporter)
 
     def load_geometry(self, args: dict, reporter=None) -> GeometryData:

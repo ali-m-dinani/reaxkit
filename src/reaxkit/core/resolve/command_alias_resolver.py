@@ -176,7 +176,7 @@ def build_command_alias_index(
         for candidate in candidates:
             normalized = _normalize_command_token(candidate)
             if normalized:
-                alias_index[normalized] = canonical
+                alias_index.setdefault(normalized, canonical)
 
     return alias_index
 

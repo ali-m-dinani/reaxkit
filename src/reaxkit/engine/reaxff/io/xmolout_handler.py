@@ -15,26 +15,28 @@ and structural analysis.
 - Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
-
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 import pickle
 import shutil
+from time import perf_counter
 from typing import List, Optional, Iterator, Dict, Any
 import numpy as np
 import pandas as pd
 from reaxkit.core.platform.exceptions import ParseError
+from reaxkit.core.storage.frame_store import FrameOffset, FrameStore, IndexCoverage
 from reaxkit.engine.reaxff.io.base import BaseHandler
 from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
 
 
 def _parse_xmolout_header(
-    raw: str,
-    *,
-    path: str | Path,
-    frame_index: int,
-    line_number: int | None,
+        raw: str,
+        *,
+        path: str | Path,
+        frame_index: int,
+        line_number: int | None,
 ) -> tuple[str, int, list[float]]:
     """Parse one xmolout frame header and provide a format-specific error."""
     values = raw.split()
@@ -63,6 +65,7 @@ def _parse_xmolout_header(
             f"energy or cell fields are not numeric. Header: {raw.strip()!r}"
         ) from exc
     return name, int(values[1]), numeric_values
+
 
 class XmoloutHandler(BaseHandler):
     """
@@ -103,12 +106,14 @@ class XmoloutHandler(BaseHandler):
     """
 
     def __init__(
-        self,
-        file_path: str | Path = "xmolout",
-        *,
-        extra_atom_cols: Optional[list[str]] = None,
-        frame_indices: Optional[list[int]] = None,
-        reporter=None,
+            self,
+            file_path: str | Path = "xmolout",
+            *,
+            extra_atom_cols: Optional[list[str]] = None,
+            frame_indices: Optional[list[int]] = None,
+            reporter=None,
+            input_cache: bool = True,
+            frame_cache_root: str | Path | None = None,
     ):
         """
         Initialize the instance.
@@ -122,7 +127,7 @@ class XmoloutHandler(BaseHandler):
 
         """
         super().__init__(file_path)
-        self._frames: List[pd.DataFrame] = []     # list of per-frame atom tables
+        self._frames: List[pd.DataFrame] = []  # list of per-frame atom tables
         self._n_atoms: Optional[int] = None
         self.simulation_name: str = ""
         self._extra_atom_cols = list(extra_atom_cols) if extra_atom_cols else None
@@ -132,6 +137,9 @@ class XmoloutHandler(BaseHandler):
             else None
         )
         self._reporter = reporter
+        self._input_cache = bool(input_cache)
+        self._frame_cache_root = Path(frame_cache_root) if frame_cache_root else None
+        self._frame_cache_stats: dict[str, Any] = {}
 
     # ---- FileHandler requirement
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -205,14 +213,14 @@ class XmoloutHandler(BaseHandler):
                         if self._extra_atom_cols:
                             names = list(self._extra_atom_cols)[:n_extras]
                             if len(names) < n_extras:
-                                names += [f"unknown_{i+1}" for i in range(n_extras - len(names))]
+                                names += [f"unknown_{i + 1}" for i in range(n_extras - len(names))]
                         else:
-                            names = [f"unknown_{i+1}" for i in range(n_extras)]
+                            names = [f"unknown_{i + 1}" for i in range(n_extras)]
                         current_atom_cols = base_atom_cols + names
 
                     base = [vals[0]] + list(map(float, vals[1:4]))
                     expected_extras = len(current_atom_cols) - 4
-                    extras_vals = [float(x) for x in vals[4:4+expected_extras]]
+                    extras_vals = [float(x) for x in vals[4:4 + expected_extras]]
                     # pad if fewer provided
                     while len(extras_vals) < expected_extras:
                         extras_vals.append(float('nan'))
@@ -246,7 +254,240 @@ class XmoloutHandler(BaseHandler):
             self._reporter("load", total_lines, total_lines, "Finished parsing xmolout")
         return df, meta
 
+    def _frame_store(self) -> FrameStore | None:
+        """Return the shared source-frame store, or ``None`` when disabled."""
+        if not self._input_cache:
+            return None
+        root = self._frame_cache_root
+        if root is None:
+            configured = os.environ.get("REAXKIT_FRAME_CACHE_DIR", "").strip()
+            root = Path(configured) if configured else self._cache_root().parent
+        try:
+            return FrameStore.for_source(
+                root,
+                self.path,
+                engine="reaxff",
+                source_kind="xmolout",
+                parser=f"{self.__class__.__module__}.{self.__class__.__qualname__}",
+                parser_version="3",
+                representation="xmolout-full-frame-v1",
+                capabilities=("coordinates", "atom-extras", "cell", "energy"),
+                options={"extra_atom_cols": self._extra_atom_cols or []},
+            )
+        except (OSError, RuntimeError, ValueError):
+            return None
+
+    @staticmethod
+    def _next_nonempty_binary(handle) -> tuple[int, bytes, int] | None:
+        while True:
+            start = handle.tell()
+            raw = handle.readline()
+            if not raw:
+                return None
+            if raw.strip():
+                return start, raw, handle.tell()
+
+    def _scan_offsets(self, store: FrameStore, *, through_index: int) -> dict[str, Any]:
+        """Extend the byte index through ``through_index`` without building frames."""
+        coverage = store.get_coverage()
+        started_at = perf_counter()
+        bytes_read = 0
+        indexed = 0
+        if coverage.complete or coverage.next_frame_index > through_index:
+            return {"indexed_frames": 0, "index_bytes": 0, "index_seconds": 0.0}
+
+        with self.path.open("rb") as handle:
+            handle.seek(coverage.next_byte_offset)
+            frame_index = coverage.next_frame_index
+            while frame_index <= through_index:
+                item = self._next_nonempty_binary(handle)
+                if item is None:
+                    store.set_coverage(IndexCoverage(frame_index, handle.tell(), True))
+                    break
+                byte_start, raw_count, _ = item
+                values = raw_count.decode("utf-8").strip().split()
+                if len(values) != 1 or not values[0].isdigit():
+                    bytes_read += handle.tell() - byte_start
+                    continue
+                atom_count = int(values[0])
+                header_item = self._next_nonempty_binary(handle)
+                if header_item is None:
+                    store.set_coverage(IndexCoverage(frame_index, byte_start, True))
+                    break
+                _, raw_header, _ = header_item
+                name, iteration, _ = _parse_xmolout_header(
+                    raw_header.decode("utf-8"),
+                    path=self.path,
+                    frame_index=frame_index,
+                    line_number=None,
+                )
+                if not self.simulation_name:
+                    self.simulation_name = name
+                complete = True
+                for _atom_index in range(atom_count):
+                    if self._next_nonempty_binary(handle) is None:
+                        complete = False
+                        break
+                if not complete:
+                    store.set_coverage(IndexCoverage(frame_index, byte_start, True))
+                    break
+                byte_end = handle.tell()
+                store.put_offsets(
+                    [FrameOffset(frame_index, byte_start, byte_end, iteration, atom_count)]
+                )
+                frame_index += 1
+                indexed += 1
+                bytes_read += byte_end - byte_start
+                store.set_coverage(IndexCoverage(frame_index, byte_end, False))
+            else:
+                # Coverage is a safe resume point even though EOF is not yet known.
+                store.set_coverage(IndexCoverage(frame_index, handle.tell(), False))
+        return {
+            "indexed_frames": indexed,
+            "index_bytes": bytes_read,
+            "index_seconds": perf_counter() - started_at,
+        }
+
+    def _parse_indexed_frame(self, handle, offset: FrameOffset) -> dict[str, Any]:
+        """Parse one canonical full frame from a verified byte range."""
+        handle.seek(offset.byte_start)
+        count_item = self._next_nonempty_binary(handle)
+        if count_item is None:
+            raise ParseError(f"Missing xmolout frame {offset.frame_index} in '{self.path}'.")
+        values = count_item[1].decode("utf-8").strip().split()
+        if len(values) != 1 or not values[0].isdigit():
+            raise ParseError(f"Malformed xmolout atom count in '{self.path}' (frame {offset.frame_index}).")
+        n_atoms = int(values[0])
+        header_item = self._next_nonempty_binary(handle)
+        if header_item is None:
+            raise ParseError(f"Missing xmolout frame header in '{self.path}' (frame {offset.frame_index}).")
+        name, iteration, numeric_values = _parse_xmolout_header(
+            header_item[1].decode("utf-8"),
+            path=self.path,
+            frame_index=offset.frame_index,
+            line_number=None,
+        )
+        atom_rows: list[list[Any]] = []
+        atom_columns: list[str] | None = None
+        for _atom_index in range(n_atoms):
+            atom_item = self._next_nonempty_binary(handle)
+            if atom_item is None:
+                raise ParseError(f"Truncated xmolout atom block in '{self.path}' (frame {offset.frame_index}).")
+            atom_values = atom_item[1].decode("utf-8").strip().split()
+            if len(atom_values) < 4:
+                raise ParseError(f"Malformed xmolout atom row in '{self.path}' (frame {offset.frame_index}).")
+            if atom_columns is None:
+                n_extras = max(0, len(atom_values) - 4)
+                if self._extra_atom_cols:
+                    extra_names = list(self._extra_atom_cols)[:n_extras]
+                    extra_names.extend(
+                        f"unknown_{i + 1}" for i in range(len(extra_names), n_extras)
+                    )
+                else:
+                    extra_names = [f"unknown_{i + 1}" for i in range(n_extras)]
+                atom_columns = ["atom_type", "x", "y", "z", *extra_names]
+            extras = [float(value) for value in atom_values[4:len(atom_columns)]]
+            extras.extend([float("nan")] * (len(atom_columns) - 4 - len(extras)))
+            atom_rows.append(
+                [atom_values[0], *[float(value) for value in atom_values[1:4]], *extras]
+            )
+        return {
+            "summary": [n_atoms, iteration, *numeric_values],
+            "frame": pd.DataFrame(
+                atom_rows,
+                columns=atom_columns or ["atom_type", "x", "y", "z"],
+            ),
+            "simulation_name": name,
+            "source_bytes": int(offset.byte_end - offset.byte_start),
+        }
+
+    def _load_indexed_records(
+            self,
+            store: FrameStore,
+            requested: list[int],
+    ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
+        cache_started = perf_counter()
+        records = store.get_frames(requested)
+        cache_seconds = perf_counter() - cache_started
+        missing = [index for index in requested if index not in records]
+        scan_stats = self._scan_offsets(store, through_index=max(missing, default=-1)) if missing else {
+            "indexed_frames": 0,
+            "index_bytes": 0,
+            "index_seconds": 0.0,
+        }
+        offsets = store.get_offsets(missing)
+        source_started = perf_counter()
+        parsed: dict[int, dict[str, Any]] = {}
+        source_bytes = 0
+        if offsets:
+            with self.path.open("rb") as handle:
+                for frame_index in missing:
+                    offset = offsets.get(frame_index)
+                    if offset is None:
+                        continue
+                    record = self._parse_indexed_frame(handle, offset)
+                    parsed[frame_index] = record
+                    source_bytes += int(record.get("source_bytes", 0))
+        source_seconds = perf_counter() - source_started
+        write_started = perf_counter()
+        store.put_frames(parsed)
+        write_seconds = perf_counter() - write_started
+        records.update(parsed)
+        stats = {
+            "requested": len(requested),
+            "hits": len(requested) - len(missing),
+            "misses": len(missing),
+            "parsed_frames": len(parsed),
+            "source_bytes": source_bytes,
+            "cache_read_seconds": cache_seconds,
+            "source_read_seconds": source_seconds,
+            "cache_write_seconds": write_seconds,
+            **scan_stats,
+        }
+        return records, stats
+
     def _parse_selected_frames(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        """Load explicit frames from the shared frame store with a safe fallback."""
+        requested = list(self._frame_indices or ())
+        store = self._frame_store()
+        if store is None:
+            return self._parse_selected_frames_sequential()
+        records, stats = self._load_indexed_records(store, requested)
+        self._frame_cache_stats = stats
+        source_indices = [index for index in requested if index in records]
+        sim_rows = [records[index]["summary"] for index in source_indices]
+        frames = [records[index]["frame"] for index in source_indices]
+        if source_indices:
+            first = records[source_indices[0]]
+            self.simulation_name = str(first.get("simulation_name") or "")
+            self._n_atoms = int(first["summary"][0])
+        sim_cols = ["num_of_atoms", "iter", "E_pot", "a", "b", "c", "alpha", "beta", "gamma"]
+        df = pd.DataFrame(sim_rows, columns=sim_cols)
+        if not df.empty:
+            keep_idx = df.drop_duplicates("iter", keep="last").index.tolist()
+            frames = [frames[index] for index in keep_idx]
+            source_indices = [source_indices[index] for index in keep_idx]
+            df = df.iloc[keep_idx].reset_index(drop=True)
+        self._frames = frames
+        meta: Dict[str, Any] = {
+            "simulation_name": self.simulation_name,
+            "n_atoms": self._n_atoms,
+            "n_frames": len(frames),
+            "has_time": False,
+            "source_frame_indices": source_indices,
+            "partial": True,
+            "frame_cache": stats,
+        }
+        if self._reporter:
+            self._reporter(
+                "load",
+                len(source_indices),
+                len(requested),
+                f"xmolout frame cache: {stats['hits']} hit, {stats['misses']} miss",
+            )
+        return df, meta
+
+    def _parse_selected_frames_sequential(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """Parse only explicitly requested frames and stop after the last one."""
         sim_cols = ["num_of_atoms", "iter", "E_pot", "a", "b", "c", "alpha", "beta", "gamma"]
         base_atom_cols = ["atom_type", "x", "y", "z"]
@@ -371,6 +612,74 @@ class XmoloutHandler(BaseHandler):
         building a pandas table and parsing unused per-atom columns.  It is
         intended for total electrostatics, which consumes only XYZ positions.
         """
+        if self._frame_indices is not None:
+            requested_order = list(self._frame_indices)
+            store = self._frame_store()
+            if store is not None:
+                initially_available = store.available_indices(requested_order)
+                missing = [index for index in requested_order if index not in initially_available]
+                scan_stats = self._scan_offsets(
+                    store,
+                    through_index=max(missing, default=-1),
+                ) if missing else {"indexed_frames": 0, "index_bytes": 0, "index_seconds": 0.0}
+                offsets = store.get_offsets(missing)
+                parsed_frames = 0
+                source_bytes = 0
+                with self.path.open("rb") as handle:
+                    for emitted, source_index in enumerate(requested_order, start=1):
+                        cached = store.get_frames([source_index])
+                        record = cached.get(source_index)
+                        if record is None:
+                            offset = offsets.get(source_index)
+                            if offset is None:
+                                continue
+                            record = self._parse_indexed_frame(handle, offset)
+                            store.put_frames({source_index: record})
+                            parsed_frames += 1
+                            source_bytes += int(record.get("source_bytes", 0))
+                        summary = record["summary"]
+                        frame = record["frame"]
+                        if not self.simulation_name:
+                            self.simulation_name = str(record.get("simulation_name") or "")
+                        if callable(self._reporter):
+                            self._reporter(
+                                "stream",
+                                emitted,
+                                len(requested_order),
+                                "Streaming xmolout frames",
+                            )
+                        output = {
+                            "source_index": source_index,
+                            "iter": int(summary[1]),
+                            "num_of_atoms": int(summary[0]),
+                            "potential_energy": float(summary[2]),
+                            "cell_lengths": list(summary[3:6]),
+                            "cell_angles": list(summary[6:9]),
+                        }
+                        if coordinates_only:
+                            output["coordinates"] = frame[["x", "y", "z"]].to_numpy(dtype=float)
+                            output["elements"] = frame["atom_type"].astype(str).tolist()
+                        else:
+                            output["frame"] = frame
+                        yield output
+                self._frame_cache_stats = {
+                    "requested": len(requested_order),
+                    "hits": len(initially_available),
+                    "misses": len(requested_order) - len(initially_available),
+                    "parsed_frames": parsed_frames,
+                    "source_bytes": source_bytes,
+                    **scan_stats,
+                }
+                if callable(self._reporter):
+                    self._reporter(
+                        "stream",
+                        len(requested_order),
+                        len(requested_order),
+                        f"xmolout frame cache: {len(initially_available)} hit, "
+                        f"{len(requested_order) - len(initially_available)} miss",
+                    )
+                return
+
         requested = set(self._frame_indices) if self._frame_indices is not None else None
         max_requested = max(requested, default=-1) if requested is not None else None
         source_index = -1

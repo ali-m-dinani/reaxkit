@@ -62,18 +62,14 @@ def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Trajec
     --------
     >>> data = adapter.load_trajectory({"xmolout": "run/xmolout"})
     """
-    from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
+    from reaxkit.engine.reaxff.adapter import XmoloutHandler
 
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
     handler = adapter._build_handler(
         args,
         handler_name="XmoloutHandler",
         source_path=xmol_path,
-        factory=lambda: XmoloutHandler(
-            xmol_path,
-            frame_indices=args.get("_frame_indices"),
-            reporter=reporter,
-        ),
+        factory=lambda: _make_xmolout_handler(XmoloutHandler, xmol_path, args, reporter),
     )
     trj = adapter._time_source(
         args,
@@ -86,6 +82,19 @@ def load_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Trajec
         adapter._load_simulation_from_summary(args, reporter=reporter),
     )
     return trj
+
+
+def _make_xmolout_handler(handler_type, path: Path, args: dict, reporter=None):
+    """Construct current handlers while accepting the former minimal signature."""
+    try:
+        return handler_type(
+            path,
+            frame_indices=args.get("_frame_indices"),
+            reporter=reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+        )
+    except TypeError:
+        return handler_type(path, reporter=reporter)
 
 
 def load_geometry(adapter: ReaxFFAdapter, args: dict, reporter=None) -> GeometryData:
@@ -261,6 +270,7 @@ def _load_simulation_from_xmolout(adapter_cls: type[ReaxFFAdapter], args: dict, 
             xmol_path,
             frame_indices=args.get("_frame_indices"),
             reporter=reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     trj = adapter_cls._time_source(
@@ -346,6 +356,7 @@ def load_connectivity(adapter: ReaxFFAdapter, args: dict, reporter=None) -> Conn
             fort7_path,
             reporter=reporter,
             frame_indices=args.get("_frame_indices"),
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     conn = adapter._time_source(
@@ -437,6 +448,7 @@ def load_connectivity_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=No
             fort7_path,
             reporter=reporter,
             frame_indices=args.get("_frame_indices"),
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     xmol_handler = adapter._build_handler(
@@ -447,6 +459,7 @@ def load_connectivity_trajectory(adapter: ReaxFFAdapter, args: dict, reporter=No
             xmol_path,
             frame_indices=args.get("_frame_indices"),
             reporter=reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     summary_simulation = adapter._load_simulation_from_summary(args, reporter=reporter)

@@ -16,6 +16,7 @@ import shutil
 import tarfile
 from pathlib import Path
 
+from reaxkit.core.storage.frame_store import clear_frame_cache, inspect_frame_cache
 from reaxkit.core.storage.storage_layout import default_project_root
 
 MANAGE_WORKSPACE_COMMAND = "manage-workspace"
@@ -179,6 +180,27 @@ def _run_manage_workspace(args: argparse.Namespace) -> int:
     action = str(args.action or "delete").strip().lower()
     dry_run = bool(args.dry_run)
     keep_n = int(args.number or 0)
+
+    if target.name == "frames" and target.parent.name == "cache":
+        cache_root = target.parent
+        info = inspect_frame_cache(cache_root)
+        if action == "list":
+            print(
+                f"[Info] Frame cache: {info['stores']} store(s), "
+                f"{info['frames']} frame(s), size={_human_size(info['bytes'])}"
+            )
+            for entry in info["entries"]:
+                print(
+                    f"  - {entry['path']}  frames={entry['frames']} "
+                    f"size={_human_size(entry['bytes'])}"
+                )
+            return 0
+        if action == "delete" and keep_n == 0:
+            if not dry_run:
+                clear_frame_cache(cache_root)
+            verb = "Would clear" if dry_run else "Cleared"
+            print(f"{verb} {info['stores']} frame store(s) ({_human_size(info['bytes'])}).")
+            return 0
 
     if action == "list":
         return _print_list(target)

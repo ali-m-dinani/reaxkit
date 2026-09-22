@@ -45,7 +45,7 @@ frame and iter, plus lattice/PBC metadata and an iteration-matched electric fiel
 requested. ReaxFF charges are streamed through the lightweight charge-only reader.
 The canonical trajectory and the neighbor/polarity CSV tables are always written under
 reaxkit_workspace. --output optionally creates a second copy at another destination.
-  
+
 Examples:
   1. Write an AlN polarity trajectory with automatically assigned charges and electric field profile:
      reaxkit write-trajectory-with-polarity --include-electric-field --field-direction z --charge-source formal --formal-charge Al=3 N=-3 H=1

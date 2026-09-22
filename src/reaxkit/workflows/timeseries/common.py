@@ -291,7 +291,7 @@ def _axis_control_file(args: argparse.Namespace) -> str:
     """Resolve a default control file beside any time-series input source."""
 
     configured = Path(str(getattr(args, "control", "control")))
-    if configured != Path("control"):
+    if configured != Path("control") and configured.is_file():
         return str(configured)
 
     for directory in _axis_input_directories(args):

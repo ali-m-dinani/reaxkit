@@ -361,6 +361,7 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
                 xmolout_path=xmolout_path,
                 frame_indices=args.get("_frame_indices"),
                 reporter=reporter,
+                input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
             ),
         )
     handler = adapter._build_handler(
@@ -371,6 +372,7 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
             fort7_path,
             reporter=reporter,
             frame_indices=args.get("_frame_indices"),
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     sim = _merge_simulation_data(

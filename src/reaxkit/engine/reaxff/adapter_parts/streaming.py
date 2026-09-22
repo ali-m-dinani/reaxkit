@@ -243,6 +243,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             xmolout_path=xmol_path,
             frame_indices=selected,
             reporter=reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         )
         return
 
@@ -255,6 +256,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         xmol_path,
         frame_indices=selected,
         reporter=reporter,
+        input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
     ).stream_file_frames(coordinates_only=total_electrostatics)
 
     if data_type is TrajectoryData:
@@ -277,12 +279,14 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             frame_indices=selected,
             reporter=None,
             include_atom_types=False,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         )
     else:
         connectivity_records = Fort7Handler(
             fort7_path,
             frame_indices=selected,
             reporter=None,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ).stream_file_frames(
             charges_only=total_electrostatics,
             charge_arrays_only=total_electrostatics,

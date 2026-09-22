@@ -340,6 +340,44 @@ def test_local_equal_volumes_close_to_global_dipole_and_polarization(reference_p
     )
 
 
+def test_local_result_also_reports_neutral_aln_layers(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    positions = trajectory.positions.copy()
+    labels = np.asarray(trajectory.elements)
+    positions[0, labels == "Al", 2] += 0.1
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=trajectory.elements,
+        atom_ids=trajectory.atom_ids,
+        iterations=trajectory.iterations,
+        simulation=trajectory.simulation,
+    )
+    result = calculate_hbn_reference_local_polarization(
+        trajectory,
+        HBNReferenceLocalPolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            volume_method="cell",
+            local_grouping="layer",
+        ),
+    )
+
+    assert len(result.cell_table) == 4
+    assert len(result.layer_table) == 8
+    assert result.table is result.layer_table
+    assert set(result.layer_table["atom_count"]) == {2}
+    assert set(result.layer_table["composition"]) == {"Al1,N1"}
+    assert result.layer_table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
+        np.full(8, -0.3)
+    )
+    assert result.layer_table["local_volume (angstrom^3)"].sum() == pytest.approx(
+        result.reference_result.table.iloc[0]["volume (angstrom^3)"]
+    )
+    assert result.layer_summary.iloc[0][
+        "dipole_closure_error_z (e*angstrom)"
+    ] == pytest.approx(0.0)
+
+
 def test_local_deformation_volumes_are_normalized_to_selected_frame_volume(
         reference_path,
 ) -> None:
@@ -402,6 +440,38 @@ def test_projected_polarity_includes_zero_and_uses_fixed_cell_bins(reference_pat
     assert result.centers.groupby("local_cell_id")["u_bin"].nunique().max() == 1
     assert result.centers.groupby("local_cell_id")["v_bin"].nunique().max() == 1
     assert len(result.kymograph_bins) == 2
+
+
+def test_projected_polarity_can_use_layer_resolved_dipoles(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    positions = trajectory.positions.copy()
+    labels = np.asarray(trajectory.elements)
+    positions[0, labels == "Al", 2] += 0.1
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=trajectory.elements,
+        atom_ids=trajectory.atom_ids,
+        iterations=trajectory.iterations,
+        simulation=trajectory.simulation,
+    )
+    result = calculate_hbn_reference_projected_polarity(
+        trajectory,
+        HBNReferenceProjectedPolarityRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            local_grouping="layer",
+            component="z",
+            projection_plane="xz",
+            projection_bins=(1, 1),
+            profile_axis="z",
+        ),
+    )
+
+    projected = result.projected_bins.iloc[0]
+    assert projected["defined_group_count"] == 8
+    assert projected["negative_count"] == 8
+    assert result.centers["local_layer_id"].nunique() == 8
+    assert result.centers["local_grouping"].eq("layer").all()
 
 
 def test_reaxff_local_cells_are_neutralized_without_losing_raw_global_closure(

@@ -375,14 +375,38 @@ register_analysis_command(
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
-register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_msd", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "msd",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("mean-square-displacement", "mean_square_displacement"),
+)
+register_analysis_command(
+    "get_msd",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("msd", "get-msd", "mean-square-displacement", "mean_square_displacement"),
+)
+register_analysis_command(
+    "diffusivity",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("diffusion-coefficient", "diffusion_coefficient"),
+)
+register_analysis_command(
+    "get_diffusivity",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("diffusivity", "get-diffusivity", "diffusion-coefficient", "diffusion_coefficient"),
+)
 register_analysis_command("rdf", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_rdf", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_rdf",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("rdf", "get-rdf"),
+)
 register_analysis_command("rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_rdf_property",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("rdf_property", "rdf-property", "get-rdf-property"),
+)
 register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_dihedral", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_voronoi", module_path="reaxkit.workflows.trajectory_workflow")
@@ -413,8 +437,16 @@ register_analysis_command("relabel_traj_using_coordination", module_path="reaxki
 register_analysis_command("hybridization", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_hybridization", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.meta.plot_atom_property_workflow")
-register_analysis_command("get_active_site_structural", module_path="reaxkit.workflows.active_site_workflow")
-register_analysis_command("get_active_site_events", module_path="reaxkit.workflows.active_site_workflow")
+register_analysis_command(
+    "get_active_site_structural",
+    module_path="reaxkit.workflows.active_site_workflow",
+    aliases=("active_site_structural", "active-site-structural", "get-active-site-structural"),
+)
+register_analysis_command(
+    "get_active_site_events",
+    module_path="reaxkit.workflows.active_site_workflow",
+    aliases=("active_site_events", "active-site-events", "get-active-site-events"),
+)
 
 _TIMESERIES_WORKFLOW_COMMANDS = (
     "get_potential_energy",

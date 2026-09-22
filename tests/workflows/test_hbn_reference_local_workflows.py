@@ -95,6 +95,8 @@ def test_local_parser_defaults_to_equal_hull_volume_and_accepts_deformation() ->
                 "1",
                 "--local-volume-method",
                 "deformation",
+                "--local-grouping",
+                "layer",
                 "--deformation-neighbors",
                 "8",
                 "--plot-component",
@@ -107,6 +109,7 @@ def test_local_parser_defaults_to_equal_hull_volume_and_accepts_deformation() ->
     assert default.local_volume_method == "equal"
     assert default.volume_method == "hull"
     assert deformation.local_volume_method == "deformation"
+    assert deformation.local_grouping == "layer"
     assert deformation.deformation_neighbors == 8
 
 
@@ -148,9 +151,13 @@ def test_extxyz_contains_full_atoms_and_local_cell_properties(tmp_path) -> None:
 
     assert int(lines[0]) == len(result.trajectory.atom_ids)
     assert "local_cell_id:I:1" in lines[1]
+    assert "local_layer_id:I:1" in lines[1]
     assert "is_local_cell_center:I:1" in lines[1]
+    assert "is_local_layer_center:I:1" in lines[1]
     assert "local_dipole:R:3" in lines[1]
     assert "local_polarization:R:3" in lines[1]
+    assert "layer_dipole:R:3" in lines[1]
+    assert "layer_polarization:R:3" in lines[1]
     assert 'frame=0' in lines[1]
     assert 'iter=20' in lines[1]
 

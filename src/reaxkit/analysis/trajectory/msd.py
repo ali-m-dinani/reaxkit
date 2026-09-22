@@ -315,7 +315,8 @@ class MSDTask(AnalysisTask):
 
         # Equivalent to Fortran ndim.
         # Prefer request.max_lag if you add it to MSDRequest.
-        max_lag = int(getattr(request, "max_lag", n_selected_frames))
+        requested_max_lag = getattr(request, "max_lag", None)
+        max_lag = n_selected_frames if requested_max_lag is None else int(requested_max_lag)
 
         if max_lag <= 0:
             raise ValueError("max_lag must be positive.")

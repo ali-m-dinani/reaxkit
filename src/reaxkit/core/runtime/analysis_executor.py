@@ -198,7 +198,8 @@ class AnalysisExecutor:
                 trace.result("analysis directory", analysis_dir)
 
     @classmethod
-    def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float, extra: dict | None = None) -> None:
+    def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float,
+                       extra: dict | None = None) -> None:
         """
         Record timing.
         """
@@ -218,6 +219,14 @@ class AnalysisExecutor:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
 
+        legacy_payload = dict(payload)
+        if legacy_payload["phase"] == "load_total":
+            legacy_payload["phase"] = "load"
+        legacy_timing = Path(args.get("project_root") or ".") / "logs" / "timing.log"
+        legacy_timing.parent.mkdir(parents=True, exist_ok=True)
+        with open(legacy_timing, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(legacy_payload, sort_keys=True) + "\n")
+
         human_line = (
             f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')} "
             f"ReaxKit task={task_name} phase={phase} "
@@ -226,6 +235,11 @@ class AnalysisExecutor:
         )
         for human_path in (cls._timing_human_global_log_path(args), cls._timing_human_run_log_path(args)):
             human_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(human_path, "a", encoding="utf-8") as fh:
+                fh.write(human_line + "\n")
+        legacy_logs = Path(args.get("project_root") or ".") / "logs"
+        session_id = str(args.get("_log_session_id") or "unknown")
+        for human_path in (legacy_logs / "timing_human.log", legacy_logs / f"run_{session_id}.timing.log"):
             with open(human_path, "a", encoding="utf-8") as fh:
                 fh.write(human_line + "\n")
 
@@ -271,6 +285,7 @@ class AnalysisExecutor:
         """
         Load timing callback.
         """
+
         def _emit(*, handler: str, source: str | None, source_path: str | None, seconds: float) -> None:
             cls._record_timing(
                 args,
@@ -432,10 +447,10 @@ class AnalysisExecutor:
         execution_request, source_indices = cls._request_for_loaded_frames(request, data)
         task_name = task.__class__.__name__
         with progress_operation(
-            reporter,
-            "analyze",
-            f"Running {task_name}",
-            f"Finished {task_name}",
+                reporter,
+                "analyze",
+                f"Running {task_name}",
+                f"Finished {task_name}",
         ) as analysis_reporter:
             params = inspect.signature(task.run).parameters
             if "reporter" in params:
@@ -450,8 +465,8 @@ class AnalysisExecutor:
         return bool(
             args.get("stream", True)
             and (
-                requested_frame_indices is None
-                or bool(getattr(task, "supports_selective_streaming", False))
+                    requested_frame_indices is None
+                    or bool(getattr(task, "supports_selective_streaming", False))
             )
             and callable(getattr(task, "run_stream", None))
             and adapter.supports_streaming(required_data, args)
@@ -462,10 +477,10 @@ class AnalysisExecutor:
         """Execute an incremental task against a canonical frame iterator."""
         task_name = task.__class__.__name__
         with progress_operation(
-            reporter,
-            "stream",
-            f"Streaming {task_name}",
-            f"Finished {task_name}",
+                reporter,
+                "stream",
+                f"Streaming {task_name}",
+                f"Finished {task_name}",
         ) as stream_reporter:
             params = inspect.signature(task.run_stream).parameters
             if "reporter" in params:
@@ -544,7 +559,36 @@ class AnalysisExecutor:
             input_was_explicit = bool(explicit_input and str(explicit_input) != ".")
         if input_was_explicit and explicit_input and str(explicit_input) != ".":
             return str(explicit_input)
-        return str(args.get("_snapshot_source_dir") or cls._detection_path(args))
+        default_file_hints = {
+            "xmolout": "xmolout",
+            "fort7": "fort.7",
+            "fort13": "fort.13",
+            "fort57": "fort.57",
+            "summary": "summary.txt",
+            "control": "control",
+            "eregime": "eregime",
+            "vels": "vels",
+            "molfra": "molfra",
+        }
+        for key in cls.DETECTION_HINT_KEYS:
+            if key in {"input", "run_dir"}:
+                continue
+            value = args.get(key)
+            if not value:
+                continue
+            path = Path(str(value))
+            default_name = default_file_hints.get(key)
+            if default_name and path.parent == Path(".") and path.name == default_name:
+                continue
+            return str(value)
+
+        run_dir = args.get("run_dir")
+        run_dir_was_explicit = args.get("_run_dir_was_explicit")
+        if run_dir_was_explicit is None:
+            run_dir_was_explicit = bool(run_dir and str(run_dir) != ".")
+        if run_dir_was_explicit and run_dir and str(run_dir) != ".":
+            return str(run_dir)
+        return str(args.get("_snapshot_source_dir") or ".")
 
     @staticmethod
     def _console_step(args: dict, message: str) -> None:
@@ -599,7 +643,9 @@ class AnalysisExecutor:
         args.clear()
         args.update(normalized)
         required_data = (
-            task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
+            task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task,
+                                                                                                     "required_data",
+                                                                                                     None)
         )
         if hasattr(task, "required_data_fields_for"):
             required_fields = task.required_data_fields_for(request, args)
@@ -619,6 +665,9 @@ class AnalysisExecutor:
         handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
         handler_cache_dir.mkdir(parents=True, exist_ok=True)
         os.environ["REAXKIT_HANDLER_CACHE_DIR"] = str(handler_cache_dir.resolve())
+        os.environ["REAXKIT_FRAME_CACHE_DIR"] = str(handler_cache_dir.parent.resolve())
+        frame_cache_gb = float(args.get("frame_cache_max_gb", 10.0) or 0.0)
+        os.environ["REAXKIT_FRAME_CACHE_MAX_BYTES"] = str(max(0, int(frame_cache_gb * 1024 ** 3)))
         self._console_step(args, f"Handler cache dir={handler_cache_dir}")
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
@@ -649,7 +698,8 @@ class AnalysisExecutor:
         adapter = resolve_engine(input_path, engine=forced_engine)
         self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
-        snapshot_names = adapter.required_input_files(required_data, args)
+        required_input_files = getattr(adapter, "required_input_files", None)
+        snapshot_names = required_input_files(required_data, args) if callable(required_input_files) else None
         required_source_names = tuple(snapshot_names or ())
         streaming = self._streaming_enabled(
             task,
@@ -793,7 +843,8 @@ class AnalysisExecutor:
             data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
             if layout is not None:
-                self._console_step(args, f"Checking parsed artifact cache parsed_id={parsed_id} artifact={artifact_name}")
+                self._console_step(args,
+                                   f"Checking parsed artifact cache parsed_id={parsed_id} artifact={artifact_name}")
                 cached_parsed = layout.load_parsed_artifact(
                     parsed_id=parsed_id,
                     artifact_name=artifact_name,
@@ -828,7 +879,8 @@ class AnalysisExecutor:
 
                         if use_cache and cache.exists(analysis_id):
                             logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
-                            self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
+                            self._console_step(args,
+                                               f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_hit",
@@ -847,7 +899,8 @@ class AnalysisExecutor:
                             self._console_step(args, "Analysis cache disabled (running task)")
                         else:
                             logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
-                            self._console_step(args, f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
+                            self._console_step(args,
+                                               f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_miss",
@@ -919,10 +972,10 @@ class AnalysisExecutor:
                 )
                 cached = cache.load(analysis_id)
                 return enrich_result_with_time(
-                cached,
-                None,
-                control_file=str(args.get("control") or "control"),
-            )
+                    cached,
+                    None,
+                    control_file=str(args.get("control") or "control"),
+                )
 
         # ---------------------------------------------------------------------
         # 6) Slow path data load: parse required typed data via adapter.

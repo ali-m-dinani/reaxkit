@@ -8,6 +8,9 @@ from typing import cast
 
 import numpy as np
 
+from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
+    LocalGrouping,
+)
 from reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity import (
     CartesianAxis,
     HBNReferenceProjectedPolarityRequest,
@@ -55,6 +58,12 @@ frame-versus-position evolution map.
 Example:
   reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source reaxff --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
 """
+    parser.add_argument(
+        "--local-grouping",
+        choices=["cell", "layer"],
+        default="cell",
+        help="Project four-atom crystallographic cells or two-atom AlN layers. Default: cell.",
+    )
     parser.add_argument(
         "--local-volume-method",
         choices=["equal", "deformation"],
@@ -147,6 +156,7 @@ def build_request(args: argparse.Namespace) -> HBNReferenceProjectedPolarityRequ
         local_volume_method=str(args.local_volume_method),
         deformation_neighbors=int(args.deformation_neighbors),
         local_charge_treatment=str(args.local_charge_treatment),
+        local_grouping=cast(LocalGrouping, str(args.local_grouping)),
         component=cast(PolarityComponent, str(args.component)),
         projection_plane=projection_plane,
         projection_bins=tuple(int(value) for value in args.projection_bins),

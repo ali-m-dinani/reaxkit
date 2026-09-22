@@ -87,8 +87,8 @@ def _build_msd_request(args: argparse.Namespace) -> MSDRequest:
         frames=parse_frame_indices(args.frames),
         every=args.every,
         unwrap=bool(args.unwrap),
-        max_lag=args.max_lag,
-        delta_t_ps=args.delta_t_ps,
+        max_lag=getattr(args, "max_lag", None),
+        delta_t_ps=getattr(args, "delta_t_ps", 1.0),
     )
 
 
@@ -103,8 +103,8 @@ def _build_diffusivity_request(args: argparse.Namespace) -> DiffusivityRequest:
         every=args.every,
         d=float(args.d),
         unwrap=bool(args.unwrap),
-        max_lag=args.max_lag,
-        delta_t_ps=args.delta_t_ps,
+        max_lag=getattr(args, "max_lag", None),
+        delta_t_ps=getattr(args, "delta_t_ps", 1.0),
     )
 
 
@@ -812,6 +812,13 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
 
 def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
     """Plot payload."""
+    command = {
+        "msd": "get_msd",
+        "diffusivity": "get_diffusivity",
+        "rdf": "get_rdf",
+        "rdf_property": "get_rdf_property",
+        "voronoi": "get_voronoi",
+    }.get(command, command)
     table = result.table
     if table.empty:
         return None
@@ -828,20 +835,41 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         elif "lag_frame" in work.columns:
             x_col = "lag_frame"
             xlabel = "Lag (frames)"
+        elif "frame_index" in work.columns:
+            x_col = "frame_index"
+            xlabel = "Frame Index"
         else:
             return None
 
         work = work.sort_values(x_col)
+        series = []
+        if "atom_id" in work.columns:
+            for atom_id, group in work.groupby("atom_id", sort=True):
+                series.append({
+                    "x": pd.to_numeric(group[x_col], errors="coerce").tolist(),
+                    "y": pd.to_numeric(group["msd"], errors="coerce").tolist(),
+                    "label": f"atom {atom_id}",
+                })
+        else:
+            series.append({
+                "x": pd.to_numeric(work[x_col], errors="coerce").tolist(),
+                "y": pd.to_numeric(work["msd"], errors="coerce").tolist(),
+                "label": "MSD",
+            })
 
-        payload = {
-            "x": pd.to_numeric(work[x_col], errors="coerce").tolist(),
-            "y": pd.to_numeric(work["msd"], errors="coerce").tolist(),
-            "label": "MSD",
-        }
-
+        if getattr(args, "plot", None) == "subplot":
+            return {
+                "plot_type": "multi_subplots",
+                "subplots": [[item] for item in series],
+                "xlabel": xlabel,
+                "ylabel": "MSD (A^2)",
+                "title": "Time-Origin Averaged MSD",
+                "legend": False,
+                "grid": getattr(args, "grid", None),
+            }
         return {
             "plot_type": "single_plot",
-            "series": [payload],
+            "series": series,
             "xlabel": xlabel,
             "ylabel": "MSD (A^2)",
             "title": "Time-Origin Averaged MSD",
@@ -849,7 +877,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         }
 
     if command == "get_diffusivity":
-        if "atom_id" not in table.columns or "get_diffusivity" not in table.columns:
+        if "atom_id" not in table.columns or "diffusivity" not in table.columns:
             return None
         work = table.sort_values("atom_id")
         return {

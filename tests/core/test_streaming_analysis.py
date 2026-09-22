@@ -126,6 +126,23 @@ def test_charge_only_fort7_stream_recovers_fused_large_neighbor_ids(tmp_path):
     )
     assert "charge_atom_type_nums" not in total_only_records[0]
 
+    cache_root = tmp_path / "cache"
+    indexed = Fort7Handler(
+        fort7_path,
+        frame_indices=[0],
+        frame_cache_root=cache_root,
+    )
+    indexed_records = list(indexed.stream_file_frames(charge_arrays_only=True))
+    assert indexed_records[0]["charges"].tolist() == [1.188]
+    cached = Fort7Handler(
+        fort7_path,
+        frame_indices=[0],
+        frame_cache_root=cache_root,
+    )
+    cached_records = list(cached.stream_file_frames(charge_arrays_only=True))
+    assert cached_records[0]["charges"].tolist() == [1.188]
+    assert cached._frame_cache_stats["hits"] == 1
+
 
 def test_dipole_stream_matches_materialized_result():
     positions = np.asarray(

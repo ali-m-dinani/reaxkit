@@ -85,6 +85,7 @@ def _run_and_save() -> Path:
 
 
 def test_trajectory_rdf_property_saves_artifacts() -> None:
+    pytest.importorskip("freud")
     if not RUN_DIR.exists():
         pytest.skip(f"RUN_DIR does not exist: {RUN_DIR}")
     out_dir = _run_and_save()

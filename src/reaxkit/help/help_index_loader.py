@@ -802,27 +802,28 @@ def load_engine_data_maps() -> Dict[str, Any]:
     """Load mapping of engine name -> loader/dataclass map source from help information sources."""
     out: Dict[str, Any] = {}
     src = load_help_information_sources()
-    mapping_rows = (((src.get("source_files_by_layer") or {}).get("file_level") or {}).get("mapping") or [])
-    if not isinstance(mapping_rows, list):
+    file_level = ((src.get("source_files_by_layer") or {}).get("file_level") or {})
+    if not isinstance(file_level, dict):
         return out
-    for row in mapping_rows:
-        if not isinstance(row, dict):
+    for engine_name, engine_block in file_level.items():
+        if not isinstance(engine_block, dict):
             continue
-        for engine_name, entries in row.items():
-            if not isinstance(entries, list):
+        entries = engine_block.get("mapping") or []
+        if not isinstance(entries, list):
+            continue
+        for item in entries:
+            if not isinstance(item, dict):
                 continue
-            for item in entries:
-                if not isinstance(item, dict):
-                    continue
-                rel_path = str(item.get("file") or "").strip()
-                if not rel_path:
-                    continue
-                filename = Path(rel_path).name
-                engine_key = _norm(str(engine_name))
-                out[engine_key] = {
-                    "package": _package_from_reaxkit_rel_path(rel_path),
-                    "loader_map_file": filename,
-                }
+            rel_path = str(item.get("file") or "").strip()
+            if not rel_path:
+                continue
+            filename = Path(rel_path).name
+            engine_key = _norm(str(engine_name))
+            out[engine_key] = {
+                "package": _package_from_reaxkit_rel_path(rel_path),
+                "loader_map_file": "reaxff_map.py" if engine_key == "reaxff" else filename,
+                "source_map_file": filename,
+            }
     return out
 
 
@@ -1063,14 +1064,37 @@ def load_help_command_index() -> Dict[str, Dict[str, Any]]:
     if not isinstance(ext, dict):
         ext = {}
 
-    all_names = sorted({str(x) for x in list(ext.keys()) if str(x).strip()})
+    registry_meta: Dict[str, Dict[str, Any]] = {}
+    try:
+        from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+        from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+        from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
+
+        for kind, registry in (
+            ("analysis", get_registered_analysis_commands()),
+            ("generator", get_registered_generators()),
+            ("workflow", get_registered_workflows()),
+        ):
+            for name, spec in registry.items():
+                registry_meta[str(name)] = {
+                    "kind": kind,
+                    "aliases": list(getattr(spec, "aliases", ()) or ()),
+                }
+    except Exception:
+        registry_meta = {}
+
+    all_names = sorted(
+        {str(x) for x in [*ext.keys(), *registry_meta.keys()] if str(x).strip()}
+    )
     out: Dict[str, Dict[str, Any]] = {}
 
     for command_name in all_names:
         ext_meta = ext.get(command_name) if isinstance(ext.get(command_name), dict) else {}
+        reg_meta = registry_meta.get(command_name, {})
 
         kind = str(
             ext_meta.get("kind")
+            or reg_meta.get("kind")
             or _infer_command_kind(command_name)
             or "analysis"
         ).strip().lower()
@@ -1079,7 +1103,10 @@ def load_help_command_index() -> Dict[str, Dict[str, Any]]:
             or ext_meta.get("description")
             or ""
         ).strip()
-        aliases = _unique_strs(_as_list(ext_meta.get("aliases")))
+        aliases = _unique_strs([
+            *_as_list(ext_meta.get("aliases")),
+            *_as_list(reg_meta.get("aliases")),
+        ])
         examples = _unique_strs(_as_list(ext_meta.get("examples")))
         directory = str(ext_meta.get("directory") or "").strip()
         if not directory:
@@ -1104,7 +1131,11 @@ def _resolve_engine_loader_map(engine: str) -> Dict[str, Any]:
         if _norm(str(name)) != engine_key:
             continue
         package = str((meta or {}).get("package") or "").strip()
-        filename = str((meta or {}).get("loader_map_file") or "").strip()
+        filename = str(
+            (meta or {}).get("source_map_file")
+            or (meta or {}).get("loader_map_file")
+            or ""
+        ).strip()
         if not package or not filename:
             return {}
         return _read_map_from_package(package, filename)
@@ -2270,6 +2301,9 @@ def build_help_relationship_report(
     q_exact = _norm(query)
 
     out: List[str] = [f"Normalized query: {q_proc}"]
+    command_hits = search_help_commands(query, top_k=top_k, min_score=min_score)
+    if command_hits:
+        out.extend(["", _format_command_hits(command_hits)])
 
     # 1) generator level
     generator_hits: List[Tuple[str, float, Dict[str, Any], str]] = []
@@ -2451,6 +2485,15 @@ def build_help_relationship_report(
                     workflow_cmd = str(name)
                 out.append(f"  • How to use the workflow: reaxkit {workflow_cmd} -h")
                 out.append(" ")
+
+        _append_section_header(out, "DATACLASS -> ANALYZER -> WORKFLOW")
+        for name, _, entry, _ in analyzer_hits:
+            dataclass_name = str(entry.get("consumes_dataclass") or "").strip()
+            workflow_cmd = _workflow_command_from_ref(
+                str(entry.get("related_workflow_module") or "")
+            ) or str(name)
+            out.append(f"o {dataclass_name} -> {name}")
+            out.append(f"  cli command: {workflow_cmd}")
 
     # 5) workflow level
     workflow_hits: List[Tuple[str, float, Dict[str, Any], str]] = []

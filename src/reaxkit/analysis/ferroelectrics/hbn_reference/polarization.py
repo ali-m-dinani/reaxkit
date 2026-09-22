@@ -118,6 +118,8 @@ class PreparedHBNReference:
     applied_strain_ratios: np.ndarray
     local_cell_ids: np.ndarray
     local_cell_centers: np.ndarray
+    local_layer_ids: np.ndarray
+    local_layer_centers: np.ndarray
 
 
 @dataclass
@@ -247,6 +249,25 @@ def _primitive_ids_in_oriented_reference(source: Atoms, oriented: Atoms) -> np.n
     return np.arange(len(oriented), dtype=int) // source_count
 
 
+def _source_layer_ids(source: Atoms, *, tolerance: float = 1.0e-6) -> np.ndarray:
+    """Assign one id to each distinct reference plane normal to the c axis."""
+
+    fractional_z = np.mod(
+        np.asarray(source.get_scaled_positions(wrap=False), dtype=float)[:, 2], 1.0
+    )
+    order = np.argsort(fractional_z, kind="stable")
+    layer_ids = np.empty(len(source), dtype=int)
+    layer_id = 0
+    previous: float | None = None
+    for atom_index in order:
+        value = float(fractional_z[atom_index])
+        if previous is not None and value - previous > float(tolerance):
+            layer_id += 1
+        layer_ids[atom_index] = layer_id
+        previous = value
+    return layer_ids
+
+
 def _replicated_local_cell_ids(oriented: Atoms, replicated: Atoms) -> np.ndarray:
     """Combine oriented primitive-copy and repeat-image identities."""
 
@@ -257,6 +278,25 @@ def _replicated_local_cell_ids(oriented: Atoms, replicated: Atoms) -> np.ndarray
     repeat_image = np.arange(len(replicated), dtype=int) // oriented_count
     primitive_count = int(np.max(np.asarray(oriented.arrays["_rk_primitive_id"]))) + 1
     return repeat_image * primitive_count + primitive_id
+
+
+def _replicated_local_layer_ids(oriented: Atoms, replicated: Atoms) -> np.ndarray:
+    """Combine source-layer, oriented-copy, and repeat-image identities."""
+
+    primitive_id = np.asarray(replicated.arrays["_rk_primitive_id"], dtype=int)
+    source_layer_id = np.asarray(
+        replicated.arrays["_rk_source_layer_id"], dtype=int
+    )
+    oriented_count = len(oriented)
+    if oriented_count == 0 or len(replicated) % oriented_count:
+        raise ValueError("The replicated reference is not an integer oriented-cell repeat.")
+    repeat_image = np.arange(len(replicated), dtype=int) // oriented_count
+    primitive_count = int(np.max(np.asarray(oriented.arrays["_rk_primitive_id"]))) + 1
+    source_layer_count = (
+        int(np.max(np.asarray(oriented.arrays["_rk_source_layer_id"]))) + 1
+    )
+    oriented_layer_id = primitive_id * source_layer_count + source_layer_id
+    return repeat_image * (primitive_count * source_layer_count) + oriented_layer_id
 
 
 def _replication(values: Sequence[int]) -> tuple[int, int, int]:
@@ -578,6 +618,7 @@ def prepare_hbn_reference(
     if len(source) == 0 or abs(float(np.linalg.det(source.cell.array))) < 1.0e-12:
         raise ValueError("The reference CIF must contain atoms and a nonsingular cell.")
     source.new_array("_rk_source_basis_index", np.arange(len(source), dtype=int))
+    source.new_array("_rk_source_layer_id", _source_layer_ids(source))
     oriented, was_orthogonalized = _orient_reference(
         source, target_angles, request.orthogonalize,
         float(request.angle_tolerance_degrees),
@@ -590,6 +631,7 @@ def prepare_hbn_reference(
     strain = _strain_ratios(oriented, target_cell, repeats)
     replicated = oriented.repeat(repeats)
     local_cell_ids = _replicated_local_cell_ids(oriented, replicated)
+    local_layer_ids = _replicated_local_layer_ids(oriented, replicated)
     replicated.wrap()
     if len(replicated) != atom_count:
         raise ValueError(
@@ -641,6 +683,11 @@ def prepare_hbn_reference(
         np.mean(aligned_positions[local_cell_ids == cell_id], axis=0)
         for cell_id in range(local_cell_count)
     ])
+    local_layer_count = int(np.max(local_layer_ids)) + 1
+    local_layer_centers = np.vstack([
+        np.mean(aligned_positions[local_layer_ids == layer_id], axis=0)
+        for layer_id in range(local_layer_count)
+    ])
     replicated.set_positions(aligned_positions)
     replicated.set_pbc(_periodic_axes(request.periodic))
     return PreparedHBNReference(
@@ -658,6 +705,8 @@ def prepare_hbn_reference(
         applied_strain_ratios=applied_strain,
         local_cell_ids=local_cell_ids,
         local_cell_centers=local_cell_centers,
+        local_layer_ids=local_layer_ids,
+        local_layer_centers=local_layer_centers,
     )
 
 
@@ -820,6 +869,7 @@ def calculate_hbn_reference_polarization(
             "reference_atom_index": assignment,
             "reference_element": reference_symbols[assignment].astype(str),
             "local_cell_id": prepared.local_cell_ids[assignment],
+            "local_layer_id": prepared.local_layer_ids[assignment],
             "charge_source": np.full(len(xyz), resolved_charge_source, dtype=object),
             "charge (e)": charges,
             "electron_charge_sign": np.full(len(xyz), ELECTRON_CHARGE_SIGN),
@@ -843,6 +893,7 @@ def calculate_hbn_reference_polarization(
         "reference_atom_index": assignment,
         "reference_element": reference_symbols[assignment].astype(str),
         "local_cell_id": prepared.local_cell_ids[assignment],
+        "local_layer_id": prepared.local_layer_ids[assignment],
     }
     for component, axis in enumerate("xyz"):
         mapping_columns[f"reference_{axis} (angstrom)"] = prepared.aligned_positions[
@@ -879,7 +930,7 @@ class HBNReferencePolarizationTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "5"
+    VERSION = "6"
 
     def required_data_for(
             self, request: HBNReferencePolarizationRequest, args: dict | None = None

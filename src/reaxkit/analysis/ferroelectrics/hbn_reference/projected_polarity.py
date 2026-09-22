@@ -1,4 +1,4 @@
-"""Projected polarity fractions from local h-BN-reference cell dipoles."""
+"""Projected polarity fractions from local h-BN-reference cell or layer dipoles."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ class HBNReferenceProjectedPolarityRequest(HBNReferenceLocalPolarizationRequest)
 
 @dataclass
 class HBNReferenceProjectedPolarityResult(BaseResult):
-    """Local-cell signs plus projected and frame-resolved mean-polarity tables."""
+    """Local-group signs plus projected and frame-resolved mean-polarity tables."""
 
     centers: pd.DataFrame
     projected_bins: pd.DataFrame
@@ -137,7 +137,7 @@ def calculate_hbn_reference_projected_polarity(
         data,
         request: HBNReferenceProjectedPolarityRequest,
 ) -> HBNReferenceProjectedPolarityResult:
-    """Average fixed-reference-bin local-cell polarities in {-1, 0, +1}."""
+    """Average fixed-reference-bin local polarities in {-1, 0, +1}."""
 
     _validate_request(request)
     if request.profile_axis is None:
@@ -154,14 +154,18 @@ def calculate_hbn_reference_projected_polarity(
     centers["polarity"] = np.where(valid, polarity, np.nan)
 
     u_axis, v_axis = request.projection_plane
-    reference_centers = local.reference_result.reference.local_cell_centers
+    reference_centers = (
+        local.reference_result.reference.local_cell_centers
+        if request.local_grouping == "cell"
+        else local.reference_result.reference.local_layer_centers
+    )
     u_reference = reference_centers[:, "xyz".index(u_axis)]
     v_reference = reference_centers[:, "xyz".index(v_axis)]
     u_edges = _edges(u_reference, int(request.projection_bins[0]))
     v_edges = _edges(v_reference, int(request.projection_bins[1]))
     assignments = pd.DataFrame(
         {
-            "local_cell_id": np.arange(len(reference_centers), dtype=int),
+            "local_group_id": np.arange(len(reference_centers), dtype=int),
             "reference_u (angstrom)": u_reference,
             "reference_v (angstrom)": v_reference,
             "u_bin": _bin_indices(u_reference, u_edges),
@@ -169,7 +173,7 @@ def calculate_hbn_reference_projected_polarity(
         }
     )
     centers = centers.merge(
-        assignments, on="local_cell_id", how="left", validate="many_to_one"
+        assignments, on="local_group_id", how="left", validate="many_to_one"
     )
     reference_source_frame = _source_frame(local.trajectory, int(request.reference_frame))
     centers["bin_reference_frame"] = reference_source_frame
@@ -200,6 +204,7 @@ def calculate_hbn_reference_projected_polarity(
                         "iter": int(iteration),
                         "plane": request.projection_plane,
                         "component": request.component,
+                        "local_grouping": request.local_grouping,
                         "u_axis": u_axis,
                         "v_axis": v_axis,
                         "u_bin": u_bin,
@@ -215,6 +220,7 @@ def calculate_hbn_reference_projected_polarity(
                             (v_edges[v_bin] + v_edges[v_bin + 1]) / 2.0
                         ),
                         "defined_cell_count": count,
+                        "defined_group_count": count,
                         "positive_count": positive,
                         "negative_count": negative,
                         "zero_count": zero,
@@ -244,6 +250,7 @@ def calculate_hbn_reference_projected_polarity(
                     "iter": int(iteration),
                     "profile_axis": request.profile_axis,
                     "component": request.component,
+                    "local_grouping": request.local_grouping,
                     "profile_bin": profile_bin,
                     "coordinate_min (angstrom)": float(profile_edges[profile_bin]),
                     "coordinate_max (angstrom)": float(profile_edges[profile_bin + 1]),
@@ -251,6 +258,7 @@ def calculate_hbn_reference_projected_polarity(
                         (profile_edges[profile_bin] + profile_edges[profile_bin + 1]) / 2.0
                     ),
                     "defined_cell_count": count,
+                    "defined_group_count": count,
                     "positive_count": positive,
                     "negative_count": negative,
                     "zero_count": zero,
@@ -284,7 +292,7 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "1"
+    VERSION = "2"
 
     def required_data_for(
             self, request: HBNReferenceProjectedPolarityRequest, args: dict | None = None

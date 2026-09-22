@@ -12,6 +12,7 @@ from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
     HBNReferenceLocalPolarizationRequest,
     HBNReferenceLocalPolarizationResult,
     LocalChargeTreatment,
+    LocalGrouping,
     LocalVolumeMethod,
     _table_for_trajectory_frame,
     write_local_polarization_extxyz,
@@ -46,11 +47,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     canonical = _canonical_command(command)
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
     parser.set_defaults(command=canonical, progress=True)
-    parser.description = """Calculate local dipole and polarization for neutral reference cells.
+    parser.description = """Calculate cell- and layer-resolved local dipole and polarization.
 
-Each local cell is one primitive Al2N2 reference cell after orientation and
-replication. Its raw dipole is the exact sum of its four mapped atomic dipoles.
-Equal volume shares the selected frame volume among cells; deformation uses
+Each crystallographic cell is one Al2N2 reference cell. Each reference layer is
+one coplanar AlN pair, so both spatial resolutions are written on every run.
+--local-grouping selects the table used by plots and the generic local output.
+Equal volume shares the selected frame volume among groups; deformation uses
 normalized local affine-deformation weights. With the default hull volume,
 vacuum is excluded before either assignment.
 
@@ -59,6 +61,15 @@ Examples:
 
   reaxkit get-hbn-reference-local-polarization --replication 19 19 10 --charge-source formal --formal-charge Al=3 N=-3 --local-volume-method deformation --plot-2d --plot-plane xz --plot-component c
 """
+    parser.add_argument(
+        "--local-grouping",
+        choices=["cell", "layer"],
+        default="cell",
+        help=(
+            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and "
+            "the generic local table. Both explicit tables are always written. Default: cell."
+        ),
+    )
     parser.add_argument(
         "--local-volume-method",
         choices=["equal", "deformation"],
@@ -151,6 +162,7 @@ def build_request(args: argparse.Namespace) -> HBNReferenceLocalPolarizationRequ
         local_charge_treatment=cast(
             LocalChargeTreatment, str(args.local_charge_treatment)
         ),
+        local_grouping=cast(LocalGrouping, str(args.local_grouping)),
     )
 
 
@@ -377,10 +389,18 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     local_path = output / "hbn_reference_local_polarization.csv"
     summary_path = output / "hbn_reference_local_polarization_summary.csv"
+    cell_path = output / "hbn_reference_cell_polarization.csv"
+    cell_summary_path = output / "hbn_reference_cell_polarization_summary.csv"
+    layer_path = output / "hbn_reference_layer_polarization.csv"
+    layer_summary_path = output / "hbn_reference_layer_polarization_summary.csv"
     displacement_path = output / "hbn_reference_displacements.csv"
     mapping_path = output / "hbn_reference_mapping.csv"
     result.table.to_csv(local_path, index=False)
     result.summary.to_csv(summary_path, index=False)
+    result.cell_table.to_csv(cell_path, index=False)
+    result.cell_summary.to_csv(cell_summary_path, index=False)
+    result.layer_table.to_csv(layer_path, index=False)
+    result.layer_summary.to_csv(layer_summary_path, index=False)
     result.reference_result.displacements.to_csv(displacement_path, index=False)
     result.reference_result.mapping.to_csv(mapping_path, index=False)
     plots_2d = (
@@ -420,8 +440,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     args.suppress_table = True
     present_result(canonical, result, args)
-    print(f"Wrote local h-BN-reference polarization to {local_path}")
+    print(
+        f"Wrote selected ({result.request.local_grouping}) h-BN-reference "
+        f"polarization to {local_path}"
+    )
     print(f"Wrote local/global closure summary to {summary_path}")
+    print(f"Wrote crystallographic-cell polarization to {cell_path}")
+    print(f"Wrote layer-resolved polarization to {layer_path}")
     print(f"Wrote per-atom source displacements to {displacement_path}")
     print(f"Wrote atom-to-cell mapping to {mapping_path}")
     if plots_2d:

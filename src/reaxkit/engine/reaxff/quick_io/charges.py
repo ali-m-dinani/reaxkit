@@ -14,11 +14,12 @@ from reaxkit.engine.reaxff.quick_io.xmolout_identity import iter_xmolout_atom_id
 
 
 def iter_fort7_charge_frames(
-    path: str | Path,
-    *,
-    frame_indices: Sequence[int] | None = None,
-    reporter=None,
-    include_atom_types: bool = True,
+        path: str | Path,
+        *,
+        frame_indices: Sequence[int] | None = None,
+        reporter=None,
+        include_atom_types: bool = True,
+        input_cache: bool = True,
 ) -> Iterator[dict[str, Any]]:
     """Yield compact records containing only ids, types, charges, and frame metadata."""
 
@@ -26,6 +27,7 @@ def iter_fort7_charge_frames(
         path,
         frame_indices=frame_indices,
         reporter=reporter,
+        input_cache=input_cache,
     ).stream_file_frames(
         charge_arrays_only=True,
         include_atom_types=include_atom_types,
@@ -33,9 +35,9 @@ def iter_fort7_charge_frames(
 
 
 def charge_data_from_record(
-    record: dict[str, Any],
-    *,
-    elements: Sequence[str] | None = None,
+        record: dict[str, Any],
+        *,
+        elements: Sequence[str] | None = None,
 ) -> ChargeData:
     """Convert one compact fort.7 charge record into canonical ``ChargeData``."""
 
@@ -81,11 +83,12 @@ def charge_data_from_record(
 
 
 def iter_charge_data_quick(
-    fort7_path: str | Path,
-    *,
-    xmolout_path: str | Path | None = None,
-    frame_indices: Sequence[int] | None = None,
-    reporter=None,
+        fort7_path: str | Path,
+        *,
+        xmolout_path: str | Path | None = None,
+        frame_indices: Sequence[int] | None = None,
+        reporter=None,
+        input_cache: bool = True,
 ) -> Iterator[ChargeData]:
     """Yield charge frames aligned with each frame's lightweight identities."""
 
@@ -100,9 +103,10 @@ def iter_charge_data_quick(
         identity_record = next(identity_records, None)
 
     for charge_record in iter_fort7_charge_frames(
-        fort7_path,
-        frame_indices=frame_indices,
-        reporter=reporter,
+            fort7_path,
+            frame_indices=frame_indices,
+            reporter=reporter,
+            input_cache=input_cache,
     ):
         charge_index = int(charge_record["source_index"])
         while identity_record is not None and int(identity_record["source_index"]) < charge_index:
@@ -115,11 +119,12 @@ def iter_charge_data_quick(
 
 
 def load_charge_data_quick(
-    fort7_path: str | Path,
-    *,
-    xmolout_path: str | Path | None = None,
-    frame_indices: Sequence[int] | None = None,
-    reporter=None,
+        fort7_path: str | Path,
+        *,
+        xmolout_path: str | Path | None = None,
+        frame_indices: Sequence[int] | None = None,
+        reporter=None,
+        input_cache: bool = True,
 ) -> ChargeData:
     """Materialize canonical charges while parsing no connectivity or coordinates."""
 
@@ -129,6 +134,7 @@ def load_charge_data_quick(
             xmolout_path=xmolout_path,
             frame_indices=frame_indices,
             reporter=reporter,
+            input_cache=input_cache,
         )
     )
     if not frames:

@@ -1095,10 +1095,10 @@ tasks:
   get-hbn-reference-local-polarization:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization: HBNReferenceLocalPolarizationTask'
-    description: Calculates local dipole and polarization for fixed stoichiometric primitive reference cells using equal or deformation-weighted volumes.
+    description: Calculates local dipole and polarization for both four-atom crystallographic cells and two-atom AlN reference layers using equal or deformation-weighted volumes.
     related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow: get-hbn-reference-local-polarization'
     tags: [ferroelectrics, local polarization, reference structure, hBN, volume]
-    notes: [Automatically neutralizes charged local cells while retaining raw dipoles that close to the global result.]
+    notes: [Always reports both cell- and layer-resolved tables; local_grouping selects the primary table used by plots and projected-polarity analysis. Automatically neutralizes charged local groups while retaining raw dipoles that close to the global result.]
     aliases: [get_hbn_reference_local_polarization, hbn-reference-local-polarization]
     help_search_examples: [reaxkit help "hbn reference local polarization", reaxkit get-hbn-reference-local-polarization -h]
   get-hbn-reference-projected-polarity:

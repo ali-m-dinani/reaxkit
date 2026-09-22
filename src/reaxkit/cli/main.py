@@ -165,7 +165,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
 
     def format_help(self) -> str:
         width = self._term_width()
-        out: list[str] = [""]
+        out: list[str] = [self.prog, ""]
 
         if self.description:
             out.append(self.description.rstrip())
@@ -198,7 +198,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                 ]
             )
         if option_rows:
-            out.append("Options")
+            out.append("options")
             opt_table = self._render_table(
                 headers=["Flag", "Required", "Default", "Help", "Choices"],
                 rows=option_rows,
@@ -219,7 +219,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                 bad_command = parts[1]
             bad_command = bad_command or str(self._selected_command or "").strip() or "<unknown>"
             print(
-                f"There is no command {bad_command}. Please run 'reaxkit help \"query\"' "
+                f"There is no command {bad_command}. Please run reaxkit help \"query\" "
                 f"where query can be {bad_command} to see if any relevant command exists or not.",
                 file=sys.stderr,
             )
@@ -230,7 +230,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
             bad_flag = next((token for token in unknown_args if token.startswith("-")), unknown_args[0] if unknown_args else "")
             print(
                 f"There is no flag {bad_flag} for command {self._selected_command}. "
-                f"Please run 'reaxkit {self._selected_command} -h' to see the list of appropriate flags.",
+                f"Please run reaxkit {self._selected_command} -h to see the list of appropriate flags.",
                 file=sys.stderr,
             )
             raise SystemExit(2)
@@ -308,6 +308,14 @@ def _canonicalize_direct_command(argv: list[str]) -> list[str]:
     except KeyError:
         pass
     return out
+
+
+DEFAULTABLE: tuple[str, ...] = ()
+
+
+def _preinject(argv: list[str]) -> list[str]:
+    """Return argv unchanged now that commands define explicit defaults."""
+    return list(argv)
 
 
 def _direct_command_runner(module, command: str):

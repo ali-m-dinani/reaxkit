@@ -1428,3 +1428,12 @@ class ConnectivityTrajectoryData:
     force_field_parameters: Optional[ForceFieldParametersData] = None
 
 
+def __getattr__(name: str):
+    """Resolve request classes that historically lived in this module."""
+    if name == "MSDRequest":
+        from reaxkit.analysis.trajectory.msd import MSDRequest
+
+        return MSDRequest
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
