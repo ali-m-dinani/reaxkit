@@ -8,12 +8,12 @@ from ase.io import read
 from reaxkit.core.registry.analysis_cli_routing_registry import (
     get_registered_analysis_commands,
 )
-from reaxkit.workflows.ferroelectrics.hbn_refernce import polarization_workflow
+from reaxkit.workflows.ferroelectrics.hbn_reference import polarization_workflow
 
 
 def test_command_routes_to_hbn_reference_workflow() -> None:
     route = get_registered_analysis_commands()[polarization_workflow.COMMAND]
-    assert route.module_path.endswith("hbn_refernce.polarization_workflow")
+    assert route.module_path.endswith("hbn_reference.polarization_workflow")
 
 
 def test_parser_builds_default_charge_request() -> None:

@@ -116,6 +116,8 @@ class PreparedHBNReference:
     trajectory_angles: np.ndarray
     strain_ratios: np.ndarray
     applied_strain_ratios: np.ndarray
+    local_cell_ids: np.ndarray
+    local_cell_centers: np.ndarray
 
 
 @dataclass
@@ -231,6 +233,30 @@ def _orient_reference(
     if converted_error + float(tolerance) < original_error:
         return converted, True
     return original, False
+
+
+def _primitive_ids_in_oriented_reference(source: Atoms, oriented: Atoms) -> np.ndarray:
+    """Identify copies of the input crystallographic cell after orientation."""
+
+    source_count = len(source)
+    if source_count == 0 or len(oriented) % source_count:
+        raise ValueError("The oriented reference is not an integer number of CIF cells.")
+    # ASE make_supercell uses cell-major ordering by default: all basis atoms
+    # from one translated source cell are contiguous. Coordinate-based recovery
+    # is ambiguous after wrap() moves boundary atoms into adjacent images.
+    return np.arange(len(oriented), dtype=int) // source_count
+
+
+def _replicated_local_cell_ids(oriented: Atoms, replicated: Atoms) -> np.ndarray:
+    """Combine oriented primitive-copy and repeat-image identities."""
+
+    primitive_id = np.asarray(replicated.arrays["_rk_primitive_id"], dtype=int)
+    oriented_count = len(oriented)
+    if oriented_count == 0 or len(replicated) % oriented_count:
+        raise ValueError("The replicated reference is not an integer oriented-cell repeat.")
+    repeat_image = np.arange(len(replicated), dtype=int) // oriented_count
+    primitive_count = int(np.max(np.asarray(oriented.arrays["_rk_primitive_id"]))) + 1
+    return repeat_image * primitive_count + primitive_id
 
 
 def _replication(values: Sequence[int]) -> tuple[int, int, int]:
@@ -551,14 +577,19 @@ def prepare_hbn_reference(
     source = read_structure(reference_path)
     if len(source) == 0 or abs(float(np.linalg.det(source.cell.array))) < 1.0e-12:
         raise ValueError("The reference CIF must contain atoms and a nonsingular cell.")
+    source.new_array("_rk_source_basis_index", np.arange(len(source), dtype=int))
     oriented, was_orthogonalized = _orient_reference(
         source, target_angles, request.orthogonalize,
         float(request.angle_tolerance_degrees),
     )
+    primitive_ids = _primitive_ids_in_oriented_reference(source, oriented)
+    oriented.new_array("_rk_primitive_id", primitive_ids)
+    oriented.new_array("_rk_oriented_index", np.arange(len(oriented), dtype=int))
     atom_count = int(np.asarray(trajectory.positions).shape[1])
     repeats = _replication(request.replication)
     strain = _strain_ratios(oriented, target_cell, repeats)
     replicated = oriented.repeat(repeats)
+    local_cell_ids = _replicated_local_cell_ids(oriented, replicated)
     replicated.wrap()
     if len(replicated) != atom_count:
         raise ValueError(
@@ -605,6 +636,11 @@ def prepare_hbn_reference(
     inverse[assignment] = np.arange(len(assignment), dtype=int)
     aligned_fractional = reference_fractional + translation
     aligned_positions = aligned_fractional @ target_cell
+    local_cell_count = int(np.max(local_cell_ids)) + 1
+    local_cell_centers = np.vstack([
+        np.mean(aligned_positions[local_cell_ids == cell_id], axis=0)
+        for cell_id in range(local_cell_count)
+    ])
     replicated.set_positions(aligned_positions)
     replicated.set_pbc(_periodic_axes(request.periodic))
     return PreparedHBNReference(
@@ -620,6 +656,8 @@ def prepare_hbn_reference(
         trajectory_angles=target_angles,
         strain_ratios=strain,
         applied_strain_ratios=applied_strain,
+        local_cell_ids=local_cell_ids,
+        local_cell_centers=local_cell_centers,
     )
 
 
@@ -643,7 +681,7 @@ def calculate_hbn_reference_polarization(
     resolved_charge_source = (
         "reaxff"
         if request.charge_source == "reaxff"
-        or (request.charge_source == "auto" and dynamic_charges is not None)
+           or (request.charge_source == "auto" and dynamic_charges is not None)
         else "formal"
     )
     if resolved_charge_source == "reaxff" and dynamic_charges is None:
@@ -669,7 +707,7 @@ def calculate_hbn_reference_polarization(
         raise RuntimeError("Required dipole/polarization conversion constants are missing.")
     factor = float(factor_value)
     debye_factor = float(debye_value)
-    displacement_rows: list[dict[str, object]] = []
+    displacement_tables: list[pd.DataFrame] = []
     summary_rows: list[dict[str, object]] = []
     output_iterations: list[int] = []
 
@@ -772,52 +810,49 @@ def calculate_hbn_reference_polarization(
                 else np.nan
             ),
         })
-        for atom_index in range(len(xyz)):
-            ref_index = int(assignment[atom_index])
-            reference_position = reference_for_atoms[atom_index] @ cell
-            row: dict[str, object] = {
-                "frame_index": int(frame),
-                "iter": iteration,
-                "atom_index": atom_index,
-                "atom_id": int(atom_ids[atom_index]),
-                "element": str(labels[atom_index]),
-                "reference_atom_index": ref_index,
-                "reference_element": str(reference_symbols[ref_index]),
-                "charge_source": resolved_charge_source,
-                "charge (e)": float(charges[atom_index]),
-                "electron_charge_sign": ELECTRON_CHARGE_SIGN,
-                "displacement_c (angstrom)": float(displacement_c[atom_index]),
-                "dipole_c (e*angstrom)": float(dipole_c[atom_index]),
-                "dipole_c (debye)": float(dipole_c[atom_index] * debye_factor),
-            }
-            for component, axis in enumerate("xyz"):
-                row[f"{axis} (angstrom)"] = float(xyz[atom_index, component])
-                row[f"reference_{axis} (angstrom)"] = float(reference_position[component])
-                row[f"displacement_{axis} (angstrom)"] = float(displacement[atom_index, component])
-                row[f"dipole_{axis} (e*angstrom)"] = float(dipole[atom_index, component])
-                row[f"dipole_{axis} (debye)"] = float(
-                    dipole[atom_index, component] * debye_factor
-                )
-            displacement_rows.append(row)
+        reference_positions = reference_for_atoms @ cell
+        frame_columns: dict[str, object] = {
+            "frame_index": np.full(len(xyz), int(frame), dtype=int),
+            "iter": np.full(len(xyz), iteration, dtype=int),
+            "atom_index": np.arange(len(xyz), dtype=int),
+            "atom_id": atom_ids,
+            "element": labels.astype(str),
+            "reference_atom_index": assignment,
+            "reference_element": reference_symbols[assignment].astype(str),
+            "local_cell_id": prepared.local_cell_ids[assignment],
+            "charge_source": np.full(len(xyz), resolved_charge_source, dtype=object),
+            "charge (e)": charges,
+            "electron_charge_sign": np.full(len(xyz), ELECTRON_CHARGE_SIGN),
+            "displacement_c (angstrom)": displacement_c,
+            "dipole_c (e*angstrom)": dipole_c,
+            "dipole_c (debye)": dipole_c * debye_factor,
+        }
+        for component, axis in enumerate("xyz"):
+            frame_columns[f"{axis} (angstrom)"] = xyz[:, component]
+            frame_columns[f"reference_{axis} (angstrom)"] = reference_positions[:, component]
+            frame_columns[f"displacement_{axis} (angstrom)"] = displacement[:, component]
+            frame_columns[f"dipole_{axis} (e*angstrom)"] = dipole[:, component]
+            frame_columns[f"dipole_{axis} (debye)"] = dipole[:, component] * debye_factor
+        displacement_tables.append(pd.DataFrame(frame_columns))
 
-    mapping_rows: list[dict[str, object]] = []
     base_labels = _frame_labels(trajectory, int(request.reference_frame))
-    for atom_index, ref_index in enumerate(assignment):
-        mapping_rows.append({
-            "atom_index": atom_index,
-            "atom_id": int(atom_ids[atom_index]),
-            "element": str(base_labels[atom_index]),
-            "reference_atom_index": int(ref_index),
-            "reference_element": str(reference_symbols[int(ref_index)]),
-            "reference_x (angstrom)": float(prepared.aligned_positions[int(ref_index), 0]),
-            "reference_y (angstrom)": float(prepared.aligned_positions[int(ref_index), 1]),
-            "reference_z (angstrom)": float(prepared.aligned_positions[int(ref_index), 2]),
-        })
+    mapping_columns: dict[str, object] = {
+        "atom_index": np.arange(len(assignment), dtype=int),
+        "atom_id": atom_ids,
+        "element": base_labels.astype(str),
+        "reference_atom_index": assignment,
+        "reference_element": reference_symbols[assignment].astype(str),
+        "local_cell_id": prepared.local_cell_ids[assignment],
+    }
+    for component, axis in enumerate("xyz"):
+        mapping_columns[f"reference_{axis} (angstrom)"] = prepared.aligned_positions[
+            assignment, component
+        ]
     return HBNReferencePolarizationResult(
         table=pd.DataFrame(summary_rows),
         request=request,
-        displacements=pd.DataFrame(displacement_rows),
-        mapping=pd.DataFrame(mapping_rows),
+        displacements=pd.concat(displacement_tables, ignore_index=True),
+        mapping=pd.DataFrame(mapping_columns),
         reference=prepared,
         frame_indices=np.asarray(selected, dtype=int),
         iterations=np.asarray(output_iterations, dtype=int),
@@ -844,7 +879,7 @@ class HBNReferencePolarizationTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "4"
+    VERSION = "5"
 
     def required_data_for(
             self, request: HBNReferencePolarizationRequest, args: dict | None = None

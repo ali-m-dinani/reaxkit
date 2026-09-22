@@ -221,6 +221,119 @@ without assigning one N atom several incompatible local reference planes. The
 apical neighbor remains a useful structural diagnostic, but its full height
 above another N plane is not an additional ferroelectric displacement.
 
+### Local dipole and polarization
+
+`get-basal-plane-displacement-dipole` reports one local dipole vector per valid
+Al/B center. `get-basal-plane-displacement-local-polarization` converts each
+center dipole
+to a local polarization, \(\mathbf P_i=\boldsymbol{\mu}_i/\Omega_i\), using
+one of two local-volume conventions:
+
+- `--local-volume-method equal` (default) divides the selected frame `hull`,
+  `bbox`, or `cell` volume equally among all valid centers. The assigned local
+  volumes sum to the frame volume, so their volume-weighted polarization
+  reproduces the frame polarization.
+- `--local-volume-method coordination` uses the tetrahedron whose vertices are
+  the three basal N neighbors and the apical N neighbor. A center without four
+  valid neighbor vertices, or with a degenerate tetrahedron, is retained with
+  `has_valid_local_volume=false` and `NaN` local polarization.
+
+The command writes one row per selected center to
+`basal_plane_local_polarization.csv`, including the source dipole, assigned
+volume, and x, y, and z polarization components.
+
+The default combination is `--local-volume-method equal --volume-method hull`.
+The convex hull is calculated from occupied atomic coordinates and therefore
+excludes empty slab vacuum before it is divided among valid centers. `bbox`
+also excludes surrounding vacuum using occupied coordinate extents. `cell`
+includes the complete simulation cell and should be selected only when that is
+the intended normalization.
+
+For spatial visualization, `--plot-2d` bins centers in the selected
+`--plot-plane` and aggregates along the omitted coordinate. Polarization maps
+sum dipoles and local volumes separately and then divide, rather than averaging
+already-normalized center polarizations. `--plot-3d` writes a per-frame 3D
+center scatter plot. `--plot-quantity polarization|dipole` and
+`--plot-component x|y|z` select the displayed value. Shared color limits across
+frames are available with `--global-scaling`.
+
+`--write-extxyz` writes `basal_plane_local_polarization.extxyz` for OVITO. Each
+frame retains every atom and provides `is_local_center`,
+`has_valid_local_volume`, `local_volume`, `local_dipole`, and
+`local_polarization` atom properties. Vector properties have three Cartesian
+components.
+
+Add `--include-electric-field --field-direction z` to read `fort.78`, align the
+selected field component by iteration, and write it only in each frame header
+as `electric_field`, `electric_field_direction`, and `electric_field_units`.
+
+### Projected polarity fractions
+
+`get-basal-plane-displacement-projected-polarity` converts the selected local
+dipole component into a discrete polarity for every valid center:
+
+\[
+s_i=\operatorname{sign}(\mu_{i,c})\in\{-1,0,+1\}.
+\]
+
+Values with magnitude at or below `--dipole-zero-tolerance` receive polarity
+zero and remain in the population. Only centers without a valid finite dipole
+are excluded. In every spatial bin, the reported value is the plain arithmetic
+mean,
+
+\[
+\overline{s}=\frac{1}{N}\sum_i s_i
+=\frac{N_+-N_-}{N_++N_0+N_-},
+\]
+
+which ranges from -1 (all negative) through 0 (equal populations) to +1 (all
+positive). This operation does not weight by dipole magnitude or local volume.
+The CSV tables also contain positive, zero, and negative counts and fractions.
+
+`--projection-plane xz --projection-bins 40 40 --plot-2d` bins in x and z and
+projects through y. The command constructs the bin edges at `--reference-frame`
+(frame 0 by default), assigns every center atom to one bin by atom ID, and keeps
+that assignment fixed in every later frame even if the atom crosses a spatial
+boundary.
+
+`--plot-kymograph --profile-axis z` writes a **kymograph**: source frame is on
+the horizontal axis, reference-frame z position is on the vertical axis, and
+mean polarity is the color. A kymograph is the general name used here for any
+position-versus-frame heatmap and can be adopted by other workflows. The
+profile reuses the matching projection bins. For `--projection-plane xz
+--projection-bins 1 10 --profile-axis z`, the kymograph therefore has 10 z
+bins. `--plot-evolution` remains an alias for `--plot-kymograph`.
+
+```powershell
+reaxkit get-basal-plane-displacement-projected-polarity `
+  --periodic xy `
+  --charge-source formal `
+  --formal-charge Al=3 N=-3 `
+  --frames 0:3200:50 `
+  --reference-frame 0 `
+  --component z `
+  --projection-plane xz `
+  --projection-bins 40 40 `
+  --profile-axis z `
+  --plot-2d `
+  --plot-kymograph
+```
+This option does not add charge or charge-difference atom properties.
+
+Example:
+
+```powershell
+reaxkit get-basal-plane-displacement-local-polarization `
+  --periodic xy `
+  --charge-source formal `
+  --formal-charge Al=3 N=-3 `
+  --local-volume-method equal `
+  --volume-method hull `
+  --plot-2d --plot-plane xy --plot-component z `
+  --plot-3d --write-extxyz `
+  --include-electric-field --field-direction z
+```
+
 For a slab, `cell` includes vacuum and therefore lowers the reported material
 polarization. Use `hull` (the default) or `bbox` when the intended denominator
 is the occupied material volume. Use `cell` only when polarization per complete
@@ -245,12 +358,12 @@ user-selected x, y, and z bins and divides by `hull`, `bbox`, or `cell` bin
 volumes. It also supports 2D heatmaps with shared global scaling or independent
 per-frame scaling.
 
-## `hbn_refernce`
+## `get-hbn-reference-polarization`
 
 This method calculates vector polarization from the displacement of a
 trajectory relative to a nonpolar, layered hexagonal AlN structure. The
 reference is bundled as
-`hbn_refernce/AlN_hbn.cif`, so an installed ReaxKit package does not depend on
+`hbn_reference/AlN_hbn.cif`, so an installed ReaxKit package does not depend on
 the repository's `examples_to_test` directory. A different CIF can be selected
 with `--reference`.
 
@@ -377,4 +490,125 @@ reaxkit get-hbn-reference-polarization `
   --volume-method hull `
   --output-dir .\hbn_polarization `
   --frames 0
+```
+
+### Local dipole and polarization
+
+`get-hbn-reference-local-polarization` partitions the replicated reference into
+its stoichiometric primitive cells. For the bundled structure, each local cell
+contains two Al sites and two N sites. Membership is fixed by the reference
+construction and atom-to-reference-site mapping. It is not rebuilt from the
+instantaneous basal or apical coordination, so an apical-neighbor switch does
+not move an atom discontinuously between local cells. The switch instead
+appears through the sign and magnitude of the mapped atomic displacements.
+
+For reference cell \(g\), the raw local dipole is
+
+\[
+\boldsymbol{\mu}^{\mathrm{raw}}_g=
+\sum_{i\in g}-q_i\Delta\mathbf{u}_i.
+\]
+
+Raw local dipoles sum exactly to the global dipole. With the default formal
+charges, every Al2N2 cell is neutral because
+\(2(+3)+2(-3)=0\). Instantaneous ReaxFF charges need not sum to zero inside
+each cell, even when the complete simulation is neutral. A charged local group
+has an origin-dependent dipole. The default
+`--local-charge-treatment auto` therefore replaces its charges by
+
+\[
+q_i^{\mathrm{local}}=q_i-\frac{Q_g}{N_g},\qquad
+Q_g=\sum_{i\in g}q_i,
+\]
+
+when \(|Q_g|>10^{-10}\ e\). This makes the effective local charge exactly zero
+and prevents a rigid translation of a charged cell from creating local
+polarization. `raw_dipole_*` columns retain the exact decomposition of the
+global result; `neutralized_dipole_*` columns retain the neutral result; and
+`dipole_*` plus `P_*` contain the value selected by
+`--local-charge-treatment`. Use `raw` to force exact global decomposition or
+`neutralize` to force neutralization. Formal Al=3, N=-3 results are identical
+under all three choices.
+
+Local polarization divides each selected local dipole by a local volume:
+
+- `--local-volume-method equal` (default) divides the selected frame volume
+  equally among all reference cells;
+- `--local-volume-method deformation` fits a local affine deformation from
+  neighboring reference-cell centers and uses the absolute determinant as a
+  relative volume weight. The weights are normalized so that all local volumes
+  add to the selected frame volume. Rank-deficient local fits fall back to the
+  median valid weight, or an equal weight if none is valid.
+
+The frame volume still comes from `--volume-method`. Its default is `hull`, so
+empty slab vacuum is excluded before the volume is split among cells. Select
+`cell` only when polarization should use the complete simulation box including
+vacuum.
+
+```powershell
+reaxkit get-hbn-reference-local-polarization `
+  --replication 19 19 10 `
+  --periodic xy `
+  --charge-source reaxff `
+  --volume-method hull `
+  --local-volume-method equal `
+  --plot-2d --plot-plane xz --plot-bins 1 40 `
+  --plot-3d `
+  --plot-quantity polarization --plot-component c `
+  --global-scaling `
+  --write-extxyz
+```
+
+The command writes `hbn_reference_local_polarization.csv`, a frame summary that
+reports raw/global closure, and the source displacement and mapping tables. In
+2D polarization plots, dipoles and local volumes are summed along the omitted
+coordinate before division. Dipole plots sum dipoles directly. The 3D plot
+colors each reference-cell center.
+
+`--write-extxyz` retains every trajectory atom. Every atom receives
+`local_cell_id`; one representative cation per cell receives
+`is_local_cell_center=1`, `local_volume`, `local_dipole`,
+`local_polarization`, `local_dipole_c`, and `local_polarization_c`. These local
+values are `NaN` on the other atoms so OVITO does not display duplicate vectors
+for a single cell.
+
+### Local polarity projections and kymographs
+
+`get-hbn-reference-projected-polarity` converts the selected local dipole
+component to
+
+\[
+s_g=\operatorname{sign}(\mu_{g,\alpha})\in\{-1,0,+1\}.
+\]
+
+Zero dipoles remain in the arithmetic mean. A bin value therefore measures the
+signed population fraction: +1 means all cells are positive, -1 means all are
+negative, and 0 can mean all are nonpolar or an equal positive/negative
+population. The CSV tables report positive, negative, and zero counts and
+fractions so those cases remain distinguishable.
+
+Cell-to-bin membership is calculated once from the fixed reference-cell
+centers associated with `--reference-frame` and reused for every selected
+frame. Atomic motion cannot move a cell between bins. `--plot-2d` writes one
+projection-plane heatmap per frame. `--plot-kymograph` (also available as
+`--plot-evolution`) averages over the other projection coordinate and writes
+mean polarity versus source frame and the selected `--profile-axis`.
+The profile uses the corresponding count from `--projection-bins`; for
+`--projection-plane xz --projection-bins 1 40 --profile-axis z`, it has 40 z
+bins.
+
+```powershell
+reaxkit get-hbn-reference-projected-polarity `
+  --replication 19 19 10 `
+  --periodic xy `
+  --frames 0:3200:50 `
+  --reference-frame 0 `
+  --charge-source reaxff `
+  --local-charge-treatment auto `
+  --component c `
+  --projection-plane xz `
+  --projection-bins 1 40 `
+  --profile-axis z `
+  --plot-2d `
+  --plot-kymograph
 ```

@@ -246,11 +246,55 @@ register_analysis_command(
     ),
 )
 register_analysis_command(
+    "get-basal-plane-displacement-local-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.local_polarization_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_local_polarization",
+        "basal-plane-local-polarization",
+    ),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-projected-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.projected_polarity_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_projected_polarity",
+        "basal-plane-projected-polarity",
+    ),
+)
+register_analysis_command(
     "get-hbn-reference-polarization",
     module_path=(
-        "reaxkit.workflows.ferroelectrics.hbn_refernce.polarization_workflow"
+        "reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow"
     ),
     aliases=("get_hbn_reference_polarization", "hbn-reference-polarization"),
+)
+register_analysis_command(
+    "get-hbn-reference-local-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_reference."
+        "local_polarization_workflow"
+    ),
+    aliases=(
+        "get_hbn_reference_local_polarization",
+        "hbn-reference-local-polarization",
+    ),
+)
+register_analysis_command(
+    "get-hbn-reference-projected-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_reference."
+        "projected_polarity_workflow"
+    ),
+    aliases=(
+        "get_hbn_reference_projected_polarity",
+        "hbn-reference-projected-polarity",
+    ),
 )
 register_analysis_command(
     "get-potential-and-electric-field",

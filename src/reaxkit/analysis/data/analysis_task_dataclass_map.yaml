@@ -1065,6 +1065,51 @@ tasks:
     notes: [Supports hull, bbox, and cell volume estimators.]
     aliases: [get_basal_plane_displacement_polarization, basal-plane-polarization]
     help_search_examples: [reaxkit help "basal plane polarization", reaxkit get-basal-plane-displacement-polarization -h]
+  get-basal-plane-displacement-local-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization: BasalPlaneLocalPolarizationTask'
+    description: Calculates one local polarization vector per valid center using equal frame-volume shares or N-neighbor coordination tetrahedra.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow: get-basal-plane-displacement-local-polarization'
+    tags: [ferroelectrics, wurtzite, local polarization, basal plane, coordination volume]
+    notes: [Equal frame-volume shares are the default; coordination volumes require three basal and one apical neighbor.]
+    aliases: [get_basal_plane_displacement_local_polarization, basal-plane-local-polarization]
+    help_search_examples: [reaxkit help "basal plane local polarization", reaxkit get-basal-plane-displacement-local-polarization -h]
+  get-basal-plane-displacement-projected-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity: BasalPlaneProjectedPolarityTask'
+    description: Averages the positive and negative signs of local basal-plane dipoles in TEM-like spatial projections and frame-resolved profiles.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow: get-basal-plane-displacement-projected-polarity'
+    tags: [ferroelectrics, wurtzite, polarity, projection, heatmap, TEM]
+    notes: [Mean polarity is the arithmetic mean of per-center values -1, 0, and +1 using fixed reference-frame bin assignments.]
+    aliases: [get_basal_plane_displacement_projected_polarity, basal-plane-projected-polarity]
+    help_search_examples: [reaxkit help "basal plane projected polarity", reaxkit get-basal-plane-displacement-projected-polarity -h]
+  get-hbn-reference-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.polarization: HBNReferencePolarizationTask'
+    description: Calculates vector dipole and polarization from all atoms mapped to a replicated nonpolar hexagonal AlN reference.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow: get-hbn-reference-polarization'
+    tags: [ferroelectrics, polarization, reference structure, hBN, AlN]
+    notes: [Reports Cartesian and selected c-axis components and supports occupied hull volume for slabs.]
+    aliases: [get_hbn_reference_polarization, hbn-reference-polarization]
+    help_search_examples: [reaxkit help "hbn reference polarization", reaxkit get-hbn-reference-polarization -h]
+  get-hbn-reference-local-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization: HBNReferenceLocalPolarizationTask'
+    description: Calculates local dipole and polarization for fixed stoichiometric primitive reference cells using equal or deformation-weighted volumes.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow: get-hbn-reference-local-polarization'
+    tags: [ferroelectrics, local polarization, reference structure, hBN, volume]
+    notes: [Automatically neutralizes charged local cells while retaining raw dipoles that close to the global result.]
+    aliases: [get_hbn_reference_local_polarization, hbn-reference-local-polarization]
+    help_search_examples: [reaxkit help "hbn reference local polarization", reaxkit get-hbn-reference-local-polarization -h]
+  get-hbn-reference-projected-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity: HBNReferenceProjectedPolarityTask'
+    description: Averages fixed-reference-cell polarity signs in spatial projections and frame-resolved kymographs.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow: get-hbn-reference-projected-polarity'
+    tags: [ferroelectrics, polarity, projection, kymograph, hBN, TEM]
+    notes: [Mean polarity includes local values -1, 0, and +1 using fixed reference-frame bin assignments.]
+    aliases: [get_hbn_reference_projected_polarity, hbn-reference-projected-polarity]
+    help_search_examples: [reaxkit help "hbn reference projected polarity", reaxkit get-hbn-reference-projected-polarity -h]
   write-three-folded-trajectory-with-polarity:
     consumes_dataclass: TrajectoryData
     implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.trajectory: PolarityExtendedXYZTask'
@@ -1163,6 +1208,11 @@ dataclass_usage_across_tasks:
   - get-three-folded-wurtzite-polarization
   - get-basal-plane-displacement-dipole
   - get-basal-plane-displacement-polarization
+  - get-basal-plane-displacement-local-polarization
+  - get-basal-plane-displacement-projected-polarity
+  - get-hbn-reference-polarization
+  - get-hbn-reference-local-polarization
+  - get-hbn-reference-projected-polarity
   - write-three-folded-trajectory-with-polarity
 
 

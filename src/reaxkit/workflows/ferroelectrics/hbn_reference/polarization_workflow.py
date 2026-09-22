@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 from typing import cast
 
-from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
+from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
     ChargeSource,
     DEFAULT_FORMAL_CHARGES,
     HBNReferencePolarizationRequest,

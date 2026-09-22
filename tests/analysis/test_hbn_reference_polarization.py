@@ -5,10 +5,18 @@ import pytest
 from ase import Atoms
 from ase.io import read
 
-from reaxkit.analysis.ferroelectrics.hbn_refernce.polarization import (
+from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
     HBNReferencePolarizationRequest,
     REFERENCE_STRUCTURE_PATH,
     calculate_hbn_reference_polarization,
+)
+from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
+    HBNReferenceLocalPolarizationRequest,
+    calculate_hbn_reference_local_polarization,
+)
+from reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity import (
+    HBNReferenceProjectedPolarityRequest,
+    calculate_hbn_reference_projected_polarity,
 )
 from reaxkit.core.platform.constants import const
 from reaxkit.domain.data_models import (
@@ -275,6 +283,185 @@ def test_replication_must_match_trajectory_atom_count(reference_path) -> None:
                 reference_path=reference_path, replication=(1, 1, 1)
             ),
         )
+
+
+def test_reference_tracks_neutral_primitive_cells(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    result = calculate_hbn_reference_polarization(
+        trajectory,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path, replication=(2, 1, 1)
+        ),
+    )
+
+    counts = result.displacements.groupby("local_cell_id").size()
+    assert len(counts) == 4
+    assert set(counts) == {4}
+    for _, group in result.displacements.groupby("local_cell_id"):
+        assert sorted(group["reference_element"].tolist()) == ["Al", "Al", "N", "N"]
+
+
+def test_local_equal_volumes_close_to_global_dipole_and_polarization(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    positions = trajectory.positions.copy()
+    labels = np.asarray(trajectory.elements)
+    positions[0, labels == "Al", 2] += 0.1
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=trajectory.elements,
+        atom_ids=trajectory.atom_ids,
+        iterations=trajectory.iterations,
+        simulation=trajectory.simulation,
+    )
+    result = calculate_hbn_reference_local_polarization(
+        trajectory,
+        HBNReferenceLocalPolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            volume_method="cell",
+        ),
+    )
+
+    assert len(result.table) == 4
+    assert set(result.table["atom_count"]) == {4}
+    assert set(result.table["composition"]) == {"Al2,N2"}
+    assert result.table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
+        np.full(4, -0.6)
+    )
+    frame_volume = result.reference_result.table.iloc[0]["volume (angstrom^3)"]
+    assert result.table["local_volume (angstrom^3)"].sum() == pytest.approx(frame_volume)
+    summary = result.summary.iloc[0]
+    assert summary["dipole_z (e*angstrom)"] == pytest.approx(
+        result.reference_result.table.iloc[0]["dipole_z (e*angstrom)"]
+    )
+    assert summary["dipole_closure_error_z (e*angstrom)"] == pytest.approx(0.0)
+    assert summary["P_z (uC/cm^2)"] == pytest.approx(
+        result.reference_result.table.iloc[0]["P_z (uC/cm^2)"]
+    )
+
+
+def test_local_deformation_volumes_are_normalized_to_selected_frame_volume(
+        reference_path,
+) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    result = calculate_hbn_reference_local_polarization(
+        trajectory,
+        HBNReferenceLocalPolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            local_volume_method="deformation",
+            volume_method="hull",
+        ),
+    )
+
+    assert np.all(result.table["local_volume (angstrom^3)"] > 0.0)
+    assert result.table["local_volume (angstrom^3)"].sum() == pytest.approx(
+        result.reference_result.table.iloc[0]["volume (angstrom^3)"]
+    )
+
+
+def test_projected_polarity_includes_zero_and_uses_fixed_cell_bins(reference_path) -> None:
+    single = _trajectory_from_reference(reference_path)
+    labels = np.asarray(single.elements)
+    positions = np.repeat(single.positions, 2, axis=0)
+    positions[1, labels == "Al", 2] += 0.1
+    assert single.simulation is not None
+    simulation = SimulationData(
+        atom_ids=single.atom_ids,
+        iterations=np.asarray([20, 40]),
+        elements=single.elements,
+        cell_lengths=np.repeat(single.simulation.cell_lengths, 2, axis=0),
+        cell_angles=np.repeat(single.simulation.cell_angles, 2, axis=0),
+    )
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=single.elements,
+        atom_ids=single.atom_ids,
+        iterations=np.asarray([20, 40]),
+        simulation=simulation,
+    )
+    result = calculate_hbn_reference_projected_polarity(
+        trajectory,
+        HBNReferenceProjectedPolarityRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            frames=(0, 1),
+            component="z",
+            projection_plane="xz",
+            projection_bins=(1, 1),
+            profile_axis="z",
+        ),
+    )
+
+    projected = result.projected_bins.set_index("frame_index")
+    assert projected.loc[0, "defined_cell_count"] == 4
+    assert projected.loc[0, "zero_count"] == 4
+    assert projected.loc[0, "mean_polarity"] == pytest.approx(0.0)
+    assert projected.loc[1, "negative_count"] == 4
+    assert projected.loc[1, "mean_polarity"] == pytest.approx(-1.0)
+    assert result.centers.groupby("local_cell_id")["u_bin"].nunique().max() == 1
+    assert result.centers.groupby("local_cell_id")["v_bin"].nunique().max() == 1
+    assert len(result.kymograph_bins) == 2
+
+
+def test_reaxff_local_cells_are_neutralized_without_losing_raw_global_closure(
+        reference_path,
+) -> None:
+    base = _trajectory_from_reference(reference_path)
+    mapping_result = calculate_hbn_reference_polarization(
+        base,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path, replication=(2, 1, 1)
+        ),
+    )
+    mapping = mapping_result.mapping.sort_values("atom_index")
+    cell_ids = mapping["local_cell_id"].to_numpy(int)
+    positions = base.positions.copy()
+    cell_translation = np.where(cell_ids < 2, 0.05, -0.05)
+    positions[0, :, 2] += cell_translation
+    trajectory = TrajectoryData(
+        positions=positions,
+        elements=base.elements,
+        atom_ids=base.atom_ids,
+        iterations=base.iterations,
+        simulation=base.simulation,
+    )
+    labels = np.asarray(base.elements)
+    formal = np.where(labels == "Al", 3.0, -3.0)
+    charge_offset = np.where(cell_ids < 2, 0.2, -0.2)
+    data = ElectrostaticsData(
+        trajectory=trajectory,
+        charges=ChargeData(
+            charges=(formal + charge_offset)[None, :],
+            iterations=base.iterations,
+            simulation=base.simulation,
+        ),
+    )
+
+    result = calculate_hbn_reference_local_polarization(
+        data,
+        HBNReferenceLocalPolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            charge_source="reaxff",
+            volume_method="cell",
+        ),
+    )
+
+    assert result.table["charge_neutralization_applied"].all()
+    assert result.table["effective_net_charge (e)"].to_numpy() == pytest.approx(
+        np.zeros(4), abs=1.0e-12
+    )
+    assert result.table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
+        np.zeros(4), abs=1.0e-12
+    )
+    summary = result.summary.iloc[0]
+    assert summary["raw_dipole_closure_error_z (e*angstrom)"] == pytest.approx(
+        0.0, abs=1.0e-12
+    )
+    assert summary["raw_dipole_z (e*angstrom)"] == pytest.approx(
+        result.reference_result.table.iloc[0]["dipole_z (e*angstrom)"]
+    )
 
 
 @pytest.fixture
