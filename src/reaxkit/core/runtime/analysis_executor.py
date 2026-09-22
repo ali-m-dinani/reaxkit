@@ -77,6 +77,13 @@ class AnalysisExecutor:
     )
 
     @staticmethod
+    def _ready_for_result_saving(result, args: dict):
+        """Mark the boundary between computation and workflow artifact writes."""
+        if args.get("progress") and not args.get("quiet"):
+            print("[ReaxKit] Computation complete; saving result files...")
+        return result
+
+    @staticmethod
     def _timing_console_enabled(args: dict) -> bool:
         """
         Timing console enabled.
@@ -576,6 +583,9 @@ class AnalysisExecutor:
             value = args.get(key)
             if not value:
                 continue
+            file_was_explicit = args.get(f"_{key}_was_explicit")
+            if file_was_explicit is False:
+                continue
             path = Path(str(value))
             default_name = default_file_hints.get(key)
             if default_name and path.parent == Path(".") and path.name == default_name:
@@ -794,10 +804,13 @@ class AnalysisExecutor:
             if use_cache and cache.exists(analysis_id):
                 self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                 cached = cache.load(analysis_id)
-                return enrich_result_with_time(
-                    cached,
-                    None,
-                    control_file=str(args.get("control") or "control"),
+                return self._ready_for_result_saving(
+                    enrich_result_with_time(
+                        cached,
+                        None,
+                        control_file=str(args.get("control") or "control"),
+                    ),
+                    args,
                 )
 
             self._console_step(args, f"Streaming data and running task={task_name}")
@@ -838,7 +851,7 @@ class AnalysisExecutor:
                 },
             )
             self._console_step(args, f"Completed streaming task={task_name} analysis_id={analysis_id[:12]}")
-            return result
+            return self._ready_for_result_saving(result, args)
         if parsed_id is not None:
             data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
@@ -888,10 +901,13 @@ class AnalysisExecutor:
                                 extra={"analysis_id": analysis_id},
                             )
                             cached = cache.load(analysis_id)
-                            return enrich_result_with_time(
-                                cached,
-                                data,
-                                control_file=str(args.get("control") or "control"),
+                            return self._ready_for_result_saving(
+                                enrich_result_with_time(
+                                    cached,
+                                    data,
+                                    control_file=str(args.get("control") or "control"),
+                                ),
+                                args,
                             )
 
                         if not use_cache:
@@ -939,7 +955,7 @@ class AnalysisExecutor:
                             },
                         )
                         self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-                        return result
+                        return self._ready_for_result_saving(result, args)
 
             analysis_id = cache.analysis_id_for(
                 task=task,
@@ -971,10 +987,13 @@ class AnalysisExecutor:
                     extra={"analysis_id": analysis_id},
                 )
                 cached = cache.load(analysis_id)
-                return enrich_result_with_time(
-                    cached,
-                    None,
-                    control_file=str(args.get("control") or "control"),
+                return self._ready_for_result_saving(
+                    enrich_result_with_time(
+                        cached,
+                        None,
+                        control_file=str(args.get("control") or "control"),
+                    ),
+                    args,
                 )
 
         # ---------------------------------------------------------------------
@@ -1106,7 +1125,7 @@ class AnalysisExecutor:
                 },
             )
             self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-            return result
+            return self._ready_for_result_saving(result, args)
 
         if cache.exists(analysis_id):
             logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
@@ -1118,10 +1137,13 @@ class AnalysisExecutor:
                 extra={"analysis_id": analysis_id},
             )
             cached = cache.load(analysis_id)
-            return enrich_result_with_time(
-                cached,
-                data,
-                control_file=str(args.get("control") or "control"),
+            return self._ready_for_result_saving(
+                enrich_result_with_time(
+                    cached,
+                    data,
+                    control_file=str(args.get("control") or "control"),
+                ),
+                args,
             )
 
         logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
@@ -1163,4 +1185,4 @@ class AnalysisExecutor:
             },
         )
         self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-        return result
+        return self._ready_for_result_saving(result, args)

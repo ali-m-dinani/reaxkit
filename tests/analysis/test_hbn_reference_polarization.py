@@ -48,6 +48,7 @@ def _trajectory_from_reference(
     simulation = SimulationData(
         atom_ids=list(range(1, len(reference) + 1)),
         iterations=np.asarray([20]),
+        time=np.asarray([0.5]),
         elements=symbols,
         cell_lengths=np.asarray([np.linalg.norm(strained_cell, axis=1)]),
         cell_angles=np.asarray([[90.0, 90.0, 90.0]]),
@@ -73,6 +74,27 @@ def test_cell_strain_and_origin_shift_do_not_create_polarization(reference_path)
     assert result.reference.repeats == (2, 1, 1)
     assert result.table.iloc[0]["P_c (uC/cm^2)"] == pytest.approx(0.0, abs=1.0e-9)
     assert np.max(np.abs(result.displacements["displacement_c (angstrom)"])) < 1.0e-10
+
+
+def test_polarization_reports_determinate_frame_progress(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+    events: list[tuple[str, int, int, str | None]] = []
+
+    calculate_hbn_reference_polarization(
+        trajectory,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+        ),
+        reporter=lambda stage, current, total, message=None: events.append(
+            (stage, current, total, message)
+        ),
+    )
+
+    assert events == [
+        ("analyze", 0, 1, "Analyzing polarization frames"),
+        ("analyze", 1, 1, "Analyzing polarization frames"),
+    ]
 
 
 def test_vacuum_is_not_applied_as_reference_strain(reference_path) -> None:
@@ -172,6 +194,14 @@ def test_reports_cartesian_and_selected_c_axis_components(reference_path) -> Non
     assert row["dipole_c (e*angstrom)"] == pytest.approx(
         expected @ (c_axis / np.linalg.norm(c_axis))
     )
+    counts = result.poled_counts.set_index("direction")
+    assert "hbn_reference_polarization_poled_counts" in result.csv_tables
+    assert counts.loc["x", "frame"] == 0
+    assert counts.loc["x", "iter"] == 20
+    assert counts.loc["x", "time"] == pytest.approx(0.5)
+    assert counts.loc["x", "count_poled_down"] == 1
+    assert counts.loc["x", "count_all"] == 1
+    assert counts.loc["x", "percentage_poled_down"] == pytest.approx(100.0)
 
 
 def test_slab_polarization_supports_hull_bbox_and_cell_volumes(reference_path) -> None:
@@ -338,6 +368,11 @@ def test_local_equal_volumes_close_to_global_dipole_and_polarization(reference_p
     assert summary["P_z (uC/cm^2)"] == pytest.approx(
         result.reference_result.table.iloc[0]["P_z (uC/cm^2)"]
     )
+    counts = result.poled_counts.set_index("direction")
+    assert "hbn_reference_local_polarization_poled_counts" in result.csv_tables
+    assert counts.loc["z", "count_poled_down"] == 4
+    assert counts.loc["z", "count_all"] == 4
+    assert counts.loc["z", "percentage_poled_down"] == pytest.approx(100.0)
 
 
 def test_local_result_also_reports_neutral_aln_layers(reference_path) -> None:

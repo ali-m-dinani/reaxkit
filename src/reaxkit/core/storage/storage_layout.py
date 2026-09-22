@@ -53,6 +53,27 @@ _DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
     "log.lammps",
 )
 
+_DEFAULT_STORAGE_FILE_ARGUMENTS: dict[str, str] = {
+    "xmolout": "xmolout",
+    "summary": "summary.txt",
+    "fort7": "fort.7",
+    "fort13": "fort.13",
+    "fort57": "fort.57",
+    "fort73": "fort.73",
+    "fort74": "fort.74",
+    "fort76": "fort.76",
+    "fort78": "fort.78",
+    "fort79": "fort.79",
+    "fort99": "fort.99",
+    "trainset": "trainset.in",
+    "params": "params",
+    "control": "control",
+    "eregime": "eregime.in",
+    "vels": "vels",
+    "molfra": "molfra.out",
+    "ffield": "ffield",
+}
+
 
 def _utc_now_iso() -> str:
     """
@@ -1463,6 +1484,18 @@ def normalize_storage_args(
     if "_run_dir_was_explicit" not in out:
         run_dir_value = out.get("run_dir")
         out["_run_dir_was_explicit"] = bool(run_dir_value and str(run_dir_value) != ".")
+    for key, default_name in _DEFAULT_STORAGE_FILE_ARGUMENTS.items():
+        provenance_key = f"_{key}_was_explicit"
+        if provenance_key in out:
+            continue
+        raw_value = out.get(key)
+        if not raw_value:
+            out[provenance_key] = False
+            continue
+        raw_path = Path(str(raw_value))
+        out[provenance_key] = not (
+            raw_path.parent == Path(".") and raw_path.name == default_name
+        )
     run_id = out.get("run_id")
     if not run_id:
         run_id = generate_run_id()
@@ -1485,27 +1518,7 @@ def normalize_storage_args(
         out["cache_dir"] = str(layout.cache_root)
 
     # Rewrite default bare filenames to the run-scoped raw directory.
-    default_files = {
-        "xmolout": "xmolout",
-        "summary": "summary.txt",
-        "fort7": "fort.7",
-        "fort13": "fort.13",
-        "fort57": "fort.57",
-        "fort73": "fort.73",
-        "fort74": "fort.74",
-        "fort76": "fort.76",
-        "fort78": "fort.78",
-        "fort79": "fort.79",
-        "fort99": "fort.99",
-        "trainset": "trainset.in",
-        "params": "params",
-        "control": "control",
-        "eregime": "eregime.in",
-        "vels": "vels",
-        "molfra": "molfra.out",
-        "ffield": "ffield",
-    }
-    for key, default_name in default_files.items():
+    for key, default_name in _DEFAULT_STORAGE_FILE_ARGUMENTS.items():
         raw = out.get(key)
         if not raw:
             continue

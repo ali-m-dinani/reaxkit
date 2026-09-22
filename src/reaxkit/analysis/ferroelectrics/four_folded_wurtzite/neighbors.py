@@ -555,8 +555,13 @@ def extract_wurtzite_neighbors(
 
 def _candidate_charge_file(args: dict) -> Path | None:
     configured = Path(str(args.get("fort7") or "fort.7"))
+    # Storage normalization rewrites a default bare ``fort.7`` to the
+    # run-scoped snapshot before that snapshot has been populated. Preserve
+    # the default filename so auto-detection can still inspect the source run.
+    if args.get("_fort7_was_explicit") is False:
+        configured = Path("fort.7")
     candidates = [configured]
-    for key in ("run_dir", "input", "xmolout"):
+    for key in ("_snapshot_source_dir", "run_dir", "input", "xmolout"):
         raw = args.get(key)
         if not raw:
             continue
@@ -573,6 +578,11 @@ def required_wurtzite_data_type(request: WurtziteNeighborRequest, args: dict | N
         return TrajectoryData
     if request.charge_source == "reaxff":
         return ElectrostaticsData
+    if args is None:
+        # Shared validation has no runtime path context. Both representations
+        # are valid for ``auto``; the executor already selected one using the
+        # normalized source arguments.
+        return TrajectoryData, ElectrostaticsData
     return ElectrostaticsData if _candidate_charge_file(args or {}) is not None else TrajectoryData
 
 

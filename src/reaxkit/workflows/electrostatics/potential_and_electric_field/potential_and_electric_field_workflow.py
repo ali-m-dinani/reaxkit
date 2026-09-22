@@ -10,7 +10,7 @@ from reaxkit.analysis.electrostatics.potential_and_electric_field import Potenti
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.presentation.dispatcher import present_result
-from .artifacts import write_binning, write_tables
+from .artifacts import KYMOGRAPH_VALUES, write_binning, write_tables
 from .common import add_input_arguments, artifact_directory, attach_energylog_reference, request_kwargs, runtime_arguments
 
 COMMAND = "get-potential-and-electric-field"
@@ -23,12 +23,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     if command not in (*ALL_COMMANDS, *ALL_LEGACY_COMMANDS): raise KeyError(command)
     parser.set_defaults(command=COMMAND, progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
-    parser.description = """Calculate ReaxFF Coulomb energies, local potentials, and electric fields at atom coordinates.
+    parser.description = """Calculate internal, external, and total local potentials and electric fields at atom coordinates.
 
-Use this command to reconstruct the shielded Coulomb contribution from xmolout,
-fort.7, and ffield. It writes per-atom and total energies, one potential/field CSV
-per +1e probe species, and an equal-probe average. Optional spatial binning produces
-1D profiles, 2D heatmaps, or 3D occupied-bin plots with a shared color scale.
+The command reconstructs the internal shielded Coulomb contribution from xmolout,
+fort.7, and ffield, then adds the iteration-aligned external field from fort.78.
+External potential is zero at the material midpoint by default. It writes one
+potential/field CSV per +1e probe species and an equal-probe average. Optional
+spatial binning uses the total local electric field.
 
 Examples:
   1. Calculate every twentieth saved frame with automatic probe species:
@@ -39,6 +40,9 @@ Examples:
 
   3. Validate the analytic field with a numerical derivative and no taper:
      reaxkit get-potential-and-electric-field --run-dir ./run --field-method numerical --field-step 0.0005 --disable-taper
+
+  4. Plot total local voltage and Ez versus frame and z bin:
+     reaxkit get-potential-and-electric-field --run-dir ./run --bin-axes z --bins 60 --plot-kymograph --plot-field-component z
 """
     add_input_arguments(parser)
     parser.add_argument(
@@ -52,6 +56,19 @@ Examples:
     parser.add_argument(
         "--plot-bins", action="store_true",
         help="Generate binned field plots in addition to CSV files. Example: --bin-axes z --plot-bins, writes one z profile per selected frame and probe.",
+    )
+    parser.add_argument(
+        "--plot-kymograph", action="store_true",
+        help="Plot selected voltage or field values across frames and one spatial bin axis. Example: --bin-axes z --plot-kymograph, writes frame-versus-z heatmaps.",
+    )
+    parser.add_argument(
+        "--kymograph-values", nargs="+", choices=KYMOGRAPH_VALUES,
+        default=["total-local-potential", "total-local-field"],
+        help="Choose kymograph layers. Example: --kymograph-values internal-potential total-local-field, plots both requested quantities for every probe.",
+    )
+    parser.add_argument(
+        "--kymograph-time-axis", choices=["frame", "iteration"], default="frame",
+        help="Choose the horizontal kymograph coordinate. Example: --kymograph-time-axis iteration, uses simulation iteration rather than source-frame index.",
     )
     parser.add_argument(
         "--plot-field-component", choices=["x", "y", "z", "magnitude", "mean-magnitude"], default="magnitude",
@@ -78,12 +95,18 @@ def build_request(args) -> PotentialElectricFieldRequest:
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     if args.plot_bins and not args.bin_axes: raise ValueError("--plot-bins requires --bin-axes.")
+    if args.plot_kymograph and not args.bin_axes: raise ValueError("--plot-kymograph requires --bin-axes.")
+    if args.plot_kymograph and len(str(args.bin_axes)) != 1:
+        raise ValueError("--plot-kymograph requires one bin axis: x, y, or z.")
     result = AnalysisExecutor().run(TASK_REGISTRY[COMMAND](), build_request(args), runtime_arguments(args))
     attach_energylog_reference(result, args)
     output = artifact_directory(args, COMMAND); paths = list(write_tables(result, output).values())
     if args.bin_axes:
         paths.extend(write_binning(result, output, axes=args.bin_axes, bins=args.bins, plot=args.plot_bins,
-                                   component=args.plot_field_component, units=args.plot_field_units, dpi=args.figure_dpi))
+                                   component=args.plot_field_component, units=args.plot_field_units, dpi=args.figure_dpi,
+                                   kymograph=args.plot_kymograph,
+                                   kymograph_values=args.kymograph_values,
+                                   kymograph_time_axis=args.kymograph_time_axis))
     args.suppress_table = True; present_result(COMMAND, result, args)
     print(f"Processed {len(result.frame_indices):,} frame(s); wrote {len(paths):,} artifacts under {output}.")
     return 0

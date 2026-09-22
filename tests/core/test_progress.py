@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
-from reaxkit.core.runtime import progress
+import reaxkit.core.runtime.progress as progress
 from reaxkit.domain.data_models import TrajectoryData
 from reaxkit.engine.base import EngineAdapter
 
@@ -145,7 +145,7 @@ def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
         def close(self):
             pass
 
-    monkeypatch.setattr(progress, "tqdm", FakeBar)
+    monkeypatch.setitem(vars(progress), "tqdm", FakeBar)
     reporter = progress.tqdm_reporter_factory()
 
     reporter("load", 0, 0, "Loading")
@@ -155,10 +155,11 @@ def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
     assert len(created) == 1
     assert created_kwargs[0]["ascii"] is True
     assert created_kwargs[0]["dynamic_ncols"] is False
+    assert created_kwargs[0]["leave"] is True
     assert 20 <= created_kwargs[0]["ncols"] <= 120
 
 
-def test_tqdm_reporter_animates_indeterminate_operations(monkeypatch):
+def test_tqdm_reporter_keeps_indeterminate_operations_unfilled(monkeypatch):
     created = []
 
     class FakeBar:
@@ -184,16 +185,17 @@ def test_tqdm_reporter_animates_indeterminate_operations(monkeypatch):
         def close(self):
             pass
 
-    monkeypatch.setattr(progress, "tqdm", FakeBar)
+    monkeypatch.setitem(vars(progress), "tqdm", FakeBar)
     monkeypatch.setattr(progress, "_INDETERMINATE_INTERVAL_SECONDS", 0.001)
     reporter = progress.tqdm_reporter_factory()
 
     reporter("analyze", 0, 0, "Running task")
     deadline = time.monotonic() + 0.2
-    while created[0].n == 0 and time.monotonic() < deadline:
-        time.sleep(0.001)
+    initial_n = created[0].n
+    time.sleep(max(0.01, deadline - time.monotonic()))
 
-    assert created[0].n > 0
+    assert created[0].n == initial_n == 0
+    assert created[0].total is None
     assert created[0].bar_format == progress._INDETERMINATE_BAR_FORMAT
 
     reporter("analyze", 1, 1, "Finished task")

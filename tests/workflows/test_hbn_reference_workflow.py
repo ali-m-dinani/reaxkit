@@ -8,6 +8,11 @@ from ase.io import read
 from reaxkit.core.registry.analysis_cli_routing_registry import (
     get_registered_analysis_commands,
 )
+from reaxkit.core.storage.storage_layout import normalize_storage_args
+from reaxkit.domain.data_models import ElectrostaticsData, TrajectoryData
+from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
+    HBNReferencePolarizationTask,
+)
 from reaxkit.workflows.ferroelectrics.hbn_reference import polarization_workflow
 
 
@@ -30,6 +35,33 @@ def test_parser_builds_default_charge_request() -> None:
     assert request.replication == (2, 3, 4)
     assert request.max_reference_strain == 0.15
     assert request.volume_method == "hull"
+
+
+def test_auto_charge_source_uses_fort7_from_pre_snapshot_source(
+        tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "xmolout").write_text("trajectory", encoding="utf-8")
+    (tmp_path / "fort.7").write_text("charges", encoding="utf-8")
+    parser = polarization_workflow.build_parser(
+        argparse.ArgumentParser(), command=polarization_workflow.COMMAND
+    )
+    namespace = parser.parse_args(["--replication", "1", "1", "1"])
+    request = polarization_workflow.build_request(namespace)
+    runtime = normalize_storage_args(
+        {
+            **polarization_workflow.runtime_arguments(namespace),
+            "project_root": str(tmp_path / "workspace"),
+        },
+        snapshot=False,
+    )
+
+    task = HBNReferencePolarizationTask()
+    assert task.required_data_for(request, runtime) is ElectrostaticsData
+    assert task.required_data_for(request, None) == (
+        TrajectoryData,
+        ElectrostaticsData,
+    )
 
 
 def test_parser_accepts_charge_source_and_formal_charge_options() -> None:

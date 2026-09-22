@@ -287,7 +287,15 @@ class XmoloutHandler(BaseHandler):
             if raw.strip():
                 return start, raw, handle.tell()
 
-    def _scan_offsets(self, store: FrameStore, *, through_index: int) -> dict[str, Any]:
+    def _scan_offsets(
+            self,
+            store: FrameStore,
+            *,
+            through_index: int,
+            progress_stage: str = "load",
+            progress_total: int = 0,
+            progress_message: str = "Indexing xmolout frames",
+    ) -> dict[str, Any]:
         """Extend the byte index through ``through_index`` without building frames."""
         coverage = store.get_coverage()
         started_at = perf_counter()
@@ -339,6 +347,13 @@ class XmoloutHandler(BaseHandler):
                 indexed += 1
                 bytes_read += byte_end - byte_start
                 store.set_coverage(IndexCoverage(frame_index, byte_end, False))
+                if self._reporter and progress_total > 0:
+                    self._reporter(
+                        progress_stage,
+                        indexed,
+                        progress_total,
+                        progress_message,
+                    )
             else:
                 # Coverage is a safe resume point even though EOF is not yet known.
                 store.set_coverage(IndexCoverage(frame_index, handle.tell(), False))
@@ -410,12 +425,35 @@ class XmoloutHandler(BaseHandler):
         records = store.get_frames(requested)
         cache_seconds = perf_counter() - cache_started
         missing = [index for index in requested if index not in records]
-        scan_stats = self._scan_offsets(store, through_index=max(missing, default=-1)) if missing else {
+        through_index = max(missing, default=-1)
+        coverage = store.get_coverage()
+        index_work = (
+            max(0, through_index - coverage.next_frame_index + 1)
+            if missing and not coverage.complete
+            else 0
+        )
+        total_work = index_work + len(requested)
+        if self._reporter:
+            self._reporter("load", 0, total_work, "Reading xmolout frames")
+        scan_stats = self._scan_offsets(
+            store,
+            through_index=through_index,
+            progress_total=total_work,
+            progress_message="Reading xmolout frames",
+        ) if missing else {
             "indexed_frames": 0,
             "index_bytes": 0,
             "index_seconds": 0.0,
         }
         offsets = store.get_offsets(missing)
+        completed = len(records)
+        if self._reporter:
+            self._reporter(
+                "load",
+                index_work + completed,
+                total_work,
+                "Reading xmolout frames",
+            )
         source_started = perf_counter()
         parsed: dict[int, dict[str, Any]] = {}
         source_bytes = 0
@@ -428,6 +466,14 @@ class XmoloutHandler(BaseHandler):
                     record = self._parse_indexed_frame(handle, offset)
                     parsed[frame_index] = record
                     source_bytes += int(record.get("source_bytes", 0))
+                    completed += 1
+                    if self._reporter:
+                        self._reporter(
+                            "load",
+                            index_work + completed,
+                            total_work,
+                            "Reading xmolout frames",
+                        )
         source_seconds = perf_counter() - source_started
         write_started = perf_counter()
         store.put_frames(parsed)
@@ -478,13 +524,6 @@ class XmoloutHandler(BaseHandler):
             "partial": True,
             "frame_cache": stats,
         }
-        if self._reporter:
-            self._reporter(
-                "load",
-                len(source_indices),
-                len(requested),
-                f"xmolout frame cache: {stats['hits']} hit, {stats['misses']} miss",
-            )
         return df, meta
 
     def _parse_selected_frames_sequential(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -618,9 +657,22 @@ class XmoloutHandler(BaseHandler):
             if store is not None:
                 initially_available = store.available_indices(requested_order)
                 missing = [index for index in requested_order if index not in initially_available]
+                through_index = max(missing, default=-1)
+                coverage = store.get_coverage()
+                index_work = (
+                    max(0, through_index - coverage.next_frame_index + 1)
+                    if missing and not coverage.complete
+                    else 0
+                )
+                total_work = index_work + len(requested_order)
+                if callable(self._reporter):
+                    self._reporter("stream", 0, total_work, "Reading xmolout frames")
                 scan_stats = self._scan_offsets(
                     store,
-                    through_index=max(missing, default=-1),
+                    through_index=through_index,
+                    progress_stage="stream",
+                    progress_total=total_work,
+                    progress_message="Reading xmolout frames",
                 ) if missing else {"indexed_frames": 0, "index_bytes": 0, "index_seconds": 0.0}
                 offsets = store.get_offsets(missing)
                 parsed_frames = 0
@@ -644,9 +696,9 @@ class XmoloutHandler(BaseHandler):
                         if callable(self._reporter):
                             self._reporter(
                                 "stream",
-                                emitted,
-                                len(requested_order),
-                                "Streaming xmolout frames",
+                                index_work + emitted,
+                                total_work,
+                                "Reading xmolout frames",
                             )
                         output = {
                             "source_index": source_index,
@@ -673,10 +725,9 @@ class XmoloutHandler(BaseHandler):
                 if callable(self._reporter):
                     self._reporter(
                         "stream",
-                        len(requested_order),
-                        len(requested_order),
-                        f"xmolout frame cache: {len(initially_available)} hit, "
-                        f"{len(requested_order) - len(initially_available)} miss",
+                        total_work,
+                        total_work,
+                        "Read xmolout frames",
                     )
                 return
 

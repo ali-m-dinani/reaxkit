@@ -76,20 +76,28 @@ def _attach_time_to_frame(
     """
     Attach time to frame.
     """
-    if "time" in frame.columns or "iter" not in frame.columns or frame.empty:
+    if "iter" not in frame.columns or frame.empty:
         return frame
 
     out = frame.copy()
     iter_values = pd.to_numeric(out["iter"], errors="coerce")
-    valid_mask = iter_values.notna()
+    if "time" in out.columns:
+        time_values = pd.to_numeric(out["time"], errors="coerce").to_numpy(
+            dtype=float, copy=True
+        )
+    else:
+        time_values = np.full((len(out),), np.nan, dtype=float)
+    valid_mask = iter_values.notna() & ~np.isfinite(time_values)
     if not valid_mask.any():
         return out
 
     if iter_to_time:
-        vals = np.full((len(out),), np.nan, dtype=float)
         iter_int = iter_values[valid_mask].astype(int).to_numpy()
-        vals[valid_mask.to_numpy()] = np.asarray([iter_to_time.get(int(v), np.nan) for v in iter_int], dtype=float)
-        out["time"] = vals
+        time_values[valid_mask.to_numpy()] = np.asarray(
+            [iter_to_time.get(int(value), np.nan) for value in iter_int],
+            dtype=float,
+        )
+        out["time"] = time_values
         return out
 
     try:
@@ -101,9 +109,8 @@ def _attach_time_to_frame(
     except Exception:
         return out
 
-    vals = np.full((len(out),), np.nan, dtype=float)
-    vals[valid_mask.to_numpy()] = np.asarray(converted, dtype=float)
-    out["time"] = vals
+    time_values[valid_mask.to_numpy()] = np.asarray(converted, dtype=float)
+    out["time"] = time_values
     return out
 
 

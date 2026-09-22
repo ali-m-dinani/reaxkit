@@ -25,6 +25,7 @@ from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
     _frame_cell,
     calculate_hbn_reference_polarization,
 )
+from reaxkit.analysis.ferroelectrics.poled_counts import directional_poled_counts
 from reaxkit.core.platform.constants import const
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_result import BaseResult
@@ -78,6 +79,7 @@ class HBNReferenceLocalPolarizationResult(BaseResult):
     cell_summary: pd.DataFrame
     layer_table: pd.DataFrame
     layer_summary: pd.DataFrame
+    poled_counts: pd.DataFrame
     request: HBNReferenceLocalPolarizationRequest
     reference_result: HBNReferencePolarizationResult
     trajectory: TrajectoryData
@@ -93,6 +95,7 @@ class HBNReferenceLocalPolarizationResult(BaseResult):
             "hbn_reference_cell_polarization_summary": self.cell_summary,
             "hbn_reference_layer_polarization": self.layer_table,
             "hbn_reference_layer_polarization_summary": self.layer_summary,
+            "hbn_reference_local_polarization_poled_counts": self.poled_counts,
         }
 
 
@@ -482,6 +485,11 @@ def calculate_hbn_reference_local_polarization(
     table = cell_table if request.local_grouping == "cell" else layer_table
     summary = cell_summary if request.local_grouping == "cell" else layer_summary
 
+    poled_counts = directional_poled_counts(
+        table,
+        trajectory,
+        {axis: f"P_{axis} (uC/cm^2)" for axis in "xyz"},
+    )
     return HBNReferenceLocalPolarizationResult(
         table=table,
         summary=summary,
@@ -489,6 +497,7 @@ def calculate_hbn_reference_local_polarization(
         cell_summary=cell_summary,
         layer_table=layer_table,
         layer_summary=layer_summary,
+        poled_counts=poled_counts,
         request=request,
         reference_result=reference_result,
         trajectory=trajectory,
@@ -506,7 +515,7 @@ class HBNReferenceLocalPolarizationTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "2"
+    VERSION = "3"
 
     def required_data_for(
             self, request: HBNReferenceLocalPolarizationRequest, args: dict | None = None

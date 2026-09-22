@@ -32,6 +32,7 @@ from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _trajectory_and_charges,
     required_wurtzite_data_type,
 )
+from reaxkit.analysis.ferroelectrics.poled_counts import directional_poled_counts
 from reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarity import (
     EA_TO_DEBYE,
     WurtzitePolarityRequest,
@@ -60,6 +61,7 @@ class BasalPlaneDipoleResult(BaseResult):
     polarity_result: WurtzitePolarityResult
     ions: pd.DataFrame
     summary: pd.DataFrame
+    poled_counts: pd.DataFrame
     frame_indices: np.ndarray
     iterations: np.ndarray
 
@@ -69,6 +71,7 @@ class BasalPlaneDipoleResult(BaseResult):
             "basal_plane_dipole": self.table,
             "basal_plane_ions": self.ions,
             "basal_plane_dipole_summary": self.summary,
+            "basal_plane_dipole_poled_counts": self.poled_counts,
         }
 
 
@@ -285,9 +288,14 @@ def calculate_basal_plane_dipoles(
             row[f"mu_{axis} (e*angstrom)"] = value
             row[f"mu_{axis} (debye)"] = value * EA_TO_DEBYE
         summary_rows.append(row)
+    poled_counts = directional_poled_counts(
+        table,
+        trajectory,
+        {axis: f"mu_{axis} (e*angstrom)" for axis in "xyz"},
+    )
     return BasalPlaneDipoleResult(
         table=table, request=request, polarity_result=polarity,
-        ions=ions, summary=pd.DataFrame(summary_rows),
+        ions=ions, summary=pd.DataFrame(summary_rows), poled_counts=poled_counts,
         frame_indices=polarity.frame_indices, iterations=polarity.iterations,
     )
 
@@ -301,7 +309,7 @@ class BasalPlaneDipoleTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "2"
+    VERSION = "3"
 
     def required_data_for(self, request: BasalPlaneDipoleRequest, args: dict | None = None):
         return required_wurtzite_data_type(request, args)

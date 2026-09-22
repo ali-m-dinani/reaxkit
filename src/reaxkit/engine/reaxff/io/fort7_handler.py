@@ -326,7 +326,15 @@ class Fort7Handler(BaseHandler):
         except (OSError, RuntimeError, ValueError):
             return None
 
-    def _scan_offsets(self, store: FrameStore, *, through_index: int) -> dict[str, int]:
+    def _scan_offsets(
+            self,
+            store: FrameStore,
+            *,
+            through_index: int,
+            progress_stage: str = "load",
+            progress_total: int = 0,
+            progress_message: str = "Indexing fort.7 frames",
+    ) -> dict[str, int]:
         """Extend the fort.7 header index and persist a safe resume point."""
         coverage = store.get_coverage()
         if coverage.complete or coverage.next_frame_index > through_index:
@@ -357,6 +365,13 @@ class Fort7Handler(BaseHandler):
                         frame_index += 1
                         indexed += 1
                         bytes_read += byte_end - current_start
+                        if self._reporter and progress_total > 0:
+                            self._reporter(
+                                progress_stage,
+                                indexed,
+                                progress_total,
+                                progress_message,
+                            )
                     store.set_coverage(IndexCoverage(frame_index, handle.tell(), True))
                     break
                 raw = raw_bytes.decode("utf-8")
@@ -386,6 +401,13 @@ class Fort7Handler(BaseHandler):
                 bytes_read += line_start - current_start
                 frame_index += 1
                 store.set_coverage(IndexCoverage(frame_index, line_start, False))
+                if self._reporter and progress_total > 0:
+                    self._reporter(
+                        progress_stage,
+                        indexed,
+                        progress_total,
+                        progress_message,
+                    )
                 if frame_index > through_index:
                     break
                 current_start = line_start
@@ -517,11 +539,34 @@ class Fort7Handler(BaseHandler):
     ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
         records = store.get_frames(requested)
         missing = [index for index in requested if index not in records]
-        scan_stats = self._scan_offsets(store, through_index=max(missing, default=-1)) if missing else {
+        through_index = max(missing, default=-1)
+        coverage = store.get_coverage()
+        index_work = (
+            max(0, through_index - coverage.next_frame_index + 1)
+            if missing and not coverage.complete
+            else 0
+        )
+        total_work = index_work + len(requested)
+        if self._reporter:
+            self._reporter("load", 0, total_work, "Reading fort.7 frames")
+        scan_stats = self._scan_offsets(
+            store,
+            through_index=through_index,
+            progress_total=total_work,
+            progress_message="Reading fort.7 frames",
+        ) if missing else {
             "indexed_frames": 0,
             "index_bytes": 0,
         }
         offsets = store.get_offsets(missing)
+        completed = len(records)
+        if self._reporter:
+            self._reporter(
+                "load",
+                index_work + completed,
+                total_work,
+                "Reading fort.7 frames",
+            )
         parsed: dict[int, dict[str, Any]] = {}
         source_bytes = 0
         if offsets:
@@ -533,6 +578,14 @@ class Fort7Handler(BaseHandler):
                     record = self._parse_indexed_frame(handle, offset)
                     parsed[frame_index] = record
                     source_bytes += int(record["source_bytes"])
+                    completed += 1
+                    if self._reporter:
+                        self._reporter(
+                            "load",
+                            index_work + completed,
+                            total_work,
+                            "Reading fort.7 frames",
+                        )
         store.put_frames(parsed)
         records.update(parsed)
         return records, {
@@ -586,13 +639,6 @@ class Fort7Handler(BaseHandler):
             "partial": True,
             "frame_cache": stats,
         }
-        if self._reporter:
-            self._reporter(
-                "load",
-                len(source_indices),
-                len(requested),
-                f"fort.7 frame cache: {stats['hits']} hit, {stats['misses']} miss",
-            )
         return sim_df, meta
 
     def _parse_selected_frames_sequential(self) -> tuple[pd.DataFrame, dict[str, Any]]:
@@ -784,9 +830,22 @@ class Fort7Handler(BaseHandler):
                 if rich_store is not None:
                     initially_available |= rich_store.available_indices(requested_order)
                 missing = [index for index in requested_order if index not in initially_available]
+                through_index = max(missing, default=-1)
+                coverage = store.get_coverage()
+                index_work = (
+                    max(0, through_index - coverage.next_frame_index + 1)
+                    if missing and not coverage.complete
+                    else 0
+                )
+                total_work = index_work + len(requested_order)
+                if callable(self._reporter):
+                    self._reporter("stream", 0, total_work, "Reading fort.7 frames")
                 scan_stats = self._scan_offsets(
                     store,
-                    through_index=max(missing, default=-1),
+                    through_index=through_index,
+                    progress_stage="stream",
+                    progress_total=total_work,
+                    progress_message="Reading fort.7 frames",
                 ) if missing else {"indexed_frames": 0, "index_bytes": 0}
                 offsets = store.get_offsets(missing)
                 parsed_frames = 0
@@ -823,9 +882,9 @@ class Fort7Handler(BaseHandler):
                         if callable(self._reporter):
                             self._reporter(
                                 "stream",
-                                emitted,
-                                len(requested_order),
-                                "Streaming fort.7 frames",
+                                index_work + emitted,
+                                total_work,
+                                "Reading fort.7 frames",
                             )
                         yield output
                 self._frame_cache_stats = {
@@ -839,10 +898,9 @@ class Fort7Handler(BaseHandler):
                 if callable(self._reporter):
                     self._reporter(
                         "stream",
-                        len(requested_order),
-                        len(requested_order),
-                        f"fort.7 frame cache: {len(initially_available)} hit, "
-                        f"{len(requested_order) - len(initially_available)} miss",
+                        total_work,
+                        total_work,
+                        "Read fort.7 frames",
                     )
                 return
         requested = set(self._frame_indices) if self._frame_indices is not None else None

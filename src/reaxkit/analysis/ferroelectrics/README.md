@@ -242,6 +242,12 @@ The command writes one row per selected center to
 `basal_plane_local_polarization.csv`, including the source dipole, assigned
 volume, and x, y, and z polarization components.
 
+The basal-plane dipole, binned-polarization, and local-polarization commands
+also write a compact `*_poled_counts.csv`. It has one x, y, and z row per
+frame with the iteration, time, total entry count, positive (poled-up) count,
+negative (poled-down) count, and their percentages. Zero and unavailable
+values remain in the total count but are neither poled up nor poled down.
+
 The default combination is `--local-volume-method equal --volume-method hull`.
 The convex hull is calculated from occupied atomic coordinates and therefore
 excludes empty slab vacuum before it is divided among valid centers. `bbox`
@@ -394,6 +400,8 @@ formal charge supplied with `--formal-charge B=...`, or when ReaxFF charges are
 selected. The per-atom dipole components are written to
 `hbn_reference_displacements.csv`. The x, y, z, and c-projected dipole and
 polarization components in `hbn_reference_polarization.csv` are their sums.
+`hbn_reference_polarization_poled_counts.csv` reports the sign of each total
+Cartesian component for every frame with its iteration and time.
 With equal and
 opposite cation and anion charges, this all-ion sum is equivalent to a
 relative cation-anion sublattice displacement, and a common rigid translation
@@ -539,6 +547,10 @@ Local polarization divides each selected local dipole by a local volume:
   relative volume weight. The weights are normalized so that all local volumes
   add to the selected frame volume. Rank-deficient local fits fall back to the
   median valid weight, or an equal weight if none is valid.
+
+`hbn_reference_local_polarization_poled_counts.csv` counts positive and
+negative local x, y, and z polarization values for the selected cell or layer
+grouping. It includes frame, iteration, time, total count, and percentages.
 
 The frame volume still comes from `--volume-method`. Its default is `hull`, so
 empty slab vacuum is excluded before the volume is split among cells. Select

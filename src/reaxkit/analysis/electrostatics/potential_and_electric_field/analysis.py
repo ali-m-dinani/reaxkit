@@ -12,7 +12,7 @@ from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ElectrostaticsData
+from reaxkit.domain.data_models import ElectricFieldData, ElectrostaticsData
 from reaxkit.presentation.specs import PresentationSpec
 
 from .calculation import calculate_frame, reaxff_cell_matrix
@@ -37,6 +37,8 @@ class PotentialElectricFieldRequest(BaseRequest):
     field_method: str = "analytic"
     field_step: float = 0.001
     disable_taper: bool = False
+    potential_reference_mode: str = "frame-midpoint"
+    potential_reference_position: Optional[Sequence[float]] = None
 
 
 @dataclass
@@ -95,25 +97,90 @@ def _parameters(request: PotentialElectricFieldRequest) -> ReaxFFCoulombParamete
                                    request.gamma_by_symbol, request.parameter_source)
 
 
-def _probe_rows(base: dict[str, np.ndarray], probe: str, potential: np.ndarray,
-                electric_field: np.ndarray) -> pd.DataFrame:
-    magnitude = np.linalg.norm(electric_field, axis=1)
-    return pd.DataFrame({
+def material_midpoint(positions: np.ndarray) -> np.ndarray:
+    """Return the center of the occupied Cartesian bounding box."""
+    xyz = np.asarray(positions, dtype=float)
+    if xyz.ndim != 2 or xyz.shape[1] != 3 or not len(xyz) or not np.isfinite(xyz).all():
+        raise ValueError("Finite atom positions with shape (atoms, 3) are required for the material midpoint.")
+    return (np.min(xyz, axis=0) + np.max(xyz, axis=0)) / 2.0
+
+
+def _external_field_at_iteration(field_data: ElectricFieldData | None, iteration: int,
+                                 source_frame: int) -> np.ndarray:
+    if field_data is None:
+        raise ValueError("Local electrostatics requires an externally applied electric field, usually from fort.78.")
+    values = np.asarray(field_data.applied_field_values, dtype=float)
+    components = tuple(str(value) for value in field_data.applied_field_components)
+    if values.ndim == 1:
+        values = values[:, None]
+    if values.ndim != 2 or not len(values) or values.shape[1] != len(components):
+        raise ValueError("Applied electric-field values and component labels are missing or inconsistent.")
+    if not any(name in components for name in ("field_x", "field_y", "field_z")):
+        raise ValueError("Applied electric-field data contains none of field_x, field_y, or field_z.")
+    if field_data.sampled_field_iterations is None:
+        row = int(source_frame)
+        if row >= len(values):
+            raise ValueError(f"No applied electric-field sample exists for frame {source_frame}.")
+    else:
+        sampled = np.asarray(field_data.sampled_field_iterations, dtype=int).reshape(-1)
+        matches = np.flatnonzero(sampled == int(iteration))
+        if not len(matches):
+            raise ValueError(f"No applied electric-field sample exists for iteration {iteration}.")
+        row = int(matches[-1])
+    output = np.zeros(3, dtype=float)
+    for axis, name in enumerate(("field_x", "field_y", "field_z")):
+        if name in components:
+            output[axis] = values[row, components.index(name)]
+    if not np.isfinite(output).all():
+        raise ValueError(f"Applied electric-field components are not finite at iteration {iteration}.")
+    return output
+
+
+def _reference_position(request: PotentialElectricFieldRequest, positions: np.ndarray,
+                        fixed_midpoint: np.ndarray | None) -> np.ndarray:
+    mode = str(request.potential_reference_mode).strip().lower()
+    if mode not in {"frame-midpoint", "fixed-midpoint"}:
+        raise ValueError("potential_reference_mode must be 'frame-midpoint' or 'fixed-midpoint'.")
+    if request.potential_reference_position is not None:
+        reference = np.asarray(request.potential_reference_position, dtype=float)
+        if reference.shape != (3,) or not np.isfinite(reference).all():
+            raise ValueError("potential_reference_position must contain three finite Cartesian coordinates.")
+        return reference
+    if mode == "fixed-midpoint" and fixed_midpoint is not None:
+        return np.asarray(fixed_midpoint, dtype=float)
+    return material_midpoint(positions)
+
+
+def _probe_rows(base: dict[str, np.ndarray], probe: str, internal_potential: np.ndarray,
+                internal_field: np.ndarray, external_field: np.ndarray,
+                reference: np.ndarray) -> pd.DataFrame:
+    external_field_rows = np.broadcast_to(np.asarray(external_field, dtype=float), internal_field.shape)
+    external_potential = -(base["xyz"] - reference) @ external_field
+    total_potential = internal_potential + external_potential
+    total_field = internal_field + external_field_rows
+    output: dict[str, object] = {
         "frame_index": base["frame_index"], "iter": base["iter"],
         "atom_index": base["atom_index"], "atom_id": base["atom_id"],
         "atom_element": base["atom_element"], "x (angstrom)": base["x"],
         "y (angstrom)": base["y"], "z (angstrom)": base["z"],
         "charge (e)": base["charge"], "probe_element": probe,
-        "potential (V)": potential,
-        "electric_field_x (V/angstrom)": electric_field[:, 0],
-        "electric_field_y (V/angstrom)": electric_field[:, 1],
-        "electric_field_z (V/angstrom)": electric_field[:, 2],
-        "electric_field_magnitude (V/angstrom)": magnitude,
-        "electric_field_x (MV/cm)": electric_field[:, 0] * V_PER_ANGSTROM_TO_MV_PER_CM,
-        "electric_field_y (MV/cm)": electric_field[:, 1] * V_PER_ANGSTROM_TO_MV_PER_CM,
-        "electric_field_z (MV/cm)": electric_field[:, 2] * V_PER_ANGSTROM_TO_MV_PER_CM,
-        "electric_field_magnitude (MV/cm)": magnitude * V_PER_ANGSTROM_TO_MV_PER_CM,
-    })
+        "potential_reference_x (angstrom)": reference[0],
+        "potential_reference_y (angstrom)": reference[1],
+        "potential_reference_z (angstrom)": reference[2],
+        "internal_potential (V)": internal_potential,
+        "external_potential (V)": external_potential,
+        "total_local_potential (V)": total_potential,
+    }
+    for label, values in (("internal", internal_field), ("external", external_field_rows),
+                          ("total_local", total_field)):
+        magnitude = np.linalg.norm(values, axis=1)
+        for axis, index in zip("xyz", range(3)):
+            output[f"{label}_electric_field_{axis} (V/angstrom)"] = values[:, index]
+        output[f"{label}_electric_field_magnitude (V/angstrom)"] = magnitude
+        for axis, index in zip("xyz", range(3)):
+            output[f"{label}_electric_field_{axis} (MV/cm)"] = values[:, index] * V_PER_ANGSTROM_TO_MV_PER_CM
+        output[f"{label}_electric_field_magnitude (MV/cm)"] = magnitude * V_PER_ANGSTROM_TO_MV_PER_CM
+    return pd.DataFrame(output)
 
 
 def calculate_potential_and_field(data: ElectrostaticsData, request: PotentialElectricFieldRequest,
@@ -136,6 +203,7 @@ def calculate_potential_and_field(data: ElectrostaticsData, request: PotentialEl
     output_frames: list[int] = []
     iterations: list[int] = []
     resolved_probes: tuple[str, ...] | None = None
+    fixed_midpoint: np.ndarray | None = None
     for frame in selected:
         xyz, labels = positions[frame], _labels(trajectory, frame)
         valid = np.isfinite(xyz).all(axis=1) & np.isfinite(charges[frame]) & np.asarray([bool(str(v).strip()) for v in labels])
@@ -152,10 +220,16 @@ def calculate_potential_and_field(data: ElectrostaticsData, request: PotentialEl
                                  field_step=float(request.field_step), disable_taper=bool(request.disable_taper))
         source = _source_frame(trajectory, frame) if preserve_source_indices else frame
         iteration = _iteration(trajectory, frame)
+        external_field = _external_field_at_iteration(data.electric_field, iteration, source)
+        if (str(request.potential_reference_mode).strip().lower() == "fixed-midpoint"
+                and request.potential_reference_position is None and fixed_midpoint is None):
+            fixed_midpoint = material_midpoint(xyz[valid])
+        reference = _reference_position(request, xyz[valid], fixed_midpoint)
         ids = np.asarray(trajectory.atom_ids, dtype=int)[valid]
         base = {"frame_index": np.full(len(indices), source), "iter": np.full(len(indices), iteration),
                 "atom_index": indices, "atom_id": ids, "atom_element": np.asarray(frame_labels),
-                "x": xyz[valid, 0], "y": xyz[valid, 1], "z": xyz[valid, 2], "charge": charges[frame, valid]}
+                "x": xyz[valid, 0], "y": xyz[valid, 1], "z": xyz[valid, 2], "xyz": xyz[valid],
+                "charge": charges[frame, valid]}
         coulomb_frames.append(pd.DataFrame({
             "frame_index": base["frame_index"], "iter": base["iter"], "atom_index": indices,
             "atom_id": ids, "atom_element": frame_labels, "x (angstrom)": base["x"],
@@ -164,7 +238,9 @@ def calculate_potential_and_field(data: ElectrostaticsData, request: PotentialEl
         }))
         for probe_index, probe in enumerate(resolved_probes):
             probe_tables.setdefault(probe, []).append(_probe_rows(base, probe,
-                result.probe_potential_v[probe_index], result.probe_field_v_per_angstrom[probe_index]))
+                result.internal_probe_potential_v[probe_index],
+                result.internal_probe_field_v_per_angstrom[probe_index],
+                external_field, reference))
         totals.append({"frame_index": source, "iter": iteration,
                        "coulomb (kcal/mol)": result.total_coulomb_kcal_per_mol,
                        "distinct_interactions": result.distinct_interactions,
@@ -202,11 +278,11 @@ def combine_results(results: Sequence[PotentialElectricFieldResult], request) ->
 class PotentialElectricFieldTask(AnalysisTask):
     required_data = ElectrostaticsData
     supports_selective_streaming = True
-    VERSION = "1"
+    VERSION = "2"
 
     @staticmethod
     def required_data_fields_for(_request, _args) -> tuple[str, ...]:
-        return ("trajectory", "charges")
+        return ("trajectory", "charges", "electric_field")
 
     @staticmethod
     def recommended_presentations(_result, _payload: dict[str, Any]) -> list[PresentationSpec]:
@@ -218,21 +294,36 @@ class PotentialElectricFieldTask(AnalysisTask):
 
     def run_stream(self, frames, request, reporter=None):
         requested = None if request.frames is None else set(int(value) for value in request.frames[::int(request.every)])
+        progress_total = len(requested) if requested is not None else 0
         results, seen = [], set()
+        fixed_reference = (None if request.potential_reference_position is None
+                           else tuple(request.potential_reference_position))
         for count, data in enumerate(frames, start=1):
             trajectory = data.trajectory
             source = _source_frame(trajectory, 0)
             seen.add(source)
             keep = source in requested if requested is not None else source % int(request.every) == 0
             if keep:
-                local_request = PotentialElectricFieldRequest(**{**vars(request), "frames": [0], "every": 1})
+                request_values = {**vars(request), "frames": [0], "every": 1}
+                if str(request.potential_reference_mode).strip().lower() == "fixed-midpoint":
+                    if fixed_reference is None:
+                        valid = np.isfinite(trajectory.positions[0]).all(axis=1)
+                        fixed_reference = tuple(material_midpoint(trajectory.positions[0][valid]))
+                    request_values["potential_reference_position"] = fixed_reference
+                    request_values["potential_reference_mode"] = "fixed-midpoint"
+                local_request = PotentialElectricFieldRequest(**request_values)
                 results.append(calculate_potential_and_field(data, local_request, preserve_source_indices=True))
             if callable(reporter):
-                reporter("stream", count, 0, "Calculating ReaxFF potential and electric field")
+                reporter(
+                    "stream",
+                    count,
+                    progress_total,
+                    "Calculating ReaxFF potential and electric field",
+                )
         if requested is not None and requested - seen:
             raise ValueError(f"Requested frame(s) not found: {sorted(requested - seen)}.")
         return combine_results(results, request)
 
 
 __all__ = ["PotentialElectricFieldRequest", "PotentialElectricFieldResult", "PotentialElectricFieldTask",
-           "calculate_potential_and_field", "combine_results"]
+           "calculate_potential_and_field", "combine_results", "material_midpoint"]

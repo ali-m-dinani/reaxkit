@@ -41,6 +41,7 @@ from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     cell_matrix_from_lengths_angles,
     required_wurtzite_data_type,
 )
+from reaxkit.analysis.ferroelectrics.poled_counts import directional_poled_counts
 from reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarization import (
     VolumeMethod,
     _bbox_volume,
@@ -129,6 +130,7 @@ class HBNReferencePolarizationResult(BaseResult):
     table: pd.DataFrame
     request: HBNReferencePolarizationRequest
     displacements: pd.DataFrame
+    poled_counts: pd.DataFrame
     mapping: pd.DataFrame
     reference: PreparedHBNReference
     frame_indices: np.ndarray
@@ -139,6 +141,7 @@ class HBNReferencePolarizationResult(BaseResult):
         return {
             "hbn_reference_polarization": self.table,
             "hbn_reference_displacements": self.displacements,
+            "hbn_reference_polarization_poled_counts": self.poled_counts,
             "hbn_reference_mapping": self.mapping,
         }
 
@@ -721,6 +724,7 @@ def _formal_charge_map(values: Mapping[str, float]) -> dict[str, float]:
 def calculate_hbn_reference_polarization(
         data: TrajectoryData | ElectrostaticsData,
         request: HBNReferencePolarizationRequest,
+        reporter=None,
 ) -> HBNReferencePolarizationResult:
     """Calculate longitudinal dipole and polarization for selected frames."""
 
@@ -741,8 +745,12 @@ def calculate_hbn_reference_polarization(
     ):
         raise ValueError("Per-atom charges must match the trajectory frame and atom counts.")
 
-    prepared = prepare_hbn_reference(trajectory, request)
     selected = _selected_frames(trajectory, request)
+    total_frames = len(selected)
+    if callable(reporter):
+        reporter("analyze", 0, total_frames, "Analyzing polarization frames")
+
+    prepared = prepare_hbn_reference(trajectory, request)
     periodic = _periodic_axes(request.periodic)
     c_hat = _unit_vector(request.c_axis, "c_axis")
     formal = _formal_charge_map(request.formal_charges)
@@ -772,7 +780,7 @@ def calculate_hbn_reference_polarization(
                 f"{', '.join(missing)}. Supply each value with --formal-charge ELEMENT=CHARGE."
             )
 
-    for frame in selected:
+    for completed, frame in enumerate(selected, start=1):
         xyz = positions[frame]
         if not np.isfinite(xyz).all():
             raise ValueError(f"Frame {frame} contains non-finite coordinates.")
@@ -884,6 +892,13 @@ def calculate_hbn_reference_polarization(
             frame_columns[f"dipole_{axis} (e*angstrom)"] = dipole[:, component]
             frame_columns[f"dipole_{axis} (debye)"] = dipole[:, component] * debye_factor
         displacement_tables.append(pd.DataFrame(frame_columns))
+        if callable(reporter):
+            reporter(
+                "analyze",
+                completed,
+                total_frames,
+                "Analyzing polarization frames",
+            )
 
     base_labels = _frame_labels(trajectory, int(request.reference_frame))
     mapping_columns: dict[str, object] = {
@@ -899,10 +914,17 @@ def calculate_hbn_reference_polarization(
         mapping_columns[f"reference_{axis} (angstrom)"] = prepared.aligned_positions[
             assignment, component
         ]
+    table = pd.DataFrame(summary_rows)
+    poled_counts = directional_poled_counts(
+        table,
+        trajectory,
+        {axis: f"P_{axis} (uC/cm^2)" for axis in "xyz"},
+    )
     return HBNReferencePolarizationResult(
-        table=pd.DataFrame(summary_rows),
+        table=table,
         request=request,
         displacements=pd.concat(displacement_tables, ignore_index=True),
+        poled_counts=poled_counts,
         mapping=pd.DataFrame(mapping_columns),
         reference=prepared,
         frame_indices=np.asarray(selected, dtype=int),
@@ -930,7 +952,7 @@ class HBNReferencePolarizationTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "6"
+    VERSION = "7"
 
     def required_data_for(
             self, request: HBNReferencePolarizationRequest, args: dict | None = None
@@ -964,8 +986,7 @@ class HBNReferencePolarizationTask(AnalysisTask):
             request: HBNReferencePolarizationRequest,
             reporter=None,
     ) -> HBNReferencePolarizationResult:
-        _ = reporter
-        return calculate_hbn_reference_polarization(data, request)
+        return calculate_hbn_reference_polarization(data, request, reporter=reporter)
 
 
 __all__ = [

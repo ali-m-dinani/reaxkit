@@ -6,7 +6,29 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.storage.storage_layout import normalize_storage_args
 from reaxkit.domain.data_models import TrajectoryData
+
+
+def test_executor_announces_result_saving_after_computation(capsys):
+    result = AnalysisExecutor._ready_for_result_saving(
+        "payload",
+        {"progress": True},
+    )
+
+    assert result == "payload"
+    assert capsys.readouterr().out == (
+        "[ReaxKit] Computation complete; saving result files...\n"
+    )
+
+
+def test_executor_suppresses_result_saving_message_in_quiet_mode(capsys):
+    AnalysisExecutor._ready_for_result_saving(
+        "payload",
+        {"progress": True, "quiet": True},
+    )
+
+    assert capsys.readouterr().out == ""
 
 
 def test_engine_detection_path_prefers_explicit_input_over_snapshot_source():
@@ -39,6 +61,27 @@ def test_engine_detection_path_ignores_storage_synthesized_input():
     }
 
     assert AnalysisExecutor._engine_detection_path(args) == "run_directory"
+
+
+def test_engine_detection_path_ignores_storage_synthesized_default_file_hints(
+        tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "xmolout").write_text("trajectory", encoding="utf-8")
+
+    args = normalize_storage_args(
+        {
+            "input": ".",
+            "run_dir": ".",
+            "xmolout": "xmolout",
+            "fort7": "fort.7",
+            "project_root": str(tmp_path / "workspace"),
+        },
+        snapshot=False,
+    )
+
+    assert args["_xmolout_was_explicit"] is False
+    assert AnalysisExecutor._engine_detection_path(args) == "."
 
 
 @dataclass

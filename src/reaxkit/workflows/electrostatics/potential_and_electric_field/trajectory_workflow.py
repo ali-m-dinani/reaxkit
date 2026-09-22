@@ -25,12 +25,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     if command not in (*ALL_COMMANDS, *ALL_LEGACY_COMMANDS): raise KeyError(command)
     parser.set_defaults(command=COMMAND, progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
-    parser.description = """Write an Extended XYZ trajectory with local ReaxFF potential and electric-field atom properties.
+    parser.description = """Write an Extended XYZ trajectory with internal, external, and total local electrostatic properties.
 
 Use this command when local electrostatic values must remain aligned with atom species,
 coordinates, charges, frame indices, and iterations for OVITO or another trajectory tool.
-Each frame includes equal-probe-average vectors and separate properties for every selected
-+1e probe species. The command calculates and exports data; it does not run ReaxFF.
+Each frame includes internal, external, and total local values, plus separate internal
+and total values for every selected +1e probe species. Applied fields come from fort.78.
+The command calculates and exports data; it does not run ReaxFF.
 
 Examples:
   1. Write every twentieth frame with automatically detected probe species:

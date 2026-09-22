@@ -18,9 +18,8 @@ from tqdm.auto import tqdm
 
 ProgressReporter = Callable[[str, int, int, str | None], None]
 
-_INDETERMINATE_STEPS = 24
 _INDETERMINATE_INTERVAL_SECONDS = 0.15
-_INDETERMINATE_BAR_FORMAT = "{desc}: |{bar}| [{elapsed}, working]"
+_INDETERMINATE_BAR_FORMAT = "{desc} [{elapsed}, working]"
 
 
 class ProgressOperation:
@@ -202,7 +201,7 @@ def tqdm_reporter_factory() -> ProgressReporter:
             stop.set()
 
     def _start_animation(key: str, bar: tqdm) -> None:
-        """Animate a bounded working bar until a real total becomes available."""
+        """Refresh elapsed time without implying measurable completion."""
         stop = Event()
         animations[key] = stop
 
@@ -211,9 +210,6 @@ def tqdm_reporter_factory() -> ProgressReporter:
                 with lock:
                     if stop.is_set() or bars.get(key) is not bar:
                         return
-                    if int(bar.n) >= _INDETERMINATE_STEPS:
-                        bar.reset(total=_INDETERMINATE_STEPS)
-                    bar.update(1)
                     bar.refresh()
 
         Thread(
@@ -239,9 +235,11 @@ def tqdm_reporter_factory() -> ProgressReporter:
             if key not in bars:
                 indeterminate = tot <= 0
                 bars[key] = tqdm(
-                    total=_INDETERMINATE_STEPS if indeterminate else tot,
+                    total=None if indeterminate else tot,
                     desc=desc,
                     unit="step",
+                    # Retain completed phases so users can review loader,
+                    # analysis, and output timings after the command finishes.
                     leave=True,
                     mininterval=0.2,
                     # ASCII avoids mojibake in HPC terminals whose display path does
@@ -258,6 +256,8 @@ def tqdm_reporter_factory() -> ProgressReporter:
                     _start_animation(key, bars[key])
             bar = bars[key]
             bar.set_description_str(desc)
+            if hasattr(bar, "unit"):
+                bar.unit = "frame" if "frame" in msg.lower() else "step"
 
             if tot > 0 and key in animations:
                 _stop_animation(key)

@@ -414,13 +414,47 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
     """
     required_fields = {str(field) for field in args.get("_required_data_fields", ())}
     load_all_fields = not required_fields
-
-    trajectory = adapter.load_trajectory(args, reporter=reporter)
     needs_connectivity = load_all_fields or "connectivity" in required_fields
+    selected_frames = tuple(args.get("_frame_indices") or ())
+    per_file_progress = bool(selected_frames) and callable(reporter)
+
+    def _file_reporter(source_name: str, label: str):
+        if not per_file_progress:
+            return reporter
+
+        def _report(stage: str, current: int, total: int, message: str | None = None) -> None:
+            # Each input owns one sequential bar. Nested summary scans are
+            # implementation details and must not reset the file-frame total.
+            if source_name not in str(message or "").lower():
+                return
+            reporter(
+                f"load {label}",
+                current,
+                total,
+                f"Reading {label} frames",
+            )
+
+        return _report
+
+    if per_file_progress:
+        # Close the adapter's generic indeterminate load operation before the
+        # two concrete file bars begin.
+        reporter("load", 1, 1, "Preparing input files")
+
+    trajectory = adapter.load_trajectory(
+        args,
+        reporter=_file_reporter("xmolout", "xmolout"),
+    )
     charge_args = args if needs_connectivity else {**args, "_quick_charge_only": True}
-    charges = adapter.load_charges(charge_args, reporter=reporter)
+    charges = adapter.load_charges(
+        charge_args,
+        reporter=_file_reporter("fort.7", "fort.7"),
+    )
     connectivity = (
-        adapter.load_connectivity(args, reporter=reporter)
+        adapter.load_connectivity(
+            args,
+            reporter=_file_reporter("fort.7", "fort.7 connectivity"),
+        )
         if needs_connectivity
         else None
     )
@@ -430,7 +464,10 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
         fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
         if command == "hyst" or fort78_path.exists():
             try:
-                electric_field = adapter.load_electric_field(args, reporter=reporter)
+                electric_field = adapter.load_electric_field(
+                    args,
+                    reporter=None if per_file_progress else reporter,
+                )
             except FileNotFoundError:
                 if command == "hyst":
                     raise

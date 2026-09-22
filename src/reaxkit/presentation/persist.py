@@ -61,8 +61,13 @@ def _write_csvs(out_dir: Path, result: Any) -> list[str]:
     written: list[str] = []
     for raw_path in getattr(result, "prewritten_csvs", ()) or ():
         path = Path(str(raw_path))
-        if path.is_file() and path.parent.resolve() == out_dir.resolve():
-            written.append(path.name)
+        if path.is_file():
+            try:
+                written.append(str(path.resolve().relative_to(out_dir.resolve())))
+            except ValueError:
+                pass
+    if getattr(result, "skip_automatic_csv_persistence", False):
+        return written
     if not frames:
         return written
     if set(frames.keys()) == {"table"}:

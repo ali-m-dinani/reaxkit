@@ -18,6 +18,8 @@ from .physics import (
 )
 
 MIN_DISTANCE = 0.001
+TARGET_BATCH_SIZE = 1024
+MAX_ALL_PAIRS_PER_BATCH = 1_000_000
 
 
 @dataclass
@@ -25,8 +27,8 @@ class FrameElectrostatics:
     per_atom_coulomb_kcal_per_mol: np.ndarray
     total_coulomb_kcal_per_mol: float
     probe_labels: tuple[str, ...]
-    probe_potential_v: np.ndarray
-    probe_field_v_per_angstrom: np.ndarray
+    internal_probe_potential_v: np.ndarray
+    internal_probe_field_v_per_angstrom: np.ndarray
     distinct_interactions: int
     self_image_interactions: int
 
@@ -114,6 +116,31 @@ def _kernel_gradient(vectors: np.ndarray, gamma_i, gamma_j, parameters, method: 
     return gradient
 
 
+def _probe_kernels_and_radial_factors(vectors: np.ndarray, probe_gammas: np.ndarray,
+                                      source_gammas: np.ndarray, parameters,
+                                      disable_taper: bool) -> tuple[np.ndarray, np.ndarray]:
+    """Evaluate all analytic probe kernels with one distance/taper calculation."""
+    distances = np.linalg.norm(vectors, axis=1)
+    accepted = distances >= MIN_DISTANCE
+    if not disable_taper:
+        accepted &= distances <= parameters.upper_taper_radius
+    kernels = np.zeros((len(probe_gammas), len(distances)), dtype=float)
+    radial_factors = np.zeros_like(kernels)
+    if not np.any(accepted):
+        return kernels, radial_factors
+    r = distances[accepted]
+    gi = np.asarray(probe_gammas, dtype=float)[:, None]
+    gj = np.asarray(source_gammas, dtype=float)[accepted][None, :]
+    taper = np.ones_like(r) if disable_taper else evaluate_taper(r, parameters.taper_coefficients)
+    dtaper = np.zeros_like(r) if disable_taper else evaluate_taper_derivative(r, parameters.taper_coefficients)
+    kernels[:, accepted] = shielded_kernel(r[None, :], gi, gj, taper[None, :])
+    radial = shielded_kernel_radial_derivative(
+        r[None, :], gi, gj, taper[None, :], dtaper[None, :],
+    )
+    radial_factors[:, accepted] = radial / r[None, :]
+    return kernels, radial_factors
+
+
 def _masked_kernel(vectors: np.ndarray, gamma_i, gamma_j, parameters, disable_taper: bool) -> np.ndarray:
     distances = np.linalg.norm(vectors, axis=1)
     accepted = distances >= MIN_DISTANCE
@@ -127,6 +154,39 @@ def _masked_kernel(vectors: np.ndarray, gamma_i, gamma_j, parameters, disable_ta
         taper = np.ones_like(r) if disable_taper else evaluate_taper(r, parameters.taper_coefficients)
         output[accepted] = shielded_kernel(r, gi, gj, taper)
     return output
+
+
+def _tree_pairs(tree, xyz: np.ndarray, targets: np.ndarray, translation: np.ndarray,
+                cutoff: float, *, translation_sign: float) -> tuple[np.ndarray, np.ndarray]:
+    """Flatten neighbor lists into aligned target/source index arrays."""
+    neighborhoods = tree.query_ball_point(
+        xyz[targets] + translation_sign * translation, cutoff,
+        workers=-1 if len(xyz) >= 1000 else 1,
+    )
+    counts = np.fromiter((len(values) for values in neighborhoods), dtype=np.int64,
+                         count=len(neighborhoods))
+    if not np.any(counts):
+        return np.empty(0, dtype=int), np.empty(0, dtype=int)
+    return np.repeat(targets, counts), np.concatenate(neighborhoods).astype(int, copy=False)
+
+
+def _all_pairs(targets: np.ndarray, atom_count: int) -> tuple[np.ndarray, np.ndarray]:
+    sources = np.tile(np.arange(atom_count, dtype=int), len(targets))
+    return np.repeat(targets, atom_count), sources
+
+
+def _self_image_kernel_sums(vectors: np.ndarray, gammas: np.ndarray,
+                            parameters) -> tuple[np.ndarray, int]:
+    distances = np.linalg.norm(vectors, axis=1)
+    accepted = ((distances >= MIN_DISTANCE)
+                & (distances <= parameters.upper_taper_radius))
+    if not np.any(accepted):
+        return np.zeros(len(gammas), dtype=float), 0
+    r = distances[accepted]
+    taper = evaluate_taper(r, parameters.taper_coefficients)
+    gamma = np.asarray(gammas, dtype=float)[:, None]
+    kernels = shielded_kernel(r[None, :], gamma, gamma, taper[None, :])
+    return kernels.sum(axis=1), int(len(gammas) * np.count_nonzero(accepted))
 
 
 def calculate_frame(
@@ -171,21 +231,22 @@ def calculate_frame(
         from scipy.spatial import cKDTree
         tree = cKDTree(xyz)
         for translation in translations:
-            for start in range(0, len(xyz), 1024):
-                js = np.arange(start, min(start + 1024, len(xyz)))
-                neighborhoods = tree.query_ball_point(xyz[js] - translation,
-                                                       parameters.upper_taper_radius)
-                for j, neighbors in zip(js.tolist(), neighborhoods):
-                    sources = np.asarray(neighbors, dtype=int)
-                    sources = sources[sources < j]
-                    if not len(sources):
-                        continue
-                    vectors = xyz[sources] - xyz[j] + translation
-                    kernels = _masked_kernel(vectors, gammas[sources], gammas[j], parameters, False)
-                    energies = q[sources] * q[j] * kernels
-                    per_atom[sources] += 0.5 * energies
-                    per_atom[j] += 0.5 * energies.sum()
-                    pair_count += int(np.count_nonzero(kernels))
+            for start in range(0, len(xyz), TARGET_BATCH_SIZE):
+                targets = np.arange(start, min(start + TARGET_BATCH_SIZE, len(xyz)))
+                pair_targets, sources = _tree_pairs(
+                    tree, xyz, targets, translation, parameters.upper_taper_radius,
+                    translation_sign=-1.0,
+                )
+                keep = sources < pair_targets
+                pair_targets, sources = pair_targets[keep], sources[keep]
+                if not len(sources):
+                    continue
+                vectors = xyz[sources] - xyz[pair_targets] + translation
+                kernels = _masked_kernel(vectors, gammas[sources], gammas[pair_targets], parameters, False)
+                energies = q[sources] * q[pair_targets] * kernels
+                per_atom += 0.5 * np.bincount(sources, weights=energies, minlength=len(xyz))
+                per_atom += 0.5 * np.bincount(pair_targets, weights=energies, minlength=len(xyz))
+                pair_count += int(np.count_nonzero(kernels))
     else:
         for i in range(max(0, len(xyz) - 1)):
             js = np.arange(i + 1, len(xyz))
@@ -199,10 +260,8 @@ def calculate_frame(
     if cell is not None and any(periodic) and not disable_taper:
         self_indices = _canonical_self_indices(indices)
         self_vectors = self_indices @ cell
-        for i in range(len(xyz)):
-            kernels = _masked_kernel(self_vectors, gammas[i], gammas[i], parameters, False)
-            per_atom[i] += q[i] ** 2 * kernels.sum()
-            self_count += int(np.count_nonzero(kernels))
+        kernel_sums, self_count = _self_image_kernel_sums(self_vectors, gammas, parameters)
+        per_atom += q ** 2 * kernel_sums
 
     probe_labels = tuple(str(value) for value in probe_elements)
     probe_gammas = parameters.gamma_values(probe_labels)
@@ -215,26 +274,49 @@ def calculate_frame(
         tree = cKDTree(xyz)
     for image_index, translation in enumerate(translations):
         zero = bool(np.all(indices[image_index] == 0))
-        for start in range(0, len(xyz), 1024):
-            targets = all_atoms[start:min(start + 1024, len(xyz))]
-            neighborhoods = (tree.query_ball_point(xyz[targets] + translation,
-                                                    parameters.upper_taper_radius)
-                             if tree is not None else [all_atoms] * len(targets))
-            for target, neighbors in zip(targets.tolist(), neighborhoods):
-                sources = np.asarray(neighbors, dtype=int)
-                if zero:
-                    sources = sources[sources != target]
-                if not len(sources):
-                    continue
-                vectors = xyz[target] - xyz[sources] + translation
-                if disable_taper:
-                    vectors = _minimum_image(vectors, cell, periodic)
-                for probe_index, probe_gamma in enumerate(probe_gammas):
+        batch_size = (TARGET_BATCH_SIZE if tree is not None else
+                      max(1, MAX_ALL_PAIRS_PER_BATCH // max(1, len(xyz))))
+        for start in range(0, len(xyz), batch_size):
+            targets = all_atoms[start:min(start + batch_size, len(xyz))]
+            if tree is not None:
+                pair_targets, sources = _tree_pairs(
+                    tree, xyz, targets, translation, parameters.upper_taper_radius,
+                    translation_sign=1.0,
+                )
+            else:
+                pair_targets, sources = _all_pairs(targets, len(xyz))
+            if zero:
+                keep = sources != pair_targets
+                pair_targets, sources = pair_targets[keep], sources[keep]
+            if not len(sources):
+                continue
+            vectors = xyz[pair_targets] - xyz[sources] + translation
+            if disable_taper:
+                vectors = _minimum_image(vectors, cell, periodic)
+            analytic_kernels = analytic_radial = None
+            if field_method == "analytic":
+                analytic_kernels, analytic_radial = _probe_kernels_and_radial_factors(
+                    vectors, probe_gammas, gammas[sources], parameters, disable_taper,
+                )
+            for probe_index, probe_gamma in enumerate(probe_gammas):
+                if analytic_kernels is None:
                     kernels = _masked_kernel(vectors, probe_gamma, gammas[sources], parameters, disable_taper)
-                    potential[probe_index, target] += np.sum(q[sources] * kernels)
                     gradient = _kernel_gradient(vectors, probe_gamma, gammas[sources], parameters,
                                                 field_method, field_step, disable_taper)
-                    field[probe_index, target] -= np.sum(q[sources, None] * gradient, axis=0)
+                    radial_factor = None
+                else:
+                    kernels = analytic_kernels[probe_index]
+                    radial_factor = analytic_radial[probe_index]
+                weighted_kernel = q[sources] * kernels
+                potential[probe_index] += np.bincount(
+                    pair_targets, weights=weighted_kernel, minlength=len(xyz),
+                )
+                for axis in range(3):
+                    field_weights = (q[sources] * gradient[:, axis] if radial_factor is None else
+                                     q[sources] * radial_factor * vectors[:, axis])
+                    field[probe_index, :, axis] -= np.bincount(
+                        pair_targets, weights=field_weights, minlength=len(xyz),
+                    )
     potential /= KCAL_PER_MOL_PER_EV
     field /= KCAL_PER_MOL_PER_EV
     return FrameElectrostatics(per_atom, float(per_atom.sum()), probe_labels, potential, field,

@@ -30,3 +30,18 @@ def test_cli_documentation_follows_workflow_rules(workflow, command):
             continue
         assert action.help, f"{action.option_strings} has no help text"
         assert action.help.count("Example:") == 1, action.option_strings
+
+
+def test_potential_field_parser_accepts_kymograph_controls():
+    parser = potential_and_electric_field_workflow.build_parser(
+        argparse.ArgumentParser(), command="get-potential-and-electric-field"
+    )
+    args = parser.parse_args([
+        "--bin-axes", "z", "--bins", "40", "--plot-kymograph",
+        "--kymograph-values", "external-potential", "total-local-field",
+        "--kymograph-time-axis", "iteration", "--plot-field-component", "z",
+    ])
+    assert args.bin_axes == "z"
+    assert args.plot_kymograph
+    assert args.kymograph_values == ["external-potential", "total-local-field"]
+    assert args.kymograph_time_axis == "iteration"

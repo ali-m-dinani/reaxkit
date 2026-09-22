@@ -28,6 +28,10 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
         help="Select the file containing frame-aligned atomic charges. Example: --fort7 ./run/fort.7, reads charges from that file.",
     )
     parser.add_argument(
+        "--fort78", default="fort.78",
+        help="Select the file containing the iteration-aligned applied electric field. Example: --fort78 ./run/fort.78, adds that external field to the reconstructed internal field.",
+    )
+    parser.add_argument(
         "--xmolout", default="xmolout",
         help="Select the coordinate and atom-label trajectory. Example: --xmolout ./run/xmolout, evaluates fields at coordinates in that trajectory.",
     )
@@ -71,6 +75,15 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--disable-taper", action="store_true",
                         help="Disable tapering and cutoff filtering. Example: --disable-taper, uses Tap(r)=1 and every listed atom once with minimum-image periodic displacements.")
+    parser.add_argument(
+        "--potential-reference-mode", choices=["frame-midpoint", "fixed-midpoint"],
+        default="frame-midpoint",
+        help="Choose the zero of external potential. Example: --potential-reference-mode fixed-midpoint, reuses the first selected frame's material midpoint as the zero.",
+    )
+    parser.add_argument(
+        "--potential-reference-position", nargs=3, type=float, default=None,
+        help="Set a fixed Cartesian potential-reference point in angstrom. Example: --potential-reference-position 0 0 25, uses that point instead of a calculated midpoint.",
+    )
     parser.add_argument(
         "--log", choices=["verbose", "quiet"], default="quiet",
         help="Choose console logging detail. Example: --log verbose, prints detailed loading and calculation progress.",
@@ -126,6 +139,9 @@ def request_kwargs(args) -> dict:
         "frames": None if open_stride is not None else parse_frame_indices(args.frames),
         "every": int(args.every) * (open_stride or 1), "field_method": str(args.field_method),
         "field_step": float(args.field_step), "disable_taper": bool(args.disable_taper),
+        "potential_reference_mode": str(args.potential_reference_mode),
+        "potential_reference_position": (None if args.potential_reference_position is None
+                                         else tuple(args.potential_reference_position)),
     }
 
 

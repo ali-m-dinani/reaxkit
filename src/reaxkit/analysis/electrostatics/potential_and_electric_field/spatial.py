@@ -44,10 +44,12 @@ def bin_probe_table(table: pd.DataFrame, axes: str, edges: Sequence[np.ndarray])
                for dim, edge in enumerate(edges)]
     linear = np.ravel_multi_index(indices, shape)
     work = table.copy(); work["_bin"] = linear
-    values = ["potential (V)", "electric_field_x (V/angstrom)", "electric_field_y (V/angstrom)",
-              "electric_field_z (V/angstrom)", "electric_field_magnitude (V/angstrom)",
-              "electric_field_x (MV/cm)", "electric_field_y (MV/cm)",
-              "electric_field_z (MV/cm)", "electric_field_magnitude (MV/cm)"]
+    values = [
+        *[f"{label}_potential (V)" for label in ("internal", "external", "total_local")],
+        *[f"{label}_electric_field_{component} ({unit})"
+          for label in ("internal", "external", "total_local")
+          for unit in ("V/angstrom", "MV/cm") for component in (*"xyz", "magnitude")],
+    ]
     grouped = work.groupby("_bin", sort=True)
     output = grouped[values].mean().reset_index()
     output.insert(1, "atom_count", grouped.size().to_numpy())
@@ -58,9 +60,12 @@ def bin_probe_table(table: pd.DataFrame, axes: str, edges: Sequence[np.ndarray])
         output[f"{axis}_lower (angstrom)"] = edge[idx]
         output[f"{axis}_center (angstrom)"] = (edge[idx] + edge[idx + 1]) / 2
         output[f"{axis}_upper (angstrom)"] = edge[idx + 1]
-    vector = output[[f"electric_field_{axis} (V/angstrom)" for axis in "xyz"]].to_numpy()
-    output["magnitude_of_average_field (V/angstrom)"] = np.linalg.norm(vector, axis=1)
-    output["magnitude_of_average_field (MV/cm)"] = output["magnitude_of_average_field (V/angstrom)"] * 100.0
+    for label in ("internal", "external", "total_local"):
+        vector = output[[f"{label}_electric_field_{axis} (V/angstrom)" for axis in "xyz"]].to_numpy()
+        output[f"magnitude_of_average_{label}_electric_field (V/angstrom)"] = np.linalg.norm(vector, axis=1)
+        output[f"magnitude_of_average_{label}_electric_field (MV/cm)"] = (
+            output[f"magnitude_of_average_{label}_electric_field (V/angstrom)"] * 100.0
+        )
     return output.drop(columns="_bin")
 
 
@@ -70,8 +75,9 @@ def plot_binned_frame(table: pd.DataFrame, axes: str, output: str | Path, *, com
     import matplotlib.pyplot as plt
     axes = normalize_axes(axes)
     suffix = "MV/cm" if units == "mv/cm" else "V/angstrom"
-    column = ("magnitude_of_average_field" if component == "magnitude" else
-              "electric_field_magnitude" if component == "mean-magnitude" else f"electric_field_{component}")
+    column = ("magnitude_of_average_total_local_electric_field" if component == "magnitude" else
+              "total_local_electric_field_magnitude" if component == "mean-magnitude" else
+              f"total_local_electric_field_{component}")
     value_column = f"{column} ({suffix})"
     path = Path(output); path.parent.mkdir(parents=True, exist_ok=True)
     figure = plt.figure(figsize=(8, 6))
@@ -98,4 +104,51 @@ def plot_binned_frame(table: pd.DataFrame, axes: str, output: str | Path, *, com
     return path
 
 
-__all__ = ["bin_probe_table", "global_edges", "normalize_axes", "plot_binned_frame"]
+def _center_edges(values: np.ndarray) -> np.ndarray:
+    centers = np.asarray(values, dtype=float)
+    if centers.ndim != 1 or not len(centers) or not np.isfinite(centers).all():
+        raise ValueError("Kymograph coordinates must be a non-empty finite 1D array.")
+    if len(centers) == 1:
+        return np.asarray([centers[0] - 0.5, centers[0] + 0.5])
+    differences = np.diff(centers)
+    if np.any(differences <= 0):
+        raise ValueError("Kymograph coordinates must be strictly increasing.")
+    middle = centers[:-1] + differences / 2.0
+    return np.concatenate(([centers[0] - differences[0] / 2.0], middle,
+                           [centers[-1] + differences[-1] / 2.0]))
+
+
+def plot_binned_kymograph(table: pd.DataFrame, axis_name: str, spatial_edges: np.ndarray,
+                          output: str | Path, *, value_column: str,
+                          time_column: str = "frame_index", title: str | None = None,
+                          cmap: str = "viridis", vmin: float | None = None,
+                          vmax: float | None = None, dpi: int = 180) -> Path:
+    """Plot one binned scalar versus frame/iteration and 1D spatial position."""
+    import matplotlib.pyplot as plt
+    axis_name = normalize_axes(axis_name)
+    if len(axis_name) != 1:
+        raise ValueError("Kymographs require exactly one bin axis.")
+    if time_column not in {"frame_index", "iter"}:
+        raise ValueError("Kymograph time_column must be frame_index or iter.")
+    if value_column not in table.columns:
+        raise KeyError(f"Kymograph value column {value_column!r} was not found.")
+    times = np.sort(table[time_column].dropna().unique().astype(float))
+    n_bins = len(spatial_edges) - 1
+    bin_indices = np.arange(n_bins, dtype=int)
+    values = (table.pivot_table(index=f"bin_{axis_name}_index", columns=time_column,
+                                values=value_column, aggfunc="mean")
+              .reindex(index=bin_indices, columns=times).to_numpy(dtype=float))
+    path = Path(output); path.parent.mkdir(parents=True, exist_ok=True)
+    figure, axis = plt.subplots(figsize=(9.0, 5.8))
+    image = axis.pcolormesh(_center_edges(times), np.asarray(spatial_edges, dtype=float), values,
+                            shading="flat", cmap=cmap, vmin=vmin, vmax=vmax)
+    axis.set_xlabel("source frame" if time_column == "frame_index" else "iteration")
+    axis.set_ylabel(f"{axis_name} (angstrom)")
+    axis.set_title(title or f"{value_column} kymograph along {axis_name}")
+    figure.colorbar(image, ax=axis).set_label(value_column)
+    figure.tight_layout(); figure.savefig(path, dpi=int(dpi), bbox_inches="tight"); plt.close(figure)
+    return path
+
+
+__all__ = ["bin_probe_table", "global_edges", "normalize_axes", "plot_binned_frame",
+           "plot_binned_kymograph"]

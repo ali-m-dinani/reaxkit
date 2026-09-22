@@ -23,6 +23,7 @@ from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _trajectory_and_charges,
     required_wurtzite_data_type,
 )
+from reaxkit.analysis.ferroelectrics.poled_counts import directional_poled_counts
 from reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarization import (
     VolumeMethod,
     _bbox_volume,
@@ -68,6 +69,7 @@ class BasalPlaneLocalPolarizationResult(BaseResult):
     table: pd.DataFrame
     request: BasalPlaneLocalPolarizationRequest
     summary: pd.DataFrame
+    poled_counts: pd.DataFrame
     dipole_result: BasalPlaneDipoleResult
     trajectory: TrajectoryData
     electric_field: ElectricFieldData | None
@@ -79,6 +81,7 @@ class BasalPlaneLocalPolarizationResult(BaseResult):
         return {
             "basal_plane_local_polarization": self.table,
             "basal_plane_local_polarization_summary": self.summary,
+            "basal_plane_local_polarization_poled_counts": self.poled_counts,
         }
 
 
@@ -231,10 +234,16 @@ def calculate_basal_plane_local_polarization(
             )
         summary_rows.append(row)
 
+    poled_counts = directional_poled_counts(
+        table,
+        trajectory,
+        {axis: f"P_{axis} (uC/cm^2)" for axis in "xyz"},
+    )
     return BasalPlaneLocalPolarizationResult(
         table=table,
         request=request,
         summary=pd.DataFrame(summary_rows),
+        poled_counts=poled_counts,
         dipole_result=dipoles,
         trajectory=trajectory,
         electric_field=electric_field,
@@ -252,7 +261,7 @@ class BasalPlaneLocalPolarizationTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = False
-    VERSION = "4"
+    VERSION = "5"
 
     def required_data_for(
         self, request: BasalPlaneLocalPolarizationRequest, args: dict | None = None

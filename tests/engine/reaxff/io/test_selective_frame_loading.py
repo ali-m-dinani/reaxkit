@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from reaxkit.domain.data_models import ChargeData
+from reaxkit.domain.data_models import ChargeData, ElectrostaticsData
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
@@ -177,6 +177,109 @@ def test_xmolout_reuses_partial_overlap_by_source_frame(tmp_path: Path):
     assert stats["hits"] == 4
     assert stats["misses"] == 4
     assert stats["parsed_frames"] == 4
+
+
+def test_xmolout_indexed_loading_reports_real_frame_progress(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(4), encoding="utf-8")
+    events: list[tuple[int, int, str]] = []
+
+    handler = XmoloutHandler(
+        path,
+        frame_indices=[0, 2, 3],
+        frame_cache_root=cache_root,
+        reporter=lambda _stage, current, total, message: events.append(
+            (current, total, str(message or ""))
+        ),
+    )
+    handler.dataframe()
+
+    frame_events = [event for event in events if event[1] == 7]
+    assert frame_events[0][0] == 0
+    assert frame_events[-1][0] == 7
+    assert [current for current, _, _ in frame_events] == sorted(
+        current for current, _, _ in frame_events
+    )
+    assert all("cache" not in message.lower() for _, _, message in frame_events)
+
+
+def test_fort7_charge_stream_reports_indexing_and_selected_frame_progress(
+        tmp_path: Path,
+) -> None:
+    path = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    path.write_text(_fort7(4), encoding="utf-8")
+    events: list[tuple[int, int, str]] = []
+
+    list(
+        Fort7Handler(
+            path,
+            frame_indices=[0, 2, 3],
+            frame_cache_root=cache_root,
+            reporter=lambda _stage, current, total, message: events.append(
+                (current, total, str(message or ""))
+            ),
+        ).stream_file_frames(charge_arrays_only=True)
+    )
+
+    frame_events = [event for event in events if event[1] == 7]
+    assert frame_events[0][0] == 0
+    assert frame_events[-1][0] == 7
+    assert [current for current, _, _ in frame_events] == sorted(
+        current for current, _, _ in frame_events
+    )
+    assert all("cache" not in message.lower() for _, _, message in frame_events)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "get-potential-and-electric-field",
+        "write-trajectory-with-potential-and-electric-field",
+    ],
+)
+def test_potential_field_streams_report_xmolout_and_fort7_separately(
+        tmp_path: Path,
+        monkeypatch,
+        command: str,
+) -> None:
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    xmolout.write_text(_xmolout(3), encoding="utf-8")
+    fort7.write_text(_fort7(3), encoding="utf-8")
+    monkeypatch.setenv("REAXKIT_FRAME_CACHE_DIR", str(tmp_path / "cache"))
+    events: list[tuple[str, int, int, str]] = []
+
+    frames = list(
+        ReaxFFAdapter().iter_data(
+            ElectrostaticsData,
+            {
+                "command": command,
+                "xmolout": str(xmolout),
+                "fort7": str(fort7),
+                "_frame_indices": [0, 2],
+                "scope": "total",
+            },
+            reporter=lambda stage, current, total, message=None: events.append(
+                (stage, current, total, str(message or ""))
+            ),
+        )
+    )
+
+    assert len(frames) == 2
+    assert ("stream", 1, 1, "Preparing electrostatics input streams") in events
+    for stage in ("load xmolout", "load fort.7"):
+        source_events = [event for event in events if event[0] == stage]
+        assert source_events[0][1:] == (
+            0,
+            5,
+            f"Reading {stage.removeprefix('load ')} frames",
+        )
+        assert source_events[-1][1] == source_events[-1][2] == 5
+        assert [current for _, current, _, _ in source_events] == sorted(
+            current for _, current, _, _ in source_events
+        )
 
 
 def test_xmolout_covered_misses_use_offsets_without_rescanning(tmp_path: Path):

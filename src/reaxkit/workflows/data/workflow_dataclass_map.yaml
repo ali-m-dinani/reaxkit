@@ -722,8 +722,8 @@ workflows:
     command: get-potential-and-electric-field
     command_kind: analysis
     analysis_task: get-potential-and-electric-field
-    description: Calculates ReaxFF shielded and tapered Coulomb energy, species-probe potential, and local
-      electric field at every atom location.
+    description: Calculates internal ReaxFF Coulomb electrostatics, externally applied electrostatics,
+      and their total local potential and electric field at every atom location.
     tags:
     - electrostatics
     - ReaxFF
@@ -765,7 +765,7 @@ workflows:
     command: write-trajectory-with-potential-and-electric-field
     command_kind: analysis
     analysis_task: write-trajectory-with-potential-and-electric-field
-    description: Writes an Extended XYZ trajectory with local ReaxFF potential and electric-field atom properties.
+    description: Writes an Extended XYZ trajectory with internal, external, and total local potential and electric-field atom properties.
     tags:
     - electrostatics
     - ReaxFF

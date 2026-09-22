@@ -35,6 +35,31 @@ STREAMABLE_REAXFF_TYPES = {
     ElectrostaticsData,
 }
 
+_SPLIT_ELECTROSTATICS_PROGRESS_COMMANDS = {
+    "get-potential-and-electric-field",
+    "get_potential_and_electric_field",
+    "write-trajectory-with-potential-and-electric-field",
+    "write_trajectory_with_potential_and_electric_field",
+}
+
+
+def _file_progress_reporter(reporter, *, source_name: str, stage_name: str):
+    """Give one streaming source its own user-facing progress stage."""
+    if not callable(reporter):
+        return reporter
+
+    def _report(_stage: str, current: int, total: int, message: str | None = None) -> None:
+        if source_name not in str(message or "").lower():
+            return
+        reporter(
+            stage_name,
+            current,
+            total,
+            f"Reading {source_name} frames",
+        )
+
+    return _report
+
 
 def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
     if "coordinates" in record:
@@ -231,6 +256,31 @@ def _aligned_records(
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
+    command = str(args.get("command") or "").strip().lower()
+    split_electrostatics_progress = (
+        data_type is ElectrostaticsData
+        and command in _SPLIT_ELECTROSTATICS_PROGRESS_COMMANDS
+    )
+    if split_electrostatics_progress and callable(reporter):
+        reporter("stream", 1, 1, "Preparing electrostatics input streams")
+    coordinate_reporter = (
+        _file_progress_reporter(
+            reporter,
+            source_name="xmolout",
+            stage_name="load xmolout",
+        )
+        if split_electrostatics_progress
+        else reporter
+    )
+    fort7_reporter = (
+        _file_progress_reporter(
+            reporter,
+            source_name="fort.7",
+            stage_name="load fort.7",
+        )
+        if split_electrostatics_progress
+        else None
+    )
     if data_type is ChargeData:
         fort7_path = adapter._resolve_reaxff_path(
             args, "fort7", "connectivity", "charges", default="fort.7"
@@ -255,7 +305,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     coordinate_records = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
-        reporter=reporter,
+        reporter=coordinate_reporter,
         input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
     ).stream_file_frames(coordinates_only=total_electrostatics)
 
@@ -277,7 +327,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         connectivity_records = iter_fort7_charge_frames(
             fort7_path,
             frame_indices=selected,
-            reporter=None,
+            reporter=fort7_reporter,
             include_atom_types=False,
             input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         )
@@ -285,7 +335,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
         connectivity_records = Fort7Handler(
             fort7_path,
             frame_indices=selected,
-            reporter=None,
+            reporter=fort7_reporter,
             input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ).stream_file_frames(
             charges_only=total_electrostatics,

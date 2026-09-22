@@ -3,6 +3,17 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole import (
+    calculate_basal_plane_dipoles,
+)
+from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization import (
+    BasalPlaneLocalPolarizationRequest,
+    calculate_basal_plane_local_polarization,
+)
+from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization import (
+    BasalPlanePolarizationRequest,
+    calculate_basal_plane_polarization,
+)
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity import (
     BasalPlaneProjectedPolarityRequest,
     calculate_basal_plane_projected_polarity,
@@ -111,3 +122,39 @@ def test_profile_axis_must_belong_to_projection_plane() -> None:
 
     with pytest.raises(ValueError, match="projection-plane axes"):
         calculate_basal_plane_projected_polarity(_trajectory(), request)
+
+
+def test_basal_plane_outputs_register_directional_poled_count_csvs() -> None:
+    trajectory = _trajectory()
+    request_values = {
+        "periodic": (False, False, False),
+        "charge_source": "formal",
+        "formal_charges": {"Al": 3.0, "N": -3.0},
+    }
+
+    dipole = calculate_basal_plane_dipoles(
+        trajectory, BasalPlanePolarizationRequest(**request_values)
+    )
+    polarization = calculate_basal_plane_polarization(
+        trajectory,
+        BasalPlanePolarizationRequest(
+            **request_values, volume_method="bbox", bins_x=1, bins_y=1, bins_z=1
+        ),
+    )
+    local = calculate_basal_plane_local_polarization(
+        trajectory,
+        BasalPlaneLocalPolarizationRequest(
+            **request_values, volume_method="bbox", local_volume_method="equal"
+        ),
+    )
+
+    assert "basal_plane_dipole_poled_counts" in dipole.csv_tables
+    assert "basal_plane_polarization_poled_counts" in polarization.csv_tables
+    assert "basal_plane_local_polarization_poled_counts" in local.csv_tables
+    first_z = dipole.poled_counts.query("frame == 0 and direction == 'z'").iloc[0]
+    second_z = dipole.poled_counts.query("frame == 1 and direction == 'z'").iloc[0]
+    assert first_z["count_poled_up"] == 1
+    assert first_z["count_poled_down"] == 1
+    assert first_z["count_all"] == 2
+    assert second_z["count_poled_up"] == 0
+    assert second_z["count_poled_down"] == 2

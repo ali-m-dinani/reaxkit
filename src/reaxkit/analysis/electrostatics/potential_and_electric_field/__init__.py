@@ -5,10 +5,11 @@ from .analysis import (
     PotentialElectricFieldResult,
     PotentialElectricFieldTask,
     calculate_potential_and_field,
+    material_midpoint,
 )
 from .calculation import FrameElectrostatics, calculate_frame, reaxff_cell_matrix
 from .parameters import ReaxFFCoulombParameters
-from .spatial import bin_probe_table, global_edges, plot_binned_frame
+from .spatial import bin_probe_table, global_edges, plot_binned_frame, plot_binned_kymograph
 from .trajectory import (
     PotentialElectricFieldTrajectoryRequest,
     PotentialElectricFieldTrajectoryResult,
@@ -20,5 +21,6 @@ __all__ = [
     "PotentialElectricFieldTask", "PotentialElectricFieldTrajectoryRequest",
     "PotentialElectricFieldTrajectoryResult", "PotentialElectricFieldTrajectoryTask",
     "ReaxFFCoulombParameters", "bin_probe_table", "calculate_frame",
-    "calculate_potential_and_field", "global_edges", "plot_binned_frame", "reaxff_cell_matrix",
+    "calculate_potential_and_field", "global_edges", "material_midpoint", "plot_binned_frame",
+    "plot_binned_kymograph", "reaxff_cell_matrix",
 ]
