@@ -26,3 +26,26 @@ charge command using `0:3200:100` completed successfully, followed by the
 formal-charge command using `0:3200:40`. The second command reported
 `xmolout frame cache: 16 hit, 64 miss`, did not open fort.7, and wrote the full
 polarization, displacement, mapping, and aligned-reference outputs.
+
+## Selected-frame runtime validation
+
+Run the portable workstation matrix with:
+
+```bash
+python -m reaxkit.core.runtime.benchmark --output benchmark_results/workstation.json
+```
+
+The matrix compares one, two, and four workers for an in-memory producer and
+for first/repeated reads from a generated binary trajectory. It rejects
+nondeterministic results and any run whose retained frame payload exceeds the
+configured in-flight limit.
+
+Submit `slurm_selected_frame_pipeline.sh` on Roar Collab after activating the
+same ReaxKit environment used for production analysis. Set `PYTHON_EXE` when
+`python` is not the intended environment. Put the benchmark workspace under
+`SLURM_TMPDIR` for local-scratch measurements; set `RESULT_DIR` to a shared
+filesystem path so the JSON report and `/usr/bin/time` output persist.
+
+For production comparisons, run the same scientific command twice with an
+empty ReaxKit frame cache and then with the populated cache. Record `seff`,
+the command timing log, filesystem location, ReaxKit commit, and input hashes.

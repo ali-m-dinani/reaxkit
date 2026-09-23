@@ -81,6 +81,9 @@ requirements_gen.py
 requirements_to_add_to_pyproject_toml.txt
 src/reaxkit/count_loc.py
 src/reaxkit/loc_report.csv
+UNIFIED_EXECUTION_AND_OUTPUT_PLAN.md
+UNIFIED_EXECUTION_AND_OUTPUT_TRACKER.xlsx
+src/reaxkit/analysis/ferroelectrics/switching_kinetics/domain_wall_switching_models_for_codex.md
 
 # External local files
 ../other/Reax_user_manual_June_2017.docx

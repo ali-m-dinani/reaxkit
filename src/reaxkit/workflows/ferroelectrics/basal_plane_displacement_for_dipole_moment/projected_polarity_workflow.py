@@ -17,11 +17,13 @@ from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.workflows.ferroelectrics.three_folded_wurtzite.common import (
     add_input_arguments,
     add_structure_arguments,
     artifact_directory,
+    restrict_native_charge_input,
     runtime_arguments,
     structural_request_kwargs,
 )
@@ -53,9 +55,12 @@ as Parquet unless CSV is explicitly requested.
 
 Examples:
   reaxkit get-basal-plane-displacement-projected-polarity --periodic xy --charge-source formal --formal-charge Al=3 N=-3 --projection-plane xz --projection-bins 40 40 --plot-2d --plot-kymograph
+
+  reaxkit get-basal-plane-displacement-projected-polarity --engine ams --input reaxout.kf --charge-source auto --frames 0:3200:50 --projection-plane xz --projection-bins 1 10 --plot-kymograph
 """
     add_input_arguments(parser)
     add_structure_arguments(parser, include_polarity=True)
+    restrict_native_charge_input(parser)
     parser.add_argument(
         "--component", choices=["x", "y", "z"], default="z",
         help="Choose the local dipole component whose sign defines polarity. Default: z.",
@@ -104,14 +109,20 @@ Examples:
     parser.add_argument(
         "--workers",
         type=int,
-        default=1,
-        help="Analyze frames with this many bounded worker threads. Default: 1.",
+        default=0,
+        help=(
+            "Override the automatically selected frame-worker count. "
+            "Use 0 for automatic selection. Default: 0."
+        ),
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=16,
-        help="Maximum frames submitted to workers at once. Default: 16.",
+        default=0,
+        help=(
+            "Override the maximum number of in-flight frames. "
+            "Use 0 for the memory-aware automatic limit. Default: 0."
+        ),
     )
     parser.add_argument(
         "--plot-2d", action="store_true",
@@ -264,34 +275,41 @@ generate_polarity_evolution_heatmap = generate_polarity_kymograph
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = _canonical_command(command)
-    result = AnalysisExecutor().run(
-        TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
-        REQUEST_BUILDERS[canonical](args),
-        runtime_arguments(args),
-    )
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
     centers_format = str(args.centers_format)
     centers = output / f"basal_plane_projected_polarity_centers.{centers_format}"
     projected = output / "basal_plane_projected_polarity_2d.csv"
     kymograph = output / "basal_plane_projected_polarity_kymograph.csv"
-    if args.write_centers:
-        if centers_format == "parquet":
-            result.centers.to_parquet(centers, index=False)
-        else:
-            result.centers.to_csv(centers, index=False)
-    result.projected_bins.to_csv(projected, index=False)
-    result.kymograph_bins.to_csv(kymograph, index=False)
-    plots = (
-        generate_projected_polarity_heatmaps(result, output, dpi=int(args.figure_dpi))
-        if args.plot_2d else []
+    specs = (
+        ArtifactSpec("centers", centers.name, "detail", bool(args.write_centers), centers_format, True),
+        ArtifactSpec("projected", projected.name, "core", True, "csv", True),
+        ArtifactSpec("kymograph", kymograph.name, "core", True, "csv", True),
     )
-    kymograph_plot = (
-        generate_polarity_kymograph(result, output, dpi=int(args.figure_dpi))
-        if args.plot_kymograph else None
-    )
-    args.suppress_table = True
-    present_result(canonical, result, args)
+    with ArtifactWriter(output, specs, profile="standard", overwrite=True) as writer:
+        run_args = runtime_arguments(args)
+        run_args["_artifact_writer"] = writer
+        if args.write_centers:
+            run_args["no_cache"] = True
+        result = AnalysisExecutor().run(
+            TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
+            REQUEST_BUILDERS[canonical](args),
+            run_args,
+        )
+        if args.write_centers and not result.centers.empty:
+            writer.write_table("centers", result.centers)
+        writer.write_table("projected", result.projected_bins)
+        writer.write_table("kymograph", result.kymograph_bins)
+        plots = (
+            generate_projected_polarity_heatmaps(result, output, dpi=int(args.figure_dpi))
+            if args.plot_2d else []
+        )
+        kymograph_plot = (
+            generate_polarity_kymograph(result, output, dpi=int(args.figure_dpi))
+            if args.plot_kymograph else None
+        )
+        args.suppress_table = True
+        present_result(canonical, result, args)
     if args.write_centers:
         print(f"Wrote detailed per-center polarity signs to {centers}")
     print(f"Wrote projected mean-polarity bins to {projected}")

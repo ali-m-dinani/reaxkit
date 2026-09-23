@@ -4,6 +4,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+import pytest
 from ase import Atoms
 from ase.io import read
 
@@ -143,9 +144,23 @@ def test_projected_parser_reuses_projection_bins_for_profile_axis() -> None:
     assert request.profile_axis == "z"
     assert request.component == "c"
     assert not request.include_centers
-    assert request.workers == 1
-    assert request.chunk_size == 16
+    assert request.workers == 0
+    assert request.chunk_size == 0
     assert args.plot_2d and args.plot_kymograph
+
+
+def test_hbn_projected_parser_accepts_only_native_auto_or_formal_charge_modes() -> None:
+    parser = projected_polarity_workflow.build_parser(
+        argparse.ArgumentParser(), command=projected_polarity_workflow.COMMAND
+    )
+    required = ["--replication", "2", "1", "1"]
+
+    assert parser.parse_args([*required, "--engine", "ams", "--charge-source", "auto"]).charge_source == "auto"
+    assert parser.parse_args([*required, "--engine", "reaxff", "--charge-source", "formal"]).charge_source == "formal"
+    with pytest.raises(SystemExit):
+        parser.parse_args([*required, "--charge-source", "reaxff"])
+    with pytest.raises(SystemExit):
+        parser.parse_args([*required, "--engine", "lammps"])
 
 
 def test_extxyz_contains_full_atoms_and_local_cell_properties(tmp_path) -> None:

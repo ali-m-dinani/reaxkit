@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import warnings
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field as dc_field
 from typing import Any, ClassVar, Iterable, Literal, cast
 
@@ -30,12 +29,30 @@ from reaxkit.analysis.ferroelectrics.three_folded_wurtzite.neighbors import (
     all_neighbors_within_cutoff,
 )
 from reaxkit.core.registry.analysis_task_registry import register_task
+from reaxkit.core.runtime.execution_contracts import (
+    ExecutionShape,
+    TaskCapabilities,
+    resolve_execution_policy,
+)
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+from reaxkit.core.runtime.reducers import TableAccumulator
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
 from reaxkit.presentation.specs import PresentationSpec
 
 ProjectionPlane = Literal["xy", "xz", "yz"]
 CartesianAxis = Literal["x", "y", "z"]
+
+_PIPELINE_CAPABILITIES = TaskCapabilities(
+    shape=ExecutionShape.REFERENCE_FRAME_MAP,
+    thread_safe=True,
+    needs_reference=True,
+    estimated_frame_bytes=16 * 1024 * 1024,
+)
+
+
+class _PipelineContract:
+    execution_capabilities = _PIPELINE_CAPABILITIES
 
 
 @dataclass
@@ -55,8 +72,8 @@ class BasalPlaneProjectedPolarityRequest(BasalPlaneDipoleRequest):
     )
     dipole_zero_tolerance: float = 0.0
     include_centers: bool = True
-    workers: int = 1
-    chunk_size: int = 16
+    workers: int = 0
+    chunk_size: int = 0
 
 
 @dataclass
@@ -126,10 +143,10 @@ def _validate_request(request: BasalPlaneProjectedPolarityRequest) -> None:
         raise ValueError("projection_bins must contain two positive integers.")
     if float(request.dipole_zero_tolerance) < 0.0:
         raise ValueError("dipole_zero_tolerance must be non-negative.")
-    if int(request.workers) < 1:
-        raise ValueError("workers must be at least 1.")
-    if int(request.chunk_size) < 1:
-        raise ValueError("chunk_size must be at least 1.")
+    if int(request.workers) < 0:
+        raise ValueError("workers must be zero (automatic) or at least 1.")
+    if int(request.chunk_size) < 0:
+        raise ValueError("chunk_size must be zero (automatic) or at least 1.")
 
 
 def _edges(values: np.ndarray, count: int) -> np.ndarray:
@@ -400,43 +417,47 @@ def _frame_rows(payload: _FramePayload, request, context: _ProjectionContext):
     return center_rows, projected_rows, kymograph_rows
 
 
-def _run_payloads(payloads: Iterable[_FramePayload], request, context, reporter=None):
-    centers, projected, kymograph = [], [], []
+def _run_payloads(
+    payloads: Iterable[_FramePayload],
+    request,
+    context,
+    reporter=None,
+    pipeline: BoundedFramePipeline | None = None,
+):
+    writer = getattr(pipeline, "artifact_writer", None) if pipeline is not None else None
+    center_sink = (
+        writer.sink("centers")
+        if writer is not None and request.include_centers and "centers" in writer.specs
+        else None
+    )
+    centers = TableAccumulator(retain=center_sink is None, sink=center_sink)
+    projected = TableAccumulator()
+    kymograph = TableAccumulator()
     frame_indices, iterations = [], []
 
     def consume(payload, result):
         center_rows, projected_rows, kymograph_rows = result
-        centers.extend(center_rows)
-        projected.extend(projected_rows)
-        kymograph.extend(kymograph_rows)
+        centers.add(center_rows)
+        projected.add(projected_rows)
+        kymograph.add(kymograph_rows)
         frame_indices.append(payload.frame_index)
         iterations.append(payload.iteration)
         if callable(reporter):
             reporter("analyze", len(frame_indices), 0, "Analyzing basal-plane projected polarity frames")
 
-    iterator = iter(payloads)
-    if int(request.workers) == 1:
-        for payload in iterator:
-            consume(payload, _frame_rows(payload, request, context))
-    else:
-        with ThreadPoolExecutor(max_workers=int(request.workers), thread_name_prefix="reaxkit-basal") as pool:
-            while True:
-                chunk = []
-                for _ in range(int(request.chunk_size)):
-                    try:
-                        chunk.append(next(iterator))
-                    except StopIteration:
-                        break
-                if not chunk:
-                    break
-                results = pool.map(lambda item: _frame_rows(item, request, context), chunk)
-                for payload, result in zip(chunk, results, strict=True):
-                    consume(payload, result)
+    if pipeline is None:
+        policy = resolve_execution_policy(_PipelineContract(), request, {})
+        pipeline = BoundedFramePipeline(policy)
+    for completed in pipeline.map_ordered(
+        payloads,
+        lambda item: _frame_rows(item, request, context),
+    ):
+        consume(completed.envelope.payload, completed.value)
 
     return BasalPlaneProjectedPolarityResult(
-        centers=pd.DataFrame(centers),
-        projected_bins=pd.DataFrame(projected),
-        kymograph_bins=pd.DataFrame(kymograph),
+        centers=centers.finalize(),
+        projected_bins=projected.finalize(),
+        kymograph_bins=kymograph.finalize(),
         request=request,
         dipole_result=None,
         frame_indices=np.asarray(frame_indices, dtype=int),
@@ -474,6 +495,8 @@ class BasalPlaneProjectedPolarityTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = True
+    native_charges_required_for_auto = True
+    execution_capabilities = _PIPELINE_CAPABILITIES
     VERSION = "3"
 
     def required_data_for(self, request, args: dict | None = None):
@@ -490,7 +513,7 @@ class BasalPlaneProjectedPolarityTask(AnalysisTask):
     def run(self, data, request, reporter=None):
         return calculate_basal_plane_projected_polarity(data, request, reporter=reporter)
 
-    def run_stream(self, frames, request, reporter=None):
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
         _validate_request(request)
         if request.profile_axis is None:
             request.profile_axis = cast(CartesianAxis, request.projection_plane[1])
@@ -507,29 +530,47 @@ class BasalPlaneProjectedPolarityTask(AnalysisTask):
                 break
         if reference_payload is None:
             raise ValueError(f"Reference frame {request.reference_frame} was not present in the input stream.")
-        context = _build_context(reference_payload, request)
+        if pipeline is None:
+            pipeline = BoundedFramePipeline(
+                resolve_execution_policy(self, request, {})
+            )
+        with pipeline.measure_stage(
+            "pipeline_prepare", reference_frame=int(request.reference_frame)
+        ):
+            context = _build_context(reference_payload, request)
         requested = None if request.frames is None else [int(value) for value in request.frames]
         requested_set = set(requested or ())
 
         def selected_payloads():
-            occurrence = 0
-            for payload in buffered:
-                if requested is not None and payload.frame_index not in requested_set:
-                    continue
-                if occurrence % max(1, int(request.every)) == 0:
-                    yield payload
-                occurrence += 1
-            for stream_index, data in enumerate(iterator, start=len(buffered)):
-                trajectory, _ = _trajectory_and_charges(data)
-                source = _source_frame(trajectory, 0)
-                payload = _payload(data, 0, source, request)
-                if requested is not None and source not in requested_set:
-                    continue
-                if occurrence % max(1, int(request.every)) == 0:
-                    yield payload
-                occurrence += 1
+            try:
+                occurrence = 0
+                for payload in buffered:
+                    if requested is not None and payload.frame_index not in requested_set:
+                        continue
+                    if occurrence % max(1, int(request.every)) == 0:
+                        yield payload
+                    occurrence += 1
+                for stream_index, data in enumerate(iterator, start=len(buffered)):
+                    trajectory, _ = _trajectory_and_charges(data)
+                    source = _source_frame(trajectory, 0)
+                    payload = _payload(data, 0, source, request)
+                    if requested is not None and source not in requested_set:
+                        continue
+                    if occurrence % max(1, int(request.every)) == 0:
+                        yield payload
+                    occurrence += 1
+            finally:
+                close = getattr(iterator, "close", None)
+                if callable(close):
+                    close()
 
-        return _run_payloads(selected_payloads(), request, context, reporter=reporter)
+        return _run_payloads(
+            selected_payloads(),
+            request,
+            context,
+            reporter=reporter,
+            pipeline=pipeline,
+        )
 
 
 __all__ = [

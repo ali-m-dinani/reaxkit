@@ -5,6 +5,7 @@ import numpy as np
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     WurtziteNeighborRequest,
     extract_wurtzite_neighbors,
+    required_wurtzite_data_type,
 )
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.polarity import (
     WurtzitePolarityRequest,
@@ -17,7 +18,7 @@ from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.trajectory import (
     PolarityExtendedXYZRequest,
     PolarityExtendedXYZTask,
 )
-from reaxkit.domain.data_models import SimulationData, TrajectoryData
+from reaxkit.domain.data_models import ElectrostaticsData, SimulationData, TrajectoryData
 from reaxkit.workflows.ferroelectrics.four_folded_wurtzite.artifacts import (
     write_polarity_tables,
 )
@@ -50,6 +51,27 @@ def _trajectory() -> TrajectoryData:
         simulation=simulation,
         iterations=np.asarray([0, 10]),
     )
+
+
+def test_ams_auto_charge_source_requests_kf_electrostatics() -> None:
+    request = WurtziteNeighborRequest(charge_source="auto")
+    projected = {"_native_charges_required_for_auto": True}
+
+    assert required_wurtzite_data_type(
+        request, {**projected, "engine": "ams"}
+    ) is ElectrostaticsData
+    assert required_wurtzite_data_type(
+        request, {**projected, "_resolved_engine": "ams"}
+    ) is ElectrostaticsData
+    assert required_wurtzite_data_type(
+        request, {**projected, "_resolved_engine": "reaxff"}
+    ) is ElectrostaticsData
+
+
+def test_ams_formal_charge_source_requests_only_kf_trajectory() -> None:
+    request = WurtziteNeighborRequest(charge_source="formal")
+
+    assert required_wurtzite_data_type(request, {"engine": "ams"}) is TrajectoryData
 
 
 def test_neighbor_module_returns_normalized_coordinates_and_formal_charges() -> None:

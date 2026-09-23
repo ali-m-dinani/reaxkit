@@ -23,6 +23,12 @@ from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
+from reaxkit.core.runtime.execution_contracts import (
+    ExecutionShape,
+    TaskCapabilities,
+    resolve_execution_policy,
+)
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import (
@@ -1224,15 +1230,21 @@ def _run_electrostatics_stream(
     *,
     mode: Mode,
     reporter=None,
+    pipeline: BoundedFramePipeline | None = None,
 ) -> pd.DataFrame:
     """Compute electrostatics while retaining only one canonical frame."""
     tables: list[pd.DataFrame] = []
     total_rows: list[dict[str, Any]] = []
     processed = 0
     every = max(1, int(request.every))
-    for stream_index, data in enumerate(frames):
-        if stream_index % every:
-            continue
+
+    def selected_frames():
+        for stream_index, data in enumerate(frames):
+            if stream_index % every == 0:
+                yield stream_index, data
+
+    def calculate_frame(item):
+        stream_index, data = item
         trajectory, _connectivity, dynamic_charges = _electrostatics_parts(data)
         if request.scope == "total":
             coords = np.asarray(trajectory.positions[0], dtype=float)
@@ -1306,10 +1318,29 @@ def _run_electrostatics_stream(
         if request.scope == "total":
             row["frame_index"] = source_index
             # Preserve the public column order of the materialized path.
-            total_rows.append({"frame_index": row.pop("frame_index"), **row})
-        elif table is not None and not table.empty:
+            return {"frame_index": row.pop("frame_index"), **row}, None
+        if table is not None and not table.empty:
             table = table.copy()
             table["frame_index"] = source_index
+        return None, table
+
+    if pipeline is None:
+        class _ElectrostaticsFrameMap:
+            execution_capabilities = TaskCapabilities(
+                shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+                thread_safe=True,
+                estimated_frame_bytes=8 * 1024 * 1024,
+            )
+
+        pipeline = BoundedFramePipeline(
+            resolve_execution_policy(_ElectrostaticsFrameMap(), request, {})
+        )
+
+    for completed in pipeline.map_ordered(selected_frames(), calculate_frame):
+        row, table = completed.value
+        if row is not None:
+            total_rows.append(row)
+        elif table is not None and not table.empty:
             tables.append(table)
         processed += 1
         if callable(reporter):
@@ -1329,6 +1360,11 @@ class DipoleTask(AnalysisTask):
 
     required_data = ElectrostaticsData
     supports_selective_streaming = True
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        thread_safe=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
 
     def required_data_for(self, request: DipoleRequest, _args: dict | None = None):
         """Choose coordinate-only or connectivity inputs for formal charges."""
@@ -1448,10 +1484,12 @@ class DipoleTask(AnalysisTask):
         )
         return DipoleResult(table=out, request=request)
 
-    def run_stream(self, frames, request: DipoleRequest, reporter=None) -> DipoleResult:
+    def run_stream(self, frames, request: DipoleRequest, reporter=None, pipeline=None) -> DipoleResult:
         """Compute dipoles from a bounded-memory electrostatics stream."""
         return DipoleResult(
-            table=_run_electrostatics_stream(frames, request, mode="dipole", reporter=reporter),
+            table=_run_electrostatics_stream(
+                frames, request, mode="dipole", reporter=reporter, pipeline=pipeline
+            ),
             request=request,
         )
 
@@ -1462,6 +1500,11 @@ class PolarizationTask(AnalysisTask):
 
     required_data = ElectrostaticsData
     supports_selective_streaming = True
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        thread_safe=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
 
     def required_data_for(self, request: PolarizationRequest, _args: dict | None = None):
         """Choose coordinate-only or connectivity inputs for formal charges."""
@@ -1581,10 +1624,16 @@ class PolarizationTask(AnalysisTask):
         )
         return PolarizationResult(table=out, request=request)
 
-    def run_stream(self, frames, request: PolarizationRequest, reporter=None) -> PolarizationResult:
+    def run_stream(self, frames, request: PolarizationRequest, reporter=None, pipeline=None) -> PolarizationResult:
         """Compute polarization from a bounded-memory electrostatics stream."""
         return PolarizationResult(
-            table=_run_electrostatics_stream(frames, request, mode="polarization", reporter=reporter),
+            table=_run_electrostatics_stream(
+                frames,
+                request,
+                mode="polarization",
+                reporter=reporter,
+                pipeline=pipeline,
+            ),
             request=request,
         )
 

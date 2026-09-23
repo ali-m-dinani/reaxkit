@@ -21,12 +21,14 @@ from reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity import (
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.workflows.ferroelectrics.hbn_reference import (
     polarization_workflow as global_workflow,
 )
 from reaxkit.workflows.ferroelectrics.three_folded_wurtzite.common import (
     artifact_directory,
+    restrict_native_charge_input,
     runtime_arguments,
 )
 
@@ -46,6 +48,7 @@ def _canonical_command(command: str) -> str:
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = _canonical_command(command)
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
+    restrict_native_charge_input(parser)
     parser.set_defaults(command=canonical, progress=True)
     parser.description = """Average h-BN-reference local-cell polarity in fixed spatial bins.
 
@@ -57,7 +60,10 @@ frame-versus-position evolution map. Detailed per-group centers are omitted by
 default; --write-centers writes them as Parquet unless CSV is requested.
 
 Example:
-  reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source reaxff --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
+  reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source auto --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
+
+AMS KF input:
+  reaxkit get-hbn-reference-projected-polarity --engine ams --input reaxout.kf --replication 19 19 10 --charge-source auto --frames 0:4000:5 --plot-kymograph
 """
     parser.add_argument(
         "--local-grouping",
@@ -138,14 +144,20 @@ Example:
     parser.add_argument(
         "--workers",
         type=int,
-        default=1,
-        help="Analyze frames with this many bounded worker threads. Default: 1.",
+        default=0,
+        help=(
+            "Override the automatically selected frame-worker count. "
+            "Use 0 for automatic selection. Default: 0."
+        ),
     )
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=16,
-        help="Maximum frames submitted to workers at once. Default: 16.",
+        default=0,
+        help=(
+            "Override the maximum number of in-flight frames. "
+            "Use 0 for the memory-aware automatic limit. Default: 0."
+        ),
     )
     parser.add_argument(
         "--plot-2d",
@@ -313,11 +325,6 @@ generate_polarity_evolution_heatmap = generate_polarity_kymograph
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = _canonical_command(command)
-    result = AnalysisExecutor().run(
-        TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
-        REQUEST_BUILDERS[canonical](args),
-        runtime_arguments(args),
-    )
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
     centers_format = str(args.centers_format)
@@ -327,26 +334,39 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     whole_slab_summary_path = (
             output / "hbn_reference_projected_polarity_whole_slab_summary.csv"
     )
-    if args.write_centers:
-        if centers_format == "parquet":
-            result.centers.to_parquet(centers_path, index=False)
-        else:
-            result.centers.to_csv(centers_path, index=False)
-    result.projected_bins.to_csv(projected_path, index=False)
-    result.kymograph_bins.to_csv(kymograph_path, index=False)
-    result.whole_slab_summary.to_csv(whole_slab_summary_path, index=False)
-    plots = (
-        generate_projected_polarity_heatmaps(result, output, dpi=int(args.figure_dpi))
-        if args.plot_2d
-        else []
+    specs = (
+        ArtifactSpec("centers", centers_path.name, "detail", bool(args.write_centers), centers_format, True),
+        ArtifactSpec("projected", projected_path.name, "core", True, "csv", True),
+        ArtifactSpec("kymograph", kymograph_path.name, "core", True, "csv", True),
+        ArtifactSpec("whole_slab_summary", whole_slab_summary_path.name, "summary", True, "csv", True),
     )
-    kymograph_plot = (
-        generate_polarity_kymograph(result, output, dpi=int(args.figure_dpi))
-        if args.plot_kymograph
-        else None
-    )
-    args.suppress_table = True
-    present_result(canonical, result, args)
+    with ArtifactWriter(output, specs, profile="standard", overwrite=True) as writer:
+        run_args = runtime_arguments(args)
+        run_args["_artifact_writer"] = writer
+        if args.write_centers:
+            run_args["no_cache"] = True
+        result = AnalysisExecutor().run(
+            TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
+            REQUEST_BUILDERS[canonical](args),
+            run_args,
+        )
+        if args.write_centers and not result.centers.empty:
+            writer.write_table("centers", result.centers)
+        writer.write_table("projected", result.projected_bins)
+        writer.write_table("kymograph", result.kymograph_bins)
+        writer.write_table("whole_slab_summary", result.whole_slab_summary)
+        plots = (
+            generate_projected_polarity_heatmaps(result, output, dpi=int(args.figure_dpi))
+            if args.plot_2d
+            else []
+        )
+        kymograph_plot = (
+            generate_polarity_kymograph(result, output, dpi=int(args.figure_dpi))
+            if args.plot_kymograph
+            else None
+        )
+        args.suppress_table = True
+        present_result(canonical, result, args)
     if args.write_centers:
         print(f"Wrote detailed per-group polarity signs to {centers_path}")
     print(f"Wrote projected mean-polarity bins to {projected_path}")

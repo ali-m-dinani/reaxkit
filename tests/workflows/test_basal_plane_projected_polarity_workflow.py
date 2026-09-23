@@ -4,6 +4,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity import (
     BasalPlaneProjectedPolarityRequest,
@@ -70,9 +71,22 @@ def test_parser_builds_tem_projection_request() -> None:
     assert request.projection_bins[1] == 30
     assert request.component == "z"
     assert not request.include_centers
-    assert request.workers == 1
-    assert request.chunk_size == 16
+    assert request.workers == 0
+    assert request.chunk_size == 0
     assert args.plot_2d and args.plot_kymograph
+
+
+def test_projected_parser_accepts_only_native_auto_or_formal_charge_modes() -> None:
+    parser = projected_polarity_workflow.build_parser(
+        argparse.ArgumentParser(), command=projected_polarity_workflow.COMMAND
+    )
+
+    assert parser.parse_args(["--engine", "ams", "--charge-source", "auto"]).charge_source == "auto"
+    assert parser.parse_args(["--engine", "reaxff", "--charge-source", "formal"]).charge_source == "formal"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--charge-source", "reaxff"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--engine", "lammps"])
 
 
 def test_heatmap_generators_write_frame_and_evolution_plots(tmp_path) -> None:

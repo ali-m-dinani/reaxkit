@@ -1,6 +1,6 @@
 # Unified Execution and Output Plan
 
-Status: design plan only. No framework implementation is included in this file.
+Status: the shared-policy implementation is complete. Registered analyses have explicit conservative capability decisions, shared-pipeline tasks use bounded scheduling, generic persisted tables use atomic artifact profiles, and a reproducible workstation/Slurm validation harness exists. Real-data tests passed for both projected-polarity commands with 28,880-atom ReaxFF text input and standalone `reaxout.kf`; the tests also verified automatic engine detection, native/formal charge routing, noncontiguous selected frames, and compact default output. `SELECTED_FRAME_PIPELINE_PLAN.md` remains the detailed implementation record and phase-status source of truth; production Slurm validation is still pending.
 
 ## Objective
 
@@ -14,7 +14,7 @@ Give every ReaxKit command a shared execution and artifact policy so a computati
 - write large optional tables incrementally in Parquet;
 - keep serial execution for analyses whose mathematics or external libraries require it.
 
-The optimized `get-hbn-reference-projected-polarity` and `get-basal-plane-displacement-projected-polarity` commands are prototypes for this architecture. Their duplicated worker, chunk, streaming, and optional-detail logic should eventually move into shared infrastructure.
+The optimized `get-hbn-reference-projected-polarity` and `get-basal-plane-displacement-projected-polarity` commands are prototypes for this architecture. Their worker scheduling, bounded queues, incremental optional details, and atomic table publication now use shared runtime infrastructure.
 
 ## Important constraint
 
@@ -329,17 +329,17 @@ The framework is complete when:
 - timing output explains the chosen execution plan and its fallback reasons;
 - representative HPC benchmarks show reduced wall time or memory without increased source-file rereads.
 
-## 12. Decisions to make before implementation
+## 12. Recorded implementation decisions
 
-Resolve these during Phase 0 rather than embedding assumptions in the executor:
+The implementation resolved the original Phase 0 questions as follows:
 
-1. Which existing files are contractually required core outputs for each command?
-2. How long must `--output-profile legacy` be supported?
-3. Should automatic workers use every allocated CPU or reserve one for input parsing and artifact writing?
-4. What memory limit should be used when Slurm exposes no job-memory environment value?
-5. Which tasks have proven thread-safe third-party kernels, and which require processes or serial execution?
-6. Should process workers reopen source files by frame offset, or receive canonical frame payloads from one reader?
-7. Which floating-point reductions require deterministic compensated summation?
-8. Which plots are core outputs, and which should remain explicit opt-in artifacts?
+1. Artifact declarations and the command tracker identify core, summary, detail, and debug outputs; `standard` omits declared optional details.
+2. `legacy` remains available as an explicit compatibility profile during the output transition.
+3. Automatic scheduling uses the allocated CPUs conservatively and reserves no CPU on allocations of four or fewer CPUs.
+4. Queue depth is bounded by detected memory when available and otherwise uses conservative per-frame estimates.
+5. The checked-in manifests record thread safety and execution shape; unsafe ordered and global tasks remain serial with a recorded reason.
+6. One forward reader supplies canonical frame payloads to bounded workers instead of letting workers reread shared source files.
+7. Results are collected and reduced in deterministic source-frame order; command-specific compensated reductions remain appropriate where numerical evidence requires them.
+8. Compact scientific tables follow the selected output profile, while plots and large detail artifacts remain explicit opt-ins unless a command declares otherwise.
 
-The recommended initial decisions are: reserve no CPU for jobs with four or fewer CPUs, use threads for NumPy/SciPy frame kernels, keep one reader in the parent process, prefer compact CSV plus detailed Parquet, and retain plots as explicit opt-in outputs.
+Standalone `reaxout.kf` is treated as an AMS/KF input while preserving its step-indexed History layout and angstrom-valued coordinates. `--charge-source auto` reads the detected engine's native charges; `--charge-source formal` requests trajectory data only.

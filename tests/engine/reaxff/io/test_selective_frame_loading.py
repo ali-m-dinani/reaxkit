@@ -223,13 +223,55 @@ def test_fort7_charge_stream_reports_indexing_and_selected_frame_progress(
         ).stream_file_frames(charge_arrays_only=True)
     )
 
-    frame_events = [event for event in events if event[1] == 7]
+    frame_events = [event for event in events if event[1] == 3]
     assert frame_events[0][0] == 0
-    assert frame_events[-1][0] == 7
+    assert frame_events[-1][0] == 3
     assert [current for current, _, _ in frame_events] == sorted(
         current for current, _, _ in frame_events
     )
     assert all("cache" not in message.lower() for _, _, message in frame_events)
+
+
+def test_cold_numeric_streams_use_one_forward_pass(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    xmolout.write_text(_xmolout(8), encoding="utf-8")
+    fort7.write_text(_fort7(8), encoding="utf-8")
+
+    xmol_handler = XmoloutHandler(
+        xmolout,
+        frame_indices=[0, 2, 4, 6],
+        frame_cache_root=cache_root,
+    )
+    fort7_handler = Fort7Handler(
+        fort7,
+        frame_indices=[0, 2, 4, 6],
+        frame_cache_root=cache_root,
+    )
+    monkeypatch.setattr(
+        xmol_handler,
+        "_scan_offsets",
+        lambda *args, **kwargs: pytest.fail("cold xmolout stream performed an index pass"),
+    )
+    monkeypatch.setattr(
+        fort7_handler,
+        "_scan_offsets",
+        lambda *args, **kwargs: pytest.fail("cold fort.7 stream performed an index pass"),
+    )
+
+    coordinates = list(xmol_handler.stream_file_frames(coordinates_only=True))
+    charges = list(fort7_handler.stream_file_frames(charge_arrays_only=True))
+
+    assert [record["source_index"] for record in coordinates] == [0, 2, 4, 6]
+    assert [record["source_index"] for record in charges] == [0, 2, 4, 6]
+    assert xmol_handler._frame_cache_stats["one_pass"] is True
+    assert fort7_handler._frame_cache_stats["one_pass"] is True
+    assert xmol_handler._frame_cache_stats["indexed_frames"] == 0
+    assert fort7_handler._frame_cache_stats["indexed_frames"] == 0
 
 
 @pytest.mark.parametrize(
@@ -275,10 +317,10 @@ def test_electrostatics_streams_report_xmolout_and_fort7_separately(
         source_events = [event for event in events if event[0] == stage]
         assert source_events[0][1:] == (
             0,
-            5,
+            2,
             f"Reading {stage.removeprefix('load ')} frames",
         )
-        assert source_events[-1][1] == source_events[-1][2] == 5
+        assert source_events[-1][1] == source_events[-1][2] == 2
         assert [current for _, current, _, _ in source_events] == sorted(
             current for _, current, _, _ in source_events
         )

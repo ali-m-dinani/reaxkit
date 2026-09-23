@@ -8,7 +8,12 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from reaxkit.domain.data_models import ConnectivityData, ConnectivityTrajectoryData, TrajectoryData
+from reaxkit.domain.data_models import (
+    ConnectivityData,
+    ConnectivityTrajectoryData,
+    ElectrostaticsData,
+    TrajectoryData,
+)
 from reaxkit.engine.ams.adapter import AMSAdapter
 
 
@@ -89,6 +94,58 @@ class _FakeConnectivityKF:
         if key == "General%Step numbers":
             return np.asarray([10, 20, 30], dtype=int)
         raise KeyError(key)
+
+
+class _FakeStandaloneReaxoutKF:
+    """Standalone ReaxFF KF layout keyed by the stored MD step number."""
+
+    def __init__(self):
+        self.steps = np.asarray([0, 1000, 2000], dtype=int)
+        self.history_reads: list[str] = []
+        self.section_reads: list[str] = []
+
+    def read_section(self, section: str):
+        self.section_reads.append(section)
+        raise AssertionError("Selected KF streaming must not load a complete section")
+
+    def read(self, section: str, variable: str):
+        if (section, variable) == ("General", "Step numbers"):
+            return self.steps
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            return "Al N"
+        if section == "History":
+            self.history_reads.append(variable)
+            for frame_index, step in enumerate(self.steps.tolist()):
+                if variable == f"Coordinates {step}":
+                    offset = float(frame_index)
+                    return [offset, 0.0, 0.0, 2.0 + offset, 0.0, 0.0]
+                if variable == f"Atomic charges {step}":
+                    return [1.5 + 0.1 * frame_index, -1.5 - 0.1 * frame_index]
+                if variable == f"Unit cell axes {step}":
+                    length = 10.0 + frame_index
+                    return [length, 0.0, 0.0, 0.0, length, 0.0, 0.0, 0.0, 20.0]
+                if variable == f"Unit cell angles {step}":
+                    return [90.0, 90.0, 90.0]
+        raise KeyError(f"{section}%{variable}")
+
+    def __getitem__(self, key: str):
+        if key == "General%Step numbers":
+            return self.steps
+        raise KeyError(key)
+
+
+class _FakeStandaloneIndexedAtomNamesKF(_FakeStandaloneReaxoutKF):
+    """Standalone layout with species stored only in step-indexed History keys."""
+
+    def read(self, section: str, variable: str):
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            raise KeyError(f"{section}%{variable}")
+        if section == "History":
+            for step in self.steps.tolist():
+                if variable == f"Atom names {step}":
+                    self.history_reads.append(variable)
+                    return "AlN "
+        return super().read(section, variable)
 
 
 def _save_dataframe(df: pd.DataFrame, out: Path) -> None:
@@ -202,6 +259,87 @@ def test_ams_adapter_streams_history_as_one_frame_payloads(monkeypatch):
     assert all(frame.positions.shape == (1, 2, 3) for frame in frames)
 
 
+def test_ams_streams_selected_standalone_kf_electrostatics_without_section_load(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    frames = list(
+        adapter.stream(
+            ElectrostaticsData,
+            {
+                "input": "reaxout.kf",
+                "_frame_indices": [2, 0],
+                "progress": False,
+            },
+        )
+    )
+
+    assert fake.section_reads == []
+    assert [frame.trajectory.source_frame_indices.tolist() for frame in frames] == [[2], [0]]
+    assert [frame.trajectory.iterations.tolist() for frame in frames] == [[2000], [0]]
+    assert frames[0].charges.charges.tolist() == [[1.7, -1.7]]
+    assert frames[1].charges.charges.tolist() == [[1.5, -1.5]]
+    assert frames[0].trajectory.positions[0, 1, 0] == pytest.approx(4.0)
+    assert frames[0].trajectory.simulation.cell_lengths[0].tolist() == pytest.approx([12.0, 12.0, 20.0])
+    assert "Coordinates 1000" not in fake.history_reads
+    assert "Atomic charges 1000" not in fake.history_reads
+
+
+def test_ams_streams_step_indexed_atom_names_without_molecule_section(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneIndexedAtomNamesKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    frames = list(
+        adapter.stream(
+            ElectrostaticsData,
+            {
+                "input": "reaxout.kf",
+                "_frame_indices": [2, 0],
+                "progress": False,
+            },
+        )
+    )
+
+    assert fake.section_reads == []
+    assert frames[0].trajectory.elements == ["Al", "N"]
+    assert frames[1].trajectory.elements == ["Al", "N"]
+    assert "Atom names 2000" in fake.history_reads
+    assert "Atom names 1000" not in fake.history_reads
+
+
+def test_ams_selected_standalone_trajectory_does_not_read_atomic_charges(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    frames = list(
+        adapter.stream(
+            TrajectoryData,
+            {"input": "reaxout.kf", "_frame_indices": [1], "progress": False},
+        )
+    )
+
+    assert len(frames) == 1
+    assert frames[0].source_frame_indices.tolist() == [1]
+    assert frames[0].iterations.tolist() == [1000]
+    assert not any(name.startswith("Atomic charges") for name in fake.history_reads)
+
+
+def test_ams_loads_only_selected_standalone_kf_charges(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+
+    charges = adapter.load_charges({"input": "reaxout.kf", "_frame_indices": [2, 0]})
+
+    assert fake.section_reads == []
+    assert charges.charges.tolist() == [[1.7, -1.7], [1.5, -1.5]]
+    assert charges.iterations.tolist() == [2000, 0]
+    assert charges.metadata["source_frame_indices"] == [2, 0]
+
+
 def test_ams_load_connectivity_reads_direct_rkf_frames_without_history_section(monkeypatch):
     adapter = AMSAdapter()
     monkeypatch.setattr(adapter, "load_kf", lambda _args: _FakeConnectivityKF())
@@ -303,6 +441,10 @@ def test_ams_required_input_files_prefers_explicit_kf_input_name():
     )
 
     assert names == ("30_1073_ams.rkf",)
+    assert adapter.required_input_files(
+        ElectrostaticsData,
+        {"input": "reaxout.kf"},
+    ) == ("reaxout.kf",)
 
 
 def test_ams_adapter_loaders_export_artifacts():

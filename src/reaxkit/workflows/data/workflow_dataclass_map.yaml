@@ -722,8 +722,8 @@ workflows:
     command: get-potential-and-electric-field
     command_kind: analysis
     analysis_task: get-potential-and-electric-field
-    description: Calculates internal ReaxFF Coulomb electrostatics, externally applied electrostatics,
-      and their total local potential and electric field at every atom location.
+    description: Calculates internal ReaxFF Coulomb electrostatics, externally applied electrostatics, and
+      their total local potential and electric field at every atom location.
     tags:
     - electrostatics
     - ReaxFF
@@ -765,7 +765,8 @@ workflows:
     command: write-trajectory-with-potential-and-electric-field
     command_kind: analysis
     analysis_task: write-trajectory-with-potential-and-electric-field
-    description: Writes an Extended XYZ trajectory with internal, external, and total local potential and electric-field atom properties.
+    description: Writes an Extended XYZ trajectory with internal, external, and total local potential and
+      electric-field atom properties.
     tags:
     - electrostatics
     - ReaxFF
@@ -1194,8 +1195,8 @@ workflows:
     command: get-hbn-reference-local-polarization
     command_kind: analysis
     analysis_task: get-hbn-reference-local-polarization
-    description: Calculates local dipole and polarization for fixed stoichiometric primitive reference cells
-      using equal or deformation-weighted volumes.
+    description: Calculates local dipole and polarization for both four-atom crystallographic cells and
+      two-atom AlN reference layers using equal or deformation-weighted volumes.
     tags:
     - ferroelectrics
     - local polarization

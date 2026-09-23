@@ -13,7 +13,8 @@ import copy
 import inspect
 import os
 from pathlib import Path
-from time import perf_counter
+import sys
+from time import perf_counter, process_time
 from datetime import datetime, timezone
 import json
 
@@ -26,6 +27,8 @@ from reaxkit.core.platform.exceptions import ParseError, AnalysisError
 from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import get_logger, configure_file_logging
 from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
+from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.provenance import user_settings_from_args
 from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
@@ -480,24 +483,50 @@ class AnalysisExecutor:
                     requested_frame_indices is None
                     or bool(getattr(task, "supports_selective_streaming", False))
             )
-            and callable(getattr(task, "run_stream", None))
+            and (
+                callable(getattr(task, "run_stream", None))
+                or callable(getattr(task, "run_blocks", None))
+            )
             and adapter.supports_streaming(required_data, args)
         )
 
     @classmethod
-    def _run_stream_task(cls, task, frames, request, reporter):
+    def _run_stream_task(cls, task, frames, request, reporter, args: dict):
         """Execute an incremental task against a canonical frame iterator."""
         task_name = task.__class__.__name__
+        policy = resolve_execution_policy(task, request, args)
+        args["_execution_policy"] = policy.as_dict()
+
+        def record_pipeline_timing(
+            phase: str, seconds: float, details: dict[str, object]
+        ) -> None:
+            cls._record_timing(
+                args,
+                phase=phase,
+                task_name=task_name,
+                seconds=seconds,
+                extra=details,
+            )
+
+        pipeline = BoundedFramePipeline(
+            policy,
+            timing_callback=record_pipeline_timing,
+            artifact_writer=args.get("_artifact_writer"),
+        )
         with progress_operation(
                 reporter,
                 "stream",
                 f"Streaming {task_name}",
                 f"Finished {task_name}",
         ) as stream_reporter:
-            params = inspect.signature(task.run_stream).parameters
+            runner = getattr(task, "run_stream", None) or getattr(task, "run_blocks")
+            params = inspect.signature(runner).parameters
+            kwargs = {}
             if "reporter" in params:
-                return task.run_stream(frames, request, reporter=stream_reporter)
-            return task.run_stream(frames, request)
+                kwargs["reporter"] = stream_reporter
+            if "pipeline" in params:
+                kwargs["pipeline"] = pipeline
+            return runner(frames, request, **kwargs)
 
     @classmethod
     def _stream_source_identity(cls, adapter, required_data, args: dict, required_names) -> dict:
@@ -616,7 +645,73 @@ class AnalysisExecutor:
         suffix = f" run_id={run_id}" if run_id else ""
         print(f"[ReaxKit] {message}{suffix}", flush=True)
 
+    @classmethod
+    def _source_bytes(cls, args: dict) -> int:
+        """Return the size of unique input files visible in normalized arguments."""
+        candidates: list[Path] = []
+        for key in cls.DETECTION_HINT_KEYS:
+            value = args.get(key)
+            if value:
+                candidates.append(Path(str(value)))
+        candidates.extend(
+            Path(str(value))
+            for value in dict(args.get("_selective_source_files") or {}).values()
+        )
+        total = 0
+        seen: set[str] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+                if resolved.is_file() and str(resolved) not in seen:
+                    seen.add(str(resolved))
+                    total += int(resolved.stat().st_size)
+            except OSError:
+                continue
+        return total
+
+    @staticmethod
+    def _peak_rss_bytes() -> int | None:
+        """Return process peak RSS where the platform exposes it."""
+        try:
+            import resource
+
+            value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+            return value if sys.platform == "darwin" else value * 1024
+        except (ImportError, OSError, ValueError):
+            try:
+                import psutil
+
+                return int(psutil.Process().memory_info().rss)
+            except (ImportError, OSError):
+                return None
+
     def run(self, task, request, args: dict):
+        """Run an analysis and always persist an end-to-end resource record."""
+        wall_started = perf_counter()
+        cpu_started = process_time()
+        status = "failed"
+        try:
+            result = self._run_impl(task, request, args)
+            status = "success"
+            return result
+        finally:
+            extra = {
+                "status": status,
+                "cpu_seconds": process_time() - cpu_started,
+                "source_bytes": self._source_bytes(args),
+            }
+            peak_rss = self._peak_rss_bytes()
+            if peak_rss is not None:
+                extra["peak_rss_bytes"] = peak_rss
+            self._record_timing(
+                args,
+                phase="end_to_end",
+                task_name=task.__class__.__name__,
+                seconds=perf_counter() - wall_started,
+                extra=extra,
+            )
+
+    def _run_impl(self, task, request, args: dict):
         # ---------------------------------------------------------------------
         # 1) Normalize runtime/storage arguments and derive task/data metadata.
         # ---------------------------------------------------------------------
@@ -657,6 +752,21 @@ class AnalysisExecutor:
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
+
+        # Resolve the engine before asking the task which canonical data it
+        # needs. Scientific settings can change that requirement: for example,
+        # native charges require ElectrostaticsData while formal charges need
+        # only TrajectoryData. Auto-detected engines must follow the same path
+        # as an explicitly selected engine.
+        input_path = self._engine_detection_path(args)
+        forced_engine = args.get("engine")
+        adapter = resolve_engine(input_path, engine=forced_engine)
+        resolved_engine = adapter.__class__.__name__.removesuffix("Adapter").lower()
+        args["_resolved_engine"] = resolved_engine
+        args["_native_charges_required_for_auto"] = bool(
+            getattr(task, "native_charges_required_for_auto", False)
+        )
+
         required_data = (
             task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task,
                                                                                                      "required_data",
@@ -706,12 +816,21 @@ class AnalysisExecutor:
         # 3) Resolve engine adapter from input hints and snapshot required raw
         #    inputs into run-scoped storage for traceability/reproducibility.
         # ---------------------------------------------------------------------
-        input_path = self._engine_detection_path(args)
-        forced_engine = args.get("engine")
         self._console_step(args, f"Resolving engine input={input_path} forced_engine={forced_engine or 'auto'}")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
-        adapter = resolve_engine(input_path, engine=forced_engine)
-        self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
+        self._console_step(
+            args,
+            f"Resolved engine={resolved_engine} adapter={adapter.__class__.__name__}",
+        )
+        policy = resolve_execution_policy(task, request, args)
+        args["_execution_policy"] = policy.as_dict()
+        self._record_timing(
+            args,
+            phase="execution_policy",
+            task_name=task_name,
+            seconds=0.0,
+            extra=policy.as_dict(),
+        )
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
         required_input_files = getattr(adapter, "required_input_files", None)
         snapshot_names = required_input_files(required_data, args) if callable(required_input_files) else None
@@ -822,7 +941,7 @@ class AnalysisExecutor:
             t_stream0 = perf_counter()
             try:
                 frames = adapter.stream(required_data, args, reporter=reporter)
-                result = self._run_stream_task(task, frames, request, reporter)
+                result = self._run_stream_task(task, frames, request, reporter, args)
             except (ParseError, AnalysisError):
                 raise
             except Exception as exc:

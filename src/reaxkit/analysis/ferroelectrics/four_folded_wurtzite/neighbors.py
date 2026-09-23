@@ -579,10 +579,24 @@ def required_wurtzite_data_type(request: WurtziteNeighborRequest, args: dict | N
     if request.charge_source == "reaxff":
         return ElectrostaticsData
     if args is None:
-        # Shared validation has no runtime path context. Both representations
-        # are valid for ``auto``; the executor already selected one using the
-        # normalized source arguments.
+        # Shared validation has no runtime engine context. The executor resolves
+        # the engine before calling this method with runtime arguments.
         return TrajectoryData, ElectrostaticsData
+    if args.get("_native_charges_required_for_auto"):
+        resolved_engine = str(
+            args.get("_resolved_engine") or args.get("engine") or ""
+        ).strip().lower()
+        if resolved_engine in {"ams", "reaxff"}:
+            # For projected polarity, auto means native per-atom charges from
+            # the selected/detected engine: AMS KF charges or ReaxFF fort.7.
+            return ElectrostaticsData
+        if resolved_engine:
+            raise ValueError(
+                "--charge-source auto requires an engine with per-frame atomic-charge "
+                f"support; detected engine: {resolved_engine}. Use --charge-source formal."
+            )
+    # Direct task callers may not have gone through AnalysisExecutor's engine
+    # resolution. Preserve path-based inference for that compatibility case.
     return ElectrostaticsData if _candidate_charge_file(args or {}) is not None else TrajectoryData
 
 

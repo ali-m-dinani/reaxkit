@@ -47,6 +47,11 @@ def test_analysis_executor_writes_timing_log_by_default(monkeypatch, tmp_path: P
     phases = {rec.get("phase") for rec in records}
     assert "load" in phases
     assert "analyze" in phases
+    assert "end_to_end" in phases
+    end_to_end = next(rec for rec in records if rec.get("phase") == "end_to_end")
+    assert end_to_end["status"] == "success"
+    assert end_to_end["cpu_seconds"] >= 0.0
+    assert end_to_end["source_bytes"] >= 0
 
     logs_dir = Path(args["project_root"]) / "logs"
     assert (logs_dir / "reaxkit.log").exists()

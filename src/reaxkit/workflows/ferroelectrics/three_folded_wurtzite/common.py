@@ -45,6 +45,23 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def restrict_native_charge_input(parser: argparse.ArgumentParser) -> None:
+    """Limit projected-polarity input to supported engines and charge modes."""
+    for action in parser._actions:
+        if action.dest == "engine":
+            action.choices = ("ams", "reaxff")
+            action.help = (
+                "Select AMS/KF or ReaxFF text input. If omitted, ReaxKit detects "
+                "the engine from the input path."
+            )
+        elif action.dest == "charge_source":
+            action.choices = ("auto", "formal")
+            action.help = (
+                "Use charges from the selected/detected engine, or use the values "
+                "provided by --formal-charge. Default: auto."
+            )
+
+
 def add_structure_arguments(parser: argparse.ArgumentParser, *, include_polarity: bool = False) -> None:
     parser.add_argument(
         "--center", "--cation", dest="centers", nargs="+", default=["Al"],
@@ -117,5 +134,6 @@ def add_structure_arguments(parser: argparse.ArgumentParser, *, include_polarity
 __all__ = [
     "add_input_arguments", "add_structure_arguments", "artifact_directory",
     "parse_formal_charges", "runtime_arguments", "structural_request_kwargs",
+    "restrict_native_charge_input",
     "workspace_artifact_directory",
 ]

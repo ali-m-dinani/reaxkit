@@ -1342,6 +1342,17 @@ def add_storage_cli_arguments(parser: argparse.ArgumentParser) -> None:
         default=10.0,
         help="Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB.",
     )
+    parser.add_argument(
+        "--output-profile",
+        choices=["minimal", "standard", "full", "legacy"],
+        default="standard",
+        help=(
+            "Select the shared artifact policy. Standard writes declared default "
+            "outputs; minimal keeps core tables; full and legacy include optional "
+            "details. Default: standard. Example: --output-profile full, which "
+            "includes declared optional detail tables."
+        ),
+    )
 
 
 def _copy_if_exists(src: Path, dst: Path) -> None:

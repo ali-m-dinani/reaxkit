@@ -31,6 +31,10 @@ from reaxkit.engine.reaxff.io.base import BaseHandler
 from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
 
 
+_FRAME_CACHE_BATCH_SIZE = 16
+_OFFSET_CACHE_BATCH_SIZE = 128
+
+
 def _parse_xmolout_header(
         raw: str,
         *,
@@ -254,7 +258,12 @@ class XmoloutHandler(BaseHandler):
             self._reporter("load", total_lines, total_lines, "Finished parsing xmolout")
         return df, meta
 
-    def _frame_store(self) -> FrameStore | None:
+    def _frame_store(
+            self,
+            *,
+            streaming: bool = False,
+            coordinates_only: bool = False,
+    ) -> FrameStore | None:
         """Return the shared source-frame store, or ``None`` when disabled."""
         if not self._input_cache:
             return None
@@ -263,15 +272,27 @@ class XmoloutHandler(BaseHandler):
             configured = os.environ.get("REAXKIT_FRAME_CACHE_DIR", "").strip()
             root = Path(configured) if configured else self._cache_root().parent
         try:
+            representation = (
+                "xmolout-coordinate-stream-v1"
+                if streaming and coordinates_only
+                else "xmolout-stream-v1"
+                if streaming
+                else "xmolout-full-frame-v1"
+            )
+            capabilities = (
+                ("coordinates", "cell", "energy")
+                if streaming and coordinates_only
+                else ("coordinates", "atom-extras", "cell", "energy")
+            )
             return FrameStore.for_source(
                 root,
                 self.path,
                 engine="reaxff",
                 source_kind="xmolout",
                 parser=f"{self.__class__.__module__}.{self.__class__.__qualname__}",
-                parser_version="3",
-                representation="xmolout-full-frame-v1",
-                capabilities=("coordinates", "atom-extras", "cell", "energy"),
+                parser_version="4",
+                representation=representation,
+                capabilities=capabilities,
                 options={"extra_atom_cols": self._extra_atom_cols or []},
             )
         except (OSError, RuntimeError, ValueError):
@@ -304,12 +325,21 @@ class XmoloutHandler(BaseHandler):
         if coverage.complete or coverage.next_frame_index > through_index:
             return {"indexed_frames": 0, "index_bytes": 0, "index_seconds": 0.0}
 
+        pending_offsets: list[FrameOffset] = []
+
+        def flush_offsets(next_frame_index: int, next_byte_offset: int) -> None:
+            if pending_offsets:
+                store.put_offsets(pending_offsets)
+                pending_offsets.clear()
+            store.set_coverage(IndexCoverage(next_frame_index, next_byte_offset, False))
+
         with self.path.open("rb") as handle:
             handle.seek(coverage.next_byte_offset)
             frame_index = coverage.next_frame_index
             while frame_index <= through_index:
                 item = self._next_nonempty_binary(handle)
                 if item is None:
+                    flush_offsets(frame_index, handle.tell())
                     store.set_coverage(IndexCoverage(frame_index, handle.tell(), True))
                     break
                 byte_start, raw_count, _ = item
@@ -320,6 +350,7 @@ class XmoloutHandler(BaseHandler):
                 atom_count = int(values[0])
                 header_item = self._next_nonempty_binary(handle)
                 if header_item is None:
+                    flush_offsets(frame_index, byte_start)
                     store.set_coverage(IndexCoverage(frame_index, byte_start, True))
                     break
                 _, raw_header, _ = header_item
@@ -337,16 +368,18 @@ class XmoloutHandler(BaseHandler):
                         complete = False
                         break
                 if not complete:
+                    flush_offsets(frame_index, byte_start)
                     store.set_coverage(IndexCoverage(frame_index, byte_start, True))
                     break
                 byte_end = handle.tell()
-                store.put_offsets(
-                    [FrameOffset(frame_index, byte_start, byte_end, iteration, atom_count)]
+                pending_offsets.append(
+                    FrameOffset(frame_index, byte_start, byte_end, iteration, atom_count)
                 )
                 frame_index += 1
                 indexed += 1
                 bytes_read += byte_end - byte_start
-                store.set_coverage(IndexCoverage(frame_index, byte_end, False))
+                if len(pending_offsets) >= _OFFSET_CACHE_BATCH_SIZE:
+                    flush_offsets(frame_index, byte_end)
                 if self._reporter and progress_total > 0:
                     self._reporter(
                         progress_stage,
@@ -356,11 +389,62 @@ class XmoloutHandler(BaseHandler):
                     )
             else:
                 # Coverage is a safe resume point even though EOF is not yet known.
-                store.set_coverage(IndexCoverage(frame_index, handle.tell(), False))
+                flush_offsets(frame_index, handle.tell())
         return {
             "indexed_frames": indexed,
             "index_bytes": bytes_read,
             "index_seconds": perf_counter() - started_at,
+        }
+
+    def _stream_selected_frames_one_pass(
+            self,
+            store: FrameStore,
+            requested_order: list[int],
+            *,
+            coordinates_only: bool,
+    ) -> Iterator[Dict[str, Any]]:
+        """Populate a cold stream cache without indexing and rereading the source."""
+        pending: dict[int, dict[str, Any]] = {}
+        parsed_frames = 0
+        if callable(self._reporter):
+            self._reporter("stream", 0, len(requested_order), "Reading xmolout frames")
+        sequential = XmoloutHandler(
+            self.path,
+            extra_atom_cols=self._extra_atom_cols,
+            frame_indices=requested_order,
+            reporter=self._reporter,
+            input_cache=False,
+        )
+        for record in sequential.stream_file_frames(coordinates_only=coordinates_only):
+            source_index = int(record["source_index"])
+            cached_record = dict(record)
+            cached_record["simulation_name"] = sequential.simulation_name
+            pending[source_index] = cached_record
+            parsed_frames += 1
+            if len(pending) >= _FRAME_CACHE_BATCH_SIZE:
+                store.put_frames(pending)
+                pending.clear()
+            yield record
+        if pending:
+            store.put_frames(pending)
+        if callable(self._reporter):
+            self._reporter(
+                "stream",
+                parsed_frames,
+                len(requested_order),
+                "Read xmolout frames",
+            )
+        self.simulation_name = sequential.simulation_name
+        self._frame_cache_stats = {
+            "requested": len(requested_order),
+            "hits": 0,
+            "misses": len(requested_order),
+            "parsed_frames": parsed_frames,
+            "source_bytes": int(self.path.stat().st_size),
+            "indexed_frames": 0,
+            "index_bytes": 0,
+            "index_seconds": 0.0,
+            "one_pass": True,
         }
 
     def _parse_indexed_frame(self, handle, offset: FrameOffset) -> dict[str, Any]:
@@ -653,12 +737,27 @@ class XmoloutHandler(BaseHandler):
         """
         if self._frame_indices is not None:
             requested_order = list(self._frame_indices)
-            store = self._frame_store()
+            store = self._frame_store(
+                streaming=True,
+                coordinates_only=coordinates_only,
+            )
             if store is not None:
                 initially_available = store.available_indices(requested_order)
                 missing = [index for index in requested_order if index not in initially_available]
                 through_index = max(missing, default=-1)
                 coverage = store.get_coverage()
+                if (
+                        missing
+                        and not initially_available
+                        and coverage.next_frame_index == 0
+                        and requested_order == sorted(requested_order)
+                ):
+                    yield from self._stream_selected_frames_one_pass(
+                        store,
+                        requested_order,
+                        coordinates_only=coordinates_only,
+                    )
+                    return
                 index_work = (
                     max(0, through_index - coverage.next_frame_index + 1)
                     if missing and not coverage.complete
@@ -677,43 +776,55 @@ class XmoloutHandler(BaseHandler):
                 offsets = store.get_offsets(missing)
                 parsed_frames = 0
                 source_bytes = 0
+                pending: dict[int, dict[str, Any]] = {}
                 with self.path.open("rb") as handle:
-                    for emitted, source_index in enumerate(requested_order, start=1):
-                        cached = store.get_frames([source_index])
-                        record = cached.get(source_index)
-                        if record is None:
-                            offset = offsets.get(source_index)
-                            if offset is None:
-                                continue
-                            record = self._parse_indexed_frame(handle, offset)
-                            store.put_frames({source_index: record})
-                            parsed_frames += 1
-                            source_bytes += int(record.get("source_bytes", 0))
-                        summary = record["summary"]
-                        frame = record["frame"]
-                        if not self.simulation_name:
-                            self.simulation_name = str(record.get("simulation_name") or "")
-                        if callable(self._reporter):
-                            self._reporter(
-                                "stream",
-                                index_work + emitted,
-                                total_work,
-                                "Reading xmolout frames",
-                            )
-                        output = {
-                            "source_index": source_index,
-                            "iter": int(summary[1]),
-                            "num_of_atoms": int(summary[0]),
-                            "potential_energy": float(summary[2]),
-                            "cell_lengths": list(summary[3:6]),
-                            "cell_angles": list(summary[6:9]),
-                        }
-                        if coordinates_only:
-                            output["coordinates"] = frame[["x", "y", "z"]].to_numpy(dtype=float)
-                            output["elements"] = frame["atom_type"].astype(str).tolist()
-                        else:
-                            output["frame"] = frame
-                        yield output
+                    for batch_start in range(0, len(requested_order), _FRAME_CACHE_BATCH_SIZE):
+                        batch = requested_order[batch_start:batch_start + _FRAME_CACHE_BATCH_SIZE]
+                        cached_batch = store.get_frames(batch)
+                        for batch_offset, source_index in enumerate(batch, start=1):
+                            record = cached_batch.get(source_index)
+                            if record is None:
+                                offset = offsets.get(source_index)
+                                if offset is None:
+                                    continue
+                                indexed_record = self._parse_indexed_frame(handle, offset)
+                                summary = indexed_record["summary"]
+                                frame = indexed_record["frame"]
+                                record = {
+                                    "source_index": source_index,
+                                    "iter": int(summary[1]),
+                                    "num_of_atoms": int(summary[0]),
+                                    "potential_energy": float(summary[2]),
+                                    "cell_lengths": list(summary[3:6]),
+                                    "cell_angles": list(summary[6:9]),
+                                    "simulation_name": str(
+                                        indexed_record.get("simulation_name") or ""
+                                    ),
+                                }
+                                if coordinates_only:
+                                    record["coordinates"] = frame[["x", "y", "z"]].to_numpy(dtype=float)
+                                    record["elements"] = frame["atom_type"].astype(str).tolist()
+                                else:
+                                    record["frame"] = frame
+                                pending[source_index] = record
+                                parsed_frames += 1
+                                source_bytes += int(indexed_record.get("source_bytes", 0))
+                            if not self.simulation_name:
+                                self.simulation_name = str(record.get("simulation_name") or "")
+                            emitted = batch_start + batch_offset
+                            if callable(self._reporter):
+                                self._reporter(
+                                    "stream",
+                                    index_work + emitted,
+                                    total_work,
+                                    "Reading xmolout frames",
+                                )
+                            output = dict(record)
+                            output.pop("simulation_name", None)
+                            yield output
+                        if pending:
+                            store.put_frames(pending)
+                            pending.clear()
                 self._frame_cache_stats = {
                     "requested": len(requested_order),
                     "hits": len(initially_available),
