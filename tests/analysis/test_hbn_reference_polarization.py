@@ -16,6 +16,7 @@ from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
 )
 from reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity import (
     HBNReferenceProjectedPolarityRequest,
+    HBNReferenceProjectedPolarityTask,
     calculate_hbn_reference_projected_polarity,
 )
 from reaxkit.core.platform.constants import const
@@ -540,6 +541,51 @@ def test_projected_polarity_can_use_layer_resolved_dipoles(reference_path) -> No
     assert projected["negative_count"] == 8
     assert result.centers["local_layer_id"].nunique() == 8
     assert result.centers["local_grouping"].eq("layer").all()
+
+
+def test_projected_polarity_streams_chunks_without_retaining_centers(reference_path) -> None:
+    single = _trajectory_from_reference(reference_path)
+    labels = np.asarray(single.elements)
+    positions = np.repeat(single.positions, 2, axis=0)
+    positions[1, labels == "Al", 2] += 0.1
+    assert single.simulation is not None
+
+    def frame(source: int) -> TrajectoryData:
+        simulation = SimulationData(
+            atom_ids=single.atom_ids,
+            iterations=np.asarray([20 + source]),
+            elements=single.elements,
+            cell_lengths=np.asarray([single.simulation.cell_lengths[0]]),
+            cell_angles=np.asarray([single.simulation.cell_angles[0]]),
+        )
+        return TrajectoryData(
+            positions=positions[source: source + 1],
+            elements=single.elements,
+            atom_ids=single.atom_ids,
+            iterations=np.asarray([20 + source]),
+            simulation=simulation,
+            source_frame_indices=np.asarray([source]),
+        )
+
+    request = HBNReferenceProjectedPolarityRequest(
+        reference_path=reference_path,
+        replication=(2, 1, 1),
+        frames=(0, 1),
+        component="z",
+        projection_plane="xz",
+        projection_bins=(1, 1),
+        profile_axis="z",
+        include_centers=False,
+        workers=2,
+        chunk_size=1,
+    )
+    result = HBNReferenceProjectedPolarityTask().run_stream(
+        iter([frame(0), frame(1)]), request
+    )
+
+    assert result.centers.empty
+    assert result.frame_indices.tolist() == [0, 1]
+    assert result.whole_slab_summary.set_index("frame_index").loc[1, "negative_count"] == 4
 
 
 def test_reaxff_local_cells_are_neutralized_without_losing_raw_global_closure(

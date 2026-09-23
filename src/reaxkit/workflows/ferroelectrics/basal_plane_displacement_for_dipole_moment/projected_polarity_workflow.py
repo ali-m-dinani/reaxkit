@@ -48,6 +48,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 Each valid center contributes -1, 0, or +1 according to the selected dipole
 component. Atom-to-bin assignments are fixed from the reference frame. The mean
 therefore measures the signed polarity population without magnitude weighting.
+Detailed per-center rows are omitted by default; --write-centers writes them
+as Parquet unless CSV is explicitly requested.
 
 Examples:
   reaxkit get-basal-plane-displacement-projected-polarity --periodic xy --charge-source formal --formal-charge Al=3 N=-3 --projection-plane xz --projection-bins 40 40 --plot-2d --plot-kymograph
@@ -89,6 +91,29 @@ Examples:
         ),
     )
     parser.add_argument(
+        "--write-centers",
+        action="store_true",
+        help="Write the optional detailed per-center polarity table.",
+    )
+    parser.add_argument(
+        "--centers-format",
+        choices=["parquet", "csv"],
+        default="parquet",
+        help="Choose the detailed centers-table format. Default: parquet.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Analyze frames with this many bounded worker threads. Default: 1.",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=16,
+        help="Maximum frames submitted to workers at once. Default: 16.",
+    )
+    parser.add_argument(
         "--plot-2d", action="store_true",
         help="Write one projection-plane mean-polarity heatmap per selected frame.",
     )
@@ -126,6 +151,9 @@ def build_request(args: argparse.Namespace) -> BasalPlaneProjectedPolarityReques
         profile_axis=profile_axis,
         reference_frame=int(args.reference_frame),
         dipole_zero_tolerance=float(args.dipole_zero_tolerance),
+        include_centers=bool(args.write_centers),
+        workers=int(args.workers),
+        chunk_size=int(args.chunk_size),
     )
 
 
@@ -243,10 +271,15 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
-    centers = output / "basal_plane_projected_polarity_centers.csv"
+    centers_format = str(args.centers_format)
+    centers = output / f"basal_plane_projected_polarity_centers.{centers_format}"
     projected = output / "basal_plane_projected_polarity_2d.csv"
     kymograph = output / "basal_plane_projected_polarity_kymograph.csv"
-    result.centers.to_csv(centers, index=False)
+    if args.write_centers:
+        if centers_format == "parquet":
+            result.centers.to_parquet(centers, index=False)
+        else:
+            result.centers.to_csv(centers, index=False)
     result.projected_bins.to_csv(projected, index=False)
     result.kymograph_bins.to_csv(kymograph, index=False)
     plots = (
@@ -259,7 +292,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     args.suppress_table = True
     present_result(canonical, result, args)
-    print(f"Wrote per-center polarity signs to {centers}")
+    if args.write_centers:
+        print(f"Wrote detailed per-center polarity signs to {centers}")
     print(f"Wrote projected mean-polarity bins to {projected}")
     print(f"Wrote kymograph bins to {kymograph}")
     if plots:

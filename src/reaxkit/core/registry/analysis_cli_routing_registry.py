@@ -316,6 +316,28 @@ register_analysis_command(
     module_path="reaxkit.workflows.electrostatics.dielectric_constant_workflow",
     aliases=("get_dielectric_constant", "dielectric-constant"),
 )
+register_analysis_command(
+    "fit-switching-kinetics",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.switching_kinetics.comparison_workflow"
+    ),
+    aliases=("fit_switching_kinetics",),
+)
+register_analysis_command(
+    "fit-kai-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.kai_workflow",
+    aliases=("fit_kai_switching",),
+)
+register_analysis_command(
+    "fit-nls-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.nls_workflow",
+    aliases=("fit_nls_switching",),
+)
+register_analysis_command(
+    "fit-snng-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.snng_workflow",
+    aliases=("fit_snng_switching",),
+)
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.kinematics_workflow")

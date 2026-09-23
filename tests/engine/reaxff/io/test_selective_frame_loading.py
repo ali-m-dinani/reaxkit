@@ -282,13 +282,10 @@ def test_electrostatics_streams_report_xmolout_and_fort7_separately(
         assert [current for _, current, _, _ in source_events] == sorted(
             current for _, current, _, _ in source_events
         )
-    xmolout_event_indices = [
-        index for index, event in enumerate(events) if event[0] == "load xmolout"
-    ]
-    fort7_event_indices = [
-        index for index, event in enumerate(events) if event[0] == "load fort.7"
-    ]
-    assert max(xmolout_event_indices) < min(fort7_event_indices)
+    # The two inputs advance together so selected frames are read once and
+    # aligned without a coordinate-cache prefetch pass.
+    assert any(event[0] == "load xmolout" for event in events)
+    assert any(event[0] == "load fort.7" for event in events)
 
 
 def test_xmolout_covered_misses_use_offsets_without_rescanning(tmp_path: Path):

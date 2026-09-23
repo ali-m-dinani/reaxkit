@@ -142,6 +142,9 @@ def test_projected_parser_reuses_projection_bins_for_profile_axis() -> None:
     assert request.projection_bins == (1, 10)
     assert request.profile_axis == "z"
     assert request.component == "c"
+    assert not request.include_centers
+    assert request.workers == 1
+    assert request.chunk_size == 16
     assert args.plot_2d and args.plot_kymograph
 
 

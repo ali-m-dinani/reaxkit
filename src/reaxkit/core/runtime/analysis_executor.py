@@ -331,11 +331,16 @@ class AnalysisExecutor:
 
         # Some analyses need an additional reference snapshot that is not in
         # the main frame list (for example displacement relative to frame 0).
-        dependencies = list(primary)
+        references: list[int] = []
         for name in ("reference_frame",):
             value = getattr(request, name, None)
             if value is not None:
-                dependencies.append(int(value))
+                references.append(int(value))
+        dependencies = (
+            [*references, *primary]
+            if bool(getattr(request, "stream_reference_first", False))
+            else [*primary, *references]
+        )
         return list(dict.fromkeys(i for i in dependencies if i >= 0))
 
     @staticmethod

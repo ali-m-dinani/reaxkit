@@ -294,23 +294,10 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
     input_cache = bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False))
-    if split_file_progress:
-        # Prime the selected-frame cache before opening fort.7. This keeps the
-        # two physical reads and their progress bars sequential while retaining
-        # constant-memory streaming for the analysis itself.
-        prefetch = XmoloutHandler(
-            xmol_path,
-            frame_indices=selected,
-            reporter=coordinate_reporter,
-            input_cache=input_cache,
-        ).stream_file_frames(coordinates_only=total_electrostatics)
-        for _ in prefetch:
-            pass
-
     coordinate_records = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
-        reporter=None if split_file_progress else coordinate_reporter,
+        reporter=coordinate_reporter,
         input_cache=input_cache,
     ).stream_file_frames(coordinates_only=total_electrostatics)
 

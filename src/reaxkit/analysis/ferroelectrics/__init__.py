@@ -26,6 +26,16 @@ from reaxkit.analysis.ferroelectrics.dynamic_charge import (
     DynamicChargeChangeTask,
     calculate_dynamic_charge_changes,
 )
+from reaxkit.analysis.ferroelectrics.switching_kinetics import (
+    SwitchingFitResult,
+    compare_switching_models,
+    estimate_kai_t0,
+    fit_switching_model,
+    kai_fraction,
+    nls_fraction,
+    snng_fraction,
+    snng_fraction_physical,
+)
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite import (
     PolarityExtendedXYZRequest,
     PolarityExtendedXYZResult,
@@ -59,6 +69,14 @@ __all__ = [
     "DynamicChargeChangeResult",
     "DynamicChargeChangeTask",
     "calculate_dynamic_charge_changes",
+    "SwitchingFitResult",
+    "compare_switching_models",
+    "estimate_kai_t0",
+    "fit_switching_model",
+    "kai_fraction",
+    "nls_fraction",
+    "snng_fraction",
+    "snng_fraction_physical",
     "PolarityExtendedXYZRequest",
     "PolarityExtendedXYZResult",
     "PolarityExtendedXYZTask",

@@ -310,6 +310,13 @@ profile reuses the matching projection bins. For `--projection-plane xz
 --projection-bins 1 10 --profile-axis z`, the kymograph therefore has 10 z
 bins. `--plot-evolution` remains an alias for `--plot-kymograph`.
 
+This projected command streams selected frames and calculates only the chosen
+center-dipole component. It does not build the full per-ion basal-plane table.
+Use `--workers N` for bounded frame-level parallelism and `--chunk-size N` to
+limit queued frames. Detailed center rows are off by default; request them
+with `--write-centers`. They use Parquet by default, or CSV with
+`--centers-format csv`.
+
 ```powershell
 reaxkit get-basal-plane-displacement-projected-polarity `
   --periodic xy `
@@ -321,6 +328,8 @@ reaxkit get-basal-plane-displacement-projected-polarity `
   --projection-plane xz `
   --projection-bins 40 40 `
   --profile-axis z `
+  --workers 4 `
+  --chunk-size 16 `
   --plot-2d `
   --plot-kymograph
 ```
@@ -613,6 +622,13 @@ The profile uses the corresponding count from `--projection-bins`; for
 `--projection-plane xz --projection-bins 1 40 --profile-axis z`, it has 40 z
 bins.
 
+The command streams selected ReaxFF frames, aggregates only the requested
+cell or layer grouping with NumPy, and keeps frame work in bounded chunks.
+`--workers N` processes up to N frames concurrently; set BLAS/OpenMP thread
+counts to 1 when using multiple workers. The detailed per-group centers table
+is off by default. Request it with `--write-centers`; it is written as Parquet
+by default, or as CSV with `--centers-format csv`.
+
 ```powershell
 reaxkit get-hbn-reference-projected-polarity `
   --replication 19 19 10 `
@@ -625,6 +641,7 @@ reaxkit get-hbn-reference-projected-polarity `
   --projection-plane xz `
   --projection-bins 1 40 `
   --profile-axis z `
-  --plot-2d `
+  --workers 4 `
+  --chunk-size 16 `
   --plot-kymograph
 ```

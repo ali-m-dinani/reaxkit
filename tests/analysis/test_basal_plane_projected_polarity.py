@@ -16,6 +16,7 @@ from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.
 )
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity import (
     BasalPlaneProjectedPolarityRequest,
+    BasalPlaneProjectedPolarityTask,
     calculate_basal_plane_projected_polarity,
 )
 from reaxkit.domain.data_models import TrajectoryData
@@ -122,6 +123,33 @@ def test_profile_axis_must_belong_to_projection_plane() -> None:
 
     with pytest.raises(ValueError, match="projection-plane axes"):
         calculate_basal_plane_projected_polarity(_trajectory(), request)
+
+
+def test_projected_polarity_streams_parallel_chunks_without_centers() -> None:
+    trajectory = _trajectory()
+
+    def frame(source: int) -> TrajectoryData:
+        return TrajectoryData(
+            positions=trajectory.positions[source: source + 1],
+            elements=trajectory.elements,
+            atom_ids=trajectory.atom_ids,
+            iterations=trajectory.iterations[source: source + 1],
+            source_frame_indices=np.asarray([source]),
+        )
+
+    request = _request()
+    request.frames = (0, 1)
+    request.include_centers = False
+    request.workers = 2
+    request.chunk_size = 1
+    result = BasalPlaneProjectedPolarityTask().run_stream(
+        iter([frame(0), frame(1)]), request
+    )
+
+    assert result.centers.empty
+    assert result.dipole_result is None
+    assert result.frame_indices.tolist() == [0, 1]
+    assert result.projected_bins["mean_polarity"].tolist() == pytest.approx([0.0, -1.0])
 
 
 def test_basal_plane_outputs_register_directional_poled_count_csvs() -> None:

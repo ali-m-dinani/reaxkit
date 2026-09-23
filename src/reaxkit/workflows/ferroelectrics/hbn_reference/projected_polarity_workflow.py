@@ -53,7 +53,8 @@ Each neutral reference cell contributes -1, 0, or +1 from the selected local
 dipole component. Zero dipoles remain in the average. Spatial assignments are
 made once from --reference-frame and remain fixed as atoms move. --plot-2d
 writes one TEM-like projection per frame; --plot-kymograph writes the complete
-frame-versus-position evolution map.
+frame-versus-position evolution map. Detailed per-group centers are omitted by
+default; --write-centers writes them as Parquet unless CSV is requested.
 
 Example:
   reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source reaxff --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
@@ -124,6 +125,29 @@ Example:
         ),
     )
     parser.add_argument(
+        "--write-centers",
+        action="store_true",
+        help="Write the optional detailed per-cell/per-layer polarity table.",
+    )
+    parser.add_argument(
+        "--centers-format",
+        choices=["parquet", "csv"],
+        default="parquet",
+        help="Choose the detailed centers-table format. Default: parquet.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Analyze frames with this many bounded worker threads. Default: 1.",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=16,
+        help="Maximum frames submitted to workers at once. Default: 16.",
+    )
+    parser.add_argument(
         "--plot-2d",
         action="store_true",
         help="Write one projection-plane mean-polarity heatmap per selected frame.",
@@ -146,7 +170,7 @@ Example:
 
 def build_request(args: argparse.Namespace) -> HBNReferenceProjectedPolarityRequest:
     base = global_workflow.build_request(args)
-    base.include_displacements = True
+    base.include_displacements = False
     projection_plane = cast(ProjectionPlane, str(args.projection_plane))
     profile_axis = cast(
         CartesianAxis,
@@ -163,6 +187,9 @@ def build_request(args: argparse.Namespace) -> HBNReferenceProjectedPolarityRequ
         projection_bins=tuple(int(value) for value in args.projection_bins),
         profile_axis=profile_axis,
         dipole_zero_tolerance=float(args.dipole_zero_tolerance),
+        include_centers=bool(args.write_centers),
+        workers=int(args.workers),
+        chunk_size=int(args.chunk_size),
     )
 
 
@@ -293,13 +320,18 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
-    cells_path = output / "hbn_reference_projected_polarity_cells.csv"
+    centers_format = str(args.centers_format)
+    centers_path = output / f"hbn_reference_projected_polarity_centers.{centers_format}"
     projected_path = output / "hbn_reference_projected_polarity_2d.csv"
     kymograph_path = output / "hbn_reference_projected_polarity_kymograph.csv"
     whole_slab_summary_path = (
             output / "hbn_reference_projected_polarity_whole_slab_summary.csv"
     )
-    result.centers.to_csv(cells_path, index=False)
+    if args.write_centers:
+        if centers_format == "parquet":
+            result.centers.to_parquet(centers_path, index=False)
+        else:
+            result.centers.to_csv(centers_path, index=False)
     result.projected_bins.to_csv(projected_path, index=False)
     result.kymograph_bins.to_csv(kymograph_path, index=False)
     result.whole_slab_summary.to_csv(whole_slab_summary_path, index=False)
@@ -315,7 +347,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     args.suppress_table = True
     present_result(canonical, result, args)
-    print(f"Wrote per-cell polarity signs to {cells_path}")
+    if args.write_centers:
+        print(f"Wrote detailed per-group polarity signs to {centers_path}")
     print(f"Wrote projected mean-polarity bins to {projected_path}")
     print(f"Wrote kymograph bins to {kymograph_path}")
     print(f"Wrote whole-slab polarity counts and percentages to {whole_slab_summary_path}")

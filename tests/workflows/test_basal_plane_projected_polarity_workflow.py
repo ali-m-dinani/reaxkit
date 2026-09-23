@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 import numpy as np
+import pandas as pd
 
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity import (
     BasalPlaneProjectedPolarityRequest,
@@ -68,6 +69,9 @@ def test_parser_builds_tem_projection_request() -> None:
     assert request.reference_frame == 0
     assert request.projection_bins[1] == 30
     assert request.component == "z"
+    assert not request.include_centers
+    assert request.workers == 1
+    assert request.chunk_size == 16
     assert args.plot_2d and args.plot_kymograph
 
 
@@ -95,3 +99,43 @@ def test_heatmap_generators_write_frame_and_evolution_plots(tmp_path) -> None:
     assert all(path.is_file() for path in frames)
     assert kymograph.name == "projected_polarity_kymograph.png"
     assert kymograph.is_file()
+
+
+def test_workflow_writes_optional_centers_as_parquet(tmp_path, monkeypatch) -> None:
+    result = calculate_basal_plane_projected_polarity(_trajectory(), _request_for_output())
+    parser = projected_polarity_workflow.build_parser(
+        argparse.ArgumentParser(), command=projected_polarity_workflow.COMMAND
+    )
+    args = parser.parse_args([
+        "--periodic", "none",
+        "--charge-source", "formal",
+        "--formal-charge", "Al=3", "N=-3",
+        "--write-centers",
+    ])
+
+    class StubExecutor:
+        @staticmethod
+        def run(*_args, **_kwargs):
+            return result
+
+    monkeypatch.setattr(projected_polarity_workflow, "AnalysisExecutor", StubExecutor)
+    monkeypatch.setattr(
+        projected_polarity_workflow, "artifact_directory", lambda *_args, **_kwargs: tmp_path
+    )
+    monkeypatch.setattr(projected_polarity_workflow, "present_result", lambda *_args, **_kwargs: None)
+
+    assert projected_polarity_workflow.run_main(projected_polarity_workflow.COMMAND, args) == 0
+    centers = tmp_path / "basal_plane_projected_polarity_centers.parquet"
+    assert centers.is_file()
+    assert len(pd.read_parquet(centers)) == len(result.centers)
+
+
+def _request_for_output() -> BasalPlaneProjectedPolarityRequest:
+    return BasalPlaneProjectedPolarityRequest(
+        periodic=(False, False, False),
+        charge_source="formal",
+        formal_charges={"Al": 3.0, "N": -3.0},
+        projection_plane="xz",
+        projection_bins=(1, 1),
+        profile_axis="z",
+    )

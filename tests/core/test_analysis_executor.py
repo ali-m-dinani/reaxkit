@@ -128,6 +128,14 @@ def test_executor_builds_selective_load_plan_only_for_explicit_frames():
     assert AnalysisExecutor._requested_frame_indices(_FrameRequest([]), TrajectoryData) is None
 
 
+def test_selective_stream_can_request_reference_frame_first():
+    request = _FrameRequest([10, 20])
+    request.reference_frame = 0
+    request.stream_reference_first = True
+
+    assert AnalysisExecutor._requested_frame_indices(request, TrajectoryData) == [0, 10, 20]
+
+
 def test_selective_sources_are_not_copied_into_the_run_snapshot(tmp_path):
     xmolout = tmp_path / "xmolout"
     xmolout.write_text("trajectory", encoding="utf-8")
