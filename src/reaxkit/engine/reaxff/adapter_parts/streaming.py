@@ -35,14 +35,6 @@ STREAMABLE_REAXFF_TYPES = {
     ElectrostaticsData,
 }
 
-_SPLIT_ELECTROSTATICS_PROGRESS_COMMANDS = {
-    "get-potential-and-electric-field",
-    "get_potential_and_electric_field",
-    "write-trajectory-with-potential-and-electric-field",
-    "write_trajectory_with_potential_and_electric_field",
-}
-
-
 def _file_progress_reporter(reporter, *, source_name: str, stage_name: str):
     """Give one streaming source its own user-facing progress stage."""
     if not callable(reporter):
@@ -256,20 +248,19 @@ def _aligned_records(
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
-    command = str(args.get("command") or "").strip().lower()
-    split_electrostatics_progress = (
-        data_type is ElectrostaticsData
-        and command in _SPLIT_ELECTROSTATICS_PROGRESS_COMMANDS
-    )
-    if split_electrostatics_progress and callable(reporter):
-        reporter("stream", 1, 1, "Preparing electrostatics input streams")
+    split_file_progress = selected is not None and data_type in {
+        ConnectivityTrajectoryData,
+        ElectrostaticsData,
+    }
+    if split_file_progress and callable(reporter):
+        reporter("stream", 1, 1, "Preparing input streams")
     coordinate_reporter = (
         _file_progress_reporter(
             reporter,
             source_name="xmolout",
             stage_name="load xmolout",
         )
-        if split_electrostatics_progress
+        if split_file_progress
         else reporter
     )
     fort7_reporter = (
@@ -278,7 +269,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             source_name="fort.7",
             stage_name="load fort.7",
         )
-        if split_electrostatics_progress
+        if split_file_progress
         else None
     )
     if data_type is ChargeData:
@@ -302,11 +293,25 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             and str(args.get("scope") or "total").strip().lower() == "total"
     )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+    input_cache = bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False))
+    if split_file_progress:
+        # Prime the selected-frame cache before opening fort.7. This keeps the
+        # two physical reads and their progress bars sequential while retaining
+        # constant-memory streaming for the analysis itself.
+        prefetch = XmoloutHandler(
+            xmol_path,
+            frame_indices=selected,
+            reporter=coordinate_reporter,
+            input_cache=input_cache,
+        ).stream_file_frames(coordinates_only=total_electrostatics)
+        for _ in prefetch:
+            pass
+
     coordinate_records = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
-        reporter=coordinate_reporter,
-        input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+        reporter=None if split_file_progress else coordinate_reporter,
+        input_cache=input_cache,
     ).stream_file_frames(coordinates_only=total_electrostatics)
 
     if data_type is TrajectoryData:

@@ -45,6 +45,7 @@ LocalGrouping = Literal["cell", "layer"]
 class HBNReferenceLocalPolarizationRequest(HBNReferencePolarizationRequest):
     """Configure neutral-cell dipoles and their local-volume convention."""
 
+    include_displacements: bool = True
     local_volume_method: LocalVolumeMethod = dc_field(
         default="equal",
         metadata={

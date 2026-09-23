@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 
 import numpy as np
+import pandas as pd
 from ase import Atoms
 from ase.io import read
 
@@ -204,3 +205,57 @@ def test_local_and_projected_plot_generators_write_artifacts(tmp_path) -> None:
     assert len(three_dimensional) == 1 and three_dimensional[0].is_file()
     assert len(frame_plots) == 1 and frame_plots[0].is_file()
     assert kymograph.is_file()
+
+
+def test_projected_workflow_writes_whole_slab_polarity_summary(
+        tmp_path, monkeypatch
+) -> None:
+    result = calculate_hbn_reference_projected_polarity(
+        _trajectory(),
+        HBNReferenceProjectedPolarityRequest(
+            reference_path=REFERENCE_STRUCTURE_PATH,
+            replication=(2, 1, 1),
+            component="c",
+            projection_plane="xz",
+            projection_bins=(2, 2),
+            profile_axis="z",
+        ),
+    )
+    output = tmp_path / "projected_output"
+    parser = projected_polarity_workflow.build_parser(
+        argparse.ArgumentParser(), command=projected_polarity_workflow.COMMAND
+    )
+    args = parser.parse_args(["--replication", "2", "1", "1"])
+
+    class StubExecutor:
+        @staticmethod
+        def run(*_args, **_kwargs):
+            return result
+
+    monkeypatch.setattr(projected_polarity_workflow, "AnalysisExecutor", StubExecutor)
+    monkeypatch.setattr(
+        projected_polarity_workflow,
+        "artifact_directory",
+        lambda *_args, **_kwargs: output,
+    )
+    monkeypatch.setattr(
+        projected_polarity_workflow,
+        "present_result",
+        lambda *_args, **_kwargs: None,
+    )
+
+    assert projected_polarity_workflow.run_main(
+        projected_polarity_workflow.COMMAND, args
+    ) == 0
+    summary_path = (
+            output / "hbn_reference_projected_polarity_whole_slab_summary.csv"
+    )
+    assert summary_path.is_file()
+    summary = pd.read_csv(summary_path)
+    assert len(summary) == 1
+    assert summary.loc[0, "spatial_scope"] == "whole_slab"
+    assert summary.loc[0, "defined_group_count"] == len(result.centers)
+    assert summary.loc[0, "defined_group_count"] == result.projected_bins[
+        "defined_group_count"
+    ].sum()
+    assert summary.loc[0, "negative_percentage"] == 100.0

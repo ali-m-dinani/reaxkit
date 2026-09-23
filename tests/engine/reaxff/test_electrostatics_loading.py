@@ -90,3 +90,5 @@ def test_selected_electrostatics_frames_use_one_progress_bar_per_file() -> None:
     assert all(total == 3 for _, _, total, _ in file_events)
     assert file_events[-1] == ("load fort.7", 3, 3, "Reading fort.7 frames")
     assert all("summary" not in str(message).lower() for *_, message in events)
+    stages = [stage for stage, *_ in file_events]
+    assert stages == ["load xmolout", "load xmolout", "load fort.7", "load fort.7"]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 
+import pytest
 from ase import Atoms
 from ase.io import read
 
@@ -35,6 +36,7 @@ def test_parser_builds_default_charge_request() -> None:
     assert request.replication == (2, 3, 4)
     assert request.max_reference_strain == 0.15
     assert request.volume_method == "hull"
+    assert request.include_displacements is False
 
 
 def test_auto_charge_source_uses_fort7_from_pre_snapshot_source(
@@ -95,7 +97,10 @@ def test_parser_supports_explicit_reference_orthogonalization() -> None:
     assert request.volume_method == "cell"
 
 
-def test_workflow_writes_reference_displacements_and_polarization(tmp_path) -> None:
+@pytest.mark.parametrize("write_displacements", [False, True])
+def test_workflow_writes_requested_reference_outputs(
+        tmp_path, write_displacements: bool
+) -> None:
     reference_path = polarization_workflow._default_reference_path()
     reference = read(reference_path)
     assert isinstance(reference, Atoms)
@@ -119,7 +124,7 @@ def test_workflow_writes_reference_displacements_and_polarization(tmp_path) -> N
     parser = polarization_workflow.build_parser(
         argparse.ArgumentParser(), command=polarization_workflow.COMMAND
     )
-    args = parser.parse_args([
+    command_args = [
         "--engine", "reaxff",
         "--input", str(tmp_path),
         "--xmolout", str(xmolout),
@@ -128,10 +133,13 @@ def test_workflow_writes_reference_displacements_and_polarization(tmp_path) -> N
         "--no-orthogonalize-reference",
         "--output-dir", str(output),
         "--project-root", str(tmp_path / "workspace"),
-    ])
+    ]
+    if write_displacements:
+        command_args.append("--write-displacements")
+    args = parser.parse_args(command_args)
 
     assert polarization_workflow.run_main(polarization_workflow.COMMAND, args) == 0
     assert (output / "hbn_reference_polarization.csv").is_file()
-    assert (output / "hbn_reference_displacements.csv").is_file()
+    assert (output / "hbn_reference_displacements.csv").is_file() is write_displacements
     assert (output / "hbn_reference_mapping.csv").is_file()
     assert (output / "AlN_hbn_replicated_aligned.xyz").is_file()

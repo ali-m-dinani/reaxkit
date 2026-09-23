@@ -155,6 +155,7 @@ Examples:
 
 def build_request(args: argparse.Namespace) -> HBNReferenceLocalPolarizationRequest:
     base = global_workflow.build_request(args)
+    base.include_displacements = True
     return HBNReferenceLocalPolarizationRequest(
         **vars(base),
         local_volume_method=cast(LocalVolumeMethod, str(args.local_volume_method)),
@@ -401,7 +402,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     result.cell_summary.to_csv(cell_summary_path, index=False)
     result.layer_table.to_csv(layer_path, index=False)
     result.layer_summary.to_csv(layer_summary_path, index=False)
-    result.reference_result.displacements.to_csv(displacement_path, index=False)
+    if args.write_displacements:
+        result.reference_result.displacements.to_csv(displacement_path, index=False)
     result.reference_result.mapping.to_csv(mapping_path, index=False)
     plots_2d = (
         generate_local_2d_plots(
@@ -447,7 +449,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     print(f"Wrote local/global closure summary to {summary_path}")
     print(f"Wrote crystallographic-cell polarization to {cell_path}")
     print(f"Wrote layer-resolved polarization to {layer_path}")
-    print(f"Wrote per-atom source displacements to {displacement_path}")
+    if args.write_displacements:
+        print(f"Wrote per-atom source displacements to {displacement_path}")
     print(f"Wrote atom-to-cell mapping to {mapping_path}")
     if plots_2d:
         print(f"Wrote {len(plots_2d):,} projected plot(s) under {output / 'plots_2d'}")

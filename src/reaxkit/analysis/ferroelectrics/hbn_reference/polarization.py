@@ -95,6 +95,7 @@ class HBNReferencePolarizationRequest(BaseRequest):
     angle_tolerance_degrees: float = 1.0
     max_reference_strain: float = 0.15
     max_alignment_candidates: int = 8
+    include_displacements: bool = False
     volume_method: VolumeMethod = field(
         default="hull",
         metadata={"label": "Volume method", "choices": ["hull", "bbox", "cell"]},
@@ -125,7 +126,7 @@ class PreparedHBNReference:
 
 @dataclass
 class HBNReferencePolarizationResult(BaseResult):
-    """Per-atom displacements, frame polarization, and aligned reference."""
+    """Frame polarization, optional per-atom displacements, and aligned reference."""
 
     table: pd.DataFrame
     request: HBNReferencePolarizationRequest
@@ -764,7 +765,9 @@ def calculate_hbn_reference_polarization(
         raise RuntimeError("Required dipole/polarization conversion constants are missing.")
     factor = float(factor_value)
     debye_factor = float(debye_value)
-    displacement_tables: list[pd.DataFrame] = []
+    displacement_tables: list[pd.DataFrame] | None = (
+        [] if request.include_displacements else None
+    )
     summary_rows: list[dict[str, object]] = []
     output_iterations: list[int] = []
 
@@ -867,31 +870,32 @@ def calculate_hbn_reference_polarization(
                 else np.nan
             ),
         })
-        reference_positions = reference_for_atoms @ cell
-        frame_columns: dict[str, object] = {
-            "frame_index": np.full(len(xyz), int(frame), dtype=int),
-            "iter": np.full(len(xyz), iteration, dtype=int),
-            "atom_index": np.arange(len(xyz), dtype=int),
-            "atom_id": atom_ids,
-            "element": labels.astype(str),
-            "reference_atom_index": assignment,
-            "reference_element": reference_symbols[assignment].astype(str),
-            "local_cell_id": prepared.local_cell_ids[assignment],
-            "local_layer_id": prepared.local_layer_ids[assignment],
-            "charge_source": np.full(len(xyz), resolved_charge_source, dtype=object),
-            "charge (e)": charges,
-            "electron_charge_sign": np.full(len(xyz), ELECTRON_CHARGE_SIGN),
-            "displacement_c (angstrom)": displacement_c,
-            "dipole_c (e*angstrom)": dipole_c,
-            "dipole_c (debye)": dipole_c * debye_factor,
-        }
-        for component, axis in enumerate("xyz"):
-            frame_columns[f"{axis} (angstrom)"] = xyz[:, component]
-            frame_columns[f"reference_{axis} (angstrom)"] = reference_positions[:, component]
-            frame_columns[f"displacement_{axis} (angstrom)"] = displacement[:, component]
-            frame_columns[f"dipole_{axis} (e*angstrom)"] = dipole[:, component]
-            frame_columns[f"dipole_{axis} (debye)"] = dipole[:, component] * debye_factor
-        displacement_tables.append(pd.DataFrame(frame_columns))
+        if displacement_tables is not None:
+            reference_positions = reference_for_atoms @ cell
+            frame_columns: dict[str, object] = {
+                "frame_index": np.full(len(xyz), int(frame), dtype=int),
+                "iter": np.full(len(xyz), iteration, dtype=int),
+                "atom_index": np.arange(len(xyz), dtype=int),
+                "atom_id": atom_ids,
+                "element": labels.astype(str),
+                "reference_atom_index": assignment,
+                "reference_element": reference_symbols[assignment].astype(str),
+                "local_cell_id": prepared.local_cell_ids[assignment],
+                "local_layer_id": prepared.local_layer_ids[assignment],
+                "charge_source": np.full(len(xyz), resolved_charge_source, dtype=object),
+                "charge (e)": charges,
+                "electron_charge_sign": np.full(len(xyz), ELECTRON_CHARGE_SIGN),
+                "displacement_c (angstrom)": displacement_c,
+                "dipole_c (e*angstrom)": dipole_c,
+                "dipole_c (debye)": dipole_c * debye_factor,
+            }
+            for component, axis in enumerate("xyz"):
+                frame_columns[f"{axis} (angstrom)"] = xyz[:, component]
+                frame_columns[f"reference_{axis} (angstrom)"] = reference_positions[:, component]
+                frame_columns[f"displacement_{axis} (angstrom)"] = displacement[:, component]
+                frame_columns[f"dipole_{axis} (e*angstrom)"] = dipole[:, component]
+                frame_columns[f"dipole_{axis} (debye)"] = dipole[:, component] * debye_factor
+            displacement_tables.append(pd.DataFrame(frame_columns))
         if callable(reporter):
             reporter(
                 "analyze",
@@ -923,7 +927,11 @@ def calculate_hbn_reference_polarization(
     return HBNReferencePolarizationResult(
         table=table,
         request=request,
-        displacements=pd.concat(displacement_tables, ignore_index=True),
+        displacements=(
+            pd.concat(displacement_tables, ignore_index=True)
+            if displacement_tables
+            else pd.DataFrame()
+        ),
         poled_counts=poled_counts,
         mapping=pd.DataFrame(mapping_columns),
         reference=prepared,

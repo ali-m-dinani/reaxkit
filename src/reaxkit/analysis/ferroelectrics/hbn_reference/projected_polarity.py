@@ -55,6 +55,7 @@ class HBNReferenceProjectedPolarityResult(BaseResult):
     centers: pd.DataFrame
     projected_bins: pd.DataFrame
     kymograph_bins: pd.DataFrame
+    whole_slab_summary: pd.DataFrame
     request: HBNReferenceProjectedPolarityRequest
     local_result: HBNReferenceLocalPolarizationResult
     frame_indices: np.ndarray
@@ -72,6 +73,9 @@ class HBNReferenceProjectedPolarityResult(BaseResult):
             "hbn_reference_projected_polarity_cells": self.centers,
             "hbn_reference_projected_polarity_2d": self.projected_bins,
             "hbn_reference_projected_polarity_kymograph": self.kymograph_bins,
+            "hbn_reference_projected_polarity_whole_slab_summary": (
+                self.whole_slab_summary
+            ),
         }
 
 
@@ -182,8 +186,42 @@ def calculate_hbn_reference_projected_polarity(
 
     projected_rows: list[dict[str, object]] = []
     kymograph_rows: list[dict[str, object]] = []
+    whole_slab_rows: list[dict[str, object]] = []
     for (frame, iteration), group in centers.groupby(["frame_index", "iter"], sort=True):
         frame_polarity = group["polarity"].to_numpy(float)
+        (
+            slab_count,
+            slab_positive,
+            slab_negative,
+            slab_zero,
+            slab_mean,
+            slab_positive_fraction,
+            slab_negative_fraction,
+            slab_zero_fraction,
+        ) = _polarity_statistics(frame_polarity)
+        whole_slab_rows.append(
+            {
+                "frame_index": int(frame),
+                "iter": int(iteration),
+                "component": request.component,
+                "local_grouping": request.local_grouping,
+                "spatial_scope": "whole_slab",
+                "total_group_count": int(len(group)),
+                "defined_group_count": slab_count,
+                "undefined_group_count": int(len(group) - slab_count),
+                "positive_count": slab_positive,
+                "negative_count": slab_negative,
+                "zero_count": slab_zero,
+                "positive_fraction": slab_positive_fraction,
+                "negative_fraction": slab_negative_fraction,
+                "zero_fraction": slab_zero_fraction,
+                "positive_percentage": 100.0 * slab_positive_fraction,
+                "negative_percentage": 100.0 * slab_negative_fraction,
+                "zero_percentage": 100.0 * slab_zero_fraction,
+                "mean_polarity": slab_mean,
+                "bin_reference_frame": reference_source_frame,
+            }
+        )
         for v_bin in range(len(v_edges) - 1):
             v_member = group["v_bin"].to_numpy(float) == v_bin
             for u_bin in range(len(u_edges) - 1):
@@ -274,6 +312,7 @@ def calculate_hbn_reference_projected_polarity(
         centers=centers,
         projected_bins=pd.DataFrame(projected_rows),
         kymograph_bins=pd.DataFrame(kymograph_rows),
+        whole_slab_summary=pd.DataFrame(whole_slab_rows),
         request=request,
         local_result=local,
         frame_indices=local.frame_indices,

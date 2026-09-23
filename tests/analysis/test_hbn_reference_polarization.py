@@ -65,7 +65,9 @@ def _trajectory_from_reference(
 def test_cell_strain_and_origin_shift_do_not_create_polarization(reference_path) -> None:
     trajectory = _trajectory_from_reference(reference_path, shift=(1.7, -0.8, 0.35))
     request = HBNReferencePolarizationRequest(
-        reference_path=reference_path, replication=(2, 1, 1)
+        reference_path=reference_path,
+        replication=(2, 1, 1),
+        include_displacements=True,
     )
 
     result = calculate_hbn_reference_polarization(trajectory, request)
@@ -97,6 +99,21 @@ def test_polarization_reports_determinate_frame_progress(reference_path) -> None
     ]
 
 
+def test_polarization_skips_unrequested_displacement_table(reference_path) -> None:
+    trajectory = _trajectory_from_reference(reference_path)
+
+    result = calculate_hbn_reference_polarization(
+        trajectory,
+        HBNReferencePolarizationRequest(
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+        ),
+    )
+
+    assert not result.table.empty
+    assert result.displacements.empty
+
+
 def test_vacuum_is_not_applied_as_reference_strain(reference_path) -> None:
     trajectory = _trajectory_from_reference(
         reference_path, shift=(1.7, -0.8, 12.0), vacuum_z=25.0
@@ -107,6 +124,7 @@ def test_vacuum_is_not_applied_as_reference_strain(reference_path) -> None:
             reference_path=reference_path,
             replication=(2, 1, 1),
             volume_method="cell",
+            include_displacements=True,
         ),
     )
 
@@ -134,6 +152,7 @@ def test_relative_cation_displacement_produces_formal_charge_dipole(reference_pa
             reference_path=reference_path,
             replication=(2, 1, 1),
             volume_method="cell",
+            include_displacements=True,
         ),
     )
 
@@ -295,6 +314,7 @@ def test_reaxff_charge_source_uses_per_frame_charges(reference_path) -> None:
             replication=(2, 1, 1),
             charge_source="reaxff",
             volume_method="cell",
+            include_displacements=True,
         ),
     )
 
@@ -320,7 +340,9 @@ def test_reference_tracks_neutral_primitive_cells(reference_path) -> None:
     result = calculate_hbn_reference_polarization(
         trajectory,
         HBNReferencePolarizationRequest(
-            reference_path=reference_path, replication=(2, 1, 1)
+            reference_path=reference_path,
+            replication=(2, 1, 1),
+            include_displacements=True,
         ),
     )
 
@@ -409,8 +431,8 @@ def test_local_result_also_reports_neutral_aln_layers(reference_path) -> None:
         result.reference_result.table.iloc[0]["volume (angstrom^3)"]
     )
     assert result.layer_summary.iloc[0][
-        "dipole_closure_error_z (e*angstrom)"
-    ] == pytest.approx(0.0)
+               "dipole_closure_error_z (e*angstrom)"
+           ] == pytest.approx(0.0)
 
 
 def test_local_deformation_volumes_are_normalized_to_selected_frame_volume(
@@ -472,6 +494,17 @@ def test_projected_polarity_includes_zero_and_uses_fixed_cell_bins(reference_pat
     assert projected.loc[0, "mean_polarity"] == pytest.approx(0.0)
     assert projected.loc[1, "negative_count"] == 4
     assert projected.loc[1, "mean_polarity"] == pytest.approx(-1.0)
+    whole_slab = result.whole_slab_summary.set_index("frame_index")
+    assert whole_slab.loc[0, "total_group_count"] == 4
+    assert whole_slab.loc[0, "zero_count"] == 4
+    assert whole_slab.loc[0, "zero_percentage"] == pytest.approx(100.0)
+    assert whole_slab.loc[1, "negative_count"] == 4
+    assert whole_slab.loc[1, "negative_percentage"] == pytest.approx(100.0)
+    assert whole_slab.loc[1, "defined_group_count"] == (
+        result.projected_bins.loc[
+            result.projected_bins["frame_index"] == 1, "defined_group_count"
+        ].sum()
+    )
     assert result.centers.groupby("local_cell_id")["u_bin"].nunique().max() == 1
     assert result.centers.groupby("local_cell_id")["v_bin"].nunique().max() == 1
     assert len(result.kymograph_bins) == 2

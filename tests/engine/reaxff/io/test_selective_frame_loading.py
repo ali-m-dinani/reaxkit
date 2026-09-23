@@ -237,9 +237,11 @@ def test_fort7_charge_stream_reports_indexing_and_selected_frame_progress(
     [
         "get-potential-and-electric-field",
         "write-trajectory-with-potential-and-electric-field",
+        "get-hbn-reference-polarization",
+        "an-unregistered-electrostatics-command",
     ],
 )
-def test_potential_field_streams_report_xmolout_and_fort7_separately(
+def test_electrostatics_streams_report_xmolout_and_fort7_separately(
         tmp_path: Path,
         monkeypatch,
         command: str,
@@ -268,7 +270,7 @@ def test_potential_field_streams_report_xmolout_and_fort7_separately(
     )
 
     assert len(frames) == 2
-    assert ("stream", 1, 1, "Preparing electrostatics input streams") in events
+    assert ("stream", 1, 1, "Preparing input streams") in events
     for stage in ("load xmolout", "load fort.7"):
         source_events = [event for event in events if event[0] == stage]
         assert source_events[0][1:] == (
@@ -280,6 +282,13 @@ def test_potential_field_streams_report_xmolout_and_fort7_separately(
         assert [current for _, current, _, _ in source_events] == sorted(
             current for _, current, _, _ in source_events
         )
+    xmolout_event_indices = [
+        index for index, event in enumerate(events) if event[0] == "load xmolout"
+    ]
+    fort7_event_indices = [
+        index for index, event in enumerate(events) if event[0] == "load fort.7"
+    ]
+    assert max(xmolout_event_indices) < min(fort7_event_indices)
 
 
 def test_xmolout_covered_misses_use_offsets_without_rescanning(tmp_path: Path):

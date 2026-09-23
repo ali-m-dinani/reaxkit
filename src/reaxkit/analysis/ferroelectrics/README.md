@@ -397,9 +397,10 @@ frame, the implementation calculates
 
 Thus Al and N both contribute, and B contributes when it is present and has a
 formal charge supplied with `--formal-charge B=...`, or when ReaxFF charges are
-selected. The per-atom dipole components are written to
-`hbn_reference_displacements.csv`. The x, y, z, and c-projected dipole and
-polarization components in `hbn_reference_polarization.csv` are their sums.
+selected. Pass `--write-displacements` to write the per-atom dipole components
+to `hbn_reference_displacements.csv`; this large table is disabled by default.
+The x, y, z, and c-projected dipole and polarization components in
+`hbn_reference_polarization.csv` are their sums.
 `hbn_reference_polarization_poled_counts.csv` reports the sign of each total
 Cartesian component for every frame with its iteration and time.
 With equal and
@@ -596,8 +597,11 @@ s_g=\operatorname{sign}(\mu_{g,\alpha})\in\{-1,0,+1\}.
 Zero dipoles remain in the arithmetic mean. A bin value therefore measures the
 signed population fraction: +1 means all cells are positive, -1 means all are
 negative, and 0 can mean all are nonpolar or an equal positive/negative
-population. The CSV tables report positive, negative, and zero counts and
-fractions so those cases remain distinguishable.
+population. The projected-bin CSV tables report positive, negative, and zero
+counts and fractions so those cases remain distinguishable. The dedicated
+`hbn_reference_projected_polarity_whole_slab_summary.csv` table aggregates all
+spatial bins into one row per selected frame and reports counts, fractions, and
+0--100 percentages for the complete slab.
 
 Cell-to-bin membership is calculated once from the fixed reference-cell
 centers associated with `--reference-frame` and reused for every selected

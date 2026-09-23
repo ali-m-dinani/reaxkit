@@ -146,6 +146,7 @@ Example:
 
 def build_request(args: argparse.Namespace) -> HBNReferenceProjectedPolarityRequest:
     base = global_workflow.build_request(args)
+    base.include_displacements = True
     projection_plane = cast(ProjectionPlane, str(args.projection_plane))
     profile_axis = cast(
         CartesianAxis,
@@ -295,9 +296,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     cells_path = output / "hbn_reference_projected_polarity_cells.csv"
     projected_path = output / "hbn_reference_projected_polarity_2d.csv"
     kymograph_path = output / "hbn_reference_projected_polarity_kymograph.csv"
+    whole_slab_summary_path = (
+            output / "hbn_reference_projected_polarity_whole_slab_summary.csv"
+    )
     result.centers.to_csv(cells_path, index=False)
     result.projected_bins.to_csv(projected_path, index=False)
     result.kymograph_bins.to_csv(kymograph_path, index=False)
+    result.whole_slab_summary.to_csv(whole_slab_summary_path, index=False)
     plots = (
         generate_projected_polarity_heatmaps(result, output, dpi=int(args.figure_dpi))
         if args.plot_2d
@@ -313,6 +318,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     print(f"Wrote per-cell polarity signs to {cells_path}")
     print(f"Wrote projected mean-polarity bins to {projected_path}")
     print(f"Wrote kymograph bins to {kymograph_path}")
+    print(f"Wrote whole-slab polarity counts and percentages to {whole_slab_summary_path}")
     if plots:
         print(f"Wrote {len(plots):,} projected heatmap(s) under {output / 'projected_polarity_2d'}")
     if kymograph_plot is not None:

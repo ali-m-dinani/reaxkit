@@ -180,6 +180,14 @@ Examples:
         "--output-dir", type=Path, default=None,
         help="Choose the output directory for CSV and XYZ artifacts.",
     )
+    parser.add_argument(
+        "--write-displacements",
+        action="store_true",
+        help=(
+            "Write the per-atom displacement table. Disabled by default because "
+            "the table can be very large."
+        ),
+    )
     return parser
 
 
@@ -212,6 +220,7 @@ def build_request(args: argparse.Namespace) -> HBNReferencePolarizationRequest:
         angle_tolerance_degrees=float(args.angle_tolerance),
         max_reference_strain=float(args.max_reference_strain),
         max_alignment_candidates=int(args.max_alignment_candidates),
+        include_displacements=bool(args.write_displacements),
         volume_method=cast(VolumeMethod, args.volume_method),
     )
 
@@ -233,13 +242,15 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     mapping_path = output / "hbn_reference_mapping.csv"
     reference_path = output / "AlN_hbn_replicated_aligned.xyz"
     result.table.to_csv(polarization_path, index=False)
-    result.displacements.to_csv(displacement_path, index=False)
+    if args.write_displacements:
+        result.displacements.to_csv(displacement_path, index=False)
     result.mapping.to_csv(mapping_path, index=False)
     write_aligned_reference_xyz(result, reference_path)
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote h-BN-reference polarization to {polarization_path}")
-    print(f"Wrote per-atom displacements to {displacement_path}")
+    if args.write_displacements:
+        print(f"Wrote per-atom displacements to {displacement_path}")
     print(f"Wrote atom mapping to {mapping_path}")
     print(f"Wrote replicated aligned reference to {reference_path}")
     return 0
