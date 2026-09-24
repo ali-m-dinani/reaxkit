@@ -7,7 +7,8 @@ name = "reaxkit"
 version = "3.1.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
-    { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
+    { name = "Ali Mohammadi Dinani" },
+    { email = "alimohammadi2265@gmail.com" },
     { name = "Adri van Duin", email = "acv13@psu.edu" },
     { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
     { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
@@ -37,6 +38,12 @@ dependencies = [
     "threadpoolctl>=3.1",
     "psutil>=5.9",
 ]
+
+[project.urls]
+Homepage = "https://ali-m-dinani.github.io/reaxkit/"
+Documentation = "https://ali-m-dinani.github.io/reaxkit/"
+Repository = "https://github.com/ali-m-dinani/reaxkit"
+Issues = "https://github.com/ali-m-dinani/reaxkit/issues"
 
 [project.optional-dependencies]
 plot = [
