@@ -20,15 +20,18 @@ def iter_fort7_charge_frames(
         reporter=None,
         include_atom_types: bool = True,
         input_cache: bool = True,
+        timing_callback=None,
 ) -> Iterator[dict[str, Any]]:
     """Yield compact records containing only ids, types, charges, and frame metadata."""
 
-    yield from Fort7Handler(
+    handler = Fort7Handler(
         path,
         frame_indices=frame_indices,
         reporter=reporter,
         input_cache=input_cache,
-    ).stream_file_frames(
+    )
+    handler._stream_timing_callback = timing_callback
+    yield from handler.stream_file_frames(
         charge_arrays_only=True,
         include_atom_types=include_atom_types,
     )
@@ -89,6 +92,7 @@ def iter_charge_data_quick(
         frame_indices: Sequence[int] | None = None,
         reporter=None,
         input_cache: bool = True,
+        timing_callback=None,
 ) -> Iterator[ChargeData]:
     """Yield charge frames aligned with each frame's lightweight identities."""
 
@@ -107,6 +111,7 @@ def iter_charge_data_quick(
             frame_indices=frame_indices,
             reporter=reporter,
             input_cache=input_cache,
+            timing_callback=timing_callback,
     ):
         charge_index = int(charge_record["source_index"])
         while identity_record is not None and int(identity_record["source_index"]) < charge_index:

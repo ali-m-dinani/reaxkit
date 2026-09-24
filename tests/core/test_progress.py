@@ -129,7 +129,8 @@ def test_tqdm_reporter_suppresses_duplicate_terminal_callback(monkeypatch):
             created.append(self)
             created_kwargs.append(kwargs)
 
-        def set_description_str(self, desc):
+        def set_description_str(self, desc, refresh=True):
+            assert refresh is False
             self.desc = desc
 
         def refresh(self):
@@ -169,7 +170,8 @@ def test_tqdm_reporter_keeps_indeterminate_operations_unfilled(monkeypatch):
             self.bar_format = kwargs.get("bar_format")
             created.append(self)
 
-        def set_description_str(self, desc):
+        def set_description_str(self, desc, refresh=True):
+            assert refresh is False
             self.desc = desc
 
         def refresh(self):

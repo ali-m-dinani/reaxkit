@@ -10,6 +10,7 @@ Shared progress reporting helpers.
 from __future__ import annotations
 
 import shutil
+import sys
 from threading import Event, RLock, Thread
 from typing import Any, Callable
 
@@ -190,6 +191,7 @@ def tqdm_reporter_factory() -> ProgressReporter:
     completed_events: dict[str, tuple[int, int]] = {}
     animations: dict[str, Event] = {}
     lock = RLock()
+    interactive = sys.stderr.isatty()
 
     def _bar_width() -> int:
         columns = shutil.get_terminal_size(fallback=(100, 24)).columns
@@ -206,7 +208,8 @@ def tqdm_reporter_factory() -> ProgressReporter:
         animations[key] = stop
 
         def _animate() -> None:
-            while not stop.wait(_INDETERMINATE_INTERVAL_SECONDS):
+            interval = _INDETERMINATE_INTERVAL_SECONDS if interactive else 10.0
+            while not stop.wait(interval):
                 with lock:
                     if stop.is_set() or bars.get(key) is not bar:
                         return
@@ -241,7 +244,7 @@ def tqdm_reporter_factory() -> ProgressReporter:
                     # Retain completed phases so users can review loader,
                     # analysis, and output timings after the command finishes.
                     leave=True,
-                    mininterval=0.2,
+                    mininterval=0.2 if interactive else 2.0,
                     # ASCII avoids mojibake in HPC terminals whose display path does
                     # not preserve Unicode even when the remote locale is UTF-8.
                     ascii=True,
@@ -255,7 +258,8 @@ def tqdm_reporter_factory() -> ProgressReporter:
                 if indeterminate:
                     _start_animation(key, bars[key])
             bar = bars[key]
-            bar.set_description_str(desc)
+            # Updating a description must not force a log write every frame.
+            bar.set_description_str(desc, refresh=False)
             if hasattr(bar, "unit"):
                 bar.unit = "frame" if "frame" in msg.lower() else "step"
 

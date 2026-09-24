@@ -348,8 +348,13 @@ def test_connectivity_trajectory_stream_loads_optional_valences_once(available, 
 
 @pytest.mark.parametrize("local", [False, True])
 @pytest.mark.parametrize("profile", [None, "standard", "full", "legacy"])
-def test_hbn_polarization_stream_prepares_reference_once(local, profile, monkeypatch, tmp_path):
+@pytest.mark.parametrize("charge_source", ["formal", "reaxff"])
+@pytest.mark.parametrize("workers", [1, 2, 4])
+def test_hbn_polarization_stream_prepares_reference_once(local, profile, charge_source, workers, monkeypatch, tmp_path):
     from ase.io import read
+    from reaxkit.domain.data_models import ChargeData, ElectrostaticsData
+    from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+    from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
     from reaxkit.engine.common.generators.structure_transformers import orthogonalize_hexagonal_cell
     from reaxkit.analysis.ferroelectrics.hbn_reference import polarization as module
     from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import HBNReferenceLocalPolarizationTask, HBNReferenceLocalPolarizationRequest
@@ -361,10 +366,19 @@ def test_hbn_polarization_stream_prepares_reference_once(local, profile, monkeyp
     xyz[1:, np.array(reference.get_chemical_symbols()) == "Al", 2] += .02
     data = TrajectoryData(positions=xyz, atom_ids=sim.atom_ids, elements=reference.get_chemical_symbols(), iterations=sim.iterations, simulation=sim)
     task_type, request_type = (HBNReferenceLocalPolarizationTask, HBNReferenceLocalPolarizationRequest) if local else (module.HBNReferencePolarizationTask, module.HBNReferencePolarizationRequest)
-    task, request = task_type(), request_type(reference_path=module.REFERENCE_STRUCTURE_PATH, frames=[0, 2], reference_frame=1, replication=(2, 1, 1), charge_source="formal")
+    task, request = task_type(), request_type(reference_path=module.REFERENCE_STRUCTURE_PATH, frames=[0, 2], reference_frame=1, replication=(2, 1, 1), charge_source=charge_source)
     if not local and profile in {"full", "legacy"}:
         request.include_displacements = True
-    expected = task.run(data, request)
+    frame_data = single_frames(data)
+    analysis_data = data
+    if charge_source == "reaxff":
+        charges = np.array([1., .97, 1.02])[:, None] * np.where(np.array(data.elements) == "Al", 2.4, -2.4)
+        analysis_data = ElectrostaticsData(trajectory=data, charges=ChargeData(
+            charges=charges, iterations=sim.iterations, simulation=sim))
+        frame_data = (ElectrostaticsData(trajectory=frame, charges=ChargeData(
+            charges=charges[index:index+1], iterations=frame.iterations, simulation=frame.simulation))
+            for index, frame in enumerate(single_frames(data)))
+    expected = task.run(analysis_data, request)
     prepare = module.prepare_hbn_reference
     calls = []
     def tracked(*args, **kwargs):
@@ -373,10 +387,14 @@ def test_hbn_polarization_stream_prepares_reference_once(local, profile, monkeyp
     monkeypatch.setattr(module, "prepare_hbn_reference", tracked)
     if profile is not None:
         request._output_profile = profile
-    actual = task.run_stream(single_frames(data), request)
+    runtime = BoundedFramePipeline(resolve_execution_policy(
+        task, request, {"workers": workers, "chunk_size": 4}, environ={"SLURM_CPUS_PER_TASK": "4"}))
+    actual = task.run_stream(frame_data, request, pipeline=runtime)
     pd.testing.assert_frame_equal(actual.table, expected.table, atol=1e-10, rtol=1e-10)
     assert len(calls) == 1
     target = actual.reference_result if local else actual
+    expected_target = expected.reference_result if local else expected
+    pd.testing.assert_frame_equal(target.mapping, expected_target.mapping)
     if profile is not None:
         assert target.displacements.empty
         if profile in {"full", "legacy"}:

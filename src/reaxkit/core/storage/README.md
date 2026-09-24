@@ -66,5 +66,30 @@ access implementations. LAMMPS dump and AMS inputs remain on their existing
 paths until their format-specific offset and identity rules have equivalent
 coverage.
 
+Long readers hold a `FrameStore.session()`: one connection per calling thread
+and a cross-process SQLite lease outside the evictable generation. Quota
+eviction holds an exclusive lease through deletion, so active streams cannot
+be removed by a peer writer. A process exit releases its lease automatically.
+Explicit administrative cache deletion should be done with readers stopped.
+
+Quota maintenance uses file sizes, not payload-table inventory queries. It
+runs after approximately 64 MiB of estimated growth (less for small quotas),
+30 seconds, budget pressure, or stream closure. This is a reconciled workspace
+budget, not a strict instantaneous filesystem cap: SQLite pages/WAL, small
+offset metadata, and concurrent writers can temporarily exceed it. When pinned
+stores leave no room, optional payload writes pause while reading continues.
+Necessary offset metadata can still grow; unpinned generations can be reclaimed
+at closure. Setting the limit to zero explicitly permits unlimited storage.
+
+Frame counts live in a small transactionally maintained summary. Existing
+schema-v1 stores gain it additively using a one-time primary-key-index count;
+valid payloads are preserved. Warm reads update that summary at most every
+30 seconds instead of touching every BLOB row. Frame offsets are also recorded
+during a cold forward scan, so a later overlapping selection can reuse them.
+
+See [the h-BN benchmark guide](../../../../benchmarks/HBN_PERFORMANCE.md)
+for metrics, reproducible bounded comparisons, and the outstanding production
+wall-time acceptance test.
+
 ## Extension Points
 - Extend storage schema/index versioning in `storage_layout.py`.

@@ -16,6 +16,7 @@ and structural analysis.
 """
 
 from __future__ import annotations
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -28,6 +29,9 @@ import pandas as pd
 from reaxkit.core.platform.exceptions import ParseError
 from reaxkit.core.storage.frame_store import FrameOffset, FrameStore, IndexCoverage
 from reaxkit.engine.reaxff.io.base import BaseHandler
+from reaxkit.engine.reaxff.io.stream_metrics import (
+    OffsetRecorder, FrameWriteBatch, stream_cache_session, register_stream_store, open_binary_source,
+)
 from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
 
 
@@ -284,7 +288,7 @@ class XmoloutHandler(BaseHandler):
                 if streaming and coordinates_only
                 else ("coordinates", "atom-extras", "cell", "energy")
             )
-            return FrameStore.for_source(
+            return register_stream_store(self, FrameStore.for_source(
                 root,
                 self.path,
                 engine="reaxff",
@@ -294,7 +298,7 @@ class XmoloutHandler(BaseHandler):
                 representation=representation,
                 capabilities=capabilities,
                 options={"extra_atom_cols": self._extra_atom_cols or []},
-            )
+            ))
         except (OSError, RuntimeError, ValueError):
             return None
 
@@ -333,7 +337,7 @@ class XmoloutHandler(BaseHandler):
                 pending_offsets.clear()
             store.set_coverage(IndexCoverage(next_frame_index, next_byte_offset, False))
 
-        with self.path.open("rb") as handle:
+        with open_binary_source(self) as handle:
             handle.seek(coverage.next_byte_offset)
             frame_index = coverage.next_frame_index
             while frame_index <= through_index:
@@ -404,7 +408,7 @@ class XmoloutHandler(BaseHandler):
             coordinates_only: bool,
     ) -> Iterator[Dict[str, Any]]:
         """Populate a cold stream cache without indexing and rereading the source."""
-        pending: dict[int, dict[str, Any]] = {}
+        pending = FrameWriteBatch(store)
         parsed_frames = 0
         if callable(self._reporter):
             self._reporter("stream", 0, len(requested_order), "Reading xmolout frames")
@@ -415,18 +419,26 @@ class XmoloutHandler(BaseHandler):
             reporter=self._reporter,
             input_cache=False,
         )
-        for record in sequential.stream_file_frames(coordinates_only=coordinates_only):
-            source_index = int(record["source_index"])
-            cached_record = dict(record)
-            cached_record["simulation_name"] = sequential.simulation_name
-            pending[source_index] = cached_record
-            parsed_frames += 1
-            if len(pending) >= _FRAME_CACHE_BATCH_SIZE:
-                store.put_frames(pending)
-                pending.clear()
-            yield record
-        if pending:
-            store.put_frames(pending)
+        sequential._stream_offset_store = store
+        try:
+            with closing(sequential.stream_file_frames(coordinates_only=coordinates_only)) as records:
+                for record in records:
+                    source_index = int(record["source_index"])
+                    cached_record = dict(record)
+                    cached_record["simulation_name"] = sequential.simulation_name
+                    pending.add(source_index, cached_record)
+                    parsed_frames += 1
+                    yield record
+        finally:
+            self.simulation_name = sequential.simulation_name
+            self._frame_cache_stats = {
+                **sequential._frame_cache_stats,
+                "requested": len(requested_order), "hits": 0,
+                "misses": len(requested_order), "parsed_frames": parsed_frames,
+                "indexed_frames": 0, "index_bytes": 0, "index_seconds": 0.0,
+                "one_pass": True,
+            }
+        pending.flush()
         if callable(self._reporter):
             self._reporter(
                 "stream",
@@ -434,18 +446,6 @@ class XmoloutHandler(BaseHandler):
                 len(requested_order),
                 "Read xmolout frames",
             )
-        self.simulation_name = sequential.simulation_name
-        self._frame_cache_stats = {
-            "requested": len(requested_order),
-            "hits": 0,
-            "misses": len(requested_order),
-            "parsed_frames": parsed_frames,
-            "source_bytes": int(self.path.stat().st_size),
-            "indexed_frames": 0,
-            "index_bytes": 0,
-            "index_seconds": 0.0,
-            "one_pass": True,
-        }
 
     def _parse_indexed_frame(self, handle, offset: FrameOffset) -> dict[str, Any]:
         """Parse one canonical full frame from a verified byte range."""
@@ -542,7 +542,7 @@ class XmoloutHandler(BaseHandler):
         parsed: dict[int, dict[str, Any]] = {}
         source_bytes = 0
         if offsets:
-            with self.path.open("rb") as handle:
+            with open_binary_source(self) as handle:
                 for frame_index in missing:
                     offset = offsets.get(frame_index)
                     if offset is None:
@@ -726,6 +726,7 @@ class XmoloutHandler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
+    @stream_cache_session
     def stream_file_frames(self, *, coordinates_only: bool = False) -> Iterator[Dict[str, Any]]:
         """Yield coordinate frames directly from ``xmolout`` without caching them.
 
@@ -776,8 +777,8 @@ class XmoloutHandler(BaseHandler):
                 offsets = store.get_offsets(missing)
                 parsed_frames = 0
                 source_bytes = 0
-                pending: dict[int, dict[str, Any]] = {}
-                with self.path.open("rb") as handle:
+                pending = FrameWriteBatch(store)
+                with open_binary_source(self) as handle:
                     for batch_start in range(0, len(requested_order), _FRAME_CACHE_BATCH_SIZE):
                         batch = requested_order[batch_start:batch_start + _FRAME_CACHE_BATCH_SIZE]
                         cached_batch = store.get_frames(batch)
@@ -806,7 +807,7 @@ class XmoloutHandler(BaseHandler):
                                     record["elements"] = frame["atom_type"].astype(str).tolist()
                                 else:
                                     record["frame"] = frame
-                                pending[source_index] = record
+                                pending.add(source_index, record)
                                 parsed_frames += 1
                                 source_bytes += int(indexed_record.get("source_bytes", 0))
                             if not self.simulation_name:
@@ -822,9 +823,7 @@ class XmoloutHandler(BaseHandler):
                             output = dict(record)
                             output.pop("simulation_name", None)
                             yield output
-                        if pending:
-                            store.put_frames(pending)
-                            pending.clear()
+                        pending.flush()
                 self._frame_cache_stats = {
                     "requested": len(requested_order),
                     "hits": len(initially_available),
@@ -847,8 +846,9 @@ class XmoloutHandler(BaseHandler):
         source_index = -1
         emitted = 0
 
-        with open(self.path, "r", encoding="utf-8") as fh:
+        with OffsetRecorder(getattr(self, "_stream_offset_store", None)) as offsets, open_binary_source(self) as fh:
             while True:
+                frame_start = fh.tell()
                 count_line = next((raw.strip() for raw in fh if raw.strip()), None)
                 if count_line is None:
                     break
@@ -864,7 +864,7 @@ class XmoloutHandler(BaseHandler):
                 if header is None:
                     break
                 name, iteration, numeric_values = _parse_xmolout_header(
-                    header,
+                    header.decode("utf-8"),
                     path=self.path,
                     frame_index=source_index,
                     line_number=None,
@@ -872,15 +872,18 @@ class XmoloutHandler(BaseHandler):
                 selected = requested is None or source_index in requested
 
                 atom_rows: list[list[Any]] = []
-                coordinates = np.empty((n_atoms, 3), dtype=float) if coordinates_only else None
+                coordinates = np.empty((n_atoms, 3), dtype=float) if selected and coordinates_only else None
                 elements: list[str] = []
                 atom_columns: list[str] | None = None
+                atoms_read = 0
                 for atom_index in range(n_atoms):
                     atom_line = next((raw.strip() for raw in fh if raw.strip()), None)
                     if atom_line is None:
                         break
+                    atoms_read += 1
                     if not selected:
                         continue
+                    atom_line = atom_line.decode("utf-8")
                     atom_values = atom_line.split(None, 4) if coordinates_only else atom_line.split()
                     if len(atom_values) < 4:
                         continue
@@ -909,6 +912,12 @@ class XmoloutHandler(BaseHandler):
                         [atom_values[0], *[float(value) for value in atom_values[1:4]], *extras]
                     )
 
+                if atoms_read == n_atoms:
+                    offsets.add(source_index, frame_start, fh.tell(), iteration, n_atoms)
+                self._frame_cache_stats.update(source_bytes=fh.tell(),
+                                               scanned_frames=source_index + 1,
+                                               parsed_frames=emitted + int(selected),
+                                               reader_branch="sequential_coordinates")
                 if not selected:
                     continue
                 if not self.simulation_name:

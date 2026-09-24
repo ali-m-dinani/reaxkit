@@ -1,14 +1,25 @@
 # Wurtzite polarity analysis
 
+## Method summary
+
+| Method name | Short explanation | How it calculates polarity | How it calculates polarization | Local vs global | Built on / relation to other methods | Limitations, notes, advantages |
+| --- | --- | --- | --- | --- | --- | --- |
+| [Four-folded](#four_folded_wurtzite) | Four bonds: one apical, three basal. | Sign of apical projection minus mean basal projection, with tolerance. | Local charge-weighted bond sum; no volume-normalized result. | Per-site polarity and dipole; no binned or whole-frame polarization. | Base wurtzite analysis; other workflows reuse its geometry helpers. | Needs four neighbors; apical selection can fail at surfaces. |
+| [Three-folded](#three_folded_wurtzite) | Three basal bonds; apical bond optional. | Sign of negative mean basal projection, with tolerance. | Charge-weighted basal and selected apical bonds; bin dipoles divided by bin volume. | Per-site values and spatial bin polarization; 2D projections. | Reuses four-folded helpers, with its own neighbor roles and polarity rule. | Handles three-coordinate surfaces; sparse bins can have undefined volume. |
+| [Basal plane](#basal_plane_displacement_for_dipole_moment) | Al/B displacement from the mean plane of three basal N atoms. | Three-folded structural sign; projected workflow averages signs of local dipoles. | Center charge times basal-plane displacement; dipoles divided by local or bin volume. | Per-center dipoles and polarization; bins, maps, and projected polarity. | Uses three-folded neighbor selection and roles, then changes the dipole definition. | No apical bond needed for dipole; approximate charges; tetrahedral local volume needs four neighbors. |
+| [hBN reference](#get-hbn-reference-polarization) | Displacements of all atoms from a nonpolar AlN reference. | Sign of total component; projected workflow averages local-cell signs. | Sum of charge-weighted atomic displacements divided by volume. | Whole-frame and local-cell polarization; projected bins and kymographs. | Independent reference model; shares trajectory and volume helpers only. | Requires matched reference; charge and slab-volume conventions affect results. |
+
+The linked names lead to the full method or command names and detailed equations below.
+
 The four-folded and three-folded implementations use the same signed c-axis
-bond projection. For center atom \(i\) and neighbor \(j\),
+bond projection. For center atom $i$ and neighbor $j$,
 
-\[
+$$
 b_{ij,c} = (\mathbf r_j^{\mathrm{image}}-\mathbf r_i)\cdot\hat{\mathbf c},
-\]
+$$
 
-where \(\hat{\mathbf c}\) is the normalized configured c-axis and
-\(\mathbf r_j^{\mathrm{image}}\) is the nearest periodic image of the neighbor.
+where $\hat{\mathbf c}$ is the normalized configured c-axis and
+$\mathbf r_j^{\mathrm{image}}$ is the nearest periodic image of the neighbor.
 Thus a positive projection points along the configured c-axis ("up") and a
 negative projection points in the opposite direction ("down"). Distances and
 projections use the minimum periodic image when cell data are available.
@@ -20,50 +31,50 @@ inside `neighbor_cutoff`. A site is complete only when all four are present.
 Among those four bonds, the bond with the largest absolute c-axis projection is
 classified as apical:
 
-\[
+$$
 j_{\mathrm{apical}} = \underset{j}{\operatorname{argmax}}\ |b_{ij,c}|.
-\]
+$$
 
 The remaining three bonds are basal. Their signed mean is
 
-\[
+$$
 b_{i,\mathrm{basal}} = \frac{1}{3}\sum_{j\in B_i} b_{ij,c}.
-\]
+$$
 
 The four-folded geometric displacement is
 
-\[
+$$
 \Delta_i = b_{i,\mathrm{apical}} - b_{i,\mathrm{basal}}.
-\]
+$$
 
-Given the configured tolerance \(\epsilon\), the discrete polarity is
+Given the configured tolerance $\epsilon$, the discrete polarity is
 
-\[
+$$
 s_i =
 \begin{cases}
 +1 & \Delta_i > \epsilon \quad (\mathrm{UP}),\\
 -1 & \Delta_i < -\epsilon \quad (\mathrm{DOWN}),\\
 0 & |\Delta_i|\le\epsilon \quad (\mathrm{UNASSIGNED}).
 \end{cases}
-\]
+$$
 
 The charge-weighted local vector and its c-axis component are
 
-\[
+$$
 \mathbf p_i = \sum_j q_j(\mathbf r_j^{\mathrm{image}}-\mathbf r_i),
 \qquad
 \eta_{i,c}=\mathbf p_i\cdot\hat{\mathbf c}.
-\]
+$$
 
-The code reports \(\mathbf p_i\) and \(\eta_{i,c}\) in e·Å and converts them
+The code reports $\mathbf p_i$ and $\eta_{i,c}$ in e·Å and converts them
 to debye using 1 e·Å = 4.80320427 D. It also reports the change in mean
 basal projection relative to the same atom in `reference_frame` (frame 0 by
 default):
 
-\[
+$$
 \delta b_{i,\mathrm{basal}}(t) =
 b_{i,\mathrm{basal}}(t)-b_{i,\mathrm{basal}}(t_{\mathrm{ref}}).
-\]
+$$
 
 ### Limitations for surfaces and three-coordinate sites
 
@@ -73,11 +84,11 @@ analysis:
 1. A center with only three neighbors is marked incomplete, so its displacement,
    polarity, dipole, and local order are left unassigned.
 2. Apical assignment happens before polarity is known and uses only
-   \(|b_{ij,c}|\). At a top surface, a lone neighbor below the center can therefore
+   $|b_{ij,c}|$. At a top surface, a lone neighbor below the center can therefore
    be called apical even when an UP site requires an apical neighbor above it.
    With candidates on both sides, the absolute-value rule also has no polarity
    criterion for choosing the physically consistent side.
-3. Because \(\Delta_i\) includes the apical bond, a missing or incorrectly chosen
+3. Because $\Delta_i$ includes the apical bond, a missing or incorrectly chosen
    apical atom directly changes the polarity classification.
 
 ## `three_folded_wurtzite`
@@ -85,34 +96,34 @@ analysis:
 The three-folded implementation makes the three basal bonds sufficient for a
 valid site. It first collects every unique selected neighbor inside the cutoff,
 including nearest periodic images. It then chooses the three candidates with
-the smallest \(|b_{ij,c}|\), with distance as the tie-breaker, because basal
+the smallest $|b_{ij,c}|$, with distance as the tie-breaker, because basal
 bonds have smaller c-axis separation than bonds to another layer.
 
 For these three basal neighbors it defines the requested displacement using
 the negative signed mean basal projection:
 
-\[
+$$
 \Delta_i = -b_{i,\mathrm{basal}}
 = -\frac{1}{3}\sum_{j=1}^{3} b_{ij,c}.
-\]
+$$
 
 The minus sign accounts for the bond-vector convention: every bond points from
 the center atom to its neighbor. Basal N atoms below an Al center therefore
-have negative \(b_{ij,c}\), which gives positive \(\Delta_i\), UP polarity, and
+have negative $b_{ij,c}$, which gives positive $\Delta_i$, UP polarity, and
 a dipole pointing from N toward Al. The same tolerance rule above converts
-\(\Delta_i\) to UP, DOWN, or UNASSIGNED.
+$\Delta_i$ to UP, DOWN, or UNASSIGNED.
 Consequently, a center with exactly three basal neighbors receives polarity,
 dipole, local-order, and reference-change values; an apical neighbor is not
 required for the site to be complete.
 
 Only after polarity has been calculated does the code select an apical neighbor:
 
-- for UP polarity, eligible apical candidates must have \(b_{ij,c}>\epsilon\);
-- for DOWN polarity, eligible candidates must have \(b_{ij,c}< -\epsilon\);
+- for UP polarity, eligible apical candidates must have $b_{ij,c}>\epsilon$;
+- for DOWN polarity, eligible candidates must have $b_{ij,c}< -\epsilon$;
 - for zero polarity, no apical neighbor is selected.
 
 If several candidates occur on the permitted side, the one with the largest
-\(|b_{ij,c}|\) is selected because it is most separated from the basal layer.
+$|b_{ij,c}|$ is selected because it is most separated from the basal layer.
 Candidates on the opposite side are labeled `ignored`. Therefore an UP surface
 site with only a lower-layer candidate keeps its polarity but reports
 `has_apical_neighbor = false`; that lower candidate is not misidentified as
@@ -133,21 +144,21 @@ apical neighbor, when one exists. Ignored candidates do not contribute.
 `get-three-folded-wurtzite-polarization` reuses the local dipole vectors above.
 The user chooses the number of bins independently along x, y, and z. Bin edges
 are fixed from the reference-frame coordinate range so that the same spatial
-regions are compared across frames. For bin \(k\), the code sums all valid site
+regions are compared across frames. For bin $k$, the code sums all valid site
 dipoles assigned to that bin:
 
-\[
-\boldsymbol{\mu}_k = \sum_{i\in k}\mathbf p_i.
-\]
+$$
+\vec{\mu}_k = \sum_{i\in k}\mathbf p_i.
+$$
 
 It converts the dipole density to polarization using
 
-\[
-\mathbf P_k = \frac{\boldsymbol{\mu}_k}{V_k}
-\times C_{\mathrm{e/angstrom^2\ to\ micro C/cm^2}},
-\]
+$$
+\mathbf P_k = \frac{\vec{\mu}_k}{V_k}\times 1602.176634.
+$$
 
-where \(V_k\) is selected with `--volume-method`:
+Here $\vec{\mu}_k$ is in e·Å, $V_k$ is in Å³, and $\mathbf P_k$ is in
+µC/cm². The volume is selected with `--volume-method`:
 
 - `hull`: convex-hull volume of all finite atoms located in the bin;
 - `bbox`: axis-aligned bounding-box volume of those atoms;
@@ -175,13 +186,13 @@ Hayden et al. calculate spontaneous polarization from charge-weighted ionic
 displacements and use the base of the nitrogen tetrahedron as the displacement
 reference. The cited first-principles construction is
 
-\[
+$$
 P_3=\frac{|e|}{\Omega}\sum_k \overline{Z}^{*}_{k,33}
 \Delta u_{k,3},
-\]
+$$
 
 where every ion has one displacement from a nonpolar hexagonal reference and
-\(\overline{Z}^{*}_{k,33}\) is the longitudinal Born effective charge averaged
+$\overline{Z}^{*}_{k,33}$ is the longitudinal Born effective charge averaged
 along the switching path. Reproducing that calculation exactly requires the
 nonpolar reference coordinates and Born effective charges; neither formal
 charges nor `fort.7` partial charges are Born effective charges.
@@ -194,24 +205,24 @@ user-provided formal charges or per-frame charges from `fort.7`.
 The polarity-aware neighbor roles come directly from `three_folded_wurtzite`.
 For the three basal neighbor image positions, the reference point is
 
-\[
+$$
 \overline{\mathbf r}_{i,\mathrm{basal}}=
 \frac{1}{3}\sum_{j=1}^{3}\mathbf r_{ij}^{\mathrm{image}}.
-\]
+$$
 
 The center displacement is
 
-\[
+$$
 \Delta\mathbf u_i=
 \mathbf r_{i,\mathrm{center}}-\overline{\mathbf r}_{i,\mathrm{basal}}.
-\]
+$$
 
 The local contribution is then
 
-\[
-\boldsymbol{\mu}_i=e Z_i\Delta\mathbf u_i,
+$$
+\vec{\mu}_i=e Z_i\Delta\mathbf u_i,
 \qquad e=-|e|.
-\]
+$$
 
 The electron charge is negative by the package convention. Every atom appears
 once in `basal_plane_ions.csv`. Al/B centers carry the displacement above;
@@ -226,7 +237,7 @@ above another N plane is not an additional ferroelectric displacement.
 `get-basal-plane-displacement-dipole` reports one local dipole vector per valid
 Al/B center. `get-basal-plane-displacement-local-polarization` converts each
 center dipole
-to a local polarization, \(\mathbf P_i=\boldsymbol{\mu}_i/\Omega_i\), using
+to a local polarization, $\mathbf P_i=\vec{\mu}_i/\Omega_i$, using
 one of two local-volume conventions:
 
 - `--local-volume-method equal` (default) divides the selected frame `hull`,
@@ -278,19 +289,19 @@ as `electric_field`, `electric_field_direction`, and `electric_field_units`.
 `get-basal-plane-displacement-projected-polarity` converts the selected local
 dipole component into a discrete polarity for every valid center:
 
-\[
+$$
 s_i=\operatorname{sign}(\mu_{i,c})\in\{-1,0,+1\}.
-\]
+$$
 
 Values with magnitude at or below `--dipole-zero-tolerance` receive polarity
 zero and remain in the population. Only centers without a valid finite dipole
 are excluded. In every spatial bin, the reported value is the plain arithmetic
 mean,
 
-\[
+$$
 \overline{s}=\frac{1}{N}\sum_i s_i
 =\frac{N_+-N_-}{N_++N_0+N_-},
-\]
+$$
 
 which ranges from -1 (all negative) through 0 (equal populations) to +1 (all
 positive). This operation does not weight by dipole magnitude or local volume.
@@ -385,10 +396,10 @@ with `--reference`.
 The calculation follows the displacement expression used by Hayden et al.,
 with the selected formal or ReaxFF charge and the electron-charge sign:
 
-\[
+$$
 \mathbf{P}=\frac{|e|}{\Omega}\sum_{k=1}^{N}
 \left(-q_k\Delta\mathbf{u}_k\right).
-\]
+$$
 
 The output contains Cartesian x, y, and z components. The c component is the
 projection onto the normalized direction selected by `--c-axis`.
@@ -398,11 +409,11 @@ projection onto the normalized direction selected by `--c-axis`.
 **Every trajectory atom contributes to the total dipole.** For each selected
 frame, the implementation calculates
 
-\[
-\boldsymbol{\mu}_k=-q_k\Delta\mathbf{u}_k,
+$$
+\vec{\mu}_k=-q_k\Delta\mathbf{u}_k,
 \qquad
-\boldsymbol{\mu}=\sum_{k=1}^{N}\boldsymbol{\mu}_k.
-\]
+\vec{\mu}=\sum_{k=1}^{N}\vec{\mu}_k.
+$$
 
 Thus Al and N both contribute, and B contributes when it is present and has a
 formal charge supplied with `--formal-charge B=...`, or when ReaxFF charges are
@@ -520,26 +531,26 @@ instantaneous basal or apical coordination, so an apical-neighbor switch does
 not move an atom discontinuously between local cells. The switch instead
 appears through the sign and magnitude of the mapped atomic displacements.
 
-For reference cell \(g\), the raw local dipole is
+For reference cell $g$, the raw local dipole is
 
-\[
-\boldsymbol{\mu}^{\mathrm{raw}}_g=
+$$
+\vec{\mu}^{\mathrm{raw}}_g=
 \sum_{i\in g}-q_i\Delta\mathbf{u}_i.
-\]
+$$
 
 Raw local dipoles sum exactly to the global dipole. With the default formal
 charges, every Al2N2 cell is neutral because
-\(2(+3)+2(-3)=0\). Instantaneous ReaxFF charges need not sum to zero inside
+$2(+3)+2(-3)=0$. Instantaneous ReaxFF charges need not sum to zero inside
 each cell, even when the complete simulation is neutral. A charged local group
 has an origin-dependent dipole. The default
 `--local-charge-treatment auto` therefore replaces its charges by
 
-\[
+$$
 q_i^{\mathrm{local}}=q_i-\frac{Q_g}{N_g},\qquad
 Q_g=\sum_{i\in g}q_i,
-\]
+$$
 
-when \(|Q_g|>10^{-10}\ e\). This makes the effective local charge exactly zero
+when $|Q_g|>10^{-10}\ e$. This makes the effective local charge exactly zero
 and prevents a rigid translation of a charged cell from creating local
 polarization. `raw_dipole_*` columns retain the exact decomposition of the
 global result; `neutralized_dipole_*` columns retain the neutral result; and
@@ -599,9 +610,9 @@ for a single cell.
 `get-hbn-reference-projected-polarity` converts the selected local dipole
 component to
 
-\[
+$$
 s_g=\operatorname{sign}(\mu_{g,\alpha})\in\{-1,0,+1\}.
-\]
+$$
 
 Zero dipoles remain in the arithmetic mean. A bin value therefore measures the
 signed population fraction: +1 means all cells are positive, -1 means all are

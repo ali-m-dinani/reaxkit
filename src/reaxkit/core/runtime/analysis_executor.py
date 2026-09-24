@@ -313,6 +313,16 @@ class AnalysisExecutor:
         return _emit
 
     @classmethod
+    def _reader_timing_callback(cls, args: dict, *, task_name: str):
+        def _emit(*, handler: str, source_path: str, stats: dict) -> None:
+            cls._record_timing(
+                args, phase="input_stream", task_name=task_name,
+                seconds=float(stats.get("reader_active_seconds", 0.0)),
+                extra={"handler": handler, "source_path": source_path, **stats},
+            )
+        return _emit
+
+    @classmethod
     def _requested_frame_indices(cls, request, required_data, task=None) -> list[int] | None:
         """Return explicit source-frame dependencies for a partial load."""
         if getattr(required_data, "__name__", "") not in cls.FRAME_SELECTIVE_DATA_TYPES:
@@ -818,6 +828,7 @@ class AnalysisExecutor:
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
         args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task_name)
+        args["_reader_timing_callback"] = self._reader_timing_callback(args, task_name=task_name)
         log_level = args.get("log")
         if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")

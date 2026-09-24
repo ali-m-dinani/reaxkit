@@ -285,6 +285,10 @@ def test_executor_supplies_shared_pipeline_and_writes_stage_metrics(monkeypatch,
 
         @staticmethod
         def stream(data_type, args, reporter=None):
+            args["_reader_timing_callback"](
+                handler="ExampleReader", source_path="example",
+                stats={"reader_active_seconds": 0.5, "source_read_bytes": 123},
+            )
             yield from range(5)
 
     class PipelineTask:
@@ -331,6 +335,7 @@ def test_executor_supplies_shared_pipeline_and_writes_stage_metrics(monkeypatch,
     assert {
         "execution_policy",
         "pipeline_reader",
+        "input_stream",
         "pipeline_workers",
         "pipeline_collector_wait",
         "pipeline_total",

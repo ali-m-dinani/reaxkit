@@ -6,7 +6,7 @@ import numpy as np
 from reaxkit.core.runtime.execution_contracts import FrameEnvelope, resolve_execution_policy
 from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.reference_frames import reference_frames
-from reaxkit.core.runtime.result_stream import source_result, combine_results
+from reaxkit.core.runtime.result_stream import source_result, ResultAccumulator
 from reaxkit.core.runtime.trajectory_spool import TrajectorySpool
 from reaxkit.core.runtime.artifacts import TableSpool, TableChunks
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import _trajectory_and_charges
@@ -71,7 +71,7 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
                 if wanted is not None and wanted-seen:
                     raise ValueError(f"Requested frames not found: {sorted(wanted-seen)}")
 
-            results = []
+            results = ResultAccumulator()
             with closing(pipeline.map_reference(selected(), prepare, kernel)) as completed:
                 for count, item in enumerate(completed, 1):
                     result = source_result(item.value, item.envelope.source_frame)
@@ -96,10 +96,10 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
                         trajectory, _ = _trajectory_and_charges(item.envelope.payload)
                         spool.append(item.envelope.source_frame, trajectory)
                         result.trajectory = None
-                    results.append(result)
+                    results.add(result)
                     if reporter:
                         reporter("stream", count, 0, "Calculating polarization frames")
-            result = combine_results(results, request)
+            result = results.finish(request)
             if details is not None:
                 target = result.reference_result if kind == "hbn_local" else result
                 target.table_chunks = {"hbn_reference_displacements": TableChunks(details)}

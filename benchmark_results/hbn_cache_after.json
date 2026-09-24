@@ -1,0 +1,58 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.10",
+  "scope": "synthetic cache only; not end-to-end speedup",
+  "cases": [
+    {
+      "frames": 512,
+      "atoms": 5120,
+      "cold_seconds": 0.503285099985078,
+      "warm_seconds": 0.193693200009875,
+      "cache_stats": {
+        "cache_read_seconds": 0.13671340025030077,
+        "cache_write_seconds": 0.4066118000773713,
+        "cache_maintenance_seconds": 0.003841899917460978,
+        "cache_maintenance_calls": 3,
+        "cache_payload_bytes_written": 83993856,
+        "cache_payload_bytes_read": 83993856,
+        "cache_commits": 33,
+        "cache_frames_written": 512,
+        "cache_writes_skipped": 0
+      }
+    },
+    {
+      "frames": 1024,
+      "atoms": 5120,
+      "cold_seconds": 0.9083977000555024,
+      "warm_seconds": 0.31267739995382726,
+      "cache_stats": {
+        "cache_read_seconds": 0.24015009915456176,
+        "cache_write_seconds": 0.7462371994042769,
+        "cache_maintenance_seconds": 0.0037010000087320805,
+        "cache_maintenance_calls": 4,
+        "cache_payload_bytes_written": 167987968,
+        "cache_payload_bytes_read": 167987968,
+        "cache_commits": 65,
+        "cache_frames_written": 1024,
+        "cache_writes_skipped": 0
+      }
+    },
+    {
+      "frames": 2048,
+      "atoms": 5120,
+      "cold_seconds": 3.3349854999687523,
+      "warm_seconds": 1.3891460000304505,
+      "cache_stats": {
+        "cache_read_seconds": 1.0298136991914362,
+        "cache_write_seconds": 2.9302058005705476,
+        "cache_maintenance_seconds": 0.011556500103324652,
+        "cache_maintenance_calls": 7,
+        "cache_payload_bytes_written": 335976192,
+        "cache_payload_bytes_read": 335976192,
+        "cache_commits": 129,
+        "cache_frames_written": 2048,
+        "cache_writes_skipped": 0
+      }
+    }
+  ]
+}

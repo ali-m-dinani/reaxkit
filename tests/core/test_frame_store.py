@@ -254,6 +254,9 @@ def test_interrupted_frame_transaction_does_not_expose_partial_writes(
         def close(self):
             self.connection.close()
 
+        def rollback(self):
+            self.connection.rollback()
+
     with monkeypatch.context() as patch:
         patch.setattr(store, "_connect", _FailingConnection)
         assert store.put_frames({10: {"value": 10}, 20: {"value": 20}}) == set()
@@ -312,3 +315,85 @@ def test_frame_cache_limit_evicts_old_generation_and_keeps_active_one(tmp_path: 
     assert result["evicted_generations"] == 1
     assert not first.path.parent.exists()
     assert second.path.exists()
+
+
+def test_legacy_summary_migration_and_upsert_counts(tmp_path):
+    store = _store(tmp_path, _source(tmp_path))
+    store.put_frames({0: b"keep", 1: b"replace"})
+    with sqlite3.connect(store.path) as connection:
+        connection.executescript("DROP TRIGGER frame_count_insert; DROP TRIGGER frame_count_delete; "
+                                 "DROP TABLE cache_summary;")
+    migrated = _store(tmp_path, Path(store.source.path))
+    assert migrated.get_frames([0, 1]) == {0: b"keep", 1: b"replace"}
+    migrated.put_frames({1: b"updated", 2: b"new"})
+    assert inspect_frame_cache(store.cache_root)["frames"] == 3
+    with sqlite3.connect(store.path) as connection:
+        connection.execute("UPDATE frames SET checksum='corrupt' WHERE frame_index=1")
+    assert migrated.get_frames([1]) == {}
+    assert inspect_frame_cache(store.cache_root)["frames"] == 2
+
+
+def test_stream_maintenance_is_amortized_and_reads_do_not_rewrite_blobs(tmp_path):
+    store = _store(tmp_path, _source(tmp_path))
+    statements = []
+    with store.session():
+        store._session_connection.set_trace_callback(statements.append)
+        for index in range(128):
+            assert store.put_frames({index: b"x" * 4096}) == {index}
+        for index in range(128):
+            assert store.get_frames([index])[index] == b"x" * 4096
+    assert store.stats["cache_maintenance_calls"] <= 3
+    assert not any("COUNT(" in query.upper() or "MAX(" in query.upper() for query in statements)
+    assert not any("UPDATE FRAMES SET LAST_ACCESSED_AT" in query.upper() for query in statements)
+
+
+def _evict_from_peer(cache_root, queue):
+    queue.put(enforce_frame_cache_limit(cache_root, 1))
+
+
+def test_stream_lease_protects_generation_across_processes_and_releases_on_error(tmp_path):
+    import multiprocessing
+    store = _store(tmp_path, _source(tmp_path))
+    store.put_frames({0: b"payload"})
+    context = multiprocessing.get_context("spawn")
+    queue = context.Queue()
+    with pytest.raises(RuntimeError, match="interrupted"):
+        with store.session():
+            peer = context.Process(target=_evict_from_peer, args=(store.cache_root, queue))
+            peer.start()
+            try:
+                assert queue.get(timeout=30)["evicted_generations"] == 0
+                peer.join(timeout=30)
+                assert peer.exitcode == 0
+            finally:
+                if peer.is_alive():
+                    peer.terminate()
+                    peer.join()
+                queue.close()
+            assert store.get_frames([0]) == {0: b"payload"}
+            raise RuntimeError("interrupted")
+    assert store._session_connection is None
+    assert enforce_frame_cache_limit(store.cache_root, 1)["evicted_generations"] == 1
+
+
+def test_exhausted_quota_skips_optional_writes_and_preserves_active_data(tmp_path):
+    store = _store(tmp_path, _source(tmp_path))
+    store.put_frames({0: b"keep"})
+    store.max_bytes = 1
+    with store.session():
+        for index in range(1, 20):
+            assert store.put_frames({index: b"x" * 8192}) == set()
+        assert store.get_frames([0]) == {0: b"keep"}
+        assert store.stats["cache_writes_skipped"] == 19
+        assert store.stats["cache_maintenance_calls"] < 5
+
+
+def test_quota_io_error_does_not_abort_analysis(tmp_path, monkeypatch):
+    store = _store(tmp_path, _source(tmp_path))
+
+    def unavailable(*args, **kwargs):
+        raise OSError("cache filesystem unavailable")
+
+    monkeypatch.setattr("reaxkit.core.storage.frame_store.enforce_frame_cache_limit", unavailable)
+    assert store.put_frames({0: b"optional"}) == set()
+    assert store.stats["cache_writes_skipped"] == 1

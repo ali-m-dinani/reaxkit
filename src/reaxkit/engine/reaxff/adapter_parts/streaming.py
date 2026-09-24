@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -232,19 +233,25 @@ def _aligned_records(
         connectivity_records: Iterator[dict[str, Any]],
 ) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     """Merge two source-index ordered iterators while retaining two frames."""
-    coordinates = next(coordinate_records, None)
-    connectivity = next(connectivity_records, None)
-    while coordinates is not None and connectivity is not None:
-        coord_index = int(coordinates["source_index"])
-        conn_index = int(connectivity["source_index"])
-        if coord_index == conn_index:
-            yield coordinates, connectivity
-            coordinates = next(coordinate_records, None)
-            connectivity = next(connectivity_records, None)
-        elif coord_index < conn_index:
-            coordinates = next(coordinate_records, None)
-        else:
-            connectivity = next(connectivity_records, None)
+    try:
+        coordinates = next(coordinate_records, None)
+        connectivity = next(connectivity_records, None)
+        while coordinates is not None and connectivity is not None:
+            coord_index = int(coordinates["source_index"])
+            conn_index = int(connectivity["source_index"])
+            if coord_index == conn_index:
+                yield coordinates, connectivity
+                coordinates = next(coordinate_records, None)
+                connectivity = next(connectivity_records, None)
+            elif coord_index < conn_index:
+                coordinates = next(coordinate_records, None)
+            else:
+                connectivity = next(connectivity_records, None)
+    finally:
+        for records in (coordinate_records, connectivity_records):
+            close = getattr(records, "close", None)
+            if callable(close):
+                close()
 
 
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
@@ -294,6 +301,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             frame_indices=selected,
             reporter=reporter,
             input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+            timing_callback=args.get("_reader_timing_callback"),
         )
         return
 
@@ -303,16 +311,25 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
     input_cache = bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False))
-    coordinate_records = XmoloutHandler(
+    coordinate_handler = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
         reporter=coordinate_reporter,
         input_cache=input_cache,
-    ).stream_file_frames(coordinates_only=total_electrostatics)
+    )
+    coordinate_handler._stream_timing_callback = args.get("_reader_timing_callback")
+    coordinate_records = coordinate_handler.stream_file_frames(
+        coordinates_only=total_electrostatics or data_type is TrajectoryData,
+    )
 
     if data_type is TrajectoryData:
-        for coordinate_record in coordinate_records:
-            yield _trajectory_frame(coordinate_record)
+        with closing(coordinate_records):
+            for coordinate_record in coordinate_records:
+                trajectory = _trajectory_frame(coordinate_record)
+                # Preserve the trajectory contract without constructing the
+                # former per-frame atom DataFrame just to recover its labels.
+                trajectory.atom_labels = np.asarray([trajectory.elements], dtype=object)
+                yield trajectory
         return
 
     fort7_path = adapter._resolve_reaxff_path(
@@ -330,6 +347,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             frame_indices=selected,
             reporter=fort7_reporter,
             include_atom_types=False,
+            timing_callback=args.get("_reader_timing_callback"),
             input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         )
     else:

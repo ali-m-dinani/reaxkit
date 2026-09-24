@@ -43,6 +43,78 @@ def _fort7(n_frames: int) -> str:
     return "\n".join(blocks) + "\n"
 
 
+@pytest.mark.parametrize("kind", ["charges", "coordinates"])
+def test_forward_scan_records_offsets_and_reports_real_read_work(tmp_path, monkeypatch, kind):
+    handler_type, content, flags, arrays = (
+        (Fort7Handler, _fort7(10), {"charge_arrays_only": True}, ["charges", "charge_atom_ids"])
+        if kind == "charges" else
+        (XmoloutHandler, _xmolout(10), {"coordinates_only": True}, ["coordinates"])
+    )
+    import numpy as np
+    source = tmp_path / ("fort.7" if kind == "charges" else "xmolout")
+    source.write_text(content, encoding="utf-8")
+    cached = handler_type(source, frame_indices=[0, 3], frame_cache_root=tmp_path / "cache")
+    direct = handler_type(source, frame_indices=[0, 3], input_cache=False)
+    cached_frames = list(cached.stream_file_frames(**flags))
+    direct_frames = list(direct.stream_file_frames(**flags))
+    assert [frame["source_index"] for frame in direct_frames] == [0, 3]
+    for left, right in zip(cached_frames, direct_frames):
+        for name in arrays:
+            np.testing.assert_array_equal(left[name], right[name])
+    for handler in (cached, direct):
+        stats = handler._frame_cache_stats
+        assert stats["parsed_frames"] == 2
+        assert stats["source_bytes"] < source.stat().st_size
+        assert stats["source_read_bytes"] >= stats["source_bytes"]
+        assert stats["source_read_calls"] > 0
+        assert stats["source_opens"] == 1
+
+    # Frame 2 was skipped numerically, but its offset was recorded on the first
+    # pass. Request it without permitting another header-index traversal.
+    overlap = handler_type(source, frame_indices=[2, 3], frame_cache_root=tmp_path / "cache")
+    original_scan = overlap._scan_offsets
+
+    def checked_scan(store, *, through_index, **kwargs):
+        assert store.get_coverage().next_frame_index == 4
+        assert set(store.get_offsets(range(4))) == set(range(4))
+        return original_scan(store, through_index=through_index, **kwargs)
+
+    monkeypatch.setattr(overlap, "_scan_offsets", checked_scan)
+    actual = list(overlap.stream_file_frames(**flags))
+    assert [frame["source_index"] for frame in actual] == [2, 3]
+    assert overlap._frame_cache_stats["hits"] == 1
+    assert overlap._frame_cache_stats["misses"] == 1
+
+
+def test_paired_benchmark_checksums_match_cold_direct_and_warm(tmp_path):
+    from benchmarks.hbn_paired_reader import run
+    (tmp_path / "xmolout").write_text(_xmolout(8), encoding="utf-8")
+    (tmp_path / "fort.7").write_text(_fort7(8), encoding="utf-8")
+    cold = run(tmp_path, "0:8:3", tmp_path / "cache")
+    direct = run(tmp_path, "0:8:3", tmp_path / "cache", input_cache=False)
+    warm = run(tmp_path, "0:8:3", tmp_path / "cache")
+    assert cold["checksum"] == direct["checksum"] == warm["checksum"]
+    assert cold["completed"] == direct["completed"] == warm["completed"] == 3
+    assert {record["handler"] for record in cold["sources"]} == {"XmoloutHandler", "Fort7Handler"}
+    assert all(record["stats"]["hits"] == 3 for record in warm["sources"])
+    assert all(record["stats"]["source_read_bytes"] == 0 for record in warm["sources"])
+
+
+def test_closing_coordinate_stream_releases_leases_and_keeps_metrics(tmp_path):
+    from reaxkit.core.storage.frame_store import enforce_frame_cache_limit
+    source = tmp_path / "xmolout"
+    source.write_text(_xmolout(8), encoding="utf-8")
+    cache_root = tmp_path / "cache"
+    handler = XmoloutHandler(source, frame_indices=[0, 3], frame_cache_root=cache_root)
+    stream = handler.stream_file_frames(coordinates_only=True)
+    assert next(stream)["source_index"] == 0
+    assert enforce_frame_cache_limit(cache_root, 1)["evicted_generations"] == 0
+    stream.close()
+    assert handler._frame_cache_stats["source_read_bytes"] > 0
+    assert handler._frame_cache_stats["parsed_frames"] == 1
+    assert enforce_frame_cache_limit(cache_root, 1)["evicted_generations"] == 1
+
+
 def test_xmolout_loads_only_requested_frames_in_request_order(tmp_path: Path, monkeypatch):
     path = tmp_path / "xmolout"
     path.write_text(_xmolout(6), encoding="utf-8")

@@ -12,7 +12,8 @@ fort.7 handlers use this store for explicit finite selections.
 
 from __future__ import annotations
 
-from contextlib import closing
+from contextlib import closing, contextmanager
+from functools import wraps
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -25,6 +26,7 @@ import re
 import shutil
 import sqlite3
 import threading
+from time import perf_counter, monotonic
 from typing import Any, Iterable, Mapping, Sequence
 
 FRAME_STORE_SCHEMA_VERSION = 1
@@ -35,6 +37,37 @@ DEFAULT_BUSY_TIMEOUT_SECONDS = 5.0
 DEFAULT_FRAME_CACHE_MAX_BYTES = 10 * 1024 ** 3
 _SQLITE_QUERY_BATCH_SIZE = 500
 _INDEX_LOCK = threading.Lock()
+_MAINTENANCE_BYTES = 64 * 1024 ** 2
+_MAINTENANCE_SECONDS = 30.0
+
+
+@contextmanager
+def _generation_guard(root: Path, generation: Path, *, exclusive=False, timeout=5.0):
+    """Cross-process lease, released by SQLite even if the owning process dies.
+
+    The small rollback-journal database lives outside the evictable generation.
+    Shared read transactions pin it; eviction holds an exclusive transaction
+    through deletion. Payload transactions use a different database.
+    """
+    key = sha256(str(generation.resolve()).encode("utf-8")).hexdigest()
+    path = root / "index" / "leases" / f"{key}.sqlite3"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(path, timeout=timeout, isolation_level=None)) as connection:
+        connection.execute("CREATE TABLE IF NOT EXISTS lease (id INTEGER PRIMARY KEY)")
+        connection.execute("BEGIN EXCLUSIVE" if exclusive else "BEGIN")
+        connection.execute("SELECT id FROM lease").fetchall()
+        try:
+            yield
+        finally:
+            connection.rollback()
+
+
+def _leased(method):
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self.session():
+            return method(self, *args, **kwargs)
+    return wrapped
 
 
 class FrameStoreError(RuntimeError):
@@ -330,6 +363,19 @@ class FrameStore:
         self.view = view
         self.busy_timeout_seconds = max(0.0, float(busy_timeout_seconds))
         self.max_bytes = max_bytes
+        self._session_connection = None
+        self._session_depth = 0
+        self._growth = 0
+        self._known_bytes = 0
+        self._last_maintenance = float("-inf")
+        self._last_touch = float("-inf")
+        self._write_suspended = False
+        self.stats = {"cache_read_seconds": 0.0, "cache_write_seconds": 0.0,
+                      "cache_metadata_seconds": 0.0, "cache_offsets_written": 0,
+                      "cache_maintenance_seconds": 0.0, "cache_maintenance_calls": 0,
+                      "cache_payload_bytes_written": 0, "cache_payload_bytes_read": 0,
+                      "cache_commits": 0, "cache_frames_written": 0,
+                      "cache_writes_skipped": 0}
         namespace = f"{source.engine}-{source.source_kind}"
         self.path = (
                 self.cache_root
@@ -339,9 +385,10 @@ class FrameStore:
                 / source.generation_key[:20]
                 / f"{view.view_key[:20]}.sqlite3"
         )
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
-        self._update_workspace_index()
+        with _generation_guard(self.cache_root, self.path.parent):
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize()
+            self._update_workspace_index()
 
     @classmethod
     def for_source(
@@ -400,8 +447,73 @@ class FrameStore:
         connection.execute("PRAGMA synchronous = NORMAL")
         return connection
 
+    @contextmanager
+    def _connection(self):
+        if self._session_connection is not None:
+            yield self._session_connection
+        else:
+            with closing(self._connect()) as connection:
+                yield connection
+
+    @contextmanager
+    def session(self):
+        """Pin a generation and amortize connections over one reader stream.
+
+        A session belongs to its calling thread. Use separate stores for
+        concurrent readers/writers. Memory and transactions remain bounded.
+        """
+        if self._session_depth:
+            yield self
+            return
+        with _generation_guard(self.cache_root, self.path.parent,
+                               timeout=self.busy_timeout_seconds):
+            if not self.path.exists():
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self._initialize()
+                self._update_workspace_index()
+            self._session_connection = self._connect()
+            self._session_depth = 1
+            try:
+                yield self
+            finally:
+                self._session_depth = 0
+                self._session_connection.close()
+                self._session_connection = None
+        # Quota maintenance runs after releasing our lease; other streams are
+        # still protected by theirs. Do not mask an analysis error on cleanup.
+        if self._growth and self.max_bytes and self.max_bytes > 0:
+            self._maintain_quota(force=True)
+
+    def _maintain_quota(self, *, force=False, incoming=0):
+        if not self.max_bytes or self.max_bytes <= 0:
+            return True
+        now = monotonic()
+        interval = min(_MAINTENANCE_BYTES, max(1, self.max_bytes // 16))
+        due = (force or now - self._last_maintenance >= _MAINTENANCE_SECONDS
+               or self._growth >= interval)
+        if self._write_suspended and not due:
+            return False
+        if due or self._known_bytes + self._growth + incoming > self.max_bytes:
+            started = perf_counter()
+            # Leave space for this batch; pinned generations are never removed.
+            target = max(1, int(self.max_bytes) - incoming)
+            try:
+                info = enforce_frame_cache_limit(self.cache_root, target)
+            except (OSError, sqlite3.DatabaseError):
+                self._write_suspended = True
+                self._last_maintenance = now
+                return False
+            finally:
+                self.stats["cache_maintenance_seconds"] += perf_counter() - started
+                self.stats["cache_maintenance_calls"] += 1
+            self._known_bytes = int(info["bytes_after"])
+            self._growth = 0
+            self._last_maintenance = now
+        self._write_suspended = self._known_bytes + self._growth + incoming > self.max_bytes
+        return not self._write_suspended
+
     def _initialize(self) -> None:
-        with closing(self._connect()) as connection:
+        with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             if version not in {0, FRAME_STORE_SCHEMA_VERSION}:
@@ -527,6 +639,19 @@ class FrameStore:
             )
             for statement in statements:
                 connection.execute(statement)
+            # Additive migration: COUNT(*) uses the small primary-key index;
+            # never scan the BLOB rows to recover last_accessed_at.
+            connection.execute("CREATE TABLE IF NOT EXISTS cache_summary ("
+                               "id INTEGER PRIMARY KEY CHECK(id=1), frame_count INTEGER NOT NULL, "
+                               "last_accessed_at TEXT NOT NULL)")
+            if connection.execute("SELECT 1 FROM cache_summary WHERE id=1").fetchone() is None:
+                count = connection.execute("SELECT COUNT(*) FROM frames").fetchone()[0]
+                connection.execute("INSERT INTO cache_summary VALUES (1, ?, ?)",
+                                   (count, _utc_now_iso()))
+            connection.execute("CREATE TRIGGER IF NOT EXISTS frame_count_insert AFTER INSERT ON frames "
+                               "BEGIN UPDATE cache_summary SET frame_count=frame_count+1 WHERE id=1; END")
+            connection.execute("CREATE TRIGGER IF NOT EXISTS frame_count_delete AFTER DELETE ON frames "
+                               "BEGIN UPDATE cache_summary SET frame_count=frame_count-1 WHERE id=1; END")
             connection.execute(f"PRAGMA user_version = {FRAME_STORE_SCHEMA_VERSION}")
             expected = {
                 "schema_version": str(FRAME_STORE_SCHEMA_VERSION),
@@ -618,6 +743,7 @@ class FrameStore:
         for start in range(0, len(values), _SQLITE_QUERY_BATCH_SIZE):
             yield values[start: start + _SQLITE_QUERY_BATCH_SIZE]
 
+    @_leased
     def put_frames(self, frames: Mapping[int, Any]) -> set[int]:
         """Persist serializable frames and return the indices successfully stored."""
         if not self.path.exists():
@@ -626,6 +752,7 @@ class FrameStore:
             self._update_workspace_index()
         now = _utc_now_iso()
         prepared: list[tuple[int, str, str, bytes, str, str, str]] = []
+        serialized_at = perf_counter()
         for raw_index, value in frames.items():
             frame_index = int(raw_index)
             if frame_index < 0:
@@ -645,10 +772,19 @@ class FrameStore:
                     now,
                 )
             )
+        self.stats["cache_write_seconds"] += perf_counter() - serialized_at
         if not prepared:
             return set()
+        payload_bytes = sum(len(row[3]) for row in prepared)
+        # Conservative allowance for SQLite pages and metadata. An oversized
+        # optional batch is skipped, never allowed to evict its active reader.
+        reservation = payload_bytes + len(prepared) * 8192
+        if not self._maintain_quota(incoming=reservation):
+            self.stats["cache_writes_skipped"] += len(prepared)
+            return set()
+        started = perf_counter()
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 connection.executemany(
                     """
@@ -663,24 +799,30 @@ class FrameStore:
                     """,
                     prepared,
                 )
+                connection.execute("UPDATE cache_summary SET last_accessed_at=? WHERE id=1", (now,))
                 connection.commit()
         except (OSError, sqlite3.DatabaseError):
+            if self._session_connection is not None:
+                self._session_connection.rollback()
             return set()
-        if self.max_bytes and self.max_bytes > 0:
-            enforce_frame_cache_limit(
-                self.cache_root,
-                int(self.max_bytes),
-            )
+        finally:
+            self.stats["cache_write_seconds"] += perf_counter() - started
+        self._growth += reservation
+        self.stats["cache_payload_bytes_written"] += payload_bytes
+        self.stats["cache_frames_written"] += len(prepared)
+        self.stats["cache_commits"] += 1
         return {row[0] for row in prepared}
 
+    @_leased
     def get_frames(self, indices: Iterable[int]) -> dict[int, Any]:
         """Return valid cached frames; missing or corrupt entries are omitted."""
         requested = self._normalize_indices(indices)
         if not requested:
             return {}
         rows: dict[int, sqlite3.Row] = {}
+        started = perf_counter()
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 for batch in self._batches(requested):
                     placeholders = ",".join("?" for _ in batch)
                     query = (
@@ -704,6 +846,7 @@ class FrameStore:
                 invalid.append(frame_index)
                 continue
             payload = bytes(row["payload"])
+            self.stats["cache_payload_bytes_read"] += len(payload)
             if sha256(payload).hexdigest() != str(row["checksum"]):
                 invalid.append(frame_index)
                 continue
@@ -713,6 +856,7 @@ class FrameStore:
                 invalid.append(frame_index)
 
         self._touch_and_remove_invalid(tuple(loaded), tuple(invalid))
+        self.stats["cache_read_seconds"] += perf_counter() - started
         return loaded
 
     def _touch_and_remove_invalid(
@@ -722,17 +866,15 @@ class FrameStore:
     ) -> None:
         if not valid_indices and not invalid_indices:
             return
+        touch = monotonic() - self._last_touch >= _MAINTENANCE_SECONDS
+        if not invalid_indices and not touch:
+            return
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 now = _utc_now_iso()
-                for batch in self._batches(valid_indices):
-                    placeholders = ",".join("?" for _ in batch)
-                    connection.execute(
-                        "UPDATE frames SET last_accessed_at = ? "
-                        f"WHERE representation = ? AND frame_index IN ({placeholders})",
-                        (now, self.view.representation, *batch),
-                    )
+                if touch:
+                    connection.execute("UPDATE cache_summary SET last_accessed_at=? WHERE id=1", (now,))
                 for batch in self._batches(invalid_indices):
                     placeholders = ",".join("?" for _ in batch)
                     connection.execute(
@@ -741,13 +883,18 @@ class FrameStore:
                         (self.view.representation, *batch),
                     )
                 connection.commit()
+                self._last_touch = monotonic()
+                self.stats["cache_commits"] += 1
         except (OSError, sqlite3.DatabaseError):
+            if self._session_connection is not None:
+                self._session_connection.rollback()
             return
 
+    @_leased
     def available_indices(self, indices: Iterable[int] | None = None) -> set[int]:
         """Return stored indices without deserializing frame payloads."""
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 if indices is None:
                     rows = connection.execute(
                         "SELECT frame_index FROM frames WHERE representation = ?",
@@ -773,6 +920,7 @@ class FrameStore:
         available = self.available_indices(requested)
         return tuple(frame_index for frame_index in requested if frame_index not in available)
 
+    @_leased
     def put_offsets(self, offsets: Iterable[FrameOffset]) -> set[int]:
         values = tuple(offsets)
         if not values:
@@ -789,8 +937,12 @@ class FrameStore:
             )
             for item in values
         ]
+        reservation = 8192 + len(rows) * 256
+        # Offset metadata is needed for indexed cache misses even when optional
+        # payload writes are suspended. Account for its growth at reconciliation.
+        started = perf_counter()
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 connection.executemany(
                     """
@@ -807,16 +959,24 @@ class FrameStore:
                 )
                 connection.commit()
         except (OSError, sqlite3.DatabaseError):
+            if self._session_connection is not None:
+                self._session_connection.rollback()
             return set()
+        finally:
+            self.stats["cache_metadata_seconds"] += perf_counter() - started
+        self._growth += reservation
+        self.stats["cache_offsets_written"] += len(values)
+        self.stats["cache_commits"] += 1
         return {item.frame_index for item in values}
 
+    @_leased
     def get_offsets(self, indices: Iterable[int]) -> dict[int, FrameOffset]:
         requested = self._normalize_indices(indices)
         if not requested:
             return {}
         result: dict[int, FrameOffset] = {}
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 for batch in self._batches(requested):
                     placeholders = ",".join("?" for _ in batch)
                     for row in connection.execute(
@@ -836,9 +996,10 @@ class FrameStore:
             return {}
         return result
 
+    @_leased
     def get_coverage(self) -> IndexCoverage:
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 row = connection.execute(
                     "SELECT next_frame_index, next_byte_offset, complete "
                     "FROM index_coverage WHERE singleton = 1"
@@ -853,9 +1014,11 @@ class FrameStore:
             complete=bool(row["complete"]),
         )
 
+    @_leased
     def set_coverage(self, coverage: IndexCoverage) -> bool:
+        started = perf_counter()
         try:
-            with closing(self._connect()) as connection:
+            with self._connection() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 current = connection.execute(
                     "SELECT next_frame_index, next_byte_offset, complete "
@@ -890,12 +1053,17 @@ class FrameStore:
                     ),
                 )
                 connection.commit()
+                self.stats["cache_commits"] += 1
                 return True
         except (OSError, sqlite3.DatabaseError):
+            if self._session_connection is not None:
+                self._session_connection.rollback()
             return False
+        finally:
+            self.stats["cache_metadata_seconds"] += perf_counter() - started
 
 
-def inspect_frame_cache(cache_root: str | Path) -> dict[str, Any]:
+def inspect_frame_cache(cache_root: str | Path, *, details: bool = True) -> dict[str, Any]:
     """Return deterministic size and entry information for a workspace frame cache."""
     root = Path(cache_root)
     frames_root = root / "frames"
@@ -910,18 +1078,25 @@ def inspect_frame_cache(cache_root: str | Path) -> dict[str, Any]:
                 except OSError:
                     pass
             total_bytes += size
-            last_accessed = ""
-            frame_count = 0
             try:
-                connection = sqlite3.connect(path, timeout=0.1)
-                row = connection.execute(
-                    "SELECT COUNT(*), COALESCE(MAX(last_accessed_at), '') FROM frames"
-                ).fetchone()
-                connection.close()
-                frame_count = int(row[0])
-                last_accessed = str(row[1])
-            except sqlite3.DatabaseError:
-                pass
+                last_accessed = str(path.stat().st_mtime_ns)
+            except OSError:
+                last_accessed = ""
+            frame_count = 0
+            if details:
+                try:
+                    with closing(sqlite3.connect(path, timeout=0.1)) as connection:
+                        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='cache_summary'").fetchone():
+                            row = connection.execute(
+                                "SELECT frame_count, last_accessed_at FROM cache_summary WHERE id=1"
+                            ).fetchone()
+                            frame_count, last_accessed = int(row[0]), str(row[1])
+                        else:
+                            # Legacy stores: count via the primary-key index,
+                            # avoid MAX(timestamp) on rows containing large BLOBs.
+                            frame_count = int(connection.execute("SELECT COUNT(*) FROM frames").fetchone()[0])
+                except (OSError, sqlite3.DatabaseError):
+                    pass
             entries.append(
                 {
                     "path": str(path),
@@ -989,7 +1164,7 @@ def enforce_frame_cache_limit(
         return {"bytes_before": 0, "bytes_after": 0, "evicted_generations": 0}
     root = Path(cache_root).resolve()
     frames_root = root / "frames"
-    info = inspect_frame_cache(root)
+    info = inspect_frame_cache(root, details=False)
     before = int(info["bytes"])
     if before <= limit:
         return {"bytes_before": before, "bytes_after": before, "evicted_generations": 0}
@@ -1013,28 +1188,12 @@ def enforce_frame_cache_limit(
             break
         if generation in excluded or frames_root.resolve() not in generation.parents:
             continue
-        locks: list[sqlite3.Connection] = []
-        locked = True
         try:
-            for db_path in record["dbs"]:
-                connection = sqlite3.connect(db_path, timeout=0, isolation_level=None)
-                connection.execute("PRAGMA busy_timeout = 0")
-                connection.execute("BEGIN EXCLUSIVE")
-                locks.append(connection)
-        except sqlite3.DatabaseError:
-            locked = False
-        finally:
-            for connection in locks:
-                try:
-                    connection.rollback()
-                    connection.close()
-                except sqlite3.DatabaseError:
-                    pass
-        if not locked:
-            continue
-        try:
-            shutil.rmtree(generation)
-        except OSError:
+            with _generation_guard(root, generation, exclusive=True, timeout=0):
+                # Hold the lease through deletion; a new stream cannot start
+                # between a lock probe and rmtree.
+                shutil.rmtree(generation)
+        except (OSError, sqlite3.DatabaseError):
             continue
         remaining -= int(record["bytes"])
         evicted += 1
