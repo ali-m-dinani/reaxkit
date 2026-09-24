@@ -9,6 +9,7 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.electrostatics.electrostatics import _field_component_series
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole import (
@@ -142,6 +143,7 @@ def _coordination_volumes(dipoles: BasalPlaneDipoleResult) -> dict[tuple[int, in
 def calculate_basal_plane_local_polarization(
     data,
     request: BasalPlaneLocalPolarizationRequest,
+    dipoles=None,
 ) -> BasalPlaneLocalPolarizationResult:
     """Normalize every valid center dipole by an assigned local volume.
 
@@ -157,7 +159,7 @@ def calculate_basal_plane_local_polarization(
         raise ValueError(
             "include_electric_field requires electric-field data; for ReaxFF, provide fort.78."
         )
-    dipoles = calculate_basal_plane_dipoles(data, request)
+    dipoles = dipoles if dipoles is not None else calculate_basal_plane_dipoles(data, request)
     table = dipoles.table.copy()
     factor = float(const("ea3_to_uC_cm2"))
     coordination = (
@@ -260,6 +262,10 @@ class BasalPlaneLocalPolarizationTask(AnalysisTask):
     """Calculate per-center polarization using equal or coordination volumes."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "5"
 
@@ -294,6 +300,10 @@ class BasalPlaneLocalPolarizationTask(AnalysisTask):
     def run(self, data, request: BasalPlaneLocalPolarizationRequest, reporter=None):
         _ = reporter
         return calculate_basal_plane_local_polarization(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "basal_local", reporter, pipeline)
 
 
 def _table_for_trajectory_frame(

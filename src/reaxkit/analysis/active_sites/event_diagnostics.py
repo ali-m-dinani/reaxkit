@@ -18,6 +18,7 @@ from reaxkit.analysis.active_sites.models import (
     ActiveSiteEventDiagnosticsResult,
 )
 from reaxkit.analysis.active_sites.pbc import frame_cell_matrix, pairwise_min_image_distances
+from reaxkit.core.runtime.frame_tables import selected_frame_envelopes
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, TrajectoryData
@@ -100,6 +101,7 @@ class ActiveSiteEventDiagnosticsTask(AnalysisTask):
 
     VERSION = "3"
     required_data = TrajectoryData
+    supports_selective_streaming = True
 
     def required_data_for(self, request: object, args: dict | None = None):
         return TrajectoryData
@@ -287,9 +289,8 @@ class ActiveSiteEventDiagnosticsTask(AnalysisTask):
         every = max(1, int(request.every))
         limit = max(1, int(request.max_diag_frames))
 
-        for stream_index, data in enumerate(frames):
-            if stream_index % every:
-                continue
+        for envelope in selected_frame_envelopes(frames, request):
+            stream_index, data = envelope.source_frame, envelope.payload
             if analyzed >= limit:
                 break
             if isinstance(data, ConnectivityTrajectoryData):

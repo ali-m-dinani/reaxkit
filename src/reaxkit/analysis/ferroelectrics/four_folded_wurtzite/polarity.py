@@ -8,6 +8,7 @@ from typing import Any, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     WurtziteNeighborRequest,
@@ -425,6 +426,10 @@ class WurtzitePolarityTask(AnalysisTask):
     """Calculate site polarity from the neighbor module's normalized tables."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = True
     VERSION = "1"
 
@@ -445,64 +450,9 @@ class WurtzitePolarityTask(AnalysisTask):
         _ = reporter
         return calculate_polarity_from_trajectory(data, request)
 
-    def run_stream(self, frames, request: WurtzitePolarityRequest, reporter=None):
-        _validate_request(request)
-        requested = None if request.frames is None else [int(v) for v in request.frames][:: int(request.every)]
-        requested_set = set(requested or ())
-        reference_basal: dict[int, float] = {}
-        pending: list[tuple[int, WurtziteNeighborResult]] = []
-        results: list[WurtzitePolarityResult] = []
-        seen: set[int] = set()
-        processed = 0
-        for data in frames:
-            processed += 1
-            trajectory, charges = _charges_for_request(data, request)
-            source_frame = _source_frame(trajectory, 0)
-            seen.add(source_frame)
-            keep = source_frame in requested_set if requested is not None else source_frame % int(request.every) == 0
-            need_reference = source_frame == int(request.reference_frame)
-            if keep or need_reference:
-                frame_request = WurtzitePolarityRequest(**{
-                    **vars(request), "frames": [0], "every": 1, "reference_frame": source_frame,
-                })
-                neighbor_result = extract_wurtzite_neighbors(
-                    trajectory,
-                    frame_request,
-                    charges=charges,
-                    frame_indices=[0],
-                    preserve_source_frame_indices=True,
-                )
-                raw_result = calculate_wurtzite_polarity(neighbor_result, frame_request)
-                if need_reference:
-                    reference_basal = dict(zip(
-                        raw_result.table["site_atom_id"].astype(int),
-                        raw_result.table["mean_basal_bond_c (angstrom)"].astype(float),
-                        strict=False,
-                    ))
-                    for pending_frame, pending_neighbors in pending:
-                        pending_request = WurtzitePolarityRequest(**{
-                            **vars(request), "reference_frame": int(request.reference_frame)
-                        })
-                        results.append(calculate_wurtzite_polarity(
-                            pending_neighbors, pending_request, reference_basal=reference_basal
-                        ))
-                    pending.clear()
-                if keep:
-                    if reference_basal or source_frame == int(request.reference_frame):
-                        results.append(calculate_wurtzite_polarity(
-                            neighbor_result, request, reference_basal=reference_basal
-                        ))
-                    else:
-                        pending.append((source_frame, neighbor_result))
-            if callable(reporter):
-                reporter("stream", processed, 0, "Calculating four-fold wurtzite polarity")
-        if pending:
-            raise ValueError(f"Reference frame {request.reference_frame} is required for basal changes.")
-        if requested is not None:
-            missing = [value for value in requested if value not in seen]
-            if missing:
-                raise ValueError(f"Requested frame(s) not found in trajectory: {missing}.")
-        return combine_wurtzite_polarity_results(results, request)
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarity_stream import stream_polarity
+        return stream_polarity(self, frames, request, reporter, pipeline)
 
 
 __all__ = [

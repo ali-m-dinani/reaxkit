@@ -7,7 +7,8 @@ File loading, CSV persistence, and plotting remain workflow responsibilities.
 
 from __future__ import annotations
 
-import csv
+from contextlib import closing, contextmanager, nullcontext
+from reaxkit.core.runtime.artifacts import BufferedTableSink
 import math
 import tempfile
 from dataclasses import dataclass, field as dc_field
@@ -17,12 +18,26 @@ from typing import Any, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ChargeData
 from reaxkit.presentation.specs import PresentationSpec
+
+
+@contextmanager
+def _charge_scratch(spool, matrix_path, retain_matrix):
+    succeeded = False
+    try:
+        yield
+        succeeded = True
+    finally:
+        spool.close()
+        Path(spool.name).unlink(missing_ok=True)
+        if not succeeded or not retain_matrix:
+            matrix_path.unlink(missing_ok=True)
 
 DETAIL_COLUMNS = ["frame", "atom_number", "atom_type", "charge", "delta_charge"]
 SUMMARY_COLUMNS = [
@@ -348,6 +363,8 @@ class DynamicChargeChangeTask(AnalysisTask):
     """Compute per-atom dynamic charge changes from canonical charge data."""
 
     required_data = ChargeData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        supports_selective_frames=True, reference_frames=(0,), estimated_frame_bytes=8 * 1024 * 1024)
     VERSION = "3"
 
     @staticmethod
@@ -412,260 +429,246 @@ class DynamicChargeChangeTask(AnalysisTask):
             delete=False,
         )
         spool_path = Path(spool.name)
-        detail_handle = (
-            detail_path.open("w", encoding="utf-8", newline="")
-            if detail_path is not None
-            else None
-        )
-        writer = csv.writer(detail_handle) if detail_handle is not None else None
-        if writer is not None:
-            writer.writerow(DETAIL_COLUMNS)
+        writer = (BufferedTableSink(detail_path, "parquet" if detail_path.suffix == ".parquet" else "csv", overwrite=True)
+                  if detail_path is not None else None)
 
-        baseline: dict[int, float] | None = None
-        charge_stats: dict[int, _RunningStats] = {}
-        delta_stats: dict[int, _RunningStats] = {}
-        atom_type_by_number: dict[int, str] = {}
-        preview_rows: list[dict[str, object]] = []
-        output_frames: list[int] = []
-        output_iterations: list[int] = []
-        output_times: list[float] = []
-        have_all_times = True
-        seen_frames: set[int] = set()
-        seen_atom_numbers: set[int] = set()
-        matrix_column_by_atom: dict[int, int] = {}
-        detail_row_count = 0
-        processed_frames = 0
-        max_atoms = 0
-        frame_summary_rows: list[dict[str, object]] = []
-        frame_atom_type_summary_rows: list[dict[str, object]] = []
+        with _charge_scratch(spool, matrix_path, request._retain_matrix), writer if writer is not None else nullcontext():
+            baseline: dict[int, float] | None = None
+            charge_stats: dict[int, _RunningStats] = {}
+            delta_stats: dict[int, _RunningStats] = {}
+            atom_type_by_number: dict[int, str] = {}
+            preview_rows: list[dict[str, object]] = []
+            output_frames: list[int] = []
+            output_iterations: list[int] = []
+            output_times: list[float] = []
+            have_all_times = True
+            seen_frames: set[int] = set()
+            seen_atom_numbers: set[int] = set()
+            matrix_column_by_atom: dict[int, int] = {}
+            detail_row_count = 0
+            processed_frames = 0
+            max_atoms = 0
+            frame_summary_rows: list[dict[str, object]] = []
+            frame_atom_type_summary_rows: list[dict[str, object]] = []
 
-        stream_succeeded = False
-        try:
-            for stream_index, data in enumerate(frames):
-                processed_frames += 1
-                metadata = data.metadata or {}
-                source_values = metadata.get("source_frame_indices")
-                source_frame = (
-                    int(np.asarray(source_values).reshape(-1)[0])
-                    if source_values is not None
-                    else stream_index
-                )
-                seen_frames.add(source_frame)
-                charges = np.asarray(data.charges, dtype=float)
-                if charges.shape[0] != 1:
-                    raise ValueError("Streamed ChargeData must contain exactly one frame.")
-                atom_numbers, atom_types = _atom_identity(data, charges.shape[1])
-                atom_to_index = {number: index for index, number in enumerate(atom_numbers)}
-                present_atom_numbers = [
-                    number
-                    for number, index in atom_to_index.items()
-                    if np.isfinite(charges[0, index])
-                ]
-                for atom_number in present_atom_numbers:
-                    if atom_number not in matrix_column_by_atom:
-                        matrix_column_by_atom[atom_number] = len(matrix_column_by_atom)
-                seen_atom_numbers.update(present_atom_numbers)
-                for atom_number in present_atom_numbers:
-                    atom_type_by_number[atom_number] = str(atom_types[atom_to_index[atom_number]])
-                if baseline is None:
-                    if source_frame != 0:
-                        raise ValueError("Dynamic charge streaming must begin at frame 0.")
-                    baseline = {
-                        number: float(charges[0, index])
+            stream_succeeded = False
+            try:
+                for stream_index, data in enumerate(frames):
+                    processed_frames += 1
+                    metadata = data.metadata or {}
+                    source_values = metadata.get("source_frame_indices")
+                    source_frame = (
+                        int(np.asarray(source_values).reshape(-1)[0])
+                        if source_values is not None
+                        else stream_index
+                    )
+                    seen_frames.add(source_frame)
+                    charges = np.asarray(data.charges, dtype=float)
+                    if charges.shape[0] != 1:
+                        raise ValueError("Streamed ChargeData must contain exactly one frame.")
+                    atom_numbers, atom_types = _atom_identity(data, charges.shape[1])
+                    atom_to_index = {number: index for index, number in enumerate(atom_numbers)}
+                    present_atom_numbers = [
+                        number
                         for number, index in atom_to_index.items()
                         if np.isfinite(charges[0, index])
-                    }
+                    ]
+                    for atom_number in present_atom_numbers:
+                        if atom_number not in matrix_column_by_atom:
+                            matrix_column_by_atom[atom_number] = len(matrix_column_by_atom)
+                    seen_atom_numbers.update(present_atom_numbers)
+                    for atom_number in present_atom_numbers:
+                        atom_type_by_number[atom_number] = str(atom_types[atom_to_index[atom_number]])
+                    if baseline is None:
+                        if source_frame != 0:
+                            raise ValueError("Dynamic charge streaming must begin at frame 0.")
+                        baseline = {
+                            number: float(charges[0, index])
+                            for number, index in atom_to_index.items()
+                            if np.isfinite(charges[0, index])
+                        }
 
-                keep = (
-                    source_frame in requested_set
-                    if requested is not None
-                    else source_frame % int(request.every) == 0
-                )
-                if keep:
-                    chosen_atoms = (
-                        present_atom_numbers
-                        if selected_atom_numbers is None
-                        else [number for number in selected_atom_numbers if number in present_atom_numbers]
+                    keep = (
+                        source_frame in requested_set
+                        if requested is not None
+                        else source_frame % int(request.every) == 0
                     )
-                    iteration = (
-                        int(np.asarray(data.iterations).reshape(-1)[0])
-                        if data.iterations is not None
-                        else source_frame
-                    )
-                    frame_values = np.full(len(matrix_column_by_atom), np.nan, dtype=float)
-                    csv_rows = []
-                    frame_charges: list[float] = []
-                    frame_deltas: list[float] = []
-                    charges_by_type: dict[str, list[float]] = {}
-                    deltas_by_type: dict[str, list[float]] = {}
-                    frame_row_count = 0
-                    for atom_number in chosen_atoms:
-                        atom_index = atom_to_index[atom_number]
-                        charge = float(charges[0, atom_index])
-                        delta = charge - baseline.get(atom_number, float("nan"))
-                        atom_type = str(atom_types[atom_index])
-                        frame_values[matrix_column_by_atom[atom_number]] = charge
-                        charge_stats.setdefault(atom_number, _RunningStats()).update(charge)
-                        delta_stats.setdefault(atom_number, _RunningStats()).update(delta)
-                        frame_charges.append(charge)
-                        frame_deltas.append(delta)
-                        charges_by_type.setdefault(atom_type, []).append(charge)
-                        deltas_by_type.setdefault(atom_type, []).append(delta)
-                        if len(preview_rows) < 20:
-                            preview_rows.append(
-                                {
-                                    "frame": source_frame,
-                                    "atom_number": atom_number,
-                                    "atom_type": atom_type,
-                                    "charge": charge,
-                                    "delta_charge": delta,
-                                }
-                            )
+                    if keep:
+                        chosen_atoms = (
+                            present_atom_numbers
+                            if selected_atom_numbers is None
+                            else [number for number in selected_atom_numbers if number in present_atom_numbers]
+                        )
+                        iteration = (
+                            int(np.asarray(data.iterations).reshape(-1)[0])
+                            if data.iterations is not None
+                            else source_frame
+                        )
+                        frame_values = np.full(len(matrix_column_by_atom), np.nan, dtype=float)
+                        csv_rows = []
+                        frame_charges: list[float] = []
+                        frame_deltas: list[float] = []
+                        charges_by_type: dict[str, list[float]] = {}
+                        deltas_by_type: dict[str, list[float]] = {}
+                        frame_row_count = 0
+                        for atom_number in chosen_atoms:
+                            atom_index = atom_to_index[atom_number]
+                            charge = float(charges[0, atom_index])
+                            delta = charge - baseline.get(atom_number, float("nan"))
+                            atom_type = str(atom_types[atom_index])
+                            frame_values[matrix_column_by_atom[atom_number]] = charge
+                            charge_stats.setdefault(atom_number, _RunningStats()).update(charge)
+                            delta_stats.setdefault(atom_number, _RunningStats()).update(delta)
+                            frame_charges.append(charge)
+                            frame_deltas.append(delta)
+                            charges_by_type.setdefault(atom_type, []).append(charge)
+                            deltas_by_type.setdefault(atom_type, []).append(delta)
+                            if len(preview_rows) < 20:
+                                preview_rows.append(
+                                    {
+                                        "frame": source_frame,
+                                        "atom_number": atom_number,
+                                        "atom_type": atom_type,
+                                        "charge": charge,
+                                        "delta_charge": delta,
+                                    }
+                                )
+                            if writer is not None:
+                                csv_rows.append(
+                                    (source_frame, atom_number, atom_type, charge, delta)
+                                )
+                            frame_row_count += 1
                         if writer is not None:
-                            csv_rows.append(
-                                (source_frame, atom_number, atom_type, charge, delta)
+                            writer.append(pd.DataFrame(csv_rows, columns=DETAIL_COLUMNS))
+                        detail_row_count += frame_row_count
+                        if frame_charges:
+                            frame_summary_rows.append(
+                                _frame_summary_row(source_frame, frame_charges, frame_deltas)
                             )
-                        frame_row_count += 1
-                    if writer is not None:
-                        writer.writerows(csv_rows)
-                    detail_row_count += frame_row_count
-                    if frame_charges:
-                        frame_summary_rows.append(
-                            _frame_summary_row(source_frame, frame_charges, frame_deltas)
-                        )
-                    for atom_type, type_charges in charges_by_type.items():
-                        frame_atom_type_summary_rows.append(
-                            _frame_summary_row(
-                                source_frame,
-                                type_charges,
-                                deltas_by_type[atom_type],
-                                atom_type=atom_type,
+                        for atom_type, type_charges in charges_by_type.items():
+                            frame_atom_type_summary_rows.append(
+                                _frame_summary_row(
+                                    source_frame,
+                                    type_charges,
+                                    deltas_by_type[atom_type],
+                                    atom_type=atom_type,
+                                )
                             )
+                        np.save(spool, frame_values, allow_pickle=False)
+                        max_atoms = max(max_atoms, frame_values.size)
+                        output_frames.append(source_frame)
+                        output_iterations.append(iteration)
+                        time_values = data.simulation.time if data.simulation is not None else None
+                        if time_values is None:
+                            have_all_times = False
+                        else:
+                            output_times.append(float(np.asarray(time_values).reshape(-1)[0]))
+                    if callable(reporter):
+                        reporter(
+                            "stream",
+                            processed_frames,
+                            int(request._expected_frames or 0),
+                            "Reading charge and atom-identity frames",
                         )
-                    np.save(spool, frame_values, allow_pickle=False)
-                    max_atoms = max(max_atoms, frame_values.size)
-                    output_frames.append(source_frame)
-                    output_iterations.append(iteration)
-                    time_values = data.simulation.time if data.simulation is not None else None
-                    if time_values is None:
-                        have_all_times = False
-                    else:
-                        output_times.append(float(np.asarray(time_values).reshape(-1)[0]))
-                if callable(reporter):
-                    reporter(
-                        "stream",
-                        processed_frames,
-                        int(request._expected_frames or 0),
-                        "Reading charge and atom-identity frames",
-                    )
-            stream_succeeded = True
-        finally:
-            spool.flush()
-            spool.close()
-            if detail_handle is not None:
-                detail_handle.close()
-            if not stream_succeeded:
-                spool_path.unlink(missing_ok=True)
-                matrix_path.unlink(missing_ok=True)
+                stream_succeeded = True
+            finally:
+                spool.flush()
+                spool.close()
+                if not stream_succeeded:
+                    spool_path.unlink(missing_ok=True)
+                    matrix_path.unlink(missing_ok=True)
 
-        if baseline is None:
+            if baseline is None:
+                spool_path.unlink(missing_ok=True)
+                raise ValueError("ChargeData must contain at least one frame.")
+            if requested is not None:
+                missing_frames = [frame for frame in requested if frame not in seen_frames]
+                if missing_frames:
+                    spool_path.unlink(missing_ok=True)
+                    raise ValueError(f"Requested frame(s) not found in ChargeData: {missing_frames}.")
+            if selected_atom_numbers is not None:
+                missing_atoms = [number for number in selected_atom_numbers if number not in seen_atom_numbers]
+                if missing_atoms:
+                    spool_path.unlink(missing_ok=True)
+                    raise ValueError(f"Atom number(s) not found in ChargeData: {missing_atoms}.")
+            if callable(reporter):
+                reporter("stream", processed_frames, processed_frames, "Finished reading charge frames")
+
+            with spool_path.open("rb") as handle, matrix_path.open("wb") as matrix_file:
+                for frame_index in range(len(output_frames)):
+                    values = np.load(handle, allow_pickle=False)
+                    row = np.full(max_atoms, np.nan)
+                    row[:values.size] = values
+                    row.tofile(matrix_file)
             spool_path.unlink(missing_ok=True)
-            raise ValueError("ChargeData must contain at least one frame.")
-        if requested is not None:
-            missing_frames = [frame for frame in requested if frame not in seen_frames]
-            if missing_frames:
-                spool_path.unlink(missing_ok=True)
-                raise ValueError(f"Requested frame(s) not found in ChargeData: {missing_frames}.")
-        if selected_atom_numbers is not None:
-            missing_atoms = [number for number in selected_atom_numbers if number not in seen_atom_numbers]
-            if missing_atoms:
-                spool_path.unlink(missing_ok=True)
-                raise ValueError(f"Atom number(s) not found in ChargeData: {missing_atoms}.")
-        if callable(reporter):
-            reporter("stream", processed_frames, processed_frames, "Finished reading charge frames")
 
-        matrix = np.memmap(
-            matrix_path,
-            mode="w+",
-            dtype=np.float64,
-            shape=(len(output_frames), max_atoms),
-        )
-        matrix[:] = np.nan
-        with spool_path.open("rb") as handle:
-            for frame_index in range(len(output_frames)):
-                values = np.load(handle, allow_pickle=False)
-                matrix[frame_index, : values.size] = values
-        matrix.flush()
-        spool_path.unlink(missing_ok=True)
-
-        summary_rows: list[dict[str, object]] = []
-        reported_atoms = sorted(charge_stats)
-        for atom_number in reported_atoms:
-            matrix_column = matrix_column_by_atom[atom_number]
-            # Copy the column so Windows can release the underlying memmap file.
-            charge_values = np.array(matrix[:, matrix_column], dtype=float, copy=True)
-            reference = baseline.get(atom_number, float("nan"))
-            delta_values = charge_values - reference
-            charge = charge_stats[atom_number]
-            delta = delta_stats[atom_number]
-            summary_rows.append(
-                {
-                    "atom_number": atom_number,
-                    "atom_type": atom_type_by_number.get(atom_number, ""),
-                    "mean(charge)": charge.mean,
-                    "median(charge)": float(np.nanmedian(charge_values)),
-                    "min(charge)": charge.minimum,
-                    "max(charge)": charge.maximum,
-                    "std(charge)": charge.std(),
-                    "range(charge)": charge.maximum - charge.minimum,
-                    "mean(delta_charge)": delta.mean if delta.count else float("nan"),
-                    "median(delta_charge)": (
-                        float(np.nanmedian(delta_values)) if delta.count else float("nan")
-                    ),
-                    "min(delta_charge)": delta.minimum if delta.count else float("nan"),
-                    "max(delta_charge)": delta.maximum if delta.count else float("nan"),
-                    "std(delta_charge)": delta.std(),
-                    "range(delta_charge)": (
-                        delta.maximum - delta.minimum if delta.count else float("nan")
-                    ),
-                }
+            summary_rows: list[dict[str, object]] = []
+            reported_atoms = sorted(charge_stats)
+            from reaxkit.core.runtime.reducers import disk_matrix_columns
+            columns = [matrix_column_by_atom[number] for number in reported_atoms]
+            with closing(disk_matrix_columns(matrix_path, len(output_frames), max_atoms, columns)) as traces:
+                for atom_number, (_, charge_values) in zip(reported_atoms, traces):
+                    reference = baseline.get(atom_number, float("nan"))
+                    delta_values = charge_values - reference
+                    charge = charge_stats[atom_number]
+                    delta = delta_stats[atom_number]
+                    summary_rows.append(
+                        {
+                            "atom_number": atom_number,
+                            "atom_type": atom_type_by_number.get(atom_number, ""),
+                            "mean(charge)": charge.mean,
+                            "median(charge)": float(np.nanmedian(charge_values)),
+                            "min(charge)": charge.minimum,
+                            "max(charge)": charge.maximum,
+                            "std(charge)": charge.std(),
+                            "range(charge)": charge.maximum - charge.minimum,
+                            "mean(delta_charge)": delta.mean if delta.count else float("nan"),
+                            "median(delta_charge)": (
+                                float(np.nanmedian(delta_values)) if delta.count else float("nan")
+                            ),
+                            "min(delta_charge)": delta.minimum if delta.count else float("nan"),
+                            "max(delta_charge)": delta.maximum if delta.count else float("nan"),
+                            "std(delta_charge)": delta.std(),
+                            "range(delta_charge)": (
+                                delta.maximum - delta.minimum if delta.count else float("nan")
+                            ),
+                        }
+                    )
+            summary = pd.DataFrame(summary_rows, columns=SUMMARY_COLUMNS)
+            retained_matrix_path = str(matrix_path) if request._retain_matrix else None
+            if not request._retain_matrix:
+                matrix_path.unlink(missing_ok=True)
+            baseline_array = np.asarray(
+                [baseline.get(atom_number, float("nan")) for atom_number in reported_atoms],
+                dtype=float,
             )
-        summary = pd.DataFrame(summary_rows, columns=SUMMARY_COLUMNS)
-        del matrix
-        retained_matrix_path = str(matrix_path) if request._retain_matrix else None
-        if not request._retain_matrix:
-            matrix_path.unlink(missing_ok=True)
-        baseline_array = np.asarray(
-            [baseline.get(atom_number, float("nan")) for atom_number in reported_atoms],
-            dtype=float,
-        )
-        return DynamicChargeChangeResult(
-            charges=pd.DataFrame(preview_rows, columns=DETAIL_COLUMNS),
-            summary=summary,
-            summary_per_frame_for_all_atoms=pd.DataFrame(
-                frame_summary_rows,
-                columns=FRAME_SUMMARY_COLUMNS,
-            ),
-            summary_per_frame_per_atom_type=pd.DataFrame(
-                frame_atom_type_summary_rows,
-                columns=FRAME_ATOM_TYPE_SUMMARY_COLUMNS,
-            ),
-            request=request,
-            frame_indices=np.asarray(output_frames, dtype=int),
-            iterations=np.asarray(output_iterations, dtype=int),
-            time_values=(np.asarray(output_times, dtype=float) if have_all_times else None),
-            detail_csv_path=str(detail_path) if detail_path is not None else None,
-            charge_matrix_path=retained_matrix_path,
-            charge_matrix_shape=(len(output_frames), max_atoms),
-            atom_numbers=np.asarray(reported_atoms, dtype=int),
-            atom_types=[atom_type_by_number.get(number, "") for number in reported_atoms],
-            matrix_columns=np.asarray(
-                [matrix_column_by_atom[number] for number in reported_atoms],
-                dtype=int,
-            ),
-            baseline_charges=baseline_array,
-            detail_row_count=detail_row_count,
-        )
+            return DynamicChargeChangeResult(
+                charges=pd.DataFrame(preview_rows, columns=DETAIL_COLUMNS),
+                summary=summary,
+                summary_per_frame_for_all_atoms=pd.DataFrame(
+                    frame_summary_rows,
+                    columns=FRAME_SUMMARY_COLUMNS,
+                ),
+                summary_per_frame_per_atom_type=pd.DataFrame(
+                    frame_atom_type_summary_rows,
+                    columns=FRAME_ATOM_TYPE_SUMMARY_COLUMNS,
+                ),
+                request=request,
+                frame_indices=np.asarray(output_frames, dtype=int),
+                iterations=np.asarray(output_iterations, dtype=int),
+                time_values=(np.asarray(output_times, dtype=float) if have_all_times else None),
+                detail_csv_path=str(detail_path) if detail_path is not None else None,
+                charge_matrix_path=retained_matrix_path,
+                charge_matrix_shape=(len(output_frames), max_atoms),
+                atom_numbers=np.asarray(reported_atoms, dtype=int),
+                atom_types=[atom_type_by_number.get(number, "") for number in reported_atoms],
+                matrix_columns=np.asarray(
+                    [matrix_column_by_atom[number] for number in reported_atoms],
+                    dtype=int,
+                ),
+                baseline_charges=baseline_array,
+                detail_row_count=detail_row_count,
+            )
 
 
 __all__ = [

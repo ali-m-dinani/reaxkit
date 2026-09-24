@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.analysis.ferroelectrics.neighbor_stream import stream_neighbors
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -604,6 +606,10 @@ def required_wurtzite_data_type(request: WurtziteNeighborRequest, args: dict | N
 class WurtziteNeighborTask(AnalysisTask):
     """Extract distance-defined neighbors and coordinates without polarity math."""
 
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=16 * 1024 * 1024,
+    )
     required_data = TrajectoryData
     supports_selective_streaming = True
     VERSION = "1"
@@ -626,54 +632,9 @@ class WurtziteNeighborTask(AnalysisTask):
         trajectory, charges = _charges_for_request(data, request)
         return extract_wurtzite_neighbors(trajectory, request, charges=charges)
 
-    def run_stream(self, frames, request: WurtziteNeighborRequest, reporter=None):
-        _validate_request(request)
-        requested = None if request.frames is None else [int(v) for v in request.frames][:: int(request.every)]
-        requested_set = set(requested or ())
-        center_tables: list[pd.DataFrame] = []
-        neighbor_tables: list[pd.DataFrame] = []
-        output_frames: list[int] = []
-        output_iterations: list[int] = []
-        seen: set[int] = set()
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            processed += 1
-            trajectory, charges = _charges_for_request(data, request)
-            source_frame = _source_frame(trajectory, 0)
-            seen.add(source_frame)
-            keep = source_frame in requested_set if requested is not None else source_frame % int(request.every) == 0
-            if keep:
-                frame_request = WurtziteNeighborRequest(**{
-                    **vars(request), "frames": [0], "every": 1,
-                })
-                result = extract_wurtzite_neighbors(
-                    trajectory,
-                    frame_request,
-                    charges=charges,
-                    frame_indices=[0],
-                    preserve_source_frame_indices=True,
-                )
-                center_tables.append(result.centers)
-                neighbor_tables.append(result.neighbors)
-                output_frames.extend(result.frame_indices.tolist())
-                output_iterations.extend(result.iterations.tolist())
-            if callable(reporter):
-                reporter("stream", processed, 0, "Finding four-fold wurtzite neighbors")
-        if requested is not None:
-            missing = [value for value in requested if value not in seen]
-            if missing:
-                raise ValueError(f"Requested frame(s) not found in trajectory: {missing}.")
-        centers = pd.concat(center_tables, ignore_index=True) if center_tables else pd.DataFrame(columns=CENTER_COLUMNS)
-        neighbors = pd.concat(neighbor_tables, ignore_index=True) if neighbor_tables else pd.DataFrame(
-            columns=NEIGHBOR_COLUMNS)
-        return WurtziteNeighborResult(
-            table=neighbors,
-            request=request,
-            centers=centers,
-            neighbors=neighbors,
-            frame_indices=np.asarray(output_frames, dtype=int),
-            iterations=np.asarray(output_iterations, dtype=int),
-        )
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return stream_neighbors(self, frames, request, WurtziteNeighborResult,
+                                CENTER_COLUMNS, NEIGHBOR_COLUMNS, pipeline=pipeline, reporter=reporter)
 
 
 __all__ = [

@@ -28,15 +28,16 @@ class TableAccumulator:
         self._buffer: list[dict[str, Any]] = []
 
     def add(self, rows: Iterable[Mapping[str, Any]]) -> None:
-        batch = [dict(row) for row in rows]
-        if not batch:
+        if not self.retain and self.sink is None:
             return
-        if self.retain:
-            self._retained.extend(batch)
-        if self.sink is not None:
-            self._buffer.extend(batch)
-            if len(self._buffer) >= self.flush_rows:
-                self.flush()
+        for row in rows:
+            value = dict(row)
+            if self.retain:
+                self._retained.append(value)
+            if self.sink is not None:
+                self._buffer.append(value)
+                if len(self._buffer) >= self.flush_rows:
+                    self.flush()
 
     def flush(self) -> None:
         if self.sink is not None and self._buffer:
@@ -82,6 +83,12 @@ class CountSumReducer:
         )
         return self.counts.copy(), self.sums.copy(), means
 
+    def merge(self, other: "CountSumReducer") -> None:
+        if self.size != other.size:
+            raise ValueError("Cannot merge reducers with different bin counts.")
+        self.counts += other.counts
+        self.sums += other.sums
+
 
 class HistogramReducer:
     def __init__(self, edges: np.ndarray) -> None:
@@ -94,6 +101,33 @@ class HistogramReducer:
 
     def finalize(self) -> tuple[np.ndarray, np.ndarray]:
         return self.counts.copy(), self.edges.copy()
+
+    def merge(self, other: "HistogramReducer") -> None:
+        if not np.array_equal(self.edges, other.edges):
+            raise ValueError("Cannot merge histograms with different edges.")
+        self.counts += other.counts
+
+
+def disk_matrix_columns(path, rows, width, columns, *, budget_bytes=16 * 1024 * 1024):
+    """Yield exact atom traces without paging an entire matrix into process RSS.
+
+    The trace block is capped by the budget (or one trace for very long runs),
+    and a read buffer never exceeds one source row. Only private scratch data
+    is revisited; the original trajectory is not reread.
+    """
+    columns = list(columns)
+    block_size = max(1, min(64, budget_bytes // max(8, rows * 8)))
+    with open(path, "rb") as stream:
+        for start in range(0, len(columns), block_size):
+            selected = columns[start:start + block_size]
+            lower, upper = min(selected), max(selected)
+            values = np.empty((rows, len(selected)), dtype=float)
+            offsets = np.asarray(selected) - lower
+            for row in range(rows):
+                stream.seek((row * width + lower) * 8)
+                values[row] = np.fromfile(stream, dtype=np.float64, count=upper-lower+1)[offsets]
+            for local, column in enumerate(selected):
+                yield column, values[:, local]
 
 
 class PlotMatrixReducer:

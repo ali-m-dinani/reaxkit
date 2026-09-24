@@ -199,7 +199,12 @@ class ChargeFieldTask(AnalysisTask):
     """Stream charges for selected atoms and align them with ``fort.78`` by iteration."""
 
     required_data = ChargeData
-    VERSION = "3"
+    VERSION = "4"
+    from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.REFERENCE_FRAME_MAP, reference_frames=(0,), needs_reference=True,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
 
     def __init__(self, electric_field: ElectricFieldData | None = None):
         self.electric_field = electric_field

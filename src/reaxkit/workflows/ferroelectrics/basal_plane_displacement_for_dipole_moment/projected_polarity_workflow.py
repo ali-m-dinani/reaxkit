@@ -277,7 +277,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = _canonical_command(command)
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
-    centers_format = str(args.centers_format)
+    profile = str(getattr(args, "output_profile", "standard"))
+    args.write_centers = (bool(args.write_centers) or profile in {"full", "legacy"}) and profile != "minimal"
+    centers_format = str(getattr(args, "detail_format", None) or ("csv" if profile == "legacy" else args.centers_format))
     centers = output / f"basal_plane_projected_polarity_centers.{centers_format}"
     projected = output / "basal_plane_projected_polarity_2d.csv"
     kymograph = output / "basal_plane_projected_polarity_kymograph.csv"
@@ -286,7 +288,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         ArtifactSpec("projected", projected.name, "core", True, "csv", True),
         ArtifactSpec("kymograph", kymograph.name, "core", True, "csv", True),
     )
-    with ArtifactWriter(output, specs, profile="standard", overwrite=True) as writer:
+    with ArtifactWriter(output, specs, profile=profile, overwrite=True) as writer:
         run_args = runtime_arguments(args)
         run_args["_artifact_writer"] = writer
         if args.write_centers:
@@ -296,6 +298,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             REQUEST_BUILDERS[canonical](args),
             run_args,
         )
+        writer.metadata.update(execution_policy=run_args.get("_execution_policy", {}), source_frames=getattr(result.request, "frames", None))
         if args.write_centers and not result.centers.empty:
             writer.write_table("centers", result.centers)
         writer.write_table("projected", result.projected_bins)

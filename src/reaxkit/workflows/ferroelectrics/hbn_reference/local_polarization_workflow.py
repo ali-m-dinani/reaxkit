@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 from typing import cast
@@ -380,6 +382,11 @@ def generate_local_3d_plots(
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    profile = getattr(args, "output_profile", None)
+    if profile is None:
+        args.output_profile = "legacy"
+    if profile is not None:
+        args.write_displacements = profile != "minimal" and (profile in {"full", "legacy"} or args.write_displacements)
     canonical = _canonical_command(command)
     result = AnalysisExecutor().run(
         TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
@@ -394,17 +401,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     cell_summary_path = output / "hbn_reference_cell_polarization_summary.csv"
     layer_path = output / "hbn_reference_layer_polarization.csv"
     layer_summary_path = output / "hbn_reference_layer_polarization_summary.csv"
-    displacement_path = output / "hbn_reference_displacements.csv"
+    detail_format = getattr(args, "detail_format", None) or ("csv" if args.output_profile == "legacy" else "parquet")
+    displacement_path = output / f"hbn_reference_displacements.{detail_format}"
     mapping_path = output / "hbn_reference_mapping.csv"
-    result.table.to_csv(local_path, index=False)
-    result.summary.to_csv(summary_path, index=False)
-    result.cell_table.to_csv(cell_path, index=False)
-    result.cell_summary.to_csv(cell_summary_path, index=False)
-    result.layer_table.to_csv(layer_path, index=False)
-    result.layer_summary.to_csv(layer_summary_path, index=False)
-    if args.write_displacements:
-        result.reference_result.displacements.to_csv(displacement_path, index=False)
-    result.reference_result.mapping.to_csv(mapping_path, index=False)
+    tables = {local_path: result.table, summary_path: result.summary, cell_path: result.cell_table, cell_summary_path: result.cell_summary, layer_path: result.layer_table, layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    tables[displacement_path] = getattr(result.reference_result, "table_chunks", {}).get("hbn_reference_displacements", result.reference_result.displacements)
+    write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name),
+                          details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())
     plots_2d = (
         generate_local_2d_plots(
             result,
@@ -446,7 +449,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         f"Wrote selected ({result.request.local_grouping}) h-BN-reference "
         f"polarization to {local_path}"
     )
-    print(f"Wrote local/global closure summary to {summary_path}")
+    if getattr(args, "output_profile", "standard") != "minimal":
+        print(f"Wrote local/global closure summary to {summary_path}")
     print(f"Wrote crystallographic-cell polarization to {cell_path}")
     print(f"Wrote layer-resolved polarization to {layer_path}")
     if args.write_displacements:

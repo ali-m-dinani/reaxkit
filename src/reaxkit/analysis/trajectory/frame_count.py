@@ -30,6 +30,14 @@ class FramesCountTask(AnalysisTask):
 
     required_data = TrajectoryData
 
+    def run_stream(self, frames, request, reporter=None) -> FramesCountResult:
+        count = 0
+        for data in frames:
+            count += int(data.positions.shape[0])
+            if reporter:
+                reporter("stream", count, 0, "Counting trajectory frames")
+        return FramesCountResult(count=count, request=request)
+
     def run(
         self,
         data: TrajectoryData,

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import ConvexHull
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _frame_cell,
@@ -190,14 +191,14 @@ def _frame_rows(
     return output
 
 
-def calculate_binned_polarization(data, request: BinnedPolarizationRequest) -> BinnedPolarizationResult:
+def calculate_binned_polarization(data, request: BinnedPolarizationRequest, polarity=None, reference_positions=None) -> BinnedPolarizationResult:
     """Sum existing local dipoles in spatial bins and divide by bin volume."""
 
     bins = _validate_request(request)
     trajectory, _ = _trajectory_and_charges(data)
-    polarity = calculate_polarity_from_trajectory(data, request)
+    polarity = polarity if polarity is not None else calculate_polarity_from_trajectory(data, request)
     positions = np.asarray(trajectory.positions, dtype=float)
-    reference = positions[int(request.reference_frame)]
+    reference = positions[int(request.reference_frame)] if reference_positions is None else reference_positions
     reference = reference[np.isfinite(reference).all(axis=1)]
     edges = tuple(_axis_edges(reference[:, axis], bins[axis]) for axis in range(3))
     metadata = _metadata(edges, bins)
@@ -241,6 +242,10 @@ class BinnedPolarizationTask(AnalysisTask):
     """Calculate spatially binned polarization from three-folded site dipoles."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "1"
 
@@ -260,6 +265,10 @@ class BinnedPolarizationTask(AnalysisTask):
     def run(self, data, request: BinnedPolarizationRequest, reporter=None):
         _ = reporter
         return calculate_binned_polarization(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "three_binned", reporter, pipeline)
 
 
 __all__ = [

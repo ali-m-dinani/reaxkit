@@ -327,7 +327,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     canonical = _canonical_command(command)
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
-    centers_format = str(args.centers_format)
+    profile = str(getattr(args, "output_profile", "standard"))
+    args.write_centers = (bool(args.write_centers) or profile in {"full", "legacy"}) and profile != "minimal"
+    centers_format = str(getattr(args, "detail_format", None) or ("csv" if profile == "legacy" else args.centers_format))
     centers_path = output / f"hbn_reference_projected_polarity_centers.{centers_format}"
     projected_path = output / "hbn_reference_projected_polarity_2d.csv"
     kymograph_path = output / "hbn_reference_projected_polarity_kymograph.csv"
@@ -340,7 +342,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         ArtifactSpec("kymograph", kymograph_path.name, "core", True, "csv", True),
         ArtifactSpec("whole_slab_summary", whole_slab_summary_path.name, "summary", True, "csv", True),
     )
-    with ArtifactWriter(output, specs, profile="standard", overwrite=True) as writer:
+    with ArtifactWriter(output, specs, profile=profile, overwrite=True) as writer:
         run_args = runtime_arguments(args)
         run_args["_artifact_writer"] = writer
         if args.write_centers:
@@ -350,6 +352,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             REQUEST_BUILDERS[canonical](args),
             run_args,
         )
+        writer.metadata.update(execution_policy=run_args.get("_execution_policy", {}), source_frames=getattr(result.request, "frames", None))
         if args.write_centers and not result.centers.empty:
             writer.write_table("centers", result.centers)
         writer.write_table("projected", result.projected_bins)
@@ -371,7 +374,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         print(f"Wrote detailed per-group polarity signs to {centers_path}")
     print(f"Wrote projected mean-polarity bins to {projected_path}")
     print(f"Wrote kymograph bins to {kymograph_path}")
-    print(f"Wrote whole-slab polarity counts and percentages to {whole_slab_summary_path}")
+    if writer.enabled("whole_slab_summary"):
+        print(f"Wrote whole-slab polarity counts and percentages to {whole_slab_summary_path}")
     if plots:
         print(f"Wrote {len(plots):,} projected heatmap(s) under {output / 'projected_polarity_2d'}")
     if kymograph_plot is not None:

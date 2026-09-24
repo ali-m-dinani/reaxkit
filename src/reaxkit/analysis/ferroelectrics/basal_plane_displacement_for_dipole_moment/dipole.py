@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _trajectory_and_charges,
@@ -96,8 +97,7 @@ def _charge_for_atom(
 
 
 def calculate_basal_plane_dipoles(
-    data, request: BasalPlaneDipoleRequest
-) -> BasalPlaneDipoleResult:
+    data, request: BasalPlaneDipoleRequest, polarity=None) -> BasalPlaneDipoleResult:
     """Calculate the local basal-plane approximation to ``sum(e Z_k du_k)``.
 
     For each Al/B center ``i`` identified by the three-folded analysis,
@@ -130,7 +130,7 @@ def calculate_basal_plane_dipoles(
         str(element).casefold(): float(charge)
         for element, charge in request.formal_charges.items()
     }
-    polarity = calculate_polarity_from_trajectory(data, request)
+    polarity = polarity if polarity is not None else calculate_polarity_from_trajectory(data, request)
     geometry = polarity.neighbor_geometry.reset_index(drop=True)
     geometry_groups = geometry.groupby(
         ["frame_index", "site_atom_id"], sort=False
@@ -308,6 +308,10 @@ class BasalPlaneDipoleTask(AnalysisTask):
     """Calculate local basal-plane dipoles for the fixed-anion reference."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "3"
 
@@ -327,6 +331,10 @@ class BasalPlaneDipoleTask(AnalysisTask):
     def run(self, data, request: BasalPlaneDipoleRequest, reporter=None):
         _ = reporter
         return calculate_basal_plane_dipoles(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "basal_dipole", reporter, pipeline)
 
 
 __all__ = [

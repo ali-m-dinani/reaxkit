@@ -28,6 +28,9 @@ from reaxkit.analysis.trajectory.msd import MSDRequest
 from reaxkit.analysis.trajectory.msd_task import MSDTask
 from reaxkit.presentation.specs import PresentationSpec
 
+DIFFUSIVITY_COLUMNS = ["atom_id", "atom_type", "dim", "d", "x_source", "x_start", "x_end",
+                       "n_points", "slope_msd_per_x", "intercept", "diffusivity"]
+
 
 @dataclass
 class DiffusivityRequest(BaseRequest):
@@ -170,6 +173,74 @@ class DiffusivityTask(AnalysisTask):
     """
 
     required_data = TrajectoryData
+    supports_selective_streaming = True
+
+    def run_blocks(self, frames, request, reporter=None, pipeline=None):
+        """Fit one atom trace at a time from a single disk-backed input pass.
+
+        Retaining an entire trace preserves the existing all-finite PBC rule
+        and polyfit behavior, including a reference later than the first frame.
+        Memory is O(frames + atoms), instead of O(frames * atoms).
+        """
+        from contextlib import closing
+        from dataclasses import replace
+        from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
+        from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+        from reaxkit.core.runtime.frame_tables import selected_frame_envelopes
+        from reaxkit.core.runtime.trajectory_spool import TrajectorySpool
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        if not np.isfinite(request.d) or request.d <= 0:
+            raise ValueError("d must be a positive finite number.")
+        if not any(dim in {"x", "y", "z"} for dim in request.dims):
+            raise ValueError("dims must include at least one of 'x', 'y', or 'z'.")
+        spool = TrajectorySpool()
+        sources, axis_source = [], None
+        try:
+            with closing(pipeline.iter_blocks(selected_frame_envelopes(frames, request))) as blocks:
+                for block in blocks:
+                    for item in block:
+                        data = item.payload
+                        if axis_source is None:
+                            axis_source = "time" if data.simulation is not None and data.simulation.time is not None else "iter" if data.iterations is not None else "frame_index"
+                        if data.iterations is None:
+                            data = replace(data, iterations=np.array([item.source_frame]))
+                        spool.append(len(sources), data)
+                        sources.append(item.source_frame)
+            if not sources:
+                return DiffusivityResult(table=pd.DataFrame(columns=DIFFUSIVITY_COLUMNS), request=request)
+            data = spool.finish()
+            origin = 0 if request.origin == "first" else sources.index(int(request.origin))
+            if request.atom_ids is not None:
+                missing = set(request.atom_ids) - set(data.atom_ids)
+                if missing:
+                    raise ValueError(f"Requested atom_ids are not present in trajectory: {sorted(missing)}")
+            tables = []
+            for index, atom in enumerate(data.atom_ids):
+                if request.atom_ids is not None and atom not in request.atom_ids:
+                    continue
+                if request.atom_ids is None and request.atom_types and data.elements[index] not in request.atom_types:
+                    continue
+                coordinates = np.empty((len(sources), 1, 3), dtype=float)
+                with spool.path.open("rb") as raw:
+                    for frame in range(len(sources)):
+                        raw.seek((frame * len(data.atom_ids) + index) * 3 * 8)
+                        coordinates[frame, 0] = np.fromfile(raw, dtype=np.float64, count=3)
+                trace = replace(data, positions=coordinates,
+                                atom_ids=[atom], elements=[data.elements[index]], atom_labels=None,
+                                simulation=replace(data.simulation, atom_ids=[atom], elements=[data.elements[index]]))
+                local = replace(request, frames=None, every=1, origin=origin, atom_ids=[atom], atom_types=None)
+                table = self.run(trace, local).table
+                table["x_source"] = axis_source
+                tables.append(table)
+                if reporter:
+                    reporter("analyze", index + 1, len(data.atom_ids), "Fitting disk-backed atom traces")
+            if tables:
+                table = pd.concat(tables, ignore_index=True).sort_values("atom_id").reset_index(drop=True)
+            else:
+                table = pd.DataFrame(columns=DIFFUSIVITY_COLUMNS)
+            return DiffusivityResult(table=table, request=request)
+        finally:
+            spool.close()
 
     @staticmethod
     def recommended_presentations(_result: DiffusivityResult, payload: dict[str, Any]) -> list[PresentationSpec]:

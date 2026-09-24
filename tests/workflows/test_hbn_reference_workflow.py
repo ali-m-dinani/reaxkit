@@ -137,9 +137,10 @@ def test_workflow_writes_requested_reference_outputs(
     if write_displacements:
         command_args.append("--write-displacements")
     args = parser.parse_args(command_args)
+    args.output_profile = "standard"
 
     assert polarization_workflow.run_main(polarization_workflow.COMMAND, args) == 0
     assert (output / "hbn_reference_polarization.csv").is_file()
-    assert (output / "hbn_reference_displacements.csv").is_file() is write_displacements
+    assert (output / "hbn_reference_displacements.parquet").is_file() is write_displacements
     assert (output / "hbn_reference_mapping.csv").is_file()
     assert (output / "AlN_hbn_replicated_aligned.xyz").is_file()

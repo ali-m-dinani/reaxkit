@@ -8,6 +8,7 @@ from typing import Any, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _charges_for_request,
@@ -346,6 +347,10 @@ class WurtzitePolarityTask(AnalysisTask):
     """Calculate basal-only polarity and polarity-aware apical assignment."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "1"
 
@@ -366,6 +371,10 @@ class WurtzitePolarityTask(AnalysisTask):
         _ = reporter
         _validate_request(request)
         return calculate_polarity_from_trajectory(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarity_stream import stream_polarity
+        return stream_polarity(self, frames, request, reporter, pipeline)
 
 
 __all__ = [

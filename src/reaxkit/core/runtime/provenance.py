@@ -93,6 +93,8 @@ def runtime_metadata_from_args(args: Any) -> dict[str, Any]:
         "project_root",
         "cache_dir",
         "_snapshot_source_dir",
+        "_execution_policy",
+        "_streaming",
     )
     out = {key: json_safe(raw.get(key)) for key in keys if key in raw}
     if "_analysis_id" in out and "analysis_id" not in out:

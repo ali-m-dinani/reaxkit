@@ -146,12 +146,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         runtime_arguments(args),
     )
     output = artifact_directory(args, COMMAND)
-    paths = write_polarity_tables(result, output, complete_only=bool(args.complete_only))
+    paths = write_polarity_tables(result, output, complete_only=bool(args.complete_only), args=args)
     args.suppress_table = True
     present_result(COMMAND, result, args)
     print(f"Wrote site-resolved polarity to {paths['polarity']}")
     print(f"Wrote polarity variable guide to {paths['variables']}")
-    print(f"Wrote underlying neighbor-analysis CSVs under {output / 'other_helpful_data'}")
+    if getattr(args, "output_profile", "legacy") in {"full", "legacy"}:
+        print(f"Wrote requested neighbor details under {output / 'other_helpful_data'}")
     if args.gen_plots:
         figures = plot_site_resolved_polarity(
             result.table,

@@ -162,6 +162,7 @@ def test_neighbor_and_polarity_workflows_write_expected_csvs(tmp_path) -> None:
     polarity_args = _base_args(
         polarity_workflow, polarity_workflow.COMMAND, tmp_path
     )
+    polarity_args.output_profile = "legacy"
     polarity_args.output_dir = polarity_output
     assert polarity_workflow.run_main(polarity_workflow.COMMAND, polarity_args) == 0
     assert (polarity_output / "polarity.csv").is_file()
@@ -179,6 +180,7 @@ def test_trajectory_workflow_writes_workspace_and_requested_copy(tmp_path) -> No
     )
     requested = tmp_path / "copy" / "surface.extxyz"
     args.output = requested
+    args.output_profile = "legacy"
     assert polarity_trajectory_workflow.run_main(
         polarity_trajectory_workflow.COMMAND, args
     ) == 0

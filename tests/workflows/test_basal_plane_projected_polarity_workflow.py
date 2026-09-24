@@ -153,3 +153,23 @@ def _request_for_output() -> BasalPlaneProjectedPolarityRequest:
         projection_bins=(1, 1),
         profile_axis="z",
     )
+
+
+@pytest.mark.parametrize("profile,flag,extension", [("full", False, "parquet"), ("legacy", False, "csv"), ("minimal", True, None)])
+def test_output_profile_controls_detail_production(tmp_path, monkeypatch, profile, flag, extension):
+    result = calculate_basal_plane_projected_polarity(_trajectory(), _request_for_output())
+    parser = projected_polarity_workflow.build_parser(argparse.ArgumentParser(), command=projected_polarity_workflow.COMMAND)
+    args = parser.parse_args(["--output-profile", profile] + (["--write-centers"] if flag else []))
+    class StubExecutor:
+        @staticmethod
+        def run(task, request, runtime):
+            assert request.include_centers is (extension is not None)
+            return result
+    monkeypatch.setattr(projected_polarity_workflow, "AnalysisExecutor", StubExecutor)
+    monkeypatch.setattr(projected_polarity_workflow, "artifact_directory", lambda *_args: tmp_path)
+    monkeypatch.setattr(projected_polarity_workflow, "present_result", lambda *_args: None)
+    projected_polarity_workflow.run_main(projected_polarity_workflow.COMMAND, args)
+    matches = list(tmp_path.glob("basal_plane_projected_polarity_centers.*"))
+    assert len(matches) == (0 if extension is None else 1)
+    if matches:
+        assert matches[0].suffix == f".{extension}"

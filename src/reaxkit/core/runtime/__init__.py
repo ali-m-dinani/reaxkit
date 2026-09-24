@@ -33,6 +33,7 @@ from reaxkit.core.runtime.artifacts import (
     ArtifactSpec,
     ArtifactWriter,
     BufferedTableSink,
+    TableChunks,
 )
 from reaxkit.core.runtime.reducers import (
     CountSumReducer,
@@ -70,6 +71,7 @@ __all__ = [
     "SHARED_PIPELINE_TASKS",
     "TaskCapabilities",
     "TableAccumulator",
+    "TableChunks",
     "estimate_payload_bytes",
     "resolve_execution_policy",
     "task_capabilities",

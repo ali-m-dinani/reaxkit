@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "completed_date": "2026-09-24",
+  "platform": "Windows",
+  "python": "3.12.10",
+  "coverage": {
+    "collected": 911,
+    "passed": 899,
+    "skipped": 12,
+    "failed": 0,
+    "method": "Two disjoint suite runs followed by an affected-area rerun after the optional force-field propagation fix. Counts are deduplicated."
+  },
+  "runs": [
+    {
+      "command": "python -m pytest tests/core tests/workflows tests/presentation -q --tb=short",
+      "passed": 434,
+      "skipped": 0,
+      "seconds": 67.18
+    },
+    {
+      "command": "python -m pytest -q --tb=short --ignore=tests/core --ignore=tests/workflows --ignore=tests/presentation",
+      "passed": 462,
+      "skipped": 13,
+      "seconds": 1543.54,
+      "note": "An extra relabeling skip exposed a missing streamed force-field dependency, corrected and rerun below."
+    },
+    {
+      "command": "python -m pytest tests/core tests/workflows tests/presentation tests/engine/reaxff tests/analysis_tasks/test_trajectory_relabel_by_coordination.py tests/analysis_tasks/test_active_site_events.py tests/analysis_tasks/test_isomer_representative_detection_unit.py -q -rs --tb=short",
+      "passed": 561,
+      "skipped": 0,
+      "seconds": 187.37,
+      "note": "Includes two new optional-valence dependency tests and the previously skipped relabeling integration test."
+    }
+  ],
+  "skipped_tests": [
+    "tests/analysis_tasks/test_active_site_structural_tract_parity_unit.py::test_structural_descriptors_match_tract_reference_frame",
+    "tests/analysis_tasks/test_active_site_structural_tract_parity_unit.py::test_soap_matches_tract_reference_frame",
+    "tests/analysis_tasks/test_active_site_structural_tract_parity_unit.py::test_distance_bond_mode_task_matches_reference_statistics_without_bond_orders",
+    "tests/analysis_tasks/test_active_site_structural_tract_parity_unit.py::test_bo_mode_still_requires_bond_orders",
+    "tests/analysis_tasks/test_rdf_analyzer.py::test_rdf_property_over_frames_peak_columns[freud]",
+    "tests/analysis_tasks/test_rdf_analyzer.py::test_rdf_property_over_frames_area_columns[freud]",
+    "tests/analysis_tasks/test_trajectory_rdf.py::test_trajectory_rdf_saves_artifacts",
+    "tests/analysis_tasks/test_trajectory_rdf_property.py::test_trajectory_rdf_property_saves_artifacts",
+    "tests/engine/common/test_ffield_add_element.py::test_build_parser_add_element_command_accepts_new_flags",
+    "tests/engine/common/test_ffield_merge_keep_atoms.py::test_build_parser_merge_accepts_keep_atoms_in_dest",
+    "tests/engine/lammps/test_adapter_mapping.py::test_lammps_adapter_maps_log_to_simulation_data",
+    "tests/engine/lammps/test_log_handler.py::test_lammps_log_handler_reads_example_file"
+  ],
+  "benchmark_reports": [
+    "scientific_frame_maps.json",
+    "unified_runtime_workstation.json",
+    "rollout_completion.json"
+  ],
+  "external_validation": "Private 28,800-atom, 4,000-frame Slurm acceptance remains pending a reachable allocation and private input."
+}

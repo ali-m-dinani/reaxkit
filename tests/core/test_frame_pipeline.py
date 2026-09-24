@@ -151,7 +151,7 @@ def test_priority_manifest_classifies_all_electrostatics_and_ferroelectrics_comm
     assert len(commands) == 25
     assert len(set(commands)) == len(commands)
     assert {record["shape"] for record in PRIORITY_TASK_MANIFEST} == {
-        shape.value for shape in ExecutionShape
+        shape.value for shape in ExecutionShape if shape is not ExecutionShape.SINGLE
     }
     assert all(record["status"].startswith(("migrated_", "classified_")) for record in PRIORITY_TASK_MANIFEST)
 

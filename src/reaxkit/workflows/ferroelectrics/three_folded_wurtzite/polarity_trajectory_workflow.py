@@ -130,6 +130,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         result.polarity_result,
         workspace_output.parent,
         all_csvs_in_helpful_data=True,
+        args=args,
     )
     requested_output = _requested_output_path(args)
     if requested_output is not None and requested_output != workspace_output:

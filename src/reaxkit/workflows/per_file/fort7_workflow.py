@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 from collections.abc import Sequence
 
@@ -45,7 +47,7 @@ def _parse_frames(value: str | Sequence[int] | None):
 def _export(table: pd.DataFrame, args: argparse.Namespace) -> None:
     if getattr(args, "export", None):
         output = resolve_output_path(args.export, getattr(args, "kind", "fort7"))
-        table.to_csv(output, index=False)
+        write_workflow_csv(table, output, index=False)
 
 
 def _task_get(args: argparse.Namespace) -> int:
@@ -118,7 +120,7 @@ def _task_bond_ts(args: argparse.Namespace) -> int:
     )
     if table is not None and not table.empty and getattr(args, "export", None):
         output = resolve_output_path(args.export, getattr(args, "kind", "fort7"))
-        table.to_csv(output, index=bool(args.wide))
+        write_workflow_csv(table, output, index=bool(args.wide))
     return 0
 
 

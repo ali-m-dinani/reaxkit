@@ -19,6 +19,8 @@ from typing import Any, Literal, Optional, Sequence, Union
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.frame_tables import map_frame_tables
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.resolve.alias import normalize_choice, resolve_alias_from_columns
 from reaxkit.core.registry.analysis_task_registry import register_task
@@ -1019,11 +1021,12 @@ def _trajectory_coord_like_table(
 
     if atom_ids_req is not None:
         atom_ids = [int(a) for a in atom_ids_req]
+        indices_by_id = {int(atom_id): index for index, atom_id in enumerate(data.atom_ids)}
         atom_indices = []
         for atom_id in atom_ids:
-            atom_idx = int(atom_id) - 1
-            if not (0 <= atom_idx < n_atoms):
-                raise ValueError(f"atom_id {atom_id} out of range 1..{n_atoms}.")
+            if atom_id not in indices_by_id:
+                raise ValueError(f"atom_id {atom_id} not found in TrajectoryData.")
+            atom_idx = indices_by_id[atom_id]
             atom_indices.append(atom_idx)
     elif atom_types_req:
         chosen = {str(t) for t in atom_types_req}
@@ -1067,6 +1070,11 @@ def _trajectory_coord_like_table(
 @register_task("trajectory_coordinate_series", label="Trajectory Coordinate Series")
 class TrajectoryCoordinateSeriesTask(AnalysisTask):
     """Build coordinate time series for one or more atoms."""
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
 
     required_data = TrajectoryData
     VERSION = "2"
@@ -1151,33 +1159,22 @@ class TrajectoryCoordinateSeriesTask(AnalysisTask):
         )
         return TrajectoryCoordinateSeriesResult(table=table, request=request)
 
-    def run_stream(self, frames, request: TrajectoryCoordinateSeriesRequest, reporter=None) -> TrajectoryCoordinateSeriesResult:
-        """Build coordinate rows while retaining only the current trajectory frame."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_index"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming trajectory coordinate series")
-        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
-        if not table.empty:
-            table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> TrajectoryCoordinateSeriesResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_index', 'atom_id', 'dim'))
         return TrajectoryCoordinateSeriesResult(table=table, request=request)
 
 
 @register_task("trajectory_displacement_series", label="Trajectory Displacement Series")
 class TrajectoryDisplacementSeriesTask(AnalysisTask):
     """Build displacement time series for one or more atoms."""
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.REFERENCE_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, reference_fields=("reference_frame",),
+        needs_reference=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
 
     required_data = TrajectoryData
     VERSION = "1"
@@ -1236,82 +1233,41 @@ class TrajectoryDisplacementSeriesTask(AnalysisTask):
         )
         return TrajectoryDisplacementSeriesResult(table=table, request=request)
 
-    def run_stream(self, frames, request: TrajectoryDisplacementSeriesRequest, reporter=None) -> TrajectoryDisplacementSeriesResult:
-        """Build displacement rows without materializing unselected atom coordinates."""
-        dims = tuple(str(dim).lower() for dim in request.dims)
-        dim_to_cols = {
-            "x": (0,), "y": (1,), "z": (2,), "xy": (0, 1),
-            "xz": (0, 2), "yz": (1, 2), "xyz": (0, 1, 2),
-        }
-        if not dims or any(dim not in dim_to_cols for dim in dims):
-            raise ValueError("dims must contain x/y/z/xy/xz/yz/xyz.")
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> TrajectoryDisplacementSeriesResult:
+        """Prepare one reference, then compute displacement tables independently."""
+        from reaxkit.core.runtime.reference_frames import reference_frames
+        from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+        from reaxkit.core.runtime.execution_contracts import FrameEnvelope, resolve_execution_policy
 
-        atom_indices: list[int] | None = None
-        atom_ids: list[int] = []
-        atom_types: list[str] = []
-        sampled: list[tuple[int, int, np.ndarray]] = []
-        reference_positions: np.ndarray | None = None
-        reference_index = int(request.reference_frame)
-        processed = 0
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        local = TrajectoryCoordinateSeriesRequest(atom_ids=request.atom_ids, atom_types=request.atom_types,
+                                                  dims=request.dims, frames=None, every=1)
+        tables = []
+        with reference_frames(frames, request.reference_frame) as (reference, source):
+            identity = tuple(reference.atom_ids)
+            stride = max(1, int(request.every))
+            wanted = None if request.frames is None else set(list(request.frames)[::stride])
 
-        for stream_index, data in enumerate(frames):
-            positions = np.asarray(data.positions, dtype=float)
-            if positions.ndim != 3 or positions.shape[0] != 1:
-                raise ValueError("Streamed TrajectoryData must contain exactly one frame.")
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
+            def selected():
+                for sequence, (index, data) in enumerate(source):
+                    if (wanted is not None and index not in wanted) or (wanted is None and sequence % stride):
+                        continue
+                    yield FrameEnvelope(sequence, index, data)
 
-            if atom_indices is None:
-                n_atoms = positions.shape[1]
-                if request.atom_ids is not None:
-                    requested_ids = [int(value) for value in request.atom_ids]
-                    id_to_index = {int(value): index for index, value in enumerate(data.atom_ids)}
-                    missing = [value for value in requested_ids if value not in id_to_index]
-                    if missing:
-                        raise ValueError(f"atom_id {missing[0]} not found in TrajectoryData.")
-                    atom_indices = [id_to_index[value] for value in requested_ids]
-                elif request.atom_types:
-                    chosen = {str(value) for value in request.atom_types}
-                    atom_indices = [index for index, value in enumerate(data.elements) if str(value) in chosen]
-                else:
-                    atom_indices = list(range(n_atoms))
-                atom_ids = [int(data.atom_ids[index]) for index in atom_indices]
-                atom_types = [str(data.elements[index]) for index in atom_indices]
-            elif positions.shape[1] != len(data.atom_ids):
-                raise ValueError("Streamed trajectory atom dimension changed between frames.")
+            def calculate(data, state):
+                if tuple(data.atom_ids) != identity:
+                    raise ValueError("Trajectory atom identity/order changed between frames.")
+                displaced = replace(data, positions=np.asarray(data.positions) - state)
+                return TrajectoryCoordinateSeriesTask().run(displaced, local).table
 
-            selected = np.asarray(positions[0, atom_indices, :], dtype=float)
-            if source_index == reference_index:
-                reference_positions = selected.copy()
-            if stream_index % max(1, int(request.every)) == 0:
-                iteration = int(np.asarray(data.iterations).reshape(-1)[0]) if data.iterations is not None else source_index
-                sampled.append((source_index, iteration, selected.copy()))
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming trajectory displacement series")
-
-        if reference_positions is None:
-            raise ValueError(f"reference_frame {reference_index} was not found in the trajectory stream.")
-
-        rows: list[dict[str, object]] = []
-        for source_index, iteration, positions in sampled:
-            displacement = positions - reference_positions
-            for local_atom, (atom_id, atom_type) in enumerate(zip(atom_ids, atom_types)):
-                for dim in dims:
-                    cols = dim_to_cols[dim]
-                    vector = displacement[local_atom, list(cols)]
-                    value = float(vector[0]) if len(cols) == 1 else float(np.sqrt(np.sum(np.square(vector))))
-                    rows.append(
-                        {
-                            "frame_index": source_index,
-                            "iter": iteration,
-                            "atom_id": atom_id,
-                            "atom_type": atom_type,
-                            "dim": dim,
-                            "coord": value,
-                        }
-                    )
-        table = pd.DataFrame(rows)
+            for count, result in enumerate(pipeline.map_reference(selected(), lambda: reference.positions.copy(), calculate), 1):
+                table = result.value
+                if not table.empty:
+                    table["frame_index"] = result.envelope.source_frame
+                    tables.append(table)
+                if reporter:
+                    reporter("stream", count, 0, "Computing reference displacements")
+        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
         if not table.empty:
             table = table.sort_values(["frame_index", "atom_id", "dim"], kind="stable").reset_index(drop=True)
         return TrajectoryDisplacementSeriesResult(table=table, request=request)
@@ -1429,6 +1385,11 @@ class CellDimensionsTask(AnalysisTask):
 class ChargeSeriesTask(AnalysisTask):
     """Build charge time series for one or more atoms."""
 
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
     required_data = ChargeData
 
     @staticmethod
@@ -1545,28 +1506,11 @@ class ChargeSeriesTask(AnalysisTask):
             table=table,
         )
 
-    def run_stream(self, frames, request: ChargeSeriesRequest, reporter=None) -> ChargeSeriesResult:
-        """Build per-atom charge series from one charge frame at a time."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = (data.metadata or {}).get("source_frame_indices")
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_index"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming charge series")
-        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
-        if not table.empty:
-            table = table.sort_values(["frame_index", "atom_id"], kind="stable").reset_index(drop=True)
-        return ChargeSeriesResult(request=request, table=table)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> ChargeSeriesResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_index', 'atom_id'))
+        return ChargeSeriesResult(table=table, request=request)
 
 
 def _electric_field_group(
@@ -2189,6 +2133,16 @@ class MolecularFrequencySeriesTask(AnalysisTask):
     """Build molecular-frequency time series for one or more molecular formulas."""
 
     required_data = MolecularAnalysisData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> MolecularFrequencySeriesResult:
+        from reaxkit.analysis.molecular_analysis.frame_stream import molecular_frame_table
+        table = molecular_frame_table(self, frames, request, "frequency", pipeline=pipeline, reporter=reporter)
+        return MolecularFrequencySeriesResult(table=table, request=request)
+
 
     @staticmethod
     def recommended_presentations(_result: MolecularFrequencySeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:
@@ -2295,6 +2249,16 @@ class MolecularTotalsSeriesTask(AnalysisTask):
     """Build total molecule/atom/mass time series from MolecularAnalysisData.totals."""
 
     required_data = MolecularAnalysisData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> MolecularTotalsSeriesResult:
+        from reaxkit.analysis.molecular_analysis.frame_stream import molecular_frame_table
+        table = molecular_frame_table(self, frames, request, "totals", pipeline=pipeline, reporter=reporter)
+        return MolecularTotalsSeriesResult(table=table, request=request)
+
 
     @staticmethod
     def recommended_presentations(_result: MolecularTotalsSeriesResult, payload: dict[str, Any]) -> list[PresentationSpec]:

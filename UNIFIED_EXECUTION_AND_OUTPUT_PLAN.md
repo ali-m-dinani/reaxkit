@@ -1,6 +1,37 @@
 # Unified Execution and Output Plan
 
-Status: the shared-policy implementation is complete. Registered analyses have explicit conservative capability decisions, shared-pipeline tasks use bounded scheduling, generic persisted tables use atomic artifact profiles, and a reproducible workstation/Slurm validation harness exists. Real-data tests passed for both projected-polarity commands with 28,880-atom ReaxFF text input and standalone `reaxout.kf`; the tests also verified automatic engine detection, native/formal charge routing, noncontiguous selected frames, and compact default output. `SELECTED_FRAME_PIPELINE_PLAN.md` remains the detailed implementation record and phase-status source of truth; production Slurm validation is still pending.
+Status (2026-09-24): the local implementation covers Phases 0-7. The completion
+pass added the outstanding workflow writers, frame/reference paths, ordered
+molecular/strain scans, bounded diffusivity, and optional detail publication.
+The explicit global and one-shot exceptions are audited in the generated
+inventory; they are intentional scientific/backend decisions. Production Slurm
+acceptance still requires the private input and a reachable allocation.
+
+## Implementation record
+
+| Phase | Implemented | Validation / limits |
+| --- | --- | --- |
+| 0 | Inventory of 77 analysis tasks and 222 CLI entries, public output sites and tiers; three stale routes corrected | Generation rejects undeclared tasks, missing workflow modules and unaudited materialized paths; original baseline 762 passed, 12 skipped |
+| 1 | Capability/backend/reference contracts; affinity, Slurm and memory policy; shared overrides; executor and generator provenance | Unsupported process backends fall back to serial with a recorded reason |
+| 2 | Bounded ordered map, reference map, reducers, ordered scan; scoped native threads; dependency spooling; prototype migration | Late references use one forward source pass plus private temporary storage |
+| 3 | Lazy chunks, CSV/Parquet row groups, JSON/extxyz staging, manifests and rollback; all workflow DataFrame and row CSV writers; generator metadata | Individual files are atomic; manifests mark completion; arbitrary generator primary-file creation is generator-owned |
+| 4 | Coordinate/charge/displacement, dihedral, connectivity, neighbors, Voronoi/RDF, molecular series/ranking, polarity/polarization, relabeling and strain paths | Source-frame order is deterministic. Automatic threads require performance evidence; external RDF/pyvoro backends remain bounded serial |
+| 5 | Mergeable count/sum/histogram reducers, fixed charge bins, per-pair statistics, bond/active-site scans and molecular lifetimes | Per-frame RDF curves remain per-frame primary results; averaging them would change the requested science |
+| 6 | Disk-backed time-origin MSD and per-atom diffusivity; bounded trace blocks for exact charge medians; disk-backed local/export trajectories | Compact dielectric FFT/correlation and global isomer equivalence remain serial; input scalar tables and one-shot reports have explicit audit reasons |
+| 7 | Four profiles, detail format override, incremental optional polarity/h-BN/charge tables, release notes and compatibility guide | `legacy` retained throughout 3.x and at least the next minor release; requested primary tables retain their public names |
+
+Validation evidence is recorded in the completion checklist below. The original
+medium scientific benchmark contains 21 equivalent cases and the isolated
+runtime matrix contains nine bounded cases. The completion benchmark adds 27
+scientific comparisons and a 16-versus-512-frame, 8,192-atom memory gate. The
+latter read each source frame once and increased peak RSS by about 9 MiB.
+The new timing results are informational (the regression suite was concurrently
+active); no automatic threading policy was promoted from these timings.
+
+See [developer coverage and contracts](docs/for_developers/unified_execution.md),
+[generated inventory](docs/command_execution_inventory.json), and
+[benchmark/Slurm recipe](benchmarks/README.md). The HPC acceptance criterion below
+is an external validation requirement, not a completed workstation check.
 
 ## Objective
 
@@ -343,3 +374,56 @@ The implementation resolved the original Phase 0 questions as follows:
 8. Compact scientific tables follow the selected output profile, while plots and large detail artifacts remain explicit opt-ins unless a command declares otherwise.
 
 Standalone `reaxout.kf` is treated as an AMS/KF input while preserving its step-indexed History layout and angstrom-valued coordinates. `--charge-source auto` reads the detected engine's native charges; `--charge-source formal` requests trajectory data only.
+
+## 13. Remaining work and completion checklist
+
+This checklist records the outstanding work identified on 2026-09-23. Items
+will be checked only after their implementation and relevant validation pass.
+Serial fallback is an intentional outcome only for mathematically global tasks,
+unsafe external libraries, or kernels without a demonstrated threading benefit;
+it is not a substitute for bounded streaming where the algorithm permits it.
+
+- [x] Complete shared output routing for remaining workflow table writers and
+  generator metadata; declare artifact tiers, preserve primary filenames, and
+  record omitted artifacts, schemas, units and source-frame provenance.
+- [x] Finish bounded frame/reference paths for remaining eligible strain,
+  polarization/polarity, fixed-bin and frame-local tasks. Replace command-local
+  scheduling and declare dependencies explicitly.
+- [x] Finish bounded RDF and mergeable binned charge/profile reductions, retaining
+  compact state rather than full intermediate trajectories/tables. RDF returns
+  per-frame curves, so temporal histogram merging is intentionally not applied.
+- [x] Finish ordered molecule-lifetime and active-site paths, preserving state
+  transitions and selected-frame semantics.
+- [x] Audit global algorithms and one-shot commands individually; implement
+  feasible bounded paths and document concrete reasons for permitted serial
+  fallbacks. Do not claim process support without a validated kernel.
+- [x] Complete detail opt-in/lazy construction and incremental publication for
+  migrated commands under all four profiles; test legacy public compatibility.
+- [x] Make command/output coverage checks reject undeclared registered commands
+  and unresolved registry routes; regenerate the checked-in inventory.
+- [x] Add scientific equivalence, selected-source alignment, cancellation,
+  rollback, and subprocess memory gates for the additional migrations; run the
+  complete regression suite and record final benchmark evidence.
+- [ ] Run the private 28,800-atom, 4,000-frame Slurm acceptance matrix, capturing
+  wall/CPU time, efficiency, peak RSS, I/O, output size, throughput and source
+  rereads. This item requires a reachable allocation and private input data.
+
+Local validation completed on 2026-09-24: **899 passed, 12 skipped** across
+911 collected tests. Two complementary runs covered the entire suite; a final
+561-test rerun covered all framework/workflow tests, ReaxFF, relabeling and
+affected connectivity consumers after fixing optional force-field propagation.
+That fix removed an additional skip exposed during the initial regression run.
+The remaining skips concern unavailable reference fixtures, optional backends,
+LAMMPS logs and existing compatibility-test conditions. Exact commands, counts
+and skipped test IDs are recorded in
+`benchmark_results/rollout_validation.json`.
+
+All 27 additional scientific benchmark comparisons and both isolated memory
+cases passed. Together with the earlier 21 scientific and nine runtime cases,
+these close the workstation gates. The Slurm script includes the new completion
+gates. **Only the private-data Slurm acceptance matrix remains open.**
+
+The completed implementation and permitted serial exceptions are described in
+`docs/for_developers/unified_execution.md`. Workstation evidence cannot close the
+private-data Slurm item. No production speedup or production RSS claim is made
+without that measurement.

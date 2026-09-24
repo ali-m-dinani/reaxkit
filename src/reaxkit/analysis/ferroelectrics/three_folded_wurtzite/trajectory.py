@@ -180,6 +180,14 @@ def _result(
 class PolarityExtendedXYZTask(AnalysisTask):
     """Write an OVITO-compatible trajectory with basal-only site polarity."""
 
+    supports_output_profiles = True
+    from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.REFERENCE_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        needs_reference=True, reference_fields=("reference_frame",), supports_selective_frames=True,
+        estimated_frame_bytes=16 * 1024 * 1024,
+    )
+
     required_data = TrajectoryData
     supports_selective_streaming = False
     VERSION = "1"
@@ -228,6 +236,11 @@ class PolarityExtendedXYZTask(AnalysisTask):
                 if callable(reporter):
                     reporter("write", progress, len(selected), "Writing three-folded polarity Extended XYZ")
         return _result(request, output_frames, iterations, atom_rows, polarity_result)
+
+
+    def run_stream(self, frames, request: PolarityExtendedXYZRequest, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarity_stream import stream_polarity_trajectory
+        return stream_polarity_trajectory(self, frames, request, reporter=reporter, pipeline=pipeline)
 
 
 __all__ = [

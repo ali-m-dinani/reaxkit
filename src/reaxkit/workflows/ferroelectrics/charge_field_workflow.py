@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 from dataclasses import replace
 from pathlib import Path
@@ -233,7 +235,7 @@ def _export_csv(_command: str, result: ChargeFieldResult, args: argparse.Namespa
     if not destination.suffix:
         destination = destination / "charge_vs_electric_field.csv"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    result.table.to_csv(destination, index=False)
+    write_workflow_csv(result.table, destination, index=False)
     return [destination]
 
 
@@ -266,7 +268,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output_dir = _artifact_directory(args)
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / "charge_vs_electric_field.csv"
-    result.table.to_csv(csv_path, index=False)
+    write_workflow_csv(result.table, csv_path, index=False)
     written = generate_charge_field_plots(
         result,
         output_dir,

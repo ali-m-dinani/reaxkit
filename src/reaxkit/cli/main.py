@@ -444,6 +444,10 @@ def main(*, announce: bool = True) -> int:
             tasks = wp.add_subparsers(dest="task", required=True)
             module.register_tasks(tasks)
 
+    from reaxkit.core.runtime.cli_policy import add_execution_arguments
+
+    for command_parser in sub.choices.values():
+        add_execution_arguments(command_parser)
     args = parser.parse_args(sys_argv[1:])
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
     trace = HumanReadableRunLog(
@@ -457,7 +461,9 @@ def main(*, announce: bool = True) -> int:
     if getattr(args, "project_root", None) is None:
         setattr(args, "project_root", str(project_root))
 
-    with trace:
+    from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
+
+    with trace, workflow_artifact_policy(args):
         try:
             with trace.step(
                 f"Execute {getattr(args, 'command', selected_command)} command"

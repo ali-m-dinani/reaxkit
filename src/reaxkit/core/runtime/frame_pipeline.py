@@ -4,18 +4,21 @@ from __future__ import annotations
 
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import contextmanager
-from dataclasses import dataclass, fields, is_dataclass
+from contextlib import contextmanager, nullcontext, closing
+from dataclasses import dataclass, fields, is_dataclass, replace
+from functools import partial
 from threading import Lock
 from time import perf_counter
 from typing import Any, Callable, Iterable, Iterator
 
 import numpy as np
+from threadpoolctl import threadpool_limits
 
 from reaxkit.core.runtime.execution_contracts import (
     ExecutionPolicy,
     FrameEnvelope,
     FrameResult,
+    PreparedState,
 )
 
 
@@ -105,11 +108,17 @@ class BoundedFramePipeline:
             value = getattr(payload, name, None)
             if value is not None:
                 return int(value)
+        for candidate in (payload, getattr(payload, "trajectory", None), getattr(payload, "connectivity", None)):
+            indices = getattr(candidate, "source_frame_indices", None)
+            if indices is not None and len(indices):
+                return int(indices[0])
         return int(sequence)
 
     def _envelope(self, payload: Any, sequence: int) -> FrameEnvelope:
         if isinstance(payload, FrameEnvelope):
-            return payload
+            return payload if payload.estimated_bytes > 0 else replace(
+                payload, estimated_bytes=estimate_payload_bytes(payload.payload)
+            )
         estimated = estimate_payload_bytes(payload)
         if estimated <= 0 and self.policy.estimated_frame_bytes:
             estimated = int(self.policy.estimated_frame_bytes)
@@ -124,6 +133,8 @@ class BoundedFramePipeline:
         started = perf_counter()
         try:
             return kernel(envelope.payload)
+        except Exception as exc:
+            raise RuntimeError(f"Frame kernel failed at source frame {envelope.source_frame}: {exc}") from exc
         finally:
             elapsed = perf_counter() - started
             with self._worker_lock:
@@ -146,6 +157,11 @@ class BoundedFramePipeline:
         kernel: Callable[[Any], Any],
     ) -> Iterator[FrameResult]:
         """Yield compact results in input order with bounded read-ahead."""
+        budget = threadpool_limits(limits=1) if self.policy.workers > 1 else nullcontext()
+        with budget, closing(self._map_ordered(source, kernel)) as results:
+            yield from results
+
+    def _map_ordered(self, source, kernel) -> Iterator[FrameResult]:
         if self._used:
             raise RuntimeError("A BoundedFramePipeline instance can only be consumed once.")
         self._used = True
@@ -193,6 +209,11 @@ class BoundedFramePipeline:
             sequence = 0
             while pending or not exhausted:
                 while not exhausted and len(pending) < self.policy.max_in_flight:
+                    # Notice a later worker's failure before advancing a potentially
+                    # expensive reader, even when an earlier frame is still running.
+                    for _, submitted in pending:
+                        if submitted.done() and submitted.exception() is not None:
+                            submitted.result()
                     read_started = perf_counter()
                     try:
                         payload = next(iterator)
@@ -236,6 +257,38 @@ class BoundedFramePipeline:
                 close()
             self.metrics.total_seconds = perf_counter() - started
             self._emit_metrics()
+
+    def map_reference(self, source, prepare, kernel) -> Iterator[FrameResult]:
+        """Prepare shared state once, then run ``kernel(payload, state)`` in order.
+
+        The caller supplies dependency frames to ``prepare`` separately from the
+        selected source, so dependency-only frames cannot leak into the result.
+        """
+        with self.measure_stage("reference_preparation"):
+            state = prepare()
+            if not isinstance(state, PreparedState):
+                state = PreparedState(state)
+            _readonly_arrays(state.payload)
+        yield from self.map_ordered(source, partial(kernel, state=state.payload))
+
+    def scan_ordered(self, source, state, step) -> Iterator[FrameResult]:
+        """Apply ``step(state, payload) -> (state, result)`` strictly serially."""
+        if self.policy.workers != 1:
+            raise ValueError("Ordered scans require a serial execution policy.")
+
+        def advance(payload):
+            nonlocal state
+            state, result = step(state, payload)
+            return result
+
+        yield from self.map_ordered(source, advance)
+
+    def reduce_ordered(self, source, kernel, reducer):
+        """Merge frame contributions in deterministic order into bounded state."""
+        with closing(self.map_ordered(source, kernel)) as results:
+            for result in results:
+                reducer.add(result.value)
+        return reducer.finalize()
 
     def iter_blocks(
         self,
@@ -292,6 +345,24 @@ class BoundedFramePipeline:
                 close()
             self.metrics.total_seconds = perf_counter() - started
             self._emit_metrics()
+
+
+def _readonly_arrays(value, seen=None):
+    seen = set() if seen is None else seen
+    if id(value) in seen:
+        return
+    seen.add(id(value))
+    if isinstance(value, np.ndarray):
+        value.flags.writeable = False
+    elif isinstance(value, dict):
+        for item in value.values():
+            _readonly_arrays(item, seen)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _readonly_arrays(item, seen)
+    elif is_dataclass(value) and not isinstance(value, type):
+        for descriptor in fields(value):
+            _readonly_arrays(getattr(value, descriptor.name), seen)
 
 
 __all__ = ["BoundedFramePipeline", "PipelineMetrics", "estimate_payload_bytes"]

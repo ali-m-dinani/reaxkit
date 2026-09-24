@@ -1,6 +1,13 @@
 # Selected-Frame Pipeline Plan
 
-Status: Phases 1-3 are implemented. ReaxKit now has shared execution contracts, automatic resource policy, stage/resource instrumentation, and a bounded ordered frame pipeline. Later command migration and shared incremental-output work remain in progress.
+Status (2026-09-23): shared execution now includes ordered/reference maps,
+reducers, ordered scans, native-thread limits, dependency spooling, incremental
+artifacts and additional domain migrations. Connection statistics and bond
+events use bounded state; time-origin MSD uses disk-backed blocks. Automatic
+threading is benchmark-gated. The current phase-by-phase coverage and remaining
+conservative paths are recorded in
+[UNIFIED_EXECUTION_AND_OUTPUT_PLAN.md](UNIFIED_EXECUTION_AND_OUTPUT_PLAN.md).
+Production Slurm acceptance remains pending.
 
 This document is a focused companion to [UNIFIED_EXECUTION_AND_OUTPUT_PLAN.md](UNIFIED_EXECUTION_AND_OUTPUT_PLAN.md). It describes how ReaxKit should overlap input parsing, frame-level analysis, reduction, and output while keeping memory bounded.
 

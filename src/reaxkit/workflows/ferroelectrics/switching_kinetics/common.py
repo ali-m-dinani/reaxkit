@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -507,13 +509,13 @@ def write_results(result: SwitchingWorkflowResult, output: Path) -> Path:
     if destination.suffix:
         raise ValueError("Output must be an .xlsx/.xlsm workbook or a directory for CSV files.")
     destination.mkdir(parents=True, exist_ok=True)
-    result.normalized_data.to_csv(destination / "normalized_data.csv", index=False)
-    result.fitted_curves.to_csv(destination / "fitted_curves.csv", index=False)
-    result.parameters.to_csv(destination / "parameters.csv", index=False)
-    result.metrics.to_csv(destination / "metrics.csv", index=False)
-    result.sweep_curves.to_csv(destination / "sweep_curves.csv", index=False)
-    result.sweep_parameters.to_csv(destination / "sweep_parameters.csv", index=False)
-    result.sweep_metrics.to_csv(destination / "sweep_metrics.csv", index=False)
+    write_workflow_csv(result.normalized_data, destination / "normalized_data.csv", index=False)
+    write_workflow_csv(result.fitted_curves, destination / "fitted_curves.csv", index=False)
+    write_workflow_csv(result.parameters, destination / "parameters.csv", index=False)
+    write_workflow_csv(result.metrics, destination / "metrics.csv", index=False)
+    write_workflow_csv(result.sweep_curves, destination / "sweep_curves.csv", index=False)
+    write_workflow_csv(result.sweep_parameters, destination / "sweep_parameters.csv", index=False)
+    write_workflow_csv(result.sweep_metrics, destination / "sweep_metrics.csv", index=False)
     return destination
 
 

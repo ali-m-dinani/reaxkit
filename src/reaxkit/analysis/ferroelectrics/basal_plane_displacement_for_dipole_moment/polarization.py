@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole import (
     BasalPlaneDipoleRequest,
@@ -88,6 +89,7 @@ def _validate_request(request: BasalPlanePolarizationRequest) -> tuple[int, int,
 def calculate_basal_plane_polarization(
     data,
     request: BasalPlanePolarizationRequest,
+    dipoles=None, reference_positions=None,
 ) -> BasalPlanePolarizationResult:
     """Calculate ``P = sum(mu_ion) / volume`` with each supercell ion counted once.
 
@@ -101,9 +103,9 @@ def calculate_basal_plane_polarization(
 
     bins = _validate_request(request)
     trajectory, _ = _trajectory_and_charges(data)
-    dipoles = calculate_basal_plane_dipoles(data, request)
+    dipoles = dipoles if dipoles is not None else calculate_basal_plane_dipoles(data, request)
     positions = np.asarray(trajectory.positions, dtype=float)
-    reference = positions[int(request.reference_frame)]
+    reference = positions[int(request.reference_frame)] if reference_positions is None else reference_positions
     reference = reference[np.isfinite(reference).all(axis=1)]
     edges = tuple(_axis_edges(reference[:, axis], bins[axis]) for axis in range(3))
     metadata = _metadata(edges, bins)
@@ -193,6 +195,10 @@ class BasalPlanePolarizationTask(AnalysisTask):
     """Normalize Hayden et al.-style basal-plane dipoles by spatial-bin volume."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "3"
 
@@ -212,6 +218,10 @@ class BasalPlanePolarizationTask(AnalysisTask):
     def run(self, data, request: BasalPlanePolarizationRequest, reporter=None):
         _ = reporter
         return calculate_basal_plane_polarization(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "basal_binned", reporter, pipeline)
 
 
 __all__ = [

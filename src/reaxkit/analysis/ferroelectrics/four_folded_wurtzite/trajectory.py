@@ -197,6 +197,14 @@ def _result(
 class PolarityExtendedXYZTask(AnalysisTask):
     """Write an OVITO-compatible trajectory without changing atom names."""
 
+    supports_output_profiles = True
+    from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.REFERENCE_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        needs_reference=True, reference_fields=("reference_frame",), supports_selective_frames=True,
+        estimated_frame_bytes=16 * 1024 * 1024,
+    )
+
     required_data = TrajectoryData
     supports_selective_streaming = True
     VERSION = "1"
@@ -249,91 +257,9 @@ class PolarityExtendedXYZTask(AnalysisTask):
                     reporter("write", progress_index, len(selected), "Writing polarity Extended XYZ")
         return _result(request, frames, iterations, atom_rows, polarity_result)
 
-    def run_stream(self, frames, request: PolarityExtendedXYZRequest, reporter=None):
-        _validate_export_request(request)
-        requested = None if request.frames is None else [int(v) for v in request.frames][:: int(request.every)]
-        requested_set = set(requested or ())
-        seen: set[int] = set()
-        output_frames: list[int] = []
-        iterations: list[int] = []
-        atom_rows: list[int] = []
-        neighbor_results = []
-        output = Path(request._output_path)
-        processed = 0
-        try:
-            with ExtendedXYZWriter(output, precision=request.precision) as writer:
-                for data in frames:
-                    processed += 1
-                    trajectory, charges = _charges_for_request(data, request)
-                    source_frame = _source_frame(trajectory, 0)
-                    seen.add(source_frame)
-                    keep = (
-                        source_frame in requested_set
-                        if requested is not None
-                        else source_frame % int(request.every) == 0
-                    )
-                    if keep:
-                        frame_request = PolarityExtendedXYZRequest(**{
-                            **vars(request), "frames": [0], "every": 1, "reference_frame": 0,
-                        })
-                        neighbor_result = extract_wurtzite_neighbors(
-                            trajectory,
-                            frame_request,
-                            charges=charges,
-                            frame_indices=[0],
-                            preserve_source_frame_indices=True,
-                        )
-                        polarity_result = calculate_wurtzite_polarity(neighbor_result, frame_request)
-                        neighbor_results.append(neighbor_result)
-                        extended = polarity_extended_xyz_frame(
-                            data,
-                            request,
-                            polarity_result.table,
-                            output_frame_index=source_frame,
-                        )
-                        writer.write_frame(extended)
-                        output_frames.append(source_frame)
-                        iterations.append(int(extended.iteration))
-                        atom_rows.append(len(extended.species))
-                    if callable(reporter):
-                        reporter(
-                            "stream", processed, int(request._expected_frames or 0),
-                            "Finding polarity and writing Extended XYZ",
-                        )
-        except Exception:
-            output.unlink(missing_ok=True)
-            raise
-        if requested is not None:
-            missing = [value for value in requested if value not in seen]
-            if missing:
-                output.unlink(missing_ok=True)
-                raise ValueError(f"Requested frame(s) not found in trajectory: {missing}.")
-        if neighbor_results:
-            reference_result = next(
-                (
-                    calculate_wurtzite_polarity(value, request)
-                    for value in neighbor_results
-                    if int(value.frame_indices[0]) == int(request.reference_frame)
-                ),
-                None,
-            )
-            if reference_result is None:
-                raise ValueError(
-                    f"Reference frame {request.reference_frame} is required for polarity CSV basal changes."
-                )
-            reference_basal = dict(zip(
-                reference_result.table["site_atom_id"].astype(int),
-                reference_result.table["mean_basal_bond_c (angstrom)"].astype(float),
-                strict=False,
-            ))
-            polarity_results = [
-                calculate_wurtzite_polarity(value, request, reference_basal=reference_basal)
-                for value in neighbor_results
-            ]
-            combined = combine_wurtzite_polarity_results(polarity_results, request)
-        else:
-            combined = combine_wurtzite_polarity_results([], request)
-        return _result(request, output_frames, iterations, atom_rows, combined)
+    def run_stream(self, frames, request: PolarityExtendedXYZRequest, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarity_stream import stream_polarity_trajectory
+        return stream_polarity_trajectory(self, frames, request, reporter=reporter, pipeline=pipeline)
 
 
 __all__ = [

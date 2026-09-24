@@ -34,6 +34,7 @@ from reaxkit.core.runtime.execution_contracts import (
     TaskCapabilities,
     resolve_execution_policy,
 )
+from reaxkit.core.runtime.reference_frames import reference_frames
 from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.reducers import TableAccumulator
 from reaxkit.domain.base_result import BaseResult
@@ -47,6 +48,8 @@ _PIPELINE_CAPABILITIES = TaskCapabilities(
     shape=ExecutionShape.REFERENCE_FRAME_MAP,
     thread_safe=True,
     needs_reference=True,
+    reference_fields=("reference_frame",),
+    supports_selective_frames=True,
     estimated_frame_bytes=16 * 1024 * 1024,
 )
 
@@ -79,6 +82,12 @@ class BasalPlaneProjectedPolarityRequest(BasalPlaneDipoleRequest):
 @dataclass
 class BasalPlaneProjectedPolarityResult(BaseResult):
     """Compact projected and frame-resolved mean-polarity tables."""
+
+    artifact_tiers = {
+        "basal_plane_projected_polarity_2d": "core",
+        "basal_plane_projected_polarity_kymograph": "core",
+        "basal_plane_projected_polarity_centers": "detail",
+    }
 
     centers: pd.DataFrame
     projected_bins: pd.DataFrame
@@ -448,9 +457,10 @@ def _run_payloads(
     if pipeline is None:
         policy = resolve_execution_policy(_PipelineContract(), request, {})
         pipeline = BoundedFramePipeline(policy)
-    for completed in pipeline.map_ordered(
+    for completed in pipeline.map_reference(
         payloads,
-        lambda item: _frame_rows(item, request, context),
+        lambda: context,
+        lambda item, state: _frame_rows(item, request, state),
     ):
         consume(completed.envelope.payload, completed.value)
 
@@ -517,60 +527,25 @@ class BasalPlaneProjectedPolarityTask(AnalysisTask):
         _validate_request(request)
         if request.profile_axis is None:
             request.profile_axis = cast(CartesianAxis, request.projection_plane[1])
-        iterator = iter(frames)
-        buffered = []
-        reference_payload = None
-        for stream_index, data in enumerate(iterator):
-            trajectory, _ = _trajectory_and_charges(data)
-            source = _source_frame(trajectory, 0)
-            payload = _payload(data, 0, source, request)
-            buffered.append(payload)
-            if source == int(request.reference_frame):
-                reference_payload = payload
-                break
-        if reference_payload is None:
-            raise ValueError(f"Reference frame {request.reference_frame} was not present in the input stream.")
-        if pipeline is None:
-            pipeline = BoundedFramePipeline(
-                resolve_execution_policy(self, request, {})
-            )
-        with pipeline.measure_stage(
-            "pipeline_prepare", reference_frame=int(request.reference_frame)
-        ):
-            context = _build_context(reference_payload, request)
-        requested = None if request.frames is None else [int(value) for value in request.frames]
-        requested_set = set(requested or ())
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request, {}))
+        with reference_frames(frames, request.reference_frame) as (reference_data, selected_source):
+            reference_payload = _payload(reference_data, 0, int(request.reference_frame), request)
+            reference_request = request
+            with pipeline.measure_stage("pipeline_prepare", reference_frame=int(request.reference_frame)):
+                context = _build_context(reference_payload, request)
+            stride = max(1, int(request.every))
+            wanted = None if request.frames is None else set(list(request.frames)[::stride])
 
-        def selected_payloads():
-            try:
-                occurrence = 0
-                for payload in buffered:
-                    if requested is not None and payload.frame_index not in requested_set:
+            def selected_payloads():
+                for occurrence, (source, data) in enumerate(selected_source):
+                    if wanted is not None:
+                        if source not in wanted:
+                            continue
+                    elif occurrence % stride:
                         continue
-                    if occurrence % max(1, int(request.every)) == 0:
-                        yield payload
-                    occurrence += 1
-                for stream_index, data in enumerate(iterator, start=len(buffered)):
-                    trajectory, _ = _trajectory_and_charges(data)
-                    source = _source_frame(trajectory, 0)
-                    payload = _payload(data, 0, source, request)
-                    if requested is not None and source not in requested_set:
-                        continue
-                    if occurrence % max(1, int(request.every)) == 0:
-                        yield payload
-                    occurrence += 1
-            finally:
-                close = getattr(iterator, "close", None)
-                if callable(close):
-                    close()
+                    yield _payload(data, 0, source, reference_request)
 
-        return _run_payloads(
-            selected_payloads(),
-            request,
-            context,
-            reporter=reporter,
-            pipeline=pipeline,
-        )
+            return _run_payloads(selected_payloads(), request, context, reporter=reporter, pipeline=pipeline)
 
 
 __all__ = [

@@ -11,6 +11,8 @@ This module implements CLI workflow orchestration for its command family, includ
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 from typing import Callable
 
@@ -217,7 +219,7 @@ def _run_spatial(command: str, args: argparse.Namespace) -> int:
             project_root=getattr(args, "project_root", "."),
             analysis_id=getattr(args, "analysis_id", None),
         )
-        merged.to_csv(out_csv, index=False)
+        write_workflow_csv(merged, out_csv, index=False)
         args.export = str(out_csv)
 
     coords = merged[["x", "y", "z"]].to_numpy(float)

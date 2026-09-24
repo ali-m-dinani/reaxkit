@@ -10,7 +10,12 @@ from typing import Any
 # command requires an explicit decision here instead of silently inheriting a
 # parallel strategy.
 INDEPENDENT_FRAME_TASKS = frozenset({
-    "active_site_structural",
+    "trajectory_relabel_by_coordination",
+    "get_largest_molecule_composition",
+    "get_largest_molecule_by_mass",
+    "get_dominant_species",
+    "get_rdf_property",
+    "get_rdf",
     "cell_dimensions",
     "charge_series",
     "charge_table",
@@ -19,7 +24,6 @@ INDEPENDENT_FRAME_TASKS = frozenset({
     "get-dipole",
     "get-polarization",
     "get_connection_list",
-    "get_connection_table",
     "get_coordination",
     "get_dihedral",
     "get_hybridization",
@@ -49,26 +53,22 @@ STREAMING_REDUCTION_TASKS = frozenset({
     "get_connection_stats",
     "get_charge_vs_electric_field",
     "get_polarization_field",
-    "get_rdf",
-    "get_rdf_property",
     "isomer_representative_detection",
 })
 
 ORDERED_STATEFUL_TASKS = frozenset({
+    "get_z_binned_top_bottom_strain",
+    "get_z_binned_deformation_gradient_strain",
     "active_site_events",
     "get_bond_events",
-    "get_dominant_species",
-    "get_largest_molecule_by_mass",
-    "get_largest_molecule_composition",
     "get_molecule_lifetime",
-    "molecule_isomer_detection",
-    "trajectory_relabel_by_coordination",
     "write-trajectory-with-polarity",
     "write-trajectory-with-potential-and-electric-field",
     "write_trajectory_with_charges",
 })
 
 GLOBAL_TASKS = frozenset({
+    "molecule_isomer_detection",
     "force_field_data",
     "force_field_optimization",
     "force_field_optimization_parameters",
@@ -81,10 +81,7 @@ GLOBAL_TASKS = frozenset({
     "get_control_data",
     "get_diffusivity",
     "get_frames_count",
-    "get_kinematics",
     "get_msd",
-    "get_z_binned_deformation_gradient_strain",
-    "get_z_binned_top_bottom_strain",
     "msd",
     "parameter_optimization_diagnostic",
     "parameter_optimization_diagnostic_beeswarm",
@@ -93,12 +90,26 @@ GLOBAL_TASKS = frozenset({
     "trainset_group_comments",
 })
 
+SINGLE_TASKS = frozenset({
+    "get_kinematics",
+    "get_connection_table",
+    "active_site_structural",
+    "force_field_data", "force_field_optimization", "force_field_optimization_parameters",
+    "force_field_optimization_report", "force_field_optimization_report_bulk_modulus",
+    "force_field_optimization_report_eos", "force_field_optimization_report_restraints",
+    "geometry_optimization_data", "get_control_data", "get_frames_count",
+    "parameter_optimization_diagnostic", "parameter_optimization_diagnostic_beeswarm",
+    "structure_summary_data", "trainset_data", "trainset_group_comments",
+})
+GLOBAL_TASKS = GLOBAL_TASKS - SINGLE_TASKS
+
 ALL_GENERAL_TASKS = frozenset().union(
     INDEPENDENT_FRAME_TASKS,
     REFERENCE_FRAME_TASKS,
     STREAMING_REDUCTION_TASKS,
     ORDERED_STATEFUL_TASKS,
     GLOBAL_TASKS,
+    SINGLE_TASKS,
 )
 
 _SHAPE_BY_TASK = {
@@ -107,12 +118,18 @@ _SHAPE_BY_TASK = {
     **{name: "streaming_reduction" for name in STREAMING_REDUCTION_TASKS},
     **{name: "ordered_stateful_stream" for name in ORDERED_STATEFUL_TASKS},
     **{name: "global" for name in GLOBAL_TASKS},
+    **{name: "single" for name in SINGLE_TASKS},
 }
 
 # Only these implementations currently execute their numerical frame kernel
 # through BoundedFramePipeline. Other tasks retain an explicit serial policy
 # until their command-specific result combiner is migrated.
 SHARED_PIPELINE_TASKS = frozenset({
+    "get-wurtzite-neighbors",
+    "trajectory_displacement_series",
+    "trajectory_coordinate_series", "charge_series", "get_dihedral",
+    "get_coordination", "get_hybridization", "get_connection_list",
+    "get_voronoi_scipy", "get_voronoi_geometry_scipy",
     "charge_table",
     "get-dipole",
     "get-polarization",
@@ -152,5 +169,6 @@ __all__ = [
     "REFERENCE_FRAME_TASKS",
     "SHARED_PIPELINE_TASKS",
     "STREAMING_REDUCTION_TASKS",
+    "SINGLE_TASKS",
     "classification_for_registered_task",
 ]

@@ -7,6 +7,8 @@ https://doi.org/10.1103/PhysRevMaterials.5.044412.
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 
@@ -133,10 +135,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     ions = output / "basal_plane_ions.csv"
     bins = output / "basal_plane_polarization.csv"
     summary = output / "basal_plane_polarization_summary.csv"
-    result.dipole_result.table.to_csv(dipoles, index=False)
-    result.dipole_result.ions.to_csv(ions, index=False)
-    result.table.to_csv(bins, index=False)
-    result.summary.to_csv(summary, index=False)
+    write_workflow_tables({dipoles: result.dipole_result.table, ions: result.dipole_result.ions, bins: result.table, summary: result.summary}, args=args, summary=(summary.name,))
     figures = []
     if args.heatmaps:
         figures = generate_polarization_heatmaps(
@@ -149,7 +148,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     print(f"Wrote basal-plane polarization to {bins}")
     print(f"Wrote source dipoles to {dipoles}")
     print(f"Wrote unique-ion contributions to {ions}")
-    print(f"Wrote polarization summary to {summary}")
+    if getattr(args, "output_profile", "standard") != "minimal":
+        print(f"Wrote polarization summary to {summary}")
     if figures:
         scale = "global" if args.global_scaling else "per-frame"
         print(f"Wrote {len(figures):,} {scale}-scaled heatmap(s) under {output / 'heatmaps'}")

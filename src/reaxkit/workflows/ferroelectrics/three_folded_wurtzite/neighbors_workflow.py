@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 
@@ -80,8 +82,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     centers_path = output / "centers.csv"
     neighbors_path = output / "neighbors.csv"
-    result.csv_tables["centers"].to_csv(centers_path, index=False)
-    result.csv_tables["neighbors"].to_csv(neighbors_path, index=False)
+    write_workflow_tables({centers_path: result.csv_tables["centers"], neighbors_path: result.csv_tables["neighbors"]}, args=args)
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote {len(result.centers):,} center rows to {centers_path}")

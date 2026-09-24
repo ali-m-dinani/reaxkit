@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv, write_workflow_tables
+
 import re
 from pathlib import Path
 
@@ -161,9 +163,14 @@ def write_polarity_tables(
         *,
         complete_only: bool = False,
         all_csvs_in_helpful_data: bool = False,
+        args=None,
 ) -> dict[str, Path]:
     """Write the reusable neighbor, site-polarity, and summary tables."""
 
+    from types import SimpleNamespace
+    args = args or SimpleNamespace(output_profile="legacy")
+    if not hasattr(args, "output_profile"):
+        args = SimpleNamespace(**vars(args), output_profile="legacy")
     output.mkdir(parents=True, exist_ok=True)
     helpful = output / "other_helpful_data"
     helpful.mkdir(parents=True, exist_ok=True)
@@ -176,15 +183,25 @@ def write_polarity_tables(
         "proton": primary_csv_directory / "proton_proximity_summary.csv",
         "variables": output / "polarity_variables.txt",
     }
-    centers_csv_table(result.centers).to_csv(paths["centers"], index=False)
-    neighbors_csv_table(result.neighbor_geometry).to_csv(paths["neighbors"], index=False)
+    chunks = getattr(result, "detail_chunks", {})
+    # Do not format disabled detail tables, including materialized API results.
+    enabled = args.output_profile in {"full", "legacy"}
+    detail_tables = {
+        paths["centers"]: chunks["centers"] if "centers" in chunks else centers_csv_table(result.centers if enabled else result.centers.iloc[:0]),
+        paths["neighbors"]: chunks["neighbors"] if "neighbors" in chunks else neighbors_csv_table(result.neighbor_geometry if enabled else result.neighbor_geometry.iloc[:0]),
+    }
+    published = write_workflow_tables(detail_tables, args=args, details=("centers.csv", "neighbors.csv"))
+    for name in ("centers", "neighbors"):
+        match = next((path for path in published if path.stem == name), None)
+        if match is not None:
+            paths[name] = match
     polarity = (
         result.table[result.table["has_four_neighbors"].astype(bool)]
         if complete_only else result.table
     )
-    polarity_csv_table(polarity).to_csv(paths["polarity"], index=False)
-    time_after_iter(result.summary).to_csv(paths["summary"], index=False)
-    time_after_iter(result.proton_summary).to_csv(paths["proton"], index=False)
+    write_workflow_csv(polarity_csv_table(polarity), paths["polarity"], index=False, args=args)
+    write_workflow_csv(time_after_iter(result.summary), paths["summary"], index=False, args=args, tier="summary")
+    write_workflow_csv(time_after_iter(result.proton_summary), paths["proton"], index=False, args=args, tier="summary")
     write_polarity_variable_guide(result, output)
     for obsolete in (
             "centers.csv",

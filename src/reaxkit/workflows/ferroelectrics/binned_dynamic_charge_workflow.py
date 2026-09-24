@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from dataclasses import replace
 from pathlib import Path
@@ -129,7 +131,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         runtime_args,
     )
     csv_path = output / "binned_dynamic_charge.csv"
-    result.table.to_csv(csv_path, index=False)
+    write_workflow_tables({csv_path: result.table}, args=args)
     args.suppress_table = True
     present_result(COMMAND, result, args)
 

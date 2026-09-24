@@ -19,6 +19,8 @@ from typing import Any, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.frame_tables import map_frame_tables
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -256,6 +258,11 @@ class DihedralResult(BaseResult):
 class DihedralTask(AnalysisTask):
     """Compute the signed dihedral angle for one atom quadruplet over time."""
 
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
     required_data = TrajectoryData
 
     @staticmethod
@@ -403,27 +410,10 @@ class DihedralTask(AnalysisTask):
             reporter("analyze", total, total, "Finished dihedral")
         return DihedralResult(table=table, request=request)
 
-    def run_stream(self, frames, request: DihedralRequest, reporter=None) -> DihedralResult:
-        """Compute torsions from one trajectory frame at a time."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_index"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming dihedral analysis")
-        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
-        if not table.empty:
-            table = table.sort_values("frame_index", kind="stable").reset_index(drop=True)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> DihedralResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_index',))
         return DihedralResult(table=table, request=request)
 
 

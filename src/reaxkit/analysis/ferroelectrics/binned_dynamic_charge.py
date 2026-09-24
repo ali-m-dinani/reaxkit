@@ -9,6 +9,7 @@ from typing import Any, Literal, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -198,15 +199,13 @@ def _set_charge_aggregates(
     *,
     include_averages: bool,
 ) -> None:
-    counts = np.bincount(fixed_bins[valid], minlength=number_of_bins)
-    charge_sums = np.bincount(
-        fixed_bins[valid], weights=frame_charges[valid], minlength=number_of_bins
-    )
-    delta_sums = np.bincount(
-        fixed_bins[valid],
-        weights=frame_charges[valid] - baseline[valid],
-        minlength=number_of_bins,
-    )
+    from reaxkit.core.runtime.reducers import CountSumReducer
+    charge = CountSumReducer(number_of_bins)
+    delta = CountSumReducer(number_of_bins)
+    charge.add(fixed_bins[valid], frame_charges[valid])
+    delta.add(fixed_bins[valid], frame_charges[valid] - baseline[valid])
+    counts, charge_sums, _ = charge.finalize()
+    _, delta_sums, _ = delta.finalize()
     frame_table["valid_charge_count"] = counts
     frame_table["charge"] = charge_sums
     frame_table["delta_charge"] = delta_sums
@@ -455,6 +454,8 @@ class BinnedDynamicChargeTask(AnalysisTask):
     """Aggregate atomic charges on a projected grid fixed at frame zero."""
 
     required_data = ElectrostaticsData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        supports_selective_frames=True, reference_frames=(0,), estimated_frame_bytes=8 * 1024 * 1024)
     VERSION = "2"
 
     @staticmethod

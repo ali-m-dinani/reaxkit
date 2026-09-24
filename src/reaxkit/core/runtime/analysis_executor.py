@@ -27,7 +27,7 @@ from reaxkit.core.platform.exceptions import ParseError, AnalysisError
 from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import get_logger, configure_file_logging
 from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
-from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
+from reaxkit.core.runtime.execution_contracts import ExecutionPolicy, resolve_execution_policy, task_capabilities
 from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.provenance import user_settings_from_args
 from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
@@ -41,6 +41,7 @@ class AnalysisExecutor:
     """Orchestrate task execution with strict layer boundaries."""
 
     FRAME_SELECTIVE_DATA_TYPES = {
+        "MolecularAnalysisData",
         "TrajectoryData",
         "ChargeData",
         "ConnectivityData",
@@ -312,13 +313,13 @@ class AnalysisExecutor:
         return _emit
 
     @classmethod
-    def _requested_frame_indices(cls, request, required_data) -> list[int] | None:
+    def _requested_frame_indices(cls, request, required_data, task=None) -> list[int] | None:
         """Return explicit source-frame dependencies for a partial load."""
         if getattr(required_data, "__name__", "") not in cls.FRAME_SELECTIVE_DATA_TYPES:
             return None
 
         primary = None
-        for name in ("frames", "frame_indices", "frame"):
+        for name in ("frames", "selected_frames", "frame_indices", "frame"):
             value = getattr(request, name, None)
             if value is None or isinstance(value, (str, bytes)):
                 continue
@@ -335,13 +336,19 @@ class AnalysisExecutor:
         # Some analyses need an additional reference snapshot that is not in
         # the main frame list (for example displacement relative to frame 0).
         references: list[int] = []
-        for name in ("reference_frame",):
+        capabilities = task_capabilities(task) if task is not None else None
+        if capabilities is not None:
+            references.extend(capabilities.reference_frames)
+            if capabilities.requires_contiguous_history and bool(getattr(request, "unwrap", False)):
+                return list(range(max(primary) + 1))
+        reference_fields = capabilities.reference_fields if capabilities is not None else ()
+        for name in reference_fields or ("reference_frame",):
             value = getattr(request, name, None)
             if value is not None:
                 references.append(int(value))
         dependencies = (
             [*references, *primary]
-            if bool(getattr(request, "stream_reference_first", False))
+            if reference_fields or references or bool(getattr(request, "stream_reference_first", False))
             else [*primary, *references]
         )
         return list(dict.fromkeys(i for i in dependencies if i >= 0))
@@ -376,6 +383,8 @@ class AnalysisExecutor:
                 key = "xmolout"
             elif name_lower == "fort.7":
                 key = "fort7"
+            elif name_lower in {"molfra.out", "molfra_ig.out"}:
+                key = "molfra" if name_lower == "molfra.out" else "molfra_ig"
             elif Path(name_s).suffix.lower() in {".kf", ".rkf"}:
                 key = "rkf"
             elif "dump" in name_lower or "lammpstrj" in name_lower:
@@ -403,7 +412,7 @@ class AnalysisExecutor:
         source_to_local = {source: local for local, source in enumerate(source_indices)}
         execution_request = copy.copy(request)
 
-        for name in ("frames", "frame_indices"):
+        for name in ("frames", "selected_frames", "frame_indices"):
             values = getattr(request, name, None)
             if values is None or isinstance(values, (str, bytes)):
                 continue
@@ -432,7 +441,7 @@ class AnalysisExecutor:
         local_to_source = {local: source for local, source in enumerate(source_indices)}
 
         def _restore_frame(frame: pd.DataFrame) -> pd.DataFrame:
-            columns = [name for name in ("frame_index", "frame_idx") if name in frame.columns]
+            columns = [name for name in ("frame_index", "frame_idx", "frame") if name in frame.columns]
             if not columns:
                 return frame
             out = frame.copy()
@@ -482,6 +491,7 @@ class AnalysisExecutor:
             and (
                     requested_frame_indices is None
                     or bool(getattr(task, "supports_selective_streaming", False))
+                    or task_capabilities(task).supports_selective_frames
             )
             and (
                 callable(getattr(task, "run_stream", None))
@@ -494,8 +504,12 @@ class AnalysisExecutor:
     def _run_stream_task(cls, task, frames, request, reporter, args: dict):
         """Execute an incremental task against a canonical frame iterator."""
         task_name = task.__class__.__name__
-        policy = resolve_execution_policy(task, request, args)
+        policy = (ExecutionPolicy(**args["_execution_policy"]) if args.get("_execution_policy")
+                  else resolve_execution_policy(task, request, args))
         args["_execution_policy"] = policy.as_dict()
+        if "output_profile" in args and getattr(task, "supports_output_profiles", False):
+            request._output_profile = args["output_profile"]
+            request._write_displacements = bool(args.get("write_displacements", False))
 
         def record_pipeline_timing(
             phase: str, seconds: float, details: dict[str, object]
@@ -526,7 +540,13 @@ class AnalysisExecutor:
                 kwargs["reporter"] = stream_reporter
             if "pipeline" in params:
                 kwargs["pipeline"] = pipeline
-            return runner(frames, request, **kwargs)
+                return runner(frames, request, **kwargs)
+            # Existing incremental tasks already own their scientific state.
+            # Bound their reader and guarantee cleanup without wrapping the
+            # state machine in independent frame workers.
+            from contextlib import closing
+            with closing(pipeline.map_ordered(frames, lambda frame: frame)) as ordered:
+                return runner((item.value for item in ordered), request, **kwargs)
 
     @classmethod
     def _stream_source_identity(cls, adapter, required_data, args: dict, required_names) -> dict:
@@ -681,7 +701,8 @@ class AnalysisExecutor:
             try:
                 import psutil
 
-                return int(psutil.Process().memory_info().rss)
+                memory = psutil.Process().memory_info()
+                return int(getattr(memory, "peak_wset", memory.rss))
             except (ImportError, OSError):
                 return None
 
@@ -776,7 +797,7 @@ class AnalysisExecutor:
             required_fields = task.required_data_fields_for(request, args)
             if required_fields:
                 args["_required_data_fields"] = tuple(str(field) for field in required_fields)
-        requested_frame_indices = self._requested_frame_indices(request, required_data)
+        requested_frame_indices = self._requested_frame_indices(request, required_data, task)
         if requested_frame_indices is not None:
             args["_frame_indices"] = requested_frame_indices
         task_name = task.__class__.__name__
@@ -822,6 +843,8 @@ class AnalysisExecutor:
             args,
             f"Resolved engine={resolved_engine} adapter={adapter.__class__.__name__}",
         )
+        streaming = self._streaming_enabled(task, adapter, required_data, args, requested_frame_indices)
+        args["_streaming"] = streaming
         policy = resolve_execution_policy(task, request, args)
         args["_execution_policy"] = policy.as_dict()
         self._record_timing(
@@ -918,6 +941,7 @@ class AnalysisExecutor:
                 args,
                 required_source_names,
             )
+            identity["output_profile"] = args.get("output_profile", "legacy_api")
             analysis_id = cache.analysis_id_for(
                 task=task,
                 data=identity,
@@ -960,7 +984,7 @@ class AnalysisExecutor:
                 task_name=task_name,
                 seconds=elapsed,
             )
-            if use_cache:
+            if use_cache and not getattr(result, "skip_result_cache", False):
                 cache.store(analysis_id, result, task_name=task_name)
                 self._console_step(args, f"Stored analysis result in cache analysis_id={analysis_id[:12]}")
             self._record_general(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 from pathlib import Path
 
@@ -71,7 +73,7 @@ def export_trainset_section_csvs(command: str, result, args) -> list[Path]:
         if exporting_all and table.empty:
             continue
         filename = f"{str(section_name).strip().lower()}.csv"
-        table.to_csv(export_dir / filename, index=False)
+        write_workflow_csv(table, export_dir / filename, index=False)
         written += 1
 
     if not written:

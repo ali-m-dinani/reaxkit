@@ -7,6 +7,8 @@ https://doi.org/10.1103/PhysRevMaterials.5.044412.
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 
@@ -89,14 +91,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     dipoles = output / "basal_plane_dipoles.csv"
     ions = output / "basal_plane_ions.csv"
     summary = output / "basal_plane_dipole_summary.csv"
-    result.table.to_csv(dipoles, index=False)
-    result.ions.to_csv(ions, index=False)
-    result.summary.to_csv(summary, index=False)
+    write_workflow_tables({dipoles: result.table, ions: result.ions, summary: result.summary}, args=args, summary=(summary.name,))
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote basal-plane displacement dipoles to {dipoles}")
     print(f"Wrote unique-ion contributions to {ions}")
-    print(f"Wrote dipole summary to {summary}")
+    if getattr(args, "output_profile", "standard") != "minimal":
+        print(f"Wrote dipole summary to {summary}")
     return 0
 
 

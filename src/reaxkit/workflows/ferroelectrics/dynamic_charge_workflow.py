@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 import shutil
 from dataclasses import replace
@@ -34,8 +36,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Compare each atom's dynamic charge with its charge at frame zero.\n"
-        "Writes per-atom and per-frame summaries plus charges.csv unless "
-        "--skip-detailed-csv is supplied; --gen-plots writes one charge and "
+        "Writes per-atom and per-frame summaries; per-atom detail is opt-in. "
+        "--gen-plots writes one charge and "
         "one delta-charge trace per atom.\n\n"
         "Example:\n"
         "  reaxkit get_dynamic_charge_changes --fort7 fort.7 --xmolout xmolout "
@@ -50,6 +52,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument("--atom-numbers", "--atom-ids", type=int, nargs="+", default=None)
     parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10.")
     parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame.")
+    parser.add_argument("--write-detailed-charges", action="store_true", help="Stream per-atom details (Parquet by default).")
     parser.add_argument("--gen-plots", action="store_true", help="Generate per-atom PNG plots.")
     parser.add_argument(
         "--global-y-axis",
@@ -99,51 +102,57 @@ def _artifact_directory(args: argparse.Namespace) -> Path:
     return layout.analysis_root / COMMAND / str(analysis_id)
 
 
-def _write_requested_output(result: DynamicChargeChangeResult, args: argparse.Namespace) -> None:
-    output = _artifact_directory(args)
-    output.mkdir(parents=True, exist_ok=True)
-    if not bool(getattr(args, "skip_detailed_csv", False)):
-        detail_path = output / "charges.csv"
-        existing = Path(result.detail_csv_path) if result.detail_csv_path else None
+def _detail_enabled(args):
+    profile = getattr(args, "output_profile", "legacy")
+    return profile != "minimal" and not getattr(args, "skip_detailed_csv", False) and (
+        profile in {"full", "legacy"} or bool(getattr(args, "write_detailed_charges", False))
+    )
+
+
+def _detail_format(args):
+    return getattr(args, "detail_format", None) or ("csv" if getattr(args, "output_profile", "legacy") == "legacy" else "parquet")
+
+
+def _publish_output(result, args, output, detail_name="charges"):
+    from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter, TableChunks
+    profile = getattr(args, "output_profile", "legacy")
+    detail_format = _detail_format(args)
+    specs = [ArtifactSpec(name, name + ".csv", "core", True, "csv") for name in result.csv_tables]
+    enabled = _detail_enabled(args)
+    specs.append(ArtifactSpec("charges", str(Path(detail_name).with_suffix("." + detail_format)), "detail", enabled, detail_format, True))
+    existing = Path(result.detail_csv_path) if result.detail_csv_path else None
+    def chunks():
         if existing is None or not existing.is_file():
-            result.charges.to_csv(detail_path, index=False)
-            result.detail_csv_path = str(detail_path)
-        elif existing.resolve() != detail_path.resolve():
-            shutil.copyfile(existing, detail_path)
-            result.detail_csv_path = str(detail_path)
-    result.summary.to_csv(output / "summary_per_atom.csv", index=False)
-    result.summary_per_frame_for_all_atoms.to_csv(
-        output / "summary_per_frame_for_all_atoms.csv",
-        index=False,
-    )
-    result.summary_per_frame_per_atom_type.to_csv(
-        output / "summary_per_frame_per_atom_type.csv",
-        index=False,
-    )
-
-
-def _export_csvs(_command: str, result: DynamicChargeChangeResult, args: argparse.Namespace) -> list[Path]:
-    detail_path = Path(args.export).resolve()
-    if not detail_path.suffix:
-        detail_path = detail_path / "charges.csv"
-    detail_path.parent.mkdir(parents=True, exist_ok=True)
-    if not bool(getattr(args, "skip_detailed_csv", False)):
-        existing = Path(result.detail_csv_path) if result.detail_csv_path else None
-        if existing is not None and existing.is_file():
-            if existing.resolve() != detail_path.resolve():
-                shutil.copyfile(existing, detail_path)
+            yield result.charges
+        elif existing.suffix == ".parquet":
+            import pyarrow.parquet as pq
+            for batch in pq.ParquetFile(existing).iter_batches(batch_size=8192):
+                yield batch.to_pandas()
         else:
-            result.charges.to_csv(detail_path, index=False)
-    result.summary.to_csv(detail_path.with_name("summary_per_atom.csv"), index=False)
-    result.summary_per_frame_for_all_atoms.to_csv(
-        detail_path.with_name("summary_per_frame_for_all_atoms.csv"),
-        index=False,
-    )
-    result.summary_per_frame_per_atom_type.to_csv(
-        detail_path.with_name("summary_per_frame_per_atom_type.csv"),
-        index=False,
-    )
-    return [detail_path.parent]
+            yield from pd.read_csv(existing, chunksize=8192)
+    # Explicit skip/minimal wins even under a full profile.
+    writer_profile = profile if enabled else "standard" if profile in {"full", "legacy"} else profile
+    with ArtifactWriter(output, specs, profile=writer_profile, overwrite=True,
+                        metadata={"command": COMMAND, "source_frames": result.frame_indices.tolist()}) as writer:
+        for name, table in result.csv_tables.items():
+            writer.write_table(name, table)
+        writer.write_chunks("charges", TableChunks(chunks()))
+    if enabled:
+        result.detail_csv_path = str(output / specs[-1].filename)
+    return output
+
+
+def _write_requested_output(result, args):
+    _publish_output(result, args, _artifact_directory(args))
+
+
+def _export_csvs(_command, result, args):
+    destination = Path(args.export).resolve()
+    if not destination.suffix:
+        destination = destination / "charges.csv"
+    _publish_output(result, args, destination.parent, destination.stem)
+    return [destination.parent]
+
 
 
 def _plot_x_values(
@@ -378,7 +387,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     request = replace(
         build_request(args),
         _detail_csv_path=(
-            None if args.skip_detailed_csv else str(output_dir / "charges.csv")
+            str(output_dir / (".dynamic-charge-detail." + _detail_format(args))) if _detail_enabled(args) else None
         ),
         _matrix_path=str(output_dir / ".dynamic_charge_matrix.dat"),
         _expected_frames=expected_frames,
@@ -389,7 +398,12 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         request,
         runtime_args,
     )
-    _write_requested_output(result, args)
+    staged_detail = Path(result.detail_csv_path) if result.detail_csv_path else None
+    try:
+        _write_requested_output(result, args)
+    finally:
+        if staged_detail is not None and staged_detail.name.startswith(".dynamic-charge-detail."):
+            staged_detail.unlink(missing_ok=True)
     args.suppress_table = True
     present_result(COMMAND, result, args, export_handler=_export_csvs)
     if args.gen_plots:

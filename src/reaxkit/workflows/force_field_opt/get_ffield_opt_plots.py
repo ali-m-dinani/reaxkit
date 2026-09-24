@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import argparse
 import hashlib
 import json
@@ -614,20 +616,20 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     single_energy_csv = other_bar_dir / "single_identifier_energies.csv"
     reaction_energy_csv = reaction_energy_dir / "reaction_energies.csv"
     not_plotted_csv = root / "not_plotted_entries.csv"
-    eos_result.table.to_csv(eos_csv, index=False)
-    restraint_result.table.to_csv(restraint_csv, index=False)
-    heatfo_table.to_csv(heatfo_csv, index=False)
-    bond_table.to_csv(bond_csv, index=False)
-    angle_table.to_csv(angle_csv, index=False)
-    other_curve_table.to_csv(other_curve_csv, index=False)
-    charge_table.to_csv(charge_csv, index=False)
-    cell_parameter_table.to_csv(cell_parameter_csv, index=False)
-    geometry_target_table.to_csv(geometry_target_csv, index=False)
-    energy_curve_table.to_csv(energy_curve_csv, index=False)
-    energy_difference_table.to_csv(energy_difference_csv, index=False)
-    single_energy_table.to_csv(single_energy_csv, index=False)
-    reaction_energy_table.to_csv(reaction_energy_csv, index=False)
-    not_plotted_table.to_csv(not_plotted_csv, index=False)
+    write_workflow_csv(eos_result.table, eos_csv, index=False)
+    write_workflow_csv(restraint_result.table, restraint_csv, index=False)
+    write_workflow_csv(heatfo_table, heatfo_csv, index=False)
+    write_workflow_csv(bond_table, bond_csv, index=False)
+    write_workflow_csv(angle_table, angle_csv, index=False)
+    write_workflow_csv(other_curve_table, other_curve_csv, index=False)
+    write_workflow_csv(charge_table, charge_csv, index=False)
+    write_workflow_csv(cell_parameter_table, cell_parameter_csv, index=False)
+    write_workflow_csv(geometry_target_table, geometry_target_csv, index=False)
+    write_workflow_csv(energy_curve_table, energy_curve_csv, index=False)
+    write_workflow_csv(energy_difference_table, energy_difference_csv, index=False)
+    write_workflow_csv(single_energy_table, single_energy_csv, index=False)
+    write_workflow_csv(reaction_energy_table, reaction_energy_csv, index=False)
+    write_workflow_csv(not_plotted_table, not_plotted_csv, index=False)
 
     reporter(progress_stage, 5, progress_total, "Rendering EOS plots")
     eos_images = _render_groups(

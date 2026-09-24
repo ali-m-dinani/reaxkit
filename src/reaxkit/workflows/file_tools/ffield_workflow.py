@@ -11,6 +11,8 @@ This module implements CLI workflow orchestration for its command family, includ
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import workflow_csv_rows, write_workflow_csv
+
 import argparse
 import csv
 import re
@@ -110,9 +112,7 @@ def _write_snapshot_field_csvs(root: Path, labels_by_field: dict[str, list[str]]
     files: list[Path] = []
     for field in ("atom", "bond", "off_diagonal", "angle", "torsion", "hbond"):
         out = root / f"{field}_entries.csv"
-        with out.open("w", encoding="utf-8", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow(["entry_index", "label", "formatted_block"])
+        with workflow_csv_rows(out, ["entry_index", "label", "formatted_block"]) as writer:
             labels = labels_by_field.get(field, [])
             blocks = blocks_by_field.get(field, [])
             n = max(len(labels), len(blocks))
@@ -1278,7 +1278,7 @@ def _export_force_field_tables(tables: dict[str, pd.DataFrame], outdir: str | Pa
     out_path.mkdir(parents=True, exist_ok=True)
     suffix = "interpreted" if fmt == "interpreted" else "indices"
     for section, table in tables.items():
-        table.to_csv(out_path / f"{section}_{suffix}.csv", index=True)
+        write_workflow_csv(table, out_path / f"{section}_{suffix}.csv", index=True)
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:

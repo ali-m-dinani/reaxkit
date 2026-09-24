@@ -167,7 +167,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         runtime_arguments(args),
     )
     output = artifact_directory(args, canonical)
-    paths = write_polarity_tables(result, output, complete_only=bool(args.complete_only))
+    paths = write_polarity_tables(result, output, complete_only=bool(args.complete_only), args=args)
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote site-resolved polarity to {paths['polarity']}")

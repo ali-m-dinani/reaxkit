@@ -44,6 +44,7 @@ def test_standard_profile_uses_atomic_writer_and_omits_opt_in_detail(tmp_path):
     manifest = json.loads((output / "artifacts.json").read_text(encoding="utf-8"))
     statuses = {item["name"]: item["status"] for item in manifest["artifacts"]}
     assert statuses == {"summary": "written", "details": "omitted"}
+    assert manifest["run_metadata"]["command"] == "demo"
     assert not list(output.glob(".rk-*.tmp"))
 
 
@@ -56,4 +57,5 @@ def test_full_profile_retains_declared_detail_artifacts(tmp_path):
     output = persist_analysis_result("demo", result, _args(tmp_path, "full"))
 
     assert (output / "summary.csv").is_file()
-    assert (output / "details.csv").is_file()
+    assert (output / "details.parquet").is_file()
+    pd.testing.assert_frame_equal(pd.read_parquet(output / "details.parquet"), result.details)

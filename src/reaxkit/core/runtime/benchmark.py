@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import platform
+import subprocess
+import sys
 from time import perf_counter, process_time
 from typing import Iterable
 
@@ -30,6 +32,11 @@ class BenchmarkResult:
     result_digest: str
     peak_in_flight: int
     peak_in_flight_bytes: int
+    peak_rss_bytes: int | None = None
+    bytes_read: int = 0
+    bytes_written: int = 0
+    cpu_efficiency: float = 0.0
+    frames_per_second: float = 0.0
 
 
 def _payload(frame: int, payload_bytes: int) -> np.ndarray:
@@ -44,12 +51,9 @@ def _memory_source(frames: int, payload_bytes: int) -> Iterable[np.ndarray]:
 
 def _file_source(path: Path, frames: int, payload_bytes: int) -> Iterable[np.ndarray]:
     count = max(1, int(payload_bytes) // np.dtype(np.float64).itemsize)
-    values = np.memmap(path, dtype=np.float64, mode="r", shape=(int(frames), count))
-    try:
+    with path.open("rb") as handle:
         for frame in range(int(frames)):
-            yield np.asarray(values[frame]).copy()
-    finally:
-        del values
+            yield np.fromfile(handle, dtype=np.float64, count=count)
 
 
 def _prepare_file(path: Path, frames: int, payload_bytes: int) -> None:
@@ -58,11 +62,30 @@ def _prepare_file(path: Path, frames: int, payload_bytes: int) -> None:
     if path.is_file() and path.stat().st_size == expected:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
-    values = np.memmap(path, dtype=np.float64, mode="w+", shape=(int(frames), count))
-    for frame in range(int(frames)):
-        values[frame] = float(frame)
-    values.flush()
-    del values
+    with path.open("wb") as handle:
+        for frame in range(int(frames)):
+            _payload(frame, payload_bytes).tofile(handle)
+
+
+def peak_rss_bytes():
+    try:
+        import resource
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return int(peak if sys.platform == "darwin" else peak * 1024)
+    except ImportError:
+        import psutil
+        memory = psutil.Process().memory_info()
+        return int(getattr(memory, "peak_wset", memory.rss))
+
+
+def isolated_case(**kwargs):
+    """Measure each case in a fresh process so peak RSS is not cumulative."""
+    code = ("import json,sys; from dataclasses import asdict; "
+            "from reaxkit.core.runtime.benchmark import run_case; "
+            "print(json.dumps(asdict(run_case(**json.loads(sys.argv[1])))))")
+    completed = subprocess.run([sys.executable, "-c", code, json.dumps(kwargs)],
+                               check=True, capture_output=True, text=True)
+    return BenchmarkResult(**json.loads(completed.stdout))
 
 
 def run_case(
@@ -98,6 +121,9 @@ def run_case(
         raise ValueError(f"Unsupported benchmark source mode: {source_mode}")
 
     pipeline = BoundedFramePipeline(policy)
+    import psutil
+    process = psutil.Process()
+    io_before = process.io_counters()
 
     def kernel(values: np.ndarray) -> tuple[float, float]:
         numeric = np.asarray(values, dtype=np.float64)
@@ -108,6 +134,7 @@ def run_case(
     results = [completed.value for completed in pipeline.map_ordered(source, kernel)]
     cpu_seconds = process_time() - cpu_started
     wall_seconds = perf_counter() - wall_started
+    io_after = process.io_counters()
     digest = hashlib.sha256(np.asarray(results, dtype=np.float64).tobytes()).hexdigest()
     return BenchmarkResult(
         frames=int(frames),
@@ -120,6 +147,11 @@ def run_case(
         result_digest=digest,
         peak_in_flight=pipeline.metrics.peak_in_flight,
         peak_in_flight_bytes=pipeline.metrics.peak_in_flight_bytes,
+        peak_rss_bytes=peak_rss_bytes(),
+        bytes_read=io_after.read_bytes - io_before.read_bytes,
+        bytes_written=io_after.write_bytes - io_before.write_bytes,
+        cpu_efficiency=cpu_seconds / (wall_seconds * policy.allocated_cpus),
+        frames_per_second=int(frames) / wall_seconds,
     )
 
 
@@ -131,6 +163,7 @@ def run_matrix(
     queue_multiplier: int = 2,
     workspace: str | Path | None = None,
     include_file_source: bool = True,
+    isolate: bool = False,
 ) -> dict[str, object]:
     """Compare serial/parallel policies and verify deterministic boundedness."""
     modes = ["memory"]
@@ -140,13 +173,13 @@ def run_matrix(
     for mode in modes:
         for workers in sorted({max(1, int(value)) for value in worker_counts}):
             cases.append(
-                run_case(
+                (isolated_case if isolate else run_case)(
                     frames=frames,
                     payload_bytes=payload_bytes,
                     workers=workers,
                     max_in_flight=max(1, workers * int(queue_multiplier)),
                     source_mode=mode,
-                    workspace=workspace,
+                    workspace=str(workspace) if workspace is not None else None,
                 )
             )
     digests = {case.result_digest for case in cases}
@@ -199,6 +232,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workspace", type=Path, default=Path(".reaxkit-benchmark"))
     parser.add_argument("--output", type=Path, default=Path("runtime_benchmark.json"))
     parser.add_argument("--memory-only", action="store_true")
+    parser.add_argument("--in-process", action="store_true", help="Skip subprocess isolation (peak RSS is then cumulative).")
     args = parser.parse_args(argv)
     report = run_matrix(
         frames=max(1, args.frames),
@@ -207,6 +241,7 @@ def main(argv: list[str] | None = None) -> int:
         queue_multiplier=max(1, args.queue_multiplier),
         workspace=args.workspace,
         include_file_source=not args.memory_only,
+        isolate=not args.in_process,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")

@@ -35,6 +35,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import min_weight_full_bipartite_matching
 from scipy.spatial import cKDTree
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _trajectory_and_charges,
@@ -136,6 +137,8 @@ class HBNReferencePolarizationResult(BaseResult):
     reference: PreparedHBNReference
     frame_indices: np.ndarray
     iterations: np.ndarray
+
+    artifact_tiers = {"hbn_reference_displacements": "detail"}
 
     @property
     def csv_tables(self) -> dict[str, pd.DataFrame]:
@@ -726,6 +729,7 @@ def calculate_hbn_reference_polarization(
         data: TrajectoryData | ElectrostaticsData,
         request: HBNReferencePolarizationRequest,
         reporter=None,
+    prepared=None,
 ) -> HBNReferencePolarizationResult:
     """Calculate longitudinal dipole and polarization for selected frames."""
 
@@ -751,7 +755,7 @@ def calculate_hbn_reference_polarization(
     if callable(reporter):
         reporter("analyze", 0, total_frames, "Analyzing polarization frames")
 
-    prepared = prepare_hbn_reference(trajectory, request)
+    prepared = prepared if prepared is not None else prepare_hbn_reference(trajectory, request)
     periodic = _periodic_axes(request.periodic)
     c_hat = _unit_vector(request.c_axis, "c_axis")
     formal = _formal_charge_map(request.formal_charges)
@@ -959,6 +963,10 @@ class HBNReferencePolarizationTask(AnalysisTask):
     """Calculate vector polarization relative to replicated h-AlN."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "7"
 
@@ -995,6 +1003,10 @@ class HBNReferencePolarizationTask(AnalysisTask):
             reporter=None,
     ) -> HBNReferencePolarizationResult:
         return calculate_hbn_reference_polarization(data, request, reporter=reporter)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "hbn", reporter, pipeline)
 
 
 __all__ = [

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 
@@ -205,8 +207,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output.mkdir(parents=True, exist_ok=True)
     bins_path = output / "binned_polarization.csv"
     summary_path = output / "polarization_summary.csv"
-    result.table.to_csv(bins_path, index=False)
-    result.summary.to_csv(summary_path, index=False)
+    write_workflow_tables({bins_path: result.table, summary_path: result.summary}, args=args, summary=(summary_path.name,))
     figures: list[Path] = []
     if args.heatmaps:
         figures = generate_polarization_heatmaps(
@@ -217,7 +218,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote binned polarization to {bins_path}")
-    print(f"Wrote frame polarization summary to {summary_path}")
+    if getattr(args, "output_profile", "standard") != "minimal":
+        print(f"Wrote frame polarization summary to {summary_path}")
     if figures:
         scale = "global" if args.global_scaling else "per-frame"
         print(f"Wrote {len(figures):,} {scale}-scaled heatmap(s) under {output / 'heatmaps'}")

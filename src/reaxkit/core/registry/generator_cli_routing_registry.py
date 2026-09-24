@@ -169,4 +169,4 @@ register_generator("make-vregime", module_path="reaxkit.workflows.file_tools.vre
 register_generator("free-up", module_path="reaxkit.workflows.meta.manage_workspace_workflow")
 register_generator("manage-workspace", module_path="reaxkit.workflows.meta.manage_workspace_workflow")
 register_generator("gen-video", module_path="reaxkit.workflows.presentation.gen_video_workflow")
-register_generator("gen-plot", module_path="reaxkit.workflows.meta.gen_plot_workflow")
+register_generator("gen-plot", module_path="reaxkit.workflows.presentation.gen_plot_workflow")

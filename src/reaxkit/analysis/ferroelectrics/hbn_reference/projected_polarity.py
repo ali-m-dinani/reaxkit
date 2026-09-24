@@ -38,6 +38,7 @@ from reaxkit.core.runtime.execution_contracts import (
     TaskCapabilities,
     resolve_execution_policy,
 )
+from reaxkit.core.runtime.reference_frames import reference_frames
 from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.reducers import TableAccumulator
 from reaxkit.domain.base_result import BaseResult
@@ -52,6 +53,8 @@ _PIPELINE_CAPABILITIES = TaskCapabilities(
     shape=ExecutionShape.REFERENCE_FRAME_MAP,
     thread_safe=True,
     needs_reference=True,
+    reference_fields=("reference_frame",),
+    supports_selective_frames=True,
     estimated_frame_bytes=16 * 1024 * 1024,
 )
 
@@ -85,6 +88,13 @@ class HBNReferenceProjectedPolarityRequest(HBNReferenceLocalPolarizationRequest)
 @dataclass
 class HBNReferenceProjectedPolarityResult(BaseResult):
     """Local-group signs plus projected and frame-resolved mean-polarity tables."""
+
+    artifact_tiers = {
+        "hbn_reference_projected_polarity_2d": "core",
+        "hbn_reference_projected_polarity_kymograph": "core",
+        "hbn_reference_projected_polarity_whole_slab_summary": "summary",
+        "hbn_reference_projected_polarity_centers": "detail",
+    }
 
     centers: pd.DataFrame
     projected_bins: pd.DataFrame
@@ -451,9 +461,10 @@ def _run_payloads(
     if pipeline is None:
         policy = resolve_execution_policy(_PipelineContract(), request, {})
         pipeline = BoundedFramePipeline(policy)
-    for completed in pipeline.map_ordered(
+    for completed in pipeline.map_reference(
         payloads,
-        lambda item: _frame_rows(item, request, context),
+        lambda: context,
+        lambda item, state: _frame_rows(item, request, state),
     ):
         consume(completed.value)
 
@@ -517,62 +528,28 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
         _validate_request(request)
         if request.profile_axis is None:
             request.profile_axis = cast(CartesianAxis, request.projection_plane[1])
-        iterator = iter(frames)
-        buffered = []
-        reference_data = None
-        for stream_index, data in enumerate(iterator):
-            source = _source_frame(data, stream_index)
-            buffered.append((source, data))
-            if source == int(request.reference_frame):
-                reference_data = data
-                break
-        if reference_data is None:
-            raise ValueError(f"Reference frame {request.reference_frame} was not present in the input stream.")
-        reference_trajectory, _ = _trajectory_and_charges(reference_data)
-        reference_request = copy.copy(request)
-        reference_request.reference_frame = 0
-        reference_request.frames = (0,)
-        reference_request.every = 1
-        if pipeline is None:
-            pipeline = BoundedFramePipeline(
-                resolve_execution_policy(self, request, {})
-            )
-        with pipeline.measure_stage(
-            "pipeline_prepare", reference_frame=int(request.reference_frame)
-        ):
-            context = _build_context(reference_trajectory, reference_request)
-        wanted = None if request.frames is None else {int(value) for value in request.frames}
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request, {}))
+        with reference_frames(frames, request.reference_frame) as (reference_data, selected_source):
+            reference_trajectory, _ = _trajectory_and_charges(reference_data)
+            reference_request = copy.copy(request)
+            reference_request.reference_frame = 0
+            reference_request.frames = (0,)
+            reference_request.every = 1
+            with pipeline.measure_stage("pipeline_prepare", reference_frame=int(request.reference_frame)):
+                context = _build_context(reference_trajectory, reference_request)
+            stride = max(1, int(request.every))
+            wanted = None if request.frames is None else set(list(request.frames)[::stride])
 
-        def selected_payloads():
-            try:
-                occurrence = 0
-                for source, data in buffered:
-                    if wanted is not None and source not in wanted:
+            def selected_payloads():
+                for occurrence, (source, data) in enumerate(selected_source):
+                    if wanted is not None:
+                        if source not in wanted:
+                            continue
+                    elif occurrence % stride:
                         continue
-                    if occurrence % max(1, int(request.every)) == 0:
-                        yield _payload(data, 0, source, reference_request)
-                    occurrence += 1
-                for stream_index, data in enumerate(iterator, start=len(buffered)):
-                    source = _source_frame(data, stream_index)
-                    if wanted is not None and source not in wanted:
-                        continue
-                    if occurrence % max(1, int(request.every)) == 0:
-                        yield _payload(data, 0, source, reference_request)
-                    occurrence += 1
-            finally:
-                close = getattr(iterator, "close", None)
-                if callable(close):
-                    close()
+                    yield _payload(data, 0, source, reference_request)
 
-        result = _run_payloads(
-            selected_payloads(),
-            request,
-            context,
-            reporter=reporter,
-            pipeline=pipeline,
-        )
-        result.request = request
-        return result
+            return _run_payloads(selected_payloads(), request, context, reporter=reporter, pipeline=pipeline)
 
 
 __all__ = [

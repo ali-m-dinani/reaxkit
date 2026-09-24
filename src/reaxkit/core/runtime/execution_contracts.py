@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 import os
+from pathlib import Path
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 
 class ExecutionShape(str, Enum):
     """Frame dependency shape declared by an analysis task."""
 
+    SINGLE = "single"
     INDEPENDENT_FRAME_MAP = "independent_frame_map"
     REFERENCE_FRAME_MAP = "reference_frame_map"
     STREAMING_REDUCTION = "streaming_reduction"
@@ -31,6 +33,12 @@ class TaskCapabilities:
     max_workers: int | None = None
     required_fields: tuple[str, ...] = ()
     data_sources: tuple[str, ...] = ()
+    supports_selective_frames: bool = False
+    reference_fields: tuple[str, ...] = ()
+    reference_frames: tuple[int, ...] = ()
+    requires_contiguous_history: bool = False
+    supported_backends: tuple[str, ...] = ("serial", "threads")
+    automatic_parallel: bool = True
 
     @property
     def supports_frame_parallelism(self) -> bool:
@@ -59,6 +67,9 @@ class ExecutionPolicy:
     queue_source: str
     execution_shape: str = ExecutionShape.GLOBAL.value
     decision_reason: str = "conservative serial fallback"
+    blas_threads_per_worker: int | None = None
+    input_cache: bool = True
+    output_profile: str = "standard"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -170,6 +181,15 @@ def _allocated_cpus(args: Mapping[str, Any], environ: Mapping[str, str]) -> int:
     ):
         if parsed := _positive_int(value):
             return parsed
+    try:
+        return max(1, len(os.sched_getaffinity(0)))
+    except (AttributeError, OSError):
+        try:
+            import psutil
+
+            return max(1, len(psutil.Process().cpu_affinity()))
+        except (ImportError, AttributeError, OSError):
+            pass
     return max(1, int(os.cpu_count() or 1))
 
 
@@ -180,17 +200,30 @@ def _memory_limit_bytes(args: Mapping[str, Any], environ: Mapping[str, str], cpu
         return parsed * 1024 * 1024
     if parsed := _positive_int(environ.get("SLURM_MEM_PER_CPU")):
         return parsed * 1024 * 1024 * cpus
+    candidates = []
+    for limit_path, used_path in (
+        ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.current"),
+        ("/sys/fs/cgroup/memory/memory.limit_in_bytes", "/sys/fs/cgroup/memory/memory.usage_in_bytes"),
+    ):
+        try:
+            limit = int(Path(limit_path).read_text().strip())
+            used = int(Path(used_path).read_text().strip())
+            if 0 < limit < 2**60:
+                candidates.append(max(1, limit - used))
+        except (OSError, ValueError):
+            pass
     try:
         import psutil
 
-        return int(psutil.virtual_memory().available)
+        candidates.append(int(psutil.virtual_memory().available))
     except (ImportError, OSError):
         try:
             pages = int(os.sysconf("SC_AVPHYS_PAGES"))
             page_size = int(os.sysconf("SC_PAGE_SIZE"))
-            return pages * page_size
+            candidates.append(pages * page_size)
         except (AttributeError, OSError, TypeError, ValueError):
-            return None
+            pass
+    return min(candidates) if candidates else None
 
 
 def resolve_execution_policy(
@@ -207,11 +240,23 @@ def resolve_execution_policy(
     cpus = _allocated_cpus(settings, env)
     memory_bytes = _memory_limit_bytes(settings, env, cpus)
 
+    execution = str(settings.get("execution") or "auto").lower()
+    if execution not in {"auto", "serial", "threads", "processes"}:
+        raise ValueError(f"Unknown execution backend: {execution}")
+
     requested_workers = _positive_int(
         getattr(request, "workers", None) or settings.get("workers")
     )
     can_parallelize = capabilities.supports_frame_parallelism
-    if not can_parallelize:
+    if execution == "serial":
+        workers = 1
+        worker_source = "explicit"
+        decision_reason = "explicit_serial_execution"
+    elif execution == "processes" or "threads" not in capabilities.supported_backends:
+        workers = 1
+        worker_source = "capability_serial"
+        decision_reason = "task_has_no_validated_process_kernel" if execution == "processes" else "task_backend_not_supported"
+    elif not can_parallelize:
         workers = 1
         worker_source = "capability_serial"
         decision_reason = (
@@ -219,8 +264,17 @@ def resolve_execution_policy(
             if capabilities.shape is ExecutionShape.ORDERED_STATEFUL_STREAM
             else "global algorithm requires a specialized blocked implementation"
             if capabilities.shape is ExecutionShape.GLOBAL
+            else "one_shot_task" if capabilities.shape is ExecutionShape.SINGLE
             else "task has no thread-safe shared frame kernel"
         )
+    elif settings.get("_streaming") is False:
+        workers = 1
+        worker_source = "engine_serial"
+        decision_reason = "engine_cannot_stream_required_data"
+    elif execution == "auto" and requested_workers is None and not capabilities.automatic_parallel:
+        workers = 1
+        worker_source = "benchmark_serial"
+        decision_reason = "automatic_parallelism_not_benchmark_validated"
     elif requested_workers is not None:
         workers = min(requested_workers, cpus)
         worker_source = "explicit"
@@ -232,6 +286,16 @@ def resolve_execution_policy(
     if capabilities.max_workers is not None:
         workers = min(workers, max(1, int(capabilities.max_workers)))
     workers = max(1, workers)
+
+    selected = getattr(request, "frames", None)
+    if selected is None:
+        selected = getattr(request, "frame_indices", None)
+    if selected is not None and not isinstance(selected, (str, bytes)):
+        try:
+            count = len(selected[::max(1, int(getattr(request, "every", 1)))])
+            workers = min(workers, max(1, count))
+        except (TypeError, ValueError):
+            pass
 
     requested_queue = _positive_int(
         getattr(request, "chunk_size", None) or settings.get("chunk_size")
@@ -261,10 +325,13 @@ def resolve_execution_policy(
         "blocked_serial"
         if capabilities.shape is ExecutionShape.GLOBAL
         and callable(getattr(task, "run_blocks", None))
+        and settings.get("_streaming") is not False
         else "thread"
         if workers > 1
         else "serial"
     )
+    if backend == "blocked_serial" and execution != "serial":
+        decision_reason = "global dependencies preserved by bounded disk-backed blocks"
     return ExecutionPolicy(
         workers=workers,
         max_in_flight=max(1, max_in_flight),
@@ -276,6 +343,9 @@ def resolve_execution_policy(
         queue_source=queue_source,
         execution_shape=capabilities.shape.value,
         decision_reason=decision_reason,
+        blas_threads_per_worker=1 if workers > 1 else None,
+        input_cache=bool(settings.get("input_cache", True)),
+        output_profile=str(settings.get("output_profile") or "standard"),
     )
 
 

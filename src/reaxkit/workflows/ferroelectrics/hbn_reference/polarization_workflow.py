@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 from typing import cast
@@ -229,6 +231,11 @@ REQUEST_BUILDERS = {COMMAND: build_request}
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
+    profile = getattr(args, "output_profile", None)
+    if profile is None:
+        args.output_profile = "legacy"
+    if profile is not None:
+        args.write_displacements = profile != "minimal" and (profile in {"full", "legacy"} or args.write_displacements)
     canonical = _canonical_command(command)
     result = AnalysisExecutor().run(
         TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
@@ -238,13 +245,14 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
     polarization_path = output / "hbn_reference_polarization.csv"
-    displacement_path = output / "hbn_reference_displacements.csv"
+    detail_format = getattr(args, "detail_format", None) or ("csv" if args.output_profile == "legacy" else "parquet")
+    displacement_path = output / f"hbn_reference_displacements.{detail_format}"
     mapping_path = output / "hbn_reference_mapping.csv"
     reference_path = output / "AlN_hbn_replicated_aligned.xyz"
-    result.table.to_csv(polarization_path, index=False)
-    if args.write_displacements:
-        result.displacements.to_csv(displacement_path, index=False)
-    result.mapping.to_csv(mapping_path, index=False)
+    tables = {polarization_path: result.table, mapping_path: result.mapping}
+    tables[displacement_path] = getattr(result, "table_chunks", {}).get("hbn_reference_displacements", result.displacements)
+    write_workflow_tables(tables, args=args, details=(displacement_path.name,),
+                          enabled_details=(displacement_path.name,) if args.write_displacements else ())
     write_aligned_reference_xyz(result, reference_path)
     args.suppress_table = True
     present_result(canonical, result, args)

@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.analysis.ferroelectrics.neighbor_stream import stream_neighbors
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     WurtziteNeighborRequest as _FourFoldNeighborRequest,
@@ -281,6 +283,10 @@ def extract_wurtzite_neighbors(
 class WurtziteNeighborTask(AnalysisTask):
     """Extract three basal neighbors and polarity-dependent apical candidates."""
 
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=16 * 1024 * 1024,
+    )
     required_data = TrajectoryData
     supports_selective_streaming = False
     VERSION = "1"
@@ -302,6 +308,10 @@ class WurtziteNeighborTask(AnalysisTask):
         _ = reporter
         trajectory, charges = _charges_for_request(data, request)
         return extract_wurtzite_neighbors(trajectory, request, charges=charges)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return stream_neighbors(self, frames, request, WurtziteNeighborResult,
+                                CENTER_COLUMNS, NEIGHBOR_COLUMNS, pipeline=pipeline, reporter=reporter)
 
 
 __all__ = [

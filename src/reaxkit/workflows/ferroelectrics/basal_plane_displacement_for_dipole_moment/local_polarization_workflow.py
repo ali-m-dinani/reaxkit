@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+
 import argparse
 from pathlib import Path
 from typing import cast
@@ -352,10 +354,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     summary = output / "basal_plane_local_polarization_summary.csv"
     dipoles = output / "basal_plane_dipoles.csv"
     ions = output / "basal_plane_ions.csv"
-    result.table.to_csv(local, index=False)
-    result.summary.to_csv(summary, index=False)
-    result.dipole_result.table.to_csv(dipoles, index=False)
-    result.dipole_result.ions.to_csv(ions, index=False)
+    write_workflow_tables({local: result.table, summary: result.summary, dipoles: result.dipole_result.table, ions: result.dipole_result.ions}, args=args, summary=(summary.name,))
     plots_2d: list[Path] = []
     plots_3d: list[Path] = []
     if args.plot_2d:
@@ -379,7 +378,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     args.suppress_table = True
     present_result(canonical, result, args)
     print(f"Wrote per-center local polarization to {local}")
-    print(f"Wrote local polarization summary to {summary}")
+    if getattr(args, "output_profile", "standard") != "minimal":
+        print(f"Wrote local polarization summary to {summary}")
     print(f"Wrote source dipoles to {dipoles}")
     print(f"Wrote unique-ion contributions to {ions}")
     if plots_2d:

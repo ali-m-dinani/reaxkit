@@ -396,7 +396,7 @@ register_analysis_command(
 )
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
-register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
+register_analysis_command("get-params", module_path="reaxkit.workflows.file_tools.params_workflow")
 register_analysis_command(
     "msd",
     module_path="reaxkit.workflows.trajectory_workflow",
@@ -458,7 +458,7 @@ register_analysis_command("coordination_relabel", module_path="reaxkit.workflows
 register_analysis_command("relabel_traj_using_coordination", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("hybridization", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_hybridization", module_path="reaxkit.workflows.connectivity_workflow")
-register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.meta.plot_atom_property_workflow")
+register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.presentation.plot_atom_property_workflow")
 register_analysis_command(
     "get_active_site_structural",
     module_path="reaxkit.workflows.active_site_workflow",

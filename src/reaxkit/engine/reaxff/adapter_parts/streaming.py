@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.domain.data_models import (
+    MolecularAnalysisData,
     ChargeData,
     ConnectivityData,
     ConnectivityTrajectoryData,
@@ -27,6 +28,7 @@ from reaxkit.engine.reaxff.quick_io import (
 )
 
 STREAMABLE_REAXFF_TYPES = {
+    MolecularAnalysisData,
     TrajectoryData,
     ChargeData,
     ConnectivityData,
@@ -248,6 +250,13 @@ def _aligned_records(
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
+    if data_type is MolecularAnalysisData:
+        from reaxkit.engine.reaxff.adapter_parts.molecular_stream import iter_molecular_data
+        path = adapter._resolve_reaxff_path(args, "molfra", default="molfra.out")
+        if not Path(path).is_file():
+            path = adapter._resolve_reaxff_path(args, "molfra_ig", default="molfra_ig.out")
+        yield from iter_molecular_data(path, selected, reporter)
+        return
     split_file_progress = selected is not None and data_type in {
         ConnectivityTrajectoryData,
         ElectrostaticsData,
@@ -376,6 +385,22 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
                 )
         return
 
+    force_field_parameters = None
+    if data_type is ConnectivityTrajectoryData:
+        # Preserve the materialized bundle's optional valences for relabeling.
+        # Load once, then share the immutable parameter tables across frames.
+        try:
+            ff_args = dict(args)
+            if not ff_args.get("ffield"):
+                ff_args["ffield"] = str(adapter._resolve_reaxff_path(
+                    args, "ffield", "force_field", "atom_reference", default="ffield",
+                ))
+            force_field_parameters = adapter.load_force_field(ff_args, reporter=None)
+        except Exception:
+            # Existing bundle loading permits missing/unreadable optional ffield.
+            # Tasks that require valences validate this dependency themselves.
+            force_field_parameters = None
+
     for coordinate_record, connectivity_record in _aligned_records(
             iter(coordinate_records),
             iter(connectivity_records),
@@ -415,6 +440,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             yield ConnectivityTrajectoryData(
                 connectivity=connectivity,
                 trajectory=trajectory,
+                force_field_parameters=force_field_parameters,
             )
         elif data_type is ElectrostaticsData:
             yield ElectrostaticsData(

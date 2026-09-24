@@ -218,6 +218,7 @@ H 0 0 1.0
     def fail_materialized_read(*_args, **_kwargs):
         raise AssertionError("The polarity workflow must not materialize full fort.7 tables.")
 
+    args.output_profile = "legacy"
     monkeypatch.setattr(Fort7Handler, "_parse", fail_materialized_read)
     assert polarity_trajectory_workflow.run_main(polarity_trajectory_workflow.COMMAND, args) == 0
     lines = output.read_text(encoding="utf-8").splitlines()

@@ -20,6 +20,8 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import ConvexHull, Voronoi
 
+from reaxkit.core.runtime.frame_tables import map_frame_tables
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -669,6 +671,11 @@ class VoronoiScipyTask(AnalysisTask):
     SciPy Voronoi is non-periodic and can yield unbounded cells near boundaries.
     """
 
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
     required_data = TrajectoryData
     recommended_presentations = staticmethod(_recommended_presentations)
 
@@ -705,9 +712,11 @@ class VoronoiScipyTask(AnalysisTask):
         """
         return _run_voronoi(data, request, backend="scipy", reporter=reporter)
 
-    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiResult:
-        """Compute SciPy Voronoi metrics from a bounded frame stream."""
-        return _run_voronoi_stream(frames, request, backend="scipy", geometry=False, reporter=reporter)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> VoronoiResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_index', 'atom_id'))
+        return VoronoiResult(table=table, request=request)
 
 
 @register_task("get_voronoi_pyvoro", label="Voronoi (pyvoro)")
@@ -719,6 +728,12 @@ class VoronoiPyvoroTask(AnalysisTask):
     Uses pyvoro native cell outputs and enables periodic tessellation when box
     lengths are available and consistent with frame coordinates.
     """
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+        supported_backends=("serial",),
+    )
 
     required_data = TrajectoryData
     recommended_presentations = staticmethod(_recommended_presentations)
@@ -756,9 +771,9 @@ class VoronoiPyvoroTask(AnalysisTask):
         """
         return _run_voronoi(data, request, backend="pyvoro", reporter=reporter)
 
-    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiResult:
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None, pipeline=None) -> VoronoiResult:
         """Compute pyvoro metrics from a bounded frame stream."""
-        return _run_voronoi_stream(frames, request, backend="pyvoro", geometry=False, reporter=reporter)
+        return VoronoiResult(table=map_frame_tables(self, frames, request, pipeline=pipeline, reporter=reporter, sort_columns=("frame_index", "atom_id")), request=request)
 
 
 @register_task("get_voronoi_geometry_scipy", label="Voronoi Geometry (SciPy)")
@@ -768,6 +783,11 @@ class VoronoiGeometryScipyTask(AnalysisTask):
     Face connectivity and neighbor mapping are reconstructed from SciPy ridge
     structures to produce per-cell geometry records.
     """
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
 
     required_data = TrajectoryData
     recommended_presentations = staticmethod(_recommended_presentations)
@@ -805,14 +825,22 @@ class VoronoiGeometryScipyTask(AnalysisTask):
         """
         return _run_voronoi_geometry(data, request, backend="scipy", reporter=reporter)
 
-    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
-        """Compute SciPy Voronoi geometry from a bounded frame stream."""
-        return _run_voronoi_stream(frames, request, backend="scipy", geometry=True, reporter=reporter)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> VoronoiGeometryResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_index', 'atom_id'))
+        return VoronoiGeometryResult(table=table, request=request)
 
 
 @register_task("get_voronoi_geometry_pyvoro", label="Voronoi Geometry (pyvoro)")
 class VoronoiGeometryPyvoroTask(AnalysisTask):
     """Compute per-atom Voronoi geometry using pyvoro native cell outputs."""
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+        supported_backends=("serial",),
+    )
 
     required_data = TrajectoryData
     recommended_presentations = staticmethod(_recommended_presentations)
@@ -850,9 +878,9 @@ class VoronoiGeometryPyvoroTask(AnalysisTask):
         """
         return _run_voronoi_geometry(data, request, backend="pyvoro", reporter=reporter)
 
-    def run_stream(self, frames, request: VoronoiRequest, reporter=None) -> VoronoiGeometryResult:
+    def run_stream(self, frames, request: VoronoiRequest, reporter=None, pipeline=None) -> VoronoiGeometryResult:
         """Compute pyvoro geometry from a bounded frame stream."""
-        return _run_voronoi_stream(frames, request, backend="pyvoro", geometry=True, reporter=reporter)
+        return VoronoiGeometryResult(table=map_frame_tables(self, frames, request, pipeline=pipeline, reporter=reporter, sort_columns=("frame_index", "atom_id")), request=request)
 
 
 __all__ = [

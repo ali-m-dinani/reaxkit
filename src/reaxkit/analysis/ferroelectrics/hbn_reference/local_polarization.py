@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _frame_labels,
@@ -452,12 +453,13 @@ def _summarize_local_table(
 def calculate_hbn_reference_local_polarization(
         data: TrajectoryData | ElectrostaticsData,
         request: HBNReferenceLocalPolarizationRequest,
+    prepared=None,
 ) -> HBNReferenceLocalPolarizationResult:
     """Calculate cell- and layer-resolved dipoles and local polarization."""
 
     _validate_request(request)
     trajectory, _ = _trajectory_and_charges(data)
-    reference_result = calculate_hbn_reference_polarization(data, request)
+    reference_result = calculate_hbn_reference_polarization(data, request, prepared=prepared)
     factor_value = const("ea3_to_uC_cm2")
     if factor_value is None:  # pragma: no cover
         raise RuntimeError("The dipole-to-polarization conversion constant is missing.")
@@ -515,6 +517,10 @@ class HBNReferenceLocalPolarizationTask(AnalysisTask):
     """Calculate dipole and polarization for reference cells and layers."""
 
     required_data = TrajectoryData
+    supports_output_profiles = True
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.REFERENCE_FRAME_MAP,
+        thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
+        reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
     VERSION = "3"
 
@@ -548,6 +554,10 @@ class HBNReferenceLocalPolarizationTask(AnalysisTask):
     def run(self, data, request: HBNReferenceLocalPolarizationRequest, reporter=None):
         _ = reporter
         return calculate_hbn_reference_local_polarization(data, request)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.ferroelectrics.polarization_stream import stream_polarization
+        return stream_polarization(self, frames, request, "hbn_local", reporter, pipeline)
 
 
 def _table_for_trajectory_frame(

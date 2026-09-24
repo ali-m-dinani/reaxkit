@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import write_workflow_csv
+
 import re
 from pathlib import Path
 
@@ -28,11 +30,11 @@ def write_tables(result, output: Path) -> dict[str, Path]:
     paths = {"coulomb_per_atom": output / "coulomb_per_atom.csv",
              "coulomb_totals": output / "coulomb_totals.csv",
              "probe_average": fields / "probe_average_per_atom.csv"}
-    result.coulomb_table.to_csv(paths["coulomb_per_atom"], index=False)
-    result.totals.to_csv(paths["coulomb_totals"], index=False)
-    result.table.to_csv(paths["probe_average"], index=False)
+    write_workflow_csv(result.coulomb_table, paths["coulomb_per_atom"], index=False)
+    write_workflow_csv(result.totals, paths["coulomb_totals"], index=False)
+    write_workflow_csv(result.table, paths["probe_average"], index=False)
     for label, table in result.probe_tables.items():
-        path = fields / f"probe_{_safe(label)}_per_atom.csv"; table.to_csv(path, index=False); paths[f"probe_{label}"] = path
+        path = fields / f"probe_{_safe(label)}_per_atom.csv"; write_workflow_csv(table, path, index=False); paths[f"probe_{label}"] = path
     result.prewritten_csvs = tuple(paths.values())
     result.skip_automatic_csv_persistence = True
     return paths
@@ -107,7 +109,7 @@ def write_binning(result, output: Path, *, axes: str, bins, plot: bool,
             values.insert(0, "probe_element", label); values.insert(0, "iter", int(frame_table["iter"].iloc[0])); values.insert(0, "frame_index", int(frame))
             binned[(label, int(frame))] = values; chunks.append(values)
         path = directory / f"probe_{_safe(label)}_bins_{axes}.csv"
-        pd.concat(chunks, ignore_index=True).to_csv(path, index=False); paths.append(path)
+        write_workflow_csv(pd.concat(chunks, ignore_index=True), path, index=False); paths.append(path)
     if plot:
         suffix = "MV/cm" if units == "mv/cm" else "V/angstrom"
         prefix = ("magnitude_of_average_total_local_electric_field" if component == "magnitude" else
