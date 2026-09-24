@@ -28,6 +28,7 @@ dependencies = [
     "numpy",
     "pandas",
     "scipy",
+    "matplotlib>=3.6",
     "tqdm",
     "rich",
     "tabulate",
@@ -47,7 +48,6 @@ Issues = "https://github.com/ali-m-dinani/reaxkit/issues"
 
 [project.optional-dependencies]
 plot = [
-    "matplotlib",
     "seaborn",
     "plotly",
     "imageio[ffmpeg]",
