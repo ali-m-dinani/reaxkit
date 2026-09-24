@@ -37,6 +37,11 @@ ALL_COMMANDS = ("get-control_data", "gen-control", "gen_template_control")
 ALL_LEGACY_COMMANDS = ("get_control_data", "gen_control", "write-control", "write_control", "make-control", "make_control")
 MAKE_CONTROL_COMMAND = "gen_template_control"
 WRITE_CONTROL_COMMAND = "gen-control"
+COMMAND_ALIASES = {
+    "get-control_data": ("get-control",),
+    MAKE_CONTROL_COMMAND: ("make-control",),
+    WRITE_CONTROL_COMMAND: ("write-control",),
+}
 
 
 @dataclass
@@ -171,6 +176,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
+    command = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     if command == MAKE_CONTROL_COMMAND:
         parser.set_defaults(command=MAKE_CONTROL_COMMAND)
         parser.set_defaults(progress=True)
@@ -283,7 +289,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         return parser
 
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
@@ -433,12 +439,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
+    command = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     if command == MAKE_CONTROL_COMMAND:
         return _run_make(args)
     if command == WRITE_CONTROL_COMMAND:
         return _run_write(args)
 
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     if canonical == "get-control_data":
         return _run_get(args)
     if canonical == "gen-control":

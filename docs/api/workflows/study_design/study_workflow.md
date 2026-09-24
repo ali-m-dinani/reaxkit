@@ -7,12 +7,137 @@
       show_root_full_path: false
       members: []
 
+## Command: `study`
+
+<div class="analysis-section-indent" markdown="1">
+
+Create and initialize parameter-sweep study layouts.
+
+Follow these steps to design and run a study:
+ 1. Create a study YAML template using either of the followin commands and edit it to declare parameters, cases, stages, and analyses.
+  - Examples:
+    reaxkit study --make-yaml study.yaml
+    reaxkit study --gen-yaml
+  - NOTE: You need a template folder which is one example case with all stages and parameters declared to use as a reference for all other folders.
+  - NOTE: if you have multiple stages under run and they are dependent on each other, you need to have 'set -euo pipefail' in your job submission file to ensure successive stages run after each other instead of in parallel.
+
+ 2. Initialize the study layout with --init, which generates folders and manifests for each case and stage.
+  - Examples:
+    reaxkit study --init study.yaml --root .
+    reaxkit study --init study.yaml --root studies --force
+
+ 3. Run the study stages with --run, which executes the declared stages for each case and replicate, tracking status and artifacts.
+  - Cases can run in parallel by specifying --parallel-workers with the number of workers to use.
+  - Failed or waiting replicates can be rerun with --rerun-failed, which cleans stage artifacts before rerunning.
+  - Examples:
+    reaxkit study --run study_MgTemp/
+    reaxkit study --run study_MgTemp/ --parallel-workers 4
+    reaxkit study --run study_MgTemp/ --rerun-failed
+    reaxkit study --run study_MgTemp/ --stage MM
+    reaxkit study --run study_MgTemp/ --case mg_05__temp_300
+
+ 4. Analyze the study with --analyze, which executes analysis pipelines declared in the top-level study YAML for each stage.
+  - Analyses can be filtered by title or variable name with --analysis.
+  - Failed or waiting analyses can be rerun with --rerun-failed, which cleans analysis artifacts before rerunning.
+  - Examples:
+    reaxkit study --analyze study_MgTemp/
+    reaxkit study --analyze study_MgTemp/ --rerun-failed
+    reaxkit study --analyze study_MgTemp/ --analysis msd
+
+ 5. Aggregate results, which execute aggregation pipeline declared in the top-level study YAML.   - Aggregation means combining results across cases and replicates for a given analysis variable.
+  - Examples:
+    reaxkit study --aggregate study_MgTemp/
+    reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation
+    reaxkit study --aggregate study_MgTemp/ --aggregate msd_atom1_aggregation --stage NVT
+
+ 6. Present results, which generates plots and tables from completed analyses and aggregates.
+  - Examples:
+    reaxkit study --present study_MgTemp/
+    reaxkit study --present study_MgTemp/ --present msd_atom1_aggregation
+
+ 7. Manage study metadata and artifacts with --manage, which supports path updates, case renaming, and removals of analysis, aggregate, and cache outputs.
+  - Path updates and case renaming are useful when study folder structures change after initialization, and removals are useful for cleaning up old or failed runs.
+  - Targets for removals can be filtered by case, replicate, stage, analysis title, and aggregate title.
+  - Examples:
+    reaxkit study --manage study_MgTemp/ --action update-paths --target paths
+    reaxkit study --manage study_MgTemp/ --action rename-cases --target case-names
+    reaxkit study --manage study_MgTemp/ --action remove --target cache --older-than 14 --dry-run
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--analyze` | No |  | Execute analysis pipelines declared in top-level study 'analysis'. |  |
+| `--aggregate` | No |  | Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
+| `--strict-actions, --no-strict-actions` | No | False | Fail immediately when geometry generation or artifact propagation actions fail. |  |
+| `--replicate` | No |  | Optional replicate selector (e.g. rep_01). |  |
+| `--analysis` | No |  | Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. |  |
+| `--value-column` | No |  | For aggregate: explicit numeric column to extract from per-run analysis CSV exports. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--init` | No |  | Initialize a study from a YAML file and generate folders/manifests. |  |
+| `--manage` | No |  | Manage study metadata/artifacts (path update and removals). |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--make-yaml` | No |  | Write a starter study YAML template (default: study.yaml). |  |
+| `--gen-yaml` | No |  | Alias for --make-yaml. |  |
+| `--present` | No |  | Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
+| `--plot` | No |  | Deprecated alias for --present. |  |
+| `--root` | No | . | Root folder where the generated <study_name>/ tree will be created. |  |
+| `--analysis-title` | No |  | Manager filter: analysis title. |  |
+| `--aggregate-title` | No |  | Manager filter: aggregate title. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run` | No |  | Execute study stages from an initialized study root folder. |  |
+| `--run-geometry-generator, --no-run-geometry-generator` | No | True | Execute geometry_generator.cli_template during study initialization (default: true). |  |
+| `--stage` | No |  | Run only one stage name (e.g. MM, NPT, NVT). |  |
+| `--parallel-workers` | No | 1 | Number of replicate pipelines to run in parallel for --run (default: 1). |  |
+| `--rerun-failed` | No | False | For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. |  |
+| `--dry-run` | No | False | Show what --manage would change without writing/removing. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--force` | No | False | Allow overwriting existing template file or reusing non-empty study directory. |  |
+| `--artifact-transfer` | No | copy | How consumed artifacts are propagated into downstream stage folders. | copy, hardlink, symlink |
+| `--case` | No |  | Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). |  |
+| `--action` | No |  | Manager action for --manage. | update-paths, rename-cases, remove |
+| `--target` | No |  | Manager target(s) for --manage. Can be repeated. | paths, case-names, analysis, aggregate, cache, run-status, analysis-status, aggregate-status, plot-status |
+| `--older-than` | No |  | For cache removal: only remove entries older than N days. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
 ## Common Runtime and Presentation Arguments
 
 <div class="analysis-section-indent" markdown="1">
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-_No common arguments found._
+Each command table above includes its shared and inherited options.
 
 </div>

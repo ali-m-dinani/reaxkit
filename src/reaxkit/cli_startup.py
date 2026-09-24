@@ -8,7 +8,7 @@ import sys
 def announce_command_start(argv: list[str]) -> None:
     """Confirm receipt of a real command before importing the full CLI."""
     tokens = list(argv[1:])
-    if not tokens or any(token in {"-h", "--help"} for token in tokens):
+    if not tokens or any(token in {"-h", "--help", "--help-all", "--all-flags"} for token in tokens):
         return
     command = next((token for token in tokens if not token.startswith("-")), None)
     if command:

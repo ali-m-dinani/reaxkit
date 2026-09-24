@@ -273,7 +273,7 @@ def test_unknown_flag_for_existing_command_has_custom_message(
 
     err = capsys.readouterr().err
     assert "There is no flag --coords for command msd." in err
-    assert "Please run reaxkit msd -h" in err
+    assert "Please run reaxkit msd --help-all" in err
 
 
 def test_unknown_command_has_custom_message(

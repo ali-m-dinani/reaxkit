@@ -31,14 +31,67 @@ with optional frequency threshold filtering.
 
 ### Arguments
 
+#### Scientific choices
+
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
 | `--top-n` | No | 1 | Number of ranked species per frame. Example: --top-n 3, which returns first/second/third dominant species. |  |
 | `--min-freq` | No | 0.0 | Minimum species frequency to include. Example: --min-freq 2, which filters out low-frequency species. |  |
 
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
 <a id="get_dominant_species"></a>
 
-The figure below shows an example CSV output for the top 2 dominant species across a simulation. 
+The figure below shows an example CSV output for the top 2 dominant species across a simulation.
 
 <div style="text-align:center;" markdown="1">
 ![get_dominant_species](../../figures/get_dominant_species.PNG){ style="width:85%; max-width:800px;" }
@@ -71,7 +124,61 @@ Use this command to track how the maximum molecular mass evolves over trajectory
 
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
 
 </div>
 
@@ -99,7 +206,61 @@ which helps track composition shifts over time.
 
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
 
 </div>
 
@@ -127,14 +288,67 @@ lifetime statistics are reported.
 
 ### Arguments
 
+#### Scientific choices
+
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
 | `--molecules` | No |  | Restrict to selected molecular formulae. Example: --molecules H2O OH, which limits analysis to water and hydroxyl. |  |
 | `--min-freq` | No | 1.0 | Minimum frequency for an active molecule. Example: --min-freq 2, which treats only sufficiently frequent molecules as active. |  |
 
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
 <a id="get_molecule_lifetime"></a>
 
-The figure below shows an example CSV output for the lifetime of OH. This table shows during which OH was available, so cycles of OH generation can be detected. 
+The figure below shows an example CSV output for the lifetime of OH. This table shows during which OH was available, so cycles of OH generation can be detected.
 
 <div style="text-align:center;" markdown="1">
 ![get_molecule_lifetime](../../figures/get_molecule_lifetime.PNG){ style="width:85%; max-width:800px;" }
@@ -144,11 +358,37 @@ The figure below shows an example CSV output for the lifetime of OH. This table 
 
 </div>
 
-## Common Runtime and Presentation Arguments
+## Command: `largest_molecule_by_mass`
 
 <div class="analysis-section-indent" markdown="1">
 
-These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+Return the heaviest molecular species for selected frames.
+Use this command to track how the maximum molecular mass evolves over trajectory frames.
+
+### Examples
+-----
+
+```text
+  1. Export largest-mass species table:
+   reaxkit get_largest_molecule_by_mass --export largest_mass.csv
+
+  2. Plot largest-mass trend on selected frames:
+   reaxkit get_largest_molecule_by_mass --frames 0 20 40 --plot single
+
+  3. Subsample frames and save iteration-axis plot:
+   reaxkit get_largest_molecule_by_mass --every 10 --xaxis iter --save largest_mass.png
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
+
+#### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
@@ -156,17 +396,221 @@ These are shared workflow-level CLI flags added before command-specific options,
 | `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
 | `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
 | `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
-| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
 | `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
-| `--show` | No |  | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
 | `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
 | `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
 | `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
 | `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
+## Command: `largest_molecule_composition`
+
+<div class="analysis-section-indent" markdown="1">
+
+Return elemental composition of the heaviest molecular species per frame.
+This command reports element counts for the dominant-by-mass molecule in each frame,
+which helps track composition shifts over time.
+
+### Examples
+-----
+
+```text
+  1. Export composition table:
+   reaxkit get_largest_molecule_composition --export composition.csv
+
+  2. Plot selected frames with subplot layout:
+   reaxkit get_largest_molecule_composition --frames 0 10 20 --plot subplot
+
+  3. Subsample frames and save iteration-axis plot:
+   reaxkit get_largest_molecule_composition --every 5 --xaxis iter --save composition.png
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
 | `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
 | `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
+## Command: `molecule_lifetime`
+
+<div class="analysis-section-indent" markdown="1">
+
+Compute lifetimes of molecular species across selected frames.
+You can restrict to target formulas and filter by minimum activity frequency before
+lifetime statistics are reported.
+
+### Examples
+-----
+
+```text
+  1. Compute lifetimes for selected molecules and export:
+   reaxkit get_molecule_lifetime --molecules H2O OH --export lifetimes.csv
+
+  2. Compute and plot lifetimes for all detected molecules:
+   reaxkit get_molecule_lifetime --plot single
+
+  3. Apply frequency threshold on selected frames and save plot:
+   reaxkit get_molecule_lifetime --min-freq 2 --frames 0 50 100 --save molecule_lifetimes.png
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Frame stride. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--molecules` | No |  | Restrict to selected molecular formulae. Example: --molecules H2O OH, which limits analysis to water and hydroxyl. |  |
+| `--min-freq` | No | 1.0 | Minimum frequency for an active molecule. Example: --min-freq 2, which treats only sufficiently frequent molecules as active. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parser/loader behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets data-loading context. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup lookup path. |  |
+| `--molfra, --file` | No | molfra.out | Molecular analysis file path. Example: --molfra molfra.out, which reads species-frequency data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot single, which draws one combined chart. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the plot interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save dominant_species.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export dominant_species.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplots in a 2-by-2 layout. |  |
+| `--xaxis` | No | frame | Quantity on x-axis. Example: --xaxis iter, which uses iteration values on horizontal axis. | frame, iter |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
+## Common Runtime and Presentation Arguments
+
+<div class="analysis-section-indent" markdown="1">
+
+These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+
+Each command table above includes its shared and inherited options.
 
 </div>

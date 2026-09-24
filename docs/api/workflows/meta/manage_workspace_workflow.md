@@ -7,22 +7,155 @@
       show_root_full_path: false
       members: []
 
+## Command: `free-up`
+
+<div class="analysis-section-indent" markdown="1">
+
+Legacy raw-data cleanup command for `data/raw` style run folders.
+This command supports two exclusive modes: keep latest N by deleting older runs,
+or archive+delete older runs while keeping latest N unchanged.
+
+### Examples
+-----
+
+```text
+  1. Keep latest 5 raw runs and delete older ones:
+   reaxkit free-up --last 5
+
+  2. Archive+delete older runs while keeping latest 5:
+   reaxkit free-up --compress 5 --format zst
+
+  3. Preview cleanup actions without changing files:
+   reaxkit free-up --last 3 --dry-run
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--last` | No |  | Keep only the latest N raw runs. Example: --last 5, which deletes runs older than the newest five. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--raw-root` | No |  | Raw root path (default: <workspace>/data/raw). Example: --raw-root /tmp/raw_runs, which targets that folder directly. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--compress` | No |  | Archive+delete all but latest N runs. Example: --compress 5, which archives older runs and keeps five newest unarchived. |  |
+| `--format` | No | gz | Archive format for --compress. Example: --format gz, which creates .tar.gz archives. | gz, zst |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--dry-run` | No | False | Preview only; do not write/delete files. Example: --dry-run, which reports planned actions without modifying files. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--workspace-root` | No |  | Workspace root path (auto-detected by default). Example: --workspace-root /path/to/reaxkit_workspace, which sets the base for default raw-root resolution. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
+## Command: `manage-workspace`
+
+<div class="analysis-section-indent" markdown="1">
+
+Manage workspace storage by listing, deleting, keeping, or archiving entries.
+Use this command to control disk usage under selected workspace folders such as
+`data/raw` or `cache`, while optionally preserving the newest N entries.
+
+### Examples
+-----
+
+```text
+  1. Delete all entries in a target folder (default action):
+   reaxkit manage-workspace --folder data/raw
+
+  2. Keep only the latest 5 entries and delete older ones:
+   reaxkit manage-workspace --folder data/raw --action keep --number 5
+
+  3. Archive older entries (then delete originals) and keep latest 5:
+   reaxkit manage-workspace --folder data/raw --action archive --number 5 --format zst
+
+  4. List entries and sizes without deleting anything:
+   reaxkit manage-workspace --folder cache --action list
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--number` | No | 0 | Retention count N. Example: --number 5, which keeps the 5 most recent entries and applies action to older ones. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--folder` | Yes |  | Target folder inside workspace. Example: --folder data/raw, which selects the raw-data folder for management. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--format` | No | gz | Archive format for --action archive. Example: --format zst, which writes .tar.zst archives. | gz, zst |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--dry-run` | No | False | Preview only; do not write/delete files. Example: --dry-run, which shows what would change without modifying disk. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--action` | No | delete | Action to perform. Example: --action archive, which compresses targets then removes originals when archive succeeds. | list, delete, keep, archive |
+| `--workspace-root` | No |  | Workspace root path (auto-detected by default). Example: --workspace-root /path/to/reaxkit_workspace, which forces root resolution to that location. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
 ## Common Runtime and Presentation Arguments
 
 <div class="analysis-section-indent" markdown="1">
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--folder` | Yes |  | Target folder inside workspace. Example: --folder data/raw, which selects the raw-data folder for management. |  |
-| `--action` | No | delete | Action to perform. Example: --action archive, which compresses targets then removes originals when archive succeeds. | list, delete, keep, archive |
-| `--number` | No | 0 | Retention count N. Example: --number 5, which keeps the 5 most recent entries and applies action to older ones. |  |
-| `--format` | No | gz | Archive format for --action archive. Example: --format zst, which writes .tar.zst archives. | gz, zst |
-| `--workspace-root` | No |  | Workspace root path (auto-detected by default). Example: --workspace-root /path/to/reaxkit_workspace, which forces root resolution to that location. |  |
-| `--dry-run` | No |  | Preview only; do not write/delete files. Example: --dry-run, which shows what would change without modifying disk. |  |
-| `--last` | No |  | Keep only the latest N raw runs. Example: --last 5, which deletes runs older than the newest five. |  |
-| `--compress` | No |  | Archive+delete all but latest N runs. Example: --compress 5, which archives older runs and keeps five newest unarchived. |  |
-| `--raw-root` | No |  | Raw root path (default: <workspace>/data/raw). Example: --raw-root /tmp/raw_runs, which targets that folder directly. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

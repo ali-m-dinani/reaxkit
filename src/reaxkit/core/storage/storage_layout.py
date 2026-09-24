@@ -1333,7 +1333,8 @@ def add_storage_cli_arguments(parser: argparse.ArgumentParser) -> None:
         default=True,
         help=(
             "Reuse parsed input frames across commands (default: enabled; "
-            "use --no-input-cache to force source reads). Example: --no-input-cache, which reloads frames from their source files."
+            "use --no-input-cache to force source reads for reproducibility checks "
+            "or benchmarks). Example: --no-input-cache, which reloads frames from their source files."
         ),
     )
     parser.add_argument(

@@ -30,6 +30,18 @@ from reaxkit.core.platform.human_log import HumanReadableRunLog
 from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
 from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
 from reaxkit.core.storage.storage_layout import default_project_root
+from reaxkit.cli.help_metadata import metadata_for_action, CATEGORIES
+
+
+class _FullHelpAction(argparse.Action):
+    """Show the complete table without validating required scientific inputs."""
+
+    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, **kwargs):
+        super().__init__(option_strings, dest=dest, nargs=0, default=default, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser._print_message(parser.format_help(full=True))
+        parser.exit()
 
 
 class _ReaxKitArgumentParser(argparse.ArgumentParser):
@@ -39,6 +51,8 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         super().__init__(*args, **kwargs)
         self._selected_command = selected_command
         self._known_commands = known_commands or set()
+        self.add_argument("--help-all", "--all-flags", action=_FullHelpAction,
+                          help="Show every option, grouped by purpose.")
 
     def _print_message(self, message: str, file=None) -> None:
         """Write long help output incrementally for terminals with write limits."""
@@ -51,7 +65,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
 
     @staticmethod
     def _term_width() -> int:
-        return max(100, min(shutil.get_terminal_size(fallback=(120, 40)).columns, 180))
+        return max(80, min(shutil.get_terminal_size(fallback=(120, 40)).columns, 180))
 
     @staticmethod
     def _normalize(text: str) -> str:
@@ -59,6 +73,8 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
 
     @staticmethod
     def _format_flags(action: argparse.Action) -> str:
+        if not action.option_strings:
+            return str(action.metavar or action.dest)
         flags = ", ".join(action.option_strings)
         if action.nargs == 0:
             return flags
@@ -119,12 +135,13 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         if natural > width:
             fixed_cols = [i for i in range(n) if i not in wrap_cols]
             fixed_total = sum(col_widths[i] for i in fixed_cols)
-            minimum_wrap_width = 16
-            wrap_total_min = minimum_wrap_width * len(wrap_cols)
+            minimums = {i: (20 if i == 0 else 16 if i == 3 else 8)
+                        for i in wrap_cols}
+            wrap_total_min = sum(minimums.values())
             budget = max(width - sep_size - fixed_total, wrap_total_min)
             extra_budget = max(0, budget - wrap_total_min)
             desired_extras = {
-                i: max(0, col_widths[i] - minimum_wrap_width)
+                i: max(0, col_widths[i] - minimums[i])
                 for i in wrap_cols
             }
             desired_extra_total = sum(desired_extras.values())
@@ -134,17 +151,21 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                     if desired_extra_total > 0
                     else 0
                 )
-                col_widths[i] = minimum_wrap_width + share
+                col_widths[i] = minimums[i] + share
 
         def _wrap_cell(text: str, col: int) -> list[str]:
             if col not in wrap_cols:
                 return [text]
-            return textwrap.wrap(
+            wrapped = textwrap.wrap(
                 text,
                 width=col_widths[col],
-                break_long_words=True,
-                break_on_hyphens=True,
+                break_long_words=False,
+                break_on_hyphens=False,
             ) or [""]
+            if any(len(line) > col_widths[col] for line in wrapped):
+                wrapped = textwrap.wrap(text, width=col_widths[col],
+                                        break_long_words=True, break_on_hyphens=False)
+            return wrapped
 
         lines: list[str] = []
         lines.append(" | ".join(headers[i].ljust(col_widths[i]) for i in range(n)))
@@ -163,12 +184,26 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
             lines.append(row_sep)
         return "\n".join(lines)
 
-    def format_help(self) -> str:
+    def format_help(self, *, full: bool = False) -> str:
         width = self._term_width()
         out: list[str] = [self.prog, ""]
+        invocation = self.prog.replace("reaxkit CLI", "reaxkit", 1)
+        out.extend([f"Usage: {invocation} " + ("[global options] COMMAND ..."
+                    if self.prog == "reaxkit CLI" else "[options]"), ""])
 
         if self.description:
-            out.append(self.description.rstrip())
+            description = self.description.rstrip()
+            if not full:
+                sections = description.split("\n\n")
+                description = sections[0].strip()
+                example = next((line.strip() for line in self.description.splitlines()
+                                if line.lstrip().startswith("reaxkit ")), None)
+                if example:
+                    description += "\n\n" + textwrap.fill(f"Example: {example}", width=width,
+                                                             subsequent_indent="  ")
+            out.append("\n".join(textwrap.fill(line, width=width,
+                                           subsequent_indent="  ") if line.strip() else ""
+                                 for line in description.splitlines()))
             out.append("")
 
         commands = self._commands_rows()
@@ -184,11 +219,15 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                 out.append(cmd_table)
                 out.append("")
 
-        option_rows: list[list[str]] = []
-        for action in self._actions:
-            if not action.option_strings or action.help == argparse.SUPPRESS:
+        option_rows: dict[str, list[list[str]]] = {category: [] for category in CATEGORIES}
+        visible_actions = [(action, *metadata_for_action(action, self))
+                           for action in self._actions
+                           if not isinstance(action, argparse._SubParsersAction)
+                           and action.help != argparse.SUPPRESS]
+        for action, category, visibility in visible_actions:
+            if visibility == "internal" or (visibility == "full" and not full and not action.required):
                 continue
-            option_rows.append(
+            option_rows[category].append(
                 [
                     self._normalize(self._format_flags(action)),
                     "yes" if bool(getattr(action, "required", False)) else "no",
@@ -197,17 +236,24 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                     self._normalize(self._format_choices(action)),
                 ]
             )
-        if option_rows:
-            out.append("options")
+        for category, rows in option_rows.items():
+            if not rows:
+                continue
+            out.append(category)
             opt_table = self._render_table(
                 headers=["Flag", "Required", "Default", "Help", "Choices"],
-                rows=option_rows,
+                rows=rows,
                 width=width,
                 wrap_cols={0, 2, 3, 4},
             )
             if opt_table:
                 out.append(opt_table)
                 out.append("")
+
+        if not full:
+            out.append(textwrap.fill(f"For all options: {invocation} --help-all", width=width,
+                                     subsequent_indent="  "))
+            out.append("")
 
         return "\n".join(out)
 
@@ -225,12 +271,15 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
             )
             raise SystemExit(2)
 
-        if message.startswith("unrecognized arguments:") and self._selected_command in self._known_commands:
+        if message.startswith("unrecognized arguments:"):
             unknown_args = message.split(":", 1)[1].strip().split()
             bad_flag = next((token for token in unknown_args if token.startswith("-")), unknown_args[0] if unknown_args else "")
+            command = self._selected_command if self._selected_command in self._known_commands else self.prog
+            help_path = (self.prog.replace("reaxkit CLI", "reaxkit", 1)
+                         if self.prog != "reaxkit CLI" else f"reaxkit {command}")
             print(
-                f"There is no flag {bad_flag} for command {self._selected_command}. "
-                f"Please run reaxkit {self._selected_command} -h to see the list of appropriate flags.",
+                f"There is no flag {bad_flag} for command {command}. "
+                f"Please run {help_path} --help-all to see every accepted flag.",
                 file=sys.stderr,
             )
             raise SystemExit(2)
@@ -289,7 +338,9 @@ def _intspec_runner(args: argparse.Namespace) -> int:
 def _canonicalize_direct_command(argv: list[str]) -> list[str]:
     """Rewrite direct-command aliases to canonical names before parsing."""
     out = list(argv)
-    if len(out) < 2:
+    command_index = next((index for index in range(1, len(out))
+                          if not out[index].startswith("-")), None)
+    if command_index is None:
         return out
 
     direct_commands = {
@@ -302,8 +353,8 @@ def _canonicalize_direct_command(argv: list[str]) -> list[str]:
         if getattr(spec, "aliases", ())
     }
     try:
-        out[1] = resolve_command_name(
-            out[1], task_names=direct_commands.keys(), aliases=aliases
+        out[command_index] = resolve_command_name(
+            out[command_index], task_names=direct_commands.keys(), aliases=aliases
         )
     except KeyError:
         pass
@@ -327,55 +378,8 @@ def _direct_command_runner(module, command: str):
     return _runner
 
 
-def main(*, announce: bool = True) -> int:
-    """
-    Build and execute the ``reaxkit`` CLI dispatcher.
-
-    This function canonicalizes direct-command aliases, probes the selected
-    command, configures command-specific parsers lazily, and runs the resolved
-    command handler with centralized exception-to-exit-code mapping.
-
-    Parameters
-    -----
-    announce : bool, optional
-        Emit the startup notice when called directly. The lightweight console
-        bootstrap passes ``False`` because it has already emitted the notice.
-
-    Returns
-    -----
-    int
-        Process-style exit code for the CLI invocation.
-
-    Examples
-    --------
-    ```bash
-    reaxkit connection_list --fort7 fort.7 --export connections.csv
-    ```
-    Sample output:
-    ```text
-    [ReaxKit] Wrote analysis export to .../connections.csv
-    ```
-    The command runs a direct analysis task and writes its export.
-
-    ```bash
-    reaxkit help "fort.7"
-    ```
-    Sample output:
-    ```text
-    Commands
-    ...
-    ```
-    The command lists matching help entries for the query.
-    """
-    if announce:
-        announce_command_start(sys.argv)
-    sys_argv = _canonicalize_direct_command(sys.argv)
-
-    probe = argparse.ArgumentParser(add_help=False)
-    probe.add_argument("command", nargs="?")
-    command_ns, _ = probe.parse_known_args(sys_argv[1:])
-    selected_command = getattr(command_ns, "command", None)
-
+def build_parser(selected_command: str | None = None) -> _ReaxKitArgumentParser:
+    """Build the CLI without parsing input or creating runtime artifacts."""
     direct_commands = {
         **get_registered_analysis_commands(),
         **get_registered_generators(),
@@ -448,6 +452,65 @@ def main(*, announce: bool = True) -> int:
 
     for command_parser in sub.choices.values():
         add_execution_arguments(command_parser)
+    return parser
+
+
+def main(*, announce: bool = True) -> int:
+    """
+    Build and execute the ``reaxkit`` CLI dispatcher.
+
+    This function canonicalizes direct-command aliases, probes the selected
+    command, configures command-specific parsers lazily, and runs the resolved
+    command handler with centralized exception-to-exit-code mapping.
+
+    Parameters
+    -----
+    announce : bool, optional
+        Emit the startup notice when called directly. The lightweight console
+        bootstrap passes ``False`` because it has already emitted the notice.
+
+    Returns
+    -----
+    int
+        Process-style exit code for the CLI invocation.
+
+    Examples
+    --------
+    ```bash
+    reaxkit connection_list --fort7 fort.7 --export connections.csv
+    ```
+    Sample output:
+    ```text
+    [ReaxKit] Wrote analysis export to .../connections.csv
+    ```
+    The command runs a direct analysis task and writes its export.
+
+    ```bash
+    reaxkit help "fort.7"
+    ```
+    Sample output:
+    ```text
+    Commands
+    ...
+    ```
+    The command lists matching help entries for the query.
+    """
+    if announce:
+        announce_command_start(sys.argv)
+    sys_argv = _canonicalize_direct_command(sys.argv)
+    full_requested = any(arg in ("--help-all", "--all-flags") for arg in sys_argv)
+    help_tokens = {"-h", "--help", "--help-all", "--all-flags"}
+    requested_help = [arg for arg in sys_argv[1:] if arg in help_tokens]
+    if requested_help:
+        sys_argv = [sys_argv[0], *(arg for arg in sys_argv[1:] if arg not in help_tokens),
+                    "--help-all" if full_requested else "-h"]
+
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("command", nargs="?")
+    command_ns, _ = probe.parse_known_args(sys_argv[1:])
+    selected_command = getattr(command_ns, "command", None)
+
+    parser = build_parser(selected_command)
     args = parser.parse_args(sys_argv[1:])
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
     trace = HumanReadableRunLog(

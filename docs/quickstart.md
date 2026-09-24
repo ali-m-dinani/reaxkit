@@ -1,4 +1,4 @@
-# Quick Start
+﻿# Quick Start
 
 This page walks through a minimal end-to-end ReaxKit CLI run.
 
@@ -15,71 +15,16 @@ reaxkit help -h
 If help is shown, the CLI is available.
 
 
-As you will see in the next steps, passing `-h` in the CLI gives you 3 types of information:
+`reaxkit -h` lists commands. Use `reaxkit COMMAND -h` for the usual input,
+scientific choices, and outputs. Use `reaxkit COMMAND --help-all` to see every
+accepted option, including execution, storage, diagnostics, and source-file
+overrides. The same switches work for workflow tasks such as
+`reaxkit fort7 get --help-all`.
 
-1. a description of the command and its purpose
-2. a list of example usages
-3. a list of flags and their descriptions
-
-For example, the output of `reaxkit help -h` includes:
-
-1. a description of the `help` command and its purpose
-```
-Interactive help and discovery for ReaxKit commands, capabilities, and file 
-semantics. Use this command to search ReaxKit concepts (for example analyses
- or generators) and ReaxFF-related files by keyword. You can narrow results, 
- enforce exact matching, and request detailed mapping information.
-
-For more information, you can see:
- ReaxKit code: https://github.com/ali-m-dinani/reaxkit
- ReaxFF documentation: https://ali-m-dinani.github.io/reaxkit/
-```
-
-2. a list of example usages of the `help` command:
-
-```
-Examples:
-  1. Basic keyword search:
-   reaxkit help "msd"
-
-  2. Search with multi-word phrase:
-   reaxkit help "bond order"
-
-  3. Limit result count:
-   reaxkit help "bond order" --top 3
-
-  4. Search with explicit engine context:
-   reaxkit help "restraint" --engine reaxff
-
-  5. Show detailed mapping information:
-   reaxkit help "fort.7" --all-info
-   reaxkit help "xmolout" --all-info
-```
-
-3. a list of flags and their descriptions:
-
-```
-Options
-Flag            | Required | Default | Help                                                                                                                                | Choices         
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
--h, --help      | no       | -       | show this help message and exit                                                                                                     | -               
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
---top TOP       | no       | 1       | Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3    | -               
-                |          |         | hits per category.                                                                                                                  |                 
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
---engine ENGINE | no       | -       | Optional engine context for dataclass-to-file mappings. Example: --engine reaxff, which resolves relationships using ReaxFF         | -               
-                |          |         | context.                                                                                                                            |                 
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
---all-info      | no       | false   | Show detailed implementation and file/dataclass/analyzer mapping information. Example: --all-info, which expands output beyond      | -               
-                |          |         | summary hits.                                                                                                                       |                 
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
---exact-match   | no       | false   | Match query exactly against item title (and aliases) before returning results. Example: --exact-match, which avoids broad fuzzy     | -               
-                |          |         | matches.                                                                                                                            |                 
-----------------+----------+---------+-------------------------------------------------------------------------------------------------------------------------------------+-----------------
-```
+Help exits before loading trajectory data or creating an analysis workspace.
+You do not need to supply required scientific flags just to read help.
 
 ---
-
 ## Step 2: Discover commands and searchable topics
 
 Reaxkit supports a variety of commands and topics. In order to discover them, you can use 
@@ -131,9 +76,22 @@ To do so, you can run the command with `-h` or `--help`. For example:
 ```bash
 reaxkit timeseries -h
 reaxkit get_msd -h
+reaxkit get_msd --help-all
 ```
 
-give you information on how to use the `timeseries` and `get_msd` commands, respectively.
+show the usual options for `timeseries` and `get_msd`, then every accepted
+`get_msd` option. Required flags appear in short help; less common controls
+remain in full help.
+
+**Which help should I use?** `reaxkit help "QUERY"` searches for relevant
+commands and topics, while `reaxkit -h` lists the command directory.
+Once you know the command, `COMMAND -h` (or `--help`) shows its required and
+commonly used options. `COMMAND --help-all` (also `--all-flags`) shows the full
+categorized option reference, including advanced execution, storage,
+diagnostic, and file-selection flags. It expands the same command's help;
+it does not search topics or list every command's options. For nested tasks,
+use the complete path, such as `reaxkit fort7 get --help-all`.
+Use `reaxkit intspec` to inspect available workflows and their contents.
 
 ---
 

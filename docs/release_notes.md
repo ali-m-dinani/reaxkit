@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- CLI `-h` now highlights required inputs, common scientific choices, and
+  outputs. `--help-all` (also `--all-flags`) shows every accepted option in
+  purpose-based tables, including workflow tasks and advanced file overrides.
+  Parsing defaults and existing flags are unchanged. Cache overrides such as
+  `--no-input-cache` remain available for reproducibility and benchmarks.
+- Repaired legacy kinematics, molecular-analysis, connectivity, Voronoi, and
+  control-file command aliases. Restored parser support for kinematics 3D
+  plots and 2D heatmaps and normalized control-generation command spellings.
 - Added shared execution overrides, affinity/Slurm-aware worker selection,
   bounded scheduling, scoped native-thread limits, and execution-plan metadata.
   Lightweight kernels stay serial automatically when thread overhead dominates.

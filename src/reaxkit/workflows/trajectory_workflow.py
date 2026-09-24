@@ -32,6 +32,7 @@ from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
 ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi")
+COMMAND_ALIASES = {"get_voronoi": ("voronoi",)}
 ALL_LEGACY_COMMANDS = (
     "dihedral",
     "diffusivity",
@@ -173,7 +174,7 @@ REQUEST_BUILDERS: dict[str, Callable[[argparse.Namespace], object]] = {
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     """Build the parser for a direct trajectory command."""
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -1069,7 +1070,7 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct trajectory command."""
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     task_key = canonical
     if canonical == "get_voronoi":
         backend = str(getattr(args, "backend", "scipy")).strip().lower()

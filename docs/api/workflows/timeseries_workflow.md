@@ -11,21 +11,64 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Dispatcher for time-series and related sequential analyses.
+This command routes `--field` expressions to the appropriate analysis backend
+for simulation scalars, trajectory coordinates, charges, fields, energies, restraints,
+molecular frequencies/totals, and geometry-optimization data.
+
+### Examples
+-----
+
+```text
+  1. Plot simulation scalar series such as temperature:
+   reaxkit timeseries --field temperature --summary summary.txt --plot single
+
+  2. Plot trajectory/displacement series on time axis:
+   - getting the trajectory of atoms 1 and 2 in z dimension:
+       reaxkit timeseries --field trajectory[1,2].z --xaxis time --save atom_z.png
+   - getting the displacement of atoms 1 to 20 in x and y dimensions with reference frame 0:
+     [Note] when more than 1 dimension is selected, it finds the magnitude of the combined components (i.e., sqrt(dx^2 + dy^2) in the example below).
+       reaxkit timeseries --field displacement[1:20].xy --reference-frame 0 --xaxis time --plot single
+
+  3. Export charge series for atom 1:
+   reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv
+
+  4. Plot molecular frequency/totals series:
+   reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single
+   reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot
+
+  5. Plot restraint/electric-field/energy series:
+   reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single
+   reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single
+   reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single
+
+  6. Plot geometry-optimization results (i.e., energy vs iter):
+   reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single
+   reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot
+```
+
 ### Arguments
 
-_No command-specific arguments found._
-
-</div>
-
-## Common Runtime and Presentation Arguments
-
-<div class="analysis-section-indent" markdown="1">
-
-These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+#### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--field` | No |  | Dispatcher field expression. Example: --field temperature, which selects simulation temperature time series. |  |
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--every` | No | 1 | Use every Nth selected frame. Example: --every 5, which subsamples selected frames by five. |  |
+| `--atoms` | No |  | Legacy trajectory atom selector. Example: --atoms "1,5,12", which limits trajectory-series extraction to those atom ids. |  |
+| `--atom-types` | No |  | Legacy trajectory atom-type selector. Example: --atom-types O H, which limits trajectory-series extraction to oxygen/hydrogen. |  |
+| `--dims` | No |  | Legacy trajectory coordinate dimensions. Example: --dims z, which extracts only z-coordinate series. | x, y, z |
+| `--reference-frame` | No | 0 | Reference frame index used by displacement fields. Example: --reference-frame 10, which subtracts frame 10 coordinates from each selected frame. |  |
+| `--boxdims` | No | False | Legacy shortcut for cell-dimension extraction from xmolout. Example: --boxdims, which switches to lattice-parameter series mode. |  |
+| `--cell-fields` | No |  | Legacy cell-dimension fields. Example: --cell-fields a b c alpha beta gamma, which selects listed lattice fields. |  |
+| `--field-kind` | No | auto | Electric-field group. Example: --field-kind applied, which selects externally applied field channels. | applied, energy, auto |
+| `--dropna-rows` | No | False | Drop rows that are all-NaN across selected restraint fields. Example: --dropna-rows, which removes empty restraint records. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
 | `--engine` | No |  | Engine override. Example: --engine reaxff, which applies ReaxFF-specific loaders. | reaxff, ams, lammps |
 | `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets base context for file detection. |  |
 | `--run-dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which is used as backup lookup path. |  |
@@ -39,27 +82,57 @@ These are shared workflow-level CLI flags added before command-specific options,
 | `--eregime` | No | eregime.in | Path to eregime.in. Example: --eregime eregime.in, which provides imposed field program values. |  |
 | `--molfra` | No | molfra.out | Path to molfra.out. Example: --molfra molfra.out, which provides molecular frequency/total series. |  |
 | `--control` | No | control | Path to control file for time-axis conversion. Example: --control control, which provides timestep metadata. |  |
-| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
 | `--plot` | No |  | Render a plot. Example: --plot single, which creates one combined chart. | single, subplot |
-| `--show` | No |  | Show the generated plot window. Example: --show, which opens the figure interactively. |  |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the figure interactively. |  |
 | `--save` | No |  | Save the generated plot to a file path. Example: --save temperature.png, which writes the plot image. |  |
 | `--export` | No |  | Write the result table to CSV. Example: --export temperature.csv, which saves tabular output. |  |
 | `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
 | `--xaxis` | No | iter | X-axis domain. Example: --xaxis time, which converts iterations to physical time when possible. | iter, frame, time |
-| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
-| `--every` | No | 1 | Use every Nth selected frame. Example: --every 5, which subsamples selected frames by five. |  |
 | `--format` | No | long | Trajectory output table format. Example: --format wide, which pivots compatible outputs into wide columns. | long, wide |
-| `--atoms` | No |  | Legacy trajectory atom selector. Example: --atoms "1,5,12", which limits trajectory-series extraction to those atom ids. |  |
-| `--atom-types` | No |  | Legacy trajectory atom-type selector. Example: --atom-types O H, which limits trajectory-series extraction to oxygen/hydrogen. |  |
-| `--dims` | No |  | Legacy trajectory coordinate dimensions. Example: --dims z, which extracts only z-coordinate series. | x, y, z |
-| `--reference-frame` | No | 0 | Reference frame index used by displacement fields. Example: --reference-frame 10, which subtracts frame 10 coordinates from each selected frame. |  |
-| `--boxdims` | No |  | Legacy shortcut for cell-dimension extraction from xmolout. Example: --boxdims, which switches to lattice-parameter series mode. |  |
-| `--cell-fields` | No |  | Legacy cell-dimension fields. Example: --cell-fields a b c alpha beta gamma, which selects listed lattice fields. |  |
-| `--field-kind` | No | auto | Electric-field group. Example: --field-kind applied, which selects externally applied field channels. | applied, energy, auto |
-| `--dropna-rows` | No |  | Drop rows that are all-NaN across selected restraint fields. Example: --dropna-rows, which removes empty restraint records. |  |
-| `--include-geo-descriptor` | No |  | Include geo descriptor for geometry optimization data. Example: --include-geo-descriptor, which keeps descriptor annotations in output. |  |
+| `--include-geo-descriptor` | No | False | Include geo descriptor for geometry optimization data. Example: --include-geo-descriptor, which keeps descriptor annotations in output. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
+## Common Runtime and Presentation Arguments
+
+<div class="analysis-section-indent" markdown="1">
+
+These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+
+Each command table above includes its shared and inherited options.
 
 </div>

@@ -31,6 +31,7 @@ from reaxkit.presentation.plot import heatmap2d_from_3d, scatter3d_points
 
 ALL_COMMANDS = ("get_kinematics", "kinematics_plot3d", "kinematics_heatmap2d")
 ALL_LEGACY_COMMANDS = ("kinematics", "get-kinematics", "kinematics-plot3d", "kinematics-heatmap2d")
+COMMAND_ALIASES = {"get_kinematics": ("kinematics",)}
 KINEMATICS_KEYS = ("metadata", "coordinates", "velocities", "accelerations", "prev_accelerations")
 
 
@@ -121,7 +122,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -144,6 +145,19 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--key", choices=KINEMATICS_KEYS, required=True, help="Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom.")
         parser.add_argument("--atoms", type=int, nargs="*", default=None, help="1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms.")
+    elif canonical in {"kinematics_plot3d", "kinematics_heatmap2d"}:
+        _add_spatial_plot_arguments(parser)
+        parser.description = (
+            "Plot an atomic velocity or acceleration component at atom coordinates.\n\n"
+            f"Example:\n  reaxkit {canonical} --value vz --save kinematics.png"
+        )
+        if canonical == "kinematics_heatmap2d":
+            parser.add_argument("--plane", choices=["xy", "xz", "yz"], default="xy",
+                                help="Coordinate plane onto which atoms are projected.")
+            parser.add_argument("--bins", default="100",
+                                help="Number of spatial bins, or a pair such as 100,50.")
+            parser.add_argument("--agg", choices=["mean", "max", "min", "sum", "count"], default="mean",
+                                help="Reduction of atom values in each spatial bin.")
     else:
         raise KeyError(f"Unsupported kinematics command '{canonical}'.")
 
@@ -303,7 +317,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     if canonical in {"kinematics_plot3d", "kinematics_heatmap2d"}:
         return _run_spatial(canonical, args)
 

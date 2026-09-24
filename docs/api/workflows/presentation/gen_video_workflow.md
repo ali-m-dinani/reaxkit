@@ -11,9 +11,59 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Create a video file from an ordered sequence of images in a folder.
+Use this command for post-processing analysis frames into a playable animation.
+It scans the target folder for matching image extensions and writes one output video.
+
+### Examples
+-----
+
+```text
+  1. Build an MP4 from analysis figures with custom FPS:
+   reaxkit gen-video --folder reaxkit_workspace/analysis/msd/run_xxx/figures --output reaxkit_workspace/analysis/msd/run_xxx/figures/msd.mp4 --fps 8
+
+  2. Build a video from current directory images using defaults:
+   reaxkit gen-video
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--folder` | No | . | Folder containing image files. Example: --folder results/figures, which tells the command where to collect frames. |  |
+| `--ext` | No | .png,.jpg,.jpeg | Comma-separated list of accepted image extensions. Example: --ext .png,.jpg, which limits frame discovery to PNG and JPG files. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | reaxkit_outputs/video/output_video.mp4 | Output video filename. Example: --output movies/msd.mp4, which writes the generated video to that path. |  |
+| `--fps` | No | 10 | Frames per second. Example: --fps 8, which plays 8 frames each second for a slower animation than the default 10. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
 
 </div>
 
@@ -23,11 +73,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--folder` | No | . | Folder containing image files. Example: --folder results/figures, which tells the command where to collect frames. |  |
-| `--output` | No | reaxkit_outputs/video/output_video.mp4 | Output video filename. Example: --output movies/msd.mp4, which writes the generated video to that path. |  |
-| `--fps` | No | 10 | Frames per second. Example: --fps 8, which plays 8 frames each second for a slower animation than the default 10. |  |
-| `--ext` | No | .png,.jpg,.jpeg | Comma-separated list of accepted image extensions. Example: --ext .png,.jpg, which limits frame discovery to PNG and JPG files. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

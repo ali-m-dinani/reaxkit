@@ -5222,13 +5222,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -5280,13 +5280,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -5454,13 +5454,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -5984,13 +5984,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -6012,13 +6012,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -8531,7 +8531,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 222,
+          "line": 236,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9448,7 +9448,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 222,
+          "line": 236,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9470,7 +9470,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 222,
+          "line": 236,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9492,7 +9492,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 222,
+          "line": 236,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9588,13 +9588,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -11057,13 +11057,13 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=MAKE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 342,
+          "line": 348,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "prepare_generator_output(args, command=WRITE_CONTROL_COMMAND, output_value=str(getattr(args, 'output', 'control')))",
-          "line": 372,
+          "line": 378,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }

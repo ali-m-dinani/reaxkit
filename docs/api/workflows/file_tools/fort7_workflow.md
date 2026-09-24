@@ -11,9 +11,66 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Repair corrupted `fort.7` atom lines where fused integer columns break tokenization.
+This command rewrites a repaired output file while preserving lines that do not need
+changes. It is useful when malformed spacing/column fusion causes downstream parsing
+failures, which happen in +9999-atom-simulations using Standalone ReaxFF, in trajectory or analysis workflows.
+
+### Examples
+-----
+
+```text
+  1. Repair a specific input file and write to a named output:
+   reaxkit repair_fort7 --file fort.7 --output fort7_fixed
+
+  2. Repair using custom output and also copy result to current directory:
+   reaxkit repair_fort7 --output fort7_repaired --copy-to-dot
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--file` | No | fort.7 | Input fort.7 file. Example: --file runs/job1/fort.7, which reads that file as repair source. |  |
+| `--xmolout` | No | xmolout | Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist). |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | fort7_fixed | Output repaired fort.7 file. Example: --output fort7_repaired, which writes repaired content using that output name. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--progress-every` | No | 5000 | Number of input lines between progress-bar updates (default: 5000). |  |
+
 
 </div>
 
@@ -23,14 +80,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--file` | No | fort.7 | Input fort.7 file. Example: --file runs/job1/fort.7, which reads that file as repair source. |  |
-| `--output` | No | fort7_fixed | Output repaired fort.7 file. Example: --output fort7_repaired, which writes repaired content using that output name. |  |
-| `--progress-every` | No | 5000 | Progress interval in lines (stored for metadata compatibility). Example: --progress-every 10000, which records progress in larger line-step chunks. |  |
-| `--copy-to-dot` | No |  | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+Each command table above includes its shared and inherited options.
 
 </div>
