@@ -68,6 +68,8 @@ isotropic scalar approximation.
 |---|---|---|---|---|
 | `--sheet` | No | 0 | Select a worksheet by zero-based index or name. Example: --sheet production. |  |
 | `--output` | No |  | Write summary, spectrum, and autocorrelation sheets here. Example: --output dielectric.xlsx. |  |
+| `--plot-output` | No |  | Write the spectrum plot here (default: <output stem>_spectrum.png). Example: --plot-output dielectric_spectrum.png. |  |
+| `--plot-max-frequency` | No | 1000.0 | Set the plot's upper wavenumber in cm-1 (default: 1000). Example: --plot-max-frequency 1500. |  |
 | `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
 
 #### Execution

@@ -98,7 +98,7 @@ Build a surface slab from a bulk structure and write it to an ASE-supported form
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--surface` | Yes |  | Miller indices h,k,l |  |
+| `--surface` | Yes |  | Miller indices h,k,l; reversing the signs exchanges the top and bottom faces |  |
 | `--expand` | Yes |  | Supercell and layers nx,ny,layers |  |
 | `--vacuum` | Yes |  | Vacuum thickness in angstrom |  |
 

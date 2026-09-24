@@ -303,6 +303,8 @@ FLAG_METADATA = {
     '--plot-field-units': ('Outputs and plots', 'full'),
     '--plot-frames': ('Outputs and plots', 'full'),
     '--plot-kymograph': ('Outputs and plots', 'short'),
+    '--plot-max-frequency': ('Outputs and plots', 'full'),
+    '--plot-output': ('Outputs and plots', 'full'),
     '--plot-plane': ('Outputs and plots', 'full'),
     '--plot-quantity': ('Outputs and plots', 'full'),
     '--plot-real-values': ('Outputs and plots', 'full'),

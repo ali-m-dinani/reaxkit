@@ -151,7 +151,7 @@ all output profiles, incremental charge/h-BN details, trajectory metadata, and
 blocked diffusivity comparisons. `benchmarks/rollout_completion.py` adds worker
 comparisons and isolated short/long scientific-memory gates.
 
-See [benchmark instructions](../../benchmarks/README.md) for the deterministic
+See [benchmark instructions](https://github.com/ali-m-dinani/reaxkit/blob/master/benchmarks/README.md) for the deterministic
 medium corpus and private 28,800-atom, 4,000-frame Slurm recipe. Workstation
 measurements are checked in; production Slurm acceptance remains external.
 

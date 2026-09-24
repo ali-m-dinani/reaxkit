@@ -19,7 +19,7 @@ Workflow docs are organized into:
 ### Top-Level Workflows
 
 - [connectivity_workflow](connectivity_workflow.md)
-- [electrostatics_workflow](electrostatics_workflow.md)
+- [electrostatics_workflow](electrostatics/electrostatics_workflow.md)
 - [kinematics_workflow](kinematics_workflow.md)
 - [molecular_analysis_workflow](molecular_analysis_workflow.md)
 - [timeseries_workflow](timeseries_workflow.md)

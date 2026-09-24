@@ -192,7 +192,7 @@ nav:
   - Workflows:
     - 📍 Overview: api/workflows/index.md
     - Connectivity: api/workflows/connectivity_workflow.md
-    - Electrostatics: api/workflows/electrostatics_workflow.md
+    - Electrostatics: api/workflows/electrostatics/electrostatics_workflow.md
     - Kinematics: api/workflows/kinematics_workflow.md
     - Molecular Analysis: api/workflows/molecular_analysis_workflow.md
     - Timeseries: api/workflows/timeseries_workflow.md
