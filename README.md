@@ -77,11 +77,12 @@ to test the package and get the timing for their execution.
 If you use ReaxKit in your work, please cite:
 
 ```text
-Dinani, A. M., van Duin, A., Shin, Y. K., & Sepehrinezhad, A. (2025).
-ReaxKit: A modular Python toolkit for ReaxFF simulation analysis.
-Zenodo. https://doi.org/10.5281/zenodo.18485384
+Mohammadi Dinani, A., et al. (2026).
+ReaxKit: A Modular Python Toolkit for Preparing, Parsing, and Analyzing ReaxFF Molecular Dynamics Simulations.
+arXiv:2609.22019. https://arxiv.org/abs/2609.22019
 
 Source code: https://github.com/ali-m-dinani/reaxkit
+Software archive: https://doi.org/10.5281/zenodo.18485384
 ```
 
 ---
