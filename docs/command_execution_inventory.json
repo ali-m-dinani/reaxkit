@@ -6081,7 +6081,14 @@
       ],
       "task_inventory": "get-dielectric-constant",
       "workflow": "reaxkit.workflows.electrostatics.dielectric_constant_workflow",
-      "workflow_output_sites": []
+      "workflow_output_sites": [
+        {
+          "expression": "fig.savefig(output, dpi=200)",
+          "line": 294,
+          "tier": "core_compatibility",
+          "writer": "savefig"
+        }
+      ]
     },
     {
       "aliases": [
