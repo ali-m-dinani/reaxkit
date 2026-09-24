@@ -6,8 +6,10 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
+from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
+from scipy.constants import c
 import reaxkit.engine  # noqa: F401
 
 from reaxkit.analysis.electrostatics.dielectric_constant import (
@@ -150,6 +152,14 @@ Examples:
         "--output", type=Path, default=None,
         help="Write summary, spectrum, and autocorrelation sheets here. Example: --output dielectric.xlsx.",
     )
+    parser.add_argument(
+        "--plot-output", type=Path, default=None,
+        help="Write the spectrum plot here (default: <output stem>_spectrum.png). Example: --plot-output dielectric_spectrum.png.",
+    )
+    parser.add_argument(
+        "--plot-max-frequency", type=_positive_float, default=1000.0,
+        help="Set the plot's upper wavenumber in cm-1 (default: 1000). Example: --plot-max-frequency 1500.",
+    )
     return parser
 
 
@@ -262,6 +272,29 @@ def write_result_workbook(result, path: Path) -> Path:
     return output
 
 
+def write_spectrum_plot(result, path: Path, max_frequency_cm1: float = 1000.0) -> Path:
+    """Plot the real and imaginary relative permittivity against wavenumber."""
+    output = path.expanduser().resolve()
+    if output.suffix.lower() != ".png":
+        raise ValueError("--plot-output must use the .png extension.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    spectrum = result.spectrum
+    wavenumber = spectrum["frequency (Hz)"].to_numpy() / (c * 100.0)
+
+    fig = Figure(figsize=(8, 6), layout="constrained")
+    axes = fig.subplots(2, 1, sharex=True)
+    axes[0].plot(wavenumber, spectrum["epsilon real"], color="tab:blue")
+    axes[0].set_ylabel(r"$\varepsilon_r'$ (real)")
+    axes[1].plot(wavenumber, spectrum["epsilon imaginary"], color="tab:orange")
+    axes[1].set_ylabel(r"$\varepsilon_r''$ (imaginary)")
+    axes[1].set_xlabel(r"Frequency (cm$^{-1}$)")
+    axes[1].set_xlim(0, max_frequency_cm1)
+    for axis in axes:
+        axis.grid(alpha=0.25)
+    fig.savefig(output, dpi=200)
+    return output
+
+
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Read the input workbook, calculate permittivity, and write the result."""
     if command not in (*ALL_COMMANDS, *ALL_LEGACY_COMMANDS):
@@ -276,12 +309,17 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         f"{source.stem}_dielectric.xlsx"
     )
     saved = write_result_workbook(result, output)
+    plot_path = Path(args.plot_output) if args.plot_output is not None else saved.with_name(
+        f"{saved.stem}_spectrum.png"
+    )
+    saved_plot = write_spectrum_plot(result, plot_path, args.plot_max_frequency)
     print(f"Static dielectric constant: {result.static_dielectric_constant:.10g}")
     print(
         f"Volume: {volume.value:.10g} {volume.unit} "
         f"({volume.method}, {volume.frame_count or 1} frame(s))"
     )
     print(f"Wrote dielectric summary, spectrum, and autocorrelation to {saved}")
+    print(f"Wrote dielectric spectrum plot to {saved_plot}")
     return 0
 
 
@@ -295,4 +333,5 @@ __all__ = [
     "resolve_volume",
     "run_main",
     "write_result_workbook",
+    "write_spectrum_plot",
 ]
