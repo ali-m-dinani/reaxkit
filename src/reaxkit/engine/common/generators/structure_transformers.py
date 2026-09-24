@@ -52,7 +52,8 @@ def build_surface(
     bulk : Atoms
         Input bulk structure.
     miller : Tuple[int, int, int]
-        Miller index triple defining the surface orientation.
+        Miller index triple defining the surface orientation. Reversing all
+        indices reverses the slab normal and exchanges its exposed faces.
     layers : int
         Number of atomic layers to include in the slab.
     vacuum : float, optional
@@ -71,7 +72,21 @@ def build_surface(
     slab = build_surface(bulk, (1, 1, 1), layers=6, vacuum=15.0)
     ```
     """
-    slab = ase_surface(bulk, miller, layers=layers, vacuum=vacuum)
+    # ASE's surface builder treats (h, k, l) and (-h, -k, -l) as the
+    # same orientation. Build one canonical orientation, then mirror the
+    # slab along its normal when the requested direction is opposite.
+    first_nonzero = next((index for index in miller if index != 0), None)
+    if first_nonzero is None:
+        raise ValueError("miller must contain at least one nonzero index")
+    reverse_normal = first_nonzero < 0
+    oriented_miller = tuple(-index for index in miller) if reverse_normal else miller
+    slab = ase_surface(bulk, oriented_miller, layers=layers, vacuum=None if vacuum == 0 else vacuum)
+    if vacuum == 0:
+        # ASE now reserves vacuum=None for slabs without padding. Give that
+        # slab the same bounding cell that vacuum=0 used to produce.
+        slab.center(axis=2, vacuum=0)
+    if reverse_normal:
+        slab.positions[:, 2] = slab.cell[2, 2] - slab.positions[:, 2]
     if center:
         slab.center(axis=2)
     return slab

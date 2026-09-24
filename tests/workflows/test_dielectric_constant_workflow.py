@@ -35,6 +35,7 @@ def test_cli_exposes_units_and_documents_every_flag():
     assert args.dipole_column == "dipole"
     assert args.dipole_kind == "total"
     assert args.volume_method == "hull"
+    assert args.plot_max_frequency == 1000.0
     assert parser.formatter_class is argparse.RawTextHelpFormatter
     assert "\n\nExamples:\n" in parser.description
     for action in parser._actions:
@@ -62,6 +63,7 @@ def test_workflow_reads_excel_and_writes_three_result_sheets(tmp_path):
 
     assert dielectric_constant_workflow.run_main("get-dielectric-constant", args) == 0
     assert output.is_file()
+    assert output.with_name("result_spectrum.png").is_file()
     assert set(pd.ExcelFile(output).sheet_names) == {
         "summary", "spectrum", "autocorrelation"
     }

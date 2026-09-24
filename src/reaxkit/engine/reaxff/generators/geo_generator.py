@@ -64,7 +64,7 @@ def _find_geo_insert_index(lines: Sequence[str]) -> int:
 
 def _read_xyz(xyz_path: str | Path) -> Tuple[str, pd.DataFrame]:
     """
-    Read a simple XYZ file and return (descriptor, atoms_df).
+    Read an XYZ file and return (filename stem, atoms_df).
     """
     xyz_path = Path(xyz_path)
 
@@ -81,15 +81,12 @@ def _read_xyz(xyz_path: str | Path) -> Tuple[str, pd.DataFrame]:
         except ValueError as exc:
             raise ValueError(f"First line of {xyz_path} is not a valid atom count: {first!r}") from exc
 
-        second = ""
-        while second == "":
-            second = fh.readline()
-            if not second:
-                raise ValueError(f"{xyz_path} ended before descriptor line.")
-            second = second.strip()
-
-        descriptor_tokens = second.split()
-        descriptor = descriptor_tokens[0] if descriptor_tokens else ""
+        comment = ""
+        while comment == "":
+            comment = fh.readline()
+            if not comment:
+                raise ValueError(f"{xyz_path} ended before comment line.")
+            comment = comment.strip()
 
         records: List[Dict[str, Any]] = []
         for line in fh:
@@ -119,7 +116,7 @@ def _read_xyz(xyz_path: str | Path) -> Tuple[str, pd.DataFrame]:
         raise ValueError(
             f"Number of atoms in XYZ header ({nat_expected}) does not match coordinate lines found ({len(atoms_df)})."
         )
-    return descriptor, atoms_df
+    return xyz_path.stem, atoms_df
 
 
 def _sort_atoms(

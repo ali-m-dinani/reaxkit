@@ -1,6 +1,11 @@
 # Release notes
 
-## Unreleased
+## 3.1.0 (2026-09-24)
+
+- Added polar surface generation for signed Miller indices, stable XYZ-to-GEO
+  descriptions from input filenames, and dielectric spectrum PNG plots.
+- Matplotlib is now a core dependency because the dielectric workflow writes a
+  spectrum plot by default.
 
 - CLI `-h` now highlights required inputs, common scientific choices, and
   outputs. `--help-all` (also `--all-flags`) shows every accepted option in

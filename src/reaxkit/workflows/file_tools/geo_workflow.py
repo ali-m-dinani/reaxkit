@@ -356,7 +356,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         )
         parser.add_argument("--file", required=True, help="Input bulk structure file")
         parser.add_argument("--output", required=True, help="Output file")
-        parser.add_argument("--surface", required=True, help="Miller indices h,k,l")
+        parser.add_argument("--surface", required=True, help="Miller indices h,k,l; reversing the signs exchanges the top and bottom faces")
         parser.add_argument("--expand", required=True, help="Supercell and layers nx,ny,layers")
         parser.add_argument("--vacuum", required=True, help="Vacuum thickness in angstrom")
     elif canonical == "sort_geo":
