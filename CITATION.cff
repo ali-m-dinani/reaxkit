@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use ReaxKit in your research, please cite it using the following reference."
 
-title: "ReaxKit: A modular Python toolkit for ReaxFF simulation analysis"
+title: "ReaxKit"
 version: "3.1.0"
 doi: 10.5281/zenodo.18485384
 date-released: 2026-09-24
@@ -9,34 +9,49 @@ date-released: 2026-09-24
 authors:
   - family-names: Mohammadi Dinani
     given-names: Ali
-
-  - family-names: van Duin
-    given-names: Adri
-
-  - family-names: Shin
-    given-names: Yun Kyung
-
   - family-names: Sepehrinezhad
     given-names: Alireza
-
-  - family-names: Mortazavi
-    given-names: Seyed Mahmoud
-
   - family-names: Phukan
     given-names: Anirban
-
+  - family-names: Ul Hosna
+    given-names: Asma
   - family-names: Dhingra
     given-names: Jupjeet
-
-  - family-names: Dwivedi
-    given-names: Swarit
-
-  - family-names: Hosna
-    given-names: Asma Ul
-
   - family-names: Mirakhory
     given-names: Mozhdeh
-
-
+  - family-names: Mortazavi
+    given-names: Seyed Mahmoud
+  - family-names: Shin
+    given-names: Yun Kyung
+  - family-names: Dwivedi
+    given-names: Swarit
+  - family-names: van Duin
+    given-names: Adri C. T.
 repository-code: https://github.com/ali-m-dinani/reaxkit
 url: https://ali-m-dinani.github.io/reaxkit/
+preferred-citation:
+  type: article
+  title: "ReaxKit: A Modular Python Toolkit for Preparing, Parsing, and Analyzing ReaxFF Molecular Dynamics Simulations"
+  authors:
+    - family-names: Mohammadi Dinani
+      given-names: Ali
+    - family-names: Sepehrinezhad
+      given-names: Alireza
+    - family-names: Phukan
+      given-names: Anirban
+    - family-names: Ul Hosna
+      given-names: Asma
+    - family-names: Dhingra
+      given-names: Jupjeet
+    - family-names: Mirakhory
+      given-names: Mozhdeh
+    - family-names: Mortazavi
+      given-names: Seyed Mahmoud
+    - family-names: Shin
+      given-names: Yun Kyung
+    - family-names: Dwivedi
+      given-names: Swarit
+    - family-names: van Duin
+      given-names: Adri C. T.
+  year: 2026
+  url: https://arxiv.org/abs/2609.22019
