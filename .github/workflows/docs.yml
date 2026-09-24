@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -U pip
-          pip install -e . ase networkx
+          pip install -e . ase networkx imageio
           pip install mkdocs mkdocs-material "mkdocstrings[python]"
 
       - name: Regenerate MkDocs nav
