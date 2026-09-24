@@ -294,9 +294,20 @@ def get_registered_commands(include_analysis_tasks: bool = True) -> dict[str, Co
             help_text=meta.help_text if meta is not None else "",
         )
 
+    analysis_routes = get_registered_analysis_commands()
+    for name, route in analysis_routes.items():
+        meta = commands.get(name)
+        route_aliases = tuple(str(alias) for alias in route.aliases)
+        commands[name] = CommandSpec(
+            name=name,
+            kind="analysis",
+            target=route if meta is None or meta.target is None else meta.target,
+            aliases=route_aliases or (meta.aliases if meta is not None else tuple()),
+            help_text=meta.help_text if meta is not None else "",
+        )
+
     if include_analysis_tasks:
         command_metadata = _load_packaged_command_metadata()
-        analysis_routes = get_registered_analysis_commands()
         for name, target in TASK_REGISTRY.items():
             route = analysis_routes.get(name)
             if name in commands:

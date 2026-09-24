@@ -15,7 +15,7 @@ trajectory geometry analyses outside those computations.
 from __future__ import annotations
 
 from dataclasses import dataclass, field as dc_field
-from typing import Any, Literal, Optional, Sequence
+from typing import Any, Literal, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -23,9 +23,21 @@ from scipy.spatial import ConvexHull
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
+from reaxkit.core.runtime.execution_contracts import (
+    ExecutionShape,
+    TaskCapabilities,
+    resolve_execution_policy,
+)
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
-from reaxkit.domain.data_models import ConnectivityData, ElectrostaticsData, ElectricFieldData
+from reaxkit.domain.data_models import (
+    ConnectivityData,
+    ConnectivityTrajectoryData,
+    ElectrostaticsData,
+    ElectricFieldData,
+    TrajectoryData,
+)
 from reaxkit.engine.reaxff.adapter import (
     _charges_from_fort7_handler,
     _connectivity_from_fort7_handler,
@@ -38,6 +50,7 @@ from reaxkit.utils.numerical.numerical_calcs import find_zero_crossings
 Scope = Literal["total", "local"]
 Mode = Literal["dipole", "polarization"]
 VolumeMethod = Literal["hull", "bbox", "cell"]
+ChargeSource = Literal["reaxff", "formal"]
 AggregateKind = Optional[Literal["mean", "max", "min", "last"]]
 FieldDirection = Literal["x", "y", "z"]
 DipoleOrPolarizationDirection = Literal["mu_x", "mu_y", "mu_z", "p_x", "p_y", "p_z"]
@@ -59,6 +72,13 @@ class DipoleRequest(BaseRequest):
         Optional frame indices to include. `None` means all frames.
     every : int
         Frame stride after selection. Must be `>= 1`.
+    volume_method : Optional[VolumeMethod]
+        Optional volume estimator. When supplied, the selected volume is
+        reported alongside the dipole; it does not change the dipole moment.
+    charge_source : ChargeSource
+        Use per-atom ReaxFF charges or species-level formal charges.
+    formal_charges : Mapping[str, float]
+        Formal charges in elementary-charge units, keyed by species label.
 
     Examples
     -----
@@ -88,6 +108,16 @@ class DipoleRequest(BaseRequest):
     every
         Frame stride after selection. Example: ``every=5`` keeps every fifth
         selected frame.
+    volume_method
+        Optional volume to report with each dipole. ``"hull"`` uses the
+        occupied convex hull, ``"bbox"`` the occupied bounding box, and
+        ``"cell"`` the simulation cell. The dipole itself is not normalized.
+    charge_source
+        ``"reaxff"`` uses the trajectory-aligned dynamic charges. ``"formal"``
+        assigns charges by species from ``formal_charges``.
+    formal_charges
+        Explicit species charges used in formal mode. Every trajectory species
+        must be configured. Example: ``{"Al": 3.0, "N": -3.0}``.
     """
 
     scope: Scope = dc_field(
@@ -130,6 +160,30 @@ class DipoleRequest(BaseRequest):
             'units': 'frames',
         },
     )
+    volume_method: Optional[VolumeMethod] = dc_field(
+        default=None,
+        metadata={
+            'label': 'Volume Method',
+            'help': "Optional volume reported with dipole output. Examples: 'hull', 'bbox', 'cell'.",
+            'choices': ['hull', 'bbox', 'cell'],
+        },
+    )
+    charge_source: ChargeSource = dc_field(
+        default="reaxff",
+        metadata={
+            "label": "Charge Source",
+            "help": "Charge source: 'reaxff' uses per-atom dynamic charges; 'formal' uses formal_charges.",
+            "choices": ["reaxff", "formal"],
+        },
+    )
+    formal_charges: Mapping[str, float] = dc_field(
+        default_factory=dict,
+        metadata={
+            "label": "Formal Charges",
+            "help": "Species-specific formal charges in elementary-charge units. Example: {'Al': 3, 'N': -3}.",
+            "units": "e",
+        },
+    )
 
 
 @dataclass
@@ -166,6 +220,7 @@ class DipoleResult(BaseResult):
     - ``frame_index``: source frame index.
     - ``iter``: simulation iteration mapped to the frame.
     - ``mu_x (debye)``, ``mu_y (debye)``, ``mu_z (debye)``: dipole components.
+    - ``volume (angstrom^3)``: included when ``volume_method`` is requested.
 
     Local-mode extra columns
     ------------------------
@@ -200,6 +255,10 @@ class PolarizationRequest(BaseRequest):
         Frame stride after selection. Must be `>= 1`.
     volume_method : Optional[VolumeMethod]
         Volume estimator used for polarization normalization.
+    charge_source : ChargeSource
+        Use per-atom ReaxFF charges or species-level formal charges.
+    formal_charges : Mapping[str, float]
+        Formal charges in elementary-charge units, keyed by species label.
 
     Examples
     -----
@@ -231,8 +290,14 @@ class PolarizationRequest(BaseRequest):
     volume_method
         Volume estimator for polarization normalization.
         ``"hull"``: convex hull, ``"bbox"``: axis-aligned bounding box,
-        ``"cell"``: simulation cell volume (total mode).
+        ``"cell"``: simulation cell volume.
         Example: ``volume_method="hull"``.
+    charge_source
+        ``"reaxff"`` uses the trajectory-aligned dynamic charges. ``"formal"``
+        assigns charges by species from ``formal_charges``.
+    formal_charges
+        Explicit species charges used in formal mode. Every trajectory species
+        must be configured. Example: ``{"Al": 3.0, "N": -3.0}``.
     """
 
     scope: Scope = dc_field(
@@ -281,6 +346,22 @@ class PolarizationRequest(BaseRequest):
             'label': 'Volume Method',
             'help': "Volume estimator for polarization normalization. Examples: 'hull', 'bbox', 'cell'.",
             'choices': ['hull', 'bbox', 'cell'],
+        },
+    )
+    charge_source: ChargeSource = dc_field(
+        default="reaxff",
+        metadata={
+            "label": "Charge Source",
+            "help": "Charge source: 'reaxff' uses per-atom dynamic charges; 'formal' uses formal_charges.",
+            "choices": ["reaxff", "formal"],
+        },
+    )
+    formal_charges: Mapping[str, float] = dc_field(
+        default_factory=dict,
+        metadata={
+            "label": "Formal Charges",
+            "help": "Species-specific formal charges in elementary-charge units. Example: {'Al': 3, 'N': -3}.",
+            "units": "e",
         },
     )
 
@@ -550,6 +631,66 @@ def _cell_volume(cell_lengths: Optional[np.ndarray], frame_index: int) -> float:
     return float(v[0] * v[1] * v[2])
 
 
+def _selected_volume(
+    coords: np.ndarray,
+    volume_method: VolumeMethod,
+    cell_lengths: Optional[np.ndarray],
+    frame_index: int,
+) -> float:
+    """Calculate a requested occupied or simulation-cell volume."""
+    if volume_method == "cell":
+        return _cell_volume(cell_lengths, frame_index)
+    if volume_method == "bbox":
+        return _bbox_volume(coords)
+    if volume_method == "hull":
+        return _convex_hull_volume(coords)
+    raise ValueError("volume_method must be 'hull', 'bbox', or 'cell'.")
+
+
+def calculate_trajectory_volumes(
+    trajectory: TrajectoryData,
+    volume_method: VolumeMethod = "hull",
+) -> np.ndarray:
+    """Calculate one material volume per trajectory frame in angstrom cubed.
+
+    ``hull`` and ``bbox`` use the occupied atomic coordinates, so vacuum in the
+    simulation cell does not enter the result. ``cell`` uses the complete
+    simulation-cell lengths and therefore includes any vacuum region.
+    """
+    if volume_method not in {"hull", "bbox", "cell"}:
+        raise ValueError("volume_method must be 'hull', 'bbox', or 'cell'.")
+
+    positions = np.asarray(trajectory.positions, dtype=float)
+    cell_lengths = (
+        trajectory.simulation.cell_lengths
+        if trajectory.simulation is not None
+        else None
+    )
+    if volume_method == "cell" and cell_lengths is None:
+        raise ValueError(
+            "Cell volume requires trajectory simulation-cell lengths. "
+            "Use --volume-method hull or bbox when cell metadata is unavailable."
+        )
+
+    volumes = np.empty(positions.shape[0], dtype=float)
+    for frame_index, frame in enumerate(positions):
+        coordinates = np.asarray(frame, dtype=float)
+        coordinates = coordinates[np.all(np.isfinite(coordinates), axis=1)]
+        if volume_method == "cell":
+            volume = _cell_volume(cell_lengths, frame_index)
+        elif volume_method == "bbox":
+            volume = _bbox_volume(coordinates)
+        else:
+            volume = _convex_hull_volume(coordinates)
+        if not np.isfinite(volume) or volume <= 0.0:
+            raise ValueError(
+                f"Could not calculate a positive {volume_method} volume for "
+                f"trajectory frame {frame_index}."
+            )
+        volumes[frame_index] = volume
+    return volumes
+
+
 def _frame_indices(n_frames: int, frames: Optional[Sequence[int]], every: int) -> list[int]:
     idx = list(range(n_frames)) if frames is None else [int(i) for i in frames]
     return [i for i in idx if 0 <= i < n_frames][:: max(1, int(every))]
@@ -631,7 +772,7 @@ def _series_total(
     iterations: np.ndarray,
     frame_idx: Sequence[int],
     mode: Mode,
-    volume_method: VolumeMethod,
+    volume_method: Optional[VolumeMethod],
     cell_lengths: Optional[np.ndarray],
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
@@ -649,14 +790,11 @@ def _series_total(
             "mu_z (debye)": float(mu_debye[2]),
         }
 
-        if mode == "polarization":
-            if volume_method == "cell":
-                volume = _cell_volume(cell_lengths, int(fi))
-            elif volume_method == "bbox":
-                volume = _bbox_volume(coords)
-            else:
-                volume = _convex_hull_volume(coords)
+        if mode == "polarization" or volume_method is not None:
+            vm: VolumeMethod = volume_method or "hull"
+            volume = _selected_volume(coords, vm, cell_lengths, int(fi))
 
+        if mode == "polarization":
             if np.isfinite(volume) and volume > 0:
                 p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
                 row["P_x (uC/cm^2)"] = float(p_vec[0])
@@ -666,6 +804,7 @@ def _series_total(
                 row["P_x (uC/cm^2)"] = np.nan
                 row["P_y (uC/cm^2)"] = np.nan
                 row["P_z (uC/cm^2)"] = np.nan
+        if mode == "polarization" or volume_method is not None:
             row["volume (angstrom^3)"] = float(volume)
         rows.append(row)
     return pd.DataFrame(rows)
@@ -749,13 +888,11 @@ def _series_local(
                 "mu_z (debye)": float(mu_debye[2]),
             }
 
-            if mode == "polarization":
-                vm = volume_method or "bbox"
-                if vm == "hull":
-                    volume = _convex_hull_volume(rel)
-                else:
-                    volume = _bbox_volume(rel)
+            if mode == "polarization" or volume_method is not None:
+                vm: VolumeMethod = volume_method or "bbox"
+                volume = _selected_volume(rel, vm, cell_lengths, int(fi))
 
+            if mode == "polarization":
                 if np.isfinite(volume) and volume > 0:
                     p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
                     row["P_x (uC/cm^2)"] = float(p_vec[0])
@@ -765,6 +902,7 @@ def _series_local(
                     row["P_x (uC/cm^2)"] = np.nan
                     row["P_y (uC/cm^2)"] = np.nan
                     row["P_z (uC/cm^2)"] = np.nan
+            if mode == "polarization" or volume_method is not None:
                 row["volume (angstrom^3)"] = float(volume)
             rows.append(row)
         if reporter:
@@ -923,8 +1061,87 @@ def _electrostatics_data_from_handlers(xh, f7) -> ElectrostaticsData:
     )
 
 
+def _electrostatics_parts(
+    data: ElectrostaticsData | ConnectivityTrajectoryData | TrajectoryData,
+) -> tuple[TrajectoryData, ConnectivityData | None, np.ndarray | None]:
+    """Return trajectory, connectivity, and optional ReaxFF charges."""
+    if isinstance(data, ElectrostaticsData):
+        return (
+            data.trajectory,
+            data.connectivity,
+            np.asarray(data.charges.charges, dtype=float),
+        )
+    if isinstance(data, ConnectivityTrajectoryData):
+        return data.trajectory, data.connectivity, None
+    if isinstance(data, TrajectoryData):
+        return data, None, None
+    raise TypeError(
+        "Dipole and polarization analysis requires ElectrostaticsData, "
+        "ConnectivityTrajectoryData, or TrajectoryData."
+    )
+
+
+def _formal_charge_array(
+    trajectory: TrajectoryData,
+    formal_charges: Mapping[str, float],
+) -> np.ndarray:
+    """Expand species formal charges to one value per atom and frame."""
+    charge_map = {str(label).casefold(): float(value) for label, value in formal_charges.items()}
+    if not charge_map:
+        raise ValueError(
+            "charge_source='formal' requires formal_charges for every trajectory species."
+        )
+    if not all(np.isfinite(value) for value in charge_map.values()):
+        raise ValueError("Formal charges must be finite.")
+
+    positions = np.asarray(trajectory.positions, dtype=float)
+    n_frames, n_atoms = positions.shape[:2]
+    if trajectory.atom_labels is not None:
+        labels = np.asarray(trajectory.atom_labels, dtype=object)
+        if labels.shape != (n_frames, n_atoms):
+            raise ValueError(
+                "TrajectoryData.atom_labels must have shape (n_frames, n_atoms) "
+                "when formal charges are used."
+            )
+    else:
+        elements = np.asarray(trajectory.elements, dtype=object).reshape(-1)
+        if elements.shape[0] != n_atoms:
+            raise ValueError(
+                "TrajectoryData.elements length must match n_atoms when formal charges are used."
+            )
+        labels = np.broadcast_to(elements, (n_frames, n_atoms))
+
+    normalized = np.char.lower(labels.astype(str))
+    missing = sorted(
+        {str(label) for label in np.unique(labels) if str(label).casefold() not in charge_map},
+        key=str.casefold,
+    )
+    if missing:
+        raise ValueError(
+            "charge_source='formal' requires an explicit formal charge for every "
+            f"trajectory species; missing: {', '.join(missing)}."
+        )
+    return np.vectorize(charge_map.__getitem__, otypes=[float])(normalized)
+
+
+def _charges_for_request(
+    trajectory: TrajectoryData,
+    dynamic_charges: np.ndarray | None,
+    *,
+    charge_source: ChargeSource,
+    formal_charges: Mapping[str, float],
+) -> np.ndarray:
+    if charge_source == "formal":
+        return _formal_charge_array(trajectory, formal_charges)
+    if charge_source != "reaxff":
+        raise ValueError("charge_source must be 'reaxff' or 'formal'.")
+    if dynamic_charges is None:
+        raise ValueError("charge_source='reaxff' requires per-atom ChargeData.")
+    return np.asarray(dynamic_charges, dtype=float)
+
+
 def _run_electrostatics(
-    data: ElectrostaticsData,
+    data: ElectrostaticsData | ConnectivityTrajectoryData | TrajectoryData,
     *,
     mode: Mode,
     scope: Scope,
@@ -933,10 +1150,18 @@ def _run_electrostatics(
     frames: Optional[Sequence[int]],
     every: int,
     volume_method: Optional[VolumeMethod],
+    charge_source: ChargeSource,
+    formal_charges: Mapping[str, float],
     reporter=None,
 ) -> pd.DataFrame:
-    positions = np.asarray(data.trajectory.positions, dtype=float)
-    charges = np.asarray(data.charges.charges, dtype=float)
+    trajectory, connectivity, dynamic_charges = _electrostatics_parts(data)
+    positions = np.asarray(trajectory.positions, dtype=float)
+    charges = _charges_for_request(
+        trajectory,
+        dynamic_charges,
+        charge_source=charge_source,
+        formal_charges=formal_charges,
+    )
     if positions.ndim != 3 or positions.shape[2] != 3:
         raise ValueError("Trajectory positions must have shape (n_frames, n_atoms, 3).")
     if charges.shape != positions.shape[:2]:
@@ -947,24 +1172,24 @@ def _run_electrostatics(
     if not frame_idx:
         return pd.DataFrame()
 
-    if data.trajectory.iterations is not None:
-        iterations = np.asarray(data.trajectory.iterations, dtype=int).reshape(-1)
-    elif data.charges.iterations is not None:
+    if trajectory.iterations is not None:
+        iterations = np.asarray(trajectory.iterations, dtype=int).reshape(-1)
+    elif isinstance(data, ElectrostaticsData) and data.charges.iterations is not None:
         iterations = np.asarray(data.charges.iterations, dtype=int).reshape(-1)
     else:
         iterations = np.arange(n_frames, dtype=int)
     if iterations.shape[0] != n_frames:
         raise ValueError("iterations length must match n_frames.")
 
-    elements = list(data.trajectory.elements)
+    elements = list(trajectory.elements)
     if len(elements) != positions.shape[1]:
         raise ValueError("TrajectoryData.elements length must match n_atoms.")
-    atom_id_list = list(data.trajectory.atom_ids)
+    atom_id_list = list(trajectory.atom_ids)
     if len(atom_id_list) != positions.shape[1]:
         raise ValueError("TrajectoryData.atom_ids length must match n_atoms.")
 
     if scope == "total":
-        vm = volume_method or ("hull" if mode == "polarization" else "cell")
+        vm = volume_method or ("hull" if mode == "polarization" else None)
         return _series_total(
             positions=positions,
             charges=charges,
@@ -972,11 +1197,11 @@ def _run_electrostatics(
             frame_idx=frame_idx,
             mode=mode,
             volume_method=vm,
-            cell_lengths=(data.trajectory.simulation.cell_lengths if data.trajectory.simulation else None),
+            cell_lengths=(trajectory.simulation.cell_lengths if trajectory.simulation else None),
         ).reset_index(drop=True)
 
-    if data.connectivity is None:
-        raise ValueError("Local electrostatics requires ElectrostaticsData.connectivity.")
+    if connectivity is None:
+        raise ValueError("Local electrostatics requires ConnectivityData.")
 
     table = _series_local(
         positions=positions,
@@ -985,9 +1210,9 @@ def _run_electrostatics(
         atom_ids=atom_id_list,
         iterations=iterations,
         frame_idx=frame_idx,
-        cell_lengths=(data.trajectory.simulation.cell_lengths if data.trajectory.simulation else None),
-        cell_angles=(data.trajectory.simulation.cell_angles if data.trajectory.simulation else None),
-        connectivity=data.connectivity,
+        cell_lengths=(trajectory.simulation.cell_lengths if trajectory.simulation else None),
+        cell_angles=(trajectory.simulation.cell_angles if trajectory.simulation else None),
+        connectivity=connectivity,
         mode=mode,
         volume_method=volume_method,
         selected_atom_ids=atom_ids,
@@ -1005,25 +1230,37 @@ def _run_electrostatics_stream(
     *,
     mode: Mode,
     reporter=None,
+    pipeline: BoundedFramePipeline | None = None,
 ) -> pd.DataFrame:
     """Compute electrostatics while retaining only one canonical frame."""
     tables: list[pd.DataFrame] = []
     total_rows: list[dict[str, Any]] = []
     processed = 0
     every = max(1, int(request.every))
-    for stream_index, data in enumerate(frames):
-        if stream_index % every:
-            continue
+
+    def selected_frames():
+        for stream_index, data in enumerate(frames):
+            if stream_index % every == 0:
+                yield stream_index, data
+
+    def calculate_frame(item):
+        stream_index, data = item
+        trajectory, _connectivity, dynamic_charges = _electrostatics_parts(data)
         if request.scope == "total":
-            coords = np.asarray(data.trajectory.positions[0], dtype=float)
-            q = np.asarray(data.charges.charges[0], dtype=float)
+            coords = np.asarray(trajectory.positions[0], dtype=float)
+            q = _charges_for_request(
+                trajectory,
+                dynamic_charges,
+                charge_source=request.charge_source,
+                formal_charges=request.formal_charges,
+            )[0]
             if coords.ndim != 2 or coords.shape[1] != 3 or q.shape != coords.shape[:1]:
                 raise ValueError("Streamed total electrostatics requires aligned XYZ coordinates and charges.")
             # Matrix-vector multiplication performs all three component sums
             # in compiled NumPy code without allocating coords * q[:, None].
             mu_ea = q @ coords
             mu_debye = mu_ea * const("ea_to_debye")
-            iteration_values = data.trajectory.iterations
+            iteration_values = trajectory.iterations
             iteration = int(iteration_values[0]) if iteration_values is not None else stream_index
             row: dict[str, Any] = {
                 "iter": iteration,
@@ -1031,15 +1268,17 @@ def _run_electrostatics_stream(
                 "mu_y (debye)": float(mu_debye[1]),
                 "mu_z (debye)": float(mu_debye[2]),
             }
+            requested_volume_method = getattr(request, "volume_method", None)
+            if mode == "polarization" or requested_volume_method is not None:
+                volume_method: VolumeMethod = requested_volume_method or "hull"
+                simulation = trajectory.simulation
+                volume = _selected_volume(
+                    coords,
+                    volume_method,
+                    simulation.cell_lengths if simulation else None,
+                    0,
+                )
             if mode == "polarization":
-                volume_method = getattr(request, "volume_method", None) or "hull"
-                if volume_method == "cell":
-                    simulation = data.trajectory.simulation
-                    volume = _cell_volume(simulation.cell_lengths if simulation else None, 0)
-                elif volume_method == "bbox":
-                    volume = _bbox_volume(coords)
-                else:
-                    volume = _convex_hull_volume(coords)
                 if np.isfinite(volume) and volume > 0:
                     p_vec = mu_ea / volume * const("ea3_to_uC_cm2")
                     row.update({
@@ -1053,6 +1292,7 @@ def _run_electrostatics_stream(
                         "P_y (uC/cm^2)": np.nan,
                         "P_z (uC/cm^2)": np.nan,
                     })
+            if mode == "polarization" or requested_volume_method is not None:
                 row["volume (angstrom^3)"] = float(volume)
             table = None
         else:
@@ -1065,9 +1305,11 @@ def _run_electrostatics_stream(
                 frames=None,
                 every=1,
                 volume_method=getattr(request, "volume_method", None),
+                charge_source=request.charge_source,
+                formal_charges=request.formal_charges,
                 reporter=None,
             )
-        source_indices = data.trajectory.source_frame_indices
+        source_indices = trajectory.source_frame_indices
         source_index = (
             int(np.asarray(source_indices, dtype=int).reshape(-1)[0])
             if source_indices is not None
@@ -1076,10 +1318,29 @@ def _run_electrostatics_stream(
         if request.scope == "total":
             row["frame_index"] = source_index
             # Preserve the public column order of the materialized path.
-            total_rows.append({"frame_index": row.pop("frame_index"), **row})
-        elif table is not None and not table.empty:
+            return {"frame_index": row.pop("frame_index"), **row}, None
+        if table is not None and not table.empty:
             table = table.copy()
             table["frame_index"] = source_index
+        return None, table
+
+    if pipeline is None:
+        class _ElectrostaticsFrameMap:
+            execution_capabilities = TaskCapabilities(
+                shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+                thread_safe=True,
+                estimated_frame_bytes=8 * 1024 * 1024,
+            )
+
+        pipeline = BoundedFramePipeline(
+            resolve_execution_policy(_ElectrostaticsFrameMap(), request, {})
+        )
+
+    for completed in pipeline.map_ordered(selected_frames(), calculate_frame):
+        row, table = completed.value
+        if row is not None:
+            total_rows.append(row)
+        elif table is not None and not table.empty:
             tables.append(table)
         processed += 1
         if callable(reporter):
@@ -1099,11 +1360,24 @@ class DipoleTask(AnalysisTask):
 
     required_data = ElectrostaticsData
     supports_selective_streaming = True
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        thread_safe=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
+    def required_data_for(self, request: DipoleRequest, _args: dict | None = None):
+        """Choose coordinate-only or connectivity inputs for formal charges."""
+        if request.charge_source == "formal":
+            return TrajectoryData if request.scope == "total" else ConnectivityTrajectoryData
+        return ElectrostaticsData
 
     @staticmethod
     def required_data_fields_for(request: DipoleRequest, _args: dict) -> tuple[str, ...]:
         """Declare only the electrostatics inputs used by the selected scope."""
-        fields = ["trajectory", "charges"]
+        fields = ["trajectory"]
+        if request.charge_source != "formal":
+            fields.append("charges")
         if request.scope == "local":
             fields.append("connectivity")
         return tuple(fields)
@@ -1203,24 +1477,50 @@ class DipoleTask(AnalysisTask):
             atom_types=request.atom_types,
             frames=request.frames,
             every=request.every,
-            volume_method=None,
+            volume_method=request.volume_method,
+            charge_source=request.charge_source,
+            formal_charges=request.formal_charges,
             reporter=reporter,
         )
         return DipoleResult(table=out, request=request)
 
-    def run_stream(self, frames, request: DipoleRequest, reporter=None) -> DipoleResult:
+    def run_stream(self, frames, request: DipoleRequest, reporter=None, pipeline=None) -> DipoleResult:
         """Compute dipoles from a bounded-memory electrostatics stream."""
         return DipoleResult(
-            table=_run_electrostatics_stream(frames, request, mode="dipole", reporter=reporter),
+            table=_run_electrostatics_stream(
+                frames, request, mode="dipole", reporter=reporter, pipeline=pipeline
+            ),
             request=request,
         )
 
 
-@register_task("polarization", label="Polarization")
+@register_task("get-polarization", label="Polarization")
 class PolarizationTask(AnalysisTask):
     """Compute polarization series as total or local."""
 
     required_data = ElectrostaticsData
+    supports_selective_streaming = True
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        thread_safe=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
+    def required_data_for(self, request: PolarizationRequest, _args: dict | None = None):
+        """Choose coordinate-only or connectivity inputs for formal charges."""
+        if request.charge_source == "formal":
+            return TrajectoryData if request.scope == "total" else ConnectivityTrajectoryData
+        return ElectrostaticsData
+
+    @staticmethod
+    def required_data_fields_for(request: PolarizationRequest, _args: dict) -> tuple[str, ...]:
+        """Declare only inputs used by the selected charge source and scope."""
+        fields = ["trajectory"]
+        if request.charge_source != "formal":
+            fields.append("charges")
+        if request.scope == "local":
+            fields.append("connectivity")
+        return tuple(fields)
 
     @staticmethod
     def recommended_presentations(
@@ -1318,14 +1618,22 @@ class PolarizationTask(AnalysisTask):
             frames=request.frames,
             every=request.every,
             volume_method=request.volume_method,
+            charge_source=request.charge_source,
+            formal_charges=request.formal_charges,
             reporter=reporter,
         )
         return PolarizationResult(table=out, request=request)
 
-    def run_stream(self, frames, request: PolarizationRequest, reporter=None) -> PolarizationResult:
+    def run_stream(self, frames, request: PolarizationRequest, reporter=None, pipeline=None) -> PolarizationResult:
         """Compute polarization from a bounded-memory electrostatics stream."""
         return PolarizationResult(
-            table=_run_electrostatics_stream(frames, request, mode="polarization", reporter=reporter),
+            table=_run_electrostatics_stream(
+                frames,
+                request,
+                mode="polarization",
+                reporter=reporter,
+                pipeline=pipeline,
+            ),
             request=request,
         )
 
@@ -1519,5 +1827,6 @@ __all__ = [
     "PolarizationFieldRequest",
     "PolarizationFieldResult",
     "PolarizationFieldTask",
+    "calculate_trajectory_volumes",
     "polarization_field_axis_label",
 ]

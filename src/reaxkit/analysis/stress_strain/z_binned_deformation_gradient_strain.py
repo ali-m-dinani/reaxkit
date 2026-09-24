@@ -19,6 +19,8 @@ from typing import Any, NamedTuple, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.analysis.stress_strain.streaming import selected_coordinates, run_strain_stream
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.stress_strain import common
 from reaxkit.core.registry.analysis_task_registry import register_task
@@ -182,7 +184,7 @@ def _fit_deformation_gradient(reference: np.ndarray, current: np.ndarray, *, min
     return _fit_prepared_reference(prepared, current_values), prepared.rank, prepared.condition_number
 
 
-def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinnedDeformationGradientStrainRequest) -> pd.DataFrame:
+def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinnedDeformationGradientStrainRequest, *, stream=None) -> pd.DataFrame:
     """Calculate affine deformation-gradient strain by frame and z bin.
 
     Works on
@@ -217,7 +219,8 @@ def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinned
     bin_range = str(request.bin_range).lower()
     if bin_range not in {"reference", "current"}:
         raise ValueError("bin_range must be 'reference' or 'current'.")
-    frames = common.selected_frames(positions.shape[0], request.selected_frames, request.every)
+    frames = (common.selected_frames(positions.shape[0], request.selected_frames, request.every) if stream is None
+              else None if request.selected_frames is None else sorted(request.selected_frames)[::request.every])
     selected = common.select_atom_indices(data.elements, request.atom_types)
     eligible = selected[np.all(np.isfinite(positions[0, selected]), axis=1)]
     if eligible.size == 0:
@@ -232,9 +235,9 @@ def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinned
     ]
     iterations = common.iteration_values(data)
     rows: list[dict[str, int | float]] = []
-    for frame, current_all, current_valid in common.iter_selected_coordinates(
-        data, eligible, frames, unwrap=request.unwrap, periodic=request.periodic
-    ):
+    coordinate_rows = (selected_coordinates(stream[0], eligible, request, stream[1]) if stream is not None else
+                       ((frame, coords, valid, int(iterations[frame])) for frame, coords, valid in common.iter_selected_coordinates(data, eligible, frames, unwrap=request.unwrap, periodic=request.periodic)))
+    for frame, current_all, current_valid, iteration in coordinate_rows:
         if bin_range == "reference":
             edges, frame_bins = reference_edges, reference_bins
         else:
@@ -260,7 +263,7 @@ def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinned
                 atom_count = int(in_bin.sum())
                 metrics, rank, condition = _fit_deformation_gradient(reference[in_bin], current_all[in_bin], minimum_atoms=request.minimum_atoms, max_condition_number=request.max_condition_number)
             rows.append({
-                "frame": frame, "iter": int(iterations[frame]), "bin_number": bin_number,
+                "frame": frame, "iter": iteration, "bin_number": bin_number,
                 "bin_mean_z": float(midpoint), "number_of_atoms_in_this_bin": int(atom_count),
                 "fit_rank": int(rank), "reference_condition_number": condition, **metrics,
             })
@@ -274,6 +277,12 @@ class ZBinnedDeformationGradientStrainTask(AnalysisTask):
     """Run z-binned deformation-gradient strain analysis."""
 
     required_data = TrajectoryData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.ORDERED_STATEFUL_STREAM,
+        supports_selective_frames=True, reference_frames=(0,), requires_contiguous_history=True,
+        estimated_frame_bytes=8 * 1024 * 1024)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return run_strain_stream(self, frames, request, calculate_deformation_gradient_strain, ZBinnedDeformationGradientStrainResult, pipeline)
 
     @staticmethod
     def recommended_presentations(_result: ZBinnedDeformationGradientStrainResult, payload: dict[str, Any]) -> list[PresentationSpec]:

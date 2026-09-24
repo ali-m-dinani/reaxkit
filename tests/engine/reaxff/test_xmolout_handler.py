@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from reaxkit.io.handlers.xmolout_handler import XmoloutHandler
+from reaxkit.core.platform.exceptions import ParseError
+from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
 
 def _write_text(path: Path, text: str) -> Path:
@@ -137,3 +138,21 @@ def test_extra_atom_cols_named_and_unknown_fallback(tmp_path: Path):
 
     # Check that parsing didn't drop frames
     assert h.n_frames() == 2
+
+
+def test_malformed_geometry_name_has_readable_error(tmp_path: Path):
+    p = _write_text(
+        tmp_path / "xmolout",
+        """28880
+Lattice="102.95859867431082 0 -4428142.44 104.96 60.60 78.26 90.00 90.00 90.00
+""",
+    )
+
+    with pytest.raises(ParseError) as error:
+        XmoloutHandler(p).dataframe()
+
+    message = str(error.value)
+    assert "Malformed xmolout frame header" in message
+    assert "frame 0, line 2" in message
+    assert "Lattice=" in message
+    assert "short geometry name" in message

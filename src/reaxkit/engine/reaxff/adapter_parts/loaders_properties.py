@@ -316,9 +316,9 @@ def load_eregime(adapter: ReaxFFAdapter, args: dict, reporter=None) -> EregimeDa
 def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeData:
     """Load atomic-charge trajectories.
 
-    Resolves a charge source, parses it through `Fort7Handler`, and enriches
-    the output with merged simulation metadata when available. If the ReaxFF
-    engine is used, then this file would usually be `fort.7`.
+    Resolves a charge source and reads ``fort.7``. Charge-only callers use the
+    lightweight quick-I/O path; callers that also need connectivity retain the
+    full ``Fort7Handler`` parse and its richer metadata.
 
     Parameters
     ----------
@@ -339,10 +339,31 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
     >>> charges = adapter.load_charges({"fort7": "run/fort.7"})
     """
     from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
+    from reaxkit.engine.reaxff.quick_io import load_charge_data_quick
 
     raw = args.get("fort7") or args.get("charges") or args.get("input") or "fort.7"
     p = Path(raw)
     fort7_path = p / "fort.7" if p.is_dir() else p
+    required_fields = {str(field) for field in args.get("_required_data_fields", ())}
+    inferred_charge_only = bool(
+        required_fields
+        and "charges" in required_fields
+        and "connectivity" not in required_fields
+    )
+    if args.get("_quick_charge_only") or inferred_charge_only:
+        xmolout_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        return adapter._time_source(
+            args,
+            handler_name="Fort7ChargeOnlyReader",
+            source_path=fort7_path,
+            loader=lambda: load_charge_data_quick(
+                fort7_path,
+                xmolout_path=xmolout_path,
+                frame_indices=args.get("_frame_indices"),
+                reporter=reporter,
+                input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+            ),
+        )
     handler = adapter._build_handler(
         args,
         handler_name="Fort7Handler",
@@ -351,6 +372,7 @@ def load_charges(adapter: ReaxFFAdapter, args: dict, reporter=None) -> ChargeDat
             fort7_path,
             reporter=reporter,
             frame_indices=args.get("_frame_indices"),
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
         ),
     )
     sim = _merge_simulation_data(
@@ -392,12 +414,48 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
     """
     required_fields = {str(field) for field in args.get("_required_data_fields", ())}
     load_all_fields = not required_fields
+    needs_connectivity = load_all_fields or "connectivity" in required_fields
+    selected_frames = tuple(args.get("_frame_indices") or ())
+    per_file_progress = bool(selected_frames) and callable(reporter)
 
-    trajectory = adapter.load_trajectory(args, reporter=reporter)
-    charges = adapter.load_charges(args, reporter=reporter)
+    def _file_reporter(source_name: str, label: str):
+        if not per_file_progress:
+            return reporter
+
+        def _report(stage: str, current: int, total: int, message: str | None = None) -> None:
+            # Each input owns one sequential bar. Nested summary scans are
+            # implementation details and must not reset the file-frame total.
+            if source_name not in str(message or "").lower():
+                return
+            reporter(
+                f"load {label}",
+                current,
+                total,
+                f"Reading {label} frames",
+            )
+
+        return _report
+
+    if per_file_progress:
+        # Close the adapter's generic indeterminate load operation before the
+        # two concrete file bars begin.
+        reporter("load", 1, 1, "Preparing input files")
+
+    trajectory = adapter.load_trajectory(
+        args,
+        reporter=_file_reporter("xmolout", "xmolout"),
+    )
+    charge_args = args if needs_connectivity else {**args, "_quick_charge_only": True}
+    charges = adapter.load_charges(
+        charge_args,
+        reporter=_file_reporter("fort.7", "fort.7"),
+    )
     connectivity = (
-        adapter.load_connectivity(args, reporter=reporter)
-        if load_all_fields or "connectivity" in required_fields
+        adapter.load_connectivity(
+            args,
+            reporter=_file_reporter("fort.7", "fort.7 connectivity"),
+        )
+        if needs_connectivity
         else None
     )
     electric_field = None
@@ -406,7 +464,10 @@ def load_electrostatics(adapter: ReaxFFAdapter, args: dict, reporter=None) -> El
         fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
         if command == "hyst" or fort78_path.exists():
             try:
-                electric_field = adapter.load_electric_field(args, reporter=reporter)
+                electric_field = adapter.load_electric_field(
+                    args,
+                    reporter=None if per_file_progress else reporter,
+                )
             except FileNotFoundError:
                 if command == "hyst":
                     raise

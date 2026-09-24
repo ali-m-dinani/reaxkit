@@ -1,0 +1,28 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.10",
+  "scope": "synthetic cache only; not end-to-end speedup",
+  "cases": [
+    {
+      "frames": 512,
+      "atoms": 5120,
+      "cold_seconds": 1.567388000083156,
+      "warm_seconds": 0.6212390000000596,
+      "cache_stats": {}
+    },
+    {
+      "frames": 1024,
+      "atoms": 5120,
+      "cold_seconds": 9.932326700072736,
+      "warm_seconds": 1.5230500000761822,
+      "cache_stats": {}
+    },
+    {
+      "frames": 2048,
+      "atoms": 5120,
+      "cold_seconds": 34.09445870004129,
+      "warm_seconds": 3.057474699919112,
+      "cache_stats": {}
+    }
+  ]
+}

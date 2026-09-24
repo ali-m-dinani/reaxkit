@@ -35,6 +35,12 @@ ALL_COMMANDS = (
     "get_largest_molecule_composition",
     "get_molecule_lifetime",
 )
+COMMAND_ALIASES = {
+    "get_dominant_species": ("dominant_species",),
+    "get_largest_molecule_by_mass": ("largest_molecule_by_mass",),
+    "get_largest_molecule_composition": ("largest_molecule_composition",),
+    "get_molecule_lifetime": ("molecule_lifetime",),
+}
 ALL_LEGACY_COMMANDS = (
     "dominant_species",
     "largest_molecule_by_mass",
@@ -144,7 +150,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -335,7 +341,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     task_cls = TASK_REGISTRY[canonical]
     request = REQUEST_BUILDERS[canonical](args)
 

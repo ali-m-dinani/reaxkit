@@ -13,34 +13,62 @@
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
+#### Scientific choices
+
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--init` | No |  | Initialize a study from a YAML file and generate folders/manifests. |  |
-| `--make-yaml` | No |  | Write a starter study YAML template (default: study.yaml). |  |
-| `--gen-yaml` | No |  | Alias for --make-yaml. |  |
-| `--manage` | No |  | Manage study metadata/artifacts (path update and removals). |  |
 | `--run` | No |  | Execute study stages from an initialized study root folder. |  |
 | `--analyze` | No |  | Execute analysis pipelines declared in top-level study 'analysis'. |  |
 | `--aggregate` | No |  | Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
-| `--present` | No |  | Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
-| `--plot` | No |  | Deprecated alias for --present. |  |
-| `--root` | No | . | Root folder where the generated <study_name>/ tree will be created. |  |
-| `--force` | No |  | Allow overwriting existing template file or reusing non-empty study directory. |  |
-| `--artifact-transfer` | No |  | How consumed artifacts are propagated into downstream stage folders. |  |
 | `--run-geometry-generator` | No | True | Execute geometry_generator.cli_template during study initialization (default: true). |  |
 | `--strict-actions` | No | False | Fail immediately when geometry generation or artifact propagation actions fail. |  |
 | `--stage` | No |  | Run only one stage name (e.g. MM, NPT, NVT). |  |
-| `--case` | No |  | Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). |  |
 | `--replicate` | No |  | Optional replicate selector (e.g. rep_01). |  |
-| `--parallel-workers` | No | 1 | Number of replicate pipelines to run in parallel for --run (default: 1). |  |
-| `--rerun-failed` | No |  | For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. |  |
-| `--analysis` | No |  | Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. |  |
 | `--action` | No |  | Manager action for --manage. | update-paths, rename-cases, remove |
 | `--target` | No |  | Manager target(s) for --manage. Can be repeated. | paths, case-names, analysis, aggregate, cache, run-status, analysis-status, aggregate-status, plot-status |
+| `--value-column` | No |  | For aggregate: explicit numeric column to extract from per-run analysis CSV exports. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--init` | No |  | Initialize a study from a YAML file and generate folders/manifests. |  |
+| `--manage` | No |  | Manage study metadata/artifacts (path update and removals). |  |
+| `--root` | No | . | Root folder where the generated <study_name>/ tree will be created. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--make-yaml` | No |  | Write a starter study YAML template (default: study.yaml). |  |
+| `--gen-yaml` | No |  | Alias for --make-yaml. |  |
+| `--present` | No |  | Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
+| `--plot` | No |  | Deprecated alias for --present. |  |
 | `--analysis-title` | No |  | Manager filter: analysis title. |  |
 | `--aggregate-title` | No |  | Manager filter: aggregate title. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parallel-workers` | No | 1 | Number of replicate pipelines to run in parallel for --run (default: 1). |  |
+| `--rerun-failed` | No |  | For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. |  |
 | `--dry-run` | No |  | Show what --manage would change without writing/removing. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--force` | No |  | Allow overwriting existing template file or reusing non-empty study directory. |  |
+| `--artifact-transfer` | No |  | How consumed artifacts are propagated into downstream stage folders. |  |
+| `--case` | No |  | Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). |  |
+| `--analysis` | No |  | Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. |  |
 | `--older-than` | No |  | For cache removal: only remove entries older than N days. |  |
-| `--value-column` | No |  | For aggregate: explicit numeric column to extract from per-run analysis CSV exports. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
 
 </div>

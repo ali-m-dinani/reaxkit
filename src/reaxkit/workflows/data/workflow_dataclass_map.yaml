@@ -1,4 +1,4 @@
-﻿_meta:
+_meta:
   version: '1.0'
   source: workflow registries + analysis task dataclass map + workflow module docstrings
   purpose: Maps workflow families and independently invocable workflow commands
@@ -51,7 +51,7 @@ workflows:
     - reaxkit help "connectivity workflow"
     - run connectivity workflow
   electrostatics_workflow:
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge-table'
     description: Command workflow for electrostatics analyses and local visualizations.
     related_commands:
       analysis:
@@ -71,6 +71,54 @@ workflows:
     help_search_examples:
     - reaxkit help "electrostatics workflow"
     - run electrostatics workflow
+  potential_and_electric_field_workflow:
+    implementation_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow: get-potential-and-electric-field'
+    module_prefix: reaxkit.workflows.electrostatics.potential_and_electric_field
+    description: ReaxFF local potential, electric field, spatial binning, plotting, and Extended XYZ export workflows.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.electrostatics.potential_and_electric_field
+      generator: []
+    tags: [electrostatics, ReaxFF, local field, potential]
+    notes: ['How to use: reaxkit get-potential-and-electric-field -h']
+    aliases: [local electrostatics workflow]
+    help_search_examples: [reaxkit help "local electrostatics"]
+  three_folded_wurtzite_workflow:
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow: get-three-folded-wurtzite-polarity'
+    module_prefix: reaxkit.workflows.ferroelectrics.three_folded_wurtzite
+    description: Three-basal-neighbor wurtzite geometry, polarity, spatial polarization, plotting, and Extended XYZ workflows.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.ferroelectrics.three_folded_wurtzite
+      generator: []
+    tags: [ferroelectrics, wurtzite, surface, polarity]
+    notes: ['How to use: reaxkit get-three-folded-wurtzite-polarity -h']
+    aliases: [three folded wurtzite workflow]
+    help_search_examples: [reaxkit help "three folded wurtzite"]
+  basal_plane_displacement_workflow:
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow: get-basal-plane-displacement-dipole'
+    module_prefix: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment
+    description: Dipole and polarization workflows using the mean basal-anion plane as the displacement reference.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment
+      generator: []
+    tags: [ferroelectrics, wurtzite, dipole, polarization, basal plane]
+    notes: ['How to use: reaxkit get-basal-plane-displacement-dipole -h']
+    aliases: [basal plane displacement workflow]
+    help_search_examples: [reaxkit help "basal plane displacement"]
+  hbn_reference_workflow:
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow: get-hbn-reference-polarization'
+    module_prefix: reaxkit.workflows.ferroelectrics.hbn_reference
+    description: Global and local polarization workflows based on displacement from a replicated nonpolar hexagonal AlN reference.
+    related_commands:
+      analysis:
+      - reaxkit.analysis.ferroelectrics.hbn_reference
+      generator: []
+    tags: [ferroelectrics, polarization, reference structure, hBN, AlN]
+    notes: ['How to use: reaxkit get-hbn-reference-polarization -h']
+    aliases: [hbn reference workflow]
+    help_search_examples: [reaxkit help "hbn reference polarization"]
   kinematics_workflow:
     implementation_module: 'reaxkit.workflows.kinematics_workflow: get_kinematics'
     description: Direct command workflow for atomic-kinematics analyses.
@@ -667,6 +715,568 @@ workflows:
     - reaxkit help "workspace cleanup"
     - manage workspace workflow
   # BEGIN GENERATED COMMAND WORKFLOWS
+  get-potential-and-electric-field:
+    parent_workflow: potential_and_electric_field_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow:
+      get-potential-and-electric-field'
+    command: get-potential-and-electric-field
+    command_kind: analysis
+    analysis_task: get-potential-and-electric-field
+    description: Calculates internal ReaxFF Coulomb electrostatics, externally applied electrostatics, and
+      their total local potential and electric field at every atom location.
+    tags:
+    - electrostatics
+    - ReaxFF
+    - potential
+    - electric field
+    - get potential and electric field
+    - potential and electric field workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-potential-and-electric-field -h'
+    aliases:
+    - get_potential_and_electric_field
+    - reaxff-local-field
+    help_search_examples:
+    - reaxkit help "local electric field"
+    - reaxkit get-potential-and-electric-field -h
+    - reaxkit help "get potential and electric field"
+  reaxff-local-field:
+    parent_workflow: potential_and_electric_field_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow:
+      reaxff-local-field'
+    command: reaxff-local-field
+    command_kind: workflow
+    description: Run the reaxff local field workflow command provided by potential_and_electric_field_workflow.
+    tags:
+    - reaxff local field
+    - potential and electric field workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit reaxff-local-field -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "reaxff local field"
+    - reaxkit reaxff-local-field -h
+  write-trajectory-with-potential-and-electric-field:
+    parent_workflow: potential_and_electric_field_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow:
+      write-trajectory-with-potential-and-electric-field'
+    command: write-trajectory-with-potential-and-electric-field
+    command_kind: analysis
+    analysis_task: write-trajectory-with-potential-and-electric-field
+    description: Writes an Extended XYZ trajectory with internal, external, and total local potential and
+      electric-field atom properties.
+    tags:
+    - electrostatics
+    - ReaxFF
+    - trajectory
+    - Extended XYZ
+    - write trajectory with potential and electric field
+    - potential and electric field workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit write-trajectory-with-potential-and-electric-field -h'
+    aliases:
+    - write_trajectory_with_potential_and_electric_field
+    - local-field-extxyz
+    help_search_examples:
+    - reaxkit help "local field trajectory"
+    - reaxkit write-trajectory-with-potential-and-electric-field -h
+    - reaxkit help "write trajectory with potential and electric field"
+  local-field-extxyz:
+    parent_workflow: potential_and_electric_field_workflow
+    implementation_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow:
+      local-field-extxyz'
+    command: local-field-extxyz
+    command_kind: workflow
+    description: Run the local field extxyz workflow command provided by potential_and_electric_field_workflow.
+    tags:
+    - local field extxyz
+    - potential and electric field workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit local-field-extxyz -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "local field extxyz"
+    - reaxkit local-field-extxyz -h
+  get-three-folded-wurtzite-neighbors:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow: get-three-folded-wurtzite-neighbors'
+    command: get-three-folded-wurtzite-neighbors
+    command_kind: analysis
+    analysis_task: get-three-folded-wurtzite-neighbors
+    description: Finds three basal neighbors and retains remaining in-cutoff atoms as apical candidates
+      for three-folded wurtzite sites.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - neighbors
+    - surface
+    - get three folded wurtzite neighbors
+    - three folded wurtzite workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-three-folded-wurtzite-neighbors -h'
+    aliases:
+    - get_three_folded_wurtzite_neighbors
+    - three-folded-wurtzite-neighbors
+    help_search_examples:
+    - reaxkit help "three folded neighbors"
+    - reaxkit get-three-folded-wurtzite-neighbors -h
+    - reaxkit help "get three folded wurtzite neighbors"
+  three-folded-wurtzite-neighbors:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow: three-folded-wurtzite-neighbors'
+    command: three-folded-wurtzite-neighbors
+    command_kind: workflow
+    description: Run the three folded wurtzite neighbors workflow command provided by three_folded_wurtzite_workflow.
+    tags:
+    - three folded wurtzite neighbors
+    - three folded wurtzite workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit three-folded-wurtzite-neighbors -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "three folded wurtzite neighbors"
+    - reaxkit three-folded-wurtzite-neighbors -h
+  get-three-folded-wurtzite-polarity:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow: get-three-folded-wurtzite-polarity'
+    command: get-three-folded-wurtzite-polarity
+    command_kind: analysis
+    analysis_task: get-three-folded-wurtzite-polarity
+    description: Calculates polarity from three basal bonds and then selects an apical neighbor on the polarity-consistent
+      side.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - polarity
+    - surface
+    - get three folded wurtzite polarity
+    - three folded wurtzite workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-three-folded-wurtzite-polarity -h'
+    aliases:
+    - get_three_folded_wurtzite_polarity
+    - three-folded-wurtzite-polarity
+    help_search_examples:
+    - reaxkit help "three folded polarity"
+    - reaxkit get-three-folded-wurtzite-polarity -h
+    - reaxkit help "get three folded wurtzite polarity"
+  three-folded-wurtzite-polarity:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow: three-folded-wurtzite-polarity'
+    command: three-folded-wurtzite-polarity
+    command_kind: workflow
+    description: Run the three folded wurtzite polarity workflow command provided by three_folded_wurtzite_workflow.
+    tags:
+    - three folded wurtzite polarity
+    - three folded wurtzite workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit three-folded-wurtzite-polarity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "three folded wurtzite polarity"
+    - reaxkit three-folded-wurtzite-polarity -h
+  get-three-folded-wurtzite-polarization:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow:
+      get-three-folded-wurtzite-polarization'
+    command: get-three-folded-wurtzite-polarization
+    command_kind: analysis
+    analysis_task: get-three-folded-wurtzite-polarization
+    description: Sums three-folded site dipoles in spatial bins and normalizes them by hull, bounding-box,
+      or cell bin volume.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - polarization
+    - binning
+    - heatmap
+    - get three folded wurtzite polarization
+    - three folded wurtzite workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-three-folded-wurtzite-polarization -h'
+    aliases:
+    - get_three_folded_wurtzite_polarization
+    - three-folded-wurtzite-polarization
+    help_search_examples:
+    - reaxkit help "three folded polarization"
+    - reaxkit get-three-folded-wurtzite-polarization -h
+    - reaxkit help "get three folded wurtzite polarization"
+  three-folded-wurtzite-polarization:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow:
+      three-folded-wurtzite-polarization'
+    command: three-folded-wurtzite-polarization
+    command_kind: workflow
+    description: Run the three folded wurtzite polarization workflow command provided by three_folded_wurtzite_workflow.
+    tags:
+    - three folded wurtzite polarization
+    - three folded wurtzite workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit three-folded-wurtzite-polarization -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "three folded wurtzite polarization"
+    - reaxkit three-folded-wurtzite-polarization -h
+  write-three-folded-trajectory-with-polarity:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow:
+      write-three-folded-trajectory-with-polarity'
+    command: write-three-folded-trajectory-with-polarity
+    command_kind: analysis
+    analysis_task: write-three-folded-trajectory-with-polarity
+    description: Writes a species-preserving Extended XYZ trajectory containing basal-only polarity and
+      apical-presence properties.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - trajectory
+    - Extended XYZ
+    - write three folded trajectory with polarity
+    - three folded wurtzite workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit write-three-folded-trajectory-with-polarity -h'
+    aliases:
+    - write_three_folded_trajectory_with_polarity
+    - three-folded-polarity-extxyz
+    help_search_examples:
+    - reaxkit help "three folded polarity trajectory"
+    - reaxkit write-three-folded-trajectory-with-polarity -h
+    - reaxkit help "write three folded trajectory with polarity"
+  three-folded-polarity-extxyz:
+    parent_workflow: three_folded_wurtzite_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow:
+      three-folded-polarity-extxyz'
+    command: three-folded-polarity-extxyz
+    command_kind: workflow
+    description: Run the three folded polarity extxyz workflow command provided by three_folded_wurtzite_workflow.
+    tags:
+    - three folded polarity extxyz
+    - three folded wurtzite workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit three-folded-polarity-extxyz -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "three folded polarity extxyz"
+    - reaxkit three-folded-polarity-extxyz -h
+  get-basal-plane-displacement-dipole:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow:
+      get-basal-plane-displacement-dipole'
+    command: get-basal-plane-displacement-dipole
+    command_kind: analysis
+    analysis_task: get-basal-plane-displacement-dipole
+    description: Calculates all center, basal, and apical ionic contributions relative to the mean basal
+      plane using negative electron charge.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - dipole
+    - basal plane
+    - get basal plane displacement dipole
+    - basal plane displacement workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-basal-plane-displacement-dipole -h'
+    aliases:
+    - get_basal_plane_displacement_dipole
+    - basal-plane-dipole
+    help_search_examples:
+    - reaxkit help "basal plane dipole"
+    - reaxkit get-basal-plane-displacement-dipole -h
+    - reaxkit help "get basal plane displacement dipole"
+  basal-plane-dipole:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow:
+      basal-plane-dipole'
+    command: basal-plane-dipole
+    command_kind: workflow
+    description: Run the basal plane dipole workflow command provided by basal_plane_displacement_workflow.
+    tags:
+    - basal plane dipole
+    - basal plane displacement workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit basal-plane-dipole -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "basal plane dipole"
+    - reaxkit basal-plane-dipole -h
+  get-basal-plane-displacement-polarization:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow:
+      get-basal-plane-displacement-polarization'
+    command: get-basal-plane-displacement-polarization
+    command_kind: analysis
+    analysis_task: get-basal-plane-displacement-polarization
+    description: Calculates binned polarization from all ionic displacement contributions relative to the
+      basal plane.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - polarization
+    - basal plane
+    - heatmap
+    - get basal plane displacement polarization
+    - basal plane displacement workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-basal-plane-displacement-polarization -h'
+    aliases:
+    - get_basal_plane_displacement_polarization
+    - basal-plane-polarization
+    help_search_examples:
+    - reaxkit help "basal plane polarization"
+    - reaxkit get-basal-plane-displacement-polarization -h
+    - reaxkit help "get basal plane displacement polarization"
+  basal-plane-polarization:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow:
+      basal-plane-polarization'
+    command: basal-plane-polarization
+    command_kind: workflow
+    description: Run the basal plane polarization workflow command provided by basal_plane_displacement_workflow.
+    tags:
+    - basal plane polarization
+    - basal plane displacement workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit basal-plane-polarization -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "basal plane polarization"
+    - reaxkit basal-plane-polarization -h
+  get-basal-plane-displacement-local-polarization:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow:
+      get-basal-plane-displacement-local-polarization'
+    command: get-basal-plane-displacement-local-polarization
+    command_kind: analysis
+    analysis_task: get-basal-plane-displacement-local-polarization
+    description: Calculates one local polarization vector per valid center using equal frame-volume shares
+      or N-neighbor coordination tetrahedra.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - local polarization
+    - basal plane
+    - coordination volume
+    - get basal plane displacement local polarization
+    - basal plane displacement workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-basal-plane-displacement-local-polarization -h'
+    aliases:
+    - get_basal_plane_displacement_local_polarization
+    - basal-plane-local-polarization
+    help_search_examples:
+    - reaxkit help "basal plane local polarization"
+    - reaxkit get-basal-plane-displacement-local-polarization -h
+    - reaxkit help "get basal plane displacement local polarization"
+  basal-plane-local-polarization:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow:
+      basal-plane-local-polarization'
+    command: basal-plane-local-polarization
+    command_kind: workflow
+    description: Run the basal plane local polarization workflow command provided by basal_plane_displacement_workflow.
+    tags:
+    - basal plane local polarization
+    - basal plane displacement workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit basal-plane-local-polarization -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "basal plane local polarization"
+    - reaxkit basal-plane-local-polarization -h
+  get-basal-plane-displacement-projected-polarity:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow:
+      get-basal-plane-displacement-projected-polarity'
+    command: get-basal-plane-displacement-projected-polarity
+    command_kind: analysis
+    analysis_task: get-basal-plane-displacement-projected-polarity
+    description: Averages the positive and negative signs of local basal-plane dipoles in TEM-like spatial
+      projections and frame-resolved profiles.
+    tags:
+    - ferroelectrics
+    - wurtzite
+    - polarity
+    - projection
+    - heatmap
+    - TEM
+    - get basal plane displacement projected polarity
+    - basal plane displacement workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-basal-plane-displacement-projected-polarity -h'
+    aliases:
+    - get_basal_plane_displacement_projected_polarity
+    - basal-plane-projected-polarity
+    help_search_examples:
+    - reaxkit help "basal plane projected polarity"
+    - reaxkit get-basal-plane-displacement-projected-polarity -h
+    - reaxkit help "get basal plane displacement projected polarity"
+  basal-plane-projected-polarity:
+    parent_workflow: basal_plane_displacement_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow:
+      basal-plane-projected-polarity'
+    command: basal-plane-projected-polarity
+    command_kind: workflow
+    description: Run the basal plane projected polarity workflow command provided by basal_plane_displacement_workflow.
+    tags:
+    - basal plane projected polarity
+    - basal plane displacement workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit basal-plane-projected-polarity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "basal plane projected polarity"
+    - reaxkit basal-plane-projected-polarity -h
+  get-hbn-reference-polarization:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow: get-hbn-reference-polarization'
+    command: get-hbn-reference-polarization
+    command_kind: analysis
+    analysis_task: get-hbn-reference-polarization
+    description: Calculates vector dipole and polarization from all atoms mapped to a replicated nonpolar
+      hexagonal AlN reference.
+    tags:
+    - ferroelectrics
+    - polarization
+    - reference structure
+    - hBN
+    - AlN
+    - get hbn reference polarization
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-reference-polarization -h'
+    aliases:
+    - get_hbn_reference_polarization
+    - hbn-reference-polarization
+    help_search_examples:
+    - reaxkit help "hbn reference polarization"
+    - reaxkit get-hbn-reference-polarization -h
+    - reaxkit help "get hbn reference polarization"
+  hbn-reference-polarization:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow: hbn-reference-polarization'
+    command: hbn-reference-polarization
+    command_kind: workflow
+    description: Run the hbn reference polarization workflow command provided by hbn_reference_workflow.
+    tags:
+    - hbn reference polarization
+    - hbn reference workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit hbn-reference-polarization -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "hbn reference polarization"
+    - reaxkit hbn-reference-polarization -h
+  get-hbn-reference-local-polarization:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow:
+      get-hbn-reference-local-polarization'
+    command: get-hbn-reference-local-polarization
+    command_kind: analysis
+    analysis_task: get-hbn-reference-local-polarization
+    description: Calculates local dipole and polarization for both four-atom crystallographic cells and
+      two-atom AlN reference layers using equal or deformation-weighted volumes.
+    tags:
+    - ferroelectrics
+    - local polarization
+    - reference structure
+    - hBN
+    - volume
+    - get hbn reference local polarization
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-reference-local-polarization -h'
+    aliases:
+    - get_hbn_reference_local_polarization
+    - hbn-reference-local-polarization
+    help_search_examples:
+    - reaxkit help "hbn reference local polarization"
+    - reaxkit get-hbn-reference-local-polarization -h
+    - reaxkit help "get hbn reference local polarization"
+  hbn-reference-local-polarization:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow:
+      hbn-reference-local-polarization'
+    command: hbn-reference-local-polarization
+    command_kind: workflow
+    description: Run the hbn reference local polarization workflow command provided by hbn_reference_workflow.
+    tags:
+    - hbn reference local polarization
+    - hbn reference workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit hbn-reference-local-polarization -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "hbn reference local polarization"
+    - reaxkit hbn-reference-local-polarization -h
+  get-hbn-reference-projected-polarity:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow:
+      get-hbn-reference-projected-polarity'
+    command: get-hbn-reference-projected-polarity
+    command_kind: analysis
+    analysis_task: get-hbn-reference-projected-polarity
+    description: Averages fixed-reference-cell polarity signs in spatial projections and frame-resolved
+      kymographs.
+    tags:
+    - ferroelectrics
+    - polarity
+    - projection
+    - kymograph
+    - hBN
+    - TEM
+    - get hbn reference projected polarity
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-reference-projected-polarity -h'
+    aliases:
+    - get_hbn_reference_projected_polarity
+    - hbn-reference-projected-polarity
+    help_search_examples:
+    - reaxkit help "hbn reference projected polarity"
+    - reaxkit get-hbn-reference-projected-polarity -h
+    - reaxkit help "get hbn reference projected polarity"
+  hbn-reference-projected-polarity:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow:
+      hbn-reference-projected-polarity'
+    command: hbn-reference-projected-polarity
+    command_kind: workflow
+    description: Run the hbn reference projected polarity workflow command provided by hbn_reference_workflow.
+    tags:
+    - hbn reference projected polarity
+    - hbn reference workflow
+    - workflow workflow command
+    notes:
+    - 'How to use the workflow: reaxkit hbn-reference-projected-polarity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "hbn reference projected polarity"
+    - reaxkit hbn-reference-projected-polarity -h
   get_active_site_events:
     parent_workflow: active_site_workflow
     implementation_module: 'reaxkit.workflows.active_site_workflow: get_active_site_events'
@@ -832,7 +1442,7 @@ workflows:
     - reaxkit plot_atom_property -h
   charge_table:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: charge_table'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge_table'
     command: charge_table
     command_kind: analysis
     analysis_task: charge_table
@@ -857,7 +1467,7 @@ workflows:
     - reaxkit charge_table -h
   dipole:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: dipole'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: dipole'
     command: dipole
     command_kind: workflow
     description: Run the dipole workflow command provided by electrostatics_workflow.
@@ -1515,31 +2125,33 @@ workflows:
     help_search_examples:
     - reaxkit help "place geo"
     - reaxkit place-geo -h
-  polarization:
+  get-polarization:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
-    command: polarization
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-polarization'
+    command: get-polarization
     command_kind: analysis
-    analysis_task: polarization
+    analysis_task: get-polarization
     description: Computes polarization metrics from electrostatics data built from charges, coordinates,
       connectivity, and optional field values. It supports dielectric-response and field-driven charge-separation
       studies.
     tags:
     - electrostatics
     - polarization
+    - get polarization
     - electrostatics workflow
     - analysis workflow command
     notes:
-    - 'How to use the workflow: reaxkit polarization -h'
+    - 'How to use the workflow: reaxkit get-polarization -h'
     aliases:
     - polarization
     help_search_examples:
     - reaxkit help "polarization"
     - run polarization
-    - reaxkit polarization -h
+    - reaxkit help "get polarization"
+    - reaxkit get-polarization -h
   get_polarization_field:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get_polarization_field'
     command: get_polarization_field
     command_kind: analysis
     analysis_task: get_polarization_field
@@ -2921,7 +3533,7 @@ workflows:
     - reaxkit get_z_binned_deformation_gradient_strain -h
   polarization-field:
     parent_workflow: electrostatics_workflow
-    implementation_module: 'reaxkit.workflows.electrostatics_workflow: polarization-field'
+    implementation_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: polarization-field'
     command: polarization-field
     command_kind: workflow
     description: Run the polarization field workflow command provided by electrostatics_workflow.
@@ -2952,6 +3564,7 @@ dataclass_usage:
   - timeseries_workflow
   ElectrostaticsData:
   - electrostatics_workflow
+  - potential_and_electric_field_workflow
   ForceFieldOptimizationDiagnosticData:
   - ffield_workflow
   ForceFieldOptimizationParameterData:
@@ -2985,6 +3598,45 @@ dataclass_usage:
   - trajectory_workflow
   - stress_strain_workflow
 command_to_workflow_module:
+  get-potential-and-electric-field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow
+  get_potential_and_electric_field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow
+  reaxff-local-field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow
+  write-trajectory-with-potential-and-electric-field: reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow
+  write_trajectory_with_potential_and_electric_field: reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow
+  local-field-extxyz: reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow
+  get-three-folded-wurtzite-neighbors: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow
+  get_three_folded_wurtzite_neighbors: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow
+  three-folded-wurtzite-neighbors: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow
+  get-three-folded-wurtzite-polarity: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow
+  get_three_folded_wurtzite_polarity: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow
+  three-folded-wurtzite-polarity: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow
+  get-three-folded-wurtzite-polarization: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow
+  get_three_folded_wurtzite_polarization: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow
+  three-folded-wurtzite-polarization: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow
+  write-three-folded-trajectory-with-polarity: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow
+  write_three_folded_trajectory_with_polarity: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow
+  three-folded-polarity-extxyz: reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow
+  get-basal-plane-displacement-dipole: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow
+  get_basal_plane_displacement_dipole: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow
+  basal-plane-dipole: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow
+  get-basal-plane-displacement-polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow
+  get_basal_plane_displacement_polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow
+  basal-plane-polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow
+  get-basal-plane-displacement-local-polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow
+  get_basal_plane_displacement_local_polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow
+  basal-plane-local-polarization: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow
+  get-basal-plane-displacement-projected-polarity: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow
+  get_basal_plane_displacement_projected_polarity: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow
+  basal-plane-projected-polarity: reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow
+  get-hbn-reference-polarization: reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow
+  get_hbn_reference_polarization: reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow
+  hbn-reference-polarization: reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow
+  get-hbn-reference-local-polarization: reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow
+  get_hbn_reference_local_polarization: reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow
+  hbn-reference-local-polarization: reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow
+  get-hbn-reference-projected-polarity: reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow
+  get_hbn_reference_projected_polarity: reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow
+  hbn-reference-projected-polarity: reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow
   get_active_site_events: reaxkit.workflows.active_site_workflow
   get_active_site_structural: reaxkit.workflows.active_site_workflow
   add-alias: reaxkit.workflows.meta.command_alias_workflow
@@ -2995,8 +3647,8 @@ command_to_workflow_module:
   add_restraints_to_geo: reaxkit.workflows.file_tools.geo_workflow
   add_molcharge_to_geo: reaxkit.workflows.file_tools.geo_workflow
   plot_atom_property: reaxkit.workflows.meta.plot_atom_property_workflow
-  charge-table: reaxkit.workflows.electrostatics_workflow
-  dipole: reaxkit.workflows.electrostatics_workflow
+  charge-table: reaxkit.workflows.electrostatics.electrostatics_workflow
+  dipole: reaxkit.workflows.electrostatics.electrostatics_workflow
   repair_fort7: reaxkit.workflows.file_tools.fort7_workflow
   get_ffield_data: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_opt_progress_data: reaxkit.workflows.file_tools.ffield_workflow
@@ -3031,8 +3683,8 @@ command_to_workflow_module:
   get_ffield_diagnostics_sensitivity: reaxkit.workflows.file_tools.ffield_workflow
   get_ffield_diagnostics_evolution: reaxkit.workflows.file_tools.ffield_workflow
   place-geo: reaxkit.workflows.file_tools.geo_workflow
-  polarization: reaxkit.workflows.electrostatics_workflow
-  get_polarization_field: reaxkit.workflows.electrostatics_workflow
+  get-polarization: reaxkit.workflows.electrostatics.electrostatics_workflow
+  get_polarization_field: reaxkit.workflows.electrostatics.electrostatics_workflow
   sort-geo: reaxkit.workflows.file_tools.geo_workflow
   get_energy_min_summary_data: reaxkit.workflows.file_tools.ffield_workflow
   study: reaxkit.workflows.study_design.study_workflow
@@ -3137,7 +3789,7 @@ command_to_workflow_module:
   add-restraints-to-geo: reaxkit.workflows.file_tools.geo_workflow
   add-molcharge-to-geo: reaxkit.workflows.file_tools.geo_workflow
   plot-atom-property: reaxkit.workflows.meta.plot_atom_property_workflow
-  charge_table: reaxkit.workflows.electrostatics_workflow
+  charge_table: reaxkit.workflows.electrostatics.electrostatics_workflow
   repair-fort7: reaxkit.workflows.file_tools.fort7_workflow
   get-ffield-data: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-opt-progress-data: reaxkit.workflows.file_tools.ffield_workflow
@@ -3165,7 +3817,7 @@ command_to_workflow_module:
   get-ffield-diagnostics-sensitivity: reaxkit.workflows.file_tools.ffield_workflow
   get-ffield-diagnostics-evolution: reaxkit.workflows.file_tools.ffield_workflow
   place_geo: reaxkit.workflows.file_tools.geo_workflow
-  polarization-field: reaxkit.workflows.electrostatics_workflow
+  polarization-field: reaxkit.workflows.electrostatics.electrostatics_workflow
   sort_geo: reaxkit.workflows.file_tools.geo_workflow
   get-energy-min-summary-data: reaxkit.workflows.file_tools.ffield_workflow
   get-trainset-data: reaxkit.workflows.file_tools.trainset_workflow

@@ -18,7 +18,6 @@ from reaxkit.domain.data_models import ChargeData
 from reaxkit.workflows.timeseries import ALL_COMMANDS
 from reaxkit.workflows.timeseries import common
 
-
 SCALAR_FIELDS = {
     "get_potential_energy": "potential_energy",
     "get_num_of_atoms": "num_of_atoms",
@@ -64,10 +63,53 @@ def test_scalar_getters_pin_their_supported_field() -> None:
         assert request.every == 2
 
 
+def test_get_potential_energy_supports_per_atom_request() -> None:
+    module = import_module("reaxkit.workflows.timeseries.get_potential_energy")
+    args = _parser_for("get_potential_energy").parse_args(["--per-atom"])
+
+    request = module.build_request(args)
+
+    assert request.field == "potential_energy"
+    assert request.per_atom is True
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_title", "expected_ylabel"),
+    [
+        ([], "Potential Energy", "Potential Energy (kcal/mole)"),
+        (
+            ["--per-atom"],
+            "Potential Energy per Atom",
+            "Potential Energy per Atom (kcal/mole/atom)",
+        ),
+    ],
+)
+def test_get_potential_energy_plot_has_physical_label(
+    argv, expected_title, expected_ylabel
+) -> None:
+    args = _parser_for("get_potential_energy").parse_args(argv)
+    result = SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "frame_index": [0, 1],
+                "iter": [0, 10],
+                "field": ["potential_energy"] * 2,
+                "value": [-20.0, -10.0],
+            }
+        )
+    )
+
+    payload = common.build_plot_payload("get_potential_energy", result, args)
+
+    assert payload["title"] == expected_title
+    assert payload["ylabel"] == expected_ylabel
+
+
 def test_family_getters_build_requests_without_field_expressions() -> None:
     cases = {
         "get_trajectory": (["--atom-ids", "1", "2", "--dims", "z"], {"atom_ids": (1, 2), "dims": ("z",)}),
-        "get_displacement": (["--atom-ids", "3", "--dims", "xy", "--reference-frame", "5"], {"atom_ids": (3,), "dims": ("xy",), "reference_frame": 5}),
+        "get_displacement": (["--atom-ids", "3", "--dims", "xy", "--reference-frame", "5"],
+                             {"atom_ids": (3,), "dims": ("xy",), "reference_frame": 5}),
         "get_charge": (["--atom-ids", "1", "4"], {"atom_ids": (1, 4)}),
         "get_cell_dimensions": (["--fields", "a", "gamma"], {"fields": ("a", "gamma")}),
         "get_electric_field": (["--components", "field_z"], {"components": ("field_z",)}),
@@ -83,6 +125,87 @@ def test_family_getters_build_requests_without_field_expressions() -> None:
         request = module.build_request(_parser_for(command).parse_args(argv))
         for name, value in expected.items():
             assert getattr(request, name) == value
+
+
+def test_get_partial_energy_help_includes_explained_example() -> None:
+    help_text = _parser_for("get_partial_energy").format_help()
+
+    assert "Examples:" in help_text
+    assert (
+               "reaxkit get-partial-energy --fort73 .\\energylog "
+               "--save partial_energies --plot separate"
+           ) in help_text
+    assert "saves one figure per component" in help_text
+
+
+def test_get_partial_energy_separate_plot_builds_one_file_per_component() -> None:
+    args = _parser_for("get_partial_energy").parse_args(
+        ["--plot", "separate", "--save", "partial_energies"]
+    )
+    result = SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "iter": [0, 1, 0, 1],
+                "component": ["Ebond", "Ebond", "Eatom", "Eatom"],
+                "value": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+    )
+
+    payloads = common.build_plot_payload("get_partial_energy", result, args)
+
+    assert isinstance(payloads, list)
+    assert [payload["filename"] for payload in payloads] == [
+        "Ebond.png",
+        "Eatom.png",
+    ]
+    assert [payload["series"][0]["y"] for payload in payloads] == [
+        [1.0, 2.0],
+        [3.0, 4.0],
+    ]
+    assert [payload["ylabel"] for payload in payloads] == [
+        "Ebond (kcal/mole)",
+        "Eatom (kcal/mole)",
+    ]
+
+
+def _partial_energy_plot_result():
+    return SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "iter": [0, 1, 0, 1],
+                "component": ["Ebond", "Ebond", "Eatom", "Eatom"],
+                "value": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+    )
+
+
+def test_get_partial_energy_single_plot_has_physical_ylabel() -> None:
+    args = _parser_for("get_partial_energy").parse_args(["--plot", "single"])
+
+    payload = common.build_plot_payload(
+        "get_partial_energy", _partial_energy_plot_result(), args
+    )
+
+    assert payload["ylabel"] == "Partial Energy (kcal/mole)"
+
+
+def test_get_partial_energy_subplots_have_component_specific_ylabels() -> None:
+    args = _parser_for("get_partial_energy").parse_args(["--plot", "subplot"])
+    result = SimpleNamespace(
+        table=pd.DataFrame(
+            {
+                "iter": [0, 1, 0, 1],
+                "component": ["Ebond", "Ebond", "Eatom", "Eatom"],
+                "value": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+    )
+
+    payload = common.build_plot_payload("get_partial_energy", result, args)
+
+    assert payload["ylabel"] == ["Ebond (kcal/mole)", "Eatom (kcal/mole)"]
 
 
 def test_get_charge_without_atom_ids_selects_all_atoms() -> None:
@@ -244,7 +367,7 @@ def test_electric_field_run_task_updates_persisted_frame_index(monkeypatch, tmp_
 
 
 def test_electric_field_run_main_writes_corrected_frame_index_to_csv(
-    monkeypatch, tmp_path
+        monkeypatch, tmp_path
 ) -> None:
     module = import_module("reaxkit.workflows.timeseries.get_electric_field")
     fort78 = tmp_path / "fort.78"
@@ -289,7 +412,7 @@ def test_electric_field_run_main_writes_corrected_frame_index_to_csv(
 
 
 def test_electric_field_saved_plot_run_writes_corrected_automatic_result_csv(
-    monkeypatch, tmp_path
+        monkeypatch, tmp_path
 ) -> None:
     module = import_module("reaxkit.workflows.timeseries.get_electric_field")
     fort78 = tmp_path / "fort.78"
@@ -333,10 +456,10 @@ def test_electric_field_saved_plot_run_writes_corrected_automatic_result_csv(
     assert module.run_main("get_electric_field", args) == 0
 
     automatic_dir = (
-        workspace
-        / "analysis"
-        / "get_electric_field"
-        / "automatic-csv-test"
+            workspace
+            / "analysis"
+            / "get_electric_field"
+            / "automatic-csv-test"
     )
     all_frames = pd.read_csv(automatic_dir / "all_frames.csv")
     integer_frames = pd.read_csv(automatic_dir / "integer_frames.csv")
@@ -346,7 +469,7 @@ def test_electric_field_saved_plot_run_writes_corrected_automatic_result_csv(
 
 
 def test_electric_field_frame_axis_errors_before_persistence_without_source(
-    monkeypatch, tmp_path
+        monkeypatch, tmp_path
 ) -> None:
     fort78 = tmp_path / "fort.78"
     fort78.write_text("", encoding="utf-8")
@@ -387,9 +510,9 @@ def test_get_frames_count_accepts_general_and_engine_specific_paths() -> None:
     assert default_args.input == "."
 
     for argv, expected in (
-        (["trajectory.dat"], "trajectory.dat"),
-        (["--input", "trajectory.dat"], "trajectory.dat"),
-        (["--file", "trajectory.dat"], "trajectory.dat"),
+            (["trajectory.dat"], "trajectory.dat"),
+            (["--input", "trajectory.dat"], "trajectory.dat"),
+            (["--file", "trajectory.dat"], "trajectory.dat"),
     ):
         args = _parser_for("get_frames_count").parse_args(argv)
         module._normalize_trajectory_source(args)

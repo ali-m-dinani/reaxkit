@@ -84,6 +84,10 @@ def configure_file_logging(project_root: str | Path, *, session_id: str | None =
     logs_root = root / "logs" / "general"
     logs_root.mkdir(parents=True, exist_ok=True)
     sid = session_id or datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    legacy_logs_root = root / "logs"
+    legacy_logs_root.mkdir(parents=True, exist_ok=True)
+    (legacy_logs_root / "reaxkit.log").touch(exist_ok=True)
+    (legacy_logs_root / f"run_{sid}.log").touch(exist_ok=True)
 
     with _LOGGER_LOCK:
         if _GLOBAL_FILE_HANDLER is None or _CURRENT_LOGS_ROOT != logs_root:

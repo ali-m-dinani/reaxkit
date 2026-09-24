@@ -32,6 +32,8 @@ from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import TrajectoryData
 from reaxkit.analysis.trajectory.pbc import maybe_unwrap_selected_positions
 from reaxkit.presentation.specs import PresentationSpec
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape, resolve_execution_policy
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 
 
 @dataclass
@@ -166,6 +168,16 @@ class MSDTask(AnalysisTask):
     """
 
     required_data = TrajectoryData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.GLOBAL, supports_selective_frames=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
+    def run_blocks(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.trajectory.blocked_msd import time_origin_msd
+
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        return MSDResult(table=time_origin_msd(frames, request, pipeline, reporter), request=request)
 
     @staticmethod
     def recommended_presentations(_result: MSDResult, payload: dict[str, Any]) -> list[PresentationSpec]:
@@ -315,7 +327,8 @@ class MSDTask(AnalysisTask):
 
         # Equivalent to Fortran ndim.
         # Prefer request.max_lag if you add it to MSDRequest.
-        max_lag = int(getattr(request, "max_lag", n_selected_frames))
+        requested_max_lag = getattr(request, "max_lag", None)
+        max_lag = n_selected_frames if requested_max_lag is None else int(requested_max_lag)
 
         if max_lag <= 0:
             raise ValueError("max_lag must be positive.")

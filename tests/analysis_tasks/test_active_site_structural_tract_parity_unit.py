@@ -212,6 +212,8 @@ def test_distance_bond_mode_task_matches_reference_statistics_without_bond_order
 
 
 def test_bo_mode_still_requires_bond_orders():
+    if not TRACT_FRAME.exists():
+        pytest.skip("TRACT reference frame is not available in workspace.")
     atoms = ase_read(str(TRACT_FRAME), format="extxyz")
     xyz = np.asarray(atoms.get_positions(), dtype=float)
     elements = [str(e) for e in atoms.get_chemical_symbols()]

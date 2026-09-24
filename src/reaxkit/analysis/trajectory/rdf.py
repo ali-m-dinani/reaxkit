@@ -19,6 +19,8 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.core.runtime.frame_tables import map_frame_tables
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -597,6 +599,8 @@ class RDFTask(AnalysisTask):
     """RDF curve task (total/partial)."""
 
     required_data = TrajectoryData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024)
 
     @staticmethod
     def recommended_presentations(_result: RDFResult, payload: dict[str, object]) -> list[PresentationSpec]:
@@ -710,31 +714,8 @@ class RDFTask(AnalysisTask):
             table = table.sort_values(["frame_index", "r"], kind="stable").reset_index(drop=True)
         return RDFResult(table=table, request=request)
 
-    def run_stream(self, frames, request: RDFRequest, reporter=None) -> RDFResult:
-        """Compute per-frame RDF curves without retaining the trajectory."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_index"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming RDF analysis")
-        if not tables:
-            table = pd.DataFrame(columns=["frame_index", "iter", "r", "g"])
-        else:
-            table = pd.concat(tables, ignore_index=True).sort_values(
-                ["frame_index", "r"], kind="stable"
-            ).reset_index(drop=True)
-        return RDFResult(table=table, request=request)
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return RDFResult(table=map_frame_tables(self, frames, request, pipeline=pipeline, reporter=reporter, sort_columns=("frame_index",)), request=request)
 
 
 @register_task("get_rdf_property", label="RDF Property")
@@ -742,6 +723,8 @@ class RDFPropertyTask(AnalysisTask):
     """RDF-derived property task."""
 
     required_data = TrajectoryData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024)
 
     @staticmethod
     def recommended_presentations(_result: RDFPropertyResult, payload: dict[str, object]) -> list[PresentationSpec]:
@@ -852,28 +835,8 @@ class RDFPropertyTask(AnalysisTask):
             return RDFPropertyResult(table=pd.DataFrame(), request=request)
         return RDFPropertyResult(table=properties_table.copy(), request=request)
 
-    def run_stream(self, frames, request: RDFPropertyRequest, reporter=None) -> RDFPropertyResult:
-        """Compute RDF-derived properties from one trajectory frame at a time."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_index"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming RDF property analysis")
-        table = pd.concat(tables, ignore_index=True) if tables else pd.DataFrame()
-        if not table.empty:
-            table = table.sort_values("frame_index", kind="stable").reset_index(drop=True)
-        return RDFPropertyResult(table=table, request=request)
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return RDFPropertyResult(table=map_frame_tables(self, frames, request, pipeline=pipeline, reporter=reporter, sort_columns=("frame_index",)), request=request)
 
 
 __all__ = [

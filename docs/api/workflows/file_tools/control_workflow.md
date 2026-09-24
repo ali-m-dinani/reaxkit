@@ -7,6 +7,83 @@
       show_root_full_path: false
       members: []
 
+## Command: `get-control`
+
+<div class="analysis-section-indent" markdown="1">
+
+Read and print the value of one control parameter key.
+Use this command to quickly inspect a control file without opening or parsing it manually.
+You can optionally scope lookup to a section and provide a fallback default value.
+
+### Examples
+-----
+
+```text
+  1. Read a key from the default control file ('control'):
+   reaxkit get-control_data nmdit
+
+  2. Read a key from a specific section:
+   reaxkit get-control_data iout2 --control control --section md
+
+  3. Read a key from a control file at a custom path:
+   reaxkit get-control_data imetho --control runs/job1/control
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--section` | No |  | Optional section: general, md, mm, ff, outdated. Example: --section md, which narrows lookup to the MD section. |  |
+| `--default` | No |  | Fallback value if key is missing. Example: --default 0, which prints 0 instead of failing when the key is absent. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing/writing rules. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which tells the resolver where to inspect files. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which is used when --input is not enough to resolve context. |  |
+| `--control, --file` | No | control | Path to control file. Example: --control runs/job1/control, which reads that specific control file instead of the default one. |  |
+| `key` | Yes |  | Control key to look up. Example: nmdit, which queries the `nmdit` parameter value. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
 ## Command: `get-control_data`
 
 <div class="analysis-section-indent" markdown="1">
@@ -31,19 +108,131 @@ You can optionally scope lookup to a section and provide a fallback default valu
 
 ### Arguments
 
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--section` | No |  | Optional section: general, md, mm, ff, outdated. Example: --section md, which narrows lookup to the MD section. |  |
+| `--default` | No |  | Fallback value if key is missing. Example: --default 0, which prints 0 instead of failing when the key is absent. |  |
+
+#### Input and file selection
+
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing/writing rules. | reaxff, ams, lammps |
 | `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which tells the resolver where to inspect files. |  |
 | `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which is used when --input is not enough to resolve context. |  |
 | `--control, --file` | No | control | Path to control file. Example: --control runs/job1/control, which reads that specific control file instead of the default one. |  |
+| `key` | Yes |  | Control key to look up. Example: nmdit, which queries the `nmdit` parameter value. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
 | `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
-| `key` | No |  | Control key to look up. Example: nmdit, which queries the `nmdit` parameter value. |  |
-| `--section` | No |  | Optional section: general, md, mm, ff, outdated. Example: --section md, which narrows lookup to the MD section. |  |
-| `--default` | No |  | Fallback value if key is missing. Example: --default 0, which prints 0 instead of failing when the key is absent. |  |
+
+
+</div>
+
+## Command: `gen_control`
+
+<div class="analysis-section-indent" markdown="1">
+
+Read an existing control file, apply parameter overrides, and write an updated file.
+Use this command when you want to keep most of a control file unchanged while updating
+specific keys through repeatable --parameter/--value pairs.
+
+### Examples
+-----
+
+```text
+  1. Copy a control file to a new output name without changing parameters:
+   reaxkit gen-control --control control --output control.new
+
+  2. Update one parameter while writing a new control file:
+   reaxkit gen-control --control control --parameter nmdit --value 200000 --output control.fast
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement. |  |
+| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 200000, which becomes the new value for the matched parameter key. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No | reaxff | Engine type for control IO. Example: --engine reaxff, which applies ReaxFF-specific control-file handling. | reaxff |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which points resolution to that run location. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup context for engine detection. |  |
+| `--control, --file` | No | control | Path to source control file. Example: --control runs/job1/control, which is the file to read and modify. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.new, which writes the updated file under that name. |  |
+| `--copy-to-dot` | No | False | Also copy the generated control file to the current directory. Example: --copy-to-dot, which creates a convenience copy in your working directory. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log quiet, which suppresses non-essential log output. | verbose, quiet |
+
 
 </div>
 
@@ -51,9 +240,74 @@ You can optionally scope lookup to a section and provide a fallback default valu
 
 <div class="analysis-section-indent" markdown="1">
 
+Read an existing control file, apply parameter overrides, and write an updated file.
+Use this command when you want to keep most of a control file unchanged while updating
+specific keys through repeatable --parameter/--value pairs.
+
+### Examples
+-----
+
+```text
+  1. Copy a control file to a new output name without changing parameters:
+   reaxkit gen-control --control control --output control.new
+
+  2. Update one parameter while writing a new control file:
+   reaxkit gen-control --control control --parameter nmdit --value 200000 --output control.fast
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement. |  |
+| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 200000, which becomes the new value for the matched parameter key. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No | reaxff | Engine type for control IO. Example: --engine reaxff, which applies ReaxFF-specific control-file handling. | reaxff |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which points resolution to that run location. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup context for engine detection. |  |
+| `--control, --file` | No | control | Path to source control file. Example: --control runs/job1/control, which is the file to read and modify. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.new, which writes the updated file under that name. |  |
+| `--copy-to-dot` | No | False | Also copy the generated control file to the current directory. Example: --copy-to-dot, which creates a convenience copy in your working directory. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log quiet, which suppresses non-essential log output. | verbose, quiet |
+
 
 </div>
 
@@ -61,9 +315,212 @@ _No command-specific arguments found._
 
 <div class="analysis-section-indent" markdown="1">
 
+Write a template ReaxFF control file.
+This command generates a starter control file only. It does not run a simulation.
+You can optionally override one or more parameters at generation time by repeating
+--parameter/--value pairs.
+
+### Examples
+-----
+
+```text
+  1. Generate a default control template ('control'):
+   reaxkit gen_template_control
+
+  2. Generate a template and override one parameter:
+   reaxkit gen_template_control --parameter nmdit --value 100000
+
+  3. Generate a template and also copy it to the current directory:
+   reaxkit gen_template_control --output control --copy-to-dot
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which selects the key to change. |  |
+| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 100000, which sets the new value for the paired key. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.fast, which writes the generated template with that filename. |  |
+| `--copy-to-dot` | No | False | Also copy the generated control file to the current directory. Example: --copy-to-dot, which keeps an extra copy beside where you run the command. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
+## Command: `make-control`
+
+<div class="analysis-section-indent" markdown="1">
+
+Write a template ReaxFF control file.
+This command generates a starter control file only. It does not run a simulation.
+You can optionally override one or more parameters at generation time by repeating
+--parameter/--value pairs.
+
+### Examples
+-----
+
+```text
+  1. Generate a default control template ('control'):
+   reaxkit gen_template_control
+
+  2. Generate a template and override one parameter:
+   reaxkit gen_template_control --parameter nmdit --value 100000
+
+  3. Generate a template and also copy it to the current directory:
+   reaxkit gen_template_control --output control --copy-to-dot
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which selects the key to change. |  |
+| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 100000, which sets the new value for the paired key. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.fast, which writes the generated template with that filename. |  |
+| `--copy-to-dot` | No | False | Also copy the generated control file to the current directory. Example: --copy-to-dot, which keeps an extra copy beside where you run the command. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
+## Command: `write-control`
+
+<div class="analysis-section-indent" markdown="1">
+
+Read an existing control file, apply parameter overrides, and write an updated file.
+Use this command when you want to keep most of a control file unchanged while updating
+specific keys through repeatable --parameter/--value pairs.
+
+### Examples
+-----
+
+```text
+  1. Copy a control file to a new output name without changing parameters:
+   reaxkit gen-control --control control --output control.new
+
+  2. Update one parameter while writing a new control file:
+   reaxkit gen-control --control control --parameter nmdit --value 200000 --output control.fast
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement. |  |
+| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 200000, which becomes the new value for the matched parameter key. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No | reaxff | Engine type for control IO. Example: --engine reaxff, which applies ReaxFF-specific control-file handling. | reaxff |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which points resolution to that run location. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup context for engine detection. |  |
+| `--control, --file` | No | control | Path to source control file. Example: --control runs/job1/control, which is the file to read and modify. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.new, which writes the updated file under that name. |  |
+| `--copy-to-dot` | No | False | Also copy the generated control file to the current directory. Example: --copy-to-dot, which creates a convenience copy in your working directory. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log quiet, which suppresses non-essential log output. | verbose, quiet |
+
 
 </div>
 
@@ -73,19 +530,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
-| `--output` | No | control | Output filename under <project_root>/input/. Example: --output control.fast, which writes the generated template with that filename. |  |
-| `--copy-to-dot` | No |  | Also copy the generated control file to the current directory. Example: --copy-to-dot, which keeps an extra copy beside where you run the command. |  |
-| `--parameter` | No |  | Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which selects the key to change. |  |
-| `--value` | No |  | Override value for the corresponding --parameter entry. Example: --value 100000, which sets the new value for the paired key. |  |
-| `--engine` | No | reaxff | Engine type for control IO. Example: --engine reaxff, which applies ReaxFF-specific control-file handling. | reaxff |
-| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which points resolution to that run location. |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which acts as backup context for engine detection. |  |
-| `--control, --file` | No | control | Path to source control file. Example: --control runs/job1/control, which is the file to read and modify. |  |
-| `--log` | No |  | Logging level. Example: --log quiet, which suppresses non-essential log output. | verbose, quiet |
+Each command table above includes its shared and inherited options.
 
 </div>

@@ -10,6 +10,7 @@ Persistence helpers for analysis results.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import fields, is_dataclass
 from pathlib import Path
 from typing import Any
@@ -18,7 +19,9 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.core.platform.log import get_logger
+from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter, TableChunks
 from reaxkit.core.runtime.provenance import (
+    json_safe,
     effective_settings_from_args,
     runtime_metadata_from_args,
     user_settings_from_args,
@@ -53,23 +56,76 @@ def _result_frames(result: Any) -> dict[str, pd.DataFrame]:
     return frames
 
 
-def _write_csvs(out_dir: Path, result: Any) -> list[str]:
+def _safe_artifact_name(value: str) -> str:
+    return "".join(
+        ch if (ch.isalnum() or ch in {"_", "-"}) else "_" for ch in value
+    ).strip("_") or "table"
+
+
+def _write_csvs(
+    out_dir: Path,
+    result: Any,
+    *,
+    output_profile: str = "standard",
+    detail_format: str | None = None,
+    metadata: dict | None = None,
+) -> list[str]:
     """
     Write csvs.
     """
     frames = _result_frames(result)
+    frames.update(dict(getattr(result, "table_chunks", {}) or {}))
     written: list[str] = []
+    for raw_path in getattr(result, "prewritten_csvs", ()) or ():
+        path = Path(str(raw_path))
+        if path.is_file():
+            try:
+                written.append(str(path.resolve().relative_to(out_dir.resolve())))
+            except ValueError:
+                pass
+    if getattr(result, "skip_automatic_csv_persistence", False):
+        return written
     if not frames:
         return written
-    if set(frames.keys()) == {"table"}:
-        path = out_dir / "result.csv"
-        frames["table"].to_csv(path, index=False)
-        return [path.name]
-    for key, frame in frames.items():
-        safe = "".join(ch if (ch.isalnum() or ch in {"_", "-"}) else "_" for ch in key).strip("_") or "table"
-        path = out_dir / f"{safe}.csv"
-        frame.to_csv(path, index=False)
-        written.append(path.name)
+    tiers = dict(getattr(result, "artifact_tiers", {}) or {})
+    defaults = dict(getattr(result, "artifact_defaults", {}) or {})
+    single_table = set(frames) == {"table"}
+    specs: list[ArtifactSpec] = []
+    filenames: dict[str, str] = {}
+    for key in frames:
+        safe = _safe_artifact_name(key)
+        tier = str(tiers.get(key, "core"))
+        if tier not in {"core", "summary", "detail", "debug"}:
+            tier = "core"
+        format_name = (detail_format or ("csv" if output_profile == "legacy" else "parquet")) if tier in {"detail", "debug"} else "csv"
+        filename = "result.csv" if single_table and format_name == "csv" else f"{safe}.{format_name}"
+        filenames[key] = filename
+        specs.append(
+            ArtifactSpec(
+                name=key,
+                filename=filename,
+                tier=tier,
+                default_enabled=bool(defaults.get(key, tier in {"core", "summary"})),
+                preferred_format=format_name,
+                incremental=True,
+                units=dict((getattr(result, "artifact_units", {}) or {}).get(key, {})),
+            )
+        )
+    with ArtifactWriter(
+        out_dir,
+        specs,
+        profile=output_profile if output_profile in {"minimal", "standard", "full", "legacy"} else "standard",
+        overwrite=True,
+        manifest_name="artifacts.json",
+        metadata=json_safe(metadata) if metadata else None,
+    ) as writer:
+        for key, frame in frames.items():
+            if writer.enabled(key):
+                if isinstance(frame, TableChunks):
+                    writer.write_chunks(key, frame)
+                else:
+                    writer.write_table(key, frame)
+                written.append(filenames[key])
     return written
 
 
@@ -83,7 +139,10 @@ def _write_numpy_artifacts(command: str, out_dir: Path, result: Any) -> list[str
     soap = getattr(result, "soap_descriptors", None)
     if isinstance(soap, np.ndarray):
         path = out_dir / "soap_descriptors.npy"
-        np.save(path, soap)
+        temporary = path.with_name(f".{path.name}.partial")
+        with temporary.open("wb") as handle:
+            np.save(handle, soap)
+        os.replace(temporary, path)
         written.append(path.name)
     return written
 
@@ -262,7 +321,14 @@ def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: 
     out_dir = layout.analysis_root / str(command) / str(analysis_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_files = _write_csvs(out_dir, result) if write_csv else []
+    output_profile = str(getattr(args, "output_profile", "standard") or "standard")
+    csv_files = (
+        _write_csvs(out_dir, result, output_profile=output_profile, detail_format=getattr(args, "detail_format", None),
+                    metadata={"command": str(command), "execution_policy": getattr(args, "_execution_policy", None),
+                              "source_frames": getattr(getattr(result, "request", None), "frames", None)})
+        if write_csv
+        else []
+    )
     npy_files = _write_numpy_artifacts(command, out_dir, result)
     figure_files = _write_figure_artifacts(command, out_dir, result, analysis_id=str(analysis_id))
     text_files = _write_active_site_events_summary(command, out_dir, result, args)
@@ -276,14 +342,20 @@ def persist_analysis_result(command: str, result: Any, args: Any, *, write_csv: 
         "effective_settings": effective_settings_from_args(args),
         "runtime": runtime_metadata_from_args(args),
         "artifacts": {
-            "csv": csv_files,
+            "csv": [name for name in csv_files if name.endswith(".csv")],
+            "parquet": [name for name in csv_files if name.endswith(".parquet")],
             "npy": npy_files,
             "figures": figure_files,
             "text": text_files,
             "settings": "settings.json",
         },
     }
-    (out_dir / "settings.json").write_text(json.dumps(settings, indent=2, sort_keys=True), encoding="utf-8")
+    settings_path = out_dir / "settings.json"
+    temporary_settings = settings_path.with_name(f".{settings_path.name}.partial")
+    temporary_settings.write_text(
+        json.dumps(settings, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    os.replace(temporary_settings, settings_path)
     return out_dir
 
 

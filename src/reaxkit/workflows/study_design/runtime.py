@@ -11,6 +11,8 @@ This module implements CLI workflow orchestration for its command family, includ
 
 from __future__ import annotations
 
+from reaxkit.presentation.workflow_artifacts import workflow_csv_rows
+
 import argparse
 import csv
 import math
@@ -1982,8 +1984,7 @@ def _aggregate_from_definition(
 
         raw_csv = case_out_dir / "raw_replicates.csv"
         raw_fields = [*param_names, "case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"]
-        with raw_csv.open("w", encoding="utf-8", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=raw_fields)
+        with workflow_csv_rows(raw_csv, raw_fields) as w:
             w.writeheader()
             for row in case_rows:
                 w.writerow({k: row.get(k) for k in raw_fields})
@@ -2001,8 +2002,7 @@ def _aggregate_from_definition(
         per_x_rows.sort(key=lambda r: (str(r.get("y_name")), _to_plot_value(r.get("x_value"))))
         per_x_csv = case_out_dir / "per_x_stats.csv"
         per_x_fields = ["case_id", "y_name", "x_name", "x_value", *[f"y_{k}" for k in aggregate_def.stats]]
-        with per_x_csv.open("w", encoding="utf-8", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=per_x_fields)
+        with workflow_csv_rows(per_x_csv, per_x_fields) as w:
             w.writeheader()
             for row in per_x_rows:
                 write_row = dict(row)
@@ -2022,8 +2022,7 @@ def _aggregate_from_definition(
             global_rows.append(out_row)
         global_csv = case_out_dir / "global_stats.csv"
         global_fields = ["case_id", "y_name", *[f"y_{k}" for k in aggregate_def.stats]]
-        with global_csv.open("w", encoding="utf-8", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=global_fields)
+        with workflow_csv_rows(global_csv, global_fields) as w:
             w.writeheader()
             for row in global_rows:
                 write_row = dict(row)
@@ -2039,8 +2038,7 @@ def _aggregate_from_definition(
     across_dir.mkdir(parents=True, exist_ok=True)
     across_raw_csv = across_dir / "raw_all_cases.csv"
     across_raw_fields = [*param_names, "case_id", "replicate_id", "x_name", "x_value", "y_name", "y_value", "run_stage"]
-    with across_raw_csv.open("w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=across_raw_fields)
+    with workflow_csv_rows(across_raw_csv, across_raw_fields) as w:
         w.writeheader()
         for row in raw_rows:
             w.writerow({k: row.get(k) for k in across_raw_fields})
@@ -2062,8 +2060,7 @@ def _aggregate_from_definition(
     )
     across_per_x_csv = across_dir / "across_cases_per_x_stats.csv"
     across_per_x_fields = [*param_names, "y_name", "x_name", "x_value", *[f"y_{k}" for k in aggregate_def.stats]]
-    with across_per_x_csv.open("w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=across_per_x_fields)
+    with workflow_csv_rows(across_per_x_csv, across_per_x_fields) as w:
         w.writeheader()
         for row in across_per_x_rows:
             write_row = dict(row)
@@ -2086,8 +2083,7 @@ def _aggregate_from_definition(
     )
     across_global_csv = across_dir / "across_cases_global_stats.csv"
     across_global_fields = [*param_names, "y_name", *[f"y_{k}" for k in aggregate_def.stats]]
-    with across_global_csv.open("w", encoding="utf-8", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=across_global_fields)
+    with workflow_csv_rows(across_global_csv, across_global_fields) as w:
         w.writeheader()
         for row in across_global_rows:
             write_row = dict(row)

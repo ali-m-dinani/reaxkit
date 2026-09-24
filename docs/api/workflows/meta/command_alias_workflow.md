@@ -11,9 +11,60 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Add a user-defined alias for an existing ReaxKit command.
+Use this command to create shorter or more memorable names for frequently used commands.
+The alias is saved in your user alias configuration and becomes available in future CLI runs.
+
+### Examples
+-----
+
+```text
+  1. Add a short alias for `timeseries`:
+   reaxkit add-alias timeseries ts
+
+  2. Add a custom alias for `mean-square-displacement`:
+   reaxkit add-alias mean-square-displacement msd2
+
+  3. Add an alias for `charge-table`:
+   reaxkit add-alias charge-table charges
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `target_command` | Yes |  | Canonical command or any existing alias for it. Example: timeseries, which resolves to the command you want to alias. |  |
+| `alias` | Yes |  | New alias to add for that command. Example: ts, which becomes a shortcut you can use instead of the full command name. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
 
 </div>
 
@@ -23,9 +74,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `target_command` | No |  | Canonical command or any existing alias for it. Example: timeseries, which resolves to the command you want to alias. |  |
-| `alias` | No |  | New alias to add for that command. Example: ts, which becomes a shortcut you can use instead of the full command name. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

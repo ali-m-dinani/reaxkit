@@ -29,6 +29,7 @@ from reaxkit.domain.data_models import (
     ChargeData,
     ConnectivityData,
     ConnectivityTrajectoryData,
+    ElectrostaticsData,
     MolecularAnalysisData,
     PartialEnergyData,
     SimulationData,
@@ -47,7 +48,7 @@ BOHR_TO_ANG = 0.529177210903
 class AMSAdapter(EngineAdapter):
     """Adapter scaffold for AMS KF/RKF-based loading."""
 
-    HANDLER_VERSION = "2"
+    HANDLER_VERSION = "3"
 
     _AMS_ENERGY_COMPONENTS: tuple[str, ...] = (
         "E_pot",  # 1: Total potential
@@ -72,10 +73,23 @@ class AMSAdapter(EngineAdapter):
     def supports_streaming(self, data_type, args: dict | None = None) -> bool:
         """AMS History variables support bounded frame-indexed reads."""
         _ = args
-        return data_type in {TrajectoryData, ConnectivityData, ConnectivityTrajectoryData}
+        return data_type in {
+            TrajectoryData,
+            ConnectivityData,
+            ConnectivityTrajectoryData,
+            ElectrostaticsData,
+        }
 
     def iter_data(self, data_type, args: dict, reporter=None):
         """Yield selected AMS History frames as one-frame canonical payloads."""
+        if data_type in {TrajectoryData, ElectrostaticsData}:
+            yield from self._iter_direct_history_frames(
+                args,
+                include_charges=data_type is ElectrostaticsData,
+                reporter=reporter,
+            )
+            return
+
         kf = self.load_kf(args)
         requested = args.get("_frame_indices")
         n_frames = self._history_frame_count(kf, frame_indices=requested)
@@ -236,6 +250,7 @@ class AMSAdapter(EngineAdapter):
             SimulationData,
             PartialEnergyData,
             ChargeData,
+            ElectrostaticsData,
             StressData,
         }:
             explicit_input = args.get("input") if isinstance(args, dict) else None
@@ -313,6 +328,75 @@ class AMSAdapter(EngineAdapter):
         return None
 
     @staticmethod
+    def _step_numbers(kf) -> np.ndarray:
+        """Return the stored trajectory step numbers without reading History."""
+        raw = AMSAdapter._read_kf_variable(kf, "General", "Step numbers")
+        if raw is None:
+            return np.empty((0,), dtype=int)
+        try:
+            return np.asarray(raw, dtype=int).ravel()
+        except (TypeError, ValueError):
+            return np.empty((0,), dtype=int)
+
+    @staticmethod
+    def _read_history_source_variable(
+        kf,
+        prefix: str,
+        source_index: int,
+        *,
+        step_number: int | None = None,
+        layout_cache: dict[str, str] | None = None,
+    ):
+        """Read one frame variable from modern or standalone ReaxFF KF layouts.
+
+        AMS History commonly uses one-based ``Variable(n)`` names. Standalone
+        ReaxFF ``reaxout.kf`` files instead suffix variables with the actual MD
+        step, for example ``Coordinates 5000`` and ``Atomic charges 5000``.
+        """
+        def _variable(style: str) -> str | None:
+            if style == "frame_paren":
+                return f"{prefix}({int(source_index) + 1})"
+            if style == "step_space" and step_number is not None:
+                return f"{prefix} {int(step_number)}"
+            if style == "step_paren" and step_number is not None:
+                return f"{prefix}({int(step_number)})"
+            if style == "index_space":
+                return f"{prefix} {int(source_index)}"
+            if style == "frame_space":
+                return f"{prefix} {int(source_index) + 1}"
+            return None
+
+        cached_style = layout_cache.get(prefix) if layout_cache is not None else None
+        if cached_style == "missing":
+            return None
+        if cached_style is not None:
+            cached_variable = _variable(cached_style)
+            if cached_variable is not None:
+                raw = AMSAdapter._read_kf_variable(kf, "History", cached_variable)
+                if raw is not None:
+                    return raw
+            layout_cache.pop(prefix, None)
+
+        styles = ["frame_paren"]
+        if step_number is not None:
+            styles.extend(("step_space", "step_paren"))
+        styles.extend(("index_space", "frame_space"))
+        checked: set[str] = set()
+        for style in styles:
+            variable = _variable(style)
+            if variable is None or variable in checked:
+                continue
+            checked.add(variable)
+            raw = AMSAdapter._read_kf_variable(kf, "History", variable)
+            if raw is not None:
+                if layout_cache is not None:
+                    layout_cache[prefix] = style
+                return raw
+        if layout_cache is not None:
+            layout_cache[prefix] = "missing"
+        return None
+
+    @staticmethod
     def _history_frame_count_from_metadata(kf) -> int | None:
         """Read the RKF history-entry count without loading coordinate arrays."""
         for section, variable in (("MDHistory", "nEntries"), ("History", "nEntries")):
@@ -322,6 +406,9 @@ class AMSAdapter(EngineAdapter):
                     return int(np.asarray(raw).ravel()[0])
                 except Exception:
                     pass
+        step_numbers = AMSAdapter._step_numbers(kf)
+        if step_numbers.size:
+            return int(step_numbers.size)
         return None
 
     def quick_n_frames(self, args: dict) -> int | None:
@@ -384,17 +471,75 @@ class AMSAdapter(EngineAdapter):
         )
         entries: list[np.ndarray] = []
         loaded_source_indices: list[int] = []
+        step_numbers = AMSAdapter._step_numbers(kf)
+        layout_cache: dict[str, str] = {}
         for done, source_index in enumerate(source_indices, start=1):
-            frame_no = source_index + 1
-            raw = AMSAdapter._read_kf_variable(kf, "History", f"Coords({frame_no})")
+            step_number = int(step_numbers[source_index]) if source_index < step_numbers.size else None
+            raw = AMSAdapter._read_history_source_variable(
+                kf,
+                "Coords",
+                source_index,
+                step_number=step_number,
+                layout_cache=layout_cache,
+            )
             if raw is None:
-                raw = AMSAdapter._read_kf_variable(kf, "History", f"Coordinates({frame_no})")
+                raw = AMSAdapter._read_history_source_variable(
+                    kf,
+                    "Coordinates",
+                    source_index,
+                    step_number=step_number,
+                    layout_cache=layout_cache,
+                )
             if raw is None:
                 continue
             entries.append(np.asarray(raw, dtype=dtype).ravel())
             loaded_source_indices.append(source_index)
             if callable(reporter):
                 reporter("load", done, len(source_indices), progress_message)
+        return entries, loaded_source_indices, n_frames
+
+    @staticmethod
+    def _direct_charge_entries(
+        kf,
+        *,
+        frame_indices=None,
+        reporter=None,
+    ) -> tuple[list[np.ndarray], list[int], int]:
+        """Read only selected per-frame charge arrays from AMS History."""
+        n_frames = AMSAdapter._history_frame_count(kf, frame_indices=frame_indices)
+        source_indices = AMSAdapter._normalized_frame_indices(frame_indices, n_frames)
+        step_numbers = AMSAdapter._step_numbers(kf)
+        layout_cache: dict[str, str] = {}
+        entries: list[np.ndarray] = []
+        loaded_source_indices: list[int] = []
+        for done, source_index in enumerate(source_indices, start=1):
+            step_number = int(step_numbers[source_index]) if source_index < step_numbers.size else None
+            raw = AMSAdapter._read_history_source_variable(
+                kf,
+                "Atomic charges",
+                source_index,
+                step_number=step_number,
+                layout_cache=layout_cache,
+            )
+            if raw is None:
+                raw = AMSAdapter._read_history_source_variable(
+                    kf,
+                    "Charges",
+                    source_index,
+                    step_number=step_number,
+                    layout_cache=layout_cache,
+                )
+            if raw is None:
+                continue
+            entries.append(np.asarray(raw, dtype=float).ravel())
+            loaded_source_indices.append(int(source_index))
+            if callable(reporter):
+                reporter(
+                    "load",
+                    done,
+                    len(source_indices),
+                    "Reading selected AMS RKF atomic charges",
+                )
         return entries, loaded_source_indices, n_frames
 
     @staticmethod
@@ -567,6 +712,221 @@ class AMSAdapter(EngineAdapter):
         return np.asarray([_angle(b, c), _angle(a, c), _angle(a, b)], dtype=float)
 
     @staticmethod
+    def _history_length_factor(layout_style: str | None) -> float:
+        """Return the length conversion for an AMS or standalone History layout.
+
+        Standard AMS/RKF ``Variable(n)`` arrays use bohr. Standalone ReaxFF
+        ``reaxout.kf`` files use space-suffixed step/index variables and store
+        coordinates and cell lengths directly in angstrom.
+        """
+        if layout_style in {"step_space", "index_space", "frame_space"}:
+            return 1.0
+        return BOHR_TO_ANG
+
+    @classmethod
+    def _cell_geometry_for_source(
+        cls,
+        kf,
+        source_index: int,
+        *,
+        step_number: int | None,
+        fixed_axes: np.ndarray | None,
+        layout_cache: dict[str, str] | None = None,
+    ) -> tuple[np.ndarray | None, np.ndarray | None]:
+        """Read one frame's cell lengths and angles without loading History."""
+        axes_raw = None
+        axes_prefix = None
+        for prefix in ("Unit cell axes", "LatticeVectors", "Lattice vectors"):
+            axes_raw = cls._read_history_source_variable(
+                kf,
+                prefix,
+                source_index,
+                step_number=step_number,
+                layout_cache=layout_cache,
+            )
+            if axes_raw is not None:
+                axes_prefix = prefix
+                break
+
+        axes = None
+        lengths = None
+        if axes_raw is not None:
+            flat = np.asarray(axes_raw, dtype=float).ravel()
+            layout_style = (
+                layout_cache.get(axes_prefix)
+                if layout_cache is not None and axes_prefix is not None
+                else None
+            )
+            factor = cls._history_length_factor(layout_style)
+            if flat.size >= 9:
+                axes = flat[:9].reshape(3, 3) * factor
+                lengths = np.linalg.norm(axes, axis=1)
+            elif flat.size >= 3:
+                lengths = flat[:3] * factor
+        elif fixed_axes is not None:
+            axes = np.asarray(fixed_axes, dtype=float)
+            lengths = np.linalg.norm(axes, axis=1)
+
+        angles_raw = cls._read_history_source_variable(
+            kf,
+            "Unit cell angles",
+            source_index,
+            step_number=step_number,
+            layout_cache=layout_cache,
+        )
+        angles = None
+        if angles_raw is not None:
+            flat_angles = np.asarray(angles_raw, dtype=float).ravel()
+            if flat_angles.size >= 3:
+                angles = flat_angles[:3]
+        if angles is None and axes is not None:
+            angles = cls._cell_angles_from_axes(axes)
+        return lengths, angles
+
+    def _iter_direct_history_frames(
+        self,
+        args: dict,
+        *,
+        include_charges: bool,
+        reporter=None,
+    ):
+        """Yield selected coordinate/charge frames through direct KF variables."""
+        kf = self.load_kf(args)
+        requested = args.get("_frame_indices")
+        n_frames = self._history_frame_count(kf, frame_indices=requested)
+        source_indices = self._normalized_frame_indices(requested, n_frames)
+        step_numbers = self._step_numbers(kf)
+        fixed_axes = self._molecule_lattice_vectors(kf)
+        element_cache: dict[int, list[str]] = {}
+        layout_cache: dict[str, str] = {}
+
+        for done, source_index in enumerate(source_indices, start=1):
+            step_number = int(step_numbers[source_index]) if source_index < step_numbers.size else None
+            coordinate_prefix = "Coords"
+            coordinates_raw = self._read_history_source_variable(
+                kf,
+                coordinate_prefix,
+                source_index,
+                step_number=step_number,
+                layout_cache=layout_cache,
+            )
+            if coordinates_raw is None:
+                coordinate_prefix = "Coordinates"
+                coordinates_raw = self._read_history_source_variable(
+                    kf,
+                    coordinate_prefix,
+                    source_index,
+                    step_number=step_number,
+                    layout_cache=layout_cache,
+                )
+            if coordinates_raw is None:
+                raise RuntimeError(
+                    "AMS KF History is missing coordinates for source frame "
+                    f"{source_index} (step {step_number})."
+                )
+
+            flat_coordinates = np.asarray(coordinates_raw, dtype=float).ravel()
+            if flat_coordinates.size == 0 or flat_coordinates.size % 3 != 0:
+                raise RuntimeError(
+                    f"AMS KF coordinates for source frame {source_index} are malformed."
+                )
+            coordinate_factor = self._history_length_factor(layout_cache.get(coordinate_prefix))
+            positions = flat_coordinates.reshape(-1, 3) * coordinate_factor
+            n_atoms = int(positions.shape[0])
+            elements = element_cache.get(n_atoms)
+            if elements is None:
+                atom_names_raw = self._read_history_source_variable(
+                    kf,
+                    "Atom names",
+                    source_index,
+                    step_number=step_number,
+                    layout_cache=layout_cache,
+                )
+                history_names = {} if atom_names_raw is None else {"Atom names": atom_names_raw}
+                elements = self._elements_from_history(kf, history_names, n_atoms)
+                element_cache[n_atoms] = elements
+            atom_ids = list(range(1, n_atoms + 1))
+            iteration = int(step_number) if step_number is not None else int(source_index)
+            lengths, angles = self._cell_geometry_for_source(
+                kf,
+                source_index,
+                step_number=step_number,
+                fixed_axes=fixed_axes,
+                layout_cache=layout_cache,
+            )
+            simulation = SimulationData(
+                atom_ids=atom_ids,
+                iterations=np.asarray([iteration], dtype=int),
+                elements=list(elements),
+                num_of_atoms=np.asarray([n_atoms], dtype=int),
+                cell_lengths=None if lengths is None else np.asarray([lengths], dtype=float),
+                cell_angles=None if angles is None else np.asarray([angles], dtype=float),
+            )
+            trajectory = TrajectoryData(
+                positions=positions[np.newaxis, :, :],
+                elements=list(elements),
+                atom_ids=atom_ids,
+                simulation=simulation,
+                iterations=np.asarray([iteration], dtype=int),
+                atom_labels=np.asarray([elements], dtype=object),
+                source_frame_indices=np.asarray([source_index], dtype=int),
+            )
+
+            if include_charges:
+                charges_raw = self._read_history_source_variable(
+                    kf,
+                    "Atomic charges",
+                    source_index,
+                    step_number=step_number,
+                    layout_cache=layout_cache,
+                )
+                if charges_raw is None:
+                    charges_raw = self._read_history_source_variable(
+                        kf,
+                        "Charges",
+                        source_index,
+                        step_number=step_number,
+                        layout_cache=layout_cache,
+                    )
+                if charges_raw is None:
+                    raise RuntimeError(
+                        "AMS KF History is missing atomic charges for source frame "
+                        f"{source_index} (step {step_number}); ReaxFF-charge analysis cannot continue."
+                    )
+                raw_charges = np.asarray(charges_raw, dtype=float).ravel()
+                charges_array = np.full((n_atoms,), np.nan, dtype=float)
+                charges_array[: min(n_atoms, raw_charges.size)] = raw_charges[:n_atoms]
+                charges = ChargeData(
+                    charges=charges_array[np.newaxis, :],
+                    total_charge=np.asarray([np.nansum(charges_array)], dtype=float),
+                    simulation=simulation,
+                    iterations=np.asarray([iteration], dtype=int),
+                    metadata={
+                        "source": "History%Atomic charges",
+                        "streaming": True,
+                        "source_frame_indices": [int(source_index)],
+                    },
+                )
+                yield ElectrostaticsData(
+                    trajectory=trajectory,
+                    charges=charges,
+                    connectivity=None,
+                    electric_field=None,
+                )
+            else:
+                yield trajectory
+
+            if callable(reporter):
+                reporter(
+                    "stream",
+                    done,
+                    len(source_indices),
+                    "Streaming selected AMS KF coordinates and charges"
+                    if include_charges
+                    else "Streaming selected AMS KF coordinates",
+                )
+
+    @staticmethod
     def _parse_atom_names(raw_atom_names) -> list[str]:
         """Parse element symbols from AMS atom-name payload formats."""
         names_arr = np.asarray(raw_atom_names, dtype=object).ravel()
@@ -630,10 +990,7 @@ class AMSAdapter(EngineAdapter):
     @staticmethod
     def _iterations_from_general(kf, n_frames: int) -> np.ndarray:
         """Derive iteration numbers from ``General%Step numbers`` with fallback."""
-        try:
-            step_numbers = np.asarray(kf["General%Step numbers"], dtype=int).ravel()
-        except Exception:
-            step_numbers = np.empty((0,), dtype=int)
+        step_numbers = AMSAdapter._step_numbers(kf)
         if n_frames <= 0:
             if step_numbers.size > 0:
                 return step_numbers
@@ -927,6 +1284,38 @@ class AMSAdapter(EngineAdapter):
             elements=elements,
             iterations=iterations,
         )
+        direct_lengths: list[np.ndarray] = []
+        direct_angles: list[np.ndarray] = []
+        fixed_axes = self._molecule_lattice_vectors(kf)
+        cell_layout_cache: dict[str, str] = {}
+        for source_index in loaded_source_indices:
+            step_number = (
+                int(all_iterations[source_index])
+                if source_index < all_iterations.size
+                else None
+            )
+            lengths, angles = self._cell_geometry_for_source(
+                kf,
+                source_index,
+                step_number=step_number,
+                fixed_axes=fixed_axes,
+                layout_cache=cell_layout_cache,
+            )
+            if lengths is None or angles is None:
+                direct_lengths = []
+                direct_angles = []
+                break
+            direct_lengths.append(np.asarray(lengths, dtype=float))
+            direct_angles.append(np.asarray(angles, dtype=float))
+        if direct_lengths and direct_angles:
+            simulation = SimulationData(
+                atom_ids=atom_ids,
+                iterations=iterations,
+                elements=elements,
+                num_of_atoms=np.full((n_frames,), n_atoms, dtype=int),
+                cell_lengths=np.vstack(direct_lengths),
+                cell_angles=np.vstack(direct_angles),
+            )
 
         return TrajectoryData(
             positions=positions,
@@ -1295,8 +1684,25 @@ class AMSAdapter(EngineAdapter):
         ```
         """
         kf = self.load_kf(args)
-        history_data = kf.read_section("History")
-        charge_entries = self._history_entries(history_data, "Atomic charges", dtype=float)
+        requested_frame_indices = args.get("_frame_indices")
+        charge_entries, source_indices, source_n_frames = self._direct_charge_entries(
+            kf,
+            frame_indices=requested_frame_indices,
+            reporter=reporter,
+        )
+        expected_indices = self._normalized_frame_indices(
+            requested_frame_indices, source_n_frames
+        )
+        if len(charge_entries) != len(expected_indices):
+            history_data = kf.read_section("History")
+            all_charge_entries = self._history_entries(
+                history_data, "Atomic charges", dtype=float
+            )
+            source_n_frames = len(all_charge_entries)
+            source_indices = self._normalized_frame_indices(
+                requested_frame_indices, source_n_frames
+            )
+            charge_entries = [all_charge_entries[i] for i in source_indices]
         if not charge_entries:
             raise RuntimeError("No 'Atomic charges*' entries were found in AMS History section.")
 
@@ -1309,7 +1715,14 @@ class AMSAdapter(EngineAdapter):
             if n > 0:
                 charges[fi, :n] = flat[:n]
 
-        iterations = self._iterations_from_general(kf, n_frames)
+        all_iterations = self._iterations_from_general(kf, source_n_frames)
+        iterations = np.asarray(
+            [
+                all_iterations[i] if i < all_iterations.size else i
+                for i in source_indices
+            ],
+            dtype=int,
+        )
         total_charge = np.nansum(charges, axis=1)
         if callable(reporter):
             reporter("load", n_frames, n_frames, "Reading AMS atomic charges from History")
@@ -1318,7 +1731,23 @@ class AMSAdapter(EngineAdapter):
             charges=charges,
             total_charge=total_charge,
             iterations=iterations,
-            metadata={"source": "History%Atomic charges"},
+            metadata={
+                "source": "History%Atomic charges",
+                "source_frame_indices": [int(i) for i in source_indices],
+            },
+        )
+
+    def load_electrostatics(self, args: dict, reporter=None) -> ElectrostaticsData:
+        """Load AMS coordinates and atomic charges without connectivity data."""
+        trajectory = self.load_trajectory(args, reporter=reporter)
+        charges = self.load_charges(args, reporter=reporter)
+        charges.simulation = trajectory.simulation
+        charges.iterations = trajectory.iterations
+        return ElectrostaticsData(
+            trajectory=trajectory,
+            charges=charges,
+            connectivity=None,
+            electric_field=None,
         )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:

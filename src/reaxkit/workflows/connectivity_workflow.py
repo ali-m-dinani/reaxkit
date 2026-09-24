@@ -51,6 +51,15 @@ ALL_COMMANDS = (
     "relabel_traj_using_coordination",
     "get_hybridization",
 )
+COMMAND_ALIASES = {
+    "get_connection_list": ("connection_list",),
+    "get_connection_table": ("connection_table",),
+    "get_connection_stats": ("connection_stats",),
+    "get_bond_events": ("bond_events",),
+    "get_coordination": ("coordination",),
+    "relabel_traj_using_coordination": ("coordination_relabel",),
+    "get_hybridization": ("hybridization",),
+}
 ALL_LEGACY_COMMANDS = (
     "connection_list",
     "connection_table",
@@ -295,7 +304,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
@@ -567,7 +576,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    canonical = resolve_command_name(command, task_names=ALL_COMMANDS)
+    canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
     if canonical == "relabel_traj_using_coordination":
         normalized = normalize_storage_args(vars(args))
         reporter = resolve_reporter(normalized)

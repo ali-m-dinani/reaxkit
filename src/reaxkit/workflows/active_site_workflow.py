@@ -348,6 +348,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 def _plot_payload(command: str, result, _args: argparse.Namespace) -> dict[str, object] | None:
     """Plot payload."""
+    command = {
+        "active_site_structural": "get_active_site_structural",
+        "active_site_events": "get_active_site_events",
+    }.get(command, command)
     table = result.table
     if not isinstance(table, pd.DataFrame) or table.empty:
         return None
@@ -440,13 +444,13 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     executor = AnalysisExecutor()
     result = executor.run(task_cls(), request, vars(args))
     if diagnose:
-        out_dir = persist_analysis_result(canonical, result, args, write_csv=True)
+        out_dir = persist_analysis_result(command, result, args, write_csv=True)
         _print_active_site_event_diagnostic_console(result, args, out_dir)
         return 0
 
     bundled = bundle_canonical_and_tract_tables(result)
     present_result(
-        canonical,
+        command,
         bundled,
         args,
         plot_payload_builder=_plot_payload,

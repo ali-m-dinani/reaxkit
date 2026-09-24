@@ -11,9 +11,88 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+General-purpose plotting command for tabular data files.
+Select plot behavior with --type and provide the related flags for that type.
+
+### Examples
+-----
+
+```text
+  1. Single plot:
+   reaxkit gen-plot --type single --file msd.csv --xaxis c1 --yaxis c2 --plot
+
+  2. Directed plot:
+   reaxkit gen-plot --type directed --file table.csv --xaxis c1 --yaxis c2 --save directed.png
+
+  3. Heatmap2d plot:
+   reaxkit gen-plot --type heatmap2d --file table.csv --x c1 --y c2 --z c3 --value c4 --plane xz --bins 100,80 --save heat_xz.png
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--type` | Yes |  | Plot type selector. Example: --type single, which enables single-plot mode. | single, directed, dual, tornado, scatter3d, heatmap2d |
+| `--y1` | No |  | Left y-axis column for dual mode. Example: --y1 c2, which maps c2 to left axis. |  |
+| `--y2` | No |  | Right y-axis column for dual mode. Example: --y2 c3, which maps c3 to right axis. |  |
+| `--label` | No |  | Label column for tornado mode. Example: --label c1, which provides tornado labels. |  |
+| `--min` | No |  | Minimum-value column for tornado mode. Example: --min c2, which sets low bound column. |  |
+| `--max` | No |  | Maximum-value column for tornado mode. Example: --max c3, which sets high bound column. |  |
+| `--median` | No |  | Optional median column for tornado mode. Example: --median c4, which adds median markers. |  |
+| `--top` | No | 0 | Top-N for tornado mode. Example: --top 10, which keeps widest 10 bars. |  |
+| `--x` | No |  | X coordinate column for scatter3d/heatmap2d. Example: --x c1, which maps column 1 to x. |  |
+| `--y` | No |  | Y coordinate column for scatter3d/heatmap2d. Example: --y c2, which maps column 2 to y. |  |
+| `--z` | No |  | Z coordinate column for scatter3d/heatmap2d. Example: --z c3, which maps column 3 to z. |  |
+| `--value` | No |  | Value column for scatter3d/heatmap2d color/aggregation. Example: --value c4, which supplies scalar values. |  |
+| `--plane` | No | xy | Projection plane for heatmap2d. Example: --plane xz, which projects onto XZ. | xy, xz, yz |
+| `--bins` | No | 50 | Heatmap bins: int or nx,ny. Example: --bins 100,80, which sets asymmetric grid resolution. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--file` | Yes |  | Path to input txt/csv/tsv table. Example: --file table.csv, which loads plotting data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--save` | No |  | Path to save plot (file or directory). Example: --save figures/msd.png, which writes the generated figure to that path. |  |
+| `--title` | No |  | Optional custom plot title. Example: --title "MSD vs Time", which overrides the default auto title. |  |
+| `--plot` | No | False | Generate and display/save the plot. Example: --plot, which opens the plot interactively when supported. |  |
+| `--xaxis` | No |  | X column(s), format depends on --type. Example: --xaxis c1,c3, which selects x columns for single/dual/directed. |  |
+| `--yaxis` | No |  | Y column(s), format depends on --type. Example: --yaxis c2,c4, which selects y columns for single/directed. |  |
+| `--xlabel` | No |  | Optional x-axis label. Example: --xlabel Time, which customizes axis text. |  |
+| `--ylabel` | No |  | Optional y-axis label. Example: --ylabel MSD, which customizes axis text. |  |
+| `--scatter` | No | False | Use scatter instead of line (single mode). Example: --scatter, which switches marker-style rendering. |  |
+| `--ylabel1` | No |  | Optional left y-axis label. Example: --ylabel1 Temp, which labels left axis. |  |
+| `--ylabel2` | No |  | Optional right y-axis label. Example: --ylabel2 Pressure, which labels right axis. |  |
+| `--vline` | No |  | Reference vertical line for tornado mode. Example: --vline 0.0, which draws baseline. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
 
 </div>
 
@@ -23,33 +102,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--type` | Yes |  | Plot type selector. Example: --type single, which enables single-plot mode. | single, directed, dual, tornado, scatter3d, heatmap2d |
-| `--file` | Yes |  | Path to input txt/csv/tsv table. Example: --file table.csv, which loads plotting data from that file. |  |
-| `--save` | No |  | Path to save plot (file or directory). Example: --save figures/msd.png, which writes the generated figure to that path. |  |
-| `--title` | No |  | Optional custom plot title. Example: --title "MSD vs Time", which overrides the default auto title. |  |
-| `--plot` | No |  | Generate and display/save the plot. Example: --plot, which opens the plot interactively when supported. |  |
-| `--xaxis` | No |  | X column(s), format depends on --type. Example: --xaxis c1,c3, which selects x columns for single/dual/directed. |  |
-| `--yaxis` | No |  | Y column(s), format depends on --type. Example: --yaxis c2,c4, which selects y columns for single/directed. |  |
-| `--xlabel` | No |  | Optional x-axis label. Example: --xlabel Time, which customizes axis text. |  |
-| `--ylabel` | No |  | Optional y-axis label. Example: --ylabel MSD, which customizes axis text. |  |
-| `--scatter` | No |  | Use scatter instead of line (single mode). Example: --scatter, which switches marker-style rendering. |  |
-| `--y1` | No |  | Left y-axis column for dual mode. Example: --y1 c2, which maps c2 to left axis. |  |
-| `--y2` | No |  | Right y-axis column for dual mode. Example: --y2 c3, which maps c3 to right axis. |  |
-| `--ylabel1` | No |  | Optional left y-axis label. Example: --ylabel1 Temp, which labels left axis. |  |
-| `--ylabel2` | No |  | Optional right y-axis label. Example: --ylabel2 Pressure, which labels right axis. |  |
-| `--label` | No |  | Label column for tornado mode. Example: --label c1, which provides tornado labels. |  |
-| `--min` | No |  | Minimum-value column for tornado mode. Example: --min c2, which sets low bound column. |  |
-| `--max` | No |  | Maximum-value column for tornado mode. Example: --max c3, which sets high bound column. |  |
-| `--median` | No |  | Optional median column for tornado mode. Example: --median c4, which adds median markers. |  |
-| `--top` | No | 0 | Top-N for tornado mode. Example: --top 10, which keeps widest 10 bars. |  |
-| `--vline` | No |  | Reference vertical line for tornado mode. Example: --vline 0.0, which draws baseline. |  |
-| `--x` | No |  | X coordinate column for scatter3d/heatmap2d. Example: --x c1, which maps column 1 to x. |  |
-| `--y` | No |  | Y coordinate column for scatter3d/heatmap2d. Example: --y c2, which maps column 2 to y. |  |
-| `--z` | No |  | Z coordinate column for scatter3d/heatmap2d. Example: --z c3, which maps column 3 to z. |  |
-| `--value` | No |  | Value column for scatter3d/heatmap2d color/aggregation. Example: --value c4, which supplies scalar values. |  |
-| `--plane` | No | xy | Projection plane for heatmap2d. Example: --plane xz, which projects onto XZ. | xy, xz, yz |
-| `--bins` | No | 50 | Heatmap bins: int or nx,ny. Example: --bins 100,80, which sets asymmetric grid resolution. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

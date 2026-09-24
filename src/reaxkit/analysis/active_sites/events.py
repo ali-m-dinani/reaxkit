@@ -23,6 +23,7 @@ import pandas as pd
 from reaxkit.analysis.active_sites.models import ActiveSiteEventsRequest, ActiveSiteEventsResult
 from reaxkit.analysis.active_sites.pbc import frame_cell_matrix, pairwise_min_image_distances
 from reaxkit.analysis.active_sites.tract_compat import to_tract_events_table
+from reaxkit.core.runtime.frame_tables import selected_frame_envelopes
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.data_models import ConnectivityTrajectoryData, TrajectoryData
@@ -179,6 +180,7 @@ def _rkf_like_input(args: dict) -> bool:
 class ActiveSiteEventsTask(AnalysisTask):
     """Extract persistent C-O and C-Si active-site events over trajectory frames."""
 
+    supports_selective_streaming = True
     required_data = ConnectivityTrajectoryData
 
     def required_data_for(self, request: object, args: dict | None = None):
@@ -582,9 +584,8 @@ class ActiveSiteEventsTask(AnalysisTask):
         use_bo = False
         every = max(1, int(request.every))
 
-        for stream_index, data in enumerate(frames):
-            if stream_index % every:
-                continue
+        for envelope in selected_frame_envelopes(frames, request):
+            stream_index, data = envelope.source_frame, envelope.payload
             if isinstance(data, ConnectivityTrajectoryData):
                 trajectory = data.trajectory
                 connectivity_data = data

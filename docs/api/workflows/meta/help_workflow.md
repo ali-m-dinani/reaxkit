@@ -11,9 +11,75 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Interactive help and discovery for ReaxKit commands, capabilities, and file semantics.
+Use this command to search ReaxKit concepts (for example analyses or generators) and
+ReaxFF-related files by keyword. You can narrow results, enforce exact matching, and
+request detailed mapping information.
+
+For more information, you can see:
+ ReaxKit code: https://github.com/ali-m-dinani/reaxkit
+ ReaxFF documentation: https://ali-m-dinani.github.io/reaxkit/
+
+### Examples
+-----
+
+```text
+  1. Basic keyword search:
+   reaxkit help "msd"
+
+  2. Search with multi-word phrase:
+   reaxkit help "bond order"
+
+  3. Limit result count:
+   reaxkit help "bond order" --top 3
+
+  4. Search with explicit engine context:
+   reaxkit help "restraint" --engine reaxff
+
+  5. Show detailed mapping information:
+   reaxkit help "fort.7" --all-info
+   reaxkit help "xmolout" --all-info
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `query` | No |  | Search query (use quotes for multi-word queries). Example: "bond order", which searches that phrase across help index entries. |  |
+| `--engine` | No |  | Optional engine context for dataclass-to-file mappings. Example: --engine reaxff, which resolves relationships using ReaxFF context. |  |
+| `--exact-match` | No | False | Match query exactly against item title (and aliases) before returning results. Example: --exact-match, which avoids broad fuzzy matches. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--top` | No | 1 | Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3 hits per category. |  |
+| `--all-info` | No | False | Show detailed implementation and file/dataclass/analyzer mapping information. Example: --all-info, which expands output beyond summary hits. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
 
 </div>
 
@@ -23,12 +89,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `query` | No |  | Search query (use quotes for multi-word queries). Example: "bond order", which searches that phrase across help index entries. |  |
-| `--top` | No | 1 | Maximum results per category (generator/file/analyzer/workflow), sorted by score. Example: --top 3, which returns only the top 3 hits per category. |  |
-| `--engine` | No |  | Optional engine context for dataclass-to-file mappings. Example: --engine reaxff, which resolves relationships using ReaxFF context. |  |
-| `--all-info` | No |  | Show detailed implementation and file/dataclass/analyzer mapping information. Example: --all-info, which expands output beyond summary hits. |  |
-| `--exact-match` | No |  | Match query exactly against item title (and aliases) before returning results. Example: --exact-match, which avoids broad fuzzy matches. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

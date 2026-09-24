@@ -4,10 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from reaxkit.domain.data_models import ChargeData
+from reaxkit.domain.data_models import ChargeData, ElectrostaticsData
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 from reaxkit.engine.reaxff.adapter import ReaxFFAdapter
+from reaxkit.engine.reaxff.io.base import BaseHandler
 
 
 def _xmolout(n_frames: int) -> str:
@@ -40,6 +41,78 @@ def _fort7(n_frames: int) -> str:
             )
         )
     return "\n".join(blocks) + "\n"
+
+
+@pytest.mark.parametrize("kind", ["charges", "coordinates"])
+def test_forward_scan_records_offsets_and_reports_real_read_work(tmp_path, monkeypatch, kind):
+    handler_type, content, flags, arrays = (
+        (Fort7Handler, _fort7(10), {"charge_arrays_only": True}, ["charges", "charge_atom_ids"])
+        if kind == "charges" else
+        (XmoloutHandler, _xmolout(10), {"coordinates_only": True}, ["coordinates"])
+    )
+    import numpy as np
+    source = tmp_path / ("fort.7" if kind == "charges" else "xmolout")
+    source.write_text(content, encoding="utf-8")
+    cached = handler_type(source, frame_indices=[0, 3], frame_cache_root=tmp_path / "cache")
+    direct = handler_type(source, frame_indices=[0, 3], input_cache=False)
+    cached_frames = list(cached.stream_file_frames(**flags))
+    direct_frames = list(direct.stream_file_frames(**flags))
+    assert [frame["source_index"] for frame in direct_frames] == [0, 3]
+    for left, right in zip(cached_frames, direct_frames):
+        for name in arrays:
+            np.testing.assert_array_equal(left[name], right[name])
+    for handler in (cached, direct):
+        stats = handler._frame_cache_stats
+        assert stats["parsed_frames"] == 2
+        assert stats["source_bytes"] < source.stat().st_size
+        assert stats["source_read_bytes"] >= stats["source_bytes"]
+        assert stats["source_read_calls"] > 0
+        assert stats["source_opens"] == 1
+
+    # Frame 2 was skipped numerically, but its offset was recorded on the first
+    # pass. Request it without permitting another header-index traversal.
+    overlap = handler_type(source, frame_indices=[2, 3], frame_cache_root=tmp_path / "cache")
+    original_scan = overlap._scan_offsets
+
+    def checked_scan(store, *, through_index, **kwargs):
+        assert store.get_coverage().next_frame_index == 4
+        assert set(store.get_offsets(range(4))) == set(range(4))
+        return original_scan(store, through_index=through_index, **kwargs)
+
+    monkeypatch.setattr(overlap, "_scan_offsets", checked_scan)
+    actual = list(overlap.stream_file_frames(**flags))
+    assert [frame["source_index"] for frame in actual] == [2, 3]
+    assert overlap._frame_cache_stats["hits"] == 1
+    assert overlap._frame_cache_stats["misses"] == 1
+
+
+def test_paired_benchmark_checksums_match_cold_direct_and_warm(tmp_path):
+    from benchmarks.hbn_paired_reader import run
+    (tmp_path / "xmolout").write_text(_xmolout(8), encoding="utf-8")
+    (tmp_path / "fort.7").write_text(_fort7(8), encoding="utf-8")
+    cold = run(tmp_path, "0:8:3", tmp_path / "cache")
+    direct = run(tmp_path, "0:8:3", tmp_path / "cache", input_cache=False)
+    warm = run(tmp_path, "0:8:3", tmp_path / "cache")
+    assert cold["checksum"] == direct["checksum"] == warm["checksum"]
+    assert cold["completed"] == direct["completed"] == warm["completed"] == 3
+    assert {record["handler"] for record in cold["sources"]} == {"XmoloutHandler", "Fort7Handler"}
+    assert all(record["stats"]["hits"] == 3 for record in warm["sources"])
+    assert all(record["stats"]["source_read_bytes"] == 0 for record in warm["sources"])
+
+
+def test_closing_coordinate_stream_releases_leases_and_keeps_metrics(tmp_path):
+    from reaxkit.core.storage.frame_store import enforce_frame_cache_limit
+    source = tmp_path / "xmolout"
+    source.write_text(_xmolout(8), encoding="utf-8")
+    cache_root = tmp_path / "cache"
+    handler = XmoloutHandler(source, frame_indices=[0, 3], frame_cache_root=cache_root)
+    stream = handler.stream_file_frames(coordinates_only=True)
+    assert next(stream)["source_index"] == 0
+    assert enforce_frame_cache_limit(cache_root, 1)["evicted_generations"] == 0
+    stream.close()
+    assert handler._frame_cache_stats["source_read_bytes"] > 0
+    assert handler._frame_cache_stats["parsed_frames"] == 1
+    assert enforce_frame_cache_limit(cache_root, 1)["evicted_generations"] == 1
 
 
 def test_xmolout_loads_only_requested_frames_in_request_order(tmp_path: Path, monkeypatch):
@@ -150,3 +223,339 @@ def test_reaxff_charge_adapter_preserves_source_frame_mapping(tmp_path: Path):
     assert data.iterations.tolist() == [30, 0]
     assert data.charges.shape == (2, 2)
     assert data.metadata["source_frame_indices"] == [3, 0]
+
+
+def test_xmolout_reuses_partial_overlap_by_source_frame(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(8), encoding="utf-8")
+
+    first = XmoloutHandler(
+        path,
+        frame_indices=[0, 2, 4, 6],
+        frame_cache_root=cache_root,
+    )
+    first.dataframe()
+    assert first.metadata()["frame_cache"]["parsed_frames"] == 4
+
+    BaseHandler.clear_runtime_cache()
+    second = XmoloutHandler(
+        path,
+        frame_indices=[0, 1, 2, 3, 4, 5, 6, 7],
+        frame_cache_root=cache_root,
+    )
+    assert second.dataframe()["iter"].tolist() == list(range(0, 80, 10))
+    stats = second.metadata()["frame_cache"]
+    assert stats["hits"] == 4
+    assert stats["misses"] == 4
+    assert stats["parsed_frames"] == 4
+
+
+def test_xmolout_indexed_loading_reports_real_frame_progress(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(4), encoding="utf-8")
+    events: list[tuple[int, int, str]] = []
+
+    handler = XmoloutHandler(
+        path,
+        frame_indices=[0, 2, 3],
+        frame_cache_root=cache_root,
+        reporter=lambda _stage, current, total, message: events.append(
+            (current, total, str(message or ""))
+        ),
+    )
+    handler.dataframe()
+
+    frame_events = [event for event in events if event[1] == 7]
+    assert frame_events[0][0] == 0
+    assert frame_events[-1][0] == 7
+    assert [current for current, _, _ in frame_events] == sorted(
+        current for current, _, _ in frame_events
+    )
+    assert all("cache" not in message.lower() for _, _, message in frame_events)
+
+
+def test_fort7_charge_stream_reports_indexing_and_selected_frame_progress(
+        tmp_path: Path,
+) -> None:
+    path = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    path.write_text(_fort7(4), encoding="utf-8")
+    events: list[tuple[int, int, str]] = []
+
+    list(
+        Fort7Handler(
+            path,
+            frame_indices=[0, 2, 3],
+            frame_cache_root=cache_root,
+            reporter=lambda _stage, current, total, message: events.append(
+                (current, total, str(message or ""))
+            ),
+        ).stream_file_frames(charge_arrays_only=True)
+    )
+
+    frame_events = [event for event in events if event[1] == 3]
+    assert frame_events[0][0] == 0
+    assert frame_events[-1][0] == 3
+    assert [current for current, _, _ in frame_events] == sorted(
+        current for current, _, _ in frame_events
+    )
+    assert all("cache" not in message.lower() for _, _, message in frame_events)
+
+
+def test_cold_numeric_streams_use_one_forward_pass(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    xmolout.write_text(_xmolout(8), encoding="utf-8")
+    fort7.write_text(_fort7(8), encoding="utf-8")
+
+    xmol_handler = XmoloutHandler(
+        xmolout,
+        frame_indices=[0, 2, 4, 6],
+        frame_cache_root=cache_root,
+    )
+    fort7_handler = Fort7Handler(
+        fort7,
+        frame_indices=[0, 2, 4, 6],
+        frame_cache_root=cache_root,
+    )
+    monkeypatch.setattr(
+        xmol_handler,
+        "_scan_offsets",
+        lambda *args, **kwargs: pytest.fail("cold xmolout stream performed an index pass"),
+    )
+    monkeypatch.setattr(
+        fort7_handler,
+        "_scan_offsets",
+        lambda *args, **kwargs: pytest.fail("cold fort.7 stream performed an index pass"),
+    )
+
+    coordinates = list(xmol_handler.stream_file_frames(coordinates_only=True))
+    charges = list(fort7_handler.stream_file_frames(charge_arrays_only=True))
+
+    assert [record["source_index"] for record in coordinates] == [0, 2, 4, 6]
+    assert [record["source_index"] for record in charges] == [0, 2, 4, 6]
+    assert xmol_handler._frame_cache_stats["one_pass"] is True
+    assert fort7_handler._frame_cache_stats["one_pass"] is True
+    assert xmol_handler._frame_cache_stats["indexed_frames"] == 0
+    assert fort7_handler._frame_cache_stats["indexed_frames"] == 0
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "get-potential-and-electric-field",
+        "write-trajectory-with-potential-and-electric-field",
+        "get-hbn-reference-polarization",
+        "an-unregistered-electrostatics-command",
+    ],
+)
+def test_electrostatics_streams_report_xmolout_and_fort7_separately(
+        tmp_path: Path,
+        monkeypatch,
+        command: str,
+) -> None:
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    xmolout.write_text(_xmolout(3), encoding="utf-8")
+    fort7.write_text(_fort7(3), encoding="utf-8")
+    monkeypatch.setenv("REAXKIT_FRAME_CACHE_DIR", str(tmp_path / "cache"))
+    events: list[tuple[str, int, int, str]] = []
+
+    frames = list(
+        ReaxFFAdapter().iter_data(
+            ElectrostaticsData,
+            {
+                "command": command,
+                "xmolout": str(xmolout),
+                "fort7": str(fort7),
+                "_frame_indices": [0, 2],
+                "scope": "total",
+            },
+            reporter=lambda stage, current, total, message=None: events.append(
+                (stage, current, total, str(message or ""))
+            ),
+        )
+    )
+
+    assert len(frames) == 2
+    assert ("stream", 1, 1, "Preparing input streams") in events
+    for stage in ("load xmolout", "load fort.7"):
+        source_events = [event for event in events if event[0] == stage]
+        assert source_events[0][1:] == (
+            0,
+            2,
+            f"Reading {stage.removeprefix('load ')} frames",
+        )
+        assert source_events[-1][1] == source_events[-1][2] == 2
+        assert [current for _, current, _, _ in source_events] == sorted(
+            current for _, current, _, _ in source_events
+        )
+    # The two inputs advance together so selected frames are read once and
+    # aligned without a coordinate-cache prefetch pass.
+    assert any(event[0] == "load xmolout" for event in events)
+    assert any(event[0] == "load fort.7" for event in events)
+
+
+def test_xmolout_covered_misses_use_offsets_without_rescanning(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(7), encoding="utf-8")
+
+    XmoloutHandler(
+        path,
+        frame_indices=[6],
+        frame_cache_root=cache_root,
+    ).dataframe()
+    BaseHandler.clear_runtime_cache()
+    handler = XmoloutHandler(
+        path,
+        frame_indices=[1, 3, 5],
+        frame_cache_root=cache_root,
+    )
+    assert handler.dataframe()["iter"].tolist() == [10, 30, 50]
+    stats = handler.metadata()["frame_cache"]
+    assert stats["indexed_frames"] == 0
+    assert stats["index_bytes"] == 0
+    assert stats["parsed_frames"] == 3
+
+
+def test_xmolout_finite_stream_reuses_full_cached_frames(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(5), encoding="utf-8")
+    list(
+        XmoloutHandler(
+            path,
+            frame_indices=[0, 2, 4],
+            frame_cache_root=cache_root,
+        ).stream_file_frames(coordinates_only=True)
+    )
+
+    handler = XmoloutHandler(
+        path,
+        frame_indices=[0, 1, 2, 3, 4],
+        frame_cache_root=cache_root,
+    )
+    records = list(handler.stream_file_frames(coordinates_only=True))
+    assert [record["source_index"] for record in records] == [0, 1, 2, 3, 4]
+    assert handler._frame_cache_stats["hits"] == 3
+    assert handler._frame_cache_stats["parsed_frames"] == 2
+
+
+def test_input_cache_can_be_disabled_independently(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    cache_root = tmp_path / "cache"
+    path.write_text(_xmolout(3), encoding="utf-8")
+    handler = XmoloutHandler(
+        path,
+        frame_indices=[0, 2],
+        frame_cache_root=cache_root,
+        input_cache=False,
+    )
+
+    assert handler.dataframe()["iter"].tolist() == [0, 20]
+    assert "frame_cache" not in handler.metadata()
+    assert not (cache_root / "frames").exists()
+
+
+def test_fort7_charge_stream_reuses_partial_overlap(tmp_path: Path):
+    path = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    path.write_text(_fort7(6), encoding="utf-8")
+    first = Fort7Handler(
+        path,
+        frame_indices=[0, 2, 4],
+        frame_cache_root=cache_root,
+    )
+    list(first.stream_file_frames(charge_arrays_only=True))
+
+    second = Fort7Handler(
+        path,
+        frame_indices=[0, 1, 2, 3, 4, 5],
+        frame_cache_root=cache_root,
+    )
+    records = list(second.stream_file_frames(charge_arrays_only=True))
+    assert [record["source_index"] for record in records] == list(range(6))
+    assert all(record["charges"].tolist() == [0.0, 0.0] for record in records)
+    assert second._frame_cache_stats["hits"] == 3
+    assert second._frame_cache_stats["parsed_frames"] == 3
+
+    rich_cache = tmp_path / "rich-cache"
+    Fort7Handler(
+        path,
+        frame_indices=[1, 3],
+        frame_cache_root=rich_cache,
+    ).dataframe()
+    narrow = Fort7Handler(
+        path,
+        frame_indices=[1, 3],
+        frame_cache_root=rich_cache,
+    )
+    list(narrow.stream_file_frames(charge_arrays_only=True))
+    assert narrow._frame_cache_stats["hits"] == 2
+    assert narrow._frame_cache_stats["parsed_frames"] == 0
+
+
+def test_distinct_reaxff_data_loaders_share_xmolout_frames(
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+):
+    xmolout = tmp_path / "xmolout"
+    fort7 = tmp_path / "fort.7"
+    cache_root = tmp_path / "cache"
+    xmolout.write_text(_xmolout(6), encoding="utf-8")
+    fort7.write_text(_fort7(6), encoding="utf-8")
+    monkeypatch.setenv("REAXKIT_FRAME_CACHE_DIR", str(cache_root))
+    parsed: list[int] = []
+    original = XmoloutHandler._parse_indexed_frame
+
+    def counted(self, handle, offset):
+        parsed.append(offset.frame_index)
+        return original(self, handle, offset)
+
+    monkeypatch.setattr(XmoloutHandler, "_parse_indexed_frame", counted)
+    adapter = ReaxFFAdapter()
+    trajectory = adapter.load_trajectory(
+        {"xmolout": str(xmolout), "_frame_indices": [0, 2, 4]},
+    )
+    assert trajectory.source_frame_indices.tolist() == [0, 2, 4]
+    assert parsed == [0, 2, 4]
+
+    BaseHandler.clear_runtime_cache()
+    parsed.clear()
+    combined = adapter.load_connectivity_trajectory(
+        {
+            "xmolout": str(xmolout),
+            "fort7": str(fort7),
+            "_frame_indices": [0, 1, 2, 3, 4, 5],
+        },
+    )
+    assert combined.trajectory.source_frame_indices.tolist() == list(range(6))
+    assert parsed == [1, 3, 5]
+
+
+def test_selection_normalization_preserves_order_and_handles_edges(tmp_path: Path):
+    path = tmp_path / "xmolout"
+    path.write_text(_xmolout(5), encoding="utf-8")
+
+    selected = XmoloutHandler(
+        path,
+        frame_indices=[4, 0, 4, -1, 2, 99],
+        frame_cache_root=tmp_path / "cache",
+    )
+    assert selected.metadata()["source_frame_indices"] == [4, 0, 2]
+    assert selected.dataframe()["iter"].tolist() == [40, 0, 20]
+
+    empty = XmoloutHandler(
+        path,
+        frame_indices=[],
+        frame_cache_root=tmp_path / "empty-cache",
+    )
+    assert empty.dataframe().empty
+    assert empty.metadata()["source_frame_indices"] == []

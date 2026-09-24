@@ -1,0 +1,21 @@
+name: Runtime contracts
+on:
+  push:
+  pull_request:
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e . pytest ase matplotlib networkx
+      - name: Scientific equivalence and bounded-memory contracts
+        run: >-
+          python -m pytest tests/core/test_frame_pipeline.py
+          tests/core/test_artifacts.py tests/core/test_reducers.py
+          tests/core/test_unified_rollout.py tests/core/test_rollout_completion.py
+          tests/core/test_command_inventory.py -q
+      - name: Small deterministic benchmark
+        run: python -m reaxkit.core.runtime.benchmark --frames 24 --payload-mib 1 --workers 1 2 --output benchmark_results/ci.json

@@ -303,6 +303,10 @@ class CacheManager:
         """
         return self._root / str(analysis_id) / "cache.h5"
 
+    def _pickle_path(self, analysis_id: str) -> Path:
+        """Portable cache path used when HDF5 is unavailable."""
+        return self._root / f"{analysis_id}.pkl"
+
     def _index_path(self) -> Path:
         """
         Index path.
@@ -373,7 +377,7 @@ class CacheManager:
         in_mem, _ = self._memory_get(analysis_id)
         if in_mem:
             return True
-        return self._path(analysis_id).exists()
+        return self._path(analysis_id).exists() or self._pickle_path(analysis_id).exists()
 
     def load(self, analysis_id: str) -> Any:
         """
@@ -409,8 +413,13 @@ class CacheManager:
         in_mem, value = self._memory_get(analysis_id)
         if in_mem:
             return value
-        if h5py is None:
-            raise RuntimeError("h5py is required for on-disk analysis cache.")
+        pickle_path = self._pickle_path(analysis_id)
+        if pickle_path.exists():
+            value = pickle.loads(pickle_path.read_bytes())
+            self._memory_put(analysis_id, value)
+            return value
+        if h5py is None or not self._path(analysis_id).exists():
+            raise FileNotFoundError(f"No cached analysis result for analysis_id={analysis_id}.")
         with h5py.File(self._path(analysis_id), "r") as h5:
             if "payload" not in h5:
                 raise KeyError(f"Missing payload dataset for cache analysis_id={analysis_id}.")
@@ -456,6 +465,12 @@ class CacheManager:
         """
         self._memory_put(analysis_id, value)
         if h5py is None:
+            path = self._pickle_path(analysis_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_bytes(pickle.dumps(value, protocol=self.cfg.protocol))
+            tmp.replace(path)
+            self._update_index(analysis_id, cache_path=path, task_name=task_name)
             return
         path = self._path(analysis_id)
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -245,6 +245,44 @@ class TrajectoryRelabelByCoordinationTask(AnalysisTask):
     """Build a relabeled trajectory from coordination-status output."""
 
     required_data = ConnectivityTrajectoryData
+    from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        """Relabel independent frames and retain the primary trajectory on disk."""
+        from contextlib import closing
+        from dataclasses import replace
+        from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
+        from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+        from reaxkit.core.runtime.frame_tables import selected_frame_envelopes
+        from reaxkit.core.runtime.trajectory_spool import TrajectorySpool
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        local = replace(request, frames=[0], every=1)
+        spool, tables, sources = TrajectorySpool(), [], []
+        succeeded = False
+        try:
+            with closing(pipeline.map_ordered(selected_frame_envelopes(frames, request), lambda data: self.run(data, local))) as completed:
+                for item in completed:
+                    item.value.table["frame_index"] = item.envelope.source_frame
+                    tables.append(item.value.table)
+                    spool.append(len(sources), item.value.trajectory)
+                    sources.append(item.envelope.source_frame)
+                    if reporter:
+                        reporter("stream", len(sources), 0, "Relabeling trajectory frames")
+            if not sources:
+                raise ValueError("Relabeling requires at least one selected frame.")
+            trajectory = replace(spool.finish(), source_frame_indices=np.asarray(sources))
+            result = TrajectoryRelabelByCoordinationResult(trajectory=trajectory,
+                    table=pd.concat(tables, ignore_index=True), request=request)
+            result._trajectory_spool, result.skip_result_cache = spool, True
+            succeeded = True
+            return result
+        finally:
+            if not succeeded:
+                spool.close()
 
     @staticmethod
     def recommended_presentations(

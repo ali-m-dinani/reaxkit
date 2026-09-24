@@ -1,0 +1,152 @@
+{
+  "cases": [
+    {
+      "cpu_seconds": 0.03125,
+      "frames": 256,
+      "max_in_flight": 2,
+      "payload_bytes": 262144,
+      "peak_in_flight": 1,
+      "peak_in_flight_bytes": 262144,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "memory",
+      "speedup_vs_serial": 1.0,
+      "wall_seconds": 0.03350359998876229,
+      "workers": 1
+    },
+    {
+      "cpu_seconds": 0.03125,
+      "frames": 256,
+      "max_in_flight": 4,
+      "payload_bytes": 262144,
+      "peak_in_flight": 4,
+      "peak_in_flight_bytes": 1048576,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "memory",
+      "speedup_vs_serial": 2.138536755502103,
+      "wall_seconds": 0.01566660002572462,
+      "workers": 2
+    },
+    {
+      "cpu_seconds": 0.015625,
+      "frames": 256,
+      "max_in_flight": 8,
+      "payload_bytes": 262144,
+      "peak_in_flight": 8,
+      "peak_in_flight_bytes": 2097152,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "memory",
+      "speedup_vs_serial": 2.430773917455902,
+      "wall_seconds": 0.013783100002910942,
+      "workers": 4
+    },
+    {
+      "cpu_seconds": 0.09375,
+      "frames": 256,
+      "max_in_flight": 2,
+      "payload_bytes": 262144,
+      "peak_in_flight": 1,
+      "peak_in_flight_bytes": 262144,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_first_read",
+      "speedup_vs_serial": 1.0,
+      "wall_seconds": 0.05613530002301559,
+      "workers": 1
+    },
+    {
+      "cpu_seconds": 0.046875,
+      "frames": 256,
+      "max_in_flight": 4,
+      "payload_bytes": 262144,
+      "peak_in_flight": 4,
+      "peak_in_flight_bytes": 1048576,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_first_read",
+      "speedup_vs_serial": 1.7110508282655188,
+      "wall_seconds": 0.0328074999852106,
+      "workers": 2
+    },
+    {
+      "cpu_seconds": 0.125,
+      "frames": 256,
+      "max_in_flight": 8,
+      "payload_bytes": 262144,
+      "peak_in_flight": 8,
+      "peak_in_flight_bytes": 2097152,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_first_read",
+      "speedup_vs_serial": 1.5687788553834725,
+      "wall_seconds": 0.035782799997832626,
+      "workers": 4
+    },
+    {
+      "cpu_seconds": 0.0625,
+      "frames": 256,
+      "max_in_flight": 2,
+      "payload_bytes": 262144,
+      "peak_in_flight": 1,
+      "peak_in_flight_bytes": 262144,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_repeat_read",
+      "speedup_vs_serial": 1.0,
+      "wall_seconds": 0.0583741000154987,
+      "workers": 1
+    },
+    {
+      "cpu_seconds": 0.078125,
+      "frames": 256,
+      "max_in_flight": 4,
+      "payload_bytes": 262144,
+      "peak_in_flight": 4,
+      "peak_in_flight_bytes": 1048576,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_repeat_read",
+      "speedup_vs_serial": 1.8609324116055834,
+      "wall_seconds": 0.03136819996871054,
+      "workers": 2
+    },
+    {
+      "cpu_seconds": 0.078125,
+      "frames": 256,
+      "max_in_flight": 8,
+      "payload_bytes": 262144,
+      "peak_in_flight": 8,
+      "peak_in_flight_bytes": 2097152,
+      "result_digest": "90b3ce26ad70d491d15c42e5d1d479edd72849561e100cb0c160b2e57bee4b00",
+      "source_mode": "file_repeat_read",
+      "speedup_vs_serial": 1.74170978360213,
+      "wall_seconds": 0.03351539996219799,
+      "workers": 4
+    }
+  ],
+  "platform": {
+    "cpu_count": 22,
+    "python": "3.12.10",
+    "slurm_cpus_per_task": null,
+    "slurm_job_id": null,
+    "slurm_mem_per_node_mb": null,
+    "system": "Windows-11-10.0.26200-SP0"
+  },
+  "recommendations": {
+    "file_first_read": {
+      "fastest_wall_seconds": 0.0328074999852106,
+      "fastest_workers": 2,
+      "speedup_vs_serial": 1.7110508282655188
+    },
+    "file_repeat_read": {
+      "fastest_wall_seconds": 0.03136819996871054,
+      "fastest_workers": 2,
+      "speedup_vs_serial": 1.8609324116055834
+    },
+    "memory": {
+      "fastest_wall_seconds": 0.013783100002910942,
+      "fastest_workers": 4,
+      "speedup_vs_serial": 2.430773917455902
+    }
+  },
+  "schema_version": 1,
+  "validation": {
+    "bounded": true,
+    "case_count": 9,
+    "deterministic": true
+  }
+}

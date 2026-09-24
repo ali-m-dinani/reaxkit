@@ -11,9 +11,64 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Trim an `xmolout` file to a lighter format containing only atom type and x/y/z coordinates.
+This command is useful when full xmolout output is too large for quick inspection or downstream
+tools that support reading atomic positions (not other variables like velocities, molecule numbers, etc.which may be written to the xmolout file using ixmolo keyword in the control file). It writes a reduced output file and does not modify
+the input file in place.
+
+### Examples
+-----
+
+```text
+  1. Trim a specific xmolout file to a named output:
+   reaxkit trim-xmolout --file xmolout --output xmolout_trimmed
+
+  2. Trim using a custom output filename:
+   reaxkit trim-xmolout --output xmolout_light
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--file` | No | xmolout | Input xmolout file. Example: --file runs/job1/xmolout, which reads that trajectory/output file as input. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | xmolout_trimmed | Output trimmed xmolout file. Example: --output xmolout_light, which writes the reduced-content file with that name. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
 
 </div>
 
@@ -23,13 +78,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--file` | No | xmolout | Input xmolout file. Example: --file runs/job1/xmolout, which reads that trajectory/output file as input. |  |
-| `--output` | No | xmolout_trimmed | Output trimmed xmolout file. Example: --output xmolout_light, which writes the reduced-content file with that name. |  |
-| `--copy-to-dot` | No |  | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

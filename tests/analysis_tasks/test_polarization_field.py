@@ -27,7 +27,7 @@ from reaxkit.domain.data_models import (
     SimulationData,
     TrajectoryData,
 )
-from reaxkit.workflows.electrostatics_workflow import (
+from reaxkit.workflows.electrostatics.electrostatics_workflow import (
     _apply_polarization_scale,
     _plot_payload,
     _polarization_summary_path,

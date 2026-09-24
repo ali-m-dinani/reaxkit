@@ -13,7 +13,8 @@ import copy
 import inspect
 import os
 from pathlib import Path
-from time import perf_counter
+import sys
+from time import perf_counter, process_time
 from datetime import datetime, timezone
 import json
 
@@ -26,6 +27,8 @@ from reaxkit.core.platform.exceptions import ParseError, AnalysisError
 from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import get_logger, configure_file_logging
 from reaxkit.core.runtime.progress import progress_operation, resolve_reporter
+from reaxkit.core.runtime.execution_contracts import ExecutionPolicy, resolve_execution_policy, task_capabilities
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.core.runtime.provenance import user_settings_from_args
 from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, normalize_storage_args, snapshot_storage_inputs
@@ -38,6 +41,7 @@ class AnalysisExecutor:
     """Orchestrate task execution with strict layer boundaries."""
 
     FRAME_SELECTIVE_DATA_TYPES = {
+        "MolecularAnalysisData",
         "TrajectoryData",
         "ChargeData",
         "ConnectivityData",
@@ -75,6 +79,13 @@ class AnalysisExecutor:
         "input",
         "run_dir",
     )
+
+    @staticmethod
+    def _ready_for_result_saving(result, args: dict):
+        """Mark the boundary between computation and workflow artifact writes."""
+        if args.get("progress") and not args.get("quiet"):
+            print("[ReaxKit] Computation complete; saving result files...")
+        return result
 
     @staticmethod
     def _timing_console_enabled(args: dict) -> bool:
@@ -198,7 +209,8 @@ class AnalysisExecutor:
                 trace.result("analysis directory", analysis_dir)
 
     @classmethod
-    def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float, extra: dict | None = None) -> None:
+    def _record_timing(cls, args: dict, *, phase: str, task_name: str, seconds: float,
+                       extra: dict | None = None) -> None:
         """
         Record timing.
         """
@@ -218,6 +230,14 @@ class AnalysisExecutor:
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(payload, sort_keys=True) + "\n")
 
+        legacy_payload = dict(payload)
+        if legacy_payload["phase"] == "load_total":
+            legacy_payload["phase"] = "load"
+        legacy_timing = Path(args.get("project_root") or ".") / "logs" / "timing.log"
+        legacy_timing.parent.mkdir(parents=True, exist_ok=True)
+        with open(legacy_timing, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(legacy_payload, sort_keys=True) + "\n")
+
         human_line = (
             f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')} "
             f"ReaxKit task={task_name} phase={phase} "
@@ -226,6 +246,11 @@ class AnalysisExecutor:
         )
         for human_path in (cls._timing_human_global_log_path(args), cls._timing_human_run_log_path(args)):
             human_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(human_path, "a", encoding="utf-8") as fh:
+                fh.write(human_line + "\n")
+        legacy_logs = Path(args.get("project_root") or ".") / "logs"
+        session_id = str(args.get("_log_session_id") or "unknown")
+        for human_path in (legacy_logs / "timing_human.log", legacy_logs / f"run_{session_id}.timing.log"):
             with open(human_path, "a", encoding="utf-8") as fh:
                 fh.write(human_line + "\n")
 
@@ -271,6 +296,7 @@ class AnalysisExecutor:
         """
         Load timing callback.
         """
+
         def _emit(*, handler: str, source: str | None, source_path: str | None, seconds: float) -> None:
             cls._record_timing(
                 args,
@@ -287,13 +313,23 @@ class AnalysisExecutor:
         return _emit
 
     @classmethod
-    def _requested_frame_indices(cls, request, required_data) -> list[int] | None:
+    def _reader_timing_callback(cls, args: dict, *, task_name: str):
+        def _emit(*, handler: str, source_path: str, stats: dict) -> None:
+            cls._record_timing(
+                args, phase="input_stream", task_name=task_name,
+                seconds=float(stats.get("reader_active_seconds", 0.0)),
+                extra={"handler": handler, "source_path": source_path, **stats},
+            )
+        return _emit
+
+    @classmethod
+    def _requested_frame_indices(cls, request, required_data, task=None) -> list[int] | None:
         """Return explicit source-frame dependencies for a partial load."""
         if getattr(required_data, "__name__", "") not in cls.FRAME_SELECTIVE_DATA_TYPES:
             return None
 
         primary = None
-        for name in ("frames", "frame_indices", "frame"):
+        for name in ("frames", "selected_frames", "frame_indices", "frame"):
             value = getattr(request, name, None)
             if value is None or isinstance(value, (str, bytes)):
                 continue
@@ -309,11 +345,22 @@ class AnalysisExecutor:
 
         # Some analyses need an additional reference snapshot that is not in
         # the main frame list (for example displacement relative to frame 0).
-        dependencies = list(primary)
-        for name in ("reference_frame",):
+        references: list[int] = []
+        capabilities = task_capabilities(task) if task is not None else None
+        if capabilities is not None:
+            references.extend(capabilities.reference_frames)
+            if capabilities.requires_contiguous_history and bool(getattr(request, "unwrap", False)):
+                return list(range(max(primary) + 1))
+        reference_fields = capabilities.reference_fields if capabilities is not None else ()
+        for name in reference_fields or ("reference_frame",):
             value = getattr(request, name, None)
             if value is not None:
-                dependencies.append(int(value))
+                references.append(int(value))
+        dependencies = (
+            [*references, *primary]
+            if reference_fields or references or bool(getattr(request, "stream_reference_first", False))
+            else [*primary, *references]
+        )
         return list(dict.fromkeys(i for i in dependencies if i >= 0))
 
     @staticmethod
@@ -346,6 +393,8 @@ class AnalysisExecutor:
                 key = "xmolout"
             elif name_lower == "fort.7":
                 key = "fort7"
+            elif name_lower in {"molfra.out", "molfra_ig.out"}:
+                key = "molfra" if name_lower == "molfra.out" else "molfra_ig"
             elif Path(name_s).suffix.lower() in {".kf", ".rkf"}:
                 key = "rkf"
             elif "dump" in name_lower or "lammpstrj" in name_lower:
@@ -373,7 +422,7 @@ class AnalysisExecutor:
         source_to_local = {source: local for local, source in enumerate(source_indices)}
         execution_request = copy.copy(request)
 
-        for name in ("frames", "frame_indices"):
+        for name in ("frames", "selected_frames", "frame_indices"):
             values = getattr(request, name, None)
             if values is None or isinstance(values, (str, bytes)):
                 continue
@@ -402,7 +451,7 @@ class AnalysisExecutor:
         local_to_source = {local: source for local, source in enumerate(source_indices)}
 
         def _restore_frame(frame: pd.DataFrame) -> pd.DataFrame:
-            columns = [name for name in ("frame_index", "frame_idx") if name in frame.columns]
+            columns = [name for name in ("frame_index", "frame_idx", "frame") if name in frame.columns]
             if not columns:
                 return frame
             out = frame.copy()
@@ -432,10 +481,10 @@ class AnalysisExecutor:
         execution_request, source_indices = cls._request_for_loaded_frames(request, data)
         task_name = task.__class__.__name__
         with progress_operation(
-            reporter,
-            "analyze",
-            f"Running {task_name}",
-            f"Finished {task_name}",
+                reporter,
+                "analyze",
+                f"Running {task_name}",
+                f"Finished {task_name}",
         ) as analysis_reporter:
             params = inspect.signature(task.run).parameters
             if "reporter" in params:
@@ -450,27 +499,64 @@ class AnalysisExecutor:
         return bool(
             args.get("stream", True)
             and (
-                requested_frame_indices is None
-                or bool(getattr(task, "supports_selective_streaming", False))
+                    requested_frame_indices is None
+                    or bool(getattr(task, "supports_selective_streaming", False))
+                    or task_capabilities(task).supports_selective_frames
             )
-            and callable(getattr(task, "run_stream", None))
+            and (
+                callable(getattr(task, "run_stream", None))
+                or callable(getattr(task, "run_blocks", None))
+            )
             and adapter.supports_streaming(required_data, args)
         )
 
     @classmethod
-    def _run_stream_task(cls, task, frames, request, reporter):
+    def _run_stream_task(cls, task, frames, request, reporter, args: dict):
         """Execute an incremental task against a canonical frame iterator."""
         task_name = task.__class__.__name__
+        policy = (ExecutionPolicy(**args["_execution_policy"]) if args.get("_execution_policy")
+                  else resolve_execution_policy(task, request, args))
+        args["_execution_policy"] = policy.as_dict()
+        if "output_profile" in args and getattr(task, "supports_output_profiles", False):
+            request._output_profile = args["output_profile"]
+            request._write_displacements = bool(args.get("write_displacements", False))
+
+        def record_pipeline_timing(
+            phase: str, seconds: float, details: dict[str, object]
+        ) -> None:
+            cls._record_timing(
+                args,
+                phase=phase,
+                task_name=task_name,
+                seconds=seconds,
+                extra=details,
+            )
+
+        pipeline = BoundedFramePipeline(
+            policy,
+            timing_callback=record_pipeline_timing,
+            artifact_writer=args.get("_artifact_writer"),
+        )
         with progress_operation(
-            reporter,
-            "stream",
-            f"Streaming {task_name}",
-            f"Finished {task_name}",
+                reporter,
+                "stream",
+                f"Streaming {task_name}",
+                f"Finished {task_name}",
         ) as stream_reporter:
-            params = inspect.signature(task.run_stream).parameters
+            runner = getattr(task, "run_stream", None) or getattr(task, "run_blocks")
+            params = inspect.signature(runner).parameters
+            kwargs = {}
             if "reporter" in params:
-                return task.run_stream(frames, request, reporter=stream_reporter)
-            return task.run_stream(frames, request)
+                kwargs["reporter"] = stream_reporter
+            if "pipeline" in params:
+                kwargs["pipeline"] = pipeline
+                return runner(frames, request, **kwargs)
+            # Existing incremental tasks already own their scientific state.
+            # Bound their reader and guarantee cleanup without wrapping the
+            # state machine in independent frame workers.
+            from contextlib import closing
+            with closing(pipeline.map_ordered(frames, lambda frame: frame)) as ordered:
+                return runner((item.value for item in ordered), request, **kwargs)
 
     @classmethod
     def _stream_source_identity(cls, adapter, required_data, args: dict, required_names) -> dict:
@@ -544,7 +630,39 @@ class AnalysisExecutor:
             input_was_explicit = bool(explicit_input and str(explicit_input) != ".")
         if input_was_explicit and explicit_input and str(explicit_input) != ".":
             return str(explicit_input)
-        return str(args.get("_snapshot_source_dir") or cls._detection_path(args))
+        default_file_hints = {
+            "xmolout": "xmolout",
+            "fort7": "fort.7",
+            "fort13": "fort.13",
+            "fort57": "fort.57",
+            "summary": "summary.txt",
+            "control": "control",
+            "eregime": "eregime",
+            "vels": "vels",
+            "molfra": "molfra",
+        }
+        for key in cls.DETECTION_HINT_KEYS:
+            if key in {"input", "run_dir"}:
+                continue
+            value = args.get(key)
+            if not value:
+                continue
+            file_was_explicit = args.get(f"_{key}_was_explicit")
+            if file_was_explicit is False:
+                continue
+            path = Path(str(value))
+            default_name = default_file_hints.get(key)
+            if default_name and path.parent == Path(".") and path.name == default_name:
+                continue
+            return str(value)
+
+        run_dir = args.get("run_dir")
+        run_dir_was_explicit = args.get("_run_dir_was_explicit")
+        if run_dir_was_explicit is None:
+            run_dir_was_explicit = bool(run_dir and str(run_dir) != ".")
+        if run_dir_was_explicit and run_dir and str(run_dir) != ".":
+            return str(run_dir)
+        return str(args.get("_snapshot_source_dir") or ".")
 
     @staticmethod
     def _console_step(args: dict, message: str) -> None:
@@ -557,7 +675,74 @@ class AnalysisExecutor:
         suffix = f" run_id={run_id}" if run_id else ""
         print(f"[ReaxKit] {message}{suffix}", flush=True)
 
+    @classmethod
+    def _source_bytes(cls, args: dict) -> int:
+        """Return the size of unique input files visible in normalized arguments."""
+        candidates: list[Path] = []
+        for key in cls.DETECTION_HINT_KEYS:
+            value = args.get(key)
+            if value:
+                candidates.append(Path(str(value)))
+        candidates.extend(
+            Path(str(value))
+            for value in dict(args.get("_selective_source_files") or {}).values()
+        )
+        total = 0
+        seen: set[str] = set()
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+                if resolved.is_file() and str(resolved) not in seen:
+                    seen.add(str(resolved))
+                    total += int(resolved.stat().st_size)
+            except OSError:
+                continue
+        return total
+
+    @staticmethod
+    def _peak_rss_bytes() -> int | None:
+        """Return process peak RSS where the platform exposes it."""
+        try:
+            import resource
+
+            value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+            return value if sys.platform == "darwin" else value * 1024
+        except (ImportError, OSError, ValueError):
+            try:
+                import psutil
+
+                memory = psutil.Process().memory_info()
+                return int(getattr(memory, "peak_wset", memory.rss))
+            except (ImportError, OSError):
+                return None
+
     def run(self, task, request, args: dict):
+        """Run an analysis and always persist an end-to-end resource record."""
+        wall_started = perf_counter()
+        cpu_started = process_time()
+        status = "failed"
+        try:
+            result = self._run_impl(task, request, args)
+            status = "success"
+            return result
+        finally:
+            extra = {
+                "status": status,
+                "cpu_seconds": process_time() - cpu_started,
+                "source_bytes": self._source_bytes(args),
+            }
+            peak_rss = self._peak_rss_bytes()
+            if peak_rss is not None:
+                extra["peak_rss_bytes"] = peak_rss
+            self._record_timing(
+                args,
+                phase="end_to_end",
+                task_name=task.__class__.__name__,
+                seconds=perf_counter() - wall_started,
+                extra=extra,
+            )
+
+    def _run_impl(self, task, request, args: dict):
         # ---------------------------------------------------------------------
         # 1) Normalize runtime/storage arguments and derive task/data metadata.
         # ---------------------------------------------------------------------
@@ -598,14 +783,31 @@ class AnalysisExecutor:
         normalized = normalize_storage_args(args, snapshot=False)
         args.clear()
         args.update(normalized)
+
+        # Resolve the engine before asking the task which canonical data it
+        # needs. Scientific settings can change that requirement: for example,
+        # native charges require ElectrostaticsData while formal charges need
+        # only TrajectoryData. Auto-detected engines must follow the same path
+        # as an explicitly selected engine.
+        input_path = self._engine_detection_path(args)
+        forced_engine = args.get("engine")
+        adapter = resolve_engine(input_path, engine=forced_engine)
+        resolved_engine = adapter.__class__.__name__.removesuffix("Adapter").lower()
+        args["_resolved_engine"] = resolved_engine
+        args["_native_charges_required_for_auto"] = bool(
+            getattr(task, "native_charges_required_for_auto", False)
+        )
+
         required_data = (
-            task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task, "required_data", None)
+            task.required_data_for(request, args) if hasattr(task, "required_data_for") else getattr(task,
+                                                                                                     "required_data",
+                                                                                                     None)
         )
         if hasattr(task, "required_data_fields_for"):
             required_fields = task.required_data_fields_for(request, args)
             if required_fields:
                 args["_required_data_fields"] = tuple(str(field) for field in required_fields)
-        requested_frame_indices = self._requested_frame_indices(request, required_data)
+        requested_frame_indices = self._requested_frame_indices(request, required_data, task)
         if requested_frame_indices is not None:
             args["_frame_indices"] = requested_frame_indices
         task_name = task.__class__.__name__
@@ -619,10 +821,14 @@ class AnalysisExecutor:
         handler_cache_dir = Path(args.get("project_root") or ".") / "cache" / "handlers"
         handler_cache_dir.mkdir(parents=True, exist_ok=True)
         os.environ["REAXKIT_HANDLER_CACHE_DIR"] = str(handler_cache_dir.resolve())
+        os.environ["REAXKIT_FRAME_CACHE_DIR"] = str(handler_cache_dir.parent.resolve())
+        frame_cache_gb = float(args.get("frame_cache_max_gb", 10.0) or 0.0)
+        os.environ["REAXKIT_FRAME_CACHE_MAX_BYTES"] = str(max(0, int(frame_cache_gb * 1024 ** 3)))
         self._console_step(args, f"Handler cache dir={handler_cache_dir}")
         session_id = configure_file_logging(Path(args.get("project_root") or "."))
         args["_log_session_id"] = session_id
         args["_load_timing_callback"] = self._load_timing_callback(args, task_name=task_name)
+        args["_reader_timing_callback"] = self._reader_timing_callback(args, task_name=task_name)
         log_level = args.get("log")
         if log_level == "verbose" or args.get("verbose"):
             get_logger(__name__, level="DEBUG")
@@ -642,14 +848,26 @@ class AnalysisExecutor:
         # 3) Resolve engine adapter from input hints and snapshot required raw
         #    inputs into run-scoped storage for traceability/reproducibility.
         # ---------------------------------------------------------------------
-        input_path = self._engine_detection_path(args)
-        forced_engine = args.get("engine")
         self._console_step(args, f"Resolving engine input={input_path} forced_engine={forced_engine or 'auto'}")
         logger.debug("Resolving engine for input=%s forced_engine=%s", input_path, forced_engine)
-        adapter = resolve_engine(input_path, engine=forced_engine)
-        self._console_step(args, f"Resolved engine adapter={adapter.__class__.__name__}")
+        self._console_step(
+            args,
+            f"Resolved engine={resolved_engine} adapter={adapter.__class__.__name__}",
+        )
+        streaming = self._streaming_enabled(task, adapter, required_data, args, requested_frame_indices)
+        args["_streaming"] = streaming
+        policy = resolve_execution_policy(task, request, args)
+        args["_execution_policy"] = policy.as_dict()
+        self._record_timing(
+            args,
+            phase="execution_policy",
+            task_name=task_name,
+            seconds=0.0,
+            extra=policy.as_dict(),
+        )
         logger.debug("Resolved adapter=%s", adapter.__class__.__name__)
-        snapshot_names = adapter.required_input_files(required_data, args)
+        required_input_files = getattr(adapter, "required_input_files", None)
+        snapshot_names = required_input_files(required_data, args) if callable(required_input_files) else None
         required_source_names = tuple(snapshot_names or ())
         streaming = self._streaming_enabled(
             task,
@@ -734,6 +952,7 @@ class AnalysisExecutor:
                 args,
                 required_source_names,
             )
+            identity["output_profile"] = args.get("output_profile", "legacy_api")
             analysis_id = cache.analysis_id_for(
                 task=task,
                 data=identity,
@@ -744,17 +963,20 @@ class AnalysisExecutor:
             if use_cache and cache.exists(analysis_id):
                 self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                 cached = cache.load(analysis_id)
-                return enrich_result_with_time(
-                    cached,
-                    None,
-                    control_file=str(args.get("control") or "control"),
+                return self._ready_for_result_saving(
+                    enrich_result_with_time(
+                        cached,
+                        None,
+                        control_file=str(args.get("control") or "control"),
+                    ),
+                    args,
                 )
 
             self._console_step(args, f"Streaming data and running task={task_name}")
             t_stream0 = perf_counter()
             try:
                 frames = adapter.stream(required_data, args, reporter=reporter)
-                result = self._run_stream_task(task, frames, request, reporter)
+                result = self._run_stream_task(task, frames, request, reporter, args)
             except (ParseError, AnalysisError):
                 raise
             except Exception as exc:
@@ -773,7 +995,7 @@ class AnalysisExecutor:
                 task_name=task_name,
                 seconds=elapsed,
             )
-            if use_cache:
+            if use_cache and not getattr(result, "skip_result_cache", False):
                 cache.store(analysis_id, result, task_name=task_name)
                 self._console_step(args, f"Stored analysis result in cache analysis_id={analysis_id[:12]}")
             self._record_general(
@@ -788,12 +1010,13 @@ class AnalysisExecutor:
                 },
             )
             self._console_step(args, f"Completed streaming task={task_name} analysis_id={analysis_id[:12]}")
-            return result
+            return self._ready_for_result_saving(result, args)
         if parsed_id is not None:
             data_name = getattr(required_data, "__name__", "parsed_data")
             artifact_name = str(data_name).lower()
             if layout is not None:
-                self._console_step(args, f"Checking parsed artifact cache parsed_id={parsed_id} artifact={artifact_name}")
+                self._console_step(args,
+                                   f"Checking parsed artifact cache parsed_id={parsed_id} artifact={artifact_name}")
                 cached_parsed = layout.load_parsed_artifact(
                     parsed_id=parsed_id,
                     artifact_name=artifact_name,
@@ -828,7 +1051,8 @@ class AnalysisExecutor:
 
                         if use_cache and cache.exists(analysis_id):
                             logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
-                            self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
+                            self._console_step(args,
+                                               f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_hit",
@@ -836,10 +1060,13 @@ class AnalysisExecutor:
                                 extra={"analysis_id": analysis_id},
                             )
                             cached = cache.load(analysis_id)
-                            return enrich_result_with_time(
-                                cached,
-                                data,
-                                control_file=str(args.get("control") or "control"),
+                            return self._ready_for_result_saving(
+                                enrich_result_with_time(
+                                    cached,
+                                    data,
+                                    control_file=str(args.get("control") or "control"),
+                                ),
+                                args,
                             )
 
                         if not use_cache:
@@ -847,7 +1074,8 @@ class AnalysisExecutor:
                             self._console_step(args, "Analysis cache disabled (running task)")
                         else:
                             logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
-                            self._console_step(args, f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
+                            self._console_step(args,
+                                               f"Analysis cache miss analysis_id={analysis_id[:12]} (running task)")
                             self._record_general(
                                 args,
                                 event="analysis_cache_miss",
@@ -886,7 +1114,7 @@ class AnalysisExecutor:
                             },
                         )
                         self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-                        return result
+                        return self._ready_for_result_saving(result, args)
 
             analysis_id = cache.analysis_id_for(
                 task=task,
@@ -918,11 +1146,14 @@ class AnalysisExecutor:
                     extra={"analysis_id": analysis_id},
                 )
                 cached = cache.load(analysis_id)
-                return enrich_result_with_time(
-                cached,
-                None,
-                control_file=str(args.get("control") or "control"),
-            )
+                return self._ready_for_result_saving(
+                    enrich_result_with_time(
+                        cached,
+                        None,
+                        control_file=str(args.get("control") or "control"),
+                    ),
+                    args,
+                )
 
         # ---------------------------------------------------------------------
         # 6) Slow path data load: parse required typed data via adapter.
@@ -1053,7 +1284,7 @@ class AnalysisExecutor:
                 },
             )
             self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-            return result
+            return self._ready_for_result_saving(result, args)
 
         if cache.exists(analysis_id):
             logger.info("Cache hit for task=%s analysis_id=%s", task_name, analysis_id[:12])
@@ -1065,10 +1296,13 @@ class AnalysisExecutor:
                 extra={"analysis_id": analysis_id},
             )
             cached = cache.load(analysis_id)
-            return enrich_result_with_time(
-                cached,
-                data,
-                control_file=str(args.get("control") or "control"),
+            return self._ready_for_result_saving(
+                enrich_result_with_time(
+                    cached,
+                    data,
+                    control_file=str(args.get("control") or "control"),
+                ),
+                args,
             )
 
         logger.info("Cache miss for task=%s analysis_id=%s", task_name, analysis_id[:12])
@@ -1110,4 +1344,4 @@ class AnalysisExecutor:
             },
         )
         self._console_step(args, f"Completed task={task_name} analysis_id={analysis_id[:12]}")
-        return result
+        return self._ready_for_result_saving(result, args)

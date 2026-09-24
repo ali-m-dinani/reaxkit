@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.domain.data_models import (
+    MolecularAnalysisData,
     ChargeData,
     ConnectivityData,
     ConnectivityTrajectoryData,
@@ -21,9 +23,13 @@ from reaxkit.domain.data_models import (
 from reaxkit.engine.reaxff.adapter_parts.normalizers import _SparseFrame
 from reaxkit.engine.reaxff.io.fort7_handler import Fort7Handler
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
-
+from reaxkit.engine.reaxff.quick_io import (
+    iter_charge_data_quick,
+    iter_fort7_charge_frames,
+)
 
 STREAMABLE_REAXFF_TYPES = {
+    MolecularAnalysisData,
     TrajectoryData,
     ChargeData,
     ConnectivityData,
@@ -31,6 +37,23 @@ STREAMABLE_REAXFF_TYPES = {
     CoordinationStatusBundleData,
     ElectrostaticsData,
 }
+
+def _file_progress_reporter(reporter, *, source_name: str, stage_name: str):
+    """Give one streaming source its own user-facing progress stage."""
+    if not callable(reporter):
+        return reporter
+
+    def _report(_stage: str, current: int, total: int, message: str | None = None) -> None:
+        if source_name not in str(message or "").lower():
+            return
+        reporter(
+            stage_name,
+            current,
+            total,
+            f"Reading {source_name} frames",
+        )
+
+    return _report
 
 
 def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
@@ -67,10 +90,10 @@ def _trajectory_frame(record: dict[str, Any]) -> TrajectoryData:
 
 
 def _fort7_frame(
-    record: dict[str, Any],
-    *,
-    atom_ids: list[int] | None = None,
-    elements: list[str] | None = None,
+        record: dict[str, Any],
+        *,
+        atom_ids: list[int] | None = None,
+        elements: list[str] | None = None,
 ) -> tuple[ConnectivityData, ChargeData]:
     table: pd.DataFrame = record["frame"]
     discovered = (
@@ -173,9 +196,9 @@ def _fort7_frame(
 
 
 def _fort7_charge_array_frame(
-    record: dict[str, Any],
-    *,
-    n_atoms: int,
+        record: dict[str, Any],
+        *,
+        n_atoms: int,
 ) -> ChargeData:
     """Build only the aligned charge model needed by total electrostatics."""
     atom_ids = np.asarray(record["charge_atom_ids"], dtype=int)
@@ -206,42 +229,107 @@ def _fort7_charge_array_frame(
 
 
 def _aligned_records(
-    coordinate_records: Iterator[dict[str, Any]],
-    connectivity_records: Iterator[dict[str, Any]],
+        coordinate_records: Iterator[dict[str, Any]],
+        connectivity_records: Iterator[dict[str, Any]],
 ) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     """Merge two source-index ordered iterators while retaining two frames."""
-    coordinates = next(coordinate_records, None)
-    connectivity = next(connectivity_records, None)
-    while coordinates is not None and connectivity is not None:
-        coord_index = int(coordinates["source_index"])
-        conn_index = int(connectivity["source_index"])
-        if coord_index == conn_index:
-            yield coordinates, connectivity
-            coordinates = next(coordinate_records, None)
-            connectivity = next(connectivity_records, None)
-        elif coord_index < conn_index:
-            coordinates = next(coordinate_records, None)
-        else:
-            connectivity = next(connectivity_records, None)
+    try:
+        coordinates = next(coordinate_records, None)
+        connectivity = next(connectivity_records, None)
+        while coordinates is not None and connectivity is not None:
+            coord_index = int(coordinates["source_index"])
+            conn_index = int(connectivity["source_index"])
+            if coord_index == conn_index:
+                yield coordinates, connectivity
+                coordinates = next(coordinate_records, None)
+                connectivity = next(connectivity_records, None)
+            elif coord_index < conn_index:
+                coordinates = next(coordinate_records, None)
+            else:
+                connectivity = next(connectivity_records, None)
+    finally:
+        for records in (coordinate_records, connectivity_records):
+            close = getattr(records, "close", None)
+            if callable(close):
+                close()
 
 
 def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[Any]:
     """Yield one canonical ReaxFF frame bundle at a time."""
     selected = args.get("_frame_indices")
+    if data_type is MolecularAnalysisData:
+        from reaxkit.engine.reaxff.adapter_parts.molecular_stream import iter_molecular_data
+        path = adapter._resolve_reaxff_path(args, "molfra", default="molfra.out")
+        if not Path(path).is_file():
+            path = adapter._resolve_reaxff_path(args, "molfra_ig", default="molfra_ig.out")
+        yield from iter_molecular_data(path, selected, reporter)
+        return
+    split_file_progress = selected is not None and data_type in {
+        ConnectivityTrajectoryData,
+        ElectrostaticsData,
+    }
+    if split_file_progress and callable(reporter):
+        reporter("stream", 1, 1, "Preparing input streams")
+    coordinate_reporter = (
+        _file_progress_reporter(
+            reporter,
+            source_name="xmolout",
+            stage_name="load xmolout",
+        )
+        if split_file_progress
+        else reporter
+    )
+    fort7_reporter = (
+        _file_progress_reporter(
+            reporter,
+            source_name="fort.7",
+            stage_name="load fort.7",
+        )
+        if split_file_progress
+        else None
+    )
+    if data_type is ChargeData:
+        fort7_path = adapter._resolve_reaxff_path(
+            args, "fort7", "connectivity", "charges", default="fort.7"
+        )
+        if not Path(fort7_path).is_file():
+            raise FileNotFoundError(f"ReaxFF streaming requires fort.7: {fort7_path}")
+        xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
+        yield from iter_charge_data_quick(
+            fort7_path,
+            xmolout_path=xmol_path,
+            frame_indices=selected,
+            reporter=reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+            timing_callback=args.get("_reader_timing_callback"),
+        )
+        return
+
     total_electrostatics = (
-        data_type is ElectrostaticsData
-        and str(args.get("scope") or "total").strip().lower() == "total"
+            data_type is ElectrostaticsData
+            and str(args.get("scope") or "total").strip().lower() == "total"
     )
     xmol_path = adapter._resolve_reaxff_path(args, "xmolout", default="xmolout")
-    coordinate_records = XmoloutHandler(
+    input_cache = bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False))
+    coordinate_handler = XmoloutHandler(
         xmol_path,
         frame_indices=selected,
-        reporter=reporter,
-    ).stream_file_frames(coordinates_only=total_electrostatics)
+        reporter=coordinate_reporter,
+        input_cache=input_cache,
+    )
+    coordinate_handler._stream_timing_callback = args.get("_reader_timing_callback")
+    coordinate_records = coordinate_handler.stream_file_frames(
+        coordinates_only=total_electrostatics or data_type is TrajectoryData,
+    )
 
     if data_type is TrajectoryData:
-        for coordinate_record in coordinate_records:
-            yield _trajectory_frame(coordinate_record)
+        with closing(coordinate_records):
+            for coordinate_record in coordinate_records:
+                trajectory = _trajectory_frame(coordinate_record)
+                # Preserve the trajectory contract without constructing the
+                # former per-frame atom DataFrame just to recover its labels.
+                trajectory.atom_labels = np.asarray([trajectory.elements], dtype=object)
+                yield trajectory
         return
 
     fort7_path = adapter._resolve_reaxff_path(
@@ -253,26 +341,42 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
     )
     if not Path(fort7_path).is_file():
         raise FileNotFoundError(f"ReaxFF streaming requires fort.7: {fort7_path}")
-    connectivity_records = Fort7Handler(
-        fort7_path,
-        frame_indices=selected,
-        reporter=None,
-    ).stream_file_frames(
-        charges_only=(
-            data_type is ChargeData
-            or (
-                data_type is ElectrostaticsData
-                and str(args.get("scope") or "total").strip().lower() == "total"
-            )
-        ),
-        charge_arrays_only=total_electrostatics,
-    )
+    if total_electrostatics:
+        connectivity_records = iter_fort7_charge_frames(
+            fort7_path,
+            frame_indices=selected,
+            reporter=fort7_reporter,
+            include_atom_types=False,
+            timing_callback=args.get("_reader_timing_callback"),
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+        )
+    else:
+        connectivity_records = Fort7Handler(
+            fort7_path,
+            frame_indices=selected,
+            reporter=fort7_reporter,
+            input_cache=bool(args.get("input_cache", True)) and not bool(args.get("no_input_cache", False)),
+        ).stream_file_frames(
+            charges_only=total_electrostatics,
+            charge_arrays_only=total_electrostatics,
+        )
 
     electric_field = None
     if data_type is ElectrostaticsData:
         command = str(args.get("command") or "").strip().lower()
         fort78_path = adapter._resolve_reaxff_path(args, "fort78", default="fort.78")
-        if command == "hyst" or fort78_path.exists():
+        needs_field = bool(args.get("include_electric_field")) or command not in {
+            "write_trajectory_with_charges",
+            "generate_charge_extxyz",
+            "charge_extxyz",
+            "get-wurtzite-neighbors",
+            "get_wurtzite_neighbors",
+            "get-wurtzite-polarity",
+            "get_wurtzite_polarity",
+            "write-trajectory-with-polarity",
+            "write_trajectory_with_polarity",
+        }
+        if command == "hyst" or (needs_field and fort78_path.exists()):
             try:
                 electric_field = adapter.load_electric_field(
                     {**args, "fort78": str(fort78_path)}, reporter=None
@@ -299,9 +403,25 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
                 )
         return
 
+    force_field_parameters = None
+    if data_type is ConnectivityTrajectoryData:
+        # Preserve the materialized bundle's optional valences for relabeling.
+        # Load once, then share the immutable parameter tables across frames.
+        try:
+            ff_args = dict(args)
+            if not ff_args.get("ffield"):
+                ff_args["ffield"] = str(adapter._resolve_reaxff_path(
+                    args, "ffield", "force_field", "atom_reference", default="ffield",
+                ))
+            force_field_parameters = adapter.load_force_field(ff_args, reporter=None)
+        except Exception:
+            # Existing bundle loading permits missing/unreadable optional ffield.
+            # Tasks that require valences validate this dependency themselves.
+            force_field_parameters = None
+
     for coordinate_record, connectivity_record in _aligned_records(
-        iter(coordinate_records),
-        iter(connectivity_records),
+            iter(coordinate_records),
+            iter(connectivity_records),
     ):
         trajectory = _trajectory_frame(coordinate_record)
         if total_electrostatics:
@@ -338,6 +458,7 @@ def iter_reaxff_data(adapter, data_type, args: dict, reporter=None) -> Iterator[
             yield ConnectivityTrajectoryData(
                 connectivity=connectivity,
                 trajectory=trajectory,
+                force_field_parameters=force_field_parameters,
             )
         elif data_type is ElectrostaticsData:
             yield ElectrostaticsData(

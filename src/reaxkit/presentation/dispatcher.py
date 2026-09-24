@@ -371,7 +371,7 @@ def present_result(
             if copied is not None:
                 result_dirs.append(copied if copied.is_dir() else copied.parent)
 
-    if not (wants_plot or export_csv or wants_report):
+    if not (wants_plot or export_csv or wants_report or bool(getattr(args, "suppress_table", False))):
         print_result_table(result)
     _print_output_dirs(result_dirs)
     if human_trace is not None:

@@ -19,6 +19,8 @@ from typing import Any, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.analysis.stress_strain.streaming import selected_coordinates, run_strain_stream
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.stress_strain import common
 from reaxkit.core.registry.analysis_task_registry import register_task
@@ -128,7 +130,7 @@ def _span_rows(coordinates: np.ndarray, bins: np.ndarray, edges: np.ndarray, *, 
     return pd.DataFrame(rows)
 
 
-def calculate_top_bottom_strain(data: TrajectoryData, request: ZBinnedTopBottomStrainRequest) -> pd.DataFrame:
+def calculate_top_bottom_strain(data: TrajectoryData, request: ZBinnedTopBottomStrainRequest, *, stream=None) -> pd.DataFrame:
     """Calculate robust span changes and fractional normal strain.
 
     Works on
@@ -163,8 +165,9 @@ def calculate_top_bottom_strain(data: TrajectoryData, request: ZBinnedTopBottomS
     bin_range = str(request.bin_range).lower()
     if bin_range not in {"reference", "current"}:
         raise ValueError("bin_range must be 'reference' or 'current'.")
-    frames = common.selected_frames(positions.shape[0], request.selected_frames, request.every)
-    frames_needed = sorted({0, *frames})
+    frames = (common.selected_frames(positions.shape[0], request.selected_frames, request.every) if stream is None
+              else None if request.selected_frames is None else sorted(request.selected_frames)[::request.every])
+    frames_needed = sorted({0, *frames}) if frames is not None else None
     selected = common.select_atom_indices(data.elements, request.atom_types)
     reference_finite = np.all(np.isfinite(positions[0, selected]), axis=1)
     eligible = selected[reference_finite]
@@ -176,18 +179,18 @@ def calculate_top_bottom_strain(data: TrajectoryData, request: ZBinnedTopBottomS
     iterations = common.iteration_values(data)
     baseline: pd.DataFrame | None = None
     outputs: list[pd.DataFrame] = []
-    for frame, all_coordinates, valid in common.iter_selected_coordinates(
-        data, eligible, frames_needed, unwrap=request.unwrap, periodic=request.periodic
-    ):
+    coordinate_rows = (selected_coordinates(stream[0], eligible, request, stream[1], include_reference=True) if stream is not None else
+                       ((frame, coords, valid, int(iterations[frame])) for frame, coords, valid in common.iter_selected_coordinates(data, eligible, frames_needed, unwrap=request.unwrap, periodic=request.periodic)))
+    for frame, all_coordinates, valid, iteration in coordinate_rows:
         coordinates = all_coordinates[valid]
         if coordinates.size == 0:
             raise ValueError(f"Frame {frame} contains no finite selected atoms.")
         edges = reference_edges if bin_range == "reference" else common.bin_edges(coordinates[:, 2], request.z_bins)
         bins = reference_bins[valid] if bin_range == "reference" else common.assign_bins(coordinates[:, 2], edges)
-        raw = _span_rows(coordinates, bins, edges, frame=frame, iteration=int(iterations[frame]), count=request.n_extreme_atoms)
+        raw = _span_rows(coordinates, bins, edges, frame=frame, iteration=iteration, count=request.n_extreme_atoms)
         if frame == 0:
             baseline = raw[["bin_number", *SPAN_COLUMNS]].rename(columns={name: f"{name}_frame_0" for name in SPAN_COLUMNS})
-        if frame not in frames:
+        if (frames is not None and frame not in frames) or (frames is None and frame % request.every):
             continue
         assert baseline is not None
         result = raw.merge(baseline, on="bin_number", how="left", validate="one_to_one")
@@ -208,6 +211,12 @@ class ZBinnedTopBottomStrainTask(AnalysisTask):
     """Run robust top/bottom span strain analysis on canonical trajectories."""
 
     required_data = TrajectoryData
+    execution_capabilities = TaskCapabilities(shape=ExecutionShape.ORDERED_STATEFUL_STREAM,
+        supports_selective_frames=True, reference_frames=(0,), requires_contiguous_history=True,
+        estimated_frame_bytes=8 * 1024 * 1024)
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        return run_strain_stream(self, frames, request, calculate_top_bottom_strain, ZBinnedTopBottomStrainResult, pipeline)
 
     @staticmethod
     def recommended_presentations(_result: ZBinnedTopBottomStrainResult, payload: dict[str, Any]) -> list[PresentationSpec]:

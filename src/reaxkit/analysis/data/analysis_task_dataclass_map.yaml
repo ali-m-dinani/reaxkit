@@ -150,7 +150,7 @@ tasks:
     description: Builds tabular views of atomic charge values with atom-indexed rows
       and frame-aware values. Use it to inspect, filter, export, or plot charge data
       outside the raw ReaxFF output format.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: charge-table'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: charge-table'
     tags:
     - electrostatics
     - charges
@@ -246,7 +246,7 @@ tasks:
     description: Computes dipole-moment metrics from electrostatics inputs that combine
       coordinates, charges, connectivity, and optional field data. Use it to quantify
       molecular or system-level charge separation over time.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get-dipole'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-dipole'
     tags:
     - electrostatics
     - dipole
@@ -702,13 +702,13 @@ tasks:
     - time series
     - partial energy
     notes: []
-  polarization:
+  get-polarization:
     consumes_dataclass: ElectrostaticsData
-    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: polarization'
+    implementation_module: 'reaxkit.analysis.electrostatics.electrostatics: get-polarization'
     description: Computes polarization metrics from electrostatics data built from
       charges, coordinates, connectivity, and optional field values. It supports dielectric-response
       and field-driven charge-separation studies.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: polarization'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get-polarization'
     tags:
     - electrostatics
     - polarization
@@ -724,7 +724,7 @@ tasks:
     description: Analyzes polarization response versus applied electric field. Use
       it to relate field schedules to polarization curves, hysteresis behavior, or
       field-dependent electrostatic response.
-    related_workflow_module: 'reaxkit.workflows.electrostatics_workflow: get_polarization_field'
+    related_workflow_module: 'reaxkit.workflows.electrostatics.electrostatics_workflow: get_polarization_field'
     tags:
     - electrostatics
     - polarization
@@ -1002,6 +1002,123 @@ tasks:
     help_search_examples:
     - reaxkit help "plot atom property"
     - run plot atom property
+  get-potential-and-electric-field:
+    consumes_dataclass: ElectrostaticsData
+    implementation_module: 'reaxkit.analysis.electrostatics.potential_and_electric_field.analysis: PotentialElectricFieldTask'
+    description: Calculates internal ReaxFF Coulomb electrostatics, externally applied electrostatics, and their total local potential and electric field at every atom location.
+    related_workflow_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow: get-potential-and-electric-field'
+    tags: [electrostatics, ReaxFF, potential, electric field]
+    notes: [The evaluated atom is excluded as a source at its own coordinate.]
+    aliases: [get_potential_and_electric_field, reaxff-local-field]
+    help_search_examples: [reaxkit help "local electric field", reaxkit get-potential-and-electric-field -h]
+  write-trajectory-with-potential-and-electric-field:
+    consumes_dataclass: ElectrostaticsData
+    implementation_module: 'reaxkit.analysis.electrostatics.potential_and_electric_field.trajectory: PotentialElectricFieldTrajectoryTask'
+    description: Writes an Extended XYZ trajectory with internal, external, and total local potential and electric-field atom properties.
+    related_workflow_module: 'reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow: write-trajectory-with-potential-and-electric-field'
+    tags: [electrostatics, ReaxFF, trajectory, Extended XYZ]
+    notes: []
+    aliases: [write_trajectory_with_potential_and_electric_field, local-field-extxyz]
+    help_search_examples: [reaxkit help "local field trajectory", reaxkit write-trajectory-with-potential-and-electric-field -h]
+  get-three-folded-wurtzite-neighbors:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.neighbors: WurtziteNeighborTask'
+    description: Finds three basal neighbors and retains remaining in-cutoff atoms as apical candidates for three-folded wurtzite sites.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow: get-three-folded-wurtzite-neighbors'
+    tags: [ferroelectrics, wurtzite, neighbors, surface]
+    notes: [Three basal neighbors are sufficient for a complete geometry site.]
+    aliases: [get_three_folded_wurtzite_neighbors, three-folded-wurtzite-neighbors]
+    help_search_examples: [reaxkit help "three folded neighbors", reaxkit get-three-folded-wurtzite-neighbors -h]
+  get-three-folded-wurtzite-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarity: WurtzitePolarityTask'
+    description: Calculates polarity from three basal bonds and then selects an apical neighbor on the polarity-consistent side.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow: get-three-folded-wurtzite-polarity'
+    tags: [ferroelectrics, wurtzite, polarity, surface]
+    notes: [The apical neighbor is optional and does not determine polarity.]
+    aliases: [get_three_folded_wurtzite_polarity, three-folded-wurtzite-polarity]
+    help_search_examples: [reaxkit help "three folded polarity", reaxkit get-three-folded-wurtzite-polarity -h]
+  get-three-folded-wurtzite-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.polarization: BinnedPolarizationTask'
+    description: Sums three-folded site dipoles in spatial bins and normalizes them by hull, bounding-box, or cell bin volume.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarization_workflow: get-three-folded-wurtzite-polarization'
+    tags: [ferroelectrics, wurtzite, polarization, binning, heatmap]
+    notes: [Supports hull, bbox, and cell volume estimators.]
+    aliases: [get_three_folded_wurtzite_polarization, three-folded-wurtzite-polarization]
+    help_search_examples: [reaxkit help "three folded polarization", reaxkit get-three-folded-wurtzite-polarization -h]
+  get-basal-plane-displacement-dipole:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole: BasalPlaneDipoleTask'
+    description: Calculates all center, basal, and apical ionic contributions relative to the mean basal plane using negative electron charge.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.dipole_workflow: get-basal-plane-displacement-dipole'
+    tags: [ferroelectrics, wurtzite, dipole, basal plane]
+    notes: [Uses three-folded polarity-aware neighbor selection.]
+    aliases: [get_basal_plane_displacement_dipole, basal-plane-dipole]
+    help_search_examples: [reaxkit help "basal plane dipole", reaxkit get-basal-plane-displacement-dipole -h]
+  get-basal-plane-displacement-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization: BasalPlanePolarizationTask'
+    description: Calculates binned polarization from all ionic displacement contributions relative to the basal plane.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.polarization_workflow: get-basal-plane-displacement-polarization'
+    tags: [ferroelectrics, wurtzite, polarization, basal plane, heatmap]
+    notes: [Supports hull, bbox, and cell volume estimators.]
+    aliases: [get_basal_plane_displacement_polarization, basal-plane-polarization]
+    help_search_examples: [reaxkit help "basal plane polarization", reaxkit get-basal-plane-displacement-polarization -h]
+  get-basal-plane-displacement-local-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization: BasalPlaneLocalPolarizationTask'
+    description: Calculates one local polarization vector per valid center using equal frame-volume shares or N-neighbor coordination tetrahedra.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.local_polarization_workflow: get-basal-plane-displacement-local-polarization'
+    tags: [ferroelectrics, wurtzite, local polarization, basal plane, coordination volume]
+    notes: [Equal frame-volume shares are the default; coordination volumes require three basal and one apical neighbor.]
+    aliases: [get_basal_plane_displacement_local_polarization, basal-plane-local-polarization]
+    help_search_examples: [reaxkit help "basal plane local polarization", reaxkit get-basal-plane-displacement-local-polarization -h]
+  get-basal-plane-displacement-projected-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity: BasalPlaneProjectedPolarityTask'
+    description: Averages the positive and negative signs of local basal-plane dipoles in TEM-like spatial projections and frame-resolved profiles.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.basal_plane_displacement_for_dipole_moment.projected_polarity_workflow: get-basal-plane-displacement-projected-polarity'
+    tags: [ferroelectrics, wurtzite, polarity, projection, heatmap, TEM]
+    notes: [Mean polarity is the arithmetic mean of per-center values -1, 0, and +1 using fixed reference-frame bin assignments.]
+    aliases: [get_basal_plane_displacement_projected_polarity, basal-plane-projected-polarity]
+    help_search_examples: [reaxkit help "basal plane projected polarity", reaxkit get-basal-plane-displacement-projected-polarity -h]
+  get-hbn-reference-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.polarization: HBNReferencePolarizationTask'
+    description: Calculates vector dipole and polarization from all atoms mapped to a replicated nonpolar hexagonal AlN reference.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow: get-hbn-reference-polarization'
+    tags: [ferroelectrics, polarization, reference structure, hBN, AlN]
+    notes: [Reports Cartesian and selected c-axis components and supports occupied hull volume for slabs.]
+    aliases: [get_hbn_reference_polarization, hbn-reference-polarization]
+    help_search_examples: [reaxkit help "hbn reference polarization", reaxkit get-hbn-reference-polarization -h]
+  get-hbn-reference-local-polarization:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization: HBNReferenceLocalPolarizationTask'
+    description: Calculates local dipole and polarization for both four-atom crystallographic cells and two-atom AlN reference layers using equal or deformation-weighted volumes.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.local_polarization_workflow: get-hbn-reference-local-polarization'
+    tags: [ferroelectrics, local polarization, reference structure, hBN, volume]
+    notes: [Always reports both cell- and layer-resolved tables; local_grouping selects the primary table used by plots and projected-polarity analysis. Automatically neutralizes charged local groups while retaining raw dipoles that close to the global result.]
+    aliases: [get_hbn_reference_local_polarization, hbn-reference-local-polarization]
+    help_search_examples: [reaxkit help "hbn reference local polarization", reaxkit get-hbn-reference-local-polarization -h]
+  get-hbn-reference-projected-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.hbn_reference.projected_polarity: HBNReferenceProjectedPolarityTask'
+    description: Averages fixed-reference-cell polarity signs in spatial projections and frame-resolved kymographs.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.projected_polarity_workflow: get-hbn-reference-projected-polarity'
+    tags: [ferroelectrics, polarity, projection, kymograph, hBN, TEM]
+    notes: [Mean polarity includes local values -1, 0, and +1 using fixed reference-frame bin assignments.]
+    aliases: [get_hbn_reference_projected_polarity, hbn-reference-projected-polarity]
+    help_search_examples: [reaxkit help "hbn reference projected polarity", reaxkit get-hbn-reference-projected-polarity -h]
+  write-three-folded-trajectory-with-polarity:
+    consumes_dataclass: TrajectoryData
+    implementation_module: 'reaxkit.analysis.ferroelectrics.three_folded_wurtzite.trajectory: PolarityExtendedXYZTask'
+    description: Writes a species-preserving Extended XYZ trajectory containing basal-only polarity and apical-presence properties.
+    related_workflow_module: 'reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_trajectory_workflow: write-three-folded-trajectory-with-polarity'
+    tags: [ferroelectrics, wurtzite, trajectory, Extended XYZ]
+    notes: []
+    aliases: [write_three_folded_trajectory_with_polarity, three-folded-polarity-extxyz]
+    help_search_examples: [reaxkit help "three folded polarity trajectory", reaxkit write-three-folded-trajectory-with-polarity -h]
 dataclass_usage_across_tasks:
   AtomicKinematicsData:
   - get_kinematics
@@ -1029,6 +1146,8 @@ dataclass_usage_across_tasks:
   - dipole
   - polarization
   - get_polarization_field
+  - get-potential-and-electric-field
+  - write-trajectory-with-potential-and-electric-field
   ForceFieldOptimizationDiagnosticData:
   - get_ffield_diagnostic_data
   ForceFieldOptimizationDiagnosticBundleData:
@@ -1084,6 +1203,17 @@ dataclass_usage_across_tasks:
   - voronoi_geometry_scipy
   - voronoi_geometry_pyvoro
   - plot_atom_property
+  - get-three-folded-wurtzite-neighbors
+  - get-three-folded-wurtzite-polarity
+  - get-three-folded-wurtzite-polarization
+  - get-basal-plane-displacement-dipole
+  - get-basal-plane-displacement-polarization
+  - get-basal-plane-displacement-local-polarization
+  - get-basal-plane-displacement-projected-polarity
+  - get-hbn-reference-polarization
+  - get-hbn-reference-local-polarization
+  - get-hbn-reference-projected-polarity
+  - write-three-folded-trajectory-with-polarity
 
 
 

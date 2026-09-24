@@ -4,19 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "3.0.3"
+version = "3.1.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
-  { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
-  { name = "Adri van Duin", email = "acv13@psu.edu" },
-  { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
-  { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
-  { name = "Seyed Mahmoud Mortazavi", email = "mahmoud.mortazavi72@gmail.com" },
-  { name = "Anirban Phukan", email = "akp6421@psu.edu" },
-  { name = "Jupjeet Dhingra", email = "jvd6198@psu.edu" },
-  { name = "Swarit Dwivedi", email = "Swarit.Dwivedi@monash.edu" },
-  { name = "Asma Ul Hosna", email = "abh6073@psu.edu" },
-  { name = "Mozhdeh Mirakhory", email = "mjm8816@psu.edu" },
+    { name = "Ali Mohammadi", email = "alimohammadi2265@gmail.com" },
+    { name = "Adri van Duin", email = "acv13@psu.edu" },
+    { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
+    { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
+    { name = "Seyed Mahmoud Mortazavi", email = "mahmoud.mortazavi72@gmail.com" },
+    { name = "Anirban Phukan", email = "akp6421@psu.edu" },
+    { name = "Jupjeet Dhingra", email = "jvd6198@psu.edu" },
+    { name = "Swarit Dwivedi", email = "Swarit.Dwivedi@monash.edu" },
+    { name = "Asma Ul Hosna", email = "abh6073@psu.edu" },
+    { name = "Mozhdeh Mirakhory", email = "mjm8816@psu.edu" },
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -32,6 +32,10 @@ dependencies = [
     "tabulate",
     "PyYAML",
     "rapidfuzz",
+    "openpyxl>=3.1",
+    "pyarrow",
+    "threadpoolctl>=3.1",
+    "psutil>=5.9",
 ]
 
 [project.optional-dependencies]
@@ -66,7 +70,6 @@ ml = [
     "scikit-learn",
 ]
 io = [
-    "openpyxl",
     "h5py",
     "python-docx",
     "zstandard",
@@ -80,14 +83,17 @@ all = [
 ]
 
 [project.scripts]
-reaxkit = "reaxkit.cli:main"
+reaxkit = "reaxkit.cli_startup:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-reaxkit = ["**/*.yaml", "**/*.xlsx"]
+reaxkit = ["**/*.yaml", "**/*.xlsx", "**/*.cif"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 

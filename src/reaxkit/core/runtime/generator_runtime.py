@@ -10,11 +10,13 @@ Run-scoped output helpers for generator commands.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from types import SimpleNamespace
 
 from reaxkit.core.platform.human_log import current_human_log
 from reaxkit.core.platform.log import configure_file_logging
@@ -68,6 +70,10 @@ def prepare_generator_output(args: Any, *, command: str, output_value: str) -> t
 
     setattr(args, "run_id", run_id)
     setattr(args, "project_root", str(project_root))
+    from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape, resolve_execution_policy
+    contract = SimpleNamespace(execution_capabilities=TaskCapabilities(shape=ExecutionShape.SINGLE))
+    policy = resolve_execution_policy(contract, args, vars(args))
+    setattr(args, "_execution_policy", policy.as_dict())
     configure_file_logging(project_root)
 
     layout = ReaxkitStorageLayout(project_root=project_root)
@@ -82,7 +88,7 @@ def prepare_generator_output(args: Any, *, command: str, output_value: str) -> t
         trace.completed_step(
             "Prepare generator output",
             seconds=perf_counter() - started,
-            details={"command": command, "run_id": run_id},
+            details={"command": command, "run_id": run_id, "execution_policy": policy.as_dict()},
             results={"generator output": out_path},
         )
         trace.result("generator output", out_path)
@@ -160,7 +166,20 @@ def persist_generator_metadata(
     }
     if extra:
         payload["extra"] = json_safe(extra)
-    settings_path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter
+    specs = [ArtifactSpec("settings", settings_path.name, "core", True, "json")]
+    if output_path != settings_path:
+        specs.append(ArtifactSpec("output", output_path.name, "core", True,
+                                  "directory" if output_path.is_dir() else "file"))
+    with ArtifactWriter(settings_path.parent, specs, overwrite=True,
+                        profile=getattr(args, "output_profile", "standard"),
+                        manifest_name="generator_artifacts.json",
+                        metadata={"command": command, "execution_policy": getattr(args, "_execution_policy", None)}) as writer:
+        writer.write_json("settings", payload)
+        if output_path != settings_path and output_path.exists():
+            writer.register_file("output", output_path,
+                bytes=output_path.stat().st_size if output_path.is_file() else None,
+                publication="generator_owned_primary_output")
     run_index_path = layout.record_run_generator(
         run_id=run_id,
         command=command,

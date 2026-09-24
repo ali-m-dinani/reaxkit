@@ -7,6 +7,88 @@
       show_root_full_path: false
       members: []
 
+## Command: `kinematics`
+
+<div class="analysis-section-indent" markdown="1">
+
+Extract kinematics datasets from atomic kinematics files.
+This command can return metadata, coordinates, velocities, accelerations, or previous
+accelerations, optionally filtered to selected atoms.
+
+### Examples
+-----
+
+```text
+  1. Export selected-atom velocities:
+   reaxkit get_kinematics --key velocities --atoms 1 3 7 --export velocities.csv
+
+  2. Read metadata from a specific kinematics file:
+   reaxkit get_kinematics --key metadata --vels moldyn.vel
+
+  3. Plot accelerations using subplot layout:
+   reaxkit get_kinematics --key accelerations --plot subplot --save accelerations.png
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--key` | Yes |  | Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom. | metadata, coordinates, velocities, accelerations, prev_accelerations |
+| `--atoms` | No |  | 1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context. |  |
+| `--vels, --file` | No | vels | Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--plot` | No |  | Render a plot. Example: --plot subplot, which creates one panel per value column. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the figure interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save accelerations.png, which writes the figure image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export velocities.csv, which saves tabular output. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout. |  |
+| `--xaxis` | No | atom_index | Quantity on x-axis. Example: --xaxis atom_index, which uses atom index for horizontal axis. | atom_index |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
+
+</div>
+
 ## Command: `get_kinematics`
 
 <div class="analysis-section-indent" markdown="1">
@@ -31,16 +113,61 @@ accelerations, optionally filtered to selected atoms.
 
 ### Arguments
 
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--key` | Yes |  | Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom. | metadata, coordinates, velocities, accelerations, prev_accelerations |
+| `--atoms` | No |  | 1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context. |  |
+| `--vels, --file` | No | vels | Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file. |  |
+
+#### Outputs and plots
+
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--plot` | No |  | Render a plot. Example: --plot subplot, which creates one panel per value column. | single, subplot |
-| `--show` | No |  | Show the generated plot window. Example: --show, which opens the figure interactively. |  |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the figure interactively. |  |
 | `--save` | No |  | Save the generated plot to a file path. Example: --save accelerations.png, which writes the figure image. |  |
 | `--export` | No |  | Write the result table to CSV. Example: --export velocities.csv, which saves tabular output. |  |
 | `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in a 2-by-2 layout. |  |
 | `--xaxis` | No | atom_index | Quantity on x-axis. Example: --xaxis atom_index, which uses atom index for horizontal axis. | atom_index |
-| `--key` | Yes |  | Requested kinematics dataset. Example: --key velocities, which returns velocity components by atom. |  |
-| `--atoms` | No |  | 1-based atom ids. Example: --atoms 1 3 7, which limits output rows to those atoms. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
 
 </div>
 
@@ -48,9 +175,72 @@ accelerations, optionally filtered to selected atoms.
 
 <div class="analysis-section-indent" markdown="1">
 
+Plot an atomic velocity or acceleration component at atom coordinates.
+
+### Examples
+-----
+
+```text
+  reaxkit kinematics_plot3d --value vz --save kinematics.png
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--atoms` | No |  | 1-based atom ids. Example: --atoms 1 5 9, which limits plotting to those atoms. |  |
+| `--value` | Yes |  | Scalar to plot: vx, vy, vz, ax, ay, az, pax, pay, paz. Example: --value vz, which colors points by z-velocity. |  |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context. |  |
+| `--vels, --file` | No | vels | Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the rendered spatial plot. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save vx_3d.png, which writes the spatial figure to disk. |  |
+| `--export` | No |  | Write the merged coordinate/value table to CSV. Example: --export merged.csv, which saves plotted coordinates and values. |  |
+| `--vmin` | No |  | Color scale minimum. Example: --vmin -0.2, which clamps lower color bound. |  |
+| `--vmax` | No |  | Color scale maximum. Example: --vmax 0.2, which clamps upper color bound. |  |
+| `--cmap` | No | coolwarm | Matplotlib colormap. Example: --cmap viridis, which sets the plot color palette. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
 
 </div>
 
@@ -58,9 +248,75 @@ _No command-specific arguments found._
 
 <div class="analysis-section-indent" markdown="1">
 
+Plot an atomic velocity or acceleration component at atom coordinates.
+
+### Examples
+-----
+
+```text
+  reaxkit kinematics_heatmap2d --value vz --save kinematics.png
+```
+
 ### Arguments
 
-_No command-specific arguments found._
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--atoms` | No |  | 1-based atom ids. Example: --atoms 1 5 9, which limits plotting to those atoms. |  |
+| `--value` | Yes |  | Scalar to plot: vx, vy, vz, ax, ay, az, pax, pay, paz. Example: --value vz, which colors points by z-velocity. |  |
+| `--plane` | No | xy | Coordinate plane onto which atoms are projected. | xy, xz, yz |
+| `--bins` | No | 100 | Number of spatial bins, or a pair such as 100,50. |  |
+| `--agg` | No | mean | Reduction of atom values in each spatial bin. | mean, max, min, sum, count |
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context. |  |
+| `--vels, --file` | No | vels | Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens the rendered spatial plot. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save vx_3d.png, which writes the spatial figure to disk. |  |
+| `--export` | No |  | Write the merged coordinate/value table to CSV. Example: --export merged.csv, which saves plotted coordinates and values. |  |
+| `--vmin` | No |  | Color scale minimum. Example: --vmin -0.2, which clamps lower color bound. |  |
+| `--vmax` | No |  | Color scale maximum. Example: --vmax 0.2, which clamps upper color bound. |  |
+| `--cmap` | No | coolwarm | Matplotlib colormap. Example: --cmap viridis, which sets the plot color palette. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
+
 
 </div>
 
@@ -70,15 +326,6 @@ _No command-specific arguments found._
 
 These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
 
-| Flag | Required | Default | Help | Choices |
-|---|---|---|---|---|
-| `--engine` | No |  | Engine override. Example: --engine reaxff, which forces ReaxFF parsing behavior. | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/job1, which sets lookup context for required files. |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/job1, which serves as backup path context. |  |
-| `--vels, --file` | No | vels | Atomic kinematics file path. Example: --vels moldyn.vel, which reads kinematics data from that file. |  |
-| `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+Each command table above includes its shared and inherited options.
 
 </div>

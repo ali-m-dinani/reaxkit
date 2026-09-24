@@ -20,6 +20,12 @@ from typing import Any, Literal, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from contextlib import closing
+from reaxkit.core.runtime.frame_tables import map_frame_tables, selected_frame_envelopes, source_frame_index
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
+from reaxkit.core.runtime.execution_contracts import resolve_execution_policy
+from reaxkit.analysis.connectivity.stream_state import ConnectionStatistics, BondTraceState, PAIR_COLUMNS, EVENT_COLUMNS
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
@@ -190,6 +196,11 @@ class ConnectionListResult(BaseResult):
 
 @register_task("get_connection_list", label="Connection List")
 class ConnectionListTask(AnalysisTask):
+
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
+    )
     required_data = ConnectivityData
 
     @staticmethod
@@ -364,32 +375,10 @@ class ConnectionListTask(AnalysisTask):
         out = out.sort_values(["frame_idx", "source", "destination"], kind="stable").reset_index(drop=True)
         return ConnectionListResult(table=out, request=request)
 
-    def run_stream(self, frames, request: ConnectionListRequest, reporter=None) -> ConnectionListResult:
-        """Build a connection list from one connectivity frame at a time."""
-        local_request = replace(request, frames=None, every=1)
-        tables: list[pd.DataFrame] = []
-        processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
-            table = self.run(data, local_request, reporter=None).table
-            source = data.source_frame_indices
-            source_index = int(np.asarray(source).reshape(-1)[0]) if source is not None else stream_index
-            if not table.empty:
-                table = table.copy()
-                table["frame_idx"] = source_index
-                tables.append(table)
-            processed += 1
-            if callable(reporter):
-                reporter("stream", processed, 0, "Streaming connection-list analysis")
-        if not tables:
-            table = pd.DataFrame(
-                columns=["frame_idx", "iteration", "source", "source_type", "destination", "destination_type", "BO"]
-            )
-        else:
-            table = pd.concat(tables, ignore_index=True).sort_values(
-                ["frame_idx", "source", "destination"], kind="stable"
-            ).reset_index(drop=True)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> ConnectionListResult:
+        """Execute independent frame kernels through the bounded runtime."""
+        table = map_frame_tables(self, frames, request, pipeline=pipeline,
+                                 reporter=reporter, sort_columns=('frame_idx', 'source', 'destination'))
         return ConnectionListResult(table=table, request=request)
 
 
@@ -708,6 +697,11 @@ class ConnectionStatsResult(BaseResult):
 
 @register_task("get_connection_stats", label="Connection Stats")
 class ConnectionStatsTask(AnalysisTask):
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.STREAMING_REDUCTION, supports_selective_frames=True,
+        estimated_frame_bytes=8 * 1024 * 1024,
+    )
+
     required_data = ConnectivityData
 
     @staticmethod
@@ -830,32 +824,19 @@ class ConnectionStatsTask(AnalysisTask):
         out = out.sort_values(["source", "destination"], kind="stable").reset_index(drop=True)
         return ConnectionStatsResult(table=out, request=request)
 
-    def run_stream(self, frames, request: ConnectionStatsRequest, reporter=None) -> ConnectionStatsResult:
-        """Aggregate streamed connectivity without retaining dense matrices."""
-        edges = ConnectionListTask().run_stream(
-            frames,
-            ConnectionListRequest(
-                frames=None,
-                every=request.every,
-                min_bo=request.min_bo,
-                undirected=request.undirected,
-            ),
-            reporter=reporter,
-        ).table
-        if edges.empty:
-            return ConnectionStatsResult(
-                table=pd.DataFrame(columns=["source", "source_type", "destination", "destination_type", "value"]),
-                request=request,
-            )
-        by = ["source", "source_type", "destination", "destination_type"]
-        if request.how == "count":
-            out = edges.groupby(by, as_index=False).size().rename(columns={"size": "value"})
-        elif request.how == "max":
-            out = edges.groupby(by, as_index=False)["BO"].max().rename(columns={"BO": "value"})
-        else:
-            out = edges.groupby(by, as_index=False)["BO"].mean().rename(columns={"BO": "value"})
-        out = out.sort_values(["source", "destination"], kind="stable").reset_index(drop=True)
-        return ConnectionStatsResult(table=out, request=request)
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> ConnectionStatsResult:
+        """Reduce each frame immediately into per-pair counts, sums and maxima."""
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        accumulator = ConnectionStatistics(request.how)
+        local = ConnectionListRequest(frames=None, every=1, min_bo=request.min_bo,
+                                      undirected=request.undirected)
+        with closing(pipeline.map_ordered(selected_frame_envelopes(frames, request),
+                    lambda data: ConnectionListTask().run(data, local).table)) as results:
+            for count, item in enumerate(results, 1):
+                accumulator.add(item.value)
+                if reporter:
+                    reporter("stream", count, 0, "Reducing connection statistics")
+        return ConnectionStatsResult(table=accumulator.finalize(), request=request)
 
 
 @dataclass
@@ -1079,6 +1060,47 @@ class BondEventsResult(BaseResult):
 
 @register_task("get_bond_events", label="Bond Events")
 class BondEventsTask(AnalysisTask):
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.ORDERED_STATEFUL_STREAM, supports_selective_frames=True,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
+        traces, rows = {}, []
+        local = ConnectionListRequest(frames=None, every=1, min_bo=0.0,
+                                      undirected=request.undirected, include_self=False)
+        target = None
+        if request.src is not None and request.dst is not None:
+            target = (int(request.src), int(request.dst))
+            if request.undirected:
+                target = tuple(sorted(target))
+
+        def record(key, events):
+            for frame, iteration, value, event in events:
+                rows.append((*key, event, frame, iteration, value,
+                             float(request.threshold), float(request.hysteresis)))
+
+        def step(state, data):
+            table = ConnectionListTask().run(data, local).table
+            source = source_frame_index(data, state)
+            for row in table.itertuples(index=False):
+                if target is not None and (row.source, row.destination) != target:
+                    continue
+                key = (row.source, row.source_type, row.destination, row.destination_type)
+                trace = traces.setdefault(key, BondTraceState(request))
+                record(key, trace.add(source, row.iteration, row.BO))
+            return state + 1, None
+
+        with closing(pipeline.scan_ordered(selected_frame_envelopes(frames, request), 0, step)) as results:
+            for count, _ in enumerate(results, 1):
+                if reporter:
+                    reporter("stream", count, 0, "Scanning bond events")
+        for key, trace in traces.items():
+            record(key, trace.finish())
+        table = pd.DataFrame(rows, columns=EVENT_COLUMNS).sort_values(
+            ["source", "destination", "iter", "event"], kind="stable").reset_index(drop=True)
+        return BondEventsResult(table=table, request=request)
+
     required_data = ConnectivityData
 
     @staticmethod

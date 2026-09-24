@@ -1,12 +1,39 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 
 import numpy as np
 import pandas as pd
 
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
-from reaxkit.domain.data_models import TrajectoryData
+from reaxkit.core.runtime.execution_contracts import (
+    ExecutionShape,
+    TaskCapabilities,
+)
+from reaxkit.core.storage.storage_layout import normalize_storage_args
+from reaxkit.domain.data_models import ElectrostaticsData, TrajectoryData
+
+
+def test_executor_announces_result_saving_after_computation(capsys):
+    result = AnalysisExecutor._ready_for_result_saving(
+        "payload",
+        {"progress": True},
+    )
+
+    assert result == "payload"
+    assert capsys.readouterr().out == (
+        "[ReaxKit] Computation complete; saving result files...\n"
+    )
+
+
+def test_executor_suppresses_result_saving_message_in_quiet_mode(capsys):
+    AnalysisExecutor._ready_for_result_saving(
+        "payload",
+        {"progress": True, "quiet": True},
+    )
+
+    assert capsys.readouterr().out == ""
 
 
 def test_engine_detection_path_prefers_explicit_input_over_snapshot_source():
@@ -39,6 +66,27 @@ def test_engine_detection_path_ignores_storage_synthesized_input():
     }
 
     assert AnalysisExecutor._engine_detection_path(args) == "run_directory"
+
+
+def test_engine_detection_path_ignores_storage_synthesized_default_file_hints(
+        tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "xmolout").write_text("trajectory", encoding="utf-8")
+
+    args = normalize_storage_args(
+        {
+            "input": ".",
+            "run_dir": ".",
+            "xmolout": "xmolout",
+            "fort7": "fort.7",
+            "project_root": str(tmp_path / "workspace"),
+        },
+        snapshot=False,
+    )
+
+    assert args["_xmolout_was_explicit"] is False
+    assert AnalysisExecutor._engine_detection_path(args) == "."
 
 
 @dataclass
@@ -83,6 +131,14 @@ def test_partial_frame_execution_uses_compact_indices_and_restores_source_indice
 def test_executor_builds_selective_load_plan_only_for_explicit_frames():
     assert AnalysisExecutor._requested_frame_indices(_FrameRequest([0, 50, 100]), TrajectoryData) == [0, 50, 100]
     assert AnalysisExecutor._requested_frame_indices(_FrameRequest([]), TrajectoryData) is None
+
+
+def test_selective_stream_can_request_reference_frame_first():
+    request = _FrameRequest([10, 20])
+    request.reference_frame = 0
+    request.stream_reference_first = True
+
+    assert AnalysisExecutor._requested_frame_indices(request, TrajectoryData) == [0, 10, 20]
 
 
 def test_selective_sources_are_not_copied_into_the_run_snapshot(tmp_path):
@@ -141,6 +197,62 @@ def test_executor_passes_requested_data_fields_to_adapter(monkeypatch):
     assert captured["load_fields"] == ("potential_energy",)
 
 
+def test_executor_resolves_engine_before_task_selects_required_data(monkeypatch, tmp_path):
+    captured = {}
+
+    class AMSAdapter:
+        @staticmethod
+        def supports_streaming(data_type, args):
+            return False
+
+        @staticmethod
+        def required_input_files(data_type, args):
+            captured["snapshot_type"] = data_type
+            return ()
+
+        @staticmethod
+        def load(data_type, args, reporter=None):
+            captured["load_type"] = data_type
+            return "native-charge-payload"
+
+    class EngineAwareTask:
+        native_charges_required_for_auto = True
+
+        @staticmethod
+        def required_data_for(request, args):
+            captured["resolved_engine"] = args.get("_resolved_engine")
+            captured["native_required"] = args.get("_native_charges_required_for_auto")
+            return ElectrostaticsData if request == "auto" else TrajectoryData
+
+        @staticmethod
+        def run(data, request):
+            return data
+
+    monkeypatch.setattr(
+        "reaxkit.core.runtime.analysis_executor.resolve_engine",
+        lambda path, engine=None: AMSAdapter(),
+    )
+
+    result = AnalysisExecutor().run(
+        EngineAwareTask(),
+        request="auto",
+        args={
+            "input": str(tmp_path / "reaxout.kf"),
+            "project_root": str(tmp_path / "workspace"),
+            "no_cache": True,
+            "progress": False,
+        },
+    )
+
+    assert result == "native-charge-payload"
+    assert captured == {
+        "resolved_engine": "ams",
+        "native_required": True,
+        "snapshot_type": ElectrostaticsData,
+        "load_type": ElectrostaticsData,
+    }
+
+
 def test_selective_streaming_requires_task_opt_in():
     class DummyAdapter:
         @staticmethod
@@ -159,6 +271,76 @@ def test_selective_streaming_requires_task_opt_in():
 
     StreamTask.supports_selective_streaming = True
     assert AnalysisExecutor._streaming_enabled(StreamTask(), adapter, object, {}, selected)
+
+
+def test_executor_supplies_shared_pipeline_and_writes_stage_metrics(monkeypatch, tmp_path):
+    class DummyAdapter:
+        @staticmethod
+        def supports_streaming(data_type, args):
+            return True
+
+        @staticmethod
+        def required_input_files(data_type, args):
+            return ()
+
+        @staticmethod
+        def stream(data_type, args, reporter=None):
+            args["_reader_timing_callback"](
+                handler="ExampleReader", source_path="example",
+                stats={"reader_active_seconds": 0.5, "source_read_bytes": 123},
+            )
+            yield from range(5)
+
+    class PipelineTask:
+        required_data = object
+        supports_selective_streaming = True
+        execution_capabilities = TaskCapabilities(
+            shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+            thread_safe=True,
+        )
+
+        @staticmethod
+        def run_stream(frames, request, reporter=None, pipeline=None):
+            assert pipeline is not None
+            return [item.value for item in pipeline.map_ordered(frames, lambda value: value * 2)]
+
+    monkeypatch.setattr(
+        "reaxkit.core.runtime.analysis_executor.resolve_engine",
+        lambda path, engine=None: DummyAdapter(),
+    )
+    args = {
+        "input": str(tmp_path),
+        "project_root": str(tmp_path / "workspace"),
+        "no_cache": True,
+        "progress": False,
+        "workers": 2,
+        "chunk_size": 3,
+    }
+
+    result = AnalysisExecutor().run(PipelineTask(), object(), args)
+
+    assert result == [0, 2, 4, 6, 8]
+    assert args["_execution_policy"]["workers"] == 2
+    timing_path = (
+        tmp_path
+        / "workspace"
+        / "logs"
+        / "timing"
+        / "machine_readable_timing.log"
+    )
+    phases = {
+        json.loads(line)["phase"]
+        for line in timing_path.read_text(encoding="utf-8").splitlines()
+    }
+    assert {
+        "execution_policy",
+        "pipeline_reader",
+        "input_stream",
+        "pipeline_workers",
+        "pipeline_collector_wait",
+        "pipeline_total",
+        "stream_analyze",
+    } <= phases
 
 
 def test_ams_and_lammps_selective_sources_are_not_copied(tmp_path):

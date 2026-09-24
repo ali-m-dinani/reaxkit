@@ -21,6 +21,12 @@ import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.core.registry.analysis_task_registry import register_task
+from reaxkit.core.runtime.execution_contracts import (
+    ExecutionShape,
+    TaskCapabilities,
+    resolve_execution_policy,
+)
+from reaxkit.core.runtime.frame_pipeline import BoundedFramePipeline
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ChargeData
@@ -125,6 +131,11 @@ class ChargeTableTask(AnalysisTask):
     """Return per-atom charges across selected frames as a tidy table."""
 
     required_data = ChargeData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
+        thread_safe=True,
+        estimated_frame_bytes=4 * 1024 * 1024,
+    )
 
     @staticmethod
     def recommended_presentations(
@@ -277,14 +288,19 @@ class ChargeTableTask(AnalysisTask):
             table = table.sort_values(["frame_index", "atom_id"], kind="stable").reset_index(drop=True)
         return ChargeTableResult(table=table, request=request)
 
-    def run_stream(self, frames, request: ChargeTableRequest, reporter=None) -> ChargeTableResult:
+    def run_stream(self, frames, request: ChargeTableRequest, reporter=None, pipeline=None) -> ChargeTableResult:
         """Extract charge rows without retaining the full charge matrix."""
         local_request = replace(request, frames=None, every=1)
         tables: list[pd.DataFrame] = []
         processed = 0
-        for stream_index, data in enumerate(frames):
-            if stream_index % max(1, int(request.every)):
-                continue
+
+        def selected_frames():
+            for stream_index, data in enumerate(frames):
+                if stream_index % max(1, int(request.every)) == 0:
+                    yield stream_index, data
+
+        def calculate_frame(item):
+            stream_index, data = item
             table = self.run(data, local_request, reporter=None).table
             source = (data.metadata or {}).get("source_frame_indices")
             if source is None and data.simulation is not None:
@@ -293,6 +309,15 @@ class ChargeTableTask(AnalysisTask):
             if not table.empty:
                 table = table.copy()
                 table["frame_index"] = source_index
+            return table
+
+        if pipeline is None:
+            pipeline = BoundedFramePipeline(
+                resolve_execution_policy(self, request, {})
+            )
+        for completed in pipeline.map_ordered(selected_frames(), calculate_frame):
+            table = completed.value
+            if not table.empty:
                 tables.append(table)
             processed += 1
             if callable(reporter):

@@ -18,9 +18,9 @@ Typical use cases include:
 - Diagnostics/export: Preserve parsed metadata for reporting and downstream conversion.
 """
 
-
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 import pickle
 import re
@@ -29,7 +29,13 @@ from typing import List, Dict, Any, Iterator, Optional
 import numpy as np
 import pandas as pd
 
+from reaxkit.core.platform.exceptions import ParseError
+from reaxkit.core.storage.frame_store import FrameOffset, FrameStore, IndexCoverage
 from reaxkit.engine.reaxff.io.base import BaseHandler
+from reaxkit.engine.reaxff.io.stream_metrics import (
+    OffsetRecorder, FrameWriteBatch, stream_cache_session, register_stream_store, open_binary_source,
+)
+from reaxkit.engine.reaxff.io.frame_header_validation import validate_geometry_name
 
 _FORT7_HEADER_RE = re.compile(
     r"^\s*(?P<num_atoms>\d+)\s+(?P<simulation_name>\S+)\s+Iteration:\s*(?P<iteration>\d+)\s+#Bonds:\s*(?P<num_bonds>\d+)\s*$"
@@ -37,6 +43,57 @@ _FORT7_HEADER_RE = re.compile(
 _FORT7_FLOAT_FIELD_RE = re.compile(
     r"(?<!\S)[+-]?(?:\d*\.\d+|\d+\.?\d*[Ee][+-]?\d+)(?=\s|$)"
 )
+_FRAME_CACHE_BATCH_SIZE = 16
+_OFFSET_CACHE_BATCH_SIZE = 128
+
+
+def _validate_fort7_header(
+        match: re.Match[str],
+        *,
+        path: str | Path,
+        frame_index: int,
+        line_number: int | None,
+        header: str,
+) -> None:
+    validate_geometry_name(
+        match.group("simulation_name"),
+        file_kind="fort.7",
+        path=path,
+        frame_index=frame_index,
+        line_number=line_number,
+        header=header,
+    )
+
+
+def _match_fort7_header(
+        raw: str,
+        *,
+        path: str | Path,
+        frame_index: int,
+        line_number: int | None,
+) -> re.Match[str] | None:
+    """Match a fort.7 header and reject header-like malformed lines."""
+    if "Iteration:" not in raw and "#Bonds:" not in raw:
+        return None
+    match = _FORT7_HEADER_RE.match(raw)
+    if match is not None:
+        _validate_fort7_header(
+            match,
+            path=path,
+            frame_index=frame_index,
+            line_number=line_number,
+            header=raw,
+        )
+        return match
+    location = f"frame {frame_index}"
+    if line_number is not None:
+        location += f", line {line_number}"
+    raise ParseError(
+        f"Malformed fort.7 frame header in '{Path(path)}' ({location}). "
+        "Expected: atom_count geometry_name Iteration: iteration #Bonds: count. "
+        "The geometry name must be a short token without spaces, quotes, or '='. "
+        f"Header: {raw.strip()!r}"
+    )
 
 
 class Fort7Handler(BaseHandler):
@@ -73,12 +130,15 @@ class Fort7Handler(BaseHandler):
     - Connectivity and bond-order columns are inferred from the header.
     - Extra, file-dependent columns are preserved as ``unknown*`` fields.
     """
+
     def __init__(
-        self,
-        file_path: str | Path = "fort.7",
-        reporter=None,
-        *,
-        frame_indices: Optional[list[int]] = None,
+            self,
+            file_path: str | Path = "fort.7",
+            reporter=None,
+            *,
+            frame_indices: Optional[list[int]] = None,
+            input_cache: bool = True,
+            frame_cache_root: str | Path | None = None,
     ):
         """Initialize a handler for a ReaxFF ``fort.7`` connectivity file.
 
@@ -105,6 +165,9 @@ class Fort7Handler(BaseHandler):
             else None
         )
         self._reporter = reporter
+        self._input_cache = bool(input_cache)
+        self._frame_cache_root = Path(frame_cache_root) if frame_cache_root else None
+        self._frame_cache_stats: dict[str, Any] = {}
 
     def _parse(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """
@@ -136,11 +199,11 @@ class Fort7Handler(BaseHandler):
                 return
             nb = int(cur_nbonds)
             atom_cols = (
-                ["atom_num", "atom_type_num"]
-                + [f"atom_cnn{i}" for i in range(1, nb + 1)]
-                + ["molecule_num"]
-                + [f"BO{i}" for i in range(1, nb + 1)]
-                + ["sum_BOs", "num_LPs", "partial_charge"]
+                    ["atom_num", "atom_type_num"]
+                    + [f"atom_cnn{i}" for i in range(1, nb + 1)]
+                    + ["molecule_num"]
+                    + [f"BO{i}" for i in range(1, nb + 1)]
+                    + ["sum_BOs", "num_LPs", "partial_charge"]
             )
             extra = max(0, len(cur_atoms_rows[0]) - len(atom_cols))
             if extra > 0:
@@ -160,7 +223,12 @@ class Fort7Handler(BaseHandler):
                 if not values:
                     continue
 
-                header_match = _FORT7_HEADER_RE.match(raw)
+                header_match = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=len(sim_rows),
+                    line_number=lines_read,
+                )
                 # Header. Some ReaxFF outputs omit the space after
                 # "Iteration:" once iteration numbers grow large.
                 if header_match:
@@ -235,7 +303,525 @@ class Fort7Handler(BaseHandler):
 
         return sim_df, meta
 
+    def _frame_store(self, *, charge_only: bool = False) -> FrameStore | None:
+        if not self._input_cache:
+            return None
+        root = self._frame_cache_root
+        if root is None:
+            configured = os.environ.get("REAXKIT_FRAME_CACHE_DIR", "").strip()
+            root = Path(configured) if configured else self._cache_root().parent
+        try:
+            representation = "fort7-charge-frame-v1" if charge_only else "fort7-full-frame-v1"
+            capabilities = (
+                ("charges", "atom-types", "totals")
+                if charge_only
+                else ("charges", "atom-types", "connectivity", "totals")
+            )
+            return register_stream_store(self, FrameStore.for_source(
+                root,
+                self.path,
+                engine="reaxff",
+                source_kind="fort7",
+                parser=f"{self.__class__.__module__}.{self.__class__.__qualname__}",
+                parser_version="4",
+                representation=representation,
+                capabilities=capabilities,
+            ))
+        except (OSError, RuntimeError, ValueError):
+            return None
+
+    def _scan_offsets(
+            self,
+            store: FrameStore,
+            *,
+            through_index: int,
+            progress_stage: str = "load",
+            progress_total: int = 0,
+            progress_message: str = "Indexing fort.7 frames",
+    ) -> dict[str, int]:
+        """Extend the fort.7 header index and persist a safe resume point."""
+        coverage = store.get_coverage()
+        if coverage.complete or coverage.next_frame_index > through_index:
+            return {"indexed_frames": 0, "index_bytes": 0}
+        indexed = 0
+        bytes_read = 0
+        pending_offsets: list[FrameOffset] = []
+
+        def flush_offsets(next_frame_index: int, next_byte_offset: int) -> None:
+            if pending_offsets:
+                store.put_offsets(pending_offsets)
+                pending_offsets.clear()
+            store.set_coverage(IndexCoverage(next_frame_index, next_byte_offset, False))
+
+        with open_binary_source(self) as handle:
+            handle.seek(coverage.next_byte_offset)
+            frame_index = coverage.next_frame_index
+            current_start: int | None = None
+            current_iteration: int | None = None
+            current_atoms: int | None = None
+            while True:
+                line_start = handle.tell()
+                raw_bytes = handle.readline()
+                if not raw_bytes:
+                    if current_start is not None:
+                        byte_end = handle.tell()
+                        pending_offsets.append(
+                            FrameOffset(
+                                frame_index,
+                                current_start,
+                                byte_end,
+                                current_iteration,
+                                current_atoms,
+                            )
+                        )
+                        frame_index += 1
+                        indexed += 1
+                        bytes_read += byte_end - current_start
+                        if self._reporter and progress_total > 0:
+                            self._reporter(
+                                progress_stage,
+                                indexed,
+                                progress_total,
+                                progress_message,
+                            )
+                    flush_offsets(frame_index, handle.tell())
+                    store.set_coverage(IndexCoverage(frame_index, handle.tell(), True))
+                    break
+                raw = raw_bytes.decode("utf-8")
+                header = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=frame_index if current_start is None else frame_index + 1,
+                    line_number=None,
+                )
+                if header is None:
+                    continue
+                if current_start is None:
+                    current_start = line_start
+                    current_iteration = int(header.group("iteration"))
+                    current_atoms = int(header.group("num_atoms"))
+                    continue
+                pending_offsets.append(
+                    FrameOffset(
+                        frame_index,
+                        current_start,
+                        line_start,
+                        current_iteration,
+                        current_atoms,
+                    )
+                )
+                indexed += 1
+                bytes_read += line_start - current_start
+                frame_index += 1
+                if len(pending_offsets) >= _OFFSET_CACHE_BATCH_SIZE:
+                    flush_offsets(frame_index, line_start)
+                if self._reporter and progress_total > 0:
+                    self._reporter(
+                        progress_stage,
+                        indexed,
+                        progress_total,
+                        progress_message,
+                    )
+                if frame_index > through_index:
+                    flush_offsets(frame_index, line_start)
+                    break
+                current_start = line_start
+                current_iteration = int(header.group("iteration"))
+                current_atoms = int(header.group("num_atoms"))
+        return {"indexed_frames": indexed, "index_bytes": bytes_read}
+
+    def _stream_selected_charge_frames_one_pass(
+            self,
+            store: FrameStore,
+            requested_order: list[int],
+            *,
+            include_atom_types: bool,
+    ) -> Iterator[Dict[str, Any]]:
+        """Populate a cold charge cache during one forward source scan."""
+        pending = FrameWriteBatch(store)
+        parsed_frames = 0
+        if callable(self._reporter):
+            self._reporter("stream", 0, len(requested_order), "Reading fort.7 frames")
+        for record in self._iter_selected_charge_frames_sequential(
+                requested_order,
+                include_atom_types=True,
+                offset_store=store,
+        ):
+            source_index = int(record["source_index"])
+            pending.add(source_index, record)
+            parsed_frames += 1
+            output = dict(record)
+            if not include_atom_types:
+                output.pop("charge_atom_type_nums", None)
+            yield output
+        pending.flush()
+        if callable(self._reporter):
+            self._reporter(
+                "stream",
+                parsed_frames,
+                len(requested_order),
+                "Read fort.7 frames",
+            )
+        self._frame_cache_stats = {
+            **self._frame_cache_stats,
+            "requested": len(requested_order),
+            "hits": 0,
+            "misses": len(requested_order),
+            "parsed_frames": parsed_frames,
+            "source_bytes": self._frame_cache_stats.get("source_bytes", 0),
+            "indexed_frames": 0,
+            "index_bytes": 0,
+            "one_pass": True,
+        }
+
+    def _iter_selected_charge_frames_sequential(
+            self,
+            requested_order: list[int],
+            *,
+            include_atom_types: bool,
+            offset_store: FrameStore | None = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Read selected charge arrays without decoding skipped atom rows."""
+        requested = set(requested_order)
+        max_requested = max(requested, default=-1)
+        source_index = 0
+        emitted = 0
+        with OffsetRecorder(offset_store) as offsets, open_binary_source(self) as handle:
+            while source_index <= max_requested:
+                header_start = handle.tell()
+                raw_header = handle.readline()
+                while raw_header and not raw_header.strip():
+                    header_start = handle.tell()
+                    raw_header = handle.readline()
+                if not raw_header:
+                    break
+                header_text = raw_header.decode("utf-8")
+                header = _match_fort7_header(
+                    header_text,
+                    path=self.path,
+                    frame_index=source_index,
+                    line_number=None,
+                )
+                if header is None:
+                    continue
+
+                num_atoms = int(header.group("num_atoms"))
+                num_bonds = int(header.group("num_bonds"))
+                selected = source_index in requested
+                atom_ids: list[int] = []
+                atom_types: list[int] = []
+                charges: list[float] = []
+                totals: list[float] = []
+                trailing_count: int | None = None
+
+                atoms_read = 0
+                while atoms_read < num_atoms:
+                    raw_bytes = handle.readline()
+                    if not raw_bytes:
+                        break
+                    stripped_bytes = raw_bytes.strip()
+                    if not stripped_bytes:
+                        continue
+                    atoms_read += 1
+                    if not selected:
+                        continue
+                    raw = raw_bytes.decode("utf-8")
+                    stripped = raw.strip()
+                    leading_fields = stripped.split(None, 5)
+                    if len(leading_fields) < 6:
+                        totals.extend(map(float, leading_fields))
+                        break
+                    if trailing_count is None:
+                        float_match = _FORT7_FLOAT_FIELD_RE.search(stripped)
+                        float_fields = stripped[float_match.start():].split() if float_match else []
+                        charge_offset = num_bonds + 2
+                        if len(float_fields) <= charge_offset:
+                            raise ValueError("Could not recover partial charge from a fort.7 atom row.")
+                        trailing_count = len(float_fields) - charge_offset - 1
+                        charge_token = float_fields[charge_offset]
+                    else:
+                        ending = stripped.rsplit(None, trailing_count + 1)
+                        charge_token = ending[-trailing_count - 1]
+                    atom_ids.append(int(leading_fields[0]))
+                    if include_atom_types:
+                        atom_type_token = raw[5:10].strip()
+                        if not atom_type_token.lstrip("+-").isdigit():
+                            atom_type_token = leading_fields[1]
+                        atom_types.append(int(atom_type_token))
+                    charges.append(float(charge_token))
+
+                while len(totals) < 4:
+                    line_start = handle.tell()
+                    raw_bytes = handle.readline()
+                    if not raw_bytes:
+                        break
+                    stripped_bytes = raw_bytes.strip()
+                    if not stripped_bytes:
+                        continue
+                    if b"Iteration:" in raw_bytes or b"#Bonds:" in raw_bytes:
+                        handle.seek(line_start)
+                        break
+                    totals.extend(map(float, stripped_bytes.split()))
+
+                if atoms_read == num_atoms and len(totals) >= 4:
+                    offsets.add(source_index, header_start, handle.tell(),
+                                int(header.group("iteration")), num_atoms)
+                self._frame_cache_stats.update(source_bytes=handle.tell(),
+                                               scanned_frames=source_index + 1,
+                                               parsed_frames=emitted + int(selected),
+                                               reader_branch="sequential_charges")
+                if selected:
+                    emitted += 1
+                    if callable(self._reporter):
+                        self._reporter(
+                            "stream",
+                            emitted,
+                            len(requested),
+                            "Streaming fort.7 frames",
+                        )
+                    record: dict[str, Any] = {
+                        "source_index": source_index,
+                        "iter": int(header.group("iteration")),
+                        "num_of_atoms": num_atoms,
+                        "num_of_bonds": num_bonds,
+                        "simulation_name": header.group("simulation_name"),
+                        "totals": totals,
+                        "connectivity_incomplete": True,
+                        "charge_atom_ids": np.asarray(atom_ids, dtype=int),
+                        "charges": np.asarray(charges, dtype=float),
+                    }
+                    if include_atom_types:
+                        record["charge_atom_type_nums"] = np.asarray(atom_types, dtype=int)
+                    yield record
+                source_index += 1
+
+    def _parse_indexed_frame(self, handle, offset: FrameOffset) -> dict[str, Any]:
+        handle.seek(offset.byte_start)
+        raw_frame = handle.read(offset.byte_end - offset.byte_start).decode("utf-8")
+        lines = raw_frame.splitlines()
+        if not lines:
+            raise ParseError(f"Missing fort.7 frame {offset.frame_index} in '{self.path}'.")
+        header = _match_fort7_header(
+            lines[0],
+            path=self.path,
+            frame_index=offset.frame_index,
+            line_number=None,
+        )
+        if header is None:
+            raise ParseError(f"Malformed fort.7 frame {offset.frame_index} in '{self.path}'.")
+        num_atoms = int(header.group("num_atoms"))
+        num_bonds = int(header.group("num_bonds"))
+        atom_rows: list[list[float | int]] = []
+        totals: list[float] = []
+        for raw in lines[1:]:
+            values = raw.split()
+            if not values:
+                continue
+            if len(atom_rows) >= num_atoms or len(values) < 6:
+                totals.extend(map(float, values))
+                continue
+            integer_count = num_bonds + 3
+            int_part = list(map(int, values[:integer_count]))
+            float_part = list(map(float, values[integer_count:]))
+            atom_rows.append(int_part + float_part)
+        columns = (
+                ["atom_num", "atom_type_num"]
+                + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
+                + ["molecule_num"]
+                + [f"BO{i}" for i in range(1, num_bonds + 1)]
+                + ["sum_BOs", "num_LPs", "partial_charge"]
+        )
+        if atom_rows:
+            columns.extend(
+                f"unknown{i}"
+                for i in range(1, max(0, len(atom_rows[0]) - len(columns)) + 1)
+            )
+        return {
+            "source_index": offset.frame_index,
+            "iter": int(header.group("iteration")),
+            "num_of_atoms": num_atoms,
+            "num_of_bonds": num_bonds,
+            "simulation_name": header.group("simulation_name"),
+            "totals": totals or [float("nan")] * 4,
+            "connectivity_incomplete": False,
+            "frame": pd.DataFrame(atom_rows, columns=columns),
+            "source_bytes": int(offset.byte_end - offset.byte_start),
+        }
+
+    def _parse_indexed_charge_frame(self, handle, offset: FrameOffset) -> dict[str, Any]:
+        """Parse compact charges while preserving fused fixed-width recovery."""
+        handle.seek(offset.byte_start)
+        raw_frame = handle.read(offset.byte_end - offset.byte_start).decode("utf-8")
+        lines = raw_frame.splitlines()
+        if not lines:
+            raise ParseError(f"Missing fort.7 frame {offset.frame_index} in '{self.path}'.")
+        header = _match_fort7_header(
+            lines[0],
+            path=self.path,
+            frame_index=offset.frame_index,
+            line_number=None,
+        )
+        if header is None:
+            raise ParseError(f"Malformed fort.7 frame {offset.frame_index} in '{self.path}'.")
+        num_atoms = int(header.group("num_atoms"))
+        num_bonds = int(header.group("num_bonds"))
+        atom_ids: list[int] = []
+        atom_types: list[int] = []
+        charges: list[float] = []
+        totals: list[float] = []
+        trailing_count: int | None = None
+        for raw in lines[1:]:
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            if len(charges) >= num_atoms:
+                totals.extend(map(float, stripped.split()))
+                continue
+            leading_fields = stripped.split(None, 5)
+            if len(leading_fields) < 6:
+                totals.extend(map(float, leading_fields))
+                continue
+            if trailing_count is None:
+                float_match = _FORT7_FLOAT_FIELD_RE.search(stripped)
+                float_fields = stripped[float_match.start():].split() if float_match else []
+                charge_offset = num_bonds + 2
+                if len(float_fields) <= charge_offset:
+                    raise ValueError("Could not recover partial charge from a fort.7 atom row.")
+                trailing_count = len(float_fields) - charge_offset - 1
+                charge_token = float_fields[charge_offset]
+            else:
+                ending = stripped.rsplit(None, trailing_count + 1)
+                charge_token = ending[-trailing_count - 1]
+            atom_ids.append(int(leading_fields[0]))
+            atom_type_token = raw[5:10].strip()
+            if not atom_type_token.lstrip("+-").isdigit():
+                atom_type_token = leading_fields[1]
+            atom_types.append(int(atom_type_token))
+            charges.append(float(charge_token))
+        return {
+            "source_index": offset.frame_index,
+            "iter": int(header.group("iteration")),
+            "num_of_atoms": num_atoms,
+            "num_of_bonds": num_bonds,
+            "simulation_name": header.group("simulation_name"),
+            "totals": totals,
+            "connectivity_incomplete": True,
+            "charge_atom_ids": np.asarray(atom_ids, dtype=int),
+            "charge_atom_type_nums": np.asarray(atom_types, dtype=int),
+            "charges": np.asarray(charges, dtype=float),
+            "source_bytes": int(offset.byte_end - offset.byte_start),
+        }
+
+    def _load_indexed_records(
+            self,
+            store: FrameStore,
+            requested: list[int],
+    ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
+        records = store.get_frames(requested)
+        missing = [index for index in requested if index not in records]
+        through_index = max(missing, default=-1)
+        coverage = store.get_coverage()
+        index_work = (
+            max(0, through_index - coverage.next_frame_index + 1)
+            if missing and not coverage.complete
+            else 0
+        )
+        total_work = index_work + len(requested)
+        if self._reporter:
+            self._reporter("load", 0, total_work, "Reading fort.7 frames")
+        scan_stats = self._scan_offsets(
+            store,
+            through_index=through_index,
+            progress_total=total_work,
+            progress_message="Reading fort.7 frames",
+        ) if missing else {
+            "indexed_frames": 0,
+            "index_bytes": 0,
+        }
+        offsets = store.get_offsets(missing)
+        completed = len(records)
+        if self._reporter:
+            self._reporter(
+                "load",
+                index_work + completed,
+                total_work,
+                "Reading fort.7 frames",
+            )
+        parsed: dict[int, dict[str, Any]] = {}
+        source_bytes = 0
+        if offsets:
+            with open_binary_source(self) as handle:
+                for frame_index in missing:
+                    offset = offsets.get(frame_index)
+                    if offset is None:
+                        continue
+                    record = self._parse_indexed_frame(handle, offset)
+                    parsed[frame_index] = record
+                    source_bytes += int(record["source_bytes"])
+                    completed += 1
+                    if self._reporter:
+                        self._reporter(
+                            "load",
+                            index_work + completed,
+                            total_work,
+                            "Reading fort.7 frames",
+                        )
+        store.put_frames(parsed)
+        records.update(parsed)
+        return records, {
+            "requested": len(requested),
+            "hits": len(requested) - len(missing),
+            "misses": len(missing),
+            "parsed_frames": len(parsed),
+            "source_bytes": source_bytes,
+            **scan_stats,
+        }
+
     def _parse_selected_frames(self) -> tuple[pd.DataFrame, dict[str, Any]]:
+        requested = list(self._frame_indices or ())
+        store = self._frame_store()
+        if store is None:
+            return self._parse_selected_frames_sequential()
+        records, stats = self._load_indexed_records(store, requested)
+        self._frame_cache_stats = stats
+        source_indices = [index for index in requested if index in records]
+        frames = [records[index]["frame"] for index in source_indices]
+        sim_rows = [
+            [
+                records[index]["iter"],
+                records[index]["num_of_atoms"],
+                records[index]["num_of_bonds"],
+            ]
+            for index in source_indices
+        ]
+        totals = [records[index]["totals"] for index in source_indices]
+        sim_df = pd.DataFrame(sim_rows, columns=["iter", "num_of_atoms", "num_of_bonds"])
+        if totals:
+            width = len(totals[0])
+            total_cols = (
+                ["total_BO", "total_LP", "total_BO_uncorrected", "total_charge"]
+                if width == 4
+                else [f"total_val{i}" for i in range(1, width + 1)]
+            )
+            sim_df = pd.concat([sim_df, pd.DataFrame(totals, columns=total_cols)], axis=1)
+        if not sim_df.empty:
+            keep_idx = sim_df.drop_duplicates("iter", keep="last").index.tolist()
+            frames = [frames[index] for index in keep_idx]
+            source_indices = [source_indices[index] for index in keep_idx]
+            sim_df = sim_df.iloc[keep_idx].reset_index(drop=True)
+        self._frames = frames
+        self._sim_name = str(records[source_indices[0]]["simulation_name"]) if source_indices else ""
+        meta: Dict[str, Any] = {
+            "n_frames": len(frames),
+            "n_records": len(sim_df),
+            "simulation_name": self._sim_name,
+            "source_frame_indices": source_indices,
+            "partial": True,
+            "frame_cache": stats,
+        }
+        return sim_df, meta
+
+    def _parse_selected_frames_sequential(self) -> tuple[pd.DataFrame, dict[str, Any]]:
         """Parse only selected connectivity frames and stop after the last one."""
         requested = list(self._frame_indices or ())
         requested_set = set(requested)
@@ -254,19 +840,19 @@ class Fort7Handler(BaseHandler):
 
         def _finalize_iteration() -> None:
             if (
-                not current_selected
-                or current_row is None
-                or cur_nbonds is None
-                or not cur_atoms_rows
+                    not current_selected
+                    or current_row is None
+                    or cur_nbonds is None
+                    or not cur_atoms_rows
             ):
                 return
             nb = int(cur_nbonds)
             atom_cols = (
-                ["atom_num", "atom_type_num"]
-                + [f"atom_cnn{i}" for i in range(1, nb + 1)]
-                + ["molecule_num"]
-                + [f"BO{i}" for i in range(1, nb + 1)]
-                + ["sum_BOs", "num_LPs", "partial_charge"]
+                    ["atom_num", "atom_type_num"]
+                    + [f"atom_cnn{i}" for i in range(1, nb + 1)]
+                    + ["molecule_num"]
+                    + [f"BO{i}" for i in range(1, nb + 1)]
+                    + ["sum_BOs", "num_LPs", "partial_charge"]
             )
             extra = max(0, len(cur_atoms_rows[0]) - len(atom_cols))
             if extra:
@@ -285,8 +871,15 @@ class Fort7Handler(BaseHandler):
                 )
 
         with open(self.path, "r") as fh:
+            line_number = 0
             for raw in fh:
-                header_match = _FORT7_HEADER_RE.match(raw)
+                line_number += 1
+                header_match = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=current_index + 1,
+                    line_number=line_number,
+                )
                 if header_match:
                     _finalize_iteration()
                     cur_atoms_rows = []
@@ -377,11 +970,13 @@ class Fort7Handler(BaseHandler):
         with open(self.path, "r") as fh:
             return sum(1 for _ in fh)
 
+    @stream_cache_session
     def stream_file_frames(
-        self,
-        *,
-        charges_only: bool = False,
-        charge_arrays_only: bool = False,
+            self,
+            *,
+            charges_only: bool = False,
+            charge_arrays_only: bool = False,
+            include_atom_types: bool = True,
     ) -> Iterator[Dict[str, Any]]:
         """Yield ``fort.7`` frames without materializing the trajectory.
 
@@ -399,9 +994,121 @@ class Fort7Handler(BaseHandler):
         it extracts the atom id and partial-charge field from each atom row
         without converting the unused connectivity/bond-order fields or
         constructing a pandas table.
+
+        ``include_atom_types=False`` makes that path skip atom-type conversion
+        as well. Total dipole and polarization calculations need only atom ids,
+        coordinates, and charges, and skipping the field also avoids ambiguity
+        when fixed-width neighbor ids above 9999 are concatenated to it.
         """
         if charge_arrays_only:
             charges_only = True
+        if self._frame_indices is not None:
+            requested_order = list(self._frame_indices)
+            store = self._frame_store(charge_only=charge_arrays_only)
+            if store is not None:
+                rich_store = self._frame_store() if charge_arrays_only else None
+                initially_available = store.available_indices(requested_order)
+                if rich_store is not None:
+                    initially_available |= rich_store.available_indices(requested_order)
+                missing = [index for index in requested_order if index not in initially_available]
+                through_index = max(missing, default=-1)
+                coverage = store.get_coverage()
+                if (
+                        charge_arrays_only
+                        and missing
+                        and not initially_available
+                        and coverage.next_frame_index == 0
+                        and requested_order == sorted(requested_order)
+                ):
+                    yield from self._stream_selected_charge_frames_one_pass(
+                        store,
+                        requested_order,
+                        include_atom_types=include_atom_types,
+                    )
+                    return
+                index_work = (
+                    max(0, through_index - coverage.next_frame_index + 1)
+                    if missing and not coverage.complete
+                    else 0
+                )
+                total_work = index_work + len(requested_order)
+                if callable(self._reporter):
+                    self._reporter("stream", 0, total_work, "Reading fort.7 frames")
+                scan_stats = self._scan_offsets(
+                    store,
+                    through_index=through_index,
+                    progress_stage="stream",
+                    progress_total=total_work,
+                    progress_message="Reading fort.7 frames",
+                ) if missing else {"indexed_frames": 0, "index_bytes": 0}
+                offsets = store.get_offsets(missing)
+                parsed_frames = 0
+                source_bytes = 0
+                pending = FrameWriteBatch(store)
+                with open_binary_source(self) as handle:
+                    for batch_start in range(0, len(requested_order), _FRAME_CACHE_BATCH_SIZE):
+                        batch = requested_order[batch_start:batch_start + _FRAME_CACHE_BATCH_SIZE]
+                        cached_batch = store.get_frames(batch)
+                        rich_missing = [index for index in batch if index not in cached_batch]
+                        rich_batch = rich_store.get_frames(rich_missing) if rich_store is not None else {}
+                        for batch_offset, source_index in enumerate(batch, start=1):
+                            record = cached_batch.get(source_index) or rich_batch.get(source_index)
+                            if record is None:
+                                offset = offsets.get(source_index)
+                                if offset is None:
+                                    continue
+                                record = (
+                                    self._parse_indexed_charge_frame(handle, offset)
+                                    if charge_arrays_only
+                                    else self._parse_indexed_frame(handle, offset)
+                                )
+                                pending.add(source_index, record)
+                                parsed_frames += 1
+                                source_bytes += int(record.get("source_bytes", 0))
+                            output = dict(record)
+                            output.pop("source_bytes", None)
+                            if charge_arrays_only:
+                                frame = record.get("frame")
+                                output.pop("frame", None)
+                                if frame is not None:
+                                    output["charge_atom_ids"] = frame["atom_num"].to_numpy(dtype=int)
+                                    output["charge_atom_type_nums"] = frame["atom_type_num"].to_numpy(dtype=int)
+                                    output["charges"] = frame["partial_charge"].to_numpy(dtype=float)
+                                if not include_atom_types:
+                                    output.pop("charge_atom_type_nums", None)
+                            emitted = batch_start + batch_offset
+                            if callable(self._reporter):
+                                self._reporter(
+                                    "stream",
+                                    index_work + emitted,
+                                    total_work,
+                                    "Reading fort.7 frames",
+                                )
+                            yield output
+                        pending.flush()
+                self._frame_cache_stats = {
+                    "requested": len(requested_order),
+                    "hits": len(initially_available),
+                    "misses": len(requested_order) - len(initially_available),
+                    "parsed_frames": parsed_frames,
+                    "source_bytes": source_bytes,
+                    **scan_stats,
+                }
+                if callable(self._reporter):
+                    self._reporter(
+                        "stream",
+                        total_work,
+                        total_work,
+                        "Read fort.7 frames",
+                    )
+                return
+        if charge_arrays_only and self._frame_indices is not None:
+            requested_order = list(self._frame_indices)
+            if requested_order == sorted(requested_order):
+                yield from self._iter_selected_charge_frames_sequential(
+                    requested_order, include_atom_types=include_atom_types,
+                )
+                return
         requested = set(self._frame_indices) if self._frame_indices is not None else None
         max_requested = max(requested, default=-1) if requested is not None else None
         source_index = -1
@@ -409,6 +1116,7 @@ class Fort7Handler(BaseHandler):
         current: dict[str, Any] | None = None
         atom_rows: list[list[float | int]] = []
         charge_atom_ids: list[int] = []
+        charge_atom_type_nums: list[int] = []
         charge_values: list[float] = []
         totals: list[float] = []
 
@@ -433,14 +1141,19 @@ class Fort7Handler(BaseHandler):
             }
             if charge_arrays_only:
                 record["charge_atom_ids"] = np.asarray(charge_atom_ids, dtype=int)
+                if include_atom_types:
+                    record["charge_atom_type_nums"] = np.asarray(
+                        charge_atom_type_nums,
+                        dtype=int,
+                    )
                 record["charges"] = np.asarray(charge_values, dtype=float)
             else:
                 columns = (
-                    ["atom_num", "atom_type_num"]
-                    + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
-                    + ["molecule_num"]
-                    + [f"BO{i}" for i in range(1, num_bonds + 1)]
-                    + ["sum_BOs", "num_LPs", "partial_charge"]
+                        ["atom_num", "atom_type_num"]
+                        + [f"atom_cnn{i}" for i in range(1, num_bonds + 1)]
+                        + ["molecule_num"]
+                        + [f"BO{i}" for i in range(1, num_bonds + 1)]
+                        + ["sum_BOs", "num_LPs", "partial_charge"]
                 )
                 extra = max(0, len(atom_rows[0]) - len(columns))
                 columns.extend(f"unknown{i}" for i in range(1, extra + 1))
@@ -448,8 +1161,13 @@ class Fort7Handler(BaseHandler):
             return record
 
         with open(self.path, "r", encoding="utf-8") as fh:
-            for raw in fh:
-                header = _FORT7_HEADER_RE.match(raw)
+            for line_number, raw in enumerate(fh, start=1):
+                header = _match_fort7_header(
+                    raw,
+                    path=self.path,
+                    frame_index=source_index + 1,
+                    line_number=line_number,
+                )
                 if header:
                     record = finalize()
                     if record is not None:
@@ -459,6 +1177,7 @@ class Fort7Handler(BaseHandler):
                         return
                     atom_rows = []
                     charge_atom_ids = []
+                    charge_atom_type_nums = []
                     charge_values = []
                     totals = []
                     current = {
@@ -502,6 +1221,14 @@ class Fort7Handler(BaseHandler):
                             ending = stripped.rsplit(None, int(trailing_count) + 1)
                             charge_token = ending[-int(trailing_count) - 1]
                         charge_atom_ids.append(int(leading_fields[0]))
+                        if include_atom_types:
+                            # The first two fort.7 fields are fixed-width. Once
+                            # neighbor ids exceed 9999, whitespace splitting can
+                            # merge the atom type with every full-width neighbor.
+                            atom_type_token = raw[5:10].strip()
+                            if not atom_type_token.lstrip("+-").isdigit():
+                                atom_type_token = leading_fields[1]
+                            charge_atom_type_nums.append(int(atom_type_token))
                         charge_values.append(float(charge_token))
                     continue
                 values = raw.split()
@@ -528,8 +1255,8 @@ class Fort7Handler(BaseHandler):
                         )
                         expected_float_count = num_bonds + 3
                         if (
-                            float_index < 2
-                            or len(values) - float_index < expected_float_count
+                                float_index < 2
+                                or len(values) - float_index < expected_float_count
                         ):
                             raise ValueError(
                                 "Could not recover charge fields from a fused fort.7 atom row. "

@@ -11,23 +11,39 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Generate a ReaxFF `eregime.in` file from a selected electric-field profile.
+This command writes sampled field values for three profile types:
+  1. `sin`  -> sinusoidal waveform
+  2. `pulse` -> pulse waveform with rise/flat/fall regions
+  3. `func` -> custom expression in `t`
+It only generates the input file and does not execute the simulation.
+[Note] Worth mentioning that eregime.in can have a maximum of 100 entry lines. So, if you are working with a relatively long eregime profile, you may need to decrease the number of sampled points, or run multiple simulations using restart files.
+
+### Examples
+-----
+
+```text
+  1. Sinusoidal profile:
+   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.35 --points-per-cycle 17 --iteration-step 500 --num-cycles 2 --direction z --V 1 --copy-to-dot
+   Meaning: generates an equal-increment, piecewise-linear electric-field cycle along z. --max-magnitude 0.35 means the field reaches +0.35 and -0.35 V/A. --points-per-cycle 17 writes 17 points in one complete cycle, including the starting and ending baseline. Every cycle returns to the baseline at its start, half-cycle, and end. --iteration-step 500 maps each sampled point to every 500 MD iterations. --num-cycles 2 writes two full cycles. --V 1 writes to voltage index 1.
+[Note] Adjacent cycles share their zero-field boundary, preventing duplicate consecutive field values. Total rows = num_cycles * (points_per_cycle - 1) + 1. For equal-duration positive and negative halves, use an odd count such as 9 or 11. With 10 points there are nine time intervals, so one half necessarily has one additional interval. Use legacy --step-angle instead when true sine-value sampling is required.
+
+  2. Pulse profile:
+   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1
+   Meaning: generates smooth bipolar pulses along z. --amplitude 0.003 sets pulse height above baseline. --width 50 is how long each pulse stays flat at the top. --period 200 is one full positive+negative cycle length. --slope 20 is the rise/fall ramp duration used to smooth edges. --iteration-step 250 writes rows every 250 MD iterations. --num-cycles 5 repeats the pulse pattern five times.
+
+  3. Custom function profile:
+   reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1
+   Meaning: samples a user-defined field expression over time. --expr sets the exact formula (here a cosine with amplitude 0.003 V/A and period 100 in t-units). --t-end 1000 is the final sampled time. --dt 1 samples every 1 time unit. --iteration-step 250 maps each sampled value to every 250 MD iterations. --direction z and --V 1 choose axis and voltage index.
+```
+
 ### Arguments
 
-_No command-specific arguments found._
-
-</div>
-
-## Common Runtime and Presentation Arguments
-
-<div class="analysis-section-indent" markdown="1">
-
-These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+#### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--type` | Yes |  | Generator profile type. Example: --type sin, which selects sinusoidal waveform generation. | sin, pulse, func |
-| `--output` | No | eregime.in | Output file path. Example: --output eregime_custom.in, which writes the generated file with that name. |  |
-| `--copy-to-dot` | No |  | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
 | `--direction` | No | z | Field direction: x\|y\|z. Example: --direction x, which applies the field along x-axis. |  |
 | `--V` | No | 1 | Voltage index. Example: --V 2, which writes the field under voltage channel/index 2. |  |
 | `--start-iter` | No | 0 | Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000. |  |
@@ -38,7 +54,6 @@ These are shared workflow-level CLI flags added before command-specific options,
 | `--phase` | No | 0.0 | Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2. |  |
 | `--dc-offset` | No | 0.0 | DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform. |  |
 | `--amplitude` | No |  | Peak amplitude for pulse profile (V/A). Example: --amplitude 0.003, which sets the pulse peak field strength. |  |
-| `--width` | No |  | Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level. |  |
 | `--period` | No |  | Full-cycle period for pulse profile. Example: --period 200, which sets one pulse cycle duration. |  |
 | `--slope` | No |  | Ramp duration for pulse profile. Example: --slope 20, which sets rise/fall transition duration. |  |
 | `--step-size` | No | 0.1 | Temporal resolution for pulse profile. Example: --step-size 0.1, which samples the pulse every 0.1 time unit. |  |
@@ -47,8 +62,145 @@ These are shared workflow-level CLI flags added before command-specific options,
 | `--t-end` | No |  | End time for func profile. Example: --t-end 1000, which sets the final time point for function sampling. |  |
 | `--dt` | No |  | Time step for func profile. Example: --dt 1, which samples the function every 1 time unit. |  |
 | `--iteration-step` | Yes |  | Iterations per sample. Example: --iteration-step 250, which maps each generated sample to 250 MD iterations. |  |
-| `--run-id` | No |  | Run identifier for run-scoped layout (e.g., run_91ac0e). |  |
-| `--project-root` | No |  | Project root that contains inputs/, data/, analysis/, etc. |  |
-| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | eregime.in | Output file path. Example: --output eregime_custom.in, which writes the generated file with that name. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
+| `--width` | No |  | Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
+## Command: `make-eregime`
+
+<div class="analysis-section-indent" markdown="1">
+
+Generate a ReaxFF `eregime.in` file from a selected electric-field profile.
+This command writes sampled field values for three profile types:
+  1. `sin`  -> sinusoidal waveform
+  2. `pulse` -> pulse waveform with rise/flat/fall regions
+  3. `func` -> custom expression in `t`
+It only generates the input file and does not execute the simulation.
+[Note] Worth mentioning that eregime.in can have a maximum of 100 entry lines. So, if you are working with a relatively long eregime profile, you may need to decrease the number of sampled points, or run multiple simulations using restart files.
+
+### Examples
+-----
+
+```text
+  1. Sinusoidal profile:
+   reaxkit gen_eregime --type sin --output eregime.in --max-magnitude 0.35 --points-per-cycle 17 --iteration-step 500 --num-cycles 2 --direction z --V 1 --copy-to-dot
+   Meaning: generates an equal-increment, piecewise-linear electric-field cycle along z. --max-magnitude 0.35 means the field reaches +0.35 and -0.35 V/A. --points-per-cycle 17 writes 17 points in one complete cycle, including the starting and ending baseline. Every cycle returns to the baseline at its start, half-cycle, and end. --iteration-step 500 maps each sampled point to every 500 MD iterations. --num-cycles 2 writes two full cycles. --V 1 writes to voltage index 1.
+[Note] Adjacent cycles share their zero-field boundary, preventing duplicate consecutive field values. Total rows = num_cycles * (points_per_cycle - 1) + 1. For equal-duration positive and negative halves, use an odd count such as 9 or 11. With 10 points there are nine time intervals, so one half necessarily has one additional interval. Use legacy --step-angle instead when true sine-value sampling is required.
+
+  2. Pulse profile:
+   reaxkit gen_eregime --type pulse --output eregime.in --amplitude 0.003 --width 50 --period 200 --slope 20 --iteration-step 250 --num-cycles 5 --direction z --V 1
+   Meaning: generates smooth bipolar pulses along z. --amplitude 0.003 sets pulse height above baseline. --width 50 is how long each pulse stays flat at the top. --period 200 is one full positive+negative cycle length. --slope 20 is the rise/fall ramp duration used to smooth edges. --iteration-step 250 writes rows every 250 MD iterations. --num-cycles 5 repeats the pulse pattern five times.
+
+  3. Custom function profile:
+   reaxkit gen_eregime --type func --output eregime.in --expr '0.003*cos(2*pi*t/100)' --t-end 1000 --dt 1 --iteration-step 250 --direction z --V 1
+   Meaning: samples a user-defined field expression over time. --expr sets the exact formula (here a cosine with amplitude 0.003 V/A and period 100 in t-units). --t-end 1000 is the final sampled time. --dt 1 samples every 1 time unit. --iteration-step 250 maps each sampled value to every 250 MD iterations. --direction z and --V 1 choose axis and voltage index.
+```
+
+### Arguments
+
+#### Scientific choices
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--type` | Yes |  | Generator profile type. Example: --type sin, which selects sinusoidal waveform generation. | sin, pulse, func |
+| `--direction` | No | z | Field direction: x\|y\|z. Example: --direction x, which applies the field along x-axis. |  |
+| `--V` | No | 1 | Voltage index. Example: --V 2, which writes the field under voltage channel/index 2. |  |
+| `--start-iter` | No | 0 | Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000. |  |
+| `--max-magnitude` | No |  | Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength. |  |
+| `--points-per-cycle` | No |  | Preferred equal-increment sampling control for sin profiles. Counts the start and end rows of one cycle; the start, half-cycle, and end equal --dc-offset. Example: --points-per-cycle 17. Adjacent cycles share their boundary, so consecutive duplicate baseline rows are omitted. |  |
+| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. |  |
+| `--num-cycles` | No |  | Number of cycles for sin or pulse profile. Example: --num-cycles 3, which repeats the waveform for three cycles. |  |
+| `--phase` | No | 0.0 | Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2. |  |
+| `--dc-offset` | No | 0.0 | DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform. |  |
+| `--amplitude` | No |  | Peak amplitude for pulse profile (V/A). Example: --amplitude 0.003, which sets the pulse peak field strength. |  |
+| `--period` | No |  | Full-cycle period for pulse profile. Example: --period 200, which sets one pulse cycle duration. |  |
+| `--slope` | No |  | Ramp duration for pulse profile. Example: --slope 20, which sets rise/fall transition duration. |  |
+| `--step-size` | No | 0.1 | Temporal resolution for pulse profile. Example: --step-size 0.1, which samples the pulse every 0.1 time unit. |  |
+| `--baseline` | No | 0.0 | Baseline for pulse profile (V/A). Example: --baseline 0.0005, which shifts the pulse around a non-zero base field. |  |
+| `--expr` | No |  | Python expression in t for func profile. Example: --expr '0.003*cos(2*pi*t/100)', which defines field value as a function of t. |  |
+| `--t-end` | No |  | End time for func profile. Example: --t-end 1000, which sets the final time point for function sampling. |  |
+| `--dt` | No |  | Time step for func profile. Example: --dt 1, which samples the function every 1 time unit. |  |
+| `--iteration-step` | Yes |  | Iterations per sample. Example: --iteration-step 250, which maps each generated sample to 250 MD iterations. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--output` | No | eregime.in | Output file path. Example: --output eregime_custom.in, which writes the generated file with that name. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
+| `--width` | No |  | Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level. |  |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+
+
+</div>
+
+## Common Runtime and Presentation Arguments
+
+<div class="analysis-section-indent" markdown="1">
+
+These are shared workflow-level CLI flags added before command-specific options, covering runtime context (engine/input/storage) and output presentation/export behavior.
+
+Each command table above includes its shared and inherited options.
 
 </div>

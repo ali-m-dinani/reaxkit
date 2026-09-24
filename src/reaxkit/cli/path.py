@@ -14,8 +14,59 @@ configured project root.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from reaxkit.core.storage.storage_layout import ReaxkitStorageLayout, default_project_root, normalize_storage_args
+
+
+def free_up_keep_last(raw_root: str | Path, *, keep: int, dry_run: bool = False) -> list[Path]:
+    """Delete all but the newest ``keep`` entries under a raw-data root."""
+    from reaxkit.workflows.meta.manage_workspace_workflow import (
+        _collect_entries,
+        _delete_entry,
+        _delete_policy,
+    )
+
+    entries = _collect_entries(Path(raw_root), include_archives=False)
+    victims = _delete_policy(entries, keep_last=max(0, int(keep)))
+    for victim in victims:
+        _delete_entry(victim, dry_run=bool(dry_run))
+    return victims
+
+
+def free_up_compress_old(
+    raw_root: str | Path,
+    *,
+    keep: int,
+    compression: Literal["gz", "zst"] = "gz",
+    dry_run: bool = False,
+) -> tuple[list[Path], list[Path]]:
+    """Archive and remove all but the newest ``keep`` raw-data entries."""
+    from reaxkit.workflows.meta.manage_workspace_workflow import (
+        _archive_path,
+        _collect_entries,
+        _compress_to_archive,
+        _delete_entry,
+        _delete_policy,
+    )
+
+    if compression not in {"gz", "zst"}:
+        raise ValueError("compression must be 'gz' or 'zst'")
+
+    entries = _collect_entries(Path(raw_root), include_archives=False)
+    victims = _delete_policy(entries, keep_last=max(0, int(keep)))
+    archives: list[Path] = []
+    skipped: list[Path] = []
+    for victim in victims:
+        archive = _archive_path(victim, compression)
+        if archive.exists():
+            skipped.append(victim)
+            continue
+        if not dry_run:
+            _compress_to_archive(victim, archive, compression=compression)
+        archives.append(archive)
+        _delete_entry(victim, dry_run=bool(dry_run))
+    return archives, skipped
 
 def resolve_output_path(
     user_value: str,

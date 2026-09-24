@@ -21,6 +21,8 @@ import numpy as np
 import pandas as pd
 
 from reaxkit.analysis.base import AnalysisTask
+from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
+from reaxkit.core.runtime.frame_tables import map_frame_tables
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.domain.base_request import BaseRequest
 from reaxkit.domain.base_result import BaseResult
@@ -382,6 +384,16 @@ class DominantSpeciesTask(AnalysisTask):
     """Return the dominant molecular species per selected iteration."""
 
     required_data = MolecularAnalysisData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> DominantSpeciesResult:
+        from reaxkit.analysis.molecular_analysis.frame_stream import molecular_frame_table
+        table = molecular_frame_table(self, frames, request, "dominant", pipeline=pipeline, reporter=reporter)
+        return DominantSpeciesResult(table=table, request=request)
+
 
     @staticmethod
     def recommended_presentations(
@@ -543,6 +555,16 @@ class LargestMoleculeByMassTask(AnalysisTask):
     """Return the heaviest individual molecular species per selected iteration."""
 
     required_data = MolecularAnalysisData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> LargestMoleculeByMassResult:
+        from reaxkit.analysis.molecular_analysis.frame_stream import molecular_frame_table
+        table = molecular_frame_table(self, frames, request, "mass", pipeline=pipeline, reporter=reporter)
+        return LargestMoleculeByMassResult(table=table, request=request)
+
 
     @staticmethod
     def recommended_presentations(
@@ -689,6 +711,16 @@ class LargestMoleculeCompositionTask(AnalysisTask):
     """Return per-element composition of the heaviest molecule per selected iteration."""
 
     required_data = MolecularAnalysisData
+    execution_capabilities = TaskCapabilities(
+        shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
+        supports_selective_frames=True, estimated_frame_bytes=1024 * 1024,
+    )
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None) -> LargestMoleculeCompositionResult:
+        from reaxkit.analysis.molecular_analysis.frame_stream import molecular_frame_table
+        table = molecular_frame_table(self, frames, request, "composition", pipeline=pipeline, reporter=reporter)
+        return LargestMoleculeCompositionResult(table=table, request=request)
+
 
     @staticmethod
     def recommended_presentations(
@@ -832,6 +864,12 @@ class MoleculeLifetimeTask(AnalysisTask):
     """Compute active lifetimes and birth/death events for molecular species."""
 
     required_data = MolecularAnalysisData
+
+    supports_selective_streaming = True
+
+    def run_stream(self, frames, request, reporter=None, pipeline=None):
+        from reaxkit.analysis.molecular_analysis.lifetime_stream import lifetime_table
+        return MoleculeLifetimeResult(table=lifetime_table(self, frames, request, pipeline, reporter), request=request)
 
     @staticmethod
     def recommended_presentations(

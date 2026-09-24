@@ -1,10 +1,10 @@
-"""Generate structured workflow CLI docs from workflow source (AST-based).
+"""Generate workflow CLI docs from live registered parsers.
 
 Outputs:
 - module mkdocstrings block (file-level docstring is shown by mkdocstrings)
 - per-command description and examples (from parser.description)
-- per-command argument table (from add_argument calls in command branch)
-- common runtime/presentation argument table (from shared helper calls)
+- complete per-command argument tables, including shared/inherited options
+- AST fallback for modules that do not expose a registered CLI route
 """
 
 from __future__ import annotations
@@ -15,6 +15,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import re
+from functools import lru_cache
+
+from reaxkit.cli.help_metadata import CATEGORIES, metadata_for_flag, metadata_for_action
+from reaxkit.cli.inventory import iter_parsers
+from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
+from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
+from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
+from reaxkit.core.runtime.cli_policy import add_execution_arguments
 
 
 @dataclass(frozen=True)
@@ -41,6 +49,7 @@ class ArgRow:
     default: str
     help_text: str
     choices: str
+    category: str | None = None
 
 
 @dataclass
@@ -395,13 +404,40 @@ def _render_arg_table(rows: list[ArgRow]) -> list[str]:
     lines.append("| Flag | Required | Default | Help | Choices |")
     lines.append("|---|---|---|---|---|")
     for row in rows:
-        flag = row.flag.replace("|", "\\|")
-        req = row.required.replace("|", "\\|")
-        default = row.default.replace("|", "\\|")
-        help_text = row.help_text.replace("|", "\\|")
-        choices = row.choices.replace("|", "\\|")
+        flag, req, default, help_text, choices = (
+            " ".join(value.split()).replace("|", "\\|")
+            for value in (row.flag, row.required, row.default, row.help_text, row.choices)
+        )
         lines.append(f"| `{flag}` | {req} | {default} | {help_text} | {choices} |")
     return lines
+
+
+def _render_categorized_args(rows: list[ArgRow], parser_path: str = "") -> list[str]:
+    """Use the same explicit roles as terminal full help for documented flags."""
+    grouped: dict[str, list[ArgRow]] = {category: [] for category in CATEGORIES}
+    for row in rows:
+        spellings = row.flag.split(", ")
+        canonical = next((flag for flag in spellings if flag.startswith("--")), spellings[0])
+        category = row.category or metadata_for_flag(canonical, parser_path)[0]
+        grouped[category].append(row)
+    lines: list[str] = []
+    for category, category_rows in grouped.items():
+        if category_rows:
+            lines.extend([f"#### {category}", "", *_render_arg_table(category_rows), ""])
+    return lines
+
+
+def _shared_execution_rows() -> list[ArgRow]:
+    """Document flags injected by the dispatcher after workflow parser setup."""
+    parser = argparse.ArgumentParser(add_help=False)
+    add_execution_arguments(parser)
+    return [ArgRow(
+        flag=", ".join(action.option_strings),
+        required="No",
+        default=_display_value(action.default),
+        help_text=str(action.help or ""),
+        choices=_display_value(action.choices),
+    ) for action in parser._actions]
 
 
 def _parse_command_heading(line: str) -> str | None:
@@ -455,6 +491,11 @@ def _extract_preserved_blocks(existing_md: str) -> list[PreservedBlock]:
             while j < len(lines):
                 s = lines[j].strip()
                 if j > i and s.startswith("## "):
+                    break
+                if j > i and (s.startswith("<a id=") or
+                              (div_depth == 0 and s.startswith("</div>"))):
+                    # The surrounding section's closing tag is generated;
+                    # retaining it would add another closing tag on each run.
                     break
                 if "<div" in s and not s.startswith("</div>"):
                     div_depth += s.count("<div")
@@ -561,7 +602,7 @@ def _render_markdown(
         lines.append("### Arguments")
         lines.append("")
         if rows:
-            lines.extend(_render_arg_table(rows))
+            lines.extend(_render_categorized_args(rows, command))
         else:
             lines.append("_No command-specific arguments found._")
         lines.append("")
@@ -581,19 +622,54 @@ def _render_markdown(
     )
     lines.append("")
     if common_args:
-        lines.extend(_render_arg_table(common_args))
+        common_path = commands[0] if len(commands) == 1 else {
+            "study_workflow": "study", "help_workflow": "help",
+            "manage_workspace_workflow": "manage-workspace", "gen_video_workflow": "gen-video",
+        }.get(target.workflow_file.stem, "")
+        lines.extend(_render_categorized_args(common_args, common_path))
     else:
-        lines.append("_No common arguments found._")
+        lines.append("Each command table above includes its shared and inherited options.")
     lines.append("")
     _append_preserved_at_context(lines, preserved_blocks, "common", "### Arguments", consumed_blocks)
     _append_remaining_preserved(lines, preserved_blocks, "common", consumed_blocks)
     lines.append("</div>")
     lines.append("")
 
-    return "\n".join(lines).rstrip() + "\n"
+    return "\n".join(line.rstrip() for line in "\n".join(lines).splitlines()).rstrip() + "\n"
 
 
-def generate_workflow_cli_docs(target: WorkflowDocTarget, resolver: ContextResolver) -> Path:
+@lru_cache(maxsize=1)
+def _live_parsers_by_module():
+    """Use actual registered actions, including inherited and late-added flags."""
+    routes = {**get_registered_analysis_commands(), **get_registered_generators(),
+              **get_registered_workflows()}
+    by_module = {}
+    for path, parser in iter_parsers():
+        command = path.removeprefix("reaxkit ")
+        spec = routes.get(command.split()[0])
+        if spec is not None:
+            by_module.setdefault(spec.module_path, []).append((command, parser))
+    return by_module
+
+
+def _live_argument_rows(parser):
+    rows = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction) or action.help == argparse.SUPPRESS:
+            continue
+        category, visibility = metadata_for_action(action, parser)
+        if visibility == "internal":
+            continue
+        rows.append(ArgRow(
+            flag=", ".join(action.option_strings) if action.option_strings else action.dest,
+            required="Yes" if action.required else "No",
+            default="" if action.default == argparse.SUPPRESS else _display_value(action.default),
+            help_text=str(action.help or ""), choices=_display_value(action.choices), category=category,
+        ))
+    return rows
+
+
+def generate_workflow_cli_docs(target: WorkflowDocTarget, resolver: ContextResolver, *, check: bool = False) -> Path:
     ctx = resolver.context_for(target.workflow_file, module_import=target.module_import)
     commands = _extract_all_commands(ctx.tree)
     descriptions = _extract_build_parser_descriptions(ctx.tree)
@@ -631,9 +707,26 @@ def generate_workflow_cli_docs(target: WorkflowDocTarget, resolver: ContextResol
             )
             command_args[cmd] = rows
 
+    documented_flags = {flag.strip() for row in common_args for flag in row.flag.split(", ")}
+    common_args.extend(row for row in _shared_execution_rows()
+                       if row.flag.split(", ")[0] not in documented_flags)
+
+    live = _live_parsers_by_module().get(target.module_import)
+    if live:
+        commands = [command for command, _ in live]
+        descriptions = {command: parser.description or "" for command, parser in live}
+        command_args = {command: _live_argument_rows(parser) for command, parser in live}
+        common_args = []  # Every command table includes its inherited options.
+
     preserved_blocks: list[PreservedBlock] = []
     if target.output_md.exists():
         preserved_blocks = _extract_preserved_blocks(target.output_md.read_text(encoding="utf-8"))
+    canonical_sections = {}
+    for command, parser in live or []:
+        canonical_sections.setdefault(parser.get_default("command"), f"command:{command}")
+    for block in preserved_blocks:
+        if block.section_key != "common" and block.section_key.removeprefix("command:") not in commands:
+            block.section_key = canonical_sections.get(block.section_key.removeprefix("command:"), "common")
 
     md = _render_markdown(
         target,
@@ -643,6 +736,10 @@ def generate_workflow_cli_docs(target: WorkflowDocTarget, resolver: ContextResol
         common_args,
         preserved_blocks=preserved_blocks,
     )
+    if check:
+        if not target.output_md.exists() or target.output_md.read_text(encoding="utf-8") != md:
+            raise ValueError(f"Generated CLI documentation is stale: {target.output_md}")
+        return target.output_md
     target.output_md.parent.mkdir(parents=True, exist_ok=True)
     target.output_md.write_text(md, encoding="utf-8")
     return target.output_md
@@ -651,7 +748,8 @@ def generate_workflow_cli_docs(target: WorkflowDocTarget, resolver: ContextResol
 def _has_build_parser(py_file: Path) -> bool:
     source = py_file.read_text(encoding="utf-8")
     tree = ast.parse(source)
-    return any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "build_parser" for n in tree.body)
+    return any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+               and n.name in {"build_parser", "register_tasks"} for n in tree.body)
 
 
 def _find_existing_output_for_module(docs_root: Path, module_import: str) -> Path | None:
@@ -709,6 +807,7 @@ def _default_targets(repo_root: Path) -> list[WorkflowDocTarget]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate structured workflow CLI markdown docs from source.")
+    parser.add_argument("--check", action="store_true", help="Fail if generated documentation is stale.")
     parser.add_argument("--workflow-file", default=None, help="Path to *_workflow.py file.")
     parser.add_argument("--module-import", default=None, help="Python import path for mkdocstrings directive.")
     parser.add_argument("--output-md", default=None, help="Output markdown file path.")
@@ -736,8 +835,8 @@ def main() -> int:
         targets = _default_targets(repo_root)
 
     for target in targets:
-        out = generate_workflow_cli_docs(target, resolver)
-        print(f"[generated] {out}")
+        out = generate_workflow_cli_docs(target, resolver, check=args.check)
+        print(f"[{'checked' if args.check else 'generated'}] {out}")
     return 0
 
 

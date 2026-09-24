@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.timeseries.timeseries import SimulationScalarSeriesRequest, SimulationScalarSeriesTask
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.core.platform.engine_resolver import resolve_engine
+from reaxkit.domain.data_models import SimulationData
 
 RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
@@ -78,6 +80,36 @@ def test_simulation_scalar_series_saves_artifacts() -> None:
     assert (out_dir / "simulation_scalar_series_summary.txt").exists()
     assert (out_dir / "simulation_scalar_series.csv").exists()
     assert (out_dir / "simulation_scalar_series_head.txt").exists()
+
+
+def test_potential_energy_per_atom_uses_each_frames_atom_count() -> None:
+    data = SimulationData(
+        atom_ids=[1, 2, 3, 4],
+        iterations=np.asarray([0, 10, 20]),
+        potential_energy=np.asarray([-40.0, -30.0, -10.0]),
+        num_of_atoms=np.asarray([4, 3, 2]),
+    )
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy",
+        per_atom=True,
+    )
+
+    result = SimulationScalarSeriesTask().run(data, request)
+
+    assert result.table["field"].tolist() == ["potential_energy_per_atom"] * 3
+    assert result.table["value"].tolist() == [-10.0, -10.0, -5.0]
+
+
+def test_potential_energy_per_atom_requests_atom_counts_from_loader() -> None:
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy",
+        per_atom=True,
+    )
+
+    assert SimulationScalarSeriesTask.required_data_fields_for(request, {}) == (
+        "potential_energy",
+        "num_of_atoms",
+    )
 
 
 def main() -> None:

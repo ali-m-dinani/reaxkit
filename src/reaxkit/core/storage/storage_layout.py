@@ -53,6 +53,28 @@ _DEFAULT_SNAPSHOT_FILES: tuple[str, ...] = (
     "log.lammps",
 )
 
+_DEFAULT_STORAGE_FILE_ARGUMENTS: dict[str, str] = {
+    "xmolout": "xmolout",
+    "summary": "summary.txt",
+    "fort7": "fort.7",
+    "fort13": "fort.13",
+    "fort57": "fort.57",
+    "fort73": "fort.73",
+    "fort74": "fort.74",
+    "fort76": "fort.76",
+    "fort78": "fort.78",
+    "fort79": "fort.79",
+    "fort99": "fort.99",
+    "trainset": "trainset.in",
+    "params": "params",
+    "control": "control",
+    "eregime": "eregime.in",
+    "vels": "vels",
+    "molfra": "molfra.out",
+    "ffield": "ffield",
+}
+
+
 def _utc_now_iso() -> str:
     """
     Utc now iso.
@@ -933,11 +955,12 @@ class ReaxkitStorageLayout:
         self.ensure_run_layout(run_id, include_inputs=True)
 
     def register_parsed_dataset(
-        self,
-        *,
-        run_id: str,
-        handler_version: str,
-        engine: str,
+            self,
+            *,
+            run_id: str,
+            handler_version: str | None = None,
+            parser_version: str | None = None,
+            engine: str,
     ) -> str:
         """
         Register parsed dataset.
@@ -973,6 +996,10 @@ class ReaxkitStorageLayout:
         ```
         The output type reflects the return contract for this API call.
         """
+        effective_version = handler_version or parser_version
+        if not effective_version:
+            raise ValueError("handler_version is required")
+        handler_version = str(effective_version)
         run_id = _safe_run_id(run_id)
         self.ensure_analysis_run_layout(run_id)
         raw_dir = self.raw_run_dir(run_id)
@@ -1008,11 +1035,11 @@ class ReaxkitStorageLayout:
         return parsed_id
 
     def persist_parsed_artifact(
-        self,
-        *,
-        parsed_id: str,
-        artifact_name: str,
-        data: Any,
+            self,
+            *,
+            parsed_id: str,
+            artifact_name: str,
+            data: Any,
     ) -> Path:
         """
         Persist parsed artifact.
@@ -1059,10 +1086,10 @@ class ReaxkitStorageLayout:
         return out_path
 
     def load_parsed_artifact(
-        self,
-        *,
-        parsed_id: str,
-        artifact_name: str,
+            self,
+            *,
+            parsed_id: str,
+            artifact_name: str,
     ) -> Any | None:
         """
         Load parsed artifact.
@@ -1115,14 +1142,14 @@ class ReaxkitStorageLayout:
             return None
 
     def record_run_analysis(
-        self,
-        *,
-        run_id: str,
-        parsed_id: str | None,
-        analysis_id: str,
-        task_name: str,
-        task_version: str = "1",
-        user_settings: dict[str, Any] | None = None,
+            self,
+            *,
+            run_id: str,
+            parsed_id: str | None,
+            analysis_id: str,
+            task_name: str,
+            task_version: str = "1",
+            user_settings: dict[str, Any] | None = None,
     ) -> Path:
         """
         Record run analysis.
@@ -1195,13 +1222,13 @@ class ReaxkitStorageLayout:
         return path
 
     def record_run_generator(
-        self,
-        *,
-        run_id: str,
-        command: str,
-        output_path: str | Path,
-        settings_path: str | Path | None = None,
-        user_settings: dict[str, Any] | None = None,
+            self,
+            *,
+            run_id: str,
+            command: str,
+            output_path: str | Path,
+            settings_path: str | Path | None = None,
+            user_settings: dict[str, Any] | None = None,
     ) -> Path:
         """
         Record run generator.
@@ -1293,13 +1320,40 @@ def add_storage_cli_arguments(parser: argparse.ArgumentParser) -> None:
     ```
     The output type reflects the return contract for this API call.
     """
-    parser.add_argument("--run-id", default=None, help="Run identifier for run-scoped layout (e.g., run_91ac0e).")
+    parser.add_argument("--run-id", default=None, help="Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier.")
     parser.add_argument(
         "--project-root",
         default=str(default_project_root()),
-        help="Project root that contains inputs/, data/, analysis/, etc.",
+        help="Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there.",
     )
-    parser.add_argument("--analysis-id", default=None, help="Optional analysis artifact id; defaults to run id.")
+    parser.add_argument("--analysis-id", default=None, help="Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly.")
+    parser.add_argument(
+        "--input-cache",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Reuse parsed input frames across commands (default: enabled; "
+            "use --no-input-cache to force source reads for reproducibility checks "
+            "or benchmarks). Example: --no-input-cache, which reloads frames from their source files."
+        ),
+    )
+    parser.add_argument(
+        "--frame-cache-max-gb",
+        type=float,
+        default=10.0,
+        help="Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB.",
+    )
+    parser.add_argument(
+        "--output-profile",
+        choices=["minimal", "standard", "full", "legacy"],
+        default="standard",
+        help=(
+            "Select the shared artifact policy. Standard writes declared default "
+            "outputs; minimal keeps core tables; full and legacy include optional "
+            "details. Default: standard. Example: --output-profile full, which "
+            "includes declared optional detail tables."
+        ),
+    )
 
 
 def _copy_if_exists(src: Path, dst: Path) -> None:
@@ -1389,7 +1443,7 @@ def snapshot_storage_inputs(args: dict, *, names: Sequence[str] | None = None) -
     project_root = Path(args.get("project_root") or default_project_root())
     args["project_root"] = str(project_root)
     layout = ReaxkitStorageLayout(project_root=project_root)
-    layout.ensure_analysis_run_layout(str(run_id))
+    layout.ensure_input_run_layout(str(run_id))
     raw_dir = layout.raw_run_dir(str(run_id))
     source = _detect_snapshot_source(args)
     args["_snapshot_source_dir"] = str(source)
@@ -1397,10 +1451,10 @@ def snapshot_storage_inputs(args: dict, *, names: Sequence[str] | None = None) -
 
 
 def normalize_storage_args(
-    args: dict,
-    *,
-    snapshot: bool = True,
-    snapshot_inputs: Sequence[str] | None = None,
+        args: dict,
+        *,
+        snapshot: bool = True,
+        snapshot_inputs: Sequence[str] | None = None,
 ) -> dict:
     """
     Normalize storage args.
@@ -1439,6 +1493,21 @@ def normalize_storage_args(
     if "_input_was_explicit" not in out:
         input_value = out.get("input")
         out["_input_was_explicit"] = bool(input_value and str(input_value) != ".")
+    if "_run_dir_was_explicit" not in out:
+        run_dir_value = out.get("run_dir")
+        out["_run_dir_was_explicit"] = bool(run_dir_value and str(run_dir_value) != ".")
+    for key, default_name in _DEFAULT_STORAGE_FILE_ARGUMENTS.items():
+        provenance_key = f"_{key}_was_explicit"
+        if provenance_key in out:
+            continue
+        raw_value = out.get(key)
+        if not raw_value:
+            out[provenance_key] = False
+            continue
+        raw_path = Path(str(raw_value))
+        out[provenance_key] = not (
+            raw_path.parent == Path(".") and raw_path.name == default_name
+        )
     run_id = out.get("run_id")
     if not run_id:
         run_id = generate_run_id()
@@ -1461,34 +1530,14 @@ def normalize_storage_args(
         out["cache_dir"] = str(layout.cache_root)
 
     # Rewrite default bare filenames to the run-scoped raw directory.
-    default_files = {
-        "xmolout": "xmolout",
-        "summary": "summary.txt",
-        "fort7": "fort.7",
-        "fort13": "fort.13",
-        "fort57": "fort.57",
-        "fort73": "fort.73",
-        "fort74": "fort.74",
-        "fort76": "fort.76",
-        "fort78": "fort.78",
-        "fort79": "fort.79",
-        "fort99": "fort.99",
-        "trainset": "trainset.in",
-        "params": "params",
-        "control": "control",
-        "eregime": "eregime.in",
-        "vels": "vels",
-        "molfra": "molfra.out",
-        "ffield": "ffield",
-    }
-    for key, default_name in default_files.items():
+    for key, default_name in _DEFAULT_STORAGE_FILE_ARGUMENTS.items():
         raw = out.get(key)
         if not raw:
             continue
         path = Path(str(raw))
         if path.is_absolute():
             continue
-        if path.parent != Path(".."):
+        if path.parent != Path("."):
             continue
         if path.name != default_name:
             continue

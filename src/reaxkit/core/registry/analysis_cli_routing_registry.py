@@ -38,10 +38,10 @@ ANALYSIS_COMMAND_REGISTRY: dict[str, AnalysisCommandSpec] = {}
 
 
 def register_analysis_command(
-    name: str,
-    *,
-    module_path: str,
-    aliases: Iterable[str] = (),
+        name: str,
+        *,
+        module_path: str,
+        aliases: Iterable[str] = (),
 ) -> AnalysisCommandSpec:
     """
     Register a direct analysis command route.
@@ -121,16 +121,222 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
 
 register_analysis_command(
     "get-dipole",
-    module_path="reaxkit.workflows.electrostatics_workflow",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("get_dipole", "dipole"),
 )
-register_analysis_command("polarization", module_path="reaxkit.workflows.electrostatics_workflow")
-register_analysis_command("charge-table", module_path="reaxkit.workflows.electrostatics_workflow")
-register_analysis_command("charge_table", module_path="reaxkit.workflows.electrostatics_workflow")
+register_analysis_command(
+    "get-polarization",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
+    aliases=("polarization",),
+)
+register_analysis_command(
+    "charge-table",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
+)
+register_analysis_command(
+    "charge_table",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
+)
 register_analysis_command(
     "get_polarization_field",
-    module_path="reaxkit.workflows.electrostatics_workflow",
+    module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("polarization_field",),
+)
+register_analysis_command(
+    "get_dynamic_charge_changes",
+    module_path="reaxkit.workflows.ferroelectrics.dynamic_charge_workflow",
+    aliases=("dynamic_charge_changes", "dynamic-charge-changes"),
+)
+register_analysis_command(
+    "get_binned_dynamic_charges",
+    module_path="reaxkit.workflows.ferroelectrics.binned_dynamic_charge_workflow",
+    aliases=("binned_dynamic_charges", "binned-dynamic-charges"),
+)
+register_analysis_command(
+    "get_charge_vs_electric_field",
+    module_path="reaxkit.workflows.ferroelectrics.charge_field_workflow",
+    aliases=("charge_vs_electric_field", "charge-field"),
+)
+register_analysis_command(
+    "write_trajectory_with_charges",
+    module_path="reaxkit.workflows.ferroelectrics.charge_extxyz_workflow",
+    aliases=("generate_charge_extxyz", "charge_extxyz", "charge-extended-xyz"),
+)
+register_analysis_command(
+    "get-wurtzite-neighbors",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite.neighbors_workflow"
+    ),
+    aliases=("get_wurtzite_neighbors", "wurtzite-neighbors"),
+)
+register_analysis_command(
+    "get-wurtzite-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite.polarity_workflow"
+    ),
+    aliases=("get_wurtzite_polarity", "wurtzite-polarity"),
+)
+register_analysis_command(
+    "write-trajectory-with-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.four_folded_wurtzite."
+        "polarity_trajectory_workflow"
+    ),
+    aliases=("write_trajectory_with_polarity", "polarity-extxyz"),
+)
+register_analysis_command(
+    "get-three-folded-wurtzite-neighbors",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite.neighbors_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_neighbors",
+        "three-folded-wurtzite-neighbors",
+    ),
+)
+register_analysis_command(
+    "get-three-folded-wurtzite-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite.polarity_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_polarity",
+        "three-folded-wurtzite-polarity",
+    ),
+)
+register_analysis_command(
+    "get-three-folded-wurtzite-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite."
+        "polarization_workflow"
+    ),
+    aliases=(
+        "get_three_folded_wurtzite_polarization",
+        "three-folded-wurtzite-polarization",
+    ),
+)
+register_analysis_command(
+    "write-three-folded-trajectory-with-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.three_folded_wurtzite."
+        "polarity_trajectory_workflow"
+    ),
+    aliases=(
+        "write_three_folded_trajectory_with_polarity",
+        "three-folded-polarity-extxyz",
+    ),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-dipole",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.dipole_workflow"
+    ),
+    aliases=("get_basal_plane_displacement_dipole", "basal-plane-dipole"),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.polarization_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_polarization",
+        "basal-plane-polarization",
+    ),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-local-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.local_polarization_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_local_polarization",
+        "basal-plane-local-polarization",
+    ),
+)
+register_analysis_command(
+    "get-basal-plane-displacement-projected-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics."
+        "basal_plane_displacement_for_dipole_moment.projected_polarity_workflow"
+    ),
+    aliases=(
+        "get_basal_plane_displacement_projected_polarity",
+        "basal-plane-projected-polarity",
+    ),
+)
+register_analysis_command(
+    "get-hbn-reference-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_reference.polarization_workflow"
+    ),
+    aliases=("get_hbn_reference_polarization", "hbn-reference-polarization"),
+)
+register_analysis_command(
+    "get-hbn-reference-local-polarization",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_reference."
+        "local_polarization_workflow"
+    ),
+    aliases=(
+        "get_hbn_reference_local_polarization",
+        "hbn-reference-local-polarization",
+    ),
+)
+register_analysis_command(
+    "get-hbn-reference-projected-polarity",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.hbn_reference."
+        "projected_polarity_workflow"
+    ),
+    aliases=(
+        "get_hbn_reference_projected_polarity",
+        "hbn-reference-projected-polarity",
+    ),
+)
+register_analysis_command(
+    "get-potential-and-electric-field",
+    module_path=(
+        "reaxkit.workflows.electrostatics.potential_and_electric_field."
+        "potential_and_electric_field_workflow"
+    ),
+    aliases=("get_potential_and_electric_field", "reaxff-local-field"),
+)
+register_analysis_command(
+    "write-trajectory-with-potential-and-electric-field",
+    module_path=(
+        "reaxkit.workflows.electrostatics.potential_and_electric_field.trajectory_workflow"
+    ),
+    aliases=("write_trajectory_with_potential_and_electric_field", "local-field-extxyz"),
+)
+register_analysis_command(
+    "get-dielectric-constant",
+    module_path="reaxkit.workflows.electrostatics.dielectric_constant_workflow",
+    aliases=("get_dielectric_constant", "dielectric-constant"),
+)
+register_analysis_command(
+    "fit-switching-kinetics",
+    module_path=(
+        "reaxkit.workflows.ferroelectrics.switching_kinetics.comparison_workflow"
+    ),
+    aliases=("fit_switching_kinetics",),
+)
+register_analysis_command(
+    "fit-kai-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.kai_workflow",
+    aliases=("fit_kai_switching",),
+)
+register_analysis_command(
+    "fit-nls-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.nls_workflow",
+    aliases=("fit_nls_switching",),
+)
+register_analysis_command(
+    "fit-snng-switching",
+    module_path="reaxkit.workflows.ferroelectrics.switching_kinetics.snng_workflow",
+    aliases=("fit_snng_switching",),
 )
 register_analysis_command("kinematics", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_kinematics", module_path="reaxkit.workflows.kinematics_workflow")
@@ -138,7 +344,8 @@ register_analysis_command("kinematics_plot3d", module_path="reaxkit.workflows.ki
 register_analysis_command("kinematics_heatmap2d", module_path="reaxkit.workflows.kinematics_workflow")
 register_analysis_command("get_dominant_species", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("get_largest_molecule_by_mass", module_path="reaxkit.workflows.molecular_analysis_workflow")
-register_analysis_command("get_largest_molecule_composition", module_path="reaxkit.workflows.molecular_analysis_workflow")
+register_analysis_command("get_largest_molecule_composition",
+                          module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("get_molecule_lifetime", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("largest_molecule_by_mass", module_path="reaxkit.workflows.molecular_analysis_workflow")
 register_analysis_command("largest_molecule_composition", module_path="reaxkit.workflows.molecular_analysis_workflow")
@@ -189,27 +396,53 @@ register_analysis_command(
 )
 register_analysis_command("get_trainset_data", module_path="reaxkit.workflows.file_tools.trainset_workflow")
 register_analysis_command("get_trainset_group_comments", module_path="reaxkit.workflows.file_tools.trainset_workflow")
-register_analysis_command("get-params", module_path="reaxkit.workflows.params_workflow")
-register_analysis_command("msd", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_msd", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_diffusivity", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command("get-params", module_path="reaxkit.workflows.file_tools.params_workflow")
+register_analysis_command(
+    "msd",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("mean-square-displacement", "mean_square_displacement"),
+)
+register_analysis_command(
+    "get_msd",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("msd", "get-msd", "mean-square-displacement", "mean_square_displacement"),
+)
+register_analysis_command(
+    "diffusivity",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("diffusion-coefficient", "diffusion_coefficient"),
+)
+register_analysis_command(
+    "get_diffusivity",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("diffusivity", "get-diffusivity", "diffusion-coefficient", "diffusion_coefficient"),
+)
 register_analysis_command("rdf", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_rdf", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_rdf",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("rdf", "get-rdf"),
+)
 register_analysis_command("rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
-register_analysis_command("get_rdf_property", module_path="reaxkit.workflows.trajectory_workflow")
+register_analysis_command(
+    "get_rdf_property",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("rdf_property", "rdf-property", "get-rdf-property"),
+)
 register_analysis_command("voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_dihedral", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command("get_voronoi", module_path="reaxkit.workflows.trajectory_workflow")
 register_analysis_command(
     "get_z_binned_top_bottom_strain",
     module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
-    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms", "z-binned-strain-using-top-bottom-atoms"),
+    aliases=("get-z-binned-top-bottom-strain", "z_binned_strain_using_top_bottom_atoms",
+             "z-binned-strain-using-top-bottom-atoms"),
 )
 register_analysis_command(
     "get_z_binned_deformation_gradient_strain",
     module_path="reaxkit.workflows.stress_strain.z_binned_strain_workflow",
-    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain", "z-binned-deformation-gradient-strain"),
+    aliases=("get-z-binned-deformation-gradient-strain", "z_binned_deformation_gradient_strain",
+             "z-binned-deformation-gradient-strain"),
 )
 register_analysis_command("connection_list", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_connection_list", module_path="reaxkit.workflows.connectivity_workflow")
@@ -225,9 +458,17 @@ register_analysis_command("coordination_relabel", module_path="reaxkit.workflows
 register_analysis_command("relabel_traj_using_coordination", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("hybridization", module_path="reaxkit.workflows.connectivity_workflow")
 register_analysis_command("get_hybridization", module_path="reaxkit.workflows.connectivity_workflow")
-register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.meta.plot_atom_property_workflow")
-register_analysis_command("get_active_site_structural", module_path="reaxkit.workflows.active_site_workflow")
-register_analysis_command("get_active_site_events", module_path="reaxkit.workflows.active_site_workflow")
+register_analysis_command("plot_atom_property", module_path="reaxkit.workflows.presentation.plot_atom_property_workflow")
+register_analysis_command(
+    "get_active_site_structural",
+    module_path="reaxkit.workflows.active_site_workflow",
+    aliases=("active_site_structural", "active-site-structural", "get-active-site-structural"),
+)
+register_analysis_command(
+    "get_active_site_events",
+    module_path="reaxkit.workflows.active_site_workflow",
+    aliases=("active_site_events", "active-site-events", "get-active-site-events"),
+)
 
 _TIMESERIES_WORKFLOW_COMMANDS = (
     "get_potential_energy",
