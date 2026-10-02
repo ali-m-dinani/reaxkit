@@ -19,8 +19,14 @@ from typing import Dict, List, Optional, Tuple
 import math
 import warnings
 
+from reaxkit.engine.reaxff.generators.elastic_tensor import (
+    TENSOR_MODES, mode_strain, validate_tensor, tensor_warnings, validate_cell,
+)
+
 from reaxkit.core.platform.constants import const
 from reaxkit.utils.equation_of_states import vinet_energy_trainset
+
+VERSION = "1"
 
 
 AVOGADRO_CONSTANT = const("AVOGADRO_CONSTANT")
@@ -137,6 +143,7 @@ class ElasticEnergySpec:
     volume_reference_cell: CellSpec
     strain_step: float = 0.005
     weight: float = 1.0
+    tensor_gpa: Optional[List[List[float]]] = None
 
 
 @dataclass(frozen=True)
@@ -205,8 +212,8 @@ def _compute_orthogonal_lattice_cell_volume(
 
 def _build_symmetric_grid(*, max_abs_value: float, step: float, grid_mode: str) -> List[float]:
     """Build symmetric grid."""
-    if step <= 0:
-        raise ValueError("step must be positive.")
+    if not math.isfinite(step) or step <= 0 or not math.isfinite(max_abs_value) or max_abs_value < 0:
+        raise ValueError("step must be finite and positive; maximum strain must be finite and nonnegative.")
     rounded_ratio = _fortran_nint(max_abs_value / step)
     if grid_mode not in ("bulk", "elastic"):
         raise ValueError("grid_mode must be 'bulk' or 'elastic'.")
@@ -282,6 +289,8 @@ def _generate_bulk_data(spec: BulkEnergySpec) -> Tuple[List[Tuple[float, float]]
 
 def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tuple[float, float]], List[str]]]:
     """Generate elastic data."""
+    if spec.tensor_gpa is not None:
+        validate_cell(spec.volume_reference_cell)
     cell = spec.volume_reference_cell.as_dict()
     reference_volume = _compute_orthogonal_lattice_cell_volume(
         a_length=cell["a"],
@@ -297,6 +306,25 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
         step=spec.strain_step,
         grid_mode="elastic",
     )
+    if spec.tensor_gpa is not None:
+        if max(abs(value) for value in linear_strain_grid) >= 0.5:
+            raise ValueError("Tensor generation requires small strains (all grid values below 0.5).")
+        tensor = validate_tensor(spec.tensor_gpa)
+        result = {}
+        for mode in TENSOR_MODES:
+            direction = mode_strain(mode)
+            prefactor = float(direction @ tensor @ direction) * reference_volume / (2 * ENERGY_CONVERSION_FACTOR)
+            rows, lines = [], []
+            for strain in linear_strain_grid:
+                index = _index_from_grid_value(strain, spec.strain_step)
+                energy = prefactor * strain**2
+                if energy == 0:
+                    energy = 1e-4
+                label = _make_label(mode, index)
+                rows.append((strain, energy))
+                lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode}_0 /1          {energy:12.4f}")
+            result[mode] = (rows, lines)
+        return result
     c = spec.elastic_constants_gpa
 
     def normal_strain_prefactor(cij: float) -> float:
@@ -400,16 +428,22 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
 def _generate_trainset_energy(bulk_spec: BulkEnergySpec, elastic_spec: ElasticEnergySpec) -> TrainsetEnergyResult:
     """Generate trainset energy."""
     warnings_list: List[str] = []
-    for label, cell in (("Elastic", elastic_spec.volume_reference_cell), ("Bulk", bulk_spec.cell)):
+    legacy_cells = (("Elastic", elastic_spec.volume_reference_cell), ("Bulk", bulk_spec.cell)) if elastic_spec.tensor_gpa is None else ()
+    for label, cell in legacy_cells:
         warning_message = _warn_if_nonorthogonal(cell, label)
         if warning_message:
             warnings_list.append(warning_message)
+    if elastic_spec.tensor_gpa is not None:
+        validate_cell(bulk_spec.cell)
+        if not math.isfinite(bulk_spec.max_volumetric_strain_percent) or bulk_spec.max_volumetric_strain_percent < 0:
+            raise ValueError("Maximum volumetric strain must be finite and nonnegative.")
+        warnings_list.extend(tensor_warnings(elastic_spec.tensor_gpa))
 
     bulk_table, bulk_lines = _generate_bulk_data(bulk_spec)
     elastic_targets = _generate_elastic_data(elastic_spec)
     trainset_lines: List[str] = ["ENERGY", "# Volume Bulk_EOS", *bulk_lines]
     elastic_tables: Dict[str, List[Tuple[float, float]]] = {}
-    for mode in ENERGY_MODE_ORDER:
+    for mode in elastic_targets:
         trainset_lines.append(f"# Volume {mode.upper()}_EOS")
         trainset_lines.extend(elastic_targets[mode][1])
         elastic_tables[mode] = elastic_targets[mode][0]
@@ -468,7 +502,7 @@ def _write_trainset_energy(
     bulk_path = out_dir / "EvsStrain_bulk.dat"
     _write_two_column_table(bulk_path, "# Volume   Energy", result.bulk_table)
     written["bulk"] = bulk_path
-    for mode in ENERGY_MODE_ORDER:
+    for mode in result.elastic_tables:
         path = out_dir / f"EvsStrain_{mode}.dat"
         _write_two_column_table(path, "# Strain   Energy", result.elastic_tables[mode])
         written[mode] = path

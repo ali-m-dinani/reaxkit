@@ -58,6 +58,8 @@ class MolFraHandler(BaseHandler):
     - This handler is iteration-based rather than frame-based, but exposes
       a minimal frame-like API for consistency.
     """
+
+    VERSION = "1"
     def __init__(self, file_path: str | Path = "molfra.out", reporter=None):
         """
         Initialize the instance.

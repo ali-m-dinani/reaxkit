@@ -9,6 +9,8 @@ from typing import Any, TextIO
 
 import numpy as np
 
+VERSION = "1"
+
 
 @dataclass
 class ExtendedXYZFrame:

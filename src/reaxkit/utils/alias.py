@@ -8,6 +8,8 @@ from reaxkit.core.resolve.alias import (
     resolve_alias_from_columns,
 )
 
+VERSION = "1"
+
 
 def available_keys(cols):
     """Return current canonical keys plus legacy short canonical names."""

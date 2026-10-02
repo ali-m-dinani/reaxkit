@@ -27,6 +27,8 @@ from reaxkit.engine.reaxff.generators.trainset_mp import (
     _mp_search_material_ids_by_elements,
 )
 
+VERSION = "1"
+
 
 @dataclass(frozen=True)
 class HeatFoTrainsetRequest:

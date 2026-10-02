@@ -112,6 +112,8 @@ class Fort79Handler(BaseHandler):
       tokens are converted to ``NaN`` by design.
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
+
+    VERSION = "1"
     _CACHE_VERSION = "3"
 
     def __init__(self, file_path: str | Path = "fort.79", reporter=None):

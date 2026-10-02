@@ -27,6 +27,8 @@ from reaxkit.engine.reaxff.generators.trainset_mp import (
     _mp_pick_unary_reference_docs,
 )
 
+VERSION = "1"
+
 
 _SUBSCRIPT_TRANSLATION = str.maketrans(
     "\u2080\u2081\u2082\u2083\u2084\u2085\u2086\u2087\u2088\u2089",

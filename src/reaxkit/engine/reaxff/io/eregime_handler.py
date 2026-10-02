@@ -59,6 +59,8 @@ class EregimeHandler(BaseHandler):
     - Field directions are stored as strings; field magnitudes are numeric.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "eregime.in", reporter=None):
         """
         Initialize the instance.

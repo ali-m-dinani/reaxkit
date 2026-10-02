@@ -16,6 +16,8 @@ curves.
 import numpy as np
 import pandas as pd
 
+VERSION = "1"
+
 
 def get_extrema_points(y_series, x_series, mode='max', chunk_size=None):
     """Identify extrema points in a 1D data series.

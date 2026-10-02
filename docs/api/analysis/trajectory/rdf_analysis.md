@@ -29,6 +29,30 @@ backend options for radial distribution function evaluation.
 | `bins` | `int` | 200 | Number of radial bins. |  |
 | `r_max` | `Optional[float]` |  | Maximum radius. Empty uses half of the shortest box length. |  |
 | `backend` | `str` | freud | RDF computation backend. | freud, ovito |
+| `plot_mode` | `str` | single | RDF presentation: combined curves, kymograph, or independent plots per frame. | single, kymograph, separate |
+
+### RDF plot options
+
+```shell
+reaxkit get_rdf --run-dir runs/example --backend ovito --r-max 5 --plot kymograph --save rdf_kymograph.png
+reaxkit get_rdf --run-dir runs/example --backend ovito --r-max 5 --plot separate --save rdf_frames
+```
+
+The kymograph places frame index on x, radial distance on y, and the original
+dimensionless `g(r)` on one shared color scale. Use `--xaxis iter` for simulation
+iterations. No per-frame maximum or area normalization is applied. All frames
+must use the same radial bins; for changing cells, specify a fixed `--r-max`
+that fits every selected cell. Incompatible grids produce an error instead of
+silently mixing different radii.
+
+`separate` saves an independent `rdf_frame_000000.png`-style file per selected
+frame; `--save` must name a directory. Existing `single` (overlaid curves) and
+`subplot` modes remain available. In the analysis GUI/API, choose the
+`RDFRequest.plot_mode` field for single, kymograph, or separate views.
+
+The OVITO backend supplies each frame's cell lengths and angles and treats the
+cell as periodic in all three directions, matching the current RDF data model.
+It requires cell metadata and supports identical or disjoint atom groups.
 
 ### Examples
 

@@ -30,6 +30,9 @@ from reaxkit.engine.reaxff.generators.trainset_elastic_geometry import (
     _generate_strained_geometries,
     _write_strained_geometries,
 )
+from reaxkit.engine.reaxff.generators.elastic_tensor import TENSOR_MODES, validate_tensor, tensor_warnings
+
+VERSION = "1"
 
 
 DEFAULT_CIJ_GPA = {
@@ -92,11 +95,11 @@ def _rename_material_geometry_outputs(out_dir: Path, material_id: str) -> None:
         # Normalize generated labels such as ``c11_c0006`` to ``c11_c6``
         # and append the material identifier to every elastic/bulk label.
         identifier = re.sub(
-            r"^(bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_([ce])0+(\d+)$",
+            r"^(bulk|c[1-6][1-6])_([ce])0+(\d+)$",
             r"\1_\2\3",
             identifier,
         )
-        mode_prefixes = ("bulk", "c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
+        mode_prefixes = ("bulk", *TENSOR_MODES)
         if identifier in {f"{prefix}_0" for prefix in mode_prefixes} or identifier.startswith(mode_prefixes):
             return f"{identifier}_" + material_suffix
         return identifier
@@ -105,7 +108,7 @@ def _rename_material_geometry_outputs(out_dir: Path, material_id: str) -> None:
     for trainset_path in trainset_files:
         text = trainset_path.read_text(encoding="utf-8")
         text = re.sub(
-            r"\b(?:bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_(?:0|[ce]0*\d+)\b",
+            r"\b(?:bulk|c[1-6][1-6])_(?:0|[ce]0*\d+)\b",
             lambda m: rename_identifier(m.group(0)),
             text,
         )
@@ -115,7 +118,7 @@ def _rename_material_geometry_outputs(out_dir: Path, material_id: str) -> None:
     if not geo_dir.exists():
         return
     identifier_pattern = re.compile(
-        r"\b(?:bulk|c11|c22|c33|c12|c13|c23|c44|c55|c66)_(?:0|[ce]0*\d+)\b"
+        r"\b(?:bulk|c[1-6][1-6])_(?:0|[ce]0*\d+)\b"
     )
     for geo_path in list(geo_dir.glob("*.bgf")) + list(geo_dir.glob("*.geo")):
         geo_text = geo_path.read_text(encoding="utf-8")
@@ -257,6 +260,8 @@ def _collect_cell_warnings_from_yaml(yaml_path: str | Path) -> list[str]:
         return []
     bulk_cfg = data.get("bulk", {}) or {}
     elastic_cfg = data.get("elastic", {}) or {}
+    if elastic_cfg.get("tensor_gpa") is not None:
+        return tensor_warnings(elastic_cfg["tensor_gpa"])
     bulk_cell_cfg = bulk_cfg.get("cell")
     elastic_cell_cfg = elastic_cfg.get("cell", bulk_cell_cfg)
     if not isinstance(bulk_cell_cfg, dict) or not isinstance(elastic_cell_cfg, dict):
@@ -296,10 +301,16 @@ def _collect_negative_elastic_tensor_warning(yaml_path: str | Path) -> str | Non
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         return None
-    cij = (data.get("elastic", {}) or {}).get("cij_gpa", {})
+    elastic_cfg = data.get("elastic", {}) or {}
+    cij = elastic_cfg.get("cij_gpa", {})
+    if elastic_cfg.get("tensor_gpa") is not None:
+        tensor = validate_tensor(elastic_cfg["tensor_gpa"])
+        cij = {f"c{first + 1}{second + 1}": float(tensor[first, second])
+               for first in range(6) for second in range(first, 6)}
     if not isinstance(cij, dict):
         return None
-    negative = [f"{key}={value} GPa" for key, value in cij.items() if float(value) < 0]
+    tolerance = 1e-8 if elastic_cfg.get("tensor_gpa") is not None else 0
+    negative = [f"{key}={value} GPa" for key, value in cij.items() if float(value) < -tolerance]
     if not negative:
         return None
     return "Negative elastic tensor component(s): " + ", ".join(negative)
@@ -386,12 +397,18 @@ class TrainsetSettingsSpec:
     bulk_xyz: Optional[str | Path] = "null"
     geo_enable: bool = True
     geo_sort_by: Optional[str] = None
+    tensor_gpa: Optional[list[list[float]]] = None
+    elastic_response: str = "unspecified"
 
 
 def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
     """Generate trainset settings yaml text."""
     required_cij = ("c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66")
-    missing = [key for key in required_cij if key not in spec.cij_gpa]
+    cij_gpa = spec.cij_gpa
+    if spec.tensor_gpa is not None:
+        tensor = validate_tensor(spec.tensor_gpa)
+        cij_gpa = {key: float(tensor[int(key[1]) - 1, int(key[2]) - 1]) for key in required_cij}
+    missing = [key for key in required_cij if key not in cij_gpa]
     if missing:
         raise ValueError(f"cij_gpa is missing required keys: {missing}")
 
@@ -436,7 +453,15 @@ def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
         "  cij_gpa:",
     ]
     for key in required_cij:
-        lines.append(f"    {key}: {spec.cij_gpa[key]}")
+        lines.append(f"    {key}: {cij_gpa[key]}")
+    if spec.tensor_gpa is not None:
+        tensor = validate_tensor(spec.tensor_gpa)
+        lines.extend([
+            "  tensor_frame: cell_cartesian",
+            f"  response: {_q(spec.elastic_response)}",
+            "  tensor_gpa:",
+        ])
+        lines.extend(f"    - {row.tolist()}" for row in tensor)
     lines.extend(
         [
             "",
@@ -452,7 +477,7 @@ def _generate_trainset_settings_yaml_text(spec: TrainsetSettingsSpec) -> str:
             "structure 1:",
             f"  elastic_xyz: {elastic_xyz}  # required if geo.enable=true",
             "",
-            "# Bulk section: generates energy-vs-volume targets using an EOS (Vinet) over a wider strain range.",
+            "# Bulk section: generates energy-vs-volume targets using the third-order Birch-Murnaghan EOS.",
             "# Use this to constrain compressibility (B0, B0') around the reference volume.",
             "bulk:",
             f"  B0_gpa: {spec.B0_gpa}",
@@ -548,6 +573,8 @@ def gen_template_yaml_for_elastic_settings(
             bulk_xyz=spec.bulk_xyz,
             geo_enable=spec.geo_enable,
             geo_sort_by=spec.geo_sort_by,
+            tensor_gpa=spec.tensor_gpa,
+            elastic_response=spec.elastic_response,
         )
     return Path(out_path)
 
@@ -575,6 +602,8 @@ def _write_trainset_settings_yaml(
     bulk_xyz: Optional[str | Path] = "null",
     geo_enable: bool = True,
     geo_sort_by: Optional[str] = None,
+    tensor_gpa: Optional[list[list[float]]] = None,
+    elastic_response: str = "unspecified",
 ) -> None:
     """Write trainset settings yaml."""
     spec = TrainsetSettingsSpec(
@@ -599,6 +628,8 @@ def _write_trainset_settings_yaml(
         bulk_xyz=bulk_xyz,
         geo_enable=geo_enable,
         geo_sort_by=geo_sort_by,
+        tensor_gpa=tensor_gpa,
+        elastic_response=elastic_response,
     )
     out_path_obj = Path(out_path)
     out_path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -741,6 +772,13 @@ def _generate_trainset_from_yaml(
     material_prefix = f"for material ID [{material_id}] " if material_id else ""
     bulk_cell = CellSpec(**bulk_cfg["cell"])
     elastic_cell = CellSpec(**elastic_cfg.get("cell", bulk_cfg["cell"]))
+    tensor = elastic_cfg.get("tensor_gpa")
+    if tensor is not None:
+        validate_tensor(tensor)
+        if elastic_cfg.get("tensor_frame") != "cell_cartesian":
+            raise ValueError("tensor_frame must be 'cell_cartesian': tensor axes must match the XYZ coordinates and ASE cellpar_to_cell orientation.")
+    elif not _is_orthogonal_cell(elastic_cell) and not skip_no_orthogonal:
+        raise ValueError("Non-orthogonal elastic generation requires the full tensor_gpa and tensor_frame: cell_cartesian; regenerate old source YAML from Materials Project.")
     negative_tensor_warning = _collect_negative_elastic_tensor_warning(yaml_path)
     if negative_tensor_warning:
         print(f"[Warning] {material_prefix}{negative_tensor_warning}")
@@ -752,13 +790,13 @@ def _generate_trainset_from_yaml(
             print(
                 f"[Warning] {material_prefix}Elastic cell is non-orthogonal "
                 f"(angles = [{elastic_cell.alpha}, {elastic_cell.beta}, {elastic_cell.gamma}]). "
-                "Elastic energy targets assume an orthogonal lattice."
+                "Excluded by --skip-not-orthogonal."
             )
         if not is_bulk_ortho:
             print(
                 f"[Warning] {material_prefix}Bulk cell is non-orthogonal "
                 f"(angles = [{bulk_cell.alpha}, {bulk_cell.beta}, {bulk_cell.gamma}]). "
-                "Elastic energy targets assume an orthogonal lattice."
+                "Excluded by --skip-not-orthogonal."
             )
         if (not is_elastic_ortho) or (not is_bulk_ortho):
             print("[Skip] Lattice is non-orthogonal; skipping this lattice.\n")
@@ -775,11 +813,12 @@ def _generate_trainset_from_yaml(
             weight=effective_weight,
         ),
         ElasticEnergySpec(
-            elastic_constants_gpa=dict(elastic_cfg["cij_gpa"]),
+            elastic_constants_gpa=dict(elastic_cfg.get("cij_gpa", {})),
             max_strain_percent=elastic_cfg["max_strain_percent"],
             volume_reference_cell=elastic_cell,
             strain_step=elastic_cfg.get("dstrain", 0.005),
             weight=effective_weight,
+            tensor_gpa=tensor,
         ),
         source_note=source_note,
     )
@@ -836,6 +875,7 @@ def _generate_trainset_from_yaml(
             max_strain_bulk_linear=(1.0 + max_vol) ** (1.0 / 3.0) - 1.0,
             dstrain_bulk_linear=bulk_cfg.get("dstrain_linear", 0.004),
             sort_by=geo_cfg.get("sort_by"),
+            tensor_mode=tensor is not None,
         )
     )
     _write_strained_geometries(geometry_result, out_dir=structures_dir, sort_by=geo_cfg.get("sort_by"))
@@ -1090,7 +1130,7 @@ def _gen_elastic_trainset_batch_mode(
                     "material_id": material_id_for_row,
                     **{key: "" for key in ("a", "b", "c", "alpha", "beta", "gamma")},
                     "status": "skip",
-                    "warning": "",
+                    "warning": str(exc),
                 }
             )
             if verbose:

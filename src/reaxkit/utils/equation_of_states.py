@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import numpy as np
 
+VERSION = "1"
+
 
 def vinet_energy_ev(V: np.ndarray, E0: float, K0_eV_A3: float, V0: float, C: float) -> np.ndarray:
     """

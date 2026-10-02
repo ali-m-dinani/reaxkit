@@ -23,6 +23,8 @@ import pandas as pd
 
 from reaxkit.engine.reaxff.io.xmolout_handler import XmoloutHandler
 
+VERSION = "1"
+
 
 FrameSel = Optional[Union[Sequence[int], range, slice]]
 AtomSel = Optional[Union[Sequence[int], slice]]

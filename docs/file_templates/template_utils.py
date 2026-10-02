@@ -4,6 +4,10 @@ This module demonstrates the general structure used by reusable utility files:
 small pure functions, clear typing, deterministic numeric behavior, and no
 workflow/task coupling.
 
+Every utility module must declare a module-level `VERSION` string, starting
+at `"1"`. Increment it whenever computation, defaults, or return values change
+in ways that make previous results incompatible.
+
 **Usage context**
 
 - Shared math: Centralize reusable numerical formulas and transforms.
@@ -21,6 +25,8 @@ from __future__ import annotations
 from typing import Iterable
 
 import numpy as np
+
+VERSION = "1"
 
 __all__ = [
     "template_series_transform",

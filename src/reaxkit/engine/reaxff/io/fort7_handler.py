@@ -131,6 +131,8 @@ class Fort7Handler(BaseHandler):
     - Extra, file-dependent columns are preserved as ``unknown*`` fields.
     """
 
+    VERSION = "1"
+
     def __init__(
             self,
             file_path: str | Path = "fort.7",

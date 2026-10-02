@@ -89,6 +89,8 @@ class VelsHandler(BaseHandler):
     - This handler represents a single MD snapshot and is not frame-based;
       ``n_frames()`` always returns 0.
     """
+
+    VERSION = "1"
     SECTION_COORDS = "Atom coordinates"
     SECTION_VELS = "Atom velocities"
     SECTION_ACCELS = "Atom accelerations"

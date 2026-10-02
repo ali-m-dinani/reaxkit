@@ -17,6 +17,8 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
+VERSION = "1"
+
 ArrayLike = Union[np.ndarray, pd.Series, list, tuple]
 
 def simple_moving_average(

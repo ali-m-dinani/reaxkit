@@ -60,6 +60,8 @@ class SummaryHandler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "summary.txt", reporter=None) -> None:
         """
         Initialize the instance.

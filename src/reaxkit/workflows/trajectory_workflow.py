@@ -58,9 +58,10 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     add_storage_cli_arguments(parser)
 
 
-def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_presentation_arguments(parser: argparse.ArgumentParser, command: str = "") -> None:
     """Add presentation arguments."""
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined figure.")
+    plot_choices = ["single", "subplot", "kymograph", "separate"] if command == "get_rdf" else ["single", "subplot"]
+    parser.add_argument("--plot", choices=plot_choices, default=None, help="Render a plot. RDF supports a kymograph or separate figures per frame (save to a directory).")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save msd.png, which writes the figure image to disk.")
     parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export rdf.csv, which saves tabular analysis output.")
@@ -132,6 +133,7 @@ def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
         bins=args.bins,
         r_max=args.r_max,
         backend=args.backend,
+        plot_mode=getattr(args, "plot", None) if getattr(args, "plot", None) in {"kymograph", "separate"} else "single",
     )
 
 
@@ -180,7 +182,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
 
     _add_runtime_arguments(parser)
-    _add_presentation_arguments(parser)
+    _add_presentation_arguments(parser, canonical)
     _add_common_arguments(parser)
 
     if canonical == "get_dihedral":
@@ -811,7 +813,7 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
     }
 
 
-def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | list[dict[str, object]] | None:
     """Plot payload."""
     command = {
         "msd": "get_msd",
@@ -914,6 +916,19 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         }
 
     if command == "get_rdf":
+        if getattr(args, "plot", None) == "kymograph":
+            from reaxkit.presentation.kymograph import kymograph_grid
+
+            axis = getattr(args, "xaxis", "frame")
+            x_col = "iter" if axis == "iter" else "frame_index"
+            if axis == "time":
+                raise ValueError("RDF kymographs support --xaxis frame or iter; physical time is not stored in the RDF table.")
+            coordinates, radii, values = kymograph_grid(table, x_col=x_col)
+            return {
+                "plot_type": "kymograph", "x": coordinates.tolist(), "y": radii.tolist(), "z": values.tolist(),
+                "xlabel": "Iteration" if axis == "iter" else "Frame index", "ylabel": "r (Å)",
+                "title": "RDF evolution", "colorbar_label": "g(r)", "vmin": 0.0,
+            }
         if "frame_index" not in table.columns or "iter" not in table.columns:
             return {
                 "plot_type": "single_plot",
@@ -936,6 +951,14 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             }
             series.append(payload)
             subplots.append([payload])
+
+        if getattr(args, "plot", None) == "separate":
+            return [
+                {"plot_type": "single_plot", "x": item["x"], "y": item["y"],
+                 "xlabel": "r (Å)", "ylabel": "g(r)", "title": f"RDF — {item['label']}",
+                 "filename": f"rdf_frame_{int(frame_index):06d}.png", "legend": False}
+                for frame_index, item in zip(table["frame_index"].sort_values().unique(), series)
+            ]
 
         if getattr(args, "plot", None) == "subplot":
             return {

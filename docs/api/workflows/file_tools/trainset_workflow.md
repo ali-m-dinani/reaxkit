@@ -314,7 +314,7 @@ This comamnd supports 3 input-mode options:
 
 [NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
 
-[Note] As you may know, the trainset generator for elastic data is developed only for orthogonal systems (i.e., with alpha=beta=gamma=90). If you use the source-backed modes to fetch structures from sources like MP, you may encounter some non-orthogonal structures. If you want to skip those non-orthogonal structures, you can use the flag --skip-not-orthogonal to automatically skip them and only generate training data for orthogonal structures.
+[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain legacy orthogonal generation. Use --skip-not-orthogonal to restrict generation to cells with right angles. See [tensor conventions and compatibility](../../engine/reaxff/generators/trainset_elastic_energy_doc.md#full-tensor-generation).
 ```
 
 ### Arguments
@@ -328,7 +328,7 @@ This comamnd supports 3 input-mode options:
 | `--max-materials` | No |  | Optional cap for batch mode. |  |
 | `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. | voigt, reuss, vrh |
 | `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files | to-conventional, to-primitive |
-| `--skip-not-orthogonal` | No | True | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
+| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
 | `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. |  |
 | `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. |  |
 
@@ -629,7 +629,7 @@ This comamnd supports 3 input-mode options:
 
 [NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
 
-[Note] As you may know, the trainset generator for elastic data is developed only for orthogonal systems (i.e., with alpha=beta=gamma=90). If you use the source-backed modes to fetch structures from sources like MP, you may encounter some non-orthogonal structures. If you want to skip those non-orthogonal structures, you can use the flag --skip-not-orthogonal to automatically skip them and only generate training data for orthogonal structures.
+[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain legacy orthogonal generation. Use --skip-not-orthogonal to restrict generation to cells with right angles.
 ```
 
 ### Arguments
@@ -643,7 +643,7 @@ This comamnd supports 3 input-mode options:
 | `--max-materials` | No |  | Optional cap for batch mode. |  |
 | `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. | voigt, reuss, vrh |
 | `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files | to-conventional, to-primitive |
-| `--skip-not-orthogonal` | No | True | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
+| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
 | `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. |  |
 | `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. |  |
 

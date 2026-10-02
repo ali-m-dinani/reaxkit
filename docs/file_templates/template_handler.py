@@ -5,6 +5,10 @@ IO structure. Handlers are responsible for parsing one file type into a
 normalized summary DataFrame plus metadata; analysis logic should remain in
 analyzer/task modules.
 
+Every handler must declare its own class-level `VERSION` string, starting at
+`"1"`. Increment it whenever parsing rules, defaults, or output schema changes
+make previous parsed results incompatible.
+
 **Usage context**
 
 - Engine parsing: Convert raw text files into canonical tabular rows.
@@ -50,6 +54,8 @@ class TemplateHandler(BaseHandler):
     - Keep parsing deterministic and side-effect free.
     - Convert numeric-like values when possible to improve downstream typing.
     """
+
+    VERSION = "1"
 
     def __init__(self, file_path: str | Path = "<filetype>", reporter=None):
         """Initialize the template handler.

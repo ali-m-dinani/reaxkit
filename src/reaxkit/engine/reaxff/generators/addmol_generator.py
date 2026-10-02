@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+VERSION = "1"
+
 ADDMOL_TEMPLATE = """BIOGRF 200
 DESCRP O2
 REMARK 1 FREQADD: Indicates how often the molecule should be added to the simulation box.

@@ -33,6 +33,8 @@ class LAMMPSDumpHandler(BaseHandler):
     2) Native ``ITEM:`` dump blocks.
     """
 
+    VERSION = "1"
+
     _TIMESTEP_PATTERN = re.compile(r"timestep\s*:\s*([+-]?\d+)", flags=re.IGNORECASE)
 
     def __init__(

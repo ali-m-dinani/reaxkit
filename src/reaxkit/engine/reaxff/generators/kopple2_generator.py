@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+VERSION = "1"
+
 
 KOPPLE2_TEMPLATE = """
 REMARK 1: This file allows the user to establish links between 

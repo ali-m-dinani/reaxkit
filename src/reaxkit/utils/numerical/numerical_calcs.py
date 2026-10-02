@@ -18,6 +18,8 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
+VERSION = "1"
+
 
 def find_zero_crossings(x: Sequence[float], y: Sequence[float]) -> List[float]:
     """Find x-values where a 1D function crosses zero.

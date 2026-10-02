@@ -198,9 +198,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates "
             "to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.\n\n"
 
-            "[Note] As you may know, the trainset generator for elastic data is developed only for orthogonal systems (i.e., with alpha=beta=gamma=90). "
-            "If you use the source-backed modes to fetch structures from sources like MP, you may encounter some non-orthogonal structures. "
-            "If you want to skip those non-orthogonal structures, you can use the flag --skip-not-orthogonal to automatically skip them and only generate training data for orthogonal structures. \n\n"
+            "[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. "
+            "Older nine-constant YAML files retain legacy orthogonal generation. "
+            "Use --skip-not-orthogonal to restrict generation to cells with right angles. \n\n"
             
             ""
         )
@@ -224,7 +224,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument(
             "--skip-not-orthogonal",
             action="store_true",
-            default=True,
+            default=False,
             help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). Example: --skip-not-orthogonal, which excludes structures whose cell angles are not all 90 degrees.",
         )
         parser.add_argument(

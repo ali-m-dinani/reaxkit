@@ -17,6 +17,8 @@ from typing import Literal, Optional, Sequence, Union
 
 import numpy as np
 
+VERSION = "1"
+
 ArrayLike = Union[np.ndarray, Sequence[float], list, tuple]
 NormalizeMode = Literal["none", "biased", "unbiased", "coeff"]
 

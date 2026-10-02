@@ -749,6 +749,8 @@ class TrainsetHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
+    VERSION = "1"
+
     _CACHE_VERSION = "7"
     filetype = "trainset"
 

@@ -65,6 +65,8 @@ class Fort76Handler(BaseHandler):
     - This handler represents one row per iteration (frame-like semantics).
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "fort.76", reporter=None):
         """
         Initialize the instance.

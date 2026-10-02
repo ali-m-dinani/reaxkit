@@ -61,6 +61,8 @@ class ParamsHandler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
+    VERSION = "1"
+
     COLUMNS = [
         "ff_section",
         "ff_section_line",

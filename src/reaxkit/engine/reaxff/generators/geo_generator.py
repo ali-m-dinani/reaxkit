@@ -29,6 +29,8 @@ from reaxkit.engine.common.generators.structure_transformers import (
 )
 from reaxkit.engine.reaxff.io.geo_handler import GeoHandler
 
+VERSION = "1"
+
 
 SortKey = Literal["x", "y", "z", "atom_type"]
 GeoSortKey = Literal["m", "x", "y", "z", "atom_type"]

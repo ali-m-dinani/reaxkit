@@ -6,6 +6,10 @@ common pattern used in generator modules: template constants, a spec dataclass,
 private generate/write helpers, one public convenience function, and a registry
 entry consumed by workflow code.
 
+Every generator module must declare a module-level `VERSION` string, starting
+at `"1"`. Increment it whenever generation logic, defaults, or output format
+changes make previous outputs incompatible.
+
 **Usage context**
 
 - Template generation: Produce canonical text payloads from a typed spec.
@@ -22,6 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+VERSION = "1"
 
 TEMPLATE_MAIN_TEXT = """# TEMPLATE FILE
 key_a value_a

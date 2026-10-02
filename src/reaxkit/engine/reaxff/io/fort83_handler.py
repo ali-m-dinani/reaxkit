@@ -17,6 +17,8 @@ class Fort83Handler:
     ``Error force field``.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "fort.83") -> None:
         self.path = Path(file_path)
 

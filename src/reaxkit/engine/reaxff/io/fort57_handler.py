@@ -56,6 +56,8 @@ class Fort57Handler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
+    VERSION = "1"
+
     _COLS = ["iter", "E_pot", "T", "T_set", "RMSG", "nfc"]
 
     def __init__(self, file_path: str | Path = "fort.57", reporter=None):

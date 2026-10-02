@@ -20,6 +20,8 @@ import numpy as np
 
 from reaxkit.domain.data_models import TrajectoryData
 
+VERSION = "1"
+
 
 def write_xyz_trajectory(
     trajectory: TrajectoryData,

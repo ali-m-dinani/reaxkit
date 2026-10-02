@@ -113,6 +113,8 @@ class XmoloutHandler(BaseHandler):
       and streaming access via ``iter_frames(step=...)``.
     """
 
+    VERSION = "1"
+
     def __init__(
             self,
             file_path: str | Path = "xmolout",
