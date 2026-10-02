@@ -109,6 +109,7 @@ class FFieldOptimizationProgressResult(BaseResult):
 class FFieldOptimizationProgressTask(AnalysisTask):
     """Return total force-field error versus optimization epoch."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationProgressData
 
     @staticmethod

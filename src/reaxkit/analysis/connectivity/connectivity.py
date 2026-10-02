@@ -197,6 +197,7 @@ class ConnectionListResult(BaseResult):
 @register_task("get_connection_list", label="Connection List")
 class ConnectionListTask(AnalysisTask):
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
@@ -469,6 +470,7 @@ class ConnectionTableResult(BaseResult):
 
 @register_task("get_connection_table", label="Connection Table")
 class ConnectionTableTask(AnalysisTask):
+    VERSION = "1"
     required_data = ConnectivityData
 
     @staticmethod
@@ -697,6 +699,7 @@ class ConnectionStatsResult(BaseResult):
 
 @register_task("get_connection_stats", label="Connection Stats")
 class ConnectionStatsTask(AnalysisTask):
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.STREAMING_REDUCTION, supports_selective_frames=True,
         estimated_frame_bytes=8 * 1024 * 1024,
@@ -1060,6 +1063,7 @@ class BondEventsResult(BaseResult):
 
 @register_task("get_bond_events", label="Bond Events")
 class BondEventsTask(AnalysisTask):
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.ORDERED_STATEFUL_STREAM, supports_selective_frames=True,
     )

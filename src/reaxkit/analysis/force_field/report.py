@@ -1110,6 +1110,7 @@ class FFieldOptimizationReportBulkModulusResult(BaseResult):
 class FFieldOptimizationReportTask(AnalysisTask):
     """Return the parsed optimization-report table with QM-FF differences."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationReportData
 
     @staticmethod
@@ -1214,6 +1215,7 @@ class FFieldOptimizationReportTask(AnalysisTask):
 class FFieldOptimizationReportEOSTask(AnalysisTask):
     """Return comment-aware ENERGY-vs-volume EOS data."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationPlotBundleData
 
     @staticmethod
@@ -1328,6 +1330,7 @@ class FFieldOptimizationReportEOSTask(AnalysisTask):
 class FFieldOptimizationReportRestraintTask(AnalysisTask):
     """Return repeated two-structure ENERGY terms labeled as restraints."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationPlotBundleData
 
     def run(
@@ -1346,6 +1349,7 @@ class FFieldOptimizationReportRestraintTask(AnalysisTask):
 class FFieldOptimizationReportBulkModulusTask(AnalysisTask):
     """Return a Vinet bulk-modulus fit derived from report + geometry summary."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationReportEOSBundleData
 
     @staticmethod

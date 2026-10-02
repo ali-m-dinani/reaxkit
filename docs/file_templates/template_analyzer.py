@@ -5,6 +5,11 @@ dataclass, one result dataclass, and one registered task class exposing
 `recommended_presentations` and `run`. Replace placeholder logic, field names,
 and defaults with domain-specific behavior for your analyzer.
 
+Every analyzer task must declare its own class-level `VERSION` string, starting
+at `"1"`. Increment it whenever computation, defaults, or output schema changes
+make previous results incompatible. The executor includes this version in cache
+keys and result provenance so changed analyzers do not reuse stale results.
+
 **Usage context**
 
 - Analyzer scaffolding: Start new analyzers with consistent task wiring.
@@ -166,6 +171,7 @@ class TemplateResult(BaseResult):
 class TemplateTask(AnalysisTask):
     """Template analyzer task with default presentation wiring."""
 
+    VERSION = "1"
     required_data = TrajectoryData
 
     @staticmethod

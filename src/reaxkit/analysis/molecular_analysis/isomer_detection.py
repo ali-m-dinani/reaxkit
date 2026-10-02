@@ -510,6 +510,7 @@ class MoleculeIsomerDetectionResult(BaseResult):
 class MoleculeIsomerDetectionTask(AnalysisTask):
     """Connected-components molecule detection + formula + graph isomer grouping."""
 
+    VERSION = "1"
     required_data = GeometryData
 
     @staticmethod

@@ -282,6 +282,7 @@ def calculate_dielectric_constant(
 class DielectricConstantTask(AnalysisTask):
     """Analyze a DataFrame containing time and scalar dipole columns."""
 
+    VERSION = "1"
     required_data = pd.DataFrame
 
     def run(

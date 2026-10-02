@@ -234,6 +234,7 @@ def _selected_atom_indices(
 class HybridizationStatusTask(AnalysisTask):
     """Per-atom hybridization status over selected frames."""
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,

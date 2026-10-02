@@ -276,6 +276,7 @@ def calculate_deformation_gradient_strain(data: TrajectoryData, request: ZBinned
 class ZBinnedDeformationGradientStrainTask(AnalysisTask):
     """Run z-binned deformation-gradient strain analysis."""
 
+    VERSION = "1"
     required_data = TrajectoryData
     execution_capabilities = TaskCapabilities(shape=ExecutionShape.ORDERED_STATEFUL_STREAM,
         supports_selective_frames=True, reference_frames=(0,), requires_contiguous_history=True,

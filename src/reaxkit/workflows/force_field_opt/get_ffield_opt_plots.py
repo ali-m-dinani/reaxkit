@@ -31,6 +31,7 @@ from reaxkit.domain.data_models import ForceFieldOptimizationPlotBundleData
 from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
 from reaxkit.presentation.plot_styles import add_plot_style_argument, plot_style_context
+from reaxkit.presentation.powerpoint import write_figure_presentation
 from reaxkit.workflows.force_field_opt.charge import (
     build_charge_table,
     charge_plot_payloads,
@@ -445,7 +446,9 @@ def build_parser(
         "  4. Limit each grouped-bar figure to three entries (six paired bars):\n"
         "       reaxkit get_ffield_opt_plots --entry-per-figure 3\n\n"
         "  5. Flip the sign of EOS energies before exporting and plotting them:\n"
-        "       reaxkit get_ffield_opt_plots --flip-sign-for-eos"
+        "       reaxkit get_ffield_opt_plots --flip-sign-for-eos\n\n"
+        "  6. Assemble a PowerPoint with a title slide and figures for each category:\n"
+        "       reaxkit get_ffield_opt_plots --make-powerpoint --plot-style publication-bold"
     )
     parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
     parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
@@ -486,6 +489,16 @@ def build_parser(
         ),
     )
     parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
+    parser.add_argument(
+        "--make-powerpoint",
+        "--make-ppt",
+        action="store_true",
+        help=(
+            "Also write ffield_opt_plots.pptx in the results folder, with a category "
+            "title slide followed by one figure per slide. Empty categories are skipped. "
+            "Example: --make-powerpoint, which assembles this run's generated figures into a PowerPoint."
+        ),
+    )
     add_storage_cli_arguments(parser)
     add_plot_style_argument(parser)
     return parser
@@ -508,7 +521,8 @@ def _run_main(command: str, args: argparse.Namespace) -> int:
 
     reporter = resolve_reporter(vars(args))
     progress_stage = "ffield optimization plots"
-    progress_total = 19
+    wants_powerpoint = bool(getattr(args, "make_powerpoint", False))
+    progress_total = 20 if wants_powerpoint else 19
     reporter(progress_stage, 0, progress_total, "Loading optimization files")
     data = _load_plot_bundle(args, normalized=normalized)
     reporter(progress_stage, 1, progress_total, "Classifying training data")
@@ -720,6 +734,40 @@ def _run_main(command: str, args: argparse.Namespace) -> int:
         ylabel="Reaction energy (kcal/mol)",
     )
 
+    not_plotted_warning = (
+        f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
+        f"{not_plotted_csv}"
+    )
+    presentation_path = None
+    if wants_powerpoint:
+        reporter(progress_stage, 18, progress_total, "Building PowerPoint presentation")
+        categories = {
+            "Equation of state": eos_images,
+            "Restraints": restraint_images,
+            "Bond scans": bond_images,
+            "Angle scans": angle_images,
+            "Other curves": other_curve_images,
+            "Charges": charge_images,
+            "Cell parameters": cell_parameter_images,
+            "Geometry targets": geometry_target_images,
+            "Heat of formation": heatfo_images,
+            "Energy curves": energy_curve_images,
+            "Other energy bars": [*energy_difference_images, *single_energy_images],
+            "Reaction energies": reaction_energy_images,
+        }
+        if any(categories.values()):
+            summary_counts = {}
+            for category, images in categories.items():
+                if category == "Other energy bars":
+                    summary_counts["Energy differences"] = len(energy_difference_images)
+                    summary_counts["Single-identifier energies"] = len(single_energy_images)
+                else:
+                    summary_counts["EOS" if category == "Equation of state" else category] = len(images)
+            presentation_path = write_figure_presentation(
+                categories, root / "ffield_opt_plots.pptx",
+                summary_counts=summary_counts, warning=not_plotted_warning,
+            )
+
     eos_summary = (
         f"[Done] EOS: {len(eos_images)} images and {eos_csv}"
         if eos_images
@@ -760,21 +808,24 @@ def _run_main(command: str, args: argparse.Namespace) -> int:
             f"[Done] Reaction energies: {len(reaction_energy_images)} images and "
             f"{reaction_energy_csv}"
         ),
-        (
-            f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
-            f"{not_plotted_csv}"
-        ),
+        not_plotted_warning,
         (
             f"[Info] Custom plots: use {figure_generator_template} with the dedicated "
             "CSV files in each plot subfolder."
         ),
         f"Results saved in:\n  {root}",
     ]
+    if wants_powerpoint:
+        summary_lines.insert(-1, (
+            f"[Done] PowerPoint: {presentation_path}"
+            if presentation_path is not None
+            else "[Skipped] PowerPoint: no figures were generated"
+        ))
     summary_text = "\n".join(summary_lines)
     summary_path = root / "plot_summary.txt"
     summary_path.write_text(summary_text + "\n", encoding="utf-8")
 
-    reporter(progress_stage, 18, progress_total, "Finalizing result metadata")
+    reporter(progress_stage, progress_total - 1, progress_total, "Finalizing result metadata")
     if uses_workspace:
         settings_path = root / "settings.json"
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
@@ -816,6 +867,11 @@ def _run_main(command: str, args: argparse.Namespace) -> int:
             figure_generator_template.relative_to(root).as_posix()
         ]
         settings["artifacts"]["text"] = [summary_path.relative_to(root).as_posix()]
+        if wants_powerpoint:
+            settings["artifacts"]["presentations"] = (
+                [presentation_path.relative_to(root).as_posix()]
+                if presentation_path is not None else []
+            )
         settings_path.write_text(
             json.dumps(settings, indent=2, sort_keys=True), encoding="utf-8"
         )

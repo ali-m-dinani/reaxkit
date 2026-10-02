@@ -40477,6 +40477,19 @@
   {
     "parser": "reaxkit get_ffield_opt_plots",
     "flags": [
+      "--make-powerpoint",
+      "--make-ppt"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Also write ffield_opt_plots.pptx in the results folder, with a category title slide followed by one figure per slide. Empty categories are skipped. Example: --make-powerpoint, which assembles this run's generated figures into a PowerPoint.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_plots",
+    "flags": [
       "--output",
       "--outdir",
       "--save"

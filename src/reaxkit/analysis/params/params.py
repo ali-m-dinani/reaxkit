@@ -266,6 +266,7 @@ class FFieldOptimizationParameterResult(BaseResult):
 class FFieldOptimizationParameterTask(AnalysisTask):
     """Return raw or interpreted optimization-parameter definitions from params."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationParameterBundleData
 
     @staticmethod

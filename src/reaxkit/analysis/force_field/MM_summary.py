@@ -128,6 +128,7 @@ class MMSummaryResult(BaseResult):
 class MMSummaryTask(AnalysisTask):
     """Return structure-summary data."""
 
+    VERSION = "1"
     required_data = EnergyMinimizationSummaryData
 
     @staticmethod

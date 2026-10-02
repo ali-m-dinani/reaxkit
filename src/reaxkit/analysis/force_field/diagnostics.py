@@ -277,6 +277,7 @@ class FFieldOptimizationDiagnosticResult(BaseResult):
 class FFieldOptimizationDiagnosticTask(AnalysisTask):
     """Return sensitivity diagnostics derived from parameter-update diagnostics."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationDiagnosticBundleData
 
     @staticmethod

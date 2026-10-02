@@ -180,6 +180,7 @@ def _rkf_like_input(args: dict) -> bool:
 class ActiveSiteEventsTask(AnalysisTask):
     """Extract persistent C-O and C-Si active-site events over trajectory frames."""
 
+    VERSION = "1"
     supports_selective_streaming = True
     required_data = ConnectivityTrajectoryData
 

@@ -598,6 +598,7 @@ def _compute_rdfs(
 class RDFTask(AnalysisTask):
     """RDF curve task (total/partial)."""
 
+    VERSION = "1"
     required_data = TrajectoryData
     execution_capabilities = TaskCapabilities(shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024)
@@ -722,6 +723,7 @@ class RDFTask(AnalysisTask):
 class RDFPropertyTask(AnalysisTask):
     """RDF-derived property task."""
 
+    VERSION = "1"
     required_data = TrajectoryData
     execution_capabilities = TaskCapabilities(shape=ExecutionShape.INDEPENDENT_FRAME_MAP,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024)

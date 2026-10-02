@@ -258,6 +258,7 @@ class DihedralResult(BaseResult):
 class DihedralTask(AnalysisTask):
     """Compute the signed dihedral angle for one atom quadruplet over time."""
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,

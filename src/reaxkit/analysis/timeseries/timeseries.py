@@ -874,6 +874,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
 class SimulationScalarSeriesTask(AnalysisTask):
     """Build a scalar time series from ``SimulationData``."""
 
+    VERSION = "1"
     required_data = SimulationData
 
     @staticmethod
@@ -1277,6 +1278,7 @@ class TrajectoryDisplacementSeriesTask(AnalysisTask):
 class CellDimensionsTask(AnalysisTask):
     """Build cell-dimension time series from ``SimulationData``."""
 
+    VERSION = "1"
     required_data = SimulationData
 
     @staticmethod
@@ -1385,6 +1387,7 @@ class CellDimensionsTask(AnalysisTask):
 class ChargeSeriesTask(AnalysisTask):
     """Build charge time series for one or more atoms."""
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
@@ -1701,6 +1704,7 @@ def _resolve_restraint_fields(df: pd.DataFrame, request: RestraintSeriesRequest)
 class ElectricFieldSeriesTask(AnalysisTask):
     """Build time series for applied-field or field-energy components."""
 
+    VERSION = "1"
     required_data = ElectricFieldData
 
     @staticmethod
@@ -1828,6 +1832,7 @@ class ElectricFieldSeriesTask(AnalysisTask):
 class EregimeSeriesTask(AnalysisTask):
     """Build iteration-based series for one eregime field column."""
 
+    VERSION = "1"
     required_data = EregimeData
 
     @staticmethod
@@ -1922,6 +1927,7 @@ class EregimeSeriesTask(AnalysisTask):
 class PartialEnergySeriesTask(AnalysisTask):
     """Build iteration-based series for one or more fort.73 energy components."""
 
+    VERSION = "1"
     required_data = PartialEnergyData
 
     @staticmethod
@@ -2018,6 +2024,7 @@ class PartialEnergySeriesTask(AnalysisTask):
 class RestraintSeriesTask(AnalysisTask):
     """Build iteration-based series for fort.76 restraint data."""
 
+    VERSION = "1"
     required_data = RestraintData
 
     @staticmethod
@@ -2132,6 +2139,7 @@ class RestraintSeriesTask(AnalysisTask):
 class MolecularFrequencySeriesTask(AnalysisTask):
     """Build molecular-frequency time series for one or more molecular formulas."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
@@ -2248,6 +2256,7 @@ class MolecularFrequencySeriesTask(AnalysisTask):
 class MolecularTotalsSeriesTask(AnalysisTask):
     """Build total molecule/atom/mass time series from MolecularAnalysisData.totals."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,

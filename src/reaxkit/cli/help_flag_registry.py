@@ -2,6 +2,8 @@
 
 FLAG_METADATA = {
     '--plot-style': ('Outputs and plots', 'short'),
+    '--make-powerpoint': ('Outputs and plots', 'short'),
+    '--make-ppt': ('Outputs and plots', 'short'),
     # Legacy spellings and branch-specific flags also appear in generated docs.
     '--anion': ('Scientific choices', 'full'),
     '--bo': ('Scientific choices', 'full'),

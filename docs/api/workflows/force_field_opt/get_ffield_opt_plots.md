@@ -32,6 +32,9 @@ Classify optimization ENERGY expressions using fort.99, trainset comments, fort.
 
   5. Flip the sign of EOS energies before exporting and plotting them:
        reaxkit get_ffield_opt_plots --flip-sign-for-eos
+
+  6. Create a PowerPoint with a title slide and figures for each nonempty category:
+       reaxkit get_ffield_opt_plots --make-powerpoint --plot-style publication-bold
 ```
 
 ### Arguments
@@ -59,6 +62,7 @@ Classify optimization ENERGY expressions using fort.99, trainset comments, fort.
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--entry-per-figure` | No | 6 | Maximum entries per grouped-bar figure; every entry contributes one ReaxFF and one QM/literature bar (default: 6). |  |
+| `--make-powerpoint, --make-ppt` | No | False | Also write ffield_opt_plots.pptx in the results folder, with one category title slide followed by one figure per slide. Empty categories are skipped. |  |
 | `--output, --outdir, --save` | No |  | Optional output-folder override. By default, save under reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/. |  |
 | `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
 

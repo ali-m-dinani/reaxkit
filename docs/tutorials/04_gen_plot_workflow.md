@@ -80,6 +80,21 @@ To generate synthetic EOS and reaction-energy previews of all three styles, run
 `python docs/examples/plot_styles_example.py --output plot_style_examples`
 from the repository root using the project environment.
 
+### PowerPoint collections
+
+Add `--make-powerpoint` (alias `--make-ppt`) to assemble the generated optimization figures into a deck:
+
+```bash
+reaxkit get-ffield-opt-plots --plot-style publication-bold --make-powerpoint --output manuscript_plots
+```
+
+This writes `manuscript_plots/ffield_opt_plots.pptx`. Each nonempty category starts
+with a title slide, followed by one figure per slide. Figures retain their plot
+style and aspect ratio. EOS figures from material subfolders are included, and
+the two figure types in `other_bar_plots` share one section. Only images generated
+by this invocation are included. If no figures are generated, no deck is written.
+The headings are editable PowerPoint text; plots are embedded images.
+
 ---
 
 ## Input model

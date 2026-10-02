@@ -375,6 +375,7 @@ class TrainsetDataResult(BaseResult):
 class TrainsetDataTask(AnalysisTask):
     """Return trainset rows for one section or all sections."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationTrainingSetData
 
     @staticmethod
@@ -560,6 +561,7 @@ class TrainsetGroupCommentsResult(BaseResult):
 class TrainsetGroupCommentsTask(AnalysisTask):
     """Return every trainset group-comment occurrence by section."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationTrainingSetData
 
     @staticmethod

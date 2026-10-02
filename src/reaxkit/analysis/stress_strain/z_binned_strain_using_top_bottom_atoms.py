@@ -210,6 +210,7 @@ def calculate_top_bottom_strain(data: TrajectoryData, request: ZBinnedTopBottomS
 class ZBinnedTopBottomStrainTask(AnalysisTask):
     """Run robust top/bottom span strain analysis on canonical trajectories."""
 
+    VERSION = "1"
     required_data = TrajectoryData
     execution_capabilities = TaskCapabilities(shape=ExecutionShape.ORDERED_STATEFUL_STREAM,
         supports_selective_frames=True, reference_frames=(0,), requires_contiguous_history=True,

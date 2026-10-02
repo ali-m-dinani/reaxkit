@@ -232,6 +232,7 @@ class FFieldDataResult(BaseResult):
 class FFieldDataTask(AnalysisTask):
     """Return raw or interpreted force-field section data."""
 
+    VERSION = "1"
     required_data = ForceFieldParametersData
 
     @staticmethod

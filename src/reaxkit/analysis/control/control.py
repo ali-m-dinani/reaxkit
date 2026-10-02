@@ -173,6 +173,7 @@ class ControlParametersTaskResult(BaseResult):
 class ControlParametersTask(AnalysisTask):
     """Return one control parameter as a one-row table."""
 
+    VERSION = "1"
     required_data = ControlParametersData
 
     @staticmethod
