@@ -2,6 +2,8 @@
 
 import argparse
 
+from reaxkit.presentation.plot_styles import add_plot_style_argument
+
 
 def automatic_positive_int(value):
     if str(value).lower() == "auto":
@@ -16,15 +18,16 @@ def automatic_positive_int(value):
 
 
 def add_execution_arguments(parser, *, inherit=False):
+    add_plot_style_argument(parser, inherit=inherit)
     options = parser._option_string_actions
     definitions = (
         ("--execution", dict(choices=("auto", "serial", "threads", "processes"), default="auto",
-                             help="Execution backend; unsupported backends fall back to serial with a logged reason.")),
-        ("--workers", dict(type=automatic_positive_int, default=0, help="Frame workers: auto or N (default: auto).")),
-        ("--chunk-size", dict(type=automatic_positive_int, default=0, help="Maximum in-flight frames: auto or N.")),
-        ("--detail-format", dict(choices=("parquet", "csv"), default=None, help="Optional detail format (default: Parquet; legacy: CSV).")),
+                             help="Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially.")),
+        ("--workers", dict(type=automatic_positive_int, default=0, help="Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers.")),
+        ("--chunk-size", dict(type=automatic_positive_int, default=0, help="Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames.")),
+        ("--detail-format", dict(choices=("parquet", "csv"), default=None, help="Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV.")),
         ("--output-profile", dict(choices=("standard", "minimal", "full", "legacy"), default="standard",
-                                  help="Artifact profile (default: standard).")),
+                                  help="Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts.")),
     )
     for flag, kwargs in definitions:
         if inherit:

@@ -47,6 +47,7 @@ class PipelineNode:
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=utc_now_iso)
     updated_at: str = field(default_factory=utc_now_iso)
+    revision: int = 0
 
     def touch(self) -> None:
         """Update the modified timestamp."""

@@ -16,7 +16,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Literal, Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
+from ase import Atoms
 
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.common.generators.structure_transformers import (
@@ -35,6 +37,8 @@ __all__ = [
     "SortKey",
     "GeoSortKey",
     "xtob",
+    "vasp2reax",
+    "orient_structure_for_reaxff",
     "sort_geo",
     "add_restraints_to_geo",
     "add_molcharge_to_geo",
@@ -204,6 +208,80 @@ def _generate_geo_text(
     return "\n".join(lines) + "\n"
 
 
+def orient_structure_for_reaxff(atoms: Atoms) -> Atoms:
+    """Copy a periodic structure into standalone ReaxFF's Cartesian frame.
+
+    CRYSTX reconstructs c along z and b in the yz plane. Preserve fractional
+    positions and lattice parameters while expressing both cell and positions
+    in that frame, as in vasp2reax. Plain XYZ input has no cell orientation and
+    must already use this frame before being passed to xtob.
+    """
+    if not np.isfinite(atoms.cell.array).all() or abs(np.linalg.det(atoms.cell.array)) < 1e-12:
+        raise ValueError("ReaxFF export requires a finite, non-degenerate 3D cell.")
+    length_a, length_b, length_c, alpha, beta, gamma = atoms.cell.cellpar()
+    cos_alpha, cos_beta, cos_gamma = np.cos(np.radians([alpha, beta, gamma]))
+    sin_alpha = np.sin(np.radians(alpha))
+    axis_a_y = length_a * (cos_gamma - cos_beta * cos_alpha) / sin_alpha
+    axis_a_z = length_a * cos_beta
+    axis_a_x_squared = length_a**2 - axis_a_y**2 - axis_a_z**2
+    if axis_a_x_squared <= 0:
+        raise ValueError("ReaxFF export requires a non-degenerate 3D cell.")
+    cell = np.array([
+        [np.sqrt(axis_a_x_squared), axis_a_y, axis_a_z],
+        [0.0, length_b * sin_alpha, length_b * cos_alpha],
+        [0.0, 0.0, length_c],
+    ])
+    oriented = atoms.copy()
+    oriented.set_cell(cell, scale_atoms=True)
+    return oriented
+
+
+def vasp2reax(
+    input_file: str | Path,
+    geo_file: str | Path = "reaxff.geo",
+    *,
+    format: Optional[str] = None,
+) -> Tuple[Path, Path]:
+    """Convert a VASP POSCAR/CONTCAR or CIF to standalone ReaxFF geometry.
+
+    The GEO output (default reaxff.geo) replaces the Fortran fort.15: an
+    XTLGRF/BGF structure containing CRYSTX cell parameters and Cartesian atoms.
+    Its sibling <output-stem>_coordinates.xyz replaces the coordinate output
+    fort.51 with a standard XYZ file in the same ReaxFF Cartesian frame.
+
+    ASE reads VASP Direct/Cartesian coordinates, scaling and Selective Dynamics
+    syntax. Selective Dynamics flags are not translated into ReaxFF restraints.
+    Cell setting and atom order are preserved; no symmetry standardization or
+    relaxation is performed. CIF suffixes select CIF; otherwise VASP is assumed
+    unless format is explicitly specified. Returns (geo_path, xyz_path).
+    """
+    source = Path(input_file)
+    geo_path = Path(geo_file)
+    xyz_path = geo_path.with_name(f"{geo_path.stem}_coordinates.xyz")
+    if len({source.resolve(), geo_path.resolve(), xyz_path.resolve()}) != 3:
+        raise ValueError("Input, GEO output and coordinate output must be different files.")
+    input_format = format or ("cif" if source.suffix.lower() == ".cif" else "vasp")
+    if input_format not in {"vasp", "cif"}:
+        raise ValueError("vasp2reax input format must be 'vasp' or 'cif'.")
+    atoms = read_structure(source, format=input_format)
+    occupancies = atoms.info.get("occupancy", {})
+    if any(len(site) != 1 or not np.isclose(next(iter(site.values())), 1.0) for site in occupancies.values()):
+        raise ValueError("vasp2reax requires an ordered structure with full site occupancies.")
+    atoms = orient_structure_for_reaxff(atoms)
+    records = pd.DataFrame(atoms.positions, columns=["x", "y", "z"])
+    records["atom_type"] = atoms.get_chemical_symbols()
+    text = _generate_geo_text(
+        descriptor=source.stem,
+        atoms=records,
+        box_lengths=atoms.cell.lengths(),
+        box_angles=atoms.cell.angles(),
+    )
+    geo_path.parent.mkdir(parents=True, exist_ok=True)
+    write_structure(atoms, xyz_path, format="xyz", comment=f"{source.stem}; standalone ReaxFF Cartesian coordinates")
+    geo_path.write_text(text, encoding="utf-8")
+    return geo_path, xyz_path
+
+
 def xtob(
     xyz_file: str | Path,
     geo_file: str | Path = "geo",
@@ -212,7 +290,7 @@ def xtob(
     sort_by: Optional[SortKey] = None,
     ascending: bool = True,
 ) -> Path:
-    """Xtob.
+    """Write XYZ coordinates already oriented for standalone ReaxFF to GEO.
 
     Parameters
     ----------

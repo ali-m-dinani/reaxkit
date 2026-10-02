@@ -33,34 +33,44 @@ ALL_COMMANDS = (COMMAND,)
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     parser.set_defaults(command=COMMAND, progress=True)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Export and plot selected-atom dynamic charges alongside an iteration-matched "
-        "applied electric field."
+        "Export and plot selected-atom charges alongside the applied electric field.\n"
+        "\n"
+        "Use this to compare charge response with iteration-matched field values in an existing run.\n"
+        "Select atom IDs and the field component; time axes require control-file metadata.\n"
+        "\n"
+        "Examples:\n"
+        "  1. Compare charge and field along z:\n"
+        "     reaxkit get-charge-vs-electric-field --atom-numbers 1 2 --fort7 fort.7 --fort78 fort.78 --xmolout xmolout --field-direction z\n"
+        "\n"
+        "  2. Export values on a time axis:\n"
+        "     reaxkit get-charge-vs-electric-field --atom-numbers 1 2 --x-axis time --control control --export charge_field.csv"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection.")
-    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory.")
-    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source.")
-    parser.add_argument("--fort78", default="fort.78", help="Applied electric-field source.")
-    parser.add_argument("--xmolout", default="xmolout", help="Per-frame atom identity source.")
-    parser.add_argument("--atom-numbers", "--atom-ids", type=int, nargs="+", required=True)
-    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10.")
-    parser.add_argument("--every", type=int, default=1, help="Keep every Nth frame.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--fort78", default="fort.78", help="Applied electric-field source. Example: --fort78 runs/heating/fort.78, which reads electric-field data from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Per-frame atom identity source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--atom-numbers", "--atom-ids", type=int, nargs="+", required=True, help="One-based atom identifiers to include. Example: --atom-numbers 1 2, which includes only atoms 1 and 2.")
+    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    parser.add_argument("--every", type=int, default=1, help="Keep every Nth frame. Example: --every 5, which keeps every fifth selected frame.")
     parser.add_argument(
         "--field-direction",
         choices=["x", "y", "z"],
         default="z",
-        help="Applied-field component to correlate (default: z).",
+        help="Applied-field component to correlate (default: z). Example: --field-direction z, which selects the z-directed electric-field component.",
     )
     parser.add_argument(
         "--x-axis", "--xaxis", dest="x_axis", choices=["frame", "iter", "time"],
-        default="frame", help="Horizontal plot axis.",
+        default="frame", help="Horizontal plot axis. Example: --x-axis time, which shows physical time on the horizontal axis.",
     )
-    parser.add_argument("--control", default="control", help="Control file used to derive time.")
-    parser.add_argument("--dpi", type=int, default=180, help="Plot resolution in dots per inch.")
-    parser.add_argument("--output-dir", type=Path, default=None, help="CSV and plots output directory.")
-    parser.add_argument("--export", default=None, help="Optional CSV output path.")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet")
+    parser.add_argument("--control", default="control", help="Control file used to derive time. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
+    parser.add_argument("--dpi", type=int, default=180, help="Plot resolution in dots per inch. Example: --dpi 300, which writes figures at 300 dots per inch.")
+    parser.add_argument("--output-dir", type=Path, default=None, help="CSV and plots output directory. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.")
+    parser.add_argument("--export", default=None, help="Optional CSV output path. Example: --export analysis.csv, which writes the result table for further analysis.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

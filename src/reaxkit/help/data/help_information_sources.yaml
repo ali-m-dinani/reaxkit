@@ -87,9 +87,19 @@ runtime_usage:
 Search_mechanism:
   index_and_intent:
     query_preprocessing:
-      - normalize
-      - lemmatize
-      - wording_alias expansion to canonical wording
+      - normalize case, whitespace, hyphens, and underscores
+      - canonicalize wording_alias phrases symmetrically in queries and metadata
+      - keep each alias phrase as one concept, without adding generic query words
+      - ignore conversational stop words and normalize generation verbs
+    ranking:
+      - exact names and aliases rank first
+      - require at least 80 percent subject concept coverage
+      - generation requests require generation evidence
+      - rank accepted entries by subject coverage, name coverage, and name precision
+      - permit bounded token typos only for terms of at least five characters
+      - repeated words and repeated metadata fields do not accumulate bonuses
+      - top is an upper limit per category, not a quota to fill
+      - command descriptions and aliases also come from dedicated workflow metadata
   generator_level:
     searched_fields_in_descending_importance_order:
       - title (yaml item key)

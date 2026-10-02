@@ -54,9 +54,10 @@ plot = [
     "imageio[ffmpeg]",
 ]
 webui = [
-    "dash",
+    "dash>=3.1,<5",
     "dash_bootstrap_templates",
     "fastapi",
+    "duckdb>=1.1,<2",
 ]
 trajectory = [
     "MDAnalysis",
@@ -100,7 +101,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-reaxkit = ["**/*.yaml", "**/*.xlsx", "**/*.cif"]
+reaxkit = ["**/*.yaml", "**/*.xlsx", "**/*.cif", "webui/**/*.json", "webui/assets/*.js", "webui/assets/*.css", "webui/assets/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

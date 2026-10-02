@@ -52,13 +52,13 @@ def restrict_native_charge_input(parser: argparse.ArgumentParser) -> None:
             action.choices = ("ams", "reaxff")
             action.help = (
                 "Select AMS/KF or ReaxFF text input. If omitted, ReaxKit detects "
-                "the engine from the input path."
+                "the engine from the input path. Example: --engine ams, which reads AMS KF charge and trajectory data."
             )
         elif action.dest == "charge_source":
             action.choices = ("auto", "formal")
             action.help = (
                 "Use charges from the selected/detected engine, or use the values "
-                "provided by --formal-charge. Default: auto."
+                "provided by --formal-charge. Default: auto. Example: --charge-source formal, which uses assigned species charges instead of engine charges."
             )
 
 

@@ -397,47 +397,7 @@ def _convert_structure_setting(structure: Any, conversion: str):
     else:
         conventional = structure.to_conventional()
         converted = conventional.get_primitive_structure()
-    return _normalize_non_orthogonal_angle_to_gamma(converted)
-
-
-def _is_close_90(value: float, tol: float = 1e-6) -> bool:
-    """Is close 90."""
-    return abs(float(value) - 90.0) <= tol
-
-
-def _normalize_non_orthogonal_angle_to_gamma(structure: Any):
-    """Normalize non orthogonal angle to gamma."""
-    lat = structure.lattice
-    alpha = float(lat.alpha)
-    beta = float(lat.beta)
-    gamma = float(lat.gamma)
-
-    # If exactly one lattice angle is non-orthogonal, canonicalize axis order so that
-    # the non-90 angle appears as gamma (a,b), matching expected ReaxFF-style ordering.
-    non_orth = [not _is_close_90(alpha), not _is_close_90(beta), not _is_close_90(gamma)]
-    if sum(non_orth) != 1:
-        return structure
-    if non_orth[2]:
-        return structure
-
-    if non_orth[0]:
-        # alpha = angle(b,c) -> make it new gamma by (a', b', c') = (b, c, a)
-        perm = (1, 2, 0)
-    else:
-        # beta = angle(a,c) -> make it new gamma by (a', b', c') = (a, c, b)
-        perm = (0, 2, 1)
-
-    m = lat.matrix
-    new_matrix = [m[perm[0]], m[perm[1]], m[perm[2]]]
-    frac = structure.frac_coords
-    new_frac = [[f[perm[0]], f[perm[1]], f[perm[2]]] for f in frac]
-    return structure.__class__(
-        lattice=new_matrix,
-        species=structure.species,
-        coords=new_frac,
-        coords_are_cartesian=False,
-        site_properties=structure.site_properties,
-    )
+    return converted
 
 
 def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict[str, str]:

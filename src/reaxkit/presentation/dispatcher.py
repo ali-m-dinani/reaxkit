@@ -283,6 +283,10 @@ def present_result(
                             print("No plot-compatible presentation available for this result.")
                             return
                 plot_payloads = list(payload) if payload_batch else [payload]
+                if getattr(args, "plot_style", None) is not None:
+                    plot_payloads = [
+                        {**item, "plot_style": args.plot_style} for item in plot_payloads
+                    ]
                 if save:
                     save_path = resolve_output_path(
                         save,

@@ -1,6 +1,7 @@
 """Reviewed canonical flag roles for the registered CLI."""
 
 FLAG_METADATA = {
+    '--plot-style': ('Outputs and plots', 'short'),
     # Legacy spellings and branch-specific flags also appear in generated docs.
     '--anion': ('Scientific choices', 'full'),
     '--bo': ('Scientific choices', 'full'),
@@ -146,6 +147,7 @@ FLAG_METADATA = {
     '--field-direction': ('Scientific choices', 'full'),
     '--field-kind': ('Scientific choices', 'full'),
     '--field-method': ('Scientific choices', 'full'),
+    '--field-start-time': ('Scientific choices', 'short'),
     '--fields': ('Scientific choices', 'full'),
     '--field-step': ('Scientific choices', 'full'),
     '--figure-dpi': ('Outputs and plots', 'full'),

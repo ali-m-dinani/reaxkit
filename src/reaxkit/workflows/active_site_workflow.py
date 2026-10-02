@@ -46,34 +46,34 @@ ALL_LEGACY_COMMANDS = (
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     """Add runtime arguments."""
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7")
-    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt path")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--fort7", default="fort.7", help="Path to fort.7. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Path to xmolout. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt path. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
     """Add presentation arguments."""
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-    parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
+    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which combines selected series in one figure.")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens generated figures interactively.")
+    parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save analysis.png, which writes the generated figure to that image.")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
     parser.add_argument(
         "--report",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Generate a report under reports/<command>/<analysis_id>/",
+        help="Generate a report under reports/<command>/<analysis_id>/. Example: --report, which generates the analysis report.",
     )
     parser.add_argument(
         "--report-format",
         choices=["both", "pdf", "docx"],
         default="both",
-        help="Report format when --report is enabled.",
+        help="Report format when --report is enabled. Example: --report-format pdf, which writes the report as a PDF.",
     )
 
 
@@ -240,35 +240,35 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--bond-mode",
             choices=["bo", "distance"],
             default="bo",
-            help="Bond graph source: bo (from ConnectivityData.bond_orders) or distance (TRACT geometric cutoffs)",
+            help="Bond graph source: bo (from ConnectivityData.bond_orders) or distance (TRACT geometric cutoffs). Example: --bond-mode distance, which builds connectivity from geometric cutoffs.",
         )
-        parser.add_argument("--bond-scale", type=float, default=1.20, help="Scale factor on covalent radii for distance mode")
-        parser.add_argument("--alpha-radius", type=float, default=0.0, help="Alpha-shape radius for non-periodic boundary detection")
-        parser.add_argument("--gap-deg", type=float, default=220.0, help="Angular-gap threshold for boundary fallback")
-        parser.add_argument("--carbon-element", default="C", help="Element symbol used for carbon network analysis")
+        parser.add_argument("--bond-scale", type=float, default=1.20, help="Scale factor on covalent radii for distance mode. Example: --bond-scale 1.2, which allows distances up to 1.2 times the covalent-radius sum.")
+        parser.add_argument("--alpha-radius", type=float, default=0.0, help="Alpha-shape radius for non-periodic boundary detection. Example: --alpha-radius 2.0, which uses a 2-angstrom alpha-shape radius.")
+        parser.add_argument("--gap-deg", type=float, default=220.0, help="Angular-gap threshold for boundary fallback. Example: --gap-deg 220, which requires a 220-degree angular gap for boundary detection.")
+        parser.add_argument("--carbon-element", default="C", help="Element symbol used for carbon network analysis. Example: --carbon-element C, which identifies carbon by the C symbol.")
         parser.add_argument(
             "--include-noncarbon",
             action=argparse.BooleanOptionalAction,
             default=True,
-            help="Include non-carbon atoms in output table",
+            help="Include non-carbon atoms in output table. Example: --include-noncarbon, which retains non-carbon atoms in the output.",
         )
         parser.add_argument(
             "--strict-tract",
             action=argparse.BooleanOptionalAction,
             default=False,
-            help="Raise if canonical structural output cannot satisfy strict TRACT compatibility",
+            help="Raise if canonical structural output cannot satisfy strict TRACT compatibility. Example: --strict-tract, which raises an error when strict TRACT compatibility cannot be satisfied.",
         )
         parser.add_argument(
             "--soap",
             action=argparse.BooleanOptionalAction,
             default=False,
-            help="Compute optional SOAP descriptors (soap_pc1/2/3 and optional soap_score).",
+            help="Compute optional SOAP descriptors (soap_pc1/2/3 and optional soap_score). Example: --soap, which adds SOAP descriptors to the structural analysis.",
         )
-        parser.add_argument("--soap-ref-path", default=None, help="Optional .npy reference SOAP vectors for soap_score.")
-        parser.add_argument("--soap-r-cut", type=float, default=5.0, help="SOAP cutoff radius in angstrom.")
-        parser.add_argument("--soap-n-max", type=int, default=9, help="SOAP radial basis size.")
-        parser.add_argument("--soap-l-max", type=int, default=9, help="SOAP angular basis size.")
-        parser.add_argument("--soap-zeta", type=int, default=2, help="SOAP kernel exponent for reference similarity.")
+        parser.add_argument("--soap-ref-path", default=None, help="Optional .npy reference SOAP vectors for soap_score. Example: --soap-ref-path reference_soap.npy, which reads reference vectors for SOAP similarity scores.")
+        parser.add_argument("--soap-r-cut", type=float, default=5.0, help="SOAP cutoff radius in angstrom. Example: --soap-r-cut 5, which includes neighbors within 5 angstrom.")
+        parser.add_argument("--soap-n-max", type=int, default=9, help="SOAP radial basis size. Example: --soap-n-max 9, which uses nine radial basis functions.")
+        parser.add_argument("--soap-l-max", type=int, default=9, help="SOAP angular basis size. Example: --soap-l-max 9, which sets the maximum angular basis order to nine.")
+        parser.add_argument("--soap-zeta", type=int, default=2, help="SOAP kernel exponent for reference similarity. Example: --soap-zeta 2, which squares the SOAP similarity kernel.")
     elif canonical == "get_active_site_events":
         parser.description = (
             "Extract persistent active-site C-O and C-Si events across trajectory frames.\n"
@@ -291,7 +291,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "--frames",
             nargs="*",
             default=None,
-            help='Frames: "0,10,20", "0 10 20", "0:20", "0-20", or "0:20:2"',
+            help="Frames: \"0,10,20\", \"0 10 20\", \"0:20\", \"0-20\", or \"0:20:2\". Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.",
         )
         parser.add_argument(
             "--every",
@@ -299,16 +299,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             dest="every",
             type=int,
             default=10,
-            help="Use every Nth selected frame (TRACT alias: --stride; default: 10)",
+            help="Use every Nth selected frame (TRACT alias: --stride; default: 10). Example: --every 5, which keeps every fifth selected frame.",
         )
-        parser.add_argument("--mode", choices=["auto", "bo", "dist"], default="auto", help="Event detection mode")
+        parser.add_argument("--mode", choices=["auto", "bo", "dist"], default="auto", help="Event detection mode. Example: --mode bo, which detects events from bond orders.")
         parser.add_argument(
             "--bo-threshold",
             "--bo_threshold",
             dest="bo_threshold",
             type=float,
             default=0.8,
-            help="Bond-order threshold for bo mode",
+            help="Bond-order threshold for bo mode. Example: --bo-threshold 0.4, which requires a bond order of at least 0.4 for retained connectivity.",
         )
         parser.add_argument(
             "--r-co",
@@ -316,7 +316,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             dest="r_co",
             type=float,
             default=1.65,
-            help="C-O distance cutoff in angstrom for dist mode",
+            help="C-O distance cutoff in angstrom for dist mode. Example: --r-co 1.65, which uses a 1.65-angstrom C-O cutoff in distance mode.",
         )
         parser.add_argument(
             "--r-csi",
@@ -324,21 +324,21 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             dest="r_csi",
             type=float,
             default=2.10,
-            help="C-Si distance cutoff in angstrom for dist mode",
+            help="C-Si distance cutoff in angstrom for dist mode. Example: --r-csi 2.1, which uses a 2.1-angstrom C-Si cutoff in distance mode.",
         )
-        parser.add_argument("--persist", type=int, default=50, help="Required consecutive analyzed frames for confirmed binding")
-        parser.add_argument("--diagnose", action="store_true", help="Sample C-X distance and episode distributions to choose --r-co/--r-csi and --persist before full extraction")
-        parser.add_argument("--r-probe", type=float, default=2.5, help="Generous C-X cutoff in angstrom used for diagnostic close-approach episodes")
-        parser.add_argument("--max-diag-frames", type=int, default=500, help="Maximum sampled frames for --diagnose")
-        parser.add_argument("--timestep-fs", type=float, default=10.0, help="Raw trajectory timestep in fs used to report diagnostic episode durations")
-        parser.add_argument("--carbon-element", default="C", help="Carbon element symbol")
-        parser.add_argument("--oxygen-element", default="O", help="Oxygen element symbol")
-        parser.add_argument("--silicon-element", default="Si", help="Silicon element symbol")
+        parser.add_argument("--persist", type=int, default=50, help="Required consecutive analyzed frames for confirmed binding. Example: --persist 50, which requires binding to persist for 50 analyzed frames.")
+        parser.add_argument("--diagnose", action="store_true", help="Sample C-X distance and episode distributions to choose --r-co/--r-csi and --persist before full extraction. Example: --diagnose, which samples distances and episodes before full event extraction.")
+        parser.add_argument("--r-probe", type=float, default=2.5, help="Generous C-X cutoff in angstrom used for diagnostic close-approach episodes. Example: --r-probe 2.5, which includes diagnostic close approaches within 2.5 angstrom.")
+        parser.add_argument("--max-diag-frames", type=int, default=500, help="Maximum sampled frames for --diagnose. Example: --max-diag-frames 500, which limits diagnostics to 500 sampled frames.")
+        parser.add_argument("--timestep-fs", type=float, default=10.0, help="Raw trajectory timestep in fs used to report diagnostic episode durations. Example: --timestep-fs 10, which uses 10 fs per raw trajectory step for episode durations.")
+        parser.add_argument("--carbon-element", default="C", help="Carbon element symbol. Example: --carbon-element C, which identifies carbon by the C symbol.")
+        parser.add_argument("--oxygen-element", default="O", help="Oxygen element symbol. Example: --oxygen-element O, which identifies oxygen by the O symbol.")
+        parser.add_argument("--silicon-element", default="Si", help="Silicon element symbol. Example: --silicon-element Si, which identifies silicon by the Si symbol.")
         parser.add_argument(
             "--strict-tract",
             action=argparse.BooleanOptionalAction,
             default=False,
-            help="Raise if canonical events output cannot satisfy strict TRACT compatibility",
+            help="Raise if canonical events output cannot satisfy strict TRACT compatibility. Example: --strict-tract, which raises an error when strict TRACT compatibility cannot be satisfied.",
         )
     else:
         raise KeyError(f"Unsupported active-site command '{canonical}'.")

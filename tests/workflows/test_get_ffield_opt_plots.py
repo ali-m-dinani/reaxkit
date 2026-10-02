@@ -20,7 +20,11 @@ from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
     _not_plotted_entries,
     build_parser,
 )
-from reaxkit.workflows.file_tools.ffield_workflow import EOS_SINGLE_FIGSIZE
+from reaxkit.workflows.file_tools.ffield_workflow import (
+    EOS_SINGLE_FIGSIZE,
+    _eos_plot_groups,
+    _plot_payload,
+)
 from reaxkit.workflows.force_field_opt.heatfo import (
     _plot_identifier,
     heatfo_plot_payloads,
@@ -92,6 +96,34 @@ def test_eos_group_renderer_uses_word_table_friendly_dimensions(
     _render_groups(groups, tmp_path, curve_type="eos")
 
     assert rendered_payloads[0]["figsize"] == EOS_SINGLE_FIGSIZE == (6.0, 5.0)
+
+
+def test_aggregate_eos_matches_dedicated_plot_specifications(monkeypatch, tmp_path):
+    table = pd.DataFrame(
+        {
+            "base_iden": ["bulk_0_mgo", "bulk_0_mgo"],
+            "other_iden": ["bulk_0.9_mgo", "bulk_1.0_mgo"],
+            "V_other_iden": [9.0, 10.0],
+            "E_other_iden": [-4.1, -5.1],
+            "ffield_value": [-4.0, -5.0],
+            "qm_value": [-4.1, -5.1],
+        }
+    )
+    dedicated = _plot_payload(
+        "get_ffield_opt_eos",
+        SimpleNamespace(table=table),
+        argparse.Namespace(plot="single"),
+    )
+    rendered = []
+    monkeypatch.setattr(plots_module, "render_plot", rendered.append)
+
+    paths = _render_groups(_eos_plot_groups(table), tmp_path, curve_type="eos")
+
+    assert len(rendered) == len(dedicated) == 1
+    expected = dict(dedicated[0])
+    expected_path = tmp_path / expected.pop("subdirectory") / expected.pop("filename")
+    assert paths == [expected_path]
+    assert rendered == [{**expected, "save": expected_path}]
 
 
 def test_aggregate_workflow_skips_empty_eos_and_finishes(

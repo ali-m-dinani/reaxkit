@@ -21,52 +21,63 @@ ALL_COMMANDS = (COMMAND,)
 
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     parser.set_defaults(command=COMMAND, progress=True)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Generate an OVITO-compatible Extended XYZ trajectory with atom_number, "
-        "charge, and delta_charge particle properties."
+        "Write an OVITO-compatible trajectory with atomic charges and charge changes.\n"
+        "\n"
+        "Use existing coordinates and charges to visualize charge transfer in OVITO.\n"
+        "The Extended XYZ output includes atom_number, charge, and delta_charge properties.\n"
+        "Optional electric-field values are matched by iteration.\n"
+        "\n"
+        "Examples:\n"
+        "  1. Export charges:\n"
+        "     reaxkit write-trajectory-with-charges --fort7 fort.7 --xmolout xmolout --output charges.extxyz\n"
+        "\n"
+        "  2. Include the applied field:\n"
+        "     reaxkit write-trajectory-with-charges --fort7 fort.7 --xmolout xmolout --fort78 fort.78 --include-electric-field --field-direction z --output charges_field.extxyz"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection.")
-    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory.")
-    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source.")
-    parser.add_argument("--fort78", default="fort.78", help="Applied electric-field source.")
-    parser.add_argument("--xmolout", default="xmolout", help="Coordinate and atom-type source.")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source.")
-    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10.")
-    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--fort78", default="fort.78", help="Applied electric-field source. Example: --fort78 runs/heating/fort.78, which reads electric-field data from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Coordinate and atom-type source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file.")
+    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame.")
     parser.add_argument(
         "--include-electric-field",
         action="store_true",
-        help="Add an iteration-matched electric_field attribute to every frame header.",
+        help="Add an iteration-matched electric_field attribute to every frame header. Example: --include-electric-field, which adds iteration-matched field data to exported frames.",
     )
     parser.add_argument(
         "--field-direction",
         choices=["x", "y", "z"],
         default="z",
-        help="Electric-field component written with --include-electric-field (default: z).",
+        help="Electric-field component written with --include-electric-field (default: z). Example: --field-direction z, which selects the z-directed electric-field component.",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="Extended XYZ destination; overrides --output-dir.",
+        help="Extended XYZ destination; overrides --output-dir. Example: --output charges.extxyz, which writes generated output to charges.extxyz.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
         help=(
-            "Directory where charges_delta_charges.extxyz will be written."
+            "Directory where charges_delta_charges.extxyz will be written. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory."
         ),
     )
     parser.add_argument(
         "--precision",
         type=int,
         default=8,
-        help="Significant digits for coordinates and floating-point properties.",
+        help="Significant digits for coordinates and floating-point properties. Example: --precision 8, which writes floating-point values with eight significant digits.",
     )
-    parser.add_argument("--control", default="control", help="Control file used for frame progress.")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet")
+    parser.add_argument("--control", default="control", help="Control file used for frame progress. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

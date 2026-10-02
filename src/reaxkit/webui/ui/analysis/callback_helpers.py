@@ -1,4 +1,4 @@
-﻿"""Provide helper utilities for analysis callback registration.
+"""Provide helper utilities for analysis callback registration.
 
 This module contains the non-decorator helper logic used by
 `reaxkit.webui.ui.analysis.callbacks`. It centralizes cache/state helpers,
@@ -47,13 +47,15 @@ from reaxkit.webui.ui.shell.callbacks import (
 )
 
 logger = logging.getLogger(__name__)
-_ARTIFACT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
+from reaxkit.webui.backend.byte_cache import CacheBudget
+_CACHE_BUDGET = CacheBudget()
+_ARTIFACT_ROWS_CACHE = _CACHE_BUDGET.namespace('artifact_rows')
 _ARTIFACT_ROWS_CACHE_MAX = 128
-_PLOT_ROWS_CACHE: dict[str, list[dict[str, Any]]] = {}
+_PLOT_ROWS_CACHE = _CACHE_BUDGET.namespace('plot_rows')
 _PLOT_ROWS_CACHE_MAX = 96
-_FIGURE_CACHE: dict[str, dict[str, Any]] = {}
+_FIGURE_CACHE = _CACHE_BUDGET.namespace('figures')
 _FIGURE_CACHE_MAX = 48
-_ARTIFACT_OBJ_CACHE: dict[str, dict[str, Any]] = {}
+_ARTIFACT_OBJ_CACHE = _CACHE_BUDGET.namespace('artifacts')
 _ARTIFACT_OBJ_CACHE_MAX = 96
 _NODE_PIPELINE_CACHE: dict[str, str] = {}
 _SERVICE_HANDLE: WebUIApiService | None = None
@@ -192,11 +194,6 @@ def _resolve_artifact_by_id(artifact_id: str, *, node_id: str | None = None, pip
     aid = str(artifact_id or "").strip()
     if not aid:
         return None
-    cached = _ARTIFACT_OBJ_CACHE.get(aid)
-    if isinstance(cached, dict) and isinstance(cached.get("payload"), dict):
-        _ARTIFACT_OBJ_CACHE.pop(aid, None)
-        _ARTIFACT_OBJ_CACHE[aid] = cached
-        return cached
 
     service = _SERVICE_HANDLE
     if service is None:
@@ -214,7 +211,7 @@ def _resolve_artifact_by_id(artifact_id: str, *, node_id: str | None = None, pip
         try:
             artifact_obj = store.get_artifact(pid, aid)
         except Exception:
-            artifact_obj = None
+            return None
 
     if artifact_obj is None:
         lock = getattr(store, "_lock", None)
@@ -332,19 +329,12 @@ def _artifact_rows(artifact: dict[str, Any] | None) -> list[dict[str, Any]]:
         logger.error("ui._artifact_rows artifact_id=%s payload is not a dict", artifact.get("id"))
         return []
 
-    table = payload.get("table")
-    if not isinstance(table, list):
-        _trace(
-            f"[UI_ERROR] _artifact_rows artifact_id={artifact.get('id')} missing/invalid payload['table']; payload_keys={sorted(payload.keys())}"
-        )
-        logger.error(
-            "ui._artifact_rows artifact_id=%s missing/invalid payload['table']; payload_keys=%s",
-            artifact.get("id"),
-            sorted(payload.keys()),
-        )
-        return []
-
-    rows = [dict(r) for r in table if isinstance(r, dict)]
+    from reaxkit.webui.backend.artifact_tables import table_descriptor
+    descriptor = table_descriptor(payload)
+    if descriptor is not None and _SERVICE_HANDLE is not None:
+        rows = _SERVICE_HANDLE.store.tables.preview(descriptor, limit=12_000)
+    else:
+        rows = extract_tabular_rows(payload)
     if not rows:
         _trace(f"[UI_ERROR] _artifact_rows artifact_id={artifact.get('id')} payload['table'] is empty or non-row")
         logger.error("ui._artifact_rows artifact_id=%s payload['table'] is empty or non-row", artifact.get("id"))
@@ -516,7 +506,7 @@ def _find_source_artifact(
         if not entry_id:
             entry_id = expected
         if entry_id:
-            resolved = _resolve_artifact_by_id(entry_id, node_id=node_id)
+            resolved = _resolve_artifact_by_id(entry_id, node_id=node_id, pipeline_id=snapshot.get('id'))
             if isinstance(resolved, dict):
                 return resolved
 
@@ -1178,79 +1168,7 @@ def _as_num(value: Any) -> float | None:
     return _parse_float(value, None)
 
 
-def _compare_row_filter(row_value: Any, op: str, filter_value: str) -> bool:
-    op_norm = str(op or "==").strip().lower()
-    left_num = _as_num(row_value)
-    left_text = str(row_value or "").strip()
-    raw = str(filter_value or "").strip()
-
-    if op_norm in {"in", "not in"}:
-        tokens = [tok.strip() for tok in raw.split(",") if tok.strip()]
-        hit = left_text in tokens
-        return (not hit) if op_norm == "not in" else hit
-    if op_norm == "contains":
-        return raw.lower() in left_text.lower()
-    if op_norm == "between":
-        parts = [tok.strip() for tok in raw.split(",") if tok.strip()]
-        if len(parts) != 2:
-            return True
-        lo_num = _as_num(parts[0])
-        hi_num = _as_num(parts[1])
-        if left_num is not None and lo_num is not None and hi_num is not None:
-            lo = min(lo_num, hi_num)
-            hi = max(lo_num, hi_num)
-            return lo <= left_num <= hi
-        lo_txt, hi_txt = sorted(parts)
-        return lo_txt <= left_text <= hi_txt
-
-    right_num = _as_num(raw)
-    if left_num is not None and right_num is not None:
-        if op_norm == "==":
-            return left_num == right_num
-        if op_norm == "!=":
-            return left_num != right_num
-        if op_norm == ">":
-            return left_num > right_num
-        if op_norm == ">=":
-            return left_num >= right_num
-        if op_norm == "<":
-            return left_num < right_num
-        if op_norm == "<=":
-            return left_num <= right_num
-        return True
-
-    if op_norm == "==":
-        return left_text == raw
-    if op_norm == "!=":
-        return left_text != raw
-    if op_norm == ">":
-        return left_text > raw
-    if op_norm == ">=":
-        return left_text >= raw
-    if op_norm == "<":
-        return left_text < raw
-    if op_norm == "<=":
-        return left_text <= raw
-    return True
-
-
-def _apply_row_filters(rows: list[dict[str, Any]], raw_filters: Any) -> list[dict[str, Any]]:
-    filters = _row_filters_from_raw(raw_filters)
-    if not filters:
-        return rows
-    out: list[dict[str, Any]] = []
-    for row in rows:
-        keep = True
-        for fil in filters:
-            col = fil["column"]
-            if col not in row:
-                continue
-            if not _compare_row_filter(row.get(col), fil["op"], fil["value"]):
-                keep = False
-                break
-        if keep:
-            out.append(row)
-    return out
+from reaxkit.webui.backend.row_filters import _compare_row_filter, _apply_row_filters
 
 
 def _trace_styles_map(raw: Any) -> dict[str, dict[str, Any]]:
@@ -1864,7 +1782,7 @@ def _theme_options() -> list[dict[str, str]]:
     for t in built_in + bootstrap_like:
         if t in pio.templates and t not in names:
             names.append(t)
-    opts = [{"label": n, "value": n} for n in names]
+    opts = [{"label": "Application theme", "value": "workspace"}] + [{"label": n, "value": n} for n in names]
     setattr(_theme_options, "_cache", opts)
     return opts
 
@@ -2023,19 +1941,23 @@ def _render_pipeline_tree(snapshot: dict[str, Any], selected_node_id: str | None
             visualizations_by_analysis.setdefault(aid, []).append(node)
 
     def row(node_id: str, label: str, depth: int, status: str | None = None) -> Any:
+        from reaxkit.webui.ui.shared.workspace import icon
         selected = str(node_id) == str(selected_node_id)
         cls = "rk-tree-node selected" if selected else "rk-tree-node"
         prefix = ("   " * (depth - 1) + "|_ ") if depth > 0 else ""
         return html.Button(
             [
                 html.Span(prefix, className="rk-tree-prefix"),
-                html.Span("\U0001F4C1", className="rk-tree-icon"),
+                icon('plot' if (nodes.get(node_id) or {}).get('kind') == 'visualization' else 'tree'),
                 html.Span(label, className="rk-tree-label"),
-                html.Span(f"[{status}]" if status else "", className="rk-tree-status"),
+                html.Span(status or '', className="rk-tree-status"),
             ],
             id={"type": "pipeline-node-btn", "node_id": node_id},
             n_clicks=0,
             className=cls,
+            role='treeitem', tabIndex=0 if selected else -1, title=label,
+            **{'aria-selected': str(selected).lower(), 'aria-level': str(depth + 1),
+               'data-depth': str(depth), 'data-label': label, 'data-status': status or 'idle'},
         )
 
     rendered: list[Any] = [

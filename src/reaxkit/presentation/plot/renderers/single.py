@@ -13,7 +13,7 @@ from typing import Any, Mapping, Optional, Sequence, Union
 
 import matplotlib.pyplot as plt
 
-from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged
+from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged, save_or_show
 
 
 class SinglePlotRenderer(PlotRenderer):
@@ -64,7 +64,6 @@ class SinglePlotRenderer(PlotRenderer):
         xlim = cfg.get("xlim")
         ylim = cfg.get("ylim")
         aspect = cfg.get("aspect")
-        save = cfg.get("save")
         legend = bool(cfg.get("legend", False))
         figsize = cfg.get("figsize", (8.0, 3.2))
         plot_type = cfg.get("plot_type_style") or cfg.get("kind") or cfg.get("series_type", "line")
@@ -84,15 +83,15 @@ class SinglePlotRenderer(PlotRenderer):
                 if sx is None or sy is None:
                     continue
                 lbl = s.get("label")
-                lw = s.get("linewidth", 1.2)
+                lw = s.get("linewidth", cfg.get("linewidth", 1.2))
                 mk = s.get("marker", "." if plot_type == "scatter" else None)
-                ms = s.get("markersize", 4)
+                ms = s.get("markersize", cfg.get("markersize", 4))
                 al = s.get("alpha", 1.0)
                 kwargs = dict(linewidth=lw, marker=mk, alpha=al)
                 if s.get("color") is not None:
                     kwargs["color"] = s["color"]
                 if plot_type == "scatter":
-                    kwargs["s"] = ms
+                    kwargs["s"] = ms ** 2 if cfg.get("plot_style", "default") != "default" else ms
                 else:
                     kwargs["markersize"] = ms
                 _plot(ax, sx, sy, label=lbl, **kwargs)
@@ -100,7 +99,12 @@ class SinglePlotRenderer(PlotRenderer):
             if x is None or y is None:
                 raise ValueError("Provide (x, y) or 'series=[...]'.")
             if plot_type == "scatter":
-                ax.scatter(x, y, label=None)
+                kwargs = {}
+                if cfg.get("markersize") is not None:
+                    kwargs["s"] = cfg["markersize"] ** 2
+                if cfg.get("color") is not None:
+                    kwargs["color"] = cfg["color"]
+                ax.scatter(x, y, label=None, **kwargs)
             else:
                 ax.plot(
                     x,
@@ -108,6 +112,8 @@ class SinglePlotRenderer(PlotRenderer):
                     label=None,
                     marker=cfg.get("marker"),
                     markersize=cfg.get("markersize", 4),
+                    linewidth=cfg.get("linewidth"),
+                    color=cfg.get("color"),
                 )
 
         if hlines:
@@ -183,19 +189,4 @@ class SinglePlotRenderer(PlotRenderer):
             ax.legend()
 
         fig.tight_layout()
-        if save:
-            from pathlib import Path
-
-            p = Path(save)
-            exts = {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".tif", ".tiff", ".bmp"}
-            if p.suffix.lower() in exts:
-                p.parent.mkdir(parents=True, exist_ok=True)
-                out = p
-            else:
-                p.mkdir(parents=True, exist_ok=True)
-                out = p / f"{(title or 'single_plot').replace(' ', '_')}.png"
-            fig.savefig(out, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-        else:
-            plt.show()
-        return fig
+        return save_or_show(fig, {"plot_type": "single_plot", **cfg})

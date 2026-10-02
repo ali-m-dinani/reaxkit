@@ -14,13 +14,12 @@ def _dash_imports():
 
 
 def create_dash_app():
-    """Create and configure Dash app for Phase 2 shell."""
+    """Create the responsive scientific workspace and its shared backend."""
     Dash = _dash_imports()
     from reaxkit.webui.backend.api import WebUIApiService
     from reaxkit.webui.callbacks import register_callbacks
     from reaxkit.webui.ui.shared.debounce import enable_input_debounce
     from reaxkit.webui.ui.layout import build_layout
-    from reaxkit.webui.ui.shared.styles import _CSS
 
     enable_input_debounce()
 
@@ -36,7 +35,6 @@ def create_dash_app():
         <title>{{%title%}}</title>
         {{%favicon%}}
         {{%css%}}
-        <style>{_CSS}</style>
     </head>
     <body>
         {{%app_entry%}}
@@ -50,5 +48,20 @@ def create_dash_app():
     app.layout = build_layout()
 
     service = WebUIApiService()
+    app.reaxkit_service = service
+    from flask import g, request
+    from time import perf_counter
+
+    @app.server.before_request
+    def record_start():
+        g.reaxkit_started = perf_counter()
+
+    @app.server.after_request
+    def record_response(response):
+        elapsed = (perf_counter() - g.reaxkit_started) * 1000
+        response.headers['Server-Timing'] = f'reaxkit;dur={elapsed:.3f}'
+        if request.path == '/_dash-update-component':
+            service.metrics.record('dash_callback', elapsed, response_bytes=response.content_length or 0)
+        return response
     register_callbacks(app, service)
     return app

@@ -10,21 +10,24 @@ def build_parser(parser, *, command: str):
         parser,
         command=command,
         description=(
-            "Get potential energy as a time series.\n\n"
+            "Get potential energy as a time series.\n"
+            "\n"
+            "Compare total or per-atom potential energy in existing simulation output.\n"
+            "Per-atom normalization requires frame atom counts from xmolout.\n"
+            "\n"
             "Examples:\n"
-            "  reaxkit get_potential_energy --summary summary.txt --plot single\n"
-            "  reaxkit get_potential_energy --summary summary.txt --per-atom "
-            "--plot single --save pot_en_per_atom.png"
+            "  1. Total energy:\n"
+            "     reaxkit get-potential-energy --summary runs/heating/summary.txt --plot single\n"
+            "\n"
+            "  2. Energy per atom:\n"
+            "     reaxkit get-potential-energy --summary runs/heating/summary.txt --xmolout runs/heating/xmolout --per-atom --plot single --save energy_per_atom.png"
         ),
         inputs=("xmolout", "summary"),
     )
     parser.add_argument(
         "--per-atom",
         action="store_true",
-        help=(
-            "Divide potential energy by the number of atoms in each frame. "
-            "The atom counts are read from xmolout and may vary across frames."
-        ),
+        help="Divide potential energy by each frame's atom count from xmolout. Example: --per-atom, which reports energy per atom instead of total energy.",
     )
     return parser
 

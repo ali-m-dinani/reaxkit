@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 from typing import Any
 
 try:  # pragma: no cover - optional runtime dependency
@@ -20,16 +20,16 @@ def _serialize_value(value: Any) -> Any:
         if isinstance(value, pd.Series):
             return value.to_list()
     if is_dataclass(value):
-        return asdict(value)
+        return {f.name: _serialize_value(getattr(value, f.name)) for f in fields(value)}
     if isinstance(value, (list, dict, str, int, float, bool)) or value is None:
         return value
     return str(value)
 
 
-def normalize_result(result: object) -> dict[str, Any]:
+def normalize_result(result: object, *, tables=None) -> dict[str, Any]:
     """Normalize a result object to a dictionary payload."""
     if is_dataclass(result):
-        raw = asdict(result)
+        raw = {f.name: getattr(result, f.name) for f in fields(result)}
     elif hasattr(result, "__dict__"):
         raw = dict(vars(result))
     else:
@@ -37,12 +37,23 @@ def normalize_result(result: object) -> dict[str, Any]:
 
     payload: dict[str, Any] = {}
     for key, value in raw.items():
+        if tables is not None:
+            import numpy as np
+            if (pd is not None and isinstance(value, pd.Series)) or isinstance(value, np.ndarray) or (isinstance(value, list) and len(value) > 1024):
+                payload.update(tables.persist_payload({key: value}))
+                continue
+        if tables is not None and ((pd is not None and isinstance(value, pd.DataFrame))
+                or (isinstance(value, list) and value and isinstance(value[0], dict))):
+            payload[key] = tables.write(value)
+            continue
         payload[key] = _serialize_value(value)
     return payload
 
 
 def recommend_views(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Generate default view hints from normalized payload."""
+    from reaxkit.webui.backend.artifact_tables import is_table
+    payload = {k: v.get('preview', []) if is_table(v) else v for k, v in payload.items()}
     views: list[dict[str, Any]] = [{"type": "table", "label": "Table"}]
     records = None
     for value in payload.values():

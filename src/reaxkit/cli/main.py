@@ -52,7 +52,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         self._selected_command = selected_command
         self._known_commands = known_commands or set()
         self.add_argument("--help-all", "--all-flags", action=_FullHelpAction,
-                          help="Show every option, grouped by purpose.")
+                          help="Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output.")
 
     def _print_message(self, message: str, file=None) -> None:
         """Write long help output incrementally for terminals with write limits."""
@@ -192,18 +192,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                     if self.prog == "reaxkit CLI" else "[options]"), ""])
 
         if self.description:
-            description = self.description.rstrip()
-            if not full:
-                sections = description.split("\n\n")
-                description = sections[0].strip()
-                example = next((line.strip() for line in self.description.splitlines()
-                                if line.lstrip().startswith("reaxkit ")), None)
-                if example:
-                    description += "\n\n" + textwrap.fill(f"Example: {example}", width=width,
-                                                             subsequent_indent="  ")
-            out.append("\n".join(textwrap.fill(line, width=width,
-                                           subsequent_indent="  ") if line.strip() else ""
-                                 for line in description.splitlines()))
+            out.append(self.description.rstrip())
             out.append("")
 
         commands = self._commands_rows()
@@ -445,7 +434,25 @@ def build_parser(selected_command: str | None = None) -> _ReaxKitArgumentParser:
                 module.build_parser(wp)
             wp.set_defaults(_run=module.run_main)
         else:
-            tasks = wp.add_subparsers(dest="task", required=True)
+            wp.formatter_class = argparse.RawTextHelpFormatter
+            wp.description = (
+                "Show the compatibility interface for retired fort.7 analysis tasks.\n\n"
+                "The nested task parsers remain available, but their production analyzers have been retired.\n"
+                "Use direct get-charge, get_connection_* and get_bond_events commands for analysis.\n\n"
+                "Examples:\n"
+                "  1. Inspect the legacy charge interface:\n"
+                "     reaxkit fort7 get --help\n\n"
+                "  2. Inspect the legacy edge interface:\n"
+                "     reaxkit fort7 edges --help\n\n"
+                "  3. Inspect legacy connectivity statistics:\n"
+                "     reaxkit fort7 constats --help\n\n"
+                "  4. Inspect legacy bond histories:\n"
+                "     reaxkit fort7 bond-ts --help\n\n"
+                "  5. Inspect the legacy event interface:\n"
+                "     reaxkit fort7 bond-events --help"
+            )
+            tasks = wp.add_subparsers(dest="task", required=True,
+                                     help="Analysis task to run. Example: edges, which extracts bond connections from fort.7.")
             module.register_tasks(tasks)
 
     from reaxkit.core.runtime.cli_policy import add_execution_arguments
@@ -525,8 +532,9 @@ def main(*, announce: bool = True) -> int:
         setattr(args, "project_root", str(project_root))
 
     from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
+    from reaxkit.presentation.plot_styles import plot_style_context
 
-    with trace, workflow_artifact_policy(args):
+    with trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)):
         try:
             with trace.step(
                 f"Execute {getattr(args, 'command', selected_command)} command"

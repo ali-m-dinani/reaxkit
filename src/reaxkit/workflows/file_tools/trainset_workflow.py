@@ -91,16 +91,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Getting training sets in a specific section, for example geometry:\n"
             "  reaxkit get_trainset_data --section geometry --export geometry_trainset_data\n\n"
         )
-        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
-        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
-        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-        parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-        parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
+        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints detailed execution messages.")
+        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which combines selected series in one figure.")
+        parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens generated figures interactively.")
+        parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save analysis.png, which writes the generated figure to that image.")
         add_trainset_export_argument(parser)
-        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
-        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy.")
+        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
+        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate.")
+        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. Example: --section energy, which keeps only energy training entries.")
         add_storage_cli_arguments(parser)
         return parser
 
@@ -117,16 +117,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Getting group comments in a specific section, for example geometry:\n"
             "   reaxkit get_trainset_group_comments --section geometry --export geometry_group_comments.csv"
         )
-        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
-        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
-        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot")
-        parser.add_argument("--show", action="store_true", help="Show the generated plot window")
-        parser.add_argument("--save", default=None, help="Save the generated plot to a file path")
-        parser.add_argument("--export", default=None, help="Write the result table to CSV")
-        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
-        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy.")
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+        parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
+        parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints detailed execution messages.")
+        parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which combines selected series in one figure.")
+        parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens generated figures interactively.")
+        parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save analysis.png, which writes the generated figure to that image.")
+        parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis.")
+        parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
+        parser.add_argument("--xaxis", default=None, help="Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate.")
+        parser.add_argument("--section", default="all", help="Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. Example: --section energy, which keeps only energy training entries.")
         add_storage_cli_arguments(parser)
         return parser
 
@@ -142,22 +142,22 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "  2. Generate a template YAML with a custom name:\n"
             "  reaxkit gen_template_yaml_for_elastic_settings --output trainset_settings.yaml\n\n"
         )
-        parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path")
-        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+        parser.add_argument("--output", default="trainset_settings.yaml", help="Output YAML path. Example: --output trainset_settings.yaml, which writes generated output to trainset_settings.yaml.")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
 
     elif command in {"gen_template_yaml_for_heatfo_settings", "make-trainset-settings-heatfo"}:
         parser.description = (
-            "Write a sample trainset settings YAML for generating heat-of-formation-based-training data.\n"
-            "This command only writes the template YAML file but does not generate any trainset data. Once you have the YAML file, "
-            "you can edit it to specify what materials/systems you want to generate heatfo (i.e., heat of formation) training "
-            "data for and then run 'gen_heatfo_trainset' "
-            "with '--input-mode yaml' to generate the trainset based on the YAML config.\n\n"
-            "Example:\n"
-            "  1. Generate a template YAML with default name 'trainset_heatfo_settings.yaml':\n"
-            "  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml\n\n"
+            "Write a starter YAML for heat-of-formation training-data generation.\n"
+            "\n"
+            "Edit the material and reference settings before running gen_heatfo_trainset.\n"
+            "This command writes only the configuration template; it does not generate training data.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Create the template:\n"
+            "     reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml"
         )
-        parser.add_argument("--output", default="trainset_heatfo_settings.yaml", help="Output YAML path")
-        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+        parser.add_argument("--output", default="trainset_heatfo_settings.yaml", help="Output YAML path. Example: --output trainset_heatfo_settings.yaml, which writes generated output to trainset_heatfo_settings.yaml.")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
 
     elif command in {"gen_elastic_trainset", "make-trainset-elastic"}:
         parser.description = (
@@ -194,8 +194,9 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles than"
             "that of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). "
             "For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure "
-            "setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, "
-            "but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.\n\n"
+            "setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. "
+            "This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates "
+            "to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.\n\n"
 
             "[Note] As you may know, the trainset generator for elastic data is developed only for orthogonal systems (i.e., with alpha=beta=gamma=90). "
             "If you use the source-backed modes to fetch structures from sources like MP, you may encounter some non-orthogonal structures. "
@@ -203,38 +204,38 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             
             ""
         )
-        parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="yaml")
-        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source.")
-        parser.add_argument("--yaml", default=None, help="Existing trainset_settings.yaml file (yaml mode).")
-        parser.add_argument("--mat-id", "--mp-id", dest="mat_id", default=None, help="Material id (material-id mode).")
-        parser.add_argument("--elements", default=None, help="Comma-separated elements for batch mode, for example Ba,B,O")
-        parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact")
-        parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode.")
-        parser.add_argument("--api-key", required=True, help="Source API key (MP uses --api-key or MP_API_KEY).")
-        parser.add_argument("--bulk-mode", default="voigt", choices=["voigt", "reuss", "vrh"], help="Bulk modulus mode for supported sources.")
+        parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="yaml", help="Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML.")
+        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source. Example: --source mp, which fetches materials from Materials Project.")
+        parser.add_argument("--yaml", default=None, help="Existing trainset_settings.yaml file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration.")
+        parser.add_argument("--mat-id", "--mp-id", dest="mat_id", default=None, help="Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode.")
+        parser.add_argument("--elements", default=None, help="Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode.")
+        parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact", help="Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements.")
+        parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials.")
+        parser.add_argument("--api-key", required=True, help="Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key.")
+        parser.add_argument("--bulk-mode", default="voigt", choices=["voigt", "reuss", "vrh"], help="Bulk modulus mode for supported sources. Example: --bulk-mode vrh, which uses the Voigt-Reuss-Hill bulk modulus.")
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
             default="to-conventional",
-            help="Convert fetched crystal structure setting before generating files",
+            help="Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells.",
         )
-        parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes.")
-        parser.add_argument("--structure-dir", default=None, help="Directory for downloaded source structures.")
+        parser.add_argument("--out-yaml", default="trainset_settings_source.yaml", help="Generated YAML filename in source-backed modes. Example: --out-yaml trainset_source.yaml, which writes fetched material settings to that YAML file.")
+        parser.add_argument("--structure-dir", default=None, help="Directory for downloaded source structures. Example: --structure-dir structures, which stores downloaded crystal structures there.")
         parser.add_argument(
             "--skip-not-orthogonal",
             action="store_true",
             default=True,
-            help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90).",
+            help="Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). Example: --skip-not-orthogonal, which excludes structures whose cell angles are not all 90 degrees.",
         )
         parser.add_argument(
             "--skip-negative-elastic-data",
             action="store_true",
-            help="Skip materials whose elastic tensor contains negative cij values.",
+            help="Skip materials whose elastic tensor contains negative cij values. Example: --skip-negative-elastic-data, which excludes materials with negative elastic-tensor entries.",
         )
-        parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
-        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for elastic ENERGY lines in the training set.")
-        parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs.")
-        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+        parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging. Example: --verbose, which prints source-fetching details.")
+        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for elastic ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries.")
+        parser.add_argument("--output", default="trainset_elastic_generated", help="Directory for outputs. Example: --output trainset_elastic_generated, which writes generated artifacts under trainset_elastic_generated.")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
 
 
     elif command in {"gen_heatfo_trainset", "make-trainset-heatfo"}:
@@ -280,39 +281,38 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles than"
             "that of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). "
             "For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure "
-            "setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, "
-            "but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.\n\n"
+            "setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. "
+            "This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates "
+            "to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.\n\n"
 
         )
-        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source.")
-        parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="batch")
-        parser.add_argument("--yaml", default=None, help="Heatfo YAML settings file (yaml mode).")
-        parser.add_argument("--mat-id", "--mp-id", dest="mat_id", default=None, help="Material id (material-id mode).")
-        parser.add_argument("--elements", default=None, help="Comma-separated elements for batch mode, for example Ba,B,O")
+        parser.add_argument("--source", choices=["mp", "jarvis"], default="mp", help="Data source. Example: --source mp, which fetches materials from Materials Project.")
+        parser.add_argument("--input-mode", choices=["yaml", "material-id", "batch"], default="batch", help="Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML.")
+        parser.add_argument("--yaml", default=None, help="Heatfo YAML settings file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration.")
+        parser.add_argument("--mat-id", "--mp-id", dest="mat_id", default=None, help="Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode.")
+        parser.add_argument("--elements", default=None, help="Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode.")
         parser.add_argument(
             "--references",
             default=None,
             help=(
-                "Optional reference map: element=identifier:atoms,... "
-                '(example: "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"). '
-                "If omitted, unary references are auto-selected from the source."
+                "Optional reference map: element=identifier:atoms,... (example: \"Ba=Babcc_opt:2,B=B_alp:12,O=O2:2\"). If omitted, unary references are auto-selected from the source. Example: --references Al=Alfcc:4,N=N2:2, which uses the specified aluminum and nitrogen reference structures."
             ),
         )
-        parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact")
-        parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode.")
+        parser.add_argument("--element-count-scope", choices=["exact", "up-to"], default="exact", help="Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements.")
+        parser.add_argument("--max-materials", type=int, default=None, help="Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials.")
         parser.add_argument(
             "--crystallographic-setting-conversion",
             choices=["to-conventional", "to-primitive"],
             default="to-conventional",
-            help="Convert fetched crystal structure setting before generating files.",
+            help="Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells.",
         )
-        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set.")
-        parser.add_argument("--trainset-file", default="trainset_heatfo.in", help="Output trainset filename.")
-        parser.add_argument("--geo-file", default="geo", help="Output concatenated geo filename.")
-        parser.add_argument("--api-key", default=None, help="Source API key (MP uses --api-key or MP_API_KEY).")
-        parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging")
-        parser.add_argument("--output", default="trainset_heatfo_generated", help="Directory for outputs.")
-        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+        parser.add_argument("--weight", type=float, default=1.0, help="Weight used for heatfo ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries.")
+        parser.add_argument("--trainset-file", default="trainset_heatfo.in", help="Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in.")
+        parser.add_argument("--geo-file", default="geo", help="Output concatenated geo filename. Example: --geo-file geo, which writes generated geometries to geo.")
+        parser.add_argument("--api-key", default=None, help="Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key.")
+        parser.add_argument("--verbose", action="store_true", help="Verbose source fetching/logging. Example: --verbose, which prints source-fetching details.")
+        parser.add_argument("--output", default="trainset_heatfo_generated", help="Directory for outputs. Example: --output trainset_heatfo_generated, which writes generated artifacts under trainset_heatfo_generated.")
+        parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
     else:
         raise KeyError(f"Unsupported trainset file-tool command {command!r}.")
 

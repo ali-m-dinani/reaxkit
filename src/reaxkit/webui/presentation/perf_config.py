@@ -14,6 +14,10 @@ _DEFAULTS: dict[str, int] = {
     "plot2d_initial_max_points": 12000,
     "plot2d_zoom_max_points": 120000,
     "plot2d_max_curves_display": 10,
+    "histogram_max_bins": 256,
+    "scatter3d_max_points": 20000,
+    "scatter3d_max_bonds": 2000,
+    "plot_max_bytes": 4 * 1024 * 1024,
 }
 
 
@@ -42,6 +46,8 @@ def load_ui_performance_config() -> dict[str, int]:
     except Exception:
         raw = {}
     return {
+        **{key: _safe_int(raw.get(key), _DEFAULTS[key]) for key in
+           ('histogram_max_bins', 'scatter3d_max_points', 'scatter3d_max_bonds', 'plot_max_bytes')},
         "plot2d_scattergl_threshold": _safe_int(
             raw.get("plot2d_scattergl_threshold"),
             _DEFAULTS["plot2d_scattergl_threshold"],

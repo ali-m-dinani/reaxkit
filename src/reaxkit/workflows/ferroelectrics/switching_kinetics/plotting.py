@@ -9,11 +9,13 @@ import numpy as np
 
 
 def _safe_name(value: object) -> str:
+    """Make a group or parameter label safe for use in an output filename."""
     text = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip())
     return text.strip("._") or "group"
 
 
 def _plot_imports():
+    """Load the noninteractive plotting backend or explain the missing extra."""
     try:
         import matplotlib
 
@@ -29,6 +31,7 @@ def _plot_imports():
 
 
 def _blue_red_colormap(LinearSegmentedColormap):
+    """Return the color scale used for increasing parameter-sweep values."""
     return LinearSegmentedColormap.from_list(
         "switching_blue_red",
         ("#08306b", "#225ea8", "#6a51a3", "#b2182b", "#7f0000"),
@@ -36,6 +39,7 @@ def _blue_red_colormap(LinearSegmentedColormap):
 
 
 def _base_axis(ax, *, model: str, group: object, time_unit: str) -> None:
+    """Label a switching plot without rescaling its time or fraction data."""
     ax.set_xlabel(f"Time ({time_unit})")
     ax.set_ylabel("Flipped fraction")
     ax.set_ylim(-0.03, 1.03)
@@ -44,6 +48,7 @@ def _base_axis(ax, *, model: str, group: object, time_unit: str) -> None:
 
 
 def _draw_observations(ax, table) -> None:
+    """Draw observed switched fractions as unconnected outlined markers."""
     ax.plot(
         table["time"],
         table["observed_fraction"],
@@ -59,6 +64,7 @@ def _draw_observations(ax, table) -> None:
 
 
 def _draw_best_fit(ax, table) -> None:
+    """Draw the baseline fit as a green line."""
     ax.plot(
         table["time"],
         table["predicted_fraction"],
@@ -80,7 +86,12 @@ def generate_switching_plots(
 
     Observations use markers without connecting lines. Parameter-sweep curves
     progress from dark blue at the smallest value to dark red at the largest;
-    the unconstrained best fit is always green.
+    the baseline fit, including any user-fixed parameters, is always green.
+    Return the written paths. time_unit labels axes without converting values;
+    dpi sets PNG resolution and must be positive.
+    Plot time zero is the field onset supplied during normalization, or the
+    earliest input sample in each group if no onset was supplied. Plotting
+    preserves those elapsed times and does not reset the first sample to zero.
     """
     if dpi <= 0:
         raise ValueError("figure_dpi must be greater than zero.")

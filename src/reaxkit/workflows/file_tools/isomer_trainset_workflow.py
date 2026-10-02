@@ -35,36 +35,36 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--job-dir",
         default="isomer_jobs",
-        help="Directory containing per-isomer job folders.",
+        help="Directory containing per-isomer job folders. Example: --job-dir isomer_jobs, which reads the per-isomer calculation folders there.",
     )
     parser.add_argument(
         "--output-dir",
         default="isomer_trainset",
-        help="Output directory for geo, trainset.in, composition.txt, and log files.",
+        help="Output directory for geo, trainset.in, composition.txt, and log files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
-    parser.add_argument("--hf-output-name", default="hf.out", help="Supported output filename inside each job folder.")
-    parser.add_argument("--geo-file", default="geo", help="Output geo filename.")
-    parser.add_argument("--trainset-file", default="trainset.in", help="Output trainset filename.")
-    parser.add_argument("--composition-file", default="composition.txt", help="Output composition filename.")
-    parser.add_argument("--log-file", default="out_trainset_log.txt", help="Output log filename.")
-    parser.add_argument("--weight", type=float, default=1.0, help="Weight for generated ENERGY trainset lines.")
+    parser.add_argument("--hf-output-name", default="hf.out", help="Supported output filename inside each job folder. Example: --hf-output-name hf.out, which reads that filename in each isomer job folder.")
+    parser.add_argument("--geo-file", default="geo", help="Output geo filename. Example: --geo-file geo, which writes generated geometries to geo.")
+    parser.add_argument("--trainset-file", default="trainset.in", help="Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in.")
+    parser.add_argument("--composition-file", default="composition.txt", help="Output composition filename. Example: --composition-file composition.txt, which writes relative compositions to that file.")
+    parser.add_argument("--log-file", default="out_trainset_log.txt", help="Output log filename. Example: --log-file trainset.log, which writes generation diagnostics to that log.")
+    parser.add_argument("--weight", type=float, default=1.0, help="Weight for generated ENERGY trainset lines. Example: --weight 1.0, which assigns unit weight to generated training entries.")
     parser.add_argument(
         "--reference-composition",
         type=float,
         default=100.0,
-        help="Composition value assigned to the lowest-energy reference structure.",
+        help="Composition value assigned to the lowest-energy reference structure. Example: --reference-composition 100, which sets the lowest-energy reference composition to 100.",
     )
-    parser.add_argument("--temperature", type=float, default=273.0, help="Temperature used for relative composition.")
-    parser.add_argument("--gas-constant", type=float, default=1.987, help="Gas constant used for relative composition.")
+    parser.add_argument("--temperature", type=float, default=273.0, help="Temperature used for relative composition. Example: --temperature 300, which evaluates relative compositions at 300 K.")
+    parser.add_argument("--gas-constant", type=float, default=1.987, help="Gas constant used for relative composition. Example: --gas-constant 1.987, which uses 1.987 cal/(mol K) in the composition calculation.")
     parser.add_argument(
         "--require-all-complete",
         action="store_true",
-        help="Fail if any isomer job folder is missing a completed hf.out.",
+        help="Fail if any isomer job folder is missing a completed hf.out. Example: --require-all-complete, which fails if any expected isomer output is incomplete.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Allow overwriting files in an existing non-empty output directory.",
+        help="Allow overwriting files in an existing non-empty output directory. Example: --force, which allows replacement of existing generated output.",
     )
     return parser
 

@@ -57,10 +57,10 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
             return "WARN: No active pipeline"
         path = str(snapshot_path or "./reaxkit.pipeline.json")
         try:
-            saved = service.export_pipeline(pipeline_id, {"path": path})
+            saved = service.jobs.submit(pipeline_id, 'save_snapshot', {"path": path})
         except Exception as exc:
             return f"ERROR: Save failed: {exc}"
-        return f"Snapshot saved: {saved.get('path')}"
+        return f"Snapshot save queued: {saved['id']}"
 
     @app.callback(
         Output("session-store", "data", allow_duplicate=True),
@@ -69,26 +69,27 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
         Output("status-banner", "children", allow_duplicate=True),
         Input("btn-load-snapshot", "n_clicks"),
         State("input-snapshot-path", "value"),
+        State("session-store", "data"),
         prevent_initial_call=True,
     )
-    def on_load_snapshot(n_clicks: int, snapshot_path: str | None):
+    def on_load_snapshot(n_clicks: int, snapshot_path: str | None, session):
         if not n_clicks:
             return no_update, no_update, no_update, no_update
         path = str(snapshot_path or "").strip()
         if not path:
             return no_update, no_update, no_update, "WARN: Snapshot path required"
         try:
-            snapshot = service.load_pipeline_snapshot({"path": path})
+            if not session:
+                raise ValueError('No active session')
+            job = service.jobs.submit(session['pipeline_id'], 'import_snapshot', {'path': path})
         except Exception as exc:
             return no_update, no_update, no_update, f"ERROR: Load failed: {exc}"
         _ARTIFACT_OBJ_CACHE.clear()
         _ARTIFACT_ROWS_CACHE.clear()
         _PLOT_ROWS_CACHE.clear()
         _NODE_PIPELINE_CACHE.clear()
-        selected = "virtual:dataset"
-        session = {"pipeline_id": snapshot.get("id"), "selected_node_id": selected}
-        result_cache = _result_cache_from_snapshot(snapshot)
-        return session, snapshot, result_cache, f"Snapshot loaded: {path}"
+        session = {**session, 'selected_node_id': 'virtual:dataset'}
+        return session, no_update, no_update, f"Snapshot import queued: {job['id']}"
 
     @app.callback(
         Output("config-store", "data", allow_duplicate=True),
@@ -160,13 +161,13 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
             return "WARN: No active pipeline"
         out_dir = str(bundle_dir or "./reaxkit.bundle")
         try:
-            result = service.export_pipeline_bundle(
-                pipeline_id,
+            result = service.jobs.submit(
+                pipeline_id, 'export_bundle',
                 {"path": out_dir, "selected_node_id": session.get("selected_node_id")},
             )
         except Exception as exc:
             return f"ERROR: Export bundle failed: {exc}"
-        return f"Bundle exported: {result.get('bundle_dir')}"
+        return f"Bundle export queued: {result['id']}"
 
     @app.callback(
         Output("session-store", "data", allow_duplicate=True),
@@ -492,8 +493,8 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
         if not pipeline_id or not node:
             return no_update, no_update, no_update, "WARN: Select a node first"
         kind = str(node.get("kind") or "")
-        if kind not in {"utility", "visualization"}:
-            return no_update, no_update, no_update, "WARN: Delete is supported for utilities/presentations only"
+        if kind not in {"analysis", "utility", "visualization"}:
+            return no_update, no_update, no_update, "WARN: Select an analysis, utility, or presentation to delete"
 
         node_id = str(node.get("id"))
         nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
@@ -520,7 +521,9 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
 
         next_snapshot = service.get_pipeline(pipeline_id)
         next_store = _result_cache_from_snapshot(next_snapshot)
-        if analysis_id and kind == "utility":
+        if kind == "analysis":
+            next_selected = "virtual:analysis"
+        elif analysis_id and kind == "utility":
             next_selected = f"virtual:utilities:{analysis_id}"
         elif analysis_id and kind == "visualization":
             next_selected = f"virtual:visualization:{analysis_id}"
@@ -528,6 +531,23 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
             next_selected = "virtual:dataset"
         next_session = {"pipeline_id": pipeline_id, "selected_node_id": next_selected}
         return next_session, next_snapshot, next_store, "Node deleted"
+
+    @app.callback(Output("btn-delete-analysis", "disabled"),
+                  Input("session-store", "data"), Input("pipeline-store", "data"))
+    def analysis_delete_available(session, snapshot):
+        node = _selected_node(snapshot, session)
+        return not node or node.get("kind") != "analysis"
+
+    @app.callback(Output("session-store", "data", allow_duplicate=True),
+                  Output("pipeline-store", "data", allow_duplicate=True),
+                  Output("result-store", "data", allow_duplicate=True),
+                  Output("status-banner", "children", allow_duplicate=True),
+                  Input("btn-delete-analysis", "n_clicks"),
+                  State("session-store", "data"), State("pipeline-store", "data"), prevent_initial_call=True)
+    def delete_hierarchy_analysis(clicks, session, snapshot):
+        if not clicks or analysis_delete_available(session, snapshot):
+            return no_update, no_update, no_update, no_update
+        return on_delete_node(clicks, session, snapshot)
 
     @app.callback(
         Output("status-banner", "className"),
@@ -545,12 +565,14 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
         Output("pipeline-browser-tree", "children"),
         Input("pipeline-store", "data"),
         Input("session-store", "data"),
+        Input('hierarchy-search', 'value'),
     )
-    def render_pipeline_nodes(snapshot: dict[str, Any] | None, session: dict[str, Any] | None):
+    def render_pipeline_nodes(snapshot: dict[str, Any] | None, session: dict[str, Any] | None, query=None):
         if not snapshot:
             return [html.Div("No nodes yet.", className="rk-tree-empty")]
         selected = (session or {}).get("selected_node_id")
-        return _render_pipeline_tree(snapshot, selected)
+        from reaxkit.webui.ui.shared.forms import filter_tree_rows
+        return filter_tree_rows(_render_pipeline_tree(snapshot, selected), query)
 
     @app.callback(
         Output("session-store", "data", allow_duplicate=True),
@@ -575,17 +597,7 @@ def register_pipeline_callbacks(app, service: WebUIApiService) -> None:
         current_id = str(session.get("selected_node_id") or "")
         if str(node_id) == current_id:
             return no_update
-        # Keep long-running execution stable: do not switch into a currently-running task node.
-        try:
-            live = service.get_pipeline(str(session["pipeline_id"]))
-            live_nodes = live.get("nodes", {}) if isinstance(live, dict) else {}
-            live_node = live_nodes.get(str(node_id)) if isinstance(live_nodes, dict) else None
-            if isinstance(live_node, dict):
-                is_running = str(live_node.get("status", "")).lower() == "running"
-                if is_running and str(live_node.get("kind", "")) in {"analysis", "utility"}:
-                    return no_update
-        except Exception:
-            pass
+        # Worker inputs are immutable; selection is independent of execution.
         return {"pipeline_id": session["pipeline_id"], "selected_node_id": node_id}
 
     @app.callback(

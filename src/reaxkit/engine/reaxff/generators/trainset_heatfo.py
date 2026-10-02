@@ -19,7 +19,7 @@ import re
 
 from reaxkit.core.platform.constants import const
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
-from reaxkit.engine.reaxff.generators.geo_generator import xtob
+from reaxkit.engine.reaxff.generators.geo_generator import orient_structure_for_reaxff, xtob
 from reaxkit.engine.reaxff.generators.trainset_mp import (
     _convert_structure_setting,
     _mp_collect_heatfo_docs,
@@ -360,14 +360,15 @@ def _write_structure_triplet(
 
     structure.to(filename=str(cif_path), fmt="cif")
     atoms = read_structure(cif_path, format="cif")
+    atoms = orient_structure_for_reaxff(atoms)
     write_structure(atoms, xyz_path, format="xyz", comment=identifier)
 
     lattice = structure.lattice
     xtob(
         xyz_file=xyz_path,
         geo_file=geo_path,
-        box_lengths=(float(lattice.a), float(lattice.b), float(lattice.c)),
-        box_angles=(float(lattice.alpha), float(lattice.beta), float(lattice.gamma)),
+        box_lengths=atoms.cell.lengths(),
+        box_angles=atoms.cell.angles(),
     )
 
     composition_counts = _extract_integer_composition_counts(structure)

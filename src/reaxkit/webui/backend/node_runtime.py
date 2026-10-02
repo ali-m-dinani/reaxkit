@@ -41,7 +41,7 @@ class PipelineRuntime:
 
     def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
         logger.debug("runtime.get_pipeline pipeline_id=%s", pipeline_id)
-        return self.store.snapshot(pipeline_id)
+        return self.store.metadata_snapshot(pipeline_id)
 
     def load_dataset(
         self,
@@ -51,6 +51,7 @@ class PipelineRuntime:
         engine: str | None = None,
         sources: dict[str, str] | None = None,
         project_root: str | None = None,
+        probe: bool = True,
     ) -> dict[str, Any]:
         engine_detected = detect_engine(run_dir, engine_override=engine)
         source_map = dict(sources or {})
@@ -65,7 +66,7 @@ class PipelineRuntime:
             run_dir=run_dir,
             engine_name=(engine or engine_detected),
             sources=source_map,
-        )
+        ) if probe else (None, None)
         info = DatasetInfo(
             engine_detected=engine_detected,
             engine_override=engine,
@@ -139,19 +140,8 @@ class PipelineRuntime:
                     quick_frames = None
                 if quick_frames is not None:
                     return (int(quick_frames), None)
-            traj = adapter.load(TrajectoryData, args, reporter=None)
-            atoms = len(getattr(traj, "atom_ids", []) or [])
-            frames = None
-            sim = getattr(traj, "simulation", None)
-            if sim is not None:
-                iterations = getattr(sim, "iterations", None)
-                if iterations is not None:
-                    frames = len(iterations)
-            if frames is None:
-                pos = getattr(traj, "positions", None)
-                if pos is not None and hasattr(pos, "shape") and len(pos.shape) >= 1:
-                    frames = int(pos.shape[0])
-            return (int(frames) if frames is not None else None, int(atoms) if atoms else None)
+            # Missing metadata is preferable to materializing a full trajectory.
+            return (None, None)
         except Exception:
             return (None, None)
 
@@ -291,6 +281,9 @@ class PipelineRuntime:
             "summary": sources.get("summary"),
             "project_root": node.metadata.get("project_root") or dataset_node.metadata.get("project_root"),
         }
+        reporter = getattr(self.store, 'reporter', None)
+        if reporter:
+            runtime_args['reporter'] = reporter
         project_root = runtime_args.get("project_root")
         if project_root:
             runtime_args["cache_dir"] = str((Path(str(project_root)).resolve() / ".reaxkit_cache").resolve())
@@ -303,7 +296,9 @@ class PipelineRuntime:
             sorted((node.request or {}).keys()) if isinstance(node.request, dict) else [],
         )
         result, task_cls = run_analysis_task(task_name, node.request, runtime_args)
-        payload = normalize_result(result)
+        if reporter:
+            reporter('persist', 0, 0, 'Persisting analysis result')
+        payload = normalize_result(result, tables=self.store.tables)
         table_rows, table_cols = self._payload_table_overview(payload)
         logger.info(
             "runtime._run_analysis_node payload_keys=%s table_rows=%s table_cols=%s",
@@ -316,7 +311,9 @@ class PipelineRuntime:
             id=make_id("artifact"),
             node_id=node.id,
             payload=payload,
-            metadata={"task_name": task_name},
+            metadata={"task_name": task_name, 'task_version': str(getattr(task_cls, 'VERSION', '1')),
+                      'request': dict(node.request), 'dataset_node_id': dataset_node.id,
+                      'dataset_revision': dataset_node.revision},
             recommended_views=recommended,
         )
         self.store.store_artifact(pipeline_id, artifact)
@@ -358,10 +355,12 @@ class PipelineRuntime:
 
     @staticmethod
     def _recommend_views_for_task(task_cls: type, result: object, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        from reaxkit.webui.backend.artifact_tables import is_table
+        view_payload = {k: v.get('preview', []) if is_table(v) else v for k, v in payload.items()}
         hook = getattr(task_cls, "recommended_presentations", None)
         if callable(hook):
             try:
-                views = hook(result, payload)
+                views = hook(result, view_payload)
                 if isinstance(views, list):
                     serialized = serialize_presentation_specs(views)
                     if serialized:
@@ -376,7 +375,7 @@ class PipelineRuntime:
         if not artifact_id:
             raise ValueError("Parent node has no result artifact to transform")
         parent_artifact = self.store.get_artifact(pipeline_id, str(artifact_id))
-        base_rows = self._extract_rows(parent_artifact.payload)
+        base_rows = self._full_rows(parent_artifact.payload)
         if not base_rows:
             raise ValueError("Parent artifact has no tabular payload")
 
@@ -398,7 +397,7 @@ class PipelineRuntime:
             if not right_artifact_id:
                 raise ValueError(f"Selected join source '{right_node_id}' has no result artifact")
             right_artifact = self.store.get_artifact(pipeline_id, str(right_artifact_id))
-            other_rows = self._extract_rows(right_artifact.payload)
+            other_rows = self._full_rows(right_artifact.payload)
             if not other_rows:
                 raise ValueError("Selected join source has no tabular payload")
         out_rows = apply_utility_rows(util_name, base_rows, util_req, other_rows=other_rows)
@@ -524,8 +523,17 @@ class PipelineRuntime:
     def _extract_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
         return extract_tabular_rows(payload)
 
+    def _full_rows(self, payload):
+        from reaxkit.webui.backend.artifact_tables import table_descriptor
+        descriptor = table_descriptor(payload)
+        return list(self.store.tables.rows(descriptor)) if descriptor else extract_tabular_rows(payload)
+
     @staticmethod
     def _payload_table_overview(payload: dict[str, Any]) -> tuple[int, list[str]]:
+        from reaxkit.webui.backend.artifact_tables import table_descriptor
+        descriptor = table_descriptor(payload)
+        if descriptor:
+            return descriptor['row_count'], descriptor['columns']
         rows = extract_tabular_rows(payload)
         if not rows:
             return 0, []

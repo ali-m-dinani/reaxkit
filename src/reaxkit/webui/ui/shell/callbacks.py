@@ -125,6 +125,8 @@ def _fetch_latest_release_tag(repo_slug: str) -> tuple[str, str]:
 
 def register_shell_callbacks(app, service) -> None:
     """Register shell and top-level navigation callbacks."""
+    from reaxkit.webui.ui.shell.workspace_callbacks import register_workspace_callbacks
+    register_workspace_callbacks(app, service)
 
     @app.callback(
         Output("session-store", "data"),
@@ -133,9 +135,17 @@ def register_shell_callbacks(app, service) -> None:
         Output("config-store", "data"),
         Output("status-banner", "children"),
         Input("app-init", "n_intervals"),
+        State('session-store', 'data'),
         prevent_initial_call=False,
     )
-    def on_app_init(_: int):
+    def on_app_init(_: int, previous=None):
+        if previous and previous.get('pipeline_id'):
+            try:
+                snapshot = service.get_pipeline(previous['pipeline_id'])
+                refs = {key: node['result_ref'] for key, node in snapshot['nodes'].items() if node.get('result_ref')}
+                return previous, snapshot, refs, no_update, 'Session restored'
+            except KeyError:
+                pass
         pipeline = service.create_pipeline({"name": "ReaxKit Pipeline"})
         snapshot = service.get_pipeline(str(pipeline["id"]))
         return (
@@ -179,11 +189,6 @@ def register_shell_callbacks(app, service) -> None:
         return {"page": current, "help_open": help_open}
 
     @app.callback(
-        Output("panel-left", "style"),
-        Output("panel-canvas", "style"),
-        Output("panel-props", "style"),
-        Output("panel-info", "style"),
-        Output("panel-log-page", "style"),
         Output("btn-nav-analysis", "className"),
         Output("btn-nav-log", "className"),
         Output("help-menu-dropdown", "style"),
@@ -198,11 +203,6 @@ def register_shell_callbacks(app, service) -> None:
         show_log = page == "log"
         base = "rk-nav-btn"
         return (
-            {} if show_analysis else {"display": "none"},
-            {} if show_analysis else {"display": "none"},
-            {} if show_analysis else {"display": "none"},
-            {} if show_analysis else {"display": "none"},
-            {"display": "block"} if show_log else {"display": "none"},
             f"{base} active" if show_analysis else base,
             f"{base} active" if show_log else base,
             {"display": "grid"} if help_open else {"display": "none"},

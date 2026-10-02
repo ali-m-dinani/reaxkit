@@ -63,56 +63,52 @@ Examples:
     restrict_native_charge_input(parser)
     parser.add_argument(
         "--component", choices=["x", "y", "z"], default="z",
-        help="Choose the local dipole component whose sign defines polarity. Default: z.",
+        help="Choose the local dipole component whose sign defines polarity. Default: z. Example: --component z, which defines polarity from the sign of the z dipole component.",
     )
     parser.add_argument(
         "--projection-plane", choices=["xy", "xz", "yz"], default="xz",
-        help="Choose the two spatial coordinates shown in each per-frame map. Default: xz.",
+        help="Choose the two spatial coordinates shown in each per-frame map. Default: xz. Example: --projection-plane xz, which displays x and z in the spatial projection.",
     )
     parser.add_argument(
         "--projection-bins", nargs=2, type=int, default=(40, 40),
         metavar=("NU", "NV"),
-        help="Set bin counts along the two projection-plane axes. Default: 40 40.",
+        help="Set bin counts along the two projection-plane axes. Default: 40 40. Example: --projection-bins 1 40, which averages across x and resolves 40 bins along z.",
     )
     parser.add_argument(
         "--reference-frame", type=int, default=0,
         help=(
-            "Assign each center to a fixed spatial bin using this source frame, then "
-            "retain that atom-to-bin assignment for every analyzed frame. Default: 0."
+            "Assign each center to a fixed spatial bin using this source frame, then retain that atom-to-bin assignment for every analyzed frame. Default: 0. Example: --reference-frame 0, which uses the initial frame to establish the reference assignment."
         ),
     )
     parser.add_argument(
         "--profile-axis", choices=["x", "y", "z"], default=None,
         help=(
-            "Choose the projection-plane axis on the vertical axis of the kymograph. "
-            "It reuses that axis's --projection-bins count. Default: the second axis."
+            "Choose the projection-plane axis on the vertical axis of the kymograph. It reuses that axis's --projection-bins count. Default: the second axis. Example: --profile-axis z, which places z position on the kymograph's vertical axis."
         ),
     )
     parser.add_argument(
         "--dipole-zero-tolerance", type=float, default=0.0,
         help=(
-            "Map selected dipole magnitudes at or below this value to polarity 0. "
-            "They remain included in bin means. Default: 0."
+            "Map selected dipole magnitudes at or below this value to polarity 0. They remain included in bin means. Default: 0. Example: --dipole-zero-tolerance 0.001, which treats magnitudes up to 0.001 as zero polarity."
         ),
     )
     parser.add_argument(
         "--write-centers",
         action="store_true",
-        help="Write the optional detailed per-center polarity table.",
+        help="Write the optional detailed per-center polarity table. Example: --write-centers, which exports the detailed local polarity table.",
     )
     parser.add_argument(
         "--centers-format",
         choices=["parquet", "csv"],
         default="parquet",
-        help="Choose the detailed centers-table format. Default: parquet.",
+        help="Choose the detailed centers-table format. Default: parquet. Example: --centers-format csv, which writes the detailed centers table as CSV.",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=0,
         help=(
-            "Override the automatically selected frame-worker count. "
-            "Use 0 for automatic selection. Default: 0."
+            "Override the automatically selected frame-worker count. Use 0 for automatic selection. Default: 0. Example: --workers 4, which uses four frame workers."
         ),
     )
     parser.add_argument(
@@ -120,29 +116,27 @@ Examples:
         type=int,
         default=0,
         help=(
-            "Override the maximum number of in-flight frames. "
-            "Use 0 for the memory-aware automatic limit. Default: 0."
+            "Override the maximum number of in-flight frames. Use 0 for the memory-aware automatic limit. Default: 0. Example: --chunk-size 8, which allows at most eight frames in flight."
         ),
     )
     parser.add_argument(
         "--plot-2d", action="store_true",
-        help="Write one projection-plane mean-polarity heatmap per selected frame.",
+        help="Write one projection-plane mean-polarity heatmap per selected frame. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-kymograph", "--plot-evolution", dest="plot_kymograph",
         action="store_true",
         help=(
-            "Write a kymograph: a frame-versus-position heatmap. "
-            "--plot-evolution is retained as an alias."
+            "Write a kymograph: a frame-versus-position heatmap. --plot-evolution is retained as an alias. Example: --plot-kymograph, which writes the frame-versus-position polarity heatmap."
         ),
     )
     parser.add_argument(
         "--figure-dpi", type=int, default=180,
-        help="Set PNG resolution. Default: 180.",
+        help="Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch.",
     )
     parser.add_argument(
         "--output-dir", type=Path, default=None,
-        help="Choose the output directory for polarity tables and heatmaps.",
+        help="Choose the output directory for polarity tables and heatmaps. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     return parser
 

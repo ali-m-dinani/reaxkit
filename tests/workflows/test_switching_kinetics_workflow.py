@@ -164,6 +164,79 @@ def test_sweep_range_is_inclusive_and_accepts_explicit_steps():
     assert common._parse_sweep_values("0.5:1.5:0.5") == (0.5, 1.0, 1.5)
 
 
+@pytest.mark.parametrize("onset, expected", [(125, [1, 2, 3]), (126, [0, 1, 2]), (0, [124, 126, 127, 128])])
+def test_field_onset_preserves_elapsed_time_without_rezeroing(onset, expected):
+    data = pd.DataFrame({"time": [128, 124, 127, 126], "fraction": [1, 0, 0.6, 0.2]})
+    normalized = common.prepare_switching_fraction(
+        data, time_column="time", data_kind="fraction", value_column="fraction",
+        field_start_time=onset,
+    )
+    np.testing.assert_allclose(normalized["time"], expected)
+    np.testing.assert_allclose(normalized["fraction"], [0.2, 0.6, 1] if onset else [0, 0.2, 0.6, 1])
+
+
+def test_field_onset_uses_nearest_baseline_and_only_retained_tail():
+    data = pd.DataFrame({"time": [0, 124, 126, 127, 128], "P": [-20, -2, -1, 2, 2]})
+    normalized = common.prepare_switching_fraction(
+        data, time_column="time", data_kind="polarization", value_column="P",
+        field_start_time=125, tail_fraction=0.5,
+    )
+    np.testing.assert_allclose(normalized["time"], [1, 2, 3])
+    np.testing.assert_allclose(normalized["fraction"], [0.25, 1, 1])
+    normalized = common.prepare_switching_fraction(
+        data, time_column="time", data_kind="polarization", value_column="P",
+        field_start_time=125, initial_polarization=-4, final_polarization=2,
+    )
+    np.testing.assert_allclose(normalized["fraction"], [0.5, 1, 1])
+
+
+def test_field_onset_domain_reference_is_taken_before_filtering():
+    data = pd.DataFrame({
+        "time": [0, 124, 126, 127], "a": [-1, 1, -1, -1], "b": [1, -1, -1, 1],
+    })
+    normalized = common.prepare_switching_fraction(
+        data, time_column="time", data_kind="polarity-columns",
+        polarity_columns=["a", "b"], field_start_time=125,
+    )
+    np.testing.assert_allclose(normalized["time"], [1, 2])
+    np.testing.assert_allclose(normalized["fraction"], [0.5, 1])
+
+
+@pytest.mark.parametrize("onset, message", [(np.nan, "finite"), (np.inf, "finite"), (10, "No samples")])
+def test_field_onset_rejects_invalid_or_empty_window(onset, message):
+    with pytest.raises(ValueError, match=message):
+        common.prepare_switching_fraction(
+            pd.DataFrame({"time": [0, 1], "fraction": [0, 1]}),
+            time_column="time", data_kind="fraction", value_column="fraction",
+            field_start_time=onset,
+        )
+
+
+def test_field_onset_recovers_kai_parameters_for_groups_and_sweeps():
+    elapsed = np.linspace(0.5, 8, 31)
+    data = pd.concat([
+        pd.DataFrame({
+            "time": np.r_[0, 124, elapsed + 125],
+            "fraction": np.r_[0, 0, kai_fraction(elapsed, characteristic_time, 2)],
+            "field": group,
+        })
+        for group, characteristic_time in [("low", 2), ("high", 1)]
+    ], ignore_index=True)
+    args = _parser().parse_args([
+        "--input", "switching.csv", "--data-kind", "fraction",
+        "--value-column", "fraction", "--field-start-time", "125",
+        "--group-column", "field", "--sweep", "n=2", "--starts", "2",
+    ])
+    result = common.fit_table(data, args, ("kai",))
+    for group, characteristic_time in [("low", 2), ("high", 1)]:
+        parameters = result.parameters[result.parameters["group"] == group].set_index("parameter")
+        assert parameters.loc["t0", "value"] == pytest.approx(characteristic_time, rel=1e-4)
+        assert parameters.loc["n", "value"] == pytest.approx(2, rel=1e-4)
+        normalized = result.normalized_data[result.normalized_data["group"] == group]
+        np.testing.assert_allclose(normalized["time"], elapsed)
+    assert result.sweep_curves["time"].min() == pytest.approx(0.5)
+
+
 def test_default_output_uses_workspace_other_command_folder(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     source = tmp_path / "switching.csv"

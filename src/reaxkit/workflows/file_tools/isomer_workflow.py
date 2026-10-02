@@ -251,30 +251,30 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "   reaxkit detect-isomer-representatives --fort7 fort.7 --xmolout xmolout --control control_params --output-dir isomer_outputs\n"
         "   reaxkit detect-isomer-representatives --output-dir isomer_outputs --max-representatives 10"
     )
-    parser.add_argument("--fort7", default="fort.7", help="Input ReaxFF fort.7 file.")
-    parser.add_argument("--xmolout", default="xmolout", help="Input ReaxFF xmolout file.")
-    parser.add_argument("--control", default="control_params", help="Input legacy control_params file.")
+    parser.add_argument("--fort7", default="fort.7", help="Input ReaxFF fort.7 file. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Input ReaxFF xmolout file. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--control", default="control_params", help="Input legacy control_params file. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
     parser.add_argument(
         "--output-dir",
         default="isomer_outputs",
-        help="Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders.",
+        help="Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     parser.add_argument(
         "--max-representatives",
         type=int,
         default=None,
-        help="Optional cap on representatives, limiting downstream Jaguar jobs.",
+        help="Optional cap on representatives, limiting downstream Jaguar jobs. Example: --max-representatives 10, which limits downstream calculations to ten representatives.",
     )
     folder_group = parser.add_mutually_exclusive_group()
     folder_group.add_argument(
         "--write-isomer-dirs",
         action="store_true",
-        help="Force writing per-isomer folders under output-dir/isomers.",
+        help="Force writing per-isomer folders under output-dir/isomers. Example: --write-isomer-dirs, which writes individual representative folders.",
     )
     folder_group.add_argument(
         "--no-isomer-dirs",
         action="store_true",
-        help="Disable per-isomer folders even when control_params has isomer_run=2.",
+        help="Disable per-isomer folders even when control_params has isomer_run=2. Example: --no-isomer-dirs, which suppresses individual representative folders.",
     )
     return parser
 

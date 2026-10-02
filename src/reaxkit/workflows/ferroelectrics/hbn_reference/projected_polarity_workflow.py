@@ -50,59 +50,58 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
     restrict_native_charge_input(parser)
     parser.set_defaults(command=canonical, progress=True)
-    parser.description = """Average h-BN-reference local-cell polarity in fixed spatial bins.
-
-Each neutral reference cell contributes -1, 0, or +1 from the selected local
-dipole component. Zero dipoles remain in the average. Spatial assignments are
-made once from --reference-frame and remain fixed as atoms move. --plot-2d
-writes one TEM-like projection per frame; --plot-kymograph writes the complete
-frame-versus-position evolution map. Detailed per-group centers are omitted by
-default; --write-centers writes them as Parquet unless CSV is requested.
-
-Example:
-  reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source auto --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
-
-AMS KF input:
-  reaxkit get-hbn-reference-projected-polarity --engine ams --input reaxout.kf --replication 19 19 10 --charge-source auto --frames 0:4000:5 --plot-kymograph
-"""
+    parser.description = ("Average h-BN-reference local-cell polarity in fixed spatial bins.\n"
+                         "\n"
+                         "Each neutral reference cell contributes -1, 0, or +1 from the selected local\n"
+                         "dipole component. Zero dipoles remain in the average. Spatial assignments are\n"
+                         "made once from --reference-frame and remain fixed as atoms move. --plot-2d\n"
+                         "writes one TEM-like projection per frame; --plot-kymograph writes the complete\n"
+                         "frame-versus-position evolution map. Detailed per-group centers are omitted by\n"
+                         "default; --write-centers writes them as Parquet unless CSV is requested.\n"
+                         "\n"
+                         "Examples:\n"
+                         "  1. ReaxFF polarity maps:\n"
+                         "     reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source auto --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph\n"
+                         "\n"
+                         "  2. AMS KF input:\n"
+                         "     reaxkit get-hbn-reference-projected-polarity --engine ams --input reaxout.kf --replication 19 19 10 --charge-source auto --frames 0:4000:5 --plot-kymograph\n")
     parser.add_argument(
         "--local-grouping",
         choices=["cell", "layer"],
         default="cell",
-        help="Project four-atom crystallographic cells or two-atom AlN layers. Default: cell.",
+        help="Project four-atom crystallographic cells or two-atom AlN layers. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output.",
     )
     parser.add_argument(
         "--local-volume-method",
         choices=["equal", "deformation"],
         default="equal",
-        help="Set the local-volume convention retained in the cell table. Default: equal.",
+        help="Set the local-volume convention retained in the cell table. Default: equal. Example: --local-volume-method equal, which divides the selected frame volume among local groups.",
     )
     parser.add_argument(
         "--deformation-neighbors",
         type=int,
         default=12,
-        help="Set neighboring reference cells used by local affine fits. Default: 12.",
+        help="Set neighboring reference cells used by local affine fits. Default: 12. Example: --deformation-neighbors 12, which uses at most twelve neighboring reference cells in each affine fit.",
     )
     parser.add_argument(
         "--local-charge-treatment",
         choices=["auto", "raw", "neutralize"],
         default="auto",
         help=(
-            "Choose raw atomic charges, per-cell charge neutralization, or auto "
-            "neutralization for charged cells. Default: auto."
+            "Choose raw atomic charges, per-cell charge neutralization, or auto neutralization for charged cells. Default: auto. Example: --local-charge-treatment neutralize, which neutralizes each local group's charges."
         ),
     )
     parser.add_argument(
         "--component",
         choices=["x", "y", "z", "c"],
         default="c",
-        help="Choose the local dipole component whose sign defines polarity. Default: c.",
+        help="Choose the local dipole component whose sign defines polarity. Default: c. Example: --component z, which defines polarity from the sign of the z dipole component.",
     )
     parser.add_argument(
         "--projection-plane",
         choices=["xy", "xz", "yz"],
         default="xz",
-        help="Choose the two coordinates shown in each per-frame map. Default: xz.",
+        help="Choose the two coordinates shown in each per-frame map. Default: xz. Example: --projection-plane xz, which displays x and z in the spatial projection.",
     )
     parser.add_argument(
         "--projection-bins",
@@ -110,15 +109,14 @@ AMS KF input:
         type=int,
         default=(40, 40),
         metavar=("NU", "NV"),
-        help="Set bin counts along the projection-plane axes. Default: 40 40.",
+        help="Set bin counts along the projection-plane axes. Default: 40 40. Example: --projection-bins 1 40, which averages across x and resolves 40 bins along z.",
     )
     parser.add_argument(
         "--profile-axis",
         choices=["x", "y", "z"],
         default=None,
         help=(
-            "Choose the projection-plane axis on the kymograph vertical axis. "
-            "Its --projection-bins count is reused. Default: the second axis."
+            "Choose the projection-plane axis on the kymograph vertical axis. Its --projection-bins count is reused. Default: the second axis. Example: --profile-axis z, which places z position on the kymograph's vertical axis."
         ),
     )
     parser.add_argument(
@@ -126,28 +124,26 @@ AMS KF input:
         type=float,
         default=0.0,
         help=(
-            "Map local dipole magnitudes at or below this value to polarity 0; "
-            "zero remains included in bin means. Default: 0."
+            "Map local dipole magnitudes at or below this value to polarity 0; zero remains included in bin means. Default: 0. Example: --dipole-zero-tolerance 0.001, which treats magnitudes up to 0.001 as zero polarity."
         ),
     )
     parser.add_argument(
         "--write-centers",
         action="store_true",
-        help="Write the optional detailed per-cell/per-layer polarity table.",
+        help="Write the optional detailed per-cell/per-layer polarity table. Example: --write-centers, which exports the detailed local polarity table.",
     )
     parser.add_argument(
         "--centers-format",
         choices=["parquet", "csv"],
         default="parquet",
-        help="Choose the detailed centers-table format. Default: parquet.",
+        help="Choose the detailed centers-table format. Default: parquet. Example: --centers-format csv, which writes the detailed centers table as CSV.",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=0,
         help=(
-            "Override the automatically selected frame-worker count. "
-            "Use 0 for automatic selection. Default: 0."
+            "Override the automatically selected frame-worker count. Use 0 for automatic selection. Default: 0. Example: --workers 4, which uses four frame workers."
         ),
     )
     parser.add_argument(
@@ -155,14 +151,13 @@ AMS KF input:
         type=int,
         default=0,
         help=(
-            "Override the maximum number of in-flight frames. "
-            "Use 0 for the memory-aware automatic limit. Default: 0."
+            "Override the maximum number of in-flight frames. Use 0 for the memory-aware automatic limit. Default: 0. Example: --chunk-size 8, which allows at most eight frames in flight."
         ),
     )
     parser.add_argument(
         "--plot-2d",
         action="store_true",
-        help="Write one projection-plane mean-polarity heatmap per selected frame.",
+        help="Write one projection-plane mean-polarity heatmap per selected frame. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-kymograph",
@@ -170,12 +165,11 @@ AMS KF input:
         dest="plot_kymograph",
         action="store_true",
         help=(
-            "Write a frame-versus-position polarity heatmap. "
-            "--plot-evolution is an alias."
+            "Write a frame-versus-position polarity heatmap. --plot-evolution is an alias. Example: --plot-kymograph, which writes the frame-versus-position polarity heatmap."
         ),
     )
     parser.add_argument(
-        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180."
+        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch."
     )
     return parser
 

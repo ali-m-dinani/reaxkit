@@ -39,9 +39,9 @@ def _frames(args: argparse.Namespace) -> list[int] | None:
 
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser, *inputs: str) -> None:
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory used for engine detection.")
-    parser.add_argument("--run-dir", default=".", help="Run directory used as a fallback for input discovery.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Simulation engine used to load input data. Example: --engine reaxff, which selects ReaxFF readers instead of automatic detection.")
+    parser.add_argument("--input", default=".", help="Input file or directory used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", default=".", help="Fallback directory for input discovery. Example: --run-dir runs/heating, which searches that simulation directory.")
     defaults = {
         "xmolout": "xmolout",
         "summary": None,
@@ -54,19 +54,19 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser, *inputs: str) -> Non
         "molfra": "molfra.out",
     }
     descriptions = {
-        "xmolout": "Trajectory input path.",
-        "summary": "Optional summary.txt input path.",
-        "fort7": "Charge data input path.",
-        "fort73": "Partial-energy input path.",
-        "fort76": "Restraint data input path.",
-        "fort78": "Electric-field input path.",
-        "fort57": "Geometry-optimization input path.",
-        "eregime": "Electric-field regime input path.",
-        "molfra": "Molecular-analysis input path.",
+        "xmolout": "Input file containing trajectory coordinates and frame metadata. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates and frame metadata from that file.",
+        "summary": "Input file containing simulation scalar values. Example: --summary runs/heating/summary.txt, which reads simulation scalar values from that file.",
+        "fort7": "Input file containing atomic charges. Example: --fort7 runs/heating/fort.7, which reads atomic charges from that file.",
+        "fort73": "Input file containing partial-energy components. Example: --fort73 runs/heating/fort.73, which reads partial-energy components from that file.",
+        "fort76": "Input file containing restraint energies and values. Example: --fort76 runs/heating/fort.76, which reads restraint energies and values from that file.",
+        "fort78": "Input file containing applied-field and field-energy components. Example: --fort78 runs/heating/fort.78, which reads applied-field and field-energy components from that file.",
+        "fort57": "Input file containing geometry-optimization progress. Example: --fort57 runs/heating/fort.57, which reads geometry-optimization progress from that file.",
+        "eregime": "Input file containing the prescribed electric-field program. Example: --eregime runs/heating/eregime.in, which reads the prescribed electric-field program from that file.",
+        "molfra": "Input file containing molecular frequencies and totals. Example: --molfra runs/heating/molfra.out, which reads molecular frequencies and totals from that file.",
     }
     for name in inputs:
         parser.add_argument(f"--{name}", default=defaults[name], help=descriptions[name])
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None)
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
 
 
@@ -75,9 +75,9 @@ def _add_sampling_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frame selector, for example --frames 0:20:2 or --frames 0,5,10.',
+        help='Zero-based source frames to include; colon ranges exclude the stop. Example: --frames 0:20:2, which selects frames 0, 2, ..., 18.',
     )
-    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame.")
+    parser.add_argument("--every", type=int, default=1, help="Stride through selected frames. Example: --every 5, which keeps every fifth selected frame.")
 
 
 def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
@@ -87,20 +87,22 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=(
             "Plot all series together (single), in one multi-panel figure (subplot), "
-            "or as one figure file per series (separate)."
+            "or as one figure file per series (separate). Example: --plot subplot, "
+            "which gives each series its own panel for comparison."
         ),
     )
-    parser.add_argument("--show", action="store_true")
-    parser.add_argument("--save", default=None)
-    parser.add_argument("--export", default=None)
-    parser.add_argument("--grid", default=None, help="Subplot grid such as 2x2.")
-    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter")
+    parser.add_argument("--show", action="store_true", help="Open generated figures interactively. Example: --show, which displays plot windows in addition to any saved figures.")
+    parser.add_argument("--save", default=None, help="Destination for generated figures; separate plots use a directory. Example: --save temperature.png, which writes the plotted temperature to that image.")
+    parser.add_argument("--export", default=None, help="Destination for the result CSV table. Example: --export temperature.csv, which writes the extracted values for further analysis.")
+    parser.add_argument("--grid", default=None, help="Rows and columns for subplot layout. Example: --grid 2x2, which arranges series in two rows and two columns.")
+    parser.add_argument("--xaxis", choices=["iter", "frame", "time"], default="iter", help="Horizontal axis expressed as iterations, trajectory frames, or physical time. Example: --xaxis time, which converts iterations using control-file timestep metadata.")
     parser.add_argument(
         "--control",
         default="control",
         help=(
             "Control file used for frame (iout2) and time conversion. "
-            "The default also searches beside the selected input files."
+            "The default also searches beside the selected input files. "
+            "Example: --control runs/heating/control, which supplies output cadence and timestep metadata."
         ),
     )
     parser.add_argument(
@@ -108,7 +110,8 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=(
             "Trajectory file whose headers define frame iterations when no control "
-            "file exists. By default, the configured or sibling xmolout is used."
+            "file exists. By default, the configured or sibling xmolout is used. "
+            "Example: --frame-source runs/heating/xmolout, which maps iterations to that trajectory\'s frame positions."
         ),
     )
     parser.add_argument(
@@ -117,7 +120,8 @@ def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         help=(
             "Total trajectory frame count used to infer frame spacing only when neither "
-            "a control file nor a trajectory frame source exists."
+            "a control file nor a trajectory frame source exists. "
+            "Example: --frame-count 101, which estimates frame spacing for a trajectory containing 101 frames."
         ),
     )
 

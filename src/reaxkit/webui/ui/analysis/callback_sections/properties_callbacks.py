@@ -1,4 +1,4 @@
-﻿"""Register properties-panel callback section for analysis UI.
+"""Register properties-panel callback section for analysis UI.
 
 This module contains a responsibility-focused subset of analysis callback
 registrations extracted from `reaxkit.webui.ui.analysis.callbacks`.
@@ -15,6 +15,7 @@ from typing import Any
 
 from reaxkit.webui.backend.api import WebUIApiService
 from reaxkit.webui.ui.analysis.callback_helpers import *  # noqa: F401,F403
+from reaxkit.webui.ui.shared.forms import properties_key
 
 
 def register_properties_callbacks(app, service: WebUIApiService) -> None:
@@ -74,12 +75,20 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
 
     @app.callback(
         Output("properties-content", "children"),
+        Output("properties-render-key", "data"),
         Input("pipeline-store", "data"),
         Input("session-store", "data"),
         Input("result-store", "data"),
         Input("config-store", "data"),
         Input("selected-curve-store", "data"),
+        State("properties-render-key", "data"),
     )
+    def render_properties_stable(snapshot, session, result, config, curve, previous_key):
+        key = properties_key(snapshot, session, result, config, curve)
+        if key == previous_key:
+            return no_update, no_update
+        return render_properties(snapshot, session, result, config, curve), key
+
     def render_properties(
         snapshot: dict[str, Any] | None,
         session: dict[str, Any] | None,
@@ -352,7 +361,7 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
                     dcc.Dropdown(
                         id="viz-theme",
                         options=_theme_options(),
-                        value="plotly_white",
+                        value="workspace",
                         clearable=False,
                         style={"display": "none"},
                     ),
@@ -464,6 +473,8 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
             return html.Div(lines, className="rk-stack")
 
         if node.get("kind") == "analysis":
+            lines.append(html.Div(html.Button("Delete analysis", id="btn-delete-node", n_clicks=0,
+                title="Delete this analysis and its dependent utilities, presentations, and results."), className="rk-inline-actions"))
             req = node.get("request", {}) if isinstance(node.get("request", {}), dict) else {}
             task_name = str(node.get("metadata", {}).get("task_name") or node.get("name") or "").strip()
             catalog = _catalog_payload(service)
@@ -576,7 +587,7 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
                     [
                         html.Div(
                             [
-                                html.Button("Delete it", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
+                                html.Button("Delete node", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
                             ],
                             className="rk-inline-actions",
                         ),
@@ -701,7 +712,7 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
                 [
                     html.Div(
                         [
-                            html.Button("Delete it", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
+                            html.Button("Delete node", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
                         ],
                         className="rk-inline-actions",
                     ),
@@ -794,7 +805,7 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
             body: list[Any] = [
                 html.Div(
                     [
-                        html.Button("Delete it", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
+                        html.Button("Delete node", id="btn-delete-node", n_clicks=0, className="rk-btn-save"),
                     ],
                     className="rk-inline-actions",
                 ),
@@ -1272,7 +1283,7 @@ def register_properties_callbacks(app, service: WebUIApiService) -> None:
                         dcc.Input(id="viz-marker-size", type="number", value=6, style={"display": "none"}),
                         dcc.Checklist(id="viz-show-markers", options=[{"label": "show markers", "value": "on"}], value=[], style={"display": "none"}),
                         dcc.Checklist(id="viz-show-legend", options=[{"label": "show legend", "value": "on"}], value=["on"], style={"display": "none"}),
-                        dcc.Dropdown(id="viz-theme", options=theme_options, value="plotly_white", clearable=False, style={"display": "none"}),
+                        dcc.Dropdown(id="viz-theme", options=theme_options, value="workspace", clearable=False, style={"display": "none"}),
                         dcc.Input(id="viz-axis-title-size", type="number", value=13, style={"display": "none"}),
                         dcc.Checklist(id="viz-grid-on", options=[{"label": "grid on", "value": "on"}], value=["on"], style={"display": "none"}),
                         dcc.Checklist(id="viz-axis-box-on", options=[{"label": "axis box on", "value": "on"}], value=["on"], style={"display": "none"}),

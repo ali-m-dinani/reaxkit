@@ -145,71 +145,136 @@ def _task_bond_events(args: argparse.Namespace) -> int:
 
 
 def _add_output_arguments(parser: argparse.ArgumentParser, *, plot: bool = False) -> None:
-    parser.add_argument("--export", default=None)
-    parser.add_argument("--save", default=None)
+    parser.add_argument("--export", default=None, help="CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis.")
+    parser.add_argument("--save", default=None, help="Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image.")
     if plot:
-        parser.add_argument("--plot", action="store_true")
+        parser.add_argument("--plot", action="store_true", help="Generate a plot of the extracted data. Example: --plot, which enables plotting of the extracted data.")
 
 
 def register_tasks(subparsers: argparse._SubParsersAction) -> None:
-    get_parser = subparsers.add_parser("get")
-    get_parser.add_argument("--file", default="fort.7")
-    get_parser.add_argument("--yaxis", required=True)
-    get_parser.add_argument("--atom", default=None)
-    get_parser.add_argument("--frames", default=None)
-    get_parser.add_argument("--xaxis", choices=("iter", "frame", "time"), default="iter")
-    get_parser.add_argument("--control", default="control")
-    get_parser.add_argument("--regex", action="store_true")
+    get_parser = subparsers.add_parser(
+        "get",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "Inspect the legacy fort7 interface for atomic-property extraction.\n"
+            "\n"
+            "This parser is retained for compatibility; its production analyzer has been retired.\n"
+            "Use direct get-charge, get_connection_* or get_bond_events commands for analysis.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Inspect the retained options:\n"
+            "     reaxkit fort7 get --help"
+        ),
+    )
+    get_parser.add_argument("--file", default="fort.7", help="Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7.")
+    get_parser.add_argument("--yaxis", required=True, help="Atomic property to extract from fort.7. Example: --yaxis charge, which extracts atomic charge as the plotted quantity.")
+    get_parser.add_argument("--atom", default=None, help="Atom identifier used to select an atomic series. Example: --atom 1, which selects atom 1.")
+    get_parser.add_argument("--frames", default=None, help="Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    get_parser.add_argument("--xaxis", choices=("iter", "frame", "time"), default="iter", help="Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position.")
+    get_parser.add_argument("--control", default="control", help="Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
+    get_parser.add_argument("--regex", action="store_true", help="Interpret the atomic-property selector as a regular expression. Example: --regex, which interprets the property selector as a regular expression.")
     _add_output_arguments(get_parser, plot=True)
     get_parser.set_defaults(_run=_task_get, kind="fort7")
 
-    edges = subparsers.add_parser("edges")
-    edges.add_argument("--file", default="fort.7")
-    edges.add_argument("--frames", default=None)
-    edges.add_argument("--min-bo", type=float, default=0.0, dest="min_bo")
-    edges.add_argument("--directed", action="store_true")
-    edges.add_argument("--aggregate", choices=("max", "mean"), default="max")
-    edges.add_argument("--include-self", action="store_true", dest="include_self")
-    edges.add_argument("--xaxis", choices=("iter", "frame", "time"), default="frame")
-    edges.add_argument("--control", default="control")
+    edges = subparsers.add_parser(
+        "edges",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "Inspect the legacy fort7 interface for bond-edge extraction.\n"
+            "\n"
+            "This parser is retained for compatibility; its production analyzer has been retired.\n"
+            "Use direct get-charge, get_connection_* or get_bond_events commands for analysis.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Inspect the retained options:\n"
+            "     reaxkit fort7 edges --help"
+        ),
+    )
+    edges.add_argument("--file", default="fort.7", help="Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7.")
+    edges.add_argument("--frames", default=None, help="Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    edges.add_argument("--min-bo", type=float, default=0.0, dest="min_bo", help="Minimum bond order to retain. Example: --min-bo 0.3, which excludes bonds below order 0.3.")
+    edges.add_argument("--directed", action="store_true", help="Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction.")
+    edges.add_argument("--aggregate", choices=("max", "mean"), default="max", help="Reduction applied to repeated bond entries. Example: --aggregate mean, which averages repeated bond entries.")
+    edges.add_argument("--include-self", action="store_true", dest="include_self", help="Retain edges whose source and destination are the same atom. Example: --include-self, which retains self-pairs in bond data.")
+    edges.add_argument("--xaxis", choices=("iter", "frame", "time"), default="frame", help="Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position.")
+    edges.add_argument("--control", default="control", help="Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
     _add_output_arguments(edges, plot=True)
     edges.set_defaults(_run=_task_edges, kind="fort7")
 
-    stats = subparsers.add_parser("constats")
-    stats.add_argument("--file", default="fort.7")
-    stats.add_argument("--frames", default=None)
-    stats.add_argument("--min-bo", type=float, default=0.0, dest="min_bo")
-    stats.add_argument("--directed", action="store_true")
-    stats.add_argument("--how", choices=("mean", "max", "count"), default="mean")
+    stats = subparsers.add_parser(
+        "constats",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "Inspect the legacy fort7 interface for connectivity statistics.\n"
+            "\n"
+            "This parser is retained for compatibility; its production analyzer has been retired.\n"
+            "Use direct get-charge, get_connection_* or get_bond_events commands for analysis.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Inspect the retained options:\n"
+            "     reaxkit fort7 constats --help"
+        ),
+    )
+    stats.add_argument("--file", default="fort.7", help="Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7.")
+    stats.add_argument("--frames", default=None, help="Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    stats.add_argument("--min-bo", type=float, default=0.0, dest="min_bo", help="Minimum bond order to retain. Example: --min-bo 0.3, which excludes bonds below order 0.3.")
+    stats.add_argument("--directed", action="store_true", help="Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction.")
+    stats.add_argument("--how", choices=("mean", "max", "count"), default="mean", help="Reduction used to summarize connectivity. Example: --how mean, which averages bond values in the aggregate.")
     _add_output_arguments(stats)
     stats.set_defaults(_run=_task_constats, kind="fort7")
 
-    timeseries = subparsers.add_parser("bond-ts")
-    timeseries.add_argument("--file", default="fort.7")
-    timeseries.add_argument("--frames", default=None)
-    timeseries.add_argument("--directed", action="store_true")
-    timeseries.add_argument("--bo-threshold", type=float, default=0.0, dest="bo_threshold")
-    timeseries.add_argument("--wide", action="store_true")
-    timeseries.add_argument("--xaxis", choices=("iter", "frame", "time"), default="iter")
-    timeseries.add_argument("--control", default="control")
-    timeseries.add_argument("--src", type=int, default=None)
-    timeseries.add_argument("--dst", type=int, default=None)
+    timeseries = subparsers.add_parser(
+        "bond-ts",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "Inspect the legacy fort7 interface for bond histories.\n"
+            "\n"
+            "This parser is retained for compatibility; its production analyzer has been retired.\n"
+            "Use direct get-charge, get_connection_* or get_bond_events commands for analysis.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Inspect the retained options:\n"
+            "     reaxkit fort7 bond-ts --help"
+        ),
+    )
+    timeseries.add_argument("--file", default="fort.7", help="Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7.")
+    timeseries.add_argument("--frames", default=None, help="Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    timeseries.add_argument("--directed", action="store_true", help="Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction.")
+    timeseries.add_argument("--bo-threshold", type=float, default=0.0, dest="bo_threshold", help="Minimum bond order to include in the series. Example: --bo-threshold 0.4, which requires a bond order of at least 0.4 for retained connectivity.")
+    timeseries.add_argument("--wide", action="store_true", help="Return one column per bond instead of a long table. Example: --wide, which places series in separate table columns.")
+    timeseries.add_argument("--xaxis", choices=("iter", "frame", "time"), default="iter", help="Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position.")
+    timeseries.add_argument("--control", default="control", help="Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
+    timeseries.add_argument("--src", type=int, default=None, help="Source atom identifier for bond selection. Example: --src 1, which restricts bonds to source atom 1.")
+    timeseries.add_argument("--dst", type=int, default=None, help="Destination atom identifier for bond selection. Example: --dst 2, which restricts bonds to destination atom 2.")
     _add_output_arguments(timeseries, plot=True)
     timeseries.set_defaults(_run=_task_bond_ts, kind="fort7")
 
-    events = subparsers.add_parser("bond-events")
-    events.add_argument("--file", default="fort.7")
-    events.add_argument("--frames", default=None)
-    events.add_argument("--src", type=int, default=None)
-    events.add_argument("--dst", type=int, default=None)
-    events.add_argument("--threshold", type=float, default=0.35)
-    events.add_argument("--hysteresis", type=float, default=0.05)
-    events.add_argument("--smooth", choices=("ma", "ema", "none"), default="ma")
-    events.add_argument("--window", type=int, default=7)
-    events.add_argument("--ema-alpha", type=float, default=None, dest="ema_alpha")
-    events.add_argument("--min-run", type=int, default=3, dest="min_run")
-    events.add_argument("--xaxis", choices=("iter", "frame"), default="iter")
-    events.add_argument("--directed", action="store_true")
+    events = subparsers.add_parser(
+        "bond-events",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=(
+            "Inspect the legacy fort7 interface for bond-event detection.\n"
+            "\n"
+            "This parser is retained for compatibility; its production analyzer has been retired.\n"
+            "Use direct get-charge, get_connection_* or get_bond_events commands for analysis.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Inspect the retained options:\n"
+            "     reaxkit fort7 bond-events --help"
+        ),
+    )
+    events.add_argument("--file", default="fort.7", help="Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7.")
+    events.add_argument("--frames", default=None, help="Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    events.add_argument("--src", type=int, default=None, help="Source atom identifier for bond selection. Example: --src 1, which restricts bonds to source atom 1.")
+    events.add_argument("--dst", type=int, default=None, help="Destination atom identifier for bond selection. Example: --dst 2, which restricts bonds to destination atom 2.")
+    events.add_argument("--threshold", type=float, default=0.35, help="Bond-order threshold for bond-state detection. Example: --threshold 0.35, which centers bond-state detection on bond order 0.35.")
+    events.add_argument("--hysteresis", type=float, default=0.05, help="Bond-order margin around the state threshold. Example: --hysteresis 0.05, which uses a 0.05 bond-order hysteresis margin.")
+    events.add_argument("--smooth", choices=("ma", "ema", "none"), default="ma", help="Smoothing method applied before bond-event detection. Example: --smooth ma, which applies moving-average smoothing.")
+    events.add_argument("--window", type=int, default=7, help="Number of samples in the moving-average window. Example: --window 7, which smooths over seven samples.")
+    events.add_argument("--ema-alpha", type=float, default=None, dest="ema_alpha", help="New-sample weight for exponential moving-average smoothing. Example: --ema-alpha 0.2, which weights each new sample by 0.2 in exponential smoothing.")
+    events.add_argument("--min-run", type=int, default=3, dest="min_run", help="Minimum number of consecutive samples for an accepted state. Example: --min-run 3, which requires a state to persist for three samples.")
+    events.add_argument("--xaxis", choices=("iter", "frame"), default="iter", help="Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position.")
+    events.add_argument("--directed", action="store_true", help="Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction.")
     _add_output_arguments(events)
     events.set_defaults(_run=_task_bond_events, kind="fort7")
 

@@ -64,47 +64,47 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--isomer-dir",
         default=None,
-        help="Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs.",
+        help="Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. Example: --isomer-dir analysis/isomers, which reads per-isomer input folders there.",
     )
     parser.add_argument(
         "--hf-base",
         default=None,
-        help="Jaguar hf_base.in template. This is molecular-system specific and must be reviewed.",
+        help="Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. Example: --hf-base hf_base.in, which reads the molecular-system-specific Jaguar template.",
     )
     parser.add_argument(
         "--job-config",
         default=None,
-        help="Slurm/Jaguar YAML settings file. Use --write-example-config to create a template.",
+        help="Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. Example: --job-config jaguar_jobs.yaml, which reads Slurm and Jaguar job settings.",
     )
     parser.add_argument(
         "--output-dir",
         default="jaguar_jobs",
-        help="Output directory for generated Jaguar job folders and manifest.",
+        help="Output directory for generated Jaguar job folders and manifest. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     parser.add_argument(
         "--submit",
         action="store_true",
-        help="Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully.",
+        help="Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. Example: --submit, which submits generated jobs through sbatch.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Allow overwriting files in an existing non-empty output directory or example config.",
+        help="Allow overwriting files in an existing non-empty output directory or example config. Example: --force, which allows replacement of existing generated output.",
     )
     parser.add_argument(
         "--no-skip-completed",
         action="store_true",
-        help="Regenerate jobs even when an existing hf.out contains 'final geometry:'.",
+        help="Regenerate jobs even when an existing hf.out contains 'final geometry:'. Example: --no-skip-completed, which regenerates jobs even when completed output exists.",
     )
     parser.add_argument(
         "--no-skip-queued",
         action="store_true",
-        help="With --submit, do not skip structures that already have a matching Slurm job name in squeue.",
+        help="With --submit, do not skip structures that already have a matching Slurm job name in squeue. Example: --no-skip-queued, which permits submission despite a matching queued job.",
     )
     parser.add_argument(
         "--write-example-config",
         default=None,
-        help="Write an editable Slurm/Jaguar YAML config template and exit.",
+        help="Write an editable Slurm/Jaguar YAML config template and exit. Example: --write-example-config jaguar_jobs.yaml, which writes an editable job-settings template and exits.",
     )
     return parser
 

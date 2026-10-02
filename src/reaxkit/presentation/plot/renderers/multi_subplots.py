@@ -140,7 +140,12 @@ class MultiSubplotsRenderer(PlotRenderer):
                     y = series.get("y")
                     if x is None or y is None:
                         continue
-                    ax.plot(x, y, label=series.get("label"))
+                    options = {
+                        key: series[key]
+                        for key in ("color", "marker", "markersize", "linewidth", "linestyle", "alpha")
+                        if key in series
+                    }
+                    ax.plot(x, y, label=series.get("label"), **options)
                 if page_ylabels[idx]:
                     ax.set_ylabel(page_ylabels[idx])
                 if page_xlabels[idx]:

@@ -11,12 +11,15 @@ def extract_tabular_rows(payload: dict[str, Any] | None) -> list[dict[str, Any]]
         return []
 
     def _rows_from(value: Any) -> list[dict[str, Any]]:
+        from reaxkit.webui.backend.artifact_tables import is_table
+        if is_table(value):
+            return value.get('preview', [])
         if not isinstance(value, list):
             return []
         out: list[dict[str, Any]] = []
         for row in value:
             if isinstance(row, dict):
-                out.append(dict(row))
+                out.append(row)
         return out
 
     # Prefer explicit tabular fields before generic list-like payload entries.

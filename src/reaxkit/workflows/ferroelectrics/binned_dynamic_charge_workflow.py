@@ -28,47 +28,56 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     """Configure fixed-frame-zero charge binning and heatmap output."""
 
     parser.set_defaults(command=COMMAND, progress=True)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
-        "Project atoms onto xy, xz, or yz using frame 0, sum charge and "
-        "delta_charge through the perpendicular direction, and write globally "
-        "scaled 2-D heatmaps."
+        "Project dynamic charges into fixed spatial bins and write charge heatmaps.\n"
+        "\n"
+        "Use frame-zero positions to compare charge changes in the same spatial regions.\n"
+        "Values are summed through the omitted direction; --average reports per-particle averages.\n"
+        "This analyzes existing trajectory and charge files.\n"
+        "\n"
+        "Examples:\n"
+        "  1. Summed charges in the x-z plane:\n"
+        "     reaxkit get-binned-dynamic-charges --fort7 fort.7 --xmolout xmolout --plane xz --bins-x 40 --bins-z 40\n"
+        "\n"
+        "  2. Per-particle averages without plots:\n"
+        "     reaxkit get-binned-dynamic-charges --fort7 fort.7 --xmolout xmolout --average --skip-plots"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection.")
-    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory.")
-    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source.")
-    parser.add_argument("--xmolout", default="xmolout", help="Coordinate and atom-id source.")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--fort7", default="fort.7", help="Dynamic-charge source. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Coordinate and atom-id source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file.")
     parser.add_argument(
-        "--plane", choices=["xy", "xz", "yz"], default="xz", help="Heatmap plane."
+        "--plane", choices=["xy", "xz", "yz"], default="xz", help="Heatmap plane. Example: --plane xz, which projects onto the x-z plane."
     )
-    parser.add_argument("--bins-x", type=int, default=None, help="Number of bins along x.")
-    parser.add_argument("--bins-y", type=int, default=None, help="Number of bins along y.")
-    parser.add_argument("--bins-z", type=int, default=None, help="Number of bins along z.")
-    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10.")
-    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame.")
-    parser.add_argument("--dpi", type=int, default=180, help="Heatmap resolution in dots per inch.")
+    parser.add_argument("--bins-x", type=int, default=None, help="Number of bins along x. Example: --bins-x 40, which splits the x extent into 40 bins.")
+    parser.add_argument("--bins-y", type=int, default=None, help="Number of bins along y. Example: --bins-y 40, which splits the y extent into 40 bins.")
+    parser.add_argument("--bins-z", type=int, default=None, help="Number of bins along z. Example: --bins-z 40, which splits the z extent into 40 bins.")
+    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame.")
+    parser.add_argument("--dpi", type=int, default=180, help="Heatmap resolution in dots per inch. Example: --dpi 300, which writes figures at 300 dots per inch.")
     parser.add_argument(
         "--average",
         action="store_true",
         help=(
-            "Add average_charge and average_delta_charge to the CSV and plot "
-            "those per-particle averages instead of bin sums."
+            "Add average_charge and average_delta_charge to the CSV and plot those per-particle averages instead of bin sums. Example: --average, which plots per-particle averages instead of summed bin charges."
         ),
     )
-    parser.add_argument("--control", default="control", help="Control file used for frame progress.")
+    parser.add_argument("--control", default="control", help="Control file used for frame progress. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
     parser.add_argument(
         "--skip-plots",
         action="store_true",
-        help="Write the bin CSV without generating per-frame heatmaps.",
+        help="Write the bin CSV without generating per-frame heatmaps. Example: --skip-plots, which exports the data without generating heatmaps.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Output root for binned_dynamic_charge.csv and heatmaps/.",
+        help="Output root for binned_dynamic_charge.csv and heatmaps/. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

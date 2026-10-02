@@ -11,7 +11,41 @@
 
 <div class="analysis-section-indent" markdown="1">
 
-Fit the KAI switching model to a CSV or Excel table.
+Fit the Kolmogorov-Avrami-Ishibashi (KAI) switching model to a CSV or Excel table.
+
+Estimate the characteristic time t0 and Avrami exponent n from switched fractions.
+Normalize polarization or domain polarities before fitting; optionally fix t0 at the 63.2% crossing.
+Fit existing data only; write result tables and PNG plots in a unique run folder.
+
+[Note]
+Model time zero represents electric-field onset only when the time origin is set correctly.
+With --field-start-time T, fitted/exported/plotted time is input time minus T;
+rows before T are excluded, and the first retained sample may have positive time.
+Without this flag, time zero is the earliest input sample in each group, which
+must correspond to field onset for a physical switching-time interpretation.
+If timestamps are already relative to field onset, use --field-start-time 0
+to preserve that origin, including when the first recorded sample is later than zero.
+Specify T in the input time column's units; --time-unit only labels plots.
+
+### Examples
+-----
+
+```text
+  1. Fit an existing switched-fraction curve:
+     reaxkit fit-kai-switching --input switching.csv --data-kind fraction --value-column fraction
+
+  2. Normalize polarization and fit each applied field separately:
+     reaxkit fit-kai-switching --input switching.xlsx --sheet pulses --data-kind polarization --value-column Pz --group-column field
+
+  3. Fit the fraction of domains whose polarity has reversed:
+     reaxkit fit-kai-switching --input domains.csv --data-kind polarity-columns --polarity-columns d1 d2 d3
+
+  4. Refit at fixed parameter values and export tables to a directory:
+     reaxkit fit-kai-switching --input switching.csv --data-kind fraction --value-column fraction --fixed t0 --sweep n=1:6 --output kai_fits
+
+  5. Fit switching after the field is applied at time 125:
+     reaxkit fit-kai-switching --input switching.csv --data-kind fraction --value-column fraction --field-start-time 125
+```
 
 ### Arguments
 
@@ -19,41 +53,42 @@ Fit the KAI switching model to a CSV or Excel table.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--time-column` | No | time | Select the time column. Example: --time-column time_ns. |  |
-| `--data-kind` | Yes |  | Choose the input representation. Example: --data-kind polarization. | fraction, polarization, polarity-columns |
-| `--value-column` | No |  | Select the fraction or polarization column. Example: --value-column Pz. |  |
-| `--polarity-columns` | No |  | List per-domain polarity columns. Example: --polarity-columns d1 d2 d3. |  |
-| `--group-column` | No |  | Fit each field, pulse, or sample separately. Example: --group-column field. |  |
-| `--initial-polarization` | No |  | Override the first polarization value. Example: --initial-polarization -100. |  |
-| `--final-polarization` | No |  | Override the final polarization plateau. Example: --final-polarization 100. |  |
-| `--tail-fraction` | No | 0.1 | Use this final fraction of rows to estimate the polarization plateau. Example: --tail-fraction 0.2. |  |
-| `--clip-fraction` | No | False | Clip normalized values to [0,1]. Example: --clip-fraction. |  |
-| `--fixed` | No |  | Fix a parameter; KAI t0 can be inferred from the 63.2% crossing. Example: --fixed t0. |  |
-| `--bounds` | No |  | Override positive fit bounds. Example: --bounds kai.n=0.5:8. |  |
-| `--initial` | No |  | Override an initial guess. Example: --initial kai.t0=5. |  |
-| `--sweep` | No |  | Conditionally refit a parameter range or list. Example: --sweep kai.n=1:6. |  |
-| `--fit-nls-amplitude` | No | False | Fit NLS amplitude A instead of fixing A=1. Example: --fit-nls-amplitude. |  |
-| `--starts` | No | 12 | Set the number of optimization starts. Example: --starts 24. |  |
-| `--seed` | No | 0 | Set the multi-start random seed. Example: --seed 7. |  |
-| `--loss` | No | linear | Choose the least-squares loss. Example: --loss soft_l1. | linear, soft_l1, huber, cauchy, arctan |
-| `--thickness` | No |  | Provide SNNG thickness to derive a physical factor. Example: --thickness 100e-9. |  |
-| `--wall-velocity` | No |  | Provide SNNG wall velocity to derive N_infinity. Example: --wall-velocity 2.5. |  |
-| `--nucleation-density` | No |  | Provide SNNG N_infinity to derive wall velocity. Example: --nucleation-density 1e12. |  |
-| `--time-unit` | No | input units | Label plot time axes without rescaling values. Example: --time-unit ps. |  |
+| `--time-column` | No | time | Select numeric times; curves are sorted and shifted relative to field onset, or the first sample when onset is omitted, without unit conversion. Example: --time-column time_ns, fit using time_ns. |  |
+| `--field-start-time` | No |  | Set field onset in input time units for every group; exclude earlier rows and subtract onset. Use the last sample at or before onset as baseline, or the earliest if none exists. Default: shift each curve by its first time. Example: --field-start-time 125, fit only times at least 125 using time minus 125. |  |
+| `--data-kind` | Yes |  | Choose fraction, polarization, or per-domain polarity input. Example: --data-kind polarization, normalize the selected value column to switched fractions. | fraction, polarization, polarity-columns |
+| `--value-column` | No |  | Select the required value column for fraction or polarization input. Example: --value-column Pz, normalize Pz in polarization mode. |  |
+| `--polarity-columns` | No |  | Select domain columns for polarity-columns input; unlisted domains are excluded and initial signs must be nonzero. Example: --polarity-columns d1 d2 d3, count sign reversals across these three domains. |  |
+| `--group-column` | No |  | Fit every distinct column value as a separate curve; otherwise fit all rows together. Example: --group-column field, fit each applied field independently. |  |
+| `--initial-polarization` | No |  | Override the polarization baseline selected at field onset, or the earliest value when onset is omitted. Example: --initial-polarization -100, map -100 to zero switched fraction. |  |
+| `--final-polarization` | No |  | Set the polarization normalization endpoint instead of estimating its plateau. Example: --final-polarization 100, map 100 to unit switched fraction. |  |
+| `--tail-fraction` | No | 0.1 | Set the fraction of final time-sorted rows used for the median polarization plateau, in (0, 1]; ignored with --final-polarization. Example: --tail-fraction 0.2, use the last 20 percent of each curve. |  |
+| `--clip-fraction` | No | False | Clip normalized fractions to [0, 1] instead of rejecting values outside the numerical tolerance. Example: --clip-fraction, clamp overshoots before fitting. |  |
+| `--fixed` | No |  | Fix [MODEL.]NAME=VALUE; repeat as needed. Only KAI t0 accepts an omitted value or auto for the 63.2 percent crossing estimate. Example: --fixed kai.t0, infer and fix KAI t0 when KAI is selected. |  |
+| `--bounds` | No |  | Override positive bounds with [MODEL.]NAME=LOW:HIGH; repeat as needed. Example: --bounds n=0.5:8, constrain n in selected KAI or NLS fits. |  |
+| `--initial` | No |  | Override a starting guess with [MODEL.]NAME=VALUE; repeat as needed. Example: --initial n=2, start n at 2 in selected KAI or NLS fits. |  |
+| `--sweep` | No |  | Fix one parameter at each value and refit the others; accept lists or inclusive START:STOP[:STEP] ranges and repeat for independent sweeps. Example: --sweep snng.m=1:3:0.5, refit selected SNNG at five m values. |  |
+| `--fit-nls-amplitude` | No | False | Fit NLS amplitude instead of fixing it at 1; explicit --fixed amplitude takes precedence. Ignored without NLS. Example: --fit-nls-amplitude, estimate amplitude from the curve. |  |
+| `--starts` | No | 12 | Set optimization starts per fit; more starts increase search effort and runtime. Example: --starts 24, try 24 starting parameter sets. |  |
+| `--seed` | No | 0 | Set the seed for reproducible multi-start initialization. Example: --seed 7, reuse randomized guesses for otherwise identical fits. |  |
+| `--loss` | No | linear | Choose the least-squares optimization loss. Example: --loss soft_l1, reduce the influence of large residuals compared with linear loss. | linear, soft_l1, huber, cauchy, arctan |
+| `--thickness` | No |  | Supply positive SNNG thickness to derive density or velocity using consistent length and time units; does not constrain fitting. Example: --thickness 100e-9, use a 100 nm film when lengths are in metres. |  |
+| `--wall-velocity` | No |  | Supply positive SNNG wall velocity and --thickness to derive nucleation density from the fitted prefactor. Example: --wall-velocity 2.5, use 2.5 length units per input time unit. |  |
+| `--nucleation-density` | No |  | Supply positive SNNG nucleation density and --thickness to derive wall velocity from the fitted prefactor. Example: --nucleation-density 1e12, use 1e12 per cubic length unit. |  |
+| `--time-unit` | No | input units | Label plot time axes without rescaling times or fitted parameters. Example: --time-unit ps, label plotted times as picoseconds. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--input` | Yes |  | Read a CSV or Excel table. Example: --input switching.xlsx. |  |
+| `--input` | Yes |  | Read switching data from a CSV or Excel table. Example: --input switching.xlsx, read curves from that workbook. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--sheet` | No | 0 | Select an Excel sheet by index or name. Example: --sheet pulse_1. |  |
-| `--figure-dpi` | No | 180 | Set PNG plot resolution. Example: --figure-dpi 300. |  |
-| `--output` | No |  | Set the workbook or CSV-directory name inside the unique run folder. Example: --output switching_fits.xlsx. |  |
+| `--sheet` | No | 0 | Select an Excel sheet by zero-based index or name; ignored for CSV. Example: --sheet pulses, read only the pulses sheet. |  |
+| `--figure-dpi` | No | 180 | Set positive PNG resolution in dots per inch; larger values produce more pixels. Example: --figure-dpi 300, export plots at 300 dpi. |  |
+| `--output` | No |  | Name an .xlsx/.xlsm workbook or suffix-free CSV directory inside the unique run folder; parent paths are ignored. Defaults to <input-stem>_switching_fits.xlsx. Example: --output switching_fits.xlsx, write that workbook and sibling plots directory. |  |
 | `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
 
 #### Execution

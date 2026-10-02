@@ -15,6 +15,8 @@ from typing import Any, Mapping, Optional
 
 import matplotlib.pyplot as plt
 
+from reaxkit.presentation.plot_styles import finish_plot_style
+
 
 class PlotRenderer(ABC):
     """Abstract renderer interface."""
@@ -162,6 +164,7 @@ def save_or_show(fig: plt.Figure, cfg: Mapping[str, Any]) -> plt.Figure:
     ```
     The output type reflects the return contract for this API call.
     """
+    finish_plot_style(fig, cfg)
     save = cfg.get("save")
     title = str(cfg.get("title") or cfg.get("plot_type") or "plot")
     if save:
@@ -173,7 +176,7 @@ def save_or_show(fig: plt.Figure, cfg: Mapping[str, Any]) -> plt.Figure:
         else:
             p.mkdir(parents=True, exist_ok=True)
             out = p / f"{title.replace(' ', '_')}.png"
-        fig.savefig(out, dpi=300, bbox_inches="tight")
+        fig.savefig(out, dpi=cfg.get("dpi", 300), bbox_inches="tight")
         plt.close(fig)
     else:
         plt.show()

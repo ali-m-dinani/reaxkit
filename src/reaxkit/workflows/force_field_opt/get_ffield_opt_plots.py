@@ -30,6 +30,7 @@ from reaxkit.core.storage.storage_layout import (
 from reaxkit.domain.data_models import ForceFieldOptimizationPlotBundleData
 from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
+from reaxkit.presentation.plot_styles import add_plot_style_argument, plot_style_context
 from reaxkit.workflows.force_field_opt.charge import (
     build_charge_table,
     charge_plot_payloads,
@@ -56,12 +57,10 @@ from reaxkit.workflows.force_field_opt.report_linkage import (
     build_report_trainset_links,
 )
 from reaxkit.workflows.file_tools.ffield_workflow import (
-    EOS_SINGLE_FIGSIZE,
     QM_PLOT_COLOR,
     REAXFF_PLOT_COLOR,
-    _eos_material_name,
-    _eos_plot_filename,
     _eos_plot_groups,
+    _eos_plot_payload,
     _prepare_eos_table,
 )
 
@@ -221,10 +220,11 @@ def _render_groups(
         identifier = str(group["identifier"])
         filename_identifier = str(group.get("filename_identifier", identifier))
         if curve_type == "eos":
-            filename = _eos_plot_filename(filename_identifier)
-            curve_dir = output_dir / _eos_material_name(identifier)
-            xlabel = str(group.get("xlabel", "Volume"))
-            title = f"EOS {identifier}"
+            payload = _eos_plot_payload(group)
+            path = output_dir / str(payload.pop("subdirectory")) / str(payload.pop("filename"))
+            render_plot({**payload, "save": path})
+            paths.append(path)
+            continue
         else:
             prefix = {
                 "bond": "bond",
@@ -254,7 +254,6 @@ def _render_groups(
                 "title": title,
                 "legend": True,
                 "save": path,
-                **({"figsize": EOS_SINGLE_FIGSIZE} if curve_type == "eos" else {}),
             }
         )
         paths.append(path)
@@ -423,6 +422,7 @@ def build_parser(
     if command not in ALL_COMMANDS:
         raise ValueError(f"Unsupported command: {command}")
     parser.set_defaults(progress=True)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Classify optimization ENERGY expressions using fort.99, trainset comments, "
         "fort.74 volumes, and geo BOND/ANGLE restraints. Write separate EOS, bond, "
@@ -436,7 +436,6 @@ def build_parser(
         "plotted data type.\n\n"
         "Examples:\n"
         "  1. Analyze fort.99, fort.74, trainset.in, and geo in the current directory and save under\n"
-        "     reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/:\n"
         "       reaxkit get_ffield_opt_plots\n\n"
         "  2. Save the complete classified plot collection to an explicit folder:\n"
         "       reaxkit get_ffield_opt_plots --output ffield_opt_plots\n\n"
@@ -448,34 +447,32 @@ def build_parser(
         "  5. Flip the sign of EOS energies before exporting and plotting them:\n"
         "       reaxkit get_ffield_opt_plots --flip-sign-for-eos"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
     parser.add_argument(
-        "--run-dir", "--dir", dest="run_dir", default=".", help="Optimization run directory"
+        "--run-dir", "--dir", dest="run_dir", default=".", help="Optimization run directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery."
     )
-    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99")
-    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74")
-    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
+    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file.")
+    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file.")
+    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
     parser.add_argument(
         "--geo",
         default="geo",
-        help="Path to the multi-structure geo file containing scan restraints",
+        help="Path to the multi-structure geo file containing scan restraints. Example: --geo geo, which reads the multi-structure geometry file.",
     )
     parser.add_argument(
         "--entry-per-figure",
         type=_positive_int,
         default=6,
         help=(
-            "Maximum entries per grouped-bar figure; every entry contributes "
-            "one ReaxFF and one QM/literature bar (default: 6)."
+            "Maximum entries per grouped-bar figure; every entry contributes one ReaxFF and one QM/literature bar (default: 6). Example: --entry-per-figure 6, which places at most six comparison entries in each figure."
         ),
     )
     parser.add_argument(
         "--flip-sign-for-eos",
         action="store_true",
         help=(
-            "Flip the sign of EOS energy values before exporting and plotting; "
-            "equivalent to get_ffield_opt_eos --flip-sign."
+            "Flip the sign of EOS energy values before exporting and plotting; equivalent to get_ffield_opt_eos --flip-sign. Example: --flip-sign-for-eos, which negates equation-of-state energies before export and plotting."
         ),
     )
     parser.add_argument(
@@ -485,17 +482,23 @@ def build_parser(
         dest="output",
         default=None,
         help=(
-            "Optional output-folder override. By default, save under "
-            "reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/."
+            "Optional output-folder override. By default, save under reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/. Example: --output analysis/results, which writes generated artifacts under analysis/results."
         ),
     )
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None)
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
+    add_plot_style_argument(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Generate EOS, geo-classified curve, restraint, and HeatFO collections."""
+    with plot_style_context(getattr(args, "plot_style", None)):
+        return _run_main(command, args)
+
+
+def _run_main(command: str, args: argparse.Namespace) -> int:
+    """Execute the plot collection within the selected presentation style."""
     if command not in ALL_COMMANDS:
         raise ValueError(f"Unsupported command: {command}")
 

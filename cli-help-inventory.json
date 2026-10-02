@@ -152,6 +152,22 @@
   {
     "parser": "reaxkit add-alias",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit add-alias",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -393,6 +409,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit add-element-to-ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit add-element-to-ffield",
@@ -674,6 +706,22 @@
   {
     "parser": "reaxkit add-geo-molcharge",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit add-geo-molcharge",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -914,6 +962,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit add-geo-restraint",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit add-geo-restraint",
@@ -1178,6 +1242,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit add-term-to-ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit add-term-to-ffield",
@@ -1520,6 +1600,22 @@
   {
     "parser": "reaxkit add_element_to_ffield",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit add_element_to_ffield",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -1797,6 +1893,22 @@
   {
     "parser": "reaxkit add_molcharge_to_geo",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit add_molcharge_to_geo",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -2037,6 +2149,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit add_restraints_to_geo",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit add_restraints_to_geo",
@@ -2301,6 +2429,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit add_term_to_ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit add_term_to_ffield",
@@ -2736,6 +2880,22 @@
   {
     "parser": "reaxkit bond_events",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit bond_events",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -3164,6 +3324,22 @@
   {
     "parser": "reaxkit charge-table",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit charge-table",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -3510,6 +3686,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which makes one combined chart.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit charge_table",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -3889,6 +4081,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit connection_list",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -4303,6 +4511,22 @@
   {
     "parser": "reaxkit connection_stats",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit connection_stats",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -4707,6 +4931,22 @@
   {
     "parser": "reaxkit connection_table",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit connection_table",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -5105,6 +5345,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit coordination",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -5577,6 +5833,22 @@
   {
     "parser": "reaxkit coordination_relabel",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit coordination_relabel",
+    "flags": [
       "--precision"
     ],
     "required": false,
@@ -5921,6 +6193,22 @@
   {
     "parser": "reaxkit create-isomer-trainset",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit create-isomer-trainset",
+    "flags": [
       "--reference-composition"
     ],
     "required": false,
@@ -6160,6 +6448,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit create-jaguar-isomer-jobs",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit create-jaguar-isomer-jobs",
@@ -6383,6 +6687,22 @@
   {
     "parser": "reaxkit create_isomer_trainset",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit create_isomer_trainset",
+    "flags": [
       "--reference-composition"
     ],
     "required": false,
@@ -6626,6 +6946,22 @@
   {
     "parser": "reaxkit create_jaguar_isomer_jobs",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit create_jaguar_isomer_jobs",
+    "flags": [
       "--submit"
     ],
     "required": false,
@@ -6809,6 +7145,22 @@
   {
     "parser": "reaxkit detect-isomer-representatives",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit detect-isomer-representatives",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -6992,6 +7344,22 @@
   {
     "parser": "reaxkit detect-isomers",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit detect-isomers",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -7175,6 +7543,22 @@
   {
     "parser": "reaxkit detect_isomer_representatives",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit detect_isomer_representatives",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -7354,6 +7738,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit detect_isomers",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit detect_isomers",
@@ -7696,6 +8096,22 @@
   {
     "parser": "reaxkit diffusivity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit diffusivity",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -7971,6 +8387,22 @@
   {
     "parser": "reaxkit extract-optimized-ffield",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit extract-optimized-ffield",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -8272,6 +8704,22 @@
   {
     "parser": "reaxkit fit-kai-switching",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fit-kai-switching",
+    "flags": [
       "--polarity-columns"
     ],
     "required": false,
@@ -8681,6 +9129,22 @@
   {
     "parser": "reaxkit fit-nls-switching",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fit-nls-switching",
+    "flags": [
       "--polarity-columns"
     ],
     "required": false,
@@ -9090,6 +9554,22 @@
   {
     "parser": "reaxkit fit-snng-switching",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fit-snng-switching",
+    "flags": [
       "--polarity-columns"
     ],
     "required": false,
@@ -9499,6 +9979,22 @@
   {
     "parser": "reaxkit fit-switching-kinetics",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fit-switching-kinetics",
+    "flags": [
       "--polarity-columns"
     ],
     "required": false,
@@ -9726,6 +10222,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit fort7",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit fort7",
@@ -9921,6 +10433,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit fort7 bond-events",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit fort7 bond-events",
@@ -10199,6 +10727,22 @@
   {
     "parser": "reaxkit fort7 bond-ts",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fort7 bond-ts",
+    "flags": [
       "--save"
     ],
     "required": false,
@@ -10426,6 +10970,22 @@
   {
     "parser": "reaxkit fort7 constats",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fort7 constats",
+    "flags": [
       "--save"
     ],
     "required": false,
@@ -10648,6 +11208,22 @@
   {
     "parser": "reaxkit fort7 edges",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fort7 edges",
+    "flags": [
       "--save"
     ],
     "required": false,
@@ -10841,6 +11417,22 @@
     "default": "False",
     "choices": null,
     "help": null,
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit fort7 get",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -11045,6 +11637,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit free-up",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit free-up",
@@ -11299,6 +11907,22 @@
   {
     "parser": "reaxkit gen-control",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen-control",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -11541,6 +12165,22 @@
     "default": "False",
     "choices": null,
     "help": "Generate and display/save the plot. Example: --plot, which opens the plot interactively when supported.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen-plot",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -11917,6 +12557,22 @@
   {
     "parser": "reaxkit gen-video",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen-video",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -12139,6 +12795,22 @@
     "help": "Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement.",
     "category": "Scientific choices",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit gen_control",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit gen_control",
@@ -12471,6 +13143,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit gen_elastic_trainset",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit gen_elastic_trainset",
@@ -12890,6 +13578,22 @@
   {
     "parser": "reaxkit gen_eregime",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_eregime",
+    "flags": [
       "--points-per-cycle"
     ],
     "required": false,
@@ -13281,6 +13985,22 @@
   {
     "parser": "reaxkit gen_heatfo_trainset",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_heatfo_trainset",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -13540,6 +14260,22 @@
   {
     "parser": "reaxkit gen_template_addmol",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_template_addmol",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -13720,6 +14456,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit gen_template_charges",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit gen_template_charges",
@@ -13920,6 +14672,22 @@
   {
     "parser": "reaxkit gen_template_control",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_template_control",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -14116,6 +14884,22 @@
   {
     "parser": "reaxkit gen_template_kopple2",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_template_kopple2",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -14296,6 +15080,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit gen_template_tregime",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit gen_template_tregime",
@@ -14496,6 +15296,22 @@
   {
     "parser": "reaxkit gen_template_vregime",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_template_vregime",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -14692,6 +15508,22 @@
   {
     "parser": "reaxkit gen_template_yaml_for_elastic_settings",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gen_template_yaml_for_elastic_settings",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -14872,6 +15704,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit gen_template_yaml_for_heatfo_settings",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit gen_template_yaml_for_heatfo_settings",
@@ -15257,6 +16105,22 @@
     ],
     "help": "Choose periodic directions. Example: --periodic xy, wraps candidates across a and b while leaving the surface normal open.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-basal-plane-displacement-dipole",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -15883,6 +16747,22 @@
   {
     "parser": "reaxkit get-basal-plane-displacement-local-polarization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-basal-plane-displacement-local-polarization",
+    "flags": [
       "--polarity-tolerance"
     ],
     "required": false,
@@ -16474,6 +17354,22 @@
   {
     "parser": "reaxkit get-basal-plane-displacement-polarization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-basal-plane-displacement-polarization",
+    "flags": [
       "--polarity-tolerance"
     ],
     "required": false,
@@ -17026,6 +17922,22 @@
   {
     "parser": "reaxkit get-basal-plane-displacement-projected-polarity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-basal-plane-displacement-projected-polarity",
+    "flags": [
       "--polarity-tolerance"
     ],
     "required": false,
@@ -17394,6 +18306,22 @@
   {
     "parser": "reaxkit get-control",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-control",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -17655,6 +18583,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-control_data",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-control_data",
@@ -17941,6 +18885,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-dielectric-constant",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-dielectric-constant",
@@ -18425,6 +19385,22 @@
   {
     "parser": "reaxkit get-dipole",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-dipole",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -18825,6 +19801,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-ffield-opt-report",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-ffield-opt-report",
@@ -19415,6 +20407,22 @@
   {
     "parser": "reaxkit get-hbn-reference-local-polarization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-hbn-reference-local-polarization",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -19916,6 +20924,22 @@
     ],
     "help": "Choose periodic directions used for matching and displacement.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-hbn-reference-polarization",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -20552,6 +21576,22 @@
   {
     "parser": "reaxkit get-hbn-reference-projected-polarity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-hbn-reference-projected-polarity",
+    "flags": [
       "--profile-axis"
     ],
     "required": false,
@@ -20916,6 +21956,22 @@
   {
     "parser": "reaxkit get-optimized-ffield",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-optimized-ffield",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -21112,6 +22168,22 @@
   {
     "parser": "reaxkit get-optimized-ffield-fort83",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-optimized-ffield-fort83",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -21304,6 +22376,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-optimized-force-field-fort83",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-optimized-force-field-fort83",
@@ -21593,6 +22681,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which draws one combined chart.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-params",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -22026,6 +23130,22 @@
     "help": "Frames for local plots. Example: --plot-frames 0:20:2, which renders every second frame from 0 to 20.",
     "category": "Outputs and plots",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-polarization",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-polarization",
@@ -22650,6 +23770,22 @@
   {
     "parser": "reaxkit get-potential-and-electric-field",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-potential-and-electric-field",
+    "flags": [
       "--potential-reference-mode"
     ],
     "required": false,
@@ -23106,6 +24242,22 @@
     ],
     "help": "Choose periodic directions. Example: --periodic xy, wraps candidates across a and b while leaving the surface normal open.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-three-folded-wurtzite-neighbors",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -23644,6 +24796,22 @@
     "help": "Plot continuous delta values. Example: --plot-real-values, selects the same values as --plot-value delta.",
     "category": "Outputs and plots",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get-three-folded-wurtzite-polarity",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get-three-folded-wurtzite-polarity",
@@ -24265,6 +25433,22 @@
   {
     "parser": "reaxkit get-three-folded-wurtzite-polarization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-three-folded-wurtzite-polarization",
+    "flags": [
       "--polarity-tolerance"
     ],
     "required": false,
@@ -24734,6 +25918,22 @@
     ],
     "help": "Choose periodic lattice directions. Example: --periodic xy, wraps neighbors across a and b only.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-wurtzite-neighbors",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -25276,6 +26476,22 @@
   {
     "parser": "reaxkit get-wurtzite-polarity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get-wurtzite-polarity",
+    "flags": [
       "--plot-value"
     ],
     "required": false,
@@ -25699,6 +26915,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_a",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -26143,6 +27375,22 @@
       "subplot"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_active_site_events",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -26668,6 +27916,22 @@
   {
     "parser": "reaxkit get_active_site_structural",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_active_site_structural",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -27147,6 +28411,22 @@
   {
     "parser": "reaxkit get_alpha",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_alpha",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -27526,6 +28806,22 @@
   {
     "parser": "reaxkit get_b",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_b",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -27899,6 +29195,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_beta",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -28320,6 +29632,22 @@
   {
     "parser": "reaxkit get_binned_dynamic_charges",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_binned_dynamic_charges",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -28700,6 +30028,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_bond_events",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -29150,6 +30494,22 @@
   {
     "parser": "reaxkit get_c",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_c",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -29542,6 +30902,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_cell_dimensions",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -29945,6 +31321,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_charge",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -30355,6 +31747,22 @@
   {
     "parser": "reaxkit get_charge_vs_electric_field",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_charge_vs_electric_field",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -30704,6 +32112,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_connection_list",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -31118,6 +32542,22 @@
   {
     "parser": "reaxkit get_connection_stats",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_connection_stats",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -31516,6 +32956,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_connection_table",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -31926,6 +33382,22 @@
   {
     "parser": "reaxkit get_coordination",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_coordination",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -32324,6 +33796,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_density",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -32744,6 +34232,22 @@
   {
     "parser": "reaxkit get_diffusivity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_diffusivity",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -33098,6 +34602,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_dihedral",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -33532,6 +35052,22 @@
   {
     "parser": "reaxkit get_displacement",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_displacement",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -33893,6 +35429,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which draws one combined chart.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_dominant_species",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -34287,6 +35839,22 @@
   {
     "parser": "reaxkit get_dynamic_charge_changes",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_dynamic_charge_changes",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -34661,6 +36229,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_elapsed_time",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -35098,6 +36682,22 @@
   {
     "parser": "reaxkit get_electric_field",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_electric_field",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -35472,6 +37072,22 @@
       "beeswarm"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_energy_min_summary_data",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -35860,6 +37476,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_eregime",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -36298,6 +37930,22 @@
   {
     "parser": "reaxkit get_ffield_data",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_data",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -36717,6 +38365,22 @@
       "beeswarm"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_diagnostic_data",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -37177,6 +38841,22 @@
   {
     "parser": "reaxkit get_ffield_diagnostics_evolution",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_diagnostics_evolution",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -37586,6 +39266,22 @@
       "beeswarm"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_diagnostics_sensitivity",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -38041,6 +39737,22 @@
   {
     "parser": "reaxkit get_ffield_opt_bulk_modulus",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_bulk_modulus",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -38442,6 +40154,22 @@
   {
     "parser": "reaxkit get_ffield_opt_eos",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_eos",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -38776,6 +40504,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_plots",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get_ffield_opt_plots",
@@ -39133,6 +40877,22 @@
   {
     "parser": "reaxkit get_ffield_opt_progress_data",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_progress_data",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -39510,6 +41270,22 @@
   {
     "parser": "reaxkit get_ffield_opt_results",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_ffield_opt_results",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -39744,6 +41520,22 @@
   {
     "parser": "reaxkit get_force_field_opt_geo_files",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_force_field_opt_geo_files",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -39932,6 +41724,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit get_frames_count",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit get_frames_count",
@@ -40281,6 +42089,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_gamma",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -40708,6 +42532,22 @@
   {
     "parser": "reaxkit get_geometry_optimization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_geometry_optimization",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -41080,6 +42920,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which generates a single-panel figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_hybridization",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -41471,6 +43327,22 @@
   {
     "parser": "reaxkit get_kinematics",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_kinematics",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -41814,6 +43686,22 @@
   {
     "parser": "reaxkit get_largest_molecule_by_mass",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_largest_molecule_by_mass",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -42139,6 +44027,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which draws one combined chart.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_largest_molecule_composition",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -42524,6 +44428,22 @@
   {
     "parser": "reaxkit get_molecular_frequency",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_molecular_frequency",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -42885,6 +44805,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_molecular_totals",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -43262,6 +45198,22 @@
   {
     "parser": "reaxkit get_molecule_lifetime",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_molecule_lifetime",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -43622,6 +45574,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_msd",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -44004,6 +45972,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_num_of_atoms",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -44413,6 +46397,22 @@
   {
     "parser": "reaxkit get_partial_energy",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_partial_energy",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -44712,6 +46712,22 @@
     "default": "False",
     "choices": null,
     "help": "Render the hysteresis plot. Example: --plot, which generates the hysteresis curve figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_polarization_field",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -45146,6 +47162,22 @@
   {
     "parser": "reaxkit get_potential_energy",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_potential_energy",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -45519,6 +47551,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_pressure",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -45930,6 +47978,22 @@
   {
     "parser": "reaxkit get_rdf",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_rdf",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -46331,6 +48395,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_rdf_property",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -46783,6 +48863,22 @@
   {
     "parser": "reaxkit get_restraint",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_restraint",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -47144,6 +49240,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_temperature",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -47541,6 +49653,22 @@
   {
     "parser": "reaxkit get_total_atoms",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_total_atoms",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -47908,6 +50036,22 @@
   {
     "parser": "reaxkit get_total_molecular_mass",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_total_molecular_mass",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -48269,6 +50413,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_total_molecules",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -48535,6 +50695,22 @@
       "subplot"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_trainset_data",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -48822,6 +50998,22 @@
       "subplot"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_trainset_group_comments",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -49248,6 +51440,22 @@
   {
     "parser": "reaxkit get_trajectory",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_trajectory",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -49609,6 +51817,22 @@
       "separate"
     ],
     "help": "Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate).",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_volume",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -49993,6 +52217,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_voronoi",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -50498,6 +52738,22 @@
   {
     "parser": "reaxkit get_z_binned_deformation_gradient_strain",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_z_binned_deformation_gradient_strain",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -50969,6 +53225,22 @@
   {
     "parser": "reaxkit get_z_binned_top_bottom_strain",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit get_z_binned_top_bottom_strain",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -51219,6 +53491,22 @@
   {
     "parser": "reaxkit gui",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit gui",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -51350,6 +53638,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit help",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit help",
@@ -51680,6 +53984,22 @@
   {
     "parser": "reaxkit hybridization",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit hybridization",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -51940,6 +54260,22 @@
   {
     "parser": "reaxkit intspec",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit intspec",
+    "flags": [
       "--workers"
     ],
     "required": false,
@@ -52182,6 +54518,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot subplot, which creates one panel per value column.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit kinematics",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -52537,6 +54889,22 @@
   {
     "parser": "reaxkit kinematics_heatmap2d",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit kinematics_heatmap2d",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -52862,6 +55230,22 @@
   {
     "parser": "reaxkit kinematics_plot3d",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit kinematics_plot3d",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -53227,6 +55611,22 @@
   {
     "parser": "reaxkit largest_molecule_by_mass",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit largest_molecule_by_mass",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -53558,6 +55958,22 @@
   {
     "parser": "reaxkit largest_molecule_composition",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit largest_molecule_composition",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -53794,6 +56210,22 @@
   {
     "parser": "reaxkit make-addmol",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-addmol",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -53974,6 +56406,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-charges",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-charges",
@@ -54170,6 +56618,22 @@
     "help": "Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which selects the key to change.",
     "category": "Scientific choices",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-control",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-control",
@@ -54514,6 +56978,22 @@
   {
     "parser": "reaxkit make-eregime",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-eregime",
+    "flags": [
       "--points-per-cycle"
     ],
     "required": false,
@@ -54822,6 +57302,22 @@
   {
     "parser": "reaxkit make-geo",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-geo",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -55061,6 +57557,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-isomer-trainset",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-isomer-trainset",
@@ -55308,6 +57820,22 @@
   {
     "parser": "reaxkit make-jaguar-isomer-jobs",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-jaguar-isomer-jobs",
+    "flags": [
       "--submit"
     ],
     "required": false,
@@ -55488,6 +58016,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-kopple2",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-kopple2",
@@ -55795,6 +58339,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-trainset-elastic",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-trainset-elastic",
@@ -56177,6 +58737,22 @@
   {
     "parser": "reaxkit make-trainset-heatfo",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-trainset-heatfo",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -56436,6 +59012,22 @@
   {
     "parser": "reaxkit make-trainset-settings",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-trainset-settings",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -56620,6 +59212,22 @@
   {
     "parser": "reaxkit make-trainset-settings-heatfo",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make-trainset-settings-heatfo",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -56800,6 +59408,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-tregime",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-tregime",
@@ -56996,6 +59620,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make-vregime",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make-vregime",
@@ -57227,6 +59867,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit make_isomer_trainset",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit make_isomer_trainset",
@@ -57474,6 +60130,22 @@
   {
     "parser": "reaxkit make_jaguar_isomer_jobs",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit make_jaguar_isomer_jobs",
+    "flags": [
       "--submit"
     ],
     "required": false,
@@ -57661,6 +60333,22 @@
     "help": "Artifact profile (default: standard).",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit manage-workspace",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit manage-workspace",
@@ -57906,6 +60594,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit merge-ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit merge-ffield",
@@ -58245,6 +60949,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit merge_ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit merge_ffield",
@@ -58634,6 +61354,22 @@
   {
     "parser": "reaxkit molecule_lifetime",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit molecule_lifetime",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -59000,6 +61736,22 @@
   {
     "parser": "reaxkit msd",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit msd",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -59271,6 +62023,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit orthogonalize-geo",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit orthogonalize-geo",
@@ -59621,6 +62389,22 @@
       "beeswarm"
     ],
     "help": "Render a plot",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit parameter_optimization_most_sensitive",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -60066,6 +62850,22 @@
   {
     "parser": "reaxkit parameter_optimization_tornado",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit parameter_optimization_tornado",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -60431,6 +63231,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit place-geo",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit place-geo",
@@ -60805,6 +63621,22 @@
     ],
     "help": "Projection plane for heatmap2d. Example: --plane xz, which projects points onto XZ before binning.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit plot_atom_property",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -61263,6 +64095,22 @@
   {
     "parser": "reaxkit rdf",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit rdf",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -61664,6 +64512,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit rdf_property",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -62142,6 +65006,22 @@
   {
     "parser": "reaxkit relabel_traj_using_coordination",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit relabel_traj_using_coordination",
+    "flags": [
       "--precision"
     ],
     "required": false,
@@ -62463,6 +65343,22 @@
   {
     "parser": "reaxkit repair_fort7",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit repair_fort7",
+    "flags": [
       "--progress-every"
     ],
     "required": false,
@@ -62691,6 +65587,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit sort_geo",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit sort_geo",
@@ -63042,6 +65954,22 @@
     "default": "None",
     "choices": null,
     "help": "Deprecated alias for --present.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit study",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -63649,6 +66577,22 @@
   {
     "parser": "reaxkit timeseries",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit timeseries",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -63933,6 +66877,22 @@
   {
     "parser": "reaxkit trim-xmolout",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit trim-xmolout",
+    "flags": [
       "--project-root"
     ],
     "required": false,
@@ -63978,6 +66938,22 @@
     "help": "show this help message and exit",
     "category": "Diagnostics and compatibility",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit vasp2reax",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit voronoi",
@@ -64235,6 +67211,22 @@
       "subplot"
     ],
     "help": "Render a plot. Example: --plot single, which creates one combined figure.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit voronoi",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
     "category": "Outputs and plots",
     "visibility": "short"
   },
@@ -64584,6 +67576,22 @@
     "help": "Control parameter key to override (repeatable, pair with --value). Example: --parameter nmdit, which marks `nmdit` for replacement.",
     "category": "Scientific choices",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit write-control",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit write-control",
@@ -65034,6 +68042,22 @@
     ],
     "help": "Choose periodic directions. Example: --periodic xy, wraps candidates across a and b while leaving the surface normal open.",
     "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit write-three-folded-trajectory-with-polarity",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
     "visibility": "short"
   },
   {
@@ -65561,6 +68585,22 @@
   {
     "parser": "reaxkit write-trajectory-with-polarity",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit write-trajectory-with-polarity",
+    "flags": [
       "--polarity-tolerance"
     ],
     "required": false,
@@ -66026,6 +69066,22 @@
   {
     "parser": "reaxkit write-trajectory-with-potential-and-electric-field",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit write-trajectory-with-potential-and-electric-field",
+    "flags": [
       "--potential-reference-mode"
     ],
     "required": false,
@@ -66428,6 +69484,22 @@
   {
     "parser": "reaxkit write_trajectory_with_charges",
     "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit write_trajectory_with_charges",
+    "flags": [
       "--precision"
     ],
     "required": false,
@@ -66704,6 +69776,22 @@
     "help": "Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables.",
     "category": "Storage and cache",
     "visibility": "full"
+  },
+  {
+    "parser": "reaxkit xtob",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
   },
   {
     "parser": "reaxkit xtob",

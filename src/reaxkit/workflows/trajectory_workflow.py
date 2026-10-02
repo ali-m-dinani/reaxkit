@@ -256,8 +256,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y z, which uses full 3D displacement.")
         parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
         parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t. Example: --d 2, which applies 2D diffusivity relation.")
-        parser.add_argument("--max-lag", type=int, default=None)
-        parser.add_argument("--delta-t-ps", type=float, default=1.0)
+        parser.add_argument("--max-lag", type=int, default=None, help="Maximum frame lag used for the MSD-based diffusion estimate. Example: --max-lag 100, which limits the MSD curve to separations of 100 selected frames.")
+        parser.add_argument("--delta-t-ps", type=float, default=1.0, help="Time interval between consecutive samples in picoseconds. Example: --delta-t-ps 0.5, which uses a 0.5-ps interval between samples.")
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,

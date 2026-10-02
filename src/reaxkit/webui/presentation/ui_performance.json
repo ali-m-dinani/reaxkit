@@ -3,6 +3,10 @@
   "plot2d_max_points": 40000,
   "plot2d_min_points_per_trace": 600,
   "plot2d_initial_max_points": 12000,
-  "plot2d_zoom_max_points": 120000,
-  "plot2d_max_curves_display": 10
+  "plot2d_zoom_max_points": 12000,
+  "plot2d_max_curves_display": 10,
+  "histogram_max_bins": 256,
+  "scatter3d_max_points": 20000,
+  "scatter3d_max_bonds": 2000,
+  "plot_max_bytes": 4194304
 }

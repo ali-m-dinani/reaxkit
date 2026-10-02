@@ -13,7 +13,7 @@ from typing import Mapping
 
 import matplotlib.pyplot as plt
 
-from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged
+from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged, save_or_show
 
 
 class ErrorbarPlotRenderer(PlotRenderer):
@@ -61,7 +61,6 @@ class ErrorbarPlotRenderer(PlotRenderer):
         title = cfg.get("title")
         xlabel = cfg.get("xlabel")
         ylabel = cfg.get("ylabel")
-        save = cfg.get("save")
         legend = bool(cfg.get("legend", False))
         figsize = cfg.get("figsize", (8.0, 4.0))
         fmt = cfg.get("fmt", "o-")
@@ -87,6 +86,11 @@ class ErrorbarPlotRenderer(PlotRenderer):
                     capsize=item.get("capsize", capsize),
                     alpha=float(item.get("alpha", alpha)),
                     label=item.get("label"),
+                    **{
+                        key: item[key]
+                        for key in ("color", "linewidth", "markersize")
+                        if key in item
+                    },
                 )
         else:
             if x is None or y is None:
@@ -105,20 +109,5 @@ class ErrorbarPlotRenderer(PlotRenderer):
             ax.legend()
 
         fig.tight_layout()
-        if save:
-            from pathlib import Path
-
-            p = Path(save)
-            exts = {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".tif", ".tiff", ".bmp"}
-            if p.suffix.lower() in exts:
-                p.parent.mkdir(parents=True, exist_ok=True)
-                out = p
-            else:
-                p.mkdir(parents=True, exist_ok=True)
-                out = p / f"{(title or 'errorbar_plot').replace(' ', '_')}.png"
-            fig.savefig(out, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-        else:
-            plt.show()
-        return fig
+        return save_or_show(fig, {"plot_type": "errorbar_plot", **cfg})
 

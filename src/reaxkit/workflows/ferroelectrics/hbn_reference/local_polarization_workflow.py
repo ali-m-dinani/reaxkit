@@ -68,8 +68,7 @@ Examples:
         choices=["cell", "layer"],
         default="cell",
         help=(
-            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and "
-            "the generic local table. Both explicit tables are always written. Default: cell."
+            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and the generic local table. Both explicit tables are always written. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output."
         ),
     )
     parser.add_argument(
@@ -77,52 +76,50 @@ Examples:
         choices=["equal", "deformation"],
         default="equal",
         help=(
-            "Choose equal shares of the selected frame volume (default), or "
-            "normalized local-deformation weights."
+            "Choose equal shares of the selected frame volume (default), or normalized local-deformation weights. Example: --local-volume-method equal, which divides the selected frame volume among local groups."
         ),
     )
     parser.add_argument(
         "--deformation-neighbors",
         type=int,
         default=12,
-        help="Set the maximum neighboring reference cells used by local affine fits. Default: 12.",
+        help="Set the maximum neighboring reference cells used by local affine fits. Default: 12. Example: --deformation-neighbors 12, which uses at most twelve neighboring reference cells in each affine fit.",
     )
     parser.add_argument(
         "--local-charge-treatment",
         choices=["auto", "raw", "neutralize"],
         default="auto",
         help=(
-            "Choose raw atomic charges, per-cell charge neutralization, or auto "
-            "neutralization only when a cell is charged. Default: auto."
+            "Choose raw atomic charges, per-cell charge neutralization, or auto neutralization only when a cell is charged. Default: auto. Example: --local-charge-treatment neutralize, which neutralizes each local group's charges."
         ),
     )
     parser.add_argument(
         "--plot-2d",
         action="store_true",
-        help="Write per-frame 2D maps after aggregating along the omitted coordinate.",
+        help="Write per-frame 2D maps after aggregating along the omitted coordinate. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-3d",
         action="store_true",
-        help="Write per-frame 3D cell-center scatter plots.",
+        help="Write per-frame 3D cell-center scatter plots. Example: --plot-3d, which writes three-dimensional center scatter plots.",
     )
     parser.add_argument(
         "--plot-plane",
         choices=["xy", "xz", "yz"],
         default="xy",
-        help="Choose the displayed plane for --plot-2d. Default: xy.",
+        help="Choose the displayed plane for --plot-2d. Default: xy. Example: --plot-plane xy, which displays x and y while aggregating along z.",
     )
     parser.add_argument(
         "--plot-component",
         choices=["x", "y", "z", "c"],
         default="c",
-        help="Choose the dipole or polarization component used as plot color. Default: c.",
+        help="Choose the dipole or polarization component used as plot color. Default: c. Example: --plot-component z, which colors plots by the z component.",
     )
     parser.add_argument(
         "--plot-quantity",
         choices=["polarization", "dipole"],
         default="polarization",
-        help="Plot local polarization (default) or local dipole.",
+        help="Plot local polarization (default) or local dipole. Example: --plot-quantity dipole, which colors plots by local dipole instead of polarization.",
     )
     parser.add_argument(
         "--plot-bins",
@@ -130,27 +127,27 @@ Examples:
         type=int,
         default=(40, 40),
         metavar=("NU", "NV"),
-        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40.",
+        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40. Example: --plot-bins 40 40, which uses 40 bins along each displayed axis.",
     )
     parser.add_argument(
         "--global-scaling",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Use shared symmetric color limits across frames.",
+        help="Use shared symmetric color limits across frames. Example: --global-scaling, which uses shared symmetric color limits across frames.",
     )
     parser.add_argument(
-        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180."
+        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch."
     )
     parser.add_argument(
         "--write-extxyz",
         action="store_true",
-        help="Write an OVITO-compatible trajectory with local vector properties.",
+        help="Write an OVITO-compatible trajectory with local vector properties. Example: --write-extxyz, which exports local vector properties for OVITO.",
     )
     parser.add_argument(
         "--extxyz-precision",
         type=int,
         default=8,
-        help="Set significant digits in Extended XYZ output. Default: 8.",
+        help="Set significant digits in Extended XYZ output. Default: 8. Example: --extxyz-precision 8, which writes eight significant digits in Extended XYZ properties.",
     )
     return parser
 

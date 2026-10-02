@@ -10,10 +10,16 @@ def build_parser(parser, *, command: str):
         parser,
         command=command,
         description=(
-            "Get charge time series for all atoms or a selected subset.\n\n"
+            "Get charge time series for all atoms or a selected subset.\n"
+            "\n"
+            "Inspect charge transfer for all atoms or a selected subset of an existing run.\n"
+            "\n"
             "Examples:\n"
-            "  reaxkit get_charge --frames 0 --export charges.csv\n"
-            "  reaxkit get_charge --atom-ids 1 2 --fort7 fort.7 --export charges.csv"
+            "  1. All charges at frame zero:\n"
+            "     reaxkit get-charge --fort7 runs/heating/fort.7 --frames 0 --export charges.csv\n"
+            "\n"
+            "  2. Selected atom charges:\n"
+            "     reaxkit get-charge --fort7 runs/heating/fort.7 --atom-ids 1 2 --plot single"
         ),
         inputs=("fort7", "xmolout", "summary"),
     )
@@ -22,7 +28,7 @@ def build_parser(parser, *, command: str):
         type=int,
         nargs="+",
         default=None,
-        help="Optional 1-based atom IDs. If omitted, all atoms are included.",
+        help="One-based atom IDs to include; omitted IDs allow all atoms or the type filter. Example: --atom-ids 1 2, which includes only atoms 1 and 2.",
     )
     return parser
 

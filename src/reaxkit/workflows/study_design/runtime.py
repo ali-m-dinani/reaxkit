@@ -2946,130 +2946,130 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     mode.add_argument(
         "--init",
         metavar="PATH",
-        help="Initialize a study from a YAML file and generate folders/manifests.",
+        help="Initialize a study from a YAML file and generate folders/manifests. Example: --init study.yaml, which creates study folders from that configuration.",
     )
     mode.add_argument(
         "--make-yaml",
         nargs="?",
         const="study.yaml",
         metavar="PATH",
-        help="Write a starter study YAML template (default: study.yaml).",
+        help="Write a starter study YAML template (default: study.yaml). Example: --make-yaml study.yaml, which writes a starter study configuration.",
     )
     mode.add_argument(
         "--gen-yaml",
         nargs="?",
         const="study.yaml",
         metavar="PATH",
-        help="Alias for --make-yaml.",
+        help="Alias for --make-yaml. Example: --gen-yaml study.yaml, which writes a starter study configuration.",
     )
     mode.add_argument(
         "--manage",
         metavar="STUDY_ROOT",
-        help="Manage study metadata/artifacts (path update and removals).",
+        help="Manage study metadata/artifacts (path update and removals). Example: --manage studies/heating, which targets that study for metadata or artifact management.",
     )
     mode.add_argument(
         "--run",
         metavar="STUDY_ROOT",
-        help="Execute study stages from an initialized study root folder.",
+        help="Execute study stages from an initialized study root folder. Example: --run studies/heating, which executes stages in that initialized study.",
     )
     mode.add_argument(
         "--analyze",
         metavar="STUDY_ROOT",
-        help="Execute analysis pipelines declared in top-level study 'analysis'.",
+        help="Execute analysis pipelines declared in top-level study 'analysis'. Example: --analyze studies/heating, which runs the study's configured analysis pipelines.",
     )
     mode.add_argument(
         "--aggregate",
         action="append",
         metavar="VALUE",
-        help="Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
+        help="Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter. Example: --aggregate studies/heating, which aggregates results for that study.",
     )
     mode.add_argument(
         "--present",
         action="append",
         metavar="VALUE",
-        help="Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter.",
+        help="Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. Example: --present studies/heating, which renders presentations for that study.",
     )
     mode.add_argument(
         "--plot",
         action="append",
         metavar="VALUE",
-        help="Deprecated alias for --present.",
+        help="Deprecated alias for --present. Example: --plot studies/heating, which renders study presentations through the legacy alias.",
     )
     parser.add_argument(
         "--root",
         default=".",
-        help="Root folder where the generated <study_name>/ tree will be created.",
+        help="Root folder where the generated <study_name>/ tree will be created. Example: --root studies, which creates the study tree under that directory.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Allow overwriting existing template file or reusing non-empty study directory.",
+        help="Allow overwriting existing template file or reusing non-empty study directory. Example: --force, which allows replacement of existing generated output.",
     )
     parser.add_argument(
         "--artifact-transfer",
         choices=sorted(SUPPORTED_ARTIFACT_TRANSFER),
         default=DEFAULT_ARTIFACT_TRANSFER,
-        help="How consumed artifacts are propagated into downstream stage folders.",
+        help="How consumed artifacts are propagated into downstream stage folders. Example: --artifact-transfer copy, which copies consumed artifacts into downstream stages.",
     )
     parser.add_argument(
         "--run-geometry-generator",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Execute geometry_generator.cli_template during study initialization (default: true).",
+        help="Execute geometry_generator.cli_template during study initialization (default: true). Example: --run-geometry-generator, which executes configured geometry generation during initialization.",
     )
     parser.add_argument(
         "--strict-actions",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Fail immediately when geometry generation or artifact propagation actions fail.",
+        help="Fail immediately when geometry generation or artifact propagation actions fail. Example: --strict-actions, which stops initialization when a generation or transfer action fails.",
     )
     parser.add_argument(
         "--stage",
         default=None,
-        help="Run only one stage name (e.g. MM, NPT, NVT).",
+        help="Run only one stage name (e.g. MM, NPT, NVT). Example: --stage NVT, which runs only the NVT stage.",
     )
     parser.add_argument(
         "--case",
         default=None,
-        help="Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300).",
+        help="Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). Example: --case mg_05__temp_300, which selects that study case.",
     )
     parser.add_argument(
         "--replicate",
         default=None,
-        help="Optional replicate selector (e.g. rep_01).",
+        help="Optional replicate selector (e.g. rep_01). Example: --replicate rep_01, which selects only the first named replicate.",
     )
     parser.add_argument(
         "--parallel-workers",
         type=int,
         default=1,
-        help="Number of replicate pipelines to run in parallel for --run (default: 1).",
+        help="Number of replicate pipelines to run in parallel for --run (default: 1). Example: --parallel-workers 4, which runs up to four replicate pipelines concurrently.",
     )
     parser.add_argument(
         "--rerun-failed",
         action="store_true",
-        help="For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun.",
+        help="For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. Example: --rerun-failed, which reruns failed or waiting replicates after cleaning stage artifacts.",
     )
     parser.add_argument(
         "--analysis",
         default=None,
-        help="Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name.",
+        help="Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. Example: --analysis temperature, which selects the analysis titled temperature.",
     )
-    parser.add_argument("--action", choices=["update-paths", "rename-cases", "remove"], default=None, help="Manager action for --manage.")
+    parser.add_argument("--action", choices=["update-paths", "rename-cases", "remove"], default=None, help="Manager action for --manage. Example: --action update-paths, which updates stored study paths.")
     parser.add_argument(
         "--target",
         action="append",
         choices=["paths", "case-names", "analysis", "aggregate", "cache", "run-status", "analysis-status", "aggregate-status", "plot-status"],
         default=None,
-        help="Manager target(s) for --manage. Can be repeated.",
+        help="Manager target(s) for --manage. Can be repeated. Example: --target cache, which targets cached artifacts for the selected manager action.",
     )
-    parser.add_argument("--analysis-title", default=None, help="Manager filter: analysis title.")
-    parser.add_argument("--aggregate-title", default=None, help="Manager filter: aggregate title.")
-    parser.add_argument("--dry-run", action="store_true", help="Show what --manage would change without writing/removing.")
-    parser.add_argument("--older-than", type=int, default=None, help="For cache removal: only remove entries older than N days.")
+    parser.add_argument("--analysis-title", default=None, help="Manager filter: analysis title. Example: --analysis-title temperature, which limits management to that analysis.")
+    parser.add_argument("--aggregate-title", default=None, help="Manager filter: aggregate title. Example: --aggregate-title mean_temperature, which limits management to that aggregate.")
+    parser.add_argument("--dry-run", action="store_true", help="Show what --manage would change without writing/removing. Example: --dry-run, which previews management changes without writing or removing artifacts.")
+    parser.add_argument("--older-than", type=int, default=None, help="For cache removal: only remove entries older than N days. Example: --older-than 30, which limits cache removal to entries older than 30 days.")
     parser.add_argument(
         "--value-column",
         default=None,
-        help="For aggregate: explicit numeric column to extract from per-run analysis CSV exports.",
+        help="For aggregate: explicit numeric column to extract from per-run analysis CSV exports. Example: --value-column temperature, which aggregates that numeric analysis column.",
     )
     return parser
 

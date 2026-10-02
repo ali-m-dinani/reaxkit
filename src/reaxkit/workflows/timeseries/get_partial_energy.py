@@ -11,15 +11,19 @@ def build_parser(parser, *, command: str):
         command=command,
         description=(
             "Extract partial-energy components from a fort.73 time series.\n"
-            "Use this command to inspect how individual energy contributions change "
-            "during a simulation.\n"
-            "Omit --components to include every available component.\n\n"
+            "\n"
+            "Inspect individual energy contributions in existing fort.73 output.\n"
+            "Omit --components to include all available components.\n"
+            "\n"
             "Examples:\n"
-            "  1. Save every partial-energy component as its own plot:\n"
-            "     reaxkit get-partial-energy --fort73 .\\energylog "
-            "--save partial_energies --plot separate\n"
-            "     Reads all components from energylog and saves one figure per "
-            "component in the partial_energies directory."
+            "  1. Combined plot:\n"
+            "     reaxkit get-partial-energy --fort73 runs/heating/fort.73 --components Ebond Eatom --plot single\n"
+            "\n"
+            "  2. Separate panels:\n"
+            "     reaxkit get-partial-energy --fort73 runs/heating/fort.73 --components Ebond Eatom --plot subplot\n"
+            "\n"
+            "  3. One image per component:\n"
+            "     reaxkit get-partial-energy --fort73 runs/heating/fort.73 --plot separate --save partial_energies"
         ),
         inputs=("fort73",),
     )

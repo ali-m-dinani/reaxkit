@@ -86,7 +86,7 @@ Examples:
     add_storage_cli_arguments(parser)
     parser.add_argument(
         "--reference", type=Path, default=_default_reference_path(),
-        help="Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif.",
+        help="Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif. Example: --reference AlN_hbn.cif, which reads that nonpolar reference structure.",
     )
     parser.add_argument(
         "--replication", nargs=3, type=int, required=True, metavar=("NX", "NY", "NZ"),
@@ -107,48 +107,45 @@ Examples:
     parser.add_argument(
         "--formal-charge", action="append", nargs="+", default=[defaults], metavar="ELEMENT=CHARGE",
         help=(
-            "Assign species formal charges in e. Defaults: Al=3 N=-3; provide "
-            "values for additional trajectory species."
+            "Assign species formal charges in e. Defaults: Al=3 N=-3; provide values for additional trajectory species. Example: --formal-charge Al=3 N=-3, which assigns aluminum and nitrogen their specified charges in e."
         ),
     )
     parser.add_argument(
         "--reference-species", action="append", nargs="+", default=[["B=Al"]],
         metavar="TRAJECTORY=REFERENCE",
-        help="Map substitutions onto reference sites. Default: B=Al.",
+        help="Map substitutions onto reference sites. Default: B=Al. Example: --reference-species B=Al, which maps boron substitutions onto aluminum reference sites.",
     )
     parser.add_argument(
         "--c-axis", nargs=3, type=float, default=(0.0, 0.0, 1.0),
-        help="Set the Cartesian longitudinal direction. Default: 0 0 1.",
+        help="Set the Cartesian longitudinal direction. Default: 0 0 1. Example: --c-axis 0 0 1, which uses the Cartesian z direction as the longitudinal axis.",
     )
     parser.add_argument(
         "--periodic", choices=["none", "x", "y", "z", "xy", "xz", "yz", "xyz"],
-        default="xyz", help="Choose periodic directions used for matching and displacement.",
+        default="xyz", help="Choose periodic directions used for matching and displacement. Example: --periodic xy, which applies periodic matching in x and y only.",
     )
     parser.add_argument(
         "--cell-lengths", nargs=3, type=float, default=None,
-        help="Override trajectory cell lengths in angstrom for every frame.",
+        help="Override trajectory cell lengths in angstrom for every frame. Example: --cell-lengths 30 30 60, which uses those cell lengths in angstrom for every frame.",
     )
     parser.add_argument(
         "--cell-angles", nargs=3, type=float, default=(90.0, 90.0, 90.0),
-        help="Set angles for --cell-lengths in degrees.",
+        help="Set angles for --cell-lengths in degrees. Example: --cell-angles 90 90 90, which uses an orthogonal cell with the supplied lengths.",
     )
     parser.add_argument(
         "--frames", nargs="*", default=None,
-        help="Select zero-based source frames, for example --frames 0:101:10.",
+        help="Select zero-based source frames, for example --frames 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.",
     )
-    parser.add_argument("--every", type=int, default=1, help="Stride selected frames.")
+    parser.add_argument("--every", type=int, default=1, help="Stride selected frames. Example: --every 5, which keeps every fifth selected frame.")
     parser.add_argument(
         "--reference-frame", type=int, default=0,
-        help="Choose the frame used to size, assign, and write the reference lattice.",
+        help="Choose the frame used to size, assign, and write the reference lattice. Example: --reference-frame 0, which uses the initial frame to establish the reference assignment.",
     )
     parser.add_argument(
         "--orthogonalize-reference",
         action=argparse.BooleanOptionalAction,
         default=None,
         help=(
-            "Apply ReaxKit's hexagonal-to-orthogonal transform before replication. "
-            "Use --no-orthogonalize-reference to retain the CIF cell. If omitted, "
-            "the cell angles select the better representation automatically."
+            "Apply ReaxKit's hexagonal-to-orthogonal transform before replication. Use --no-orthogonalize-reference to retain the CIF cell. If omitted, the cell angles select the better representation automatically. Example: --orthogonalize-reference, which converts the hexagonal reference cell before replication."
         ),
     )
     parser.add_argument(
@@ -157,37 +154,33 @@ Examples:
     )
     parser.add_argument(
         "--angle-tolerance", type=float, default=1.0,
-        help="Set the cell-angle comparison tolerance in degrees.",
+        help="Set the cell-angle comparison tolerance in degrees. Example: --angle-tolerance 1, which allows a one-degree cell-angle mismatch.",
     )
     parser.add_argument(
         "--max-reference-strain", type=float, default=0.15,
         help=(
-            "Scale a replicated reference axis to the trajectory box only when "
-            "the relative length change is at most this value. Larger gaps are "
-            "treated as vacuum. Default: 0.15."
+            "Scale a replicated reference axis to the trajectory box only when the relative length change is at most this value. Larger gaps are treated as vacuum. Default: 0.15. Example: --max-reference-strain 0.15, which allows at most 15 percent reference-axis scaling."
         ),
     )
     parser.add_argument(
         "--volume-method", choices=["hull", "bbox", "cell"], default="hull",
         help=(
-            "Choose the polarization volume: occupied atomic convex hull "
-            "(default), occupied bounding box, or full simulation cell."
+            "Choose the polarization volume: occupied atomic convex hull (default), occupied bounding box, or full simulation cell. Example: --volume-method cell, which uses the full simulation-cell volume."
         ),
     )
     parser.add_argument(
         "--max-alignment-candidates", type=int, default=8,
-        help="Limit periodic origin candidates considered during initial atom assignment.",
+        help="Limit periodic origin candidates considered during initial atom assignment. Example: --max-alignment-candidates 8, which tests at most eight periodic-origin candidates.",
     )
     parser.add_argument(
         "--output-dir", type=Path, default=None,
-        help="Choose the output directory for CSV and XYZ artifacts.",
+        help="Choose the output directory for CSV and XYZ artifacts. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     parser.add_argument(
         "--write-displacements",
         action="store_true",
         help=(
-            "Write the per-atom displacement table. Disabled by default because "
-            "the table can be very large."
+            "Write the per-atom displacement table. Disabled by default because the table can be very large. Example: --write-displacements, which writes the optional per-atom displacement table."
         ),
     )
     return parser
