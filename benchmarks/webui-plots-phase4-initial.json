@@ -1,0 +1,286 @@
+{
+  "machine": "Windows-11-10.0.26200-SP0",
+  "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "ram_bytes": 33945935872,
+  "versions": {
+    "numpy": "2.5.1",
+    "pyarrow": "25.0.1",
+    "duckdb": "1.5.5",
+    "plotly": "6.9.0",
+    "dash": "4.4.1"
+  },
+  "fixture": "seed=42; numeric step/sine with late spike and missing interval; normal xyz with stable IDs",
+  "scope": "In-process summary/serialization only; first and warm OS-cache runs retained. No handler, spawn, HTTP, browser or GPU timing.",
+  "results": [
+    {
+      "kind": "plot2d",
+      "rows": 100000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          83.2373999292031,
+          48.87059994507581,
+          49.1167000727728,
+          47.65299998689443,
+          50.02219998277724
+        ],
+        "median_ms": 49.1167000727728,
+        "sampled_process_peak_rss_bytes": 138674176
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          979.4440999394283,
+          26.8942000111565,
+          27.36349997576326,
+          28.884599916636944,
+          27.533199987374246
+        ],
+        "median_ms": 27.533199987374246,
+        "sampled_process_peak_rss_bytes": 197722112
+      },
+      "displayed_points": 2315,
+      "json_bytes": 180601,
+      "parquet_bytes": 1591580,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          22.791100083850324,
+          26.545200031250715,
+          25.0019000377506,
+          23.364400025457144,
+          24.089799961075187
+        ],
+        "median_ms": 24.089799961075187,
+        "sampled_process_peak_rss_bytes": 205963264,
+        "bins": 250,
+        "exact_count": 99900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          41.445499984547496,
+          32.09280001465231,
+          54.24989992752671,
+          54.05519995838404,
+          70.31490001827478
+        ],
+        "median_ms": 54.05519995838404,
+        "sampled_process_peak_rss_bytes": 209375232,
+        "displayed_points": 101,
+        "reduced": false
+      }
+    },
+    {
+      "kind": "plot2d",
+      "rows": 1000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          495.4850999638438,
+          493.1024999823421,
+          475.22319993004203,
+          434.33389998972416,
+          467.1659000450745
+        ],
+        "median_ms": 475.22319993004203,
+        "sampled_process_peak_rss_bytes": 268263424
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          70.23650000337511,
+          70.24829997681081,
+          67.92539998423308,
+          70.34540001768619,
+          82.6981000136584
+        ],
+        "median_ms": 70.24829997681081,
+        "sampled_process_peak_rss_bytes": 218038272
+      },
+      "displayed_points": 4008,
+      "json_bytes": 325850,
+      "parquet_bytes": 15941081,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          208.32259999588132,
+          169.4497000426054,
+          218.87009998317808,
+          192.644500057213,
+          195.3573999926448
+        ],
+        "median_ms": 195.3573999926448,
+        "sampled_process_peak_rss_bytes": 266158080,
+        "bins": 250,
+        "exact_count": 999900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          291.11950006335974,
+          318.4062000364065,
+          305.84059993270785,
+          300.6722000427544,
+          303.32910001743585
+        ],
+        "median_ms": 303.32910001743585,
+        "sampled_process_peak_rss_bytes": 275316736,
+        "displayed_points": 101,
+        "reduced": false
+      }
+    },
+    {
+      "kind": "plot2d",
+      "rows": 10000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          5654.04369996395,
+          5626.559099997394,
+          5430.106100044213,
+          5219.171199947596,
+          5478.824999998324
+        ],
+        "median_ms": 5478.824999998324,
+        "sampled_process_peak_rss_bytes": 649908224
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          87.29850000236183,
+          81.68239996302873,
+          75.4513000138104,
+          90.99549998063594,
+          61.63450004532933
+        ],
+        "median_ms": 81.68239996302873,
+        "sampled_process_peak_rss_bytes": 368623616
+      },
+      "displayed_points": 4008,
+      "json_bytes": 344990,
+      "parquet_bytes": 159442952,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          2113.810900016688,
+          2122.6711000781506,
+          2023.187999962829,
+          2030.4544999962673,
+          1956.2599000055343
+        ],
+        "median_ms": 2030.4544999962673,
+        "sampled_process_peak_rss_bytes": 645681152,
+        "bins": 250,
+        "exact_count": 9999900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          3538.950700080022,
+          3471.836099983193,
+          3589.320100028999,
+          3584.576900000684,
+          3947.1744999755174
+        ],
+        "median_ms": 3584.576900000684,
+        "sampled_process_peak_rss_bytes": 658583552,
+        "displayed_points": 101,
+        "reduced": false
+      }
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 10000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          97.96279994770885,
+          53.681999910622835,
+          68.63360002171248,
+          65.78279996756464,
+          92.0105999102816
+        ],
+        "median_ms": 68.63360002171248,
+        "sampled_process_peak_rss_bytes": 580911104
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          185.1297999965027,
+          153.9477000478655,
+          125.39469997864217,
+          193.46300000324845,
+          169.49370002839714
+        ],
+        "median_ms": 169.49370002839714,
+        "sampled_process_peak_rss_bytes": 580284416
+      },
+      "displayed_points": 10000,
+      "json_bytes": 952944,
+      "parquet_bytes": 351527
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 100000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          161.92640003282577,
+          151.62819996476173,
+          168.0515999905765,
+          150.48740000929683,
+          153.25620002113283
+        ],
+        "median_ms": 153.25620002113283,
+        "sampled_process_peak_rss_bytes": 593301504
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          377.2140999790281,
+          380.2239999640733,
+          421.1196999531239,
+          382.3248000117019,
+          444.4091999903321
+        ],
+        "median_ms": 382.3248000117019,
+        "sampled_process_peak_rss_bytes": 599646208
+      },
+      "displayed_points": 20000,
+      "json_bytes": 1956869,
+      "parquet_bytes": 3584758
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 1000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          684.5471999840811,
+          645.0566999847069,
+          671.2374999187887,
+          556.1337000690401,
+          629.2696999153122
+        ],
+        "median_ms": 645.0566999847069,
+        "sampled_process_peak_rss_bytes": 642514944
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          351.44310002215207,
+          401.0763999540359,
+          404.6762000070885,
+          380.1308999536559,
+          437.34890001360327
+        ],
+        "median_ms": 401.0763999540359,
+        "sampled_process_peak_rss_bytes": 647663616
+      },
+      "displayed_points": 20000,
+      "json_bytes": 2017408,
+      "parquet_bytes": 35882308
+    }
+  ]
+}
