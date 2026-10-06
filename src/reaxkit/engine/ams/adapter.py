@@ -46,9 +46,14 @@ BOHR_TO_ANG = 0.529177210903
 
 @register_engine("ams")
 class AMSAdapter(EngineAdapter):
-    """Adapter scaffold for AMS KF/RKF-based loading."""
+    """Load AMS KF/RKF data, excluding negative-step padding at the history tail.
 
-    HANDLER_VERSION = "3"
+    Trailing unused step entries do not count as saved frames. Missing
+    coordinates within the remaining history still raise an error. Streaming
+    analysis clips explicit frame selections to the available frame count.
+    """
+
+    HANDLER_VERSION = "4"
 
     _AMS_ENERGY_COMPONENTS: tuple[str, ...] = (
         "E_pot",  # 1: Total potential
@@ -399,16 +404,21 @@ class AMSAdapter(EngineAdapter):
     @staticmethod
     def _history_frame_count_from_metadata(kf) -> int | None:
         """Read the RKF history-entry count without loading coordinate arrays."""
+        step_numbers = AMSAdapter._step_numbers(kf)
+        valid_count = int(step_numbers.size)
+        while valid_count and step_numbers[valid_count - 1] < 0:
+            valid_count -= 1
+        padded = valid_count < step_numbers.size
         for section, variable in (("MDHistory", "nEntries"), ("History", "nEntries")):
             raw = AMSAdapter._read_kf_variable(kf, section, variable)
             if raw is not None:
                 try:
-                    return int(np.asarray(raw).ravel()[0])
+                    count = int(np.asarray(raw).ravel()[0])
+                    return min(count, valid_count) if padded else count
                 except Exception:
                     pass
-        step_numbers = AMSAdapter._step_numbers(kf)
         if step_numbers.size:
-            return int(step_numbers.size)
+            return valid_count
         return None
 
     def quick_n_frames(self, args: dict) -> int | None:

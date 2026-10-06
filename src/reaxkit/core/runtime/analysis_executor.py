@@ -855,6 +855,18 @@ class AnalysisExecutor:
             f"Resolved engine={resolved_engine} adapter={adapter.__class__.__name__}",
         )
         streaming = self._streaming_enabled(task, adapter, required_data, args, requested_frame_indices)
+        frame_count_reader = getattr(adapter, "quick_n_frames", None)
+        selected_frames = getattr(request, "frames", None)
+        if streaming and resolved_engine == "ams" and selected_frames is not None and callable(frame_count_reader):
+            frame_count = frame_count_reader(args)
+            if frame_count is not None:
+                bounded_frames = [int(frame) for frame in selected_frames if 0 <= int(frame) < frame_count]
+                if not bounded_frames:
+                    raise AnalysisError(f"No requested frames exist in the trajectory ({frame_count} frames).")
+                request = copy.copy(request)
+                request.frames = bounded_frames
+                requested_frame_indices = self._requested_frame_indices(request, required_data, task)
+                args["_frame_indices"] = requested_frame_indices
         args["_streaming"] = streaming
         policy = resolve_execution_policy(task, request, args)
         args["_execution_policy"] = policy.as_dict()

@@ -259,6 +259,102 @@ def test_ams_adapter_streams_history_as_one_frame_payloads(monkeypatch):
     assert all(frame.positions.shape == (1, 2, 3) for frame in frames)
 
 
+@pytest.mark.parametrize("metadata_count", [None, 5])
+@pytest.mark.parametrize("selected", [None, list(range(10)), [2, 0, 4]])
+@pytest.mark.parametrize("data_type", [TrajectoryData, ElectrostaticsData])
+def test_ams_ignores_padded_trailing_steps(monkeypatch, metadata_count, selected, data_type):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read(section, variable):
+        if (section, variable) == ("General", "Step numbers"):
+            return np.array([0, 1000, 2000, -1, -1])
+        if variable == "nEntries" and metadata_count is not None:
+            return metadata_count
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read)
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+    assert adapter.quick_n_frames({}) == 3
+    frames = list(adapter.stream(data_type, {"_frame_indices": selected}))
+    trajectories = [frame.trajectory if data_type is ElectrostaticsData else frame for frame in frames]
+    expected = [0, 1, 2] if selected is None else [frame for frame in selected if frame < 3]
+    assert [frame.source_frame_indices.item() for frame in trajectories] == expected
+    assert not any("-1" in name for name in fake.history_reads)
+
+
+@pytest.mark.parametrize("steps, expected", [([-1, -1], 0), ([0, -1, 2000, -1], 3), ([0], 1)])
+def test_ams_frame_count_only_trims_trailing_padding(monkeypatch, steps, expected):
+    fake = _FakeStandaloneReaxoutKF()
+    fake.steps = np.array(steps)
+    assert AMSAdapter._history_frame_count_from_metadata(fake) == expected
+
+
+def test_ams_missing_coordinates_inside_valid_history_still_fail(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read(section, variable):
+        if (section, variable) == ("History", "Coordinates 1000"):
+            raise KeyError(variable)
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read)
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+    with pytest.raises(RuntimeError, match="missing coordinates for source frame 1"):
+        list(adapter.stream(TrajectoryData, {}))
+
+
+@pytest.mark.parametrize("charge_source", ["formal", "reaxff"])
+@pytest.mark.parametrize("selected", [None, list(range(10)), [0, 2, 4, 6]])
+def test_ams_hbn_polarization_finishes_with_padded_history(monkeypatch, tmp_path, charge_source, selected):
+    from ase.io import read
+    from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
+        HBNReferencePolarizationRequest, HBNReferencePolarizationTask, REFERENCE_STRUCTURE_PATH,
+    )
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+    from reaxkit.engine.common.generators.structure_transformers import orthogonalize_hexagonal_cell
+
+    reference = orthogonalize_hexagonal_cell(read(REFERENCE_STRUCTURE_PATH)).repeat((1, 1, 2))
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read_variable(section, variable):
+        if (section, variable) == ("General", "Step numbers"):
+            return np.array([0, 1000, 2000, -1, -1])
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            return " ".join(reference.get_chemical_symbols())
+        if section == "History":
+            for step in (0, 1000, 2000):
+                if variable == f"Coordinates {step}":
+                    return reference.positions.ravel()
+                if variable == f"Unit cell axes {step}":
+                    return reference.cell.array.ravel()
+                if variable == f"Atomic charges {step}":
+                    return [3.0 if symbol == "Al" else -3.0 for symbol in reference.get_chemical_symbols()]
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read_variable)
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: fake)
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    request = HBNReferencePolarizationRequest(
+        reference_path=REFERENCE_STRUCTURE_PATH, replication=(1, 1, 2),
+        orthogonalize="always", charge_source=charge_source, frames=selected,
+        volume_method="cell",
+    )
+    result = AnalysisExecutor().run(HBNReferencePolarizationTask(), request, {
+        "engine": "ams", "input": str(source), "project_root": str(tmp_path / "workspace"),
+        "workers": 4, "progress": False, "cache": False, "output_profile": "minimal",
+    })
+    expected = [0, 1, 2] if selected is None else [frame for frame in selected if frame < 3]
+    assert result.table["frame_index"].tolist() == expected
+    assert request.frames == selected
+    np.testing.assert_allclose(result.table[["P_x (uC/cm^2)", "P_y (uC/cm^2)", "P_z (uC/cm^2)"]], 0, atol=1e-10)
+
+
 def test_ams_streams_selected_standalone_kf_electrostatics_without_section_load(monkeypatch):
     adapter = AMSAdapter()
     fake = _FakeStandaloneReaxoutKF()

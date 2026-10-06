@@ -205,3 +205,38 @@ def test_tqdm_reporter_keeps_indeterminate_operations_unfilled(monkeypatch):
     assert created[0].n == 1
     assert created[0].total == 1
     assert created[0].bar_format is None
+
+
+def test_interleaved_reader_and_analysis_progress_does_not_overcount(monkeypatch):
+    created = []
+
+    class FakeBar:
+        def __init__(self, total=None, **kwargs):
+            self.total = total
+            self.n = 0
+            created.append(self)
+
+        def set_description_str(self, desc, refresh=False):
+            self.desc = desc
+
+        def refresh(self):
+            pass
+
+        def update(self, delta):
+            self.n += delta
+
+        def reset(self, total=None):
+            self.total = total
+            self.n = 0
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(progress, "tqdm", FakeBar)
+    reporter = progress.tqdm_reporter_factory()
+    for completed in range(1, 10):
+        reporter("stream", completed + 1, 10, "Reading coordinates")
+        if completed < 9:
+            reporter("stream", completed, 0, "Calculating polarization frames")
+    assert len(created) == 1
+    assert created[0].n == 10
