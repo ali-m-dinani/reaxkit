@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from typing import Callable, Sequence
@@ -31,8 +32,8 @@ from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
-ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi")
-COMMAND_ALIASES = {"get_voronoi": ("voronoi",)}
+ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi", "extract_frame")
+COMMAND_ALIASES = {"get_voronoi": ("voronoi",), "extract_frame": ("extract_trajectory_frame",)}
 ALL_LEGACY_COMMANDS = (
     "dihedral",
     "diffusivity",
@@ -180,6 +181,30 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(command=canonical)
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
+
+    if canonical == "extract_frame":
+        parser.description = (
+            "Extract one complete ReaxFF, AMS, or LAMMPS frame as XYZ and ReaxFF GEO.\n"
+            "Frame indices are zero-based; last (or -1) selects the last complete frame,\n"
+            "ignoring an incomplete trailing frame from an interrupted simulation.\n"
+            "The selected cell supplies a, b, c, alpha, beta, gamma to xtob.\n"
+            "AMS/LAMMPS cells and coordinates are oriented together for ReaxFF GEO.\n"
+            "Outputs contain geometry only, not velocities or thermostat state.\n\n"
+            "Examples:\n"
+            "  reaxkit extract_frame --file runs/job1/xmolout --frame last --output restart\n"
+            "  reaxkit extract_frame --run-dir runs/job1 --frame 25 --output frame25\n"
+            "  reaxkit extract_trajectory_frame --engine ams --file ams.rkf --output restart\n"
+            "  reaxkit extract_frame --engine lammps --file dump.lammpstrj --type-map Al N --output restart"
+        )
+        parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default="reaxff", help="Source engine. Example: --engine ams, which reads KF/RKF History frames.")
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory used when --file is omitted. Example: --run-dir runs/job1, which discovers the selected engine's trajectory there.")
+        parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Explicit trajectory path, relative to the current directory. Example: --file runs/job1/xmolout, which selects the source trajectory.")
+        parser.add_argument("--frame", default="last", help="Zero-based frame index, last, or -1 (default: last). Example: --frame 25, which selects the 26th frame.")
+        parser.add_argument("--output", default="frame", help="Output prefix; writes PREFIX.xyz and PREFIX.geo (default: frame). Example: --output restart, which writes restart.xyz and restart.geo.")
+        parser.add_argument("--type-map", nargs="+", default=None, help="LAMMPS elements for numeric types 1, 2, ... . Example: --type-map Al N, which maps type 1 to Al and type 2 to N.")
+        parser.add_argument("--cell", nargs=6, type=float, default=None, help="Cell for LAMMPS XYZ without lattice metadata: a b c alpha beta gamma in angstrom/degrees. Example: --cell 10 11 12 90 90 90, which supplies an orthogonal box.")
+        parser.add_argument("--units", choices=["metal", "real"], default="metal", help="LAMMPS source units (both use angstrom distances). Example: --units real, which reads a real-units dump.")
+        return parser
 
     _add_runtime_arguments(parser)
     _add_presentation_arguments(parser, canonical)
@@ -1094,6 +1119,28 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct trajectory command."""
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
+    if canonical == "extract_frame":
+        from reaxkit.engine.common.generators.trajectory_frame import extract_frame
+
+        if args.xmolout:
+            source = Path(args.xmolout)
+        elif args.engine == "ams":
+            from reaxkit.engine.ams.adapter import AMSAdapter
+
+            source = AMSAdapter._resolve_kf_path({"run_dir": args.run_dir})
+        elif args.engine == "lammps":
+            from reaxkit.engine.lammps.adapter import LAMMPSAdapter
+
+            source = LAMMPSAdapter()._resolve_dump_path({"run_dir": args.run_dir})
+        else:
+            source = Path(args.run_dir) / "xmolout"
+        xyz_path, geo_path = extract_frame(
+            source, engine=args.engine, frame=args.frame,
+            xyz_file=f"{args.output}.xyz", geo_file=f"{args.output}.geo",
+            type_map=args.type_map, cell=args.cell, units=args.units,
+        )
+        print(f"Wrote {xyz_path} and {geo_path}")
+        return 0
     task_key = canonical
     if canonical == "get_voronoi":
         backend = str(getattr(args, "backend", "scipy")).strip().lower()

@@ -31,16 +31,18 @@ and B0_prime=1.5 unless supplied otherwise. The CLI defaults to the Voigt modulu
 appropriate to uniform scaling; Reuss/VRH selections remain available but need
 not agree with a uniform-strain tensor curvature. B0_prime is an assumed input,
 not derivable from a second-order tensor. Strain grids round up to the next step,
-as in the original energy generator, and the tensor geometry generator uses
+as in the original energy generator, and every geometry generator uses
 exactly the same grid. Zero targets retain the legacy 0.0001 offset.
 
-Existing orthogonal YAML without `tensor_gpa` retains the legacy nine-mode
-energy and geometry behavior for reproducibility. Incomplete non-orthogonal
-YAML is rejected unless explicitly skipped; re-fetch it to recover the full
-tensor and its orientation. Tensor mode corrects Cartesian deformation and
-ReaxFF CRYSTX coordinate orientation, so geometry files need not be identical
-to legacy files. Legacy mode also retains its old endpoint-grid behavior;
-use tensor mode for corrected energy-to-geometry coverage.
+Existing orthogonal YAML without `tensor_gpa` retains the nine-mode energy
+targets. Both nine-constant and full-tensor inputs use corrected Cartesian
+deformation, ReaxFF CRYSTX coordinate orientation, and matching energy/geometry
+grids. Regenerate old GEO files to obtain these fixes; their coordinates and
+endpoint coverage can differ from historical output. No tensor is invented
+for a nine-constant input. Incomplete non-orthogonal YAML is still rejected
+unless explicitly skipped; re-fetch it to recover the full tensor and its
+orientation. Input XYZ coordinates must match the ASE `cellpar_to_cell` frame;
+only the generated output coordinates are rotated into the ReaxFF frame.
 
 MP tensors are relaxed-ion quantities (`elastic.response: relaxed_ion` in new
 source YAML), while generated coordinates are affine starting structures.

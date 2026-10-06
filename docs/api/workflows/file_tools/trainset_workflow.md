@@ -314,7 +314,7 @@ This comamnd supports 3 input-mode options:
 
 [NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
 
-[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain legacy orthogonal generation. Use --skip-not-orthogonal to restrict generation to cells with right angles. See [tensor conventions and compatibility](../../engine/reaxff/generators/trainset_elastic_energy_doc.md#full-tensor-generation).
+[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. Use --skip-not-orthogonal to restrict generation to cells with right angles. See [tensor conventions and compatibility](../../engine/reaxff/generators/trainset_elastic_energy_doc.md#full-tensor-generation).
 ```
 
 ### Arguments
@@ -629,7 +629,7 @@ This comamnd supports 3 input-mode options:
 
 [NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
 
-[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain legacy orthogonal generation. Use --skip-not-orthogonal to restrict generation to cells with right angles.
+[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. Use --skip-not-orthogonal to restrict generation to cells with right angles.
 ```
 
 ### Arguments

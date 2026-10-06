@@ -32,7 +32,7 @@ from reaxkit.engine.reaxff.generators.trainset_elastic_geometry import (
 )
 from reaxkit.engine.reaxff.generators.elastic_tensor import TENSOR_MODES, validate_tensor, tensor_warnings
 
-VERSION = "1"
+VERSION = "2"
 
 
 DEFAULT_CIJ_GPA = {

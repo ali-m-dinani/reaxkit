@@ -23,7 +23,7 @@ from reaxkit.engine.common.io.geo_io import read_structure, write_structure
 from reaxkit.engine.reaxff.generators.trainset_elastic_energy import CellSpec, _build_symmetric_grid
 from reaxkit.engine.reaxff.generators.elastic_tensor import TENSOR_MODES, mode_strain, strain_matrix, validate_cell
 
-VERSION = "1"
+VERSION = "2"
 
 
 GEOMETRY_MODE_ORDER = ["bulk", "c11", "c22", "c33", "c12", "c13", "c23", "c44", "c55", "c66"]
@@ -191,9 +191,8 @@ def _make_base_atoms_from_xyz_and_cell(xyz_path: str | Path, cell: np.ndarray) -
 
 def _generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometryResult:
     """Generate strained geometries."""
-    if spec.tensor_mode:
-        validate_cell(spec.elastic_cell)
-        validate_cell(spec.bulk_cell)
+    validate_cell(spec.elastic_cell)
+    validate_cell(spec.bulk_cell)
     def idx_abs_from_eps(eps: float, step: float) -> int:
         """Idx abs from eps.
 
@@ -252,12 +251,10 @@ def _generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometr
     out: Dict[str, List[StrainedGeometryRecord]] = {mode: [] for mode in modes}
 
     def strain_grid(maximum, step, kind):
-        if spec.tensor_mode:
-            grid = _build_symmetric_grid(max_abs_value=maximum, step=step, grid_mode=kind)
-            if max(abs(value) for value in grid) >= 0.5:
-                raise ValueError("Tensor generation requires small strains (all grid values below 0.5).")
-            return grid
-        return _symmetric_strain_grid(maximum, step)
+        grid = _build_symmetric_grid(max_abs_value=maximum, step=step, grid_mode=kind)
+        if max(abs(value) for value in grid) >= 0.5:
+            raise ValueError("Elastic generation requires small strains (all grid values below 0.5).")
+        return grid
 
     for eps in strain_grid(spec.max_strain_bulk_linear, spec.dstrain_bulk_linear, "bulk"):
         new_cell = _deformation_matrix("bulk", eps) @ cell_b
@@ -281,7 +278,7 @@ def _generate_strained_geometries(spec: StrainedGeometrySpec) -> StrainedGeometr
     for mode in modes[1:]:
         for eps in strain_grid(spec.max_strain_elastic, spec.dstrain_elastic, "elastic"):
             deformation = _deformation_matrix(mode, eps)
-            new_cell = cell_e @ deformation.T if spec.tensor_mode else deformation @ cell_e
+            new_cell = cell_e @ deformation.T
             a, b, c, alpha, beta, gamma = cell_to_cellpar(new_cell)
             title = _strain_title(mode, eps, idx_abs_from_eps(eps, spec.dstrain_elastic))
             atoms = base_e.copy()
@@ -320,7 +317,7 @@ def _write_strained_geometries(
         for record in records:
             xyz_path = xyz_dir / record.xyz_filename
             geo_path = geo_dir / record.geo_filename
-            atoms = orient_structure_for_reaxff(record.atoms) if result.tensor_mode else record.atoms
+            atoms = orient_structure_for_reaxff(record.atoms)
             write_structure(atoms, xyz_path, format="xyz", comment=record.title)
             xtob(
                 xyz_file=xyz_path,

@@ -84,8 +84,9 @@ def test_twenty_one_modes_recover_every_tensor_entry():
 
 
 @pytest.mark.parametrize("angles", [(90, 90, 90), (90, 90, 120), (90, 104, 90), (72, 83, 107)])
-def test_cell_and_atomic_deformation_in_cartesian_axes(tmp_path, angles):
-    spec = geometry_spec(tmp_path, angles)
+@pytest.mark.parametrize("tensor_mode", [False, True])
+def test_cell_and_atomic_deformation_in_cartesian_axes(tmp_path, angles, tensor_mode):
+    spec = replace(geometry_spec(tmp_path, angles), tensor_mode=tensor_mode)
     result = _generate_strained_geometries(spec)
     for mode, records in result.records_by_mode.items():
         reference = next(record.atoms for record in records if record.title.endswith("_0"))
@@ -97,11 +98,13 @@ def test_cell_and_atomic_deformation_in_cartesian_axes(tmp_path, angles):
         np.testing.assert_allclose(step.get_scaled_positions(), reference.get_scaled_positions(), atol=1e-12)
 
 
-def test_generated_energy_labels_have_geometries_on_rounded_grid(tmp_path):
-    spec = geometry_spec(tmp_path, (72, 83, 107), maximum=0.012)
+@pytest.mark.parametrize("tensor_mode", [False, True])
+def test_generated_energy_labels_have_geometries_on_rounded_grid(tmp_path, tensor_mode):
+    spec = replace(geometry_spec(tmp_path, maximum=0.012), tensor_mode=tensor_mode)
     geometries = _generate_strained_geometries(spec)
     energy = _generate_trainset_energy(BulkEnergySpec(100, 1.5, 6, spec.bulk_cell),
-                                      ElasticEnergySpec({}, 1.2, spec.elastic_cell, tensor_gpa=stiffness().tolist()))
+                                      ElasticEnergySpec(legacy_constants(), 1.2, spec.elastic_cell,
+                                                        tensor_gpa=stiffness().tolist() if tensor_mode else None))
     labels = {record.title for records in geometries.records_by_mode.values() for record in records}
     for line in energy.trainset_text.splitlines():
         if " /1 " in line:
@@ -110,11 +113,12 @@ def test_generated_energy_labels_have_geometries_on_rounded_grid(tmp_path):
     assert len(geometries.records_by_mode["bulk"]) == len(energy.bulk_table)
 
 
-def test_reaxff_export_preserves_periodic_geometry(tmp_path):
-    spec = geometry_spec(tmp_path, (72, 83, 107))
+@pytest.mark.parametrize("tensor_mode", [False, True])
+def test_reaxff_export_preserves_periodic_geometry(tmp_path, tensor_mode):
+    spec = replace(geometry_spec(tmp_path, (72, 83, 107)), tensor_mode=tensor_mode)
     result = _generate_strained_geometries(spec)
     _write_strained_geometries(result, out_dir=tmp_path / "export")
-    for mode in ("c44", "c15", "c46"):
+    for mode in (("c44", "c15", "c46") if tensor_mode else ("c44", "c55", "c66")):
         record = result.records_by_mode[mode][-1]
         exported = read(tmp_path / "export/xyz_strained" / record.xyz_filename, format="xyz")
         lengths = record.box_lengths
@@ -203,6 +207,44 @@ def test_yaml_batch_names_and_merged_linkage(tmp_path):
             assert line.split()[5] in descriptors
     assert "c15_e1_mp_1" in descriptors
     assert "c15_e1_mp_2" in descriptors
+
+
+def test_nine_constant_yaml_matches_tensor_geometries_and_vasp2reax(tmp_path):
+    from reaxkit.engine.reaxff.generators.geo_generator import vasp2reax
+
+    spec = geometry_spec(tmp_path, maximum=0.012)
+    for tensor_mode in (False, True):
+        destination = tmp_path / ("tensor" if tensor_mode else "nine_constant")
+        settings = destination / "settings.yaml"
+        _write_trainset_settings_yaml(
+            out_path=str(settings), elastic_cell=spec.elastic_cell.as_dict(),
+            bulk_cell=spec.bulk_cell.as_dict(), elastic_xyz=str(spec.elastic_xyz),
+            elastic_max_strain_percent=1.2, cij_gpa=legacy_constants(),
+            tensor_gpa=orthorhombic_tensor().tolist() if tensor_mode else None,
+        )
+        _generate_trainset_from_yaml(str(settings), str(destination))
+    old_output = tmp_path / "nine_constant"
+    tensor_output = tmp_path / "tensor"
+    for table in (old_output / "volume_energy_data").glob("*.dat"):
+        assert table.read_bytes() == (tensor_output / "volume_energy_data" / table.name).read_bytes()
+    geometries = list((old_output / "structures/geo_strained").glob("*"))
+    descriptors = {path.stem for path in geometries}
+    for line in (old_output / "trainset_elastic.in").read_text().splitlines():
+        if " /1 " in line:
+            assert line.split()[2] in descriptors
+            assert line.split()[5] in descriptors
+    for geometry in geometries:
+        assert geometry.read_bytes() == (tensor_output / "structures/geo_strained" / geometry.name).read_bytes()
+    strained = _generate_strained_geometries(replace(spec, tensor_mode=False))
+    for mode in ("c44", "c55", "c66"):
+        record = strained.records_by_mode[mode][-1]
+        poscar = tmp_path / f"POSCAR_{mode}"
+        write(poscar, record.atoms, format="vasp")
+        reference_geo, _ = vasp2reax(poscar, tmp_path / f"reference_{mode}.geo", format="vasp")
+        actual_geo = old_output / "structures/geo_strained" / record.geo_filename
+        reference_lines = [line for line in reference_geo.read_text().splitlines() if line.startswith(("CRYSTX", "HETATM"))]
+        actual_lines = [line for line in actual_geo.read_text().splitlines() if line.startswith(("CRYSTX", "HETATM"))]
+        assert actual_lines == reference_lines
 
 
 def test_incomplete_nonorthogonal_yaml_requires_full_tensor(tmp_path):

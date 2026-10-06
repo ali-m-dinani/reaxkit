@@ -199,7 +199,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.\n\n"
 
             "[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. "
-            "Older nine-constant YAML files retain legacy orthogonal generation. "
+            "Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. "
             "Use --skip-not-orthogonal to restrict generation to cells with right angles. \n\n"
             
             ""

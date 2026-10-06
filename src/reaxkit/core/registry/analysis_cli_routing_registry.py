@@ -120,6 +120,11 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
 
 
 register_analysis_command(
+    "extract_frame",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("extract-frame", "extract_trajectory_frame"),
+)
+register_analysis_command(
     "get-dipole",
     module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
     aliases=("get_dipole", "dipole"),
