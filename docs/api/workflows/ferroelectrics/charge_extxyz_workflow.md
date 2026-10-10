@@ -11,7 +11,22 @@
 
 <div class="analysis-section-indent" markdown="1">
 
-Generate an OVITO-compatible Extended XYZ trajectory with atom_number, charge, and delta_charge particle properties.
+Write an OVITO-compatible trajectory with atomic charges and charge changes.
+
+Use existing coordinates and charges to visualize charge transfer in OVITO.
+The Extended XYZ output includes atom_number, charge, and delta_charge properties.
+Optional electric-field values are matched by iteration.
+
+### Examples
+-----
+
+```text
+  1. Export charges:
+     reaxkit write-trajectory-with-charges --fort7 fort.7 --xmolout xmolout --output charges.extxyz
+
+  2. Include the applied field:
+     reaxkit write-trajectory-with-charges --fort7 fort.7 --xmolout xmolout --fort78 fort.78 --include-electric-field --field-direction z --output charges_field.extxyz
+```
 
 ### Arguments
 
@@ -19,40 +34,41 @@ Generate an OVITO-compatible Extended XYZ trajectory with atom_number, charge, a
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  | Frames, e.g. 0:101:10. |  |
-| `--every` | No | 1 | Keep every Nth selected frame. |  |
-| `--field-direction` | No | z | Electric-field component written with --include-electric-field (default: z). | x, y, z |
+| `--frames` | No |  | Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--field-direction` | No | z | Electric-field component written with --include-electric-field (default: z). Example: --field-direction z, which selects the z-directed electric-field component. | x, y, z |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input path used for engine detection. |  |
-| `--run-dir` | No | . | Fallback simulation directory. |  |
-| `--fort7` | No | fort.7 | Dynamic-charge source. |  |
-| `--fort78` | No | fort.78 | Applied electric-field source. |  |
-| `--xmolout` | No | xmolout | Coordinate and atom-type source. |  |
-| `--summary` | No |  | Optional summary.txt metadata source. |  |
-| `--control` | No | control | Control file used for frame progress. |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir` | No | . | Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--fort7` | No | fort.7 | Dynamic-charge source. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--fort78` | No | fort.78 | Applied electric-field source. Example: --fort78 runs/heating/fort.78, which reads electric-field data from that file. |  |
+| `--xmolout` | No | xmolout | Coordinate and atom-type source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--summary` | No |  | Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file. |  |
+| `--control` | No | control | Control file used for frame progress. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--include-electric-field` | No | False | Add an iteration-matched electric_field attribute to every frame header. |  |
-| `--output` | No |  | Extended XYZ destination; overrides --output-dir. |  |
-| `--output-dir` | No |  | Directory where charges_delta_charges.extxyz will be written. |  |
-| `--precision` | No | 8 | Significant digits for coordinates and floating-point properties. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--include-electric-field` | No | False | Add an iteration-matched electric_field attribute to every frame header. Example: --include-electric-field, which adds iteration-matched field data to exported frames. |  |
+| `--output` | No |  | Extended XYZ destination; overrides --output-dir. Example: --output charges.extxyz, which writes generated output to charges.extxyz. |  |
+| `--output-dir` | No |  | Directory where charges_delta_charges.extxyz will be written. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--precision` | No | 8 | Significant digits for coordinates and floating-point properties. Example: --precision 8, which writes floating-point values with eight significant digits. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -64,14 +80,18 @@ Generate an OVITO-compatible Extended XYZ trajectory with atom_number, charge, a
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No | quiet |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No | quiet | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

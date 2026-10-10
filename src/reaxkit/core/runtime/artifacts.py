@@ -13,6 +13,8 @@ from uuid import uuid4
 
 import pandas as pd
 
+from reaxkit.core.platform.paths import io_path
+
 ArtifactTier = Literal["core", "summary", "detail", "debug"]
 ArtifactFormat = Literal["csv", "parquet", "json", "extxyz", "file", "directory"]
 OutputProfile = Literal["minimal", "standard", "full", "legacy"]
@@ -163,10 +165,10 @@ class BufferedTableSink:
         if not self.temporary.exists():
             return self.destination
         if self.overwrite:
-            os.replace(self.temporary, self.destination)
+            os.replace(io_path(self.temporary), io_path(self.destination))
         else:
             try:
-                os.link(self.temporary, self.destination)
+                os.link(io_path(self.temporary), io_path(self.destination))
             finally:
                 self.temporary.unlink(missing_ok=True)
         return self.destination
@@ -269,6 +271,10 @@ class ArtifactWriter:
             sink.append(values)
 
     def write_table(self, name: str, table: pd.DataFrame) -> None:
+        from reaxkit.core.runtime.result_store import ResultTable
+        if isinstance(table, (ResultTable, TableChunks)):
+            self.write_chunks(name, table)
+            return
         self.append(name, table)
 
     def write_json(self, name: str, payload: Any) -> None:
@@ -331,21 +337,21 @@ class ArtifactWriter:
                 if not self.overwrite:
                     # Hard-link creation fails atomically if another run won
                     # the destination, unlike an exists()/replace() sequence.
-                    os.link(source, destination)
+                    os.link(io_path(source), io_path(destination))
                     published.append(destination)
                     source.unlink()
                     continue
                 if destination.exists():
                     backup = destination.with_name(f".rk-{uuid4().hex[:8]}.bak")
-                    os.replace(destination, backup)
+                    os.replace(io_path(destination), io_path(backup))
                     backups[destination] = backup
-                os.replace(source, destination)
+                os.replace(io_path(source), io_path(destination))
                 published.append(destination)
         except BaseException:
             for destination in reversed(published):
                 destination.unlink(missing_ok=True)
             for destination, backup in backups.items():
-                os.replace(backup, destination)
+                os.replace(io_path(backup), io_path(destination))
             temporary.unlink(missing_ok=True)
             self.abort()
             raise

@@ -13,48 +13,63 @@
 
 Get selected geometry-optimization progress components; omit --components to get all.
 
+Inspect convergence in existing fort.57 output; this does not run an optimization.
+Omit --components to include all available progress quantities.
+
+### Examples
+-----
+
+```text
+  1. All quantities:
+     reaxkit get-geometry-optimization --fort57 runs/relaxation/fort.57 --export optimization.csv
+
+  2. Energy and gradient:
+     reaxkit get-geometry-optimization --fort57 runs/relaxation/fort.57 --components E_pot RMSG --plot subplot
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  | Frame selector, for example --frames 0:20:2 or --frames 0,5,10. |  |
-| `--every` | No | 1 | Keep every Nth selected frame. |  |
-| `--frame-source` | No |  | Trajectory file whose headers define frame iterations when no control file exists. By default, the configured or sibling xmolout is used. |  |
-| `--frame-count` | No |  | Total trajectory frame count used to infer frame spacing only when neither a control file nor a trajectory frame source exists. |  |
-| `--components` | No |  |  | E_pot, T, T_set, RMSG, nfc |
+| `--frames` | No |  | Zero-based source frames to include; colon ranges exclude the stop. Example: --frames 0:20:2, which selects frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Stride through selected frames. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--frame-source` | No |  | Trajectory file whose headers define frame iterations when no control file exists. By default, the configured or sibling xmolout is used. Example: --frame-source runs/heating/xmolout, which maps iterations to that trajectory's frame positions. |  |
+| `--frame-count` | No |  | Total trajectory frame count used to infer frame spacing only when neither a control file nor a trajectory frame source exists. Example: --frame-count 101, which estimates frame spacing for a trajectory containing 101 frames. |  |
+| `--components` | No |  | Optimization quantities to include; omit to include all. Example: --components E_pot RMSG, which extracts energy and gradient convergence. | E_pot, T, T_set, RMSG, nfc |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory used for engine detection. |  |
-| `--run-dir` | No | . | Run directory used as a fallback for input discovery. |  |
-| `--fort57` | No | fort.57 | Geometry-optimization input path. |  |
-| `--control` | No | control | Control file used for frame (iout2) and time conversion. The default also searches beside the selected input files. |  |
+| `--engine` | No |  | Simulation engine used to load input data. Example: --engine reaxff, which selects ReaxFF readers instead of automatic detection. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory used for engine detection. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir` | No | . | Fallback directory for input discovery. Example: --run-dir runs/heating, which searches that simulation directory. |  |
+| `--fort57` | No | fort.57 | Input file containing geometry-optimization progress. Example: --fort57 runs/heating/fort.57, which reads geometry-optimization progress from that file. |  |
+| `--control` | No | control | Control file used for frame (iout2) and time conversion. The default also searches beside the selected input files. Example: --control runs/heating/control, which supplies output cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate). | single, subplot, separate |
-| `--show` | No | False |  |  |
-| `--save` | No |  |  |  |
-| `--export` | No |  |  |  |
-| `--grid` | No |  | Subplot grid such as 2x2. |  |
-| `--xaxis` | No | iter |  | iter, frame, time |
-| `--include-geo-descriptor` | No | False |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot all series together (single), in one multi-panel figure (subplot), or as one figure file per series (separate). Example: --plot subplot, which gives each series its own panel for comparison. | single, subplot, separate |
+| `--show` | No | False | Open generated figures interactively. Example: --show, which displays plot windows in addition to any saved figures. |  |
+| `--save` | No |  | Destination for generated figures; separate plots use a directory. Example: --save temperature.png, which writes the plotted temperature to that image. |  |
+| `--export` | No |  | Destination for the result CSV table. Example: --export temperature.csv, which writes the extracted values for further analysis. |  |
+| `--grid` | No |  | Rows and columns for subplot layout. Example: --grid 2x2, which arranges series in two rows and two columns. |  |
+| `--xaxis` | No | iter | Horizontal axis expressed as iterations, trajectory frames, or physical time. Example: --xaxis time, which converts iterations using control-file timestep metadata. | iter, frame, time |
+| `--include-geo-descriptor` | No | False | Retain geometry descriptor annotations in the optimization table. Example: --include-geo-descriptor, which adds descriptors to exported results. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -66,14 +81,18 @@ Get selected geometry-optimization progress components; omit --components to get
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

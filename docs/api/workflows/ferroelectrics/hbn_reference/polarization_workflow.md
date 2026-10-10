@@ -36,23 +36,23 @@ is the default and excludes slab vacuum.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--reference` | No | WindowsPath('C:/Users/alimo/PycharmProjects/pythonProject/reaxkit/src/reaxkit/analysis/ferroelectrics/hbn_reference/AlN_hbn.cif') | Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif. |  |
+| `--reference` | No | WindowsPath('C:/Users/alimo/PycharmProjects/pythonProject/reaxkit/src/reaxkit/analysis/ferroelectrics/hbn_reference/AlN_hbn.cif') | Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif. Example: --reference AlN_hbn.cif, which reads that nonpolar reference structure. |  |
 | `--replication` | Yes |  | Repeat the oriented reference explicitly. Example: --replication 19 19 10 repeats an orthogonalized AlN_hbn cell by those counts. |  |
 | `--charge-source` | No | auto | Choose ReaxFF or formal charges. Example: --charge-source formal --formal-charge Al=3 N=-3, uses the configured species charges; auto uses fort.7 when available. | auto, reaxff, formal |
-| `--formal-charge` | No | ['Al=3.0', 'N=-3.0'] | Assign species formal charges in e. Defaults: Al=3 N=-3; provide values for additional trajectory species. |  |
-| `--reference-species` | No | ['B=Al'] | Map substitutions onto reference sites. Default: B=Al. |  |
-| `--c-axis` | No | 0.0, 0.0, 1.0 | Set the Cartesian longitudinal direction. Default: 0 0 1. |  |
-| `--periodic` | No | xyz | Choose periodic directions used for matching and displacement. | none, x, y, z, xy, xz, yz, xyz |
-| `--cell-lengths` | No |  | Override trajectory cell lengths in angstrom for every frame. |  |
-| `--cell-angles` | No | 90.0, 90.0, 90.0 | Set angles for --cell-lengths in degrees. |  |
-| `--frames` | No |  | Select zero-based source frames, for example --frames 0:101:10. |  |
-| `--every` | No | 1 | Stride selected frames. |  |
-| `--reference-frame` | No | 0 | Choose the frame used to size, assign, and write the reference lattice. |  |
-| `--orthogonalize-reference, --no-orthogonalize-reference` | No |  | Apply ReaxKit's hexagonal-to-orthogonal transform before replication. Use --no-orthogonalize-reference to retain the CIF cell. If omitted, the cell angles select the better representation automatically. |  |
-| `--angle-tolerance` | No | 1.0 | Set the cell-angle comparison tolerance in degrees. |  |
-| `--max-reference-strain` | No | 0.15 | Scale a replicated reference axis to the trajectory box only when the relative length change is at most this value. Larger gaps are treated as vacuum. Default: 0.15. |  |
-| `--volume-method` | No | hull | Choose the polarization volume: occupied atomic convex hull (default), occupied bounding box, or full simulation cell. | hull, bbox, cell |
-| `--max-alignment-candidates` | No | 8 | Limit periodic origin candidates considered during initial atom assignment. |  |
+| `--formal-charge` | No | ['Al=3.0', 'N=-3.0'] | Assign species formal charges in e. Defaults: Al=3 N=-3; provide values for additional trajectory species. Example: --formal-charge Al=3 N=-3, which assigns aluminum and nitrogen their specified charges in e. |  |
+| `--reference-species` | No | ['B=Al'] | Map substitutions onto reference sites. Default: B=Al. Example: --reference-species B=Al, which maps boron substitutions onto aluminum reference sites. |  |
+| `--c-axis` | No | 0.0, 0.0, 1.0 | Set the Cartesian longitudinal direction. Default: 0 0 1. Example: --c-axis 0 0 1, which uses the Cartesian z direction as the longitudinal axis. |  |
+| `--periodic` | No | xyz | Choose periodic directions used for matching and displacement. Example: --periodic xy, which applies periodic matching in x and y only. | none, x, y, z, xy, xz, yz, xyz |
+| `--cell-lengths` | No |  | Override trajectory cell lengths in angstrom for every frame. Example: --cell-lengths 30 30 60, which uses those cell lengths in angstrom for every frame. |  |
+| `--cell-angles` | No | 90.0, 90.0, 90.0 | Set angles for --cell-lengths in degrees. Example: --cell-angles 90 90 90, which uses an orthogonal cell with the supplied lengths. |  |
+| `--frames` | No |  | Select zero-based source frames, for example --frames 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Stride selected frames. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--reference-frame` | No | 0 | Choose the frame used to size, assign, and write the reference lattice. Example: --reference-frame 0, which uses the initial frame to establish the reference assignment. |  |
+| `--orthogonalize-reference, --no-orthogonalize-reference` | No |  | Apply ReaxKit's hexagonal-to-orthogonal transform before replication. Use --no-orthogonalize-reference to retain the CIF cell. If omitted, the cell angles select the better representation automatically. Example: --orthogonalize-reference, which converts the hexagonal reference cell before replication. |  |
+| `--angle-tolerance` | No | 1.0 | Set the cell-angle comparison tolerance in degrees. Example: --angle-tolerance 1, which allows a one-degree cell-angle mismatch. |  |
+| `--max-reference-strain` | No | 0.15 | Scale a replicated reference axis to the trajectory box only when the relative length change is at most this value. Larger gaps are treated as vacuum. Default: 0.15. Example: --max-reference-strain 0.15, which allows at most 15 percent reference-axis scaling. |  |
+| `--volume-method` | No | hull | Choose the polarization volume: occupied atomic convex hull (default), occupied bounding box, or full simulation cell. Example: --volume-method cell, which uses the full simulation-cell volume. | hull, bbox, cell |
+| `--max-alignment-candidates` | No | 8 | Limit periodic origin candidates considered during initial atom assignment. Example: --max-alignment-candidates 8, which tests at most eight periodic-origin candidates. |  |
 
 #### Input and file selection
 
@@ -70,17 +70,18 @@ is the default and excludes slab vacuum.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No |  | Choose the output directory for CSV and XYZ artifacts. |  |
-| `--write-displacements` | No | False | Write the per-atom displacement table. Disabled by default because the table can be very large. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No |  | Choose the output directory for CSV and XYZ artifacts. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-displacements` | No | False | Write the per-atom displacement table. Disabled by default because the table can be very large. Example: --write-displacements, which writes the optional per-atom displacement table. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -92,13 +93,17 @@ is the default and excludes slab vacuum.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

@@ -84,10 +84,14 @@ class ExtendedXYZWriter:
         self.path = Path(out_path)
         self.precision = int(precision)
         self._handle: TextIO | None = None
+        self._complete_offset = 0
+        self._complete_frames = 0
+        self._opened = False
 
     def __enter__(self) -> "ExtendedXYZWriter":
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._handle = self.path.open("w", encoding="utf-8", newline="\n")
+        self._opened = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
@@ -147,6 +151,26 @@ class ExtendedXYZWriter:
             for _, array, kind in properties:
                 values.extend(self._format_value(value, kind) for value in array[atom_index])
             self._handle.write(" ".join(values) + "\n")
+        self._complete_offset = self._handle.tell()
+        self._complete_frames += 1
+
+    def preserve_incomplete(self, error) -> Path | None:
+        """Keep only complete frames after a caught failure, under a partial name."""
+        if not self._opened or not self.path.exists():
+            return None
+        import json
+        import os
+        from uuid import uuid4
+        with self.path.open("r+b") as stream:
+            stream.truncate(self._complete_offset)
+            stream.flush()
+            os.fsync(stream.fileno())
+        destination = self.path.with_name(f"incomplete-{uuid4().hex[:8]}.extxyz")
+        os.replace(self.path, destination)
+        destination.with_suffix(".json").write_text(json.dumps({"status": "failed", "error": str(error),
+            "complete_frames": self._complete_frames, "requested_output": str(self.path)}, indent=2), encoding="utf-8")
+        print(f"Preserved {self._complete_frames} complete frame(s) in incomplete trajectory: {destination}")
+        return destination
 
     def _format_real(self, value: Any) -> str:
         return f"{float(value):.{self.precision}g}"

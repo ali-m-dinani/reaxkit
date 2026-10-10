@@ -874,7 +874,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
 class SimulationScalarSeriesTask(AnalysisTask):
     """Build a scalar time series from ``SimulationData``."""
 
-    VERSION = "1"
+    VERSION = "4"
     required_data = SimulationData
 
     @staticmethod
@@ -985,6 +985,17 @@ class SimulationScalarSeriesTask(AnalysisTask):
                 "value": sampled_values,
             }
         )
+        if label == "elapsed_time":
+            elapsed_per_iter = np.full(n_frames, np.nan, dtype=float)
+            if data.iterations is not None:
+                elapsed_values = np.asarray(values, dtype=float)
+                np.divide(
+                    elapsed_values,
+                    iterations,
+                    out=elapsed_per_iter,
+                    where=np.isfinite(elapsed_values) & (iterations != 0),
+                )
+            table["elapsed_time_per_iter"] = elapsed_per_iter[frame_idx]
         return SimulationScalarSeriesResult(
             request=request,
             table=table,

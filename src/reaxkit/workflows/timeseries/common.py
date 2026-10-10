@@ -373,6 +373,16 @@ def build_plot_payload(
                 "label": y_col,
             }
         )
+    if command == "get_elapsed_time" and "elapsed_time_per_iter" in working:
+        for item in series:
+            item["label"] = "elapsed_time"
+        series.append(
+            {
+                "x": working["__plot_x"].tolist(),
+                "y": pd.to_numeric(working["elapsed_time_per_iter"], errors="coerce").tolist(),
+                "label": "elapsed_time_per_iter",
+            }
+        )
     if not series:
         return None
 
@@ -386,6 +396,8 @@ def build_plot_payload(
             ylabel = "Potential Energy (kcal/mole)"
     elif command == "get_partial_energy":
         ylabel = "Partial Energy (kcal/mole)"
+    elif command == "get_elapsed_time":
+        ylabel = "Elapsed time (s) / elapsed time per iteration (s/iter)"
     if getattr(args, "plot", None) == "separate":
         payloads: list[dict[str, object]] = []
         used_filenames: set[str] = set()
@@ -393,6 +405,12 @@ def build_plot_payload(
             label = str(item.get("label") or f"series_{index}")
             filename_label = label
             item_ylabel = ylabel
+            if command == "get_elapsed_time":
+                item_ylabel = (
+                    "Elapsed time per iteration (s/iter)"
+                    if label == "elapsed_time_per_iter"
+                    else "Elapsed time (s)"
+                )
             if command == "get_partial_energy" and label.startswith("component="):
                 filename_label = label.partition("=")[2]
                 item_ylabel = f"{filename_label} (kcal/mole)"
@@ -419,6 +437,8 @@ def build_plot_payload(
         return payloads
     if getattr(args, "plot", None) == "subplot":
         subplot_ylabels: str | list[str] = ylabel
+        if command == "get_elapsed_time":
+            subplot_ylabels = ["Elapsed time (s)", "Elapsed time per iteration (s/iter)"]
         if command == "get_partial_energy":
             subplot_ylabels = []
             for index, item in enumerate(series, start=1):

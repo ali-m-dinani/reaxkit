@@ -505,6 +505,8 @@ def main(*, announce: bool = True) -> int:
     if announce:
         announce_command_start(sys.argv)
     sys_argv = _canonicalize_direct_command(sys.argv)
+    if sys_argv[1:] == ["plot-from-excel"]:
+        sys_argv.append("--help")
     full_requested = any(arg in ("--help-all", "--all-flags") for arg in sys_argv)
     help_tokens = {"-h", "--help", "--help-all", "--all-flags"}
     requested_help = [arg for arg in sys_argv[1:] if arg in help_tokens]
@@ -519,6 +521,7 @@ def main(*, announce: bool = True) -> int:
 
     parser = build_parser(selected_command)
     args = parser.parse_args(sys_argv[1:])
+    args._invocation_argv = sys_argv[1:]
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
     trace = HumanReadableRunLog(
         project_root / "logs",
@@ -533,8 +536,10 @@ def main(*, announce: bool = True) -> int:
 
     from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
     from reaxkit.presentation.plot_styles import plot_style_context
+    from reaxkit.presentation.color_styles import color_style_context
 
-    with trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)):
+    with trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)), color_style_context(getattr(args, "color_style", None)):
+        exit_code = 1
         try:
             with trace.step(
                 f"Execute {getattr(args, 'command', selected_command)} command"
@@ -564,6 +569,7 @@ def main(*, announce: bool = True) -> int:
             _print_error_with_hints("Error", str(exc))
             exit_code = 1
         finally:
+            args._checkpoint_exit_code = exit_code
             for key, label in (
                 ("run_id", "runtime run_id"),
                 ("_parsed_id", "parsed data id"),

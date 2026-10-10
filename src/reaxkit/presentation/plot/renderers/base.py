@@ -16,6 +16,7 @@ from typing import Any, Mapping, Optional
 import matplotlib.pyplot as plt
 
 from reaxkit.presentation.plot_styles import finish_plot_style
+from reaxkit.presentation.color_styles import finish_color_style
 
 
 class PlotRenderer(ABC):
@@ -164,6 +165,7 @@ def save_or_show(fig: plt.Figure, cfg: Mapping[str, Any]) -> plt.Figure:
     ```
     The output type reflects the return contract for this API call.
     """
+    finish_color_style(fig, cfg)
     finish_plot_style(fig, cfg)
     save = cfg.get("save")
     title = str(cfg.get("title") or cfg.get("plot_type") or "plot")

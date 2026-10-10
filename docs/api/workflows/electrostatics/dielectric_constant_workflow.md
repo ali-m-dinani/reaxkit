@@ -18,6 +18,9 @@ dipole column. Volume is calculated from a trajectory with hull (default), bbox,
 or cell. Hull and bbox exclude empty cell vacuum; cell includes it. The mean
 frame volume is used in the Kubo--Green prefactor. The dipole mean is removed
 before the autocorrelation is formed.
+Use --epsilon-infinity to supply a constant electronic relative permittivity
+(default 1). This replaces the vacuum baseline in the static and real spectral
+response; it does not change the dipole fluctuations or dielectric loss.
 Use --dipole-kind total for the isotropic 1/3 relation shown in the supplied
 equation, or component for one signed Cartesian dipole component. A magnitude-
 only series cannot retain vector orientation, so its dynamic response is an
@@ -45,6 +48,7 @@ isotropic scalar approximation.
 | `--time-unit` | Yes |  | Declare the unit of the time column. Example: --time-unit fs. | s, ms, us, ns, ps, fs |
 | `--dipole-unit` | Yes |  | Declare the dipole unit (c-m, debye, or e-angstrom). Example: --dipole-unit debye. | c-m, debye, e-angstrom |
 | `--temperature` | Yes |  | Set the simulation temperature in kelvin. Example: --temperature 300. |  |
+| `--epsilon-infinity` | No | 1.0 | Set the electronic relative permittivity (finite, at least 1; default 1). Example: --epsilon-infinity 4.7. |  |
 | `--volume-method` | No | hull | Calculate volume from the atomic hull, occupied bounding box, or full cell. Example: --volume-method hull. | hull, bbox, cell |
 | `--volume` | No |  | Override trajectory-based volume calculation with a fixed value. Example: --volume 25000. |  |
 | `--volume-unit` | No | angstrom3 | Declare the unit of a manual --volume value. Example: --volume-unit angstrom3. | m3, cm3, nm3, angstrom3 |
@@ -70,28 +74,33 @@ isotropic scalar approximation.
 | `--output` | No |  | Write summary, spectrum, and autocorrelation sheets here. Example: --output dielectric.xlsx. |  |
 | `--plot-output` | No |  | Write the spectrum plot here (default: <output stem>_spectrum.png). Example: --plot-output dielectric_spectrum.png. |  |
 | `--plot-max-frequency` | No | 1000.0 | Set the plot's upper wavenumber in cm-1 (default: 1000). Example: --plot-max-frequency 1500. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

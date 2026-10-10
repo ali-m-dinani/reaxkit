@@ -390,6 +390,11 @@ register_analysis_command(
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
 )
 register_analysis_command(
+    "plot-from-excel",
+    module_path="reaxkit.workflows.force_field_opt.plot_from_excel",
+    aliases=("plot_from_excel",),
+)
+register_analysis_command(
     "get_force_field_opt_geo_files",
     module_path="reaxkit.workflows.force_field_opt.get_force_field_opt_geo_files",
     aliases=("get-force-field-opt-geo-files",),

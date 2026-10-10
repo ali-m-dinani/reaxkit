@@ -8,6 +8,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from threading import RLock
 
+from reaxkit.presentation.color_styles import resolve_color_style
+
 
 @dataclass(frozen=True)
 class PlotStyle:
@@ -82,6 +84,7 @@ def _size_scale(cfg):
 def styled_payload(payload):
     """Copy presentation options; preserve data, custom colors, and explicit sizes."""
     cfg = dict(payload)
+    cfg["color_style"] = resolve_color_style(cfg.get("color_style"))
     name = resolve_plot_style(cfg.get("plot_style"))
     cfg["plot_style"] = name
     preset = PLOT_STYLES[name]

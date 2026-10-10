@@ -435,6 +435,11 @@ def _run_payloads(
     reporter=None,
     pipeline: BoundedFramePipeline | None = None,
 ):
+    from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
+    store = getattr(request, "_result_store", None)
+    durable = CheckpointAccumulator(store) if store is not None else None
+    if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+        return durable.finish(request)
     writer = getattr(pipeline, "artifact_writer", None) if pipeline is not None else None
     center_sink = (
         writer.sink("centers")
@@ -449,6 +454,16 @@ def _run_payloads(
 
     def consume(result):
         center_rows, projected_rows, kymograph_rows, slab_row = result
+        if durable is not None:
+            position = store.committed_frames + len(store.pending)
+            frame_result = HBNReferenceProjectedPolarityResult(
+                centers=pd.DataFrame(center_rows), projected_bins=pd.DataFrame(projected_rows),
+                kymograph_bins=pd.DataFrame(kymograph_rows), whole_slab_summary=pd.DataFrame([slab_row]),
+                request=request, local_result=None,
+                frame_indices=np.asarray([int(slab_row["frame_index"])]), iterations=np.asarray([int(slab_row["iter"])]),
+                projection_edges=(context.u_edges, context.v_edges), profile_edges=context.profile_edges)
+            durable.add(frame_result, position, int(slab_row["frame_index"]))
+            return
         centers.add(center_rows)
         projected.add(projected_rows)
         kymograph.add(kymograph_rows)
@@ -461,12 +476,16 @@ def _run_payloads(
     if pipeline is None:
         policy = resolve_execution_policy(_PipelineContract(), request, {})
         pipeline = BoundedFramePipeline(policy)
+    selected_payloads = (item for position, item in enumerate(payloads) if store is None or position >= store.committed_frames)
     for completed in pipeline.map_reference(
-        payloads,
+        selected_payloads,
         lambda: context,
         lambda item, state: _frame_rows(item, request, state),
     ):
         consume(completed.value)
+
+    if durable is not None:
+        return durable.finish(request)
 
     return HBNReferenceProjectedPolarityResult(
         centers=centers.finalize(),
@@ -525,6 +544,10 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
         return calculate_hbn_reference_projected_polarity(data, request, reporter=reporter)
 
     def run_stream(self, frames, request, reporter=None, pipeline=None):
+        store = getattr(request, "_result_store", None)
+        if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+            from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
+            return CheckpointAccumulator(store).finish(request)
         _validate_request(request)
         if request.profile_axis is None:
             request.profile_axis = cast(CartesianAxis, request.projection_plane[1])
@@ -541,13 +564,17 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
             wanted = None if request.frames is None else set(list(request.frames)[::stride])
 
             def selected_payloads():
+                seen = set()
                 for occurrence, (source, data) in enumerate(selected_source):
                     if wanted is not None:
                         if source not in wanted:
                             continue
                     elif occurrence % stride:
                         continue
+                    seen.add(source)
                     yield _payload(data, 0, source, reference_request)
+                if wanted is not None and wanted - seen:
+                    raise ValueError(f"Requested frames not found: {sorted(wanted - seen)}")
 
             return _run_payloads(selected_payloads(), request, context, reporter=reporter, pipeline=pipeline)
 

@@ -34,47 +34,48 @@ Interpreted means converting numeric values of atom types into Atom types. For e
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--field` | No |  | Single section to query: general, atom, bond, off_diagonal, angle, torsion, hbond. |  |
-| `--term` | No |  | Optional term filter, for example C-H, CCH, C-C-H, or 1-2. |  |
-| `--ordered-2body` | No | False | For bond/off_diagonal terms, treat i-j and j-i as distinct. |  |
-| `--any-order` | No | False | For angle/torsion/hbond terms, match any atom-order permutation. |  |
+| `--field` | No |  | Single section to query: general, atom, bond, off_diagonal, angle, torsion, hbond. Example: --field bond, which selects the bond-parameter section. |  |
+| `--term` | No |  | Optional term filter, for example C-H, CCH, C-C-H, or 1-2. Example: --term C-H, which selects the carbon-hydrogen term. |  |
+| `--ordered-2body` | No | False | For bond/off_diagonal terms, treat i-j and j-i as distinct. Example: --ordered-2body, which keeps C-H and H-C as distinct terms. |  |
+| `--any-order` | No | False | For angle/torsion/hbond terms, match any atom-order permutation. Example: --any-order, which matches terms regardless of atom ordering. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--format` | No | interpreted | Output format: raw/indices atom ids or interpreted atom symbols. | raw, indices, interpreted |
-| `--outdir` | No |  | Write per-section CSV exports into this output directory. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--format` | No | interpreted | Output format: raw/indices atom ids or interpreted atom symbols. Example: --format interpreted, which displays element symbols instead of numeric atom indices. | raw, indices, interpreted |
+| `--outdir` | No |  | Write per-section CSV exports into this output directory. Example: --outdir analysis/ffield, which writes per-section CSV tables under that directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -86,14 +87,18 @@ Interpreted means converting numeric values of atom types into Atom types. For e
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -122,42 +127,43 @@ If you do the ffield optimization using ReaxFF's Successive One-Parameter Parabo
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--epochs` | No |  | Optional epoch numbers to keep; default uses all available epochs. |  |
+| `--epochs` | No |  | Optional epoch numbers to keep; default uses all available epochs. Example: --epochs 1 5, which includes only optimization epochs 1 and 5. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -169,14 +175,18 @@ If you do the ffield optimization using ReaxFF's Successive One-Parameter Parabo
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -204,37 +214,38 @@ Get energy minimization summary data (energy, heat of formation, volume, density
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--col` | No | all | Single column to keep (identifier is retained when present), or 'all'. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--col` | No | all | Single column to keep (identifier is retained when present), or 'all'. Example: --col all, which retains every diagnostic column. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -246,14 +257,18 @@ Get energy minimization summary data (energy, heat of formation, volume, density
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -288,48 +303,49 @@ Get per-parameter optimization diagnostics from force-field optimization diagnos
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--interpret` | No | False | Interpret identifier triplets with ffield symbol mapping when possible. |  |
-| `--report-most-sensitive` | No | False | Return only the minimum-sensitivity parameter view. |  |
-| `--top` | No | 0 | For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all. |  |
-| `--sort` | No | parameter | For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value. | parameter, final, starting |
-| `--global-objective-scale` | No | False | For beeswarm view, use one objective-function color range across all parameters. |  |
+| `--interpret` | No | False | Interpret identifier triplets with ffield symbol mapping when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels. |  |
+| `--report-most-sensitive` | No | False | Return only the minimum-sensitivity parameter view. Example: --report-most-sensitive, which returns the minimum-sensitivity parameter view. |  |
+| `--top` | No | 0 | For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans. |  |
+| `--sort` | No | parameter | For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value. Example: --sort parameter, which orders diagnostic rows by parameter pointer. | parameter, final, starting |
+| `--global-objective-scale` | No | False | For beeswarm view, use one objective-function color range across all parameters. Example: --global-objective-scale, which uses one objective color scale across parameters. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--export-all` | No |  | Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive). |  |
-| `--vline` | No | 1.0 | For tornado view, reference x-value for the guide line. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--export-all` | No |  | Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive). Example: --export-all diagnostics.csv, which writes the full diagnostic table even when the displayed view is filtered. |  |
+| `--vline` | No | 1.0 | For tornado view, reference x-value for the guide line. Example: --vline 1, which draws the tornado reference line at x = 1. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -341,14 +357,18 @@ Get per-parameter optimization diagnostics from force-field optimization diagnos
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 <a id="get_ffield_diagnostic_data_plot_tornado"></a>
@@ -406,44 +426,45 @@ Sensitivity values are the relative objective responses diff1/diff3, diff2/diff3
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--interpret` | No | False | Use interpreted force-field section, term, and component labels when possible. |  |
-| `--top` | No | 0 | Keep the top-N parameters with the widest sensitivity spans; 0 keeps all. |  |
+| `--interpret` | No | False | Use interpreted force-field section, term, and component labels when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels. |  |
+| `--top` | No | 0 | Keep the top-N parameters with the widest sensitivity spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No | tornado | Render a plot | tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--vline` | No | 1.0 | Reference sensitivity value drawn on tornado and beeswarm plots. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No | tornado | Plot selected force-field data or optimization diagnostics. Example: --plot tornado, which compares parameter response spans as horizontal bars. | tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--vline` | No | 1.0 | Reference sensitivity value drawn on tornado and beeswarm plots. Example: --vline 1, which draws the tornado reference line at x = 1. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -455,14 +476,18 @@ Sensitivity values are the relative objective responses diff1/diff3, diff2/diff3
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -494,45 +519,46 @@ The beeswarm view normalizes all diagnostic samples with their params bounds. Th
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--normalization` | No | bound_min | Scatter normalization origin. bound_min uses (value-lower)/(upper-lower); first uses (value-first)/(upper-lower). | bound_min, first |
-| `--top` | No | 0 | Keep the top-N parameters with the widest objective ranges; 0 keeps all. |  |
-| `--sort` | No | parameter | Sort parameter rows by numeric pointer, final value, or starting value. | parameter, final, starting |
-| `--global-objective-scale` | No | False | Use one objective-function color range across all parameters. |  |
+| `--normalization` | No | bound_min | Scatter normalization origin. bound_min uses (value-lower)/(upper-lower); first uses (value-first)/(upper-lower). Example: --normalization bound_min, which measures parameter changes from the lower bound in units of the bounds span. | bound_min, first |
+| `--top` | No | 0 | Keep the top-N parameters with the widest objective ranges; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans. |  |
+| `--sort` | No | parameter | Sort parameter rows by numeric pointer, final value, or starting value. Example: --sort parameter, which orders diagnostic rows by parameter pointer. | parameter, final, starting |
+| `--global-objective-scale` | No | False | Use one objective-function color range across all parameters. Example: --global-objective-scale, which uses one objective color scale across parameters. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No | beeswarm | Render a plot | beeswarm, scatter |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No | beeswarm | Plot selected force-field data or optimization diagnostics. Example: --plot beeswarm, which compares parameter samples and their objective values. | beeswarm, scatter |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -544,14 +570,18 @@ The beeswarm view normalizes all diagnostic samples with their params bounds. Th
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -586,48 +616,49 @@ Get per-parameter optimization diagnostics from force-field optimization diagnos
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--interpret` | No | False | Interpret identifier triplets with ffield symbol mapping when possible. |  |
-| `--report-most-sensitive` | No | False | Return only the minimum-sensitivity parameter view. |  |
-| `--top` | No | 0 | For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all. |  |
-| `--sort` | No | parameter | For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value. | parameter, final, starting |
-| `--global-objective-scale` | No | False | For beeswarm view, use one objective-function color range across all parameters. |  |
+| `--interpret` | No | False | Interpret identifier triplets with ffield symbol mapping when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels. |  |
+| `--report-most-sensitive` | No | False | Return only the minimum-sensitivity parameter view. Example: --report-most-sensitive, which returns the minimum-sensitivity parameter view. |  |
+| `--top` | No | 0 | For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans. |  |
+| `--sort` | No | parameter | For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value. Example: --sort parameter, which orders diagnostic rows by parameter pointer. | parameter, final, starting |
+| `--global-objective-scale` | No | False | For beeswarm view, use one objective-function color range across all parameters. Example: --global-objective-scale, which uses one objective color scale across parameters. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--export-all` | No |  | Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive). |  |
-| `--vline` | No | 1.0 | For tornado view, reference x-value for the guide line. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--export-all` | No |  | Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive). Example: --export-all diagnostics.csv, which writes the full diagnostic table even when the displayed view is filtered. |  |
+| `--vline` | No | 1.0 | For tornado view, reference x-value for the guide line. Example: --vline 1, which draws the tornado reference line at x = 1. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -639,14 +670,18 @@ Get per-parameter optimization diagnostics from force-field optimization diagnos
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -675,44 +710,45 @@ Sensitivity values are the relative objective responses diff1/diff3, diff2/diff3
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--interpret` | No | False | Use interpreted force-field section, term, and component labels when possible. |  |
-| `--top` | No | 0 | Keep the top-N parameters with the widest sensitivity spans; 0 keeps all. |  |
+| `--interpret` | No | False | Use interpreted force-field section, term, and component labels when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels. |  |
+| `--top` | No | 0 | Keep the top-N parameters with the widest sensitivity spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No | tornado | Render a plot | tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--vline` | No | 1.0 | Reference sensitivity value drawn on tornado and beeswarm plots. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No | tornado | Plot selected force-field data or optimization diagnostics. Example: --plot tornado, which compares parameter response spans as horizontal bars. | tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--vline` | No | 1.0 | Reference sensitivity value drawn on tornado and beeswarm plots. Example: --vline 1, which draws the tornado reference line at x = 1. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -724,14 +760,18 @@ Sensitivity values are the relative objective responses diff1/diff3, diff2/diff3
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -757,36 +797,37 @@ This includes the values in training set and the values generated by the optimiz
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -798,14 +839,18 @@ This includes the values in training set and the values generated by the optimiz
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -843,43 +888,44 @@ In single-plot mode, figures are grouped into material subfolders, for example e
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--iden` | No |  | Identifier (or base identifier) to keep; use 'all' for all rows. |  |
-| `--flip-sign` | No | False | Flip sign of energy values before plotting/export. |  |
+| `--iden` | No |  | Identifier (or base identifier) to keep; use 'all' for all rows. Example: --iden all, which includes all structure identifiers. |  |
+| `--flip-sign` | No | False | Flip sign of energy values before plotting/export. Example: --flip-sign, which negates energies before plotting and export. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save plots. With --plot single, provide an output directory; with --plot subplot, provide one figure path. |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save plots. With --plot single, provide an output directory; with --plot subplot, provide one figure path. Example: --plot single --save eos_plots, which writes individual EOS figures under eos_plots. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -891,14 +937,18 @@ In single-plot mode, figures are grouped into material subfolders, for example e
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 <a id="FFieldOptimizationReportEOSTask"></a>
@@ -940,45 +990,46 @@ Here we have used --flip-sign flag since some values where negative (sign conven
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--iden` | No |  | Optional base identifier to fit; use 'all' for all eligible bases. |  |
-| `--no-shift-min-to-zero` | No | False | Do not shift minimum energy to zero before fitting. |  |
-| `--flip-sign` | No | False | Flip sign of energy values before fitting. |  |
-| `--min-points` | No | 6 | Minimum number of finite points required per base identifier. |  |
+| `--iden` | No |  | Optional base identifier to fit; use 'all' for all eligible bases. Example: --iden all, which includes all structure identifiers. |  |
+| `--no-shift-min-to-zero` | No | False | Do not shift minimum energy to zero before fitting. Example: --no-shift-min-to-zero, which preserves the original energy offset during fitting. |  |
+| `--flip-sign` | No | False | Flip sign of energy values before fitting. Example: --flip-sign, which negates energies before plotting and export. |  |
+| `--min-points` | No | 6 | Minimum number of finite points required per base identifier. Example: --min-points 6, which requires six finite points per fitted structure group. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input file or directory for engine resolution |  |
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--ffield` | No | ffield | Path to ffield |  |
-| `--params` | No | params | Path to optimization parameter bounds |  |
-| `--fort13` | No | fort.13 | Path to fort.13 |  |
-| `--fort79` | No | fort.79 | Path to fort.79 |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--ffield` | No | ffield | Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file. |  |
+| `--params` | No | params | Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file. |  |
+| `--fort13` | No | fort.13 | Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file. |  |
+| `--fort79` | No | fort.79 | Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot, tornado, beeswarm |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Plot selected force-field data or optimization diagnostics. Example: --plot single, which combines selected series in one figure. | single, subplot, tornado, beeswarm |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -990,14 +1041,18 @@ Here we have used --flip-sign flag since some values where negative (sign conven
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -1029,57 +1084,62 @@ For eaxmple, if ffield 1 contains 'C,H,O,N,S' elements and ffield 2 contains 'C,
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--atom-types` | Yes |  | Comma-separated source atom symbols to merge, for example: W or W,Mo |  |
-| `--keep-atoms-in-dest` | No |  | Comma-separated destination atom symbols to retain before merging, for example: Al,N. All other destination atoms and parameter rows involving them are removed. |  |
-| `--fill-missing-with-template` | No | False | After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination. |  |
-| `--template-similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | family, group, radius |
-| `--template-closest-atom` | No |  | Manual destination template atom override for --fill-missing-with-template, for example: B |  |
-| `--template-radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Radius metrics for template selection when --template-similarity radius. Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius. |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--atom-types` | Yes |  | Comma-separated source atom symbols to merge, for example: W or W,Mo. Example: --atom-types W,Mo, which merges tungsten and molybdenum source parameters. |  |
+| `--keep-atoms-in-dest` | No |  | Comma-separated destination atom symbols to retain before merging, for example: Al,N. All other destination atoms and parameter rows involving them are removed. Example: --keep-atoms-in-dest Al,N, which retains only aluminum and nitrogen before merging. |  |
+| `--fill-missing-with-template` | No | False | After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination. Example: --fill-missing-with-template, which fills missing merged terms from similar destination atoms. |  |
+| `--template-similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --template-similarity group, which prefers same-group destination atoms when filling terms. | family, group, radius |
+| `--template-closest-atom` | No |  | Manual destination template atom override for --fill-missing-with-template, for example: B. Example: --template-closest-atom B, which forces boron as the missing-term template. |  |
+| `--template-radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Radius metrics for template selection when --template-similarity radius. Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius. Example: --template-radius-metrics atomic_radius, which uses atomic radii to compare missing-term templates. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--source, --src` | Yes |  | Source ffield path |  |
+| `--source, --src` | Yes |  | Source ffield path. Example: --source ffield_BN, which reads parameters from that source force field. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_merged | Output merged ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_merged | Output merged ffield path. Example: --output ffield_merged, which writes generated output to ffield_merged. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -1111,57 +1171,62 @@ For eaxmple, if ffield 1 contains 'C,H,O,N,S' elements and ffield 2 contains 'C,
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--atom-types` | Yes |  | Comma-separated source atom symbols to merge, for example: W or W,Mo |  |
-| `--keep-atoms-in-dest` | No |  | Comma-separated destination atom symbols to retain before merging, for example: Al,N. All other destination atoms and parameter rows involving them are removed. |  |
-| `--fill-missing-with-template` | No | False | After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination. |  |
-| `--template-similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | family, group, radius |
-| `--template-closest-atom` | No |  | Manual destination template atom override for --fill-missing-with-template, for example: B |  |
-| `--template-radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Radius metrics for template selection when --template-similarity radius. Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius. |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--atom-types` | Yes |  | Comma-separated source atom symbols to merge, for example: W or W,Mo. Example: --atom-types W,Mo, which merges tungsten and molybdenum source parameters. |  |
+| `--keep-atoms-in-dest` | No |  | Comma-separated destination atom symbols to retain before merging, for example: Al,N. All other destination atoms and parameter rows involving them are removed. Example: --keep-atoms-in-dest Al,N, which retains only aluminum and nitrogen before merging. |  |
+| `--fill-missing-with-template` | No | False | After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination. Example: --fill-missing-with-template, which fills missing merged terms from similar destination atoms. |  |
+| `--template-similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --template-similarity group, which prefers same-group destination atoms when filling terms. | family, group, radius |
+| `--template-closest-atom` | No |  | Manual destination template atom override for --fill-missing-with-template, for example: B. Example: --template-closest-atom B, which forces boron as the missing-term template. |  |
+| `--template-radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Radius metrics for template selection when --template-similarity radius. Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius. Example: --template-radius-metrics atomic_radius, which uses atomic radii to compare missing-term templates. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--source, --src` | Yes |  | Source ffield path |  |
+| `--source, --src` | Yes |  | Source ffield path. Example: --source ffield_BN, which reads parameters from that source force field. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_merged | Output merged ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_merged | Output merged ffield path. Example: --output ffield_merged, which writes generated output to ffield_merged. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -1195,49 +1260,54 @@ Add one atom type to an existing ffield and assign parameters of a very similar 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--element` | Yes |  | Element symbol to add, for example: Al |  |
-| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | group, family, radius |
-| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Options: 1. atomic_radius (empirical neutral-atom radius), 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), 3. van_der_waals_radius (non-bonded contact radius), 4. atomic_radius_calculated (theoretical neutral-atom radius), 5. average_ionic_radius (mean ionic radius over known oxidation states), 6. average_cationic_radius (mean radius over positive oxidation states), 7. average_anionic_radius (mean radius over negative oxidation states). |  |
-| `--closest-atom` | No |  | Override automatic selection and force template atom symbol, for example: B |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--element` | Yes |  | Element symbol to add, for example: Al. Example: --element Al, which adds aluminum using a template atom. |  |
+| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group. | group, family, radius |
+| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Options: 1. atomic_radius (empirical neutral-atom radius), 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), 3. van_der_waals_radius (non-bonded contact radius), 4. atomic_radius_calculated (theoretical neutral-atom radius), 5. average_ionic_radius (mean ionic radius over known oxidation states), 6. average_cationic_radius (mean radius over positive oxidation states), 7. average_anionic_radius (mean radius over negative oxidation states). Example: --radius-metrics atomic_radius, which compares templates using atomic radius only. |  |
+| `--closest-atom` | No |  | Override automatic selection and force template atom symbol, for example: B. Example: --closest-atom B, which forces boron as the template atom. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_with_element | Output expanded ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_with_element | Output expanded ffield path. Example: --output ffield_with_element, which writes generated output to ffield_with_element. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -1271,49 +1341,54 @@ Add one atom type to an existing ffield and assign parameters of a very similar 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--element` | Yes |  | Element symbol to add, for example: Al |  |
-| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | group, family, radius |
-| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Options: 1. atomic_radius (empirical neutral-atom radius), 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), 3. van_der_waals_radius (non-bonded contact radius), 4. atomic_radius_calculated (theoretical neutral-atom radius), 5. average_ionic_radius (mean ionic radius over known oxidation states), 6. average_cationic_radius (mean radius over positive oxidation states), 7. average_anionic_radius (mean radius over negative oxidation states). |  |
-| `--closest-atom` | No |  | Override automatic selection and force template atom symbol, for example: B |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--element` | Yes |  | Element symbol to add, for example: Al. Example: --element Al, which adds aluminum using a template atom. |  |
+| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group. | group, family, radius |
+| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Options: 1. atomic_radius (empirical neutral-atom radius), 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), 3. van_der_waals_radius (non-bonded contact radius), 4. atomic_radius_calculated (theoretical neutral-atom radius), 5. average_ionic_radius (mean ionic radius over known oxidation states), 6. average_cationic_radius (mean radius over positive oxidation states), 7. average_anionic_radius (mean radius over negative oxidation states). Example: --radius-metrics atomic_radius, which compares templates using atomic radius only. |  |
+| `--closest-atom` | No |  | Override automatic selection and force template atom symbol, for example: B. Example: --closest-atom B, which forces boron as the template atom. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_with_element | Output expanded ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_with_element | Output expanded ffield path. Example: --output ffield_with_element, which writes generated output to ffield_with_element. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -1347,57 +1422,62 @@ Add one specific missing term (bond/off_diagonal/angle/torsion/hbond) to an exis
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--field` | Yes |  | Target section for the term. | bond, off_diagonal, angle, torsion, hbond |
-| `--term` | Yes |  | Hyphen-separated atom symbols, for example: Al-N-Al |  |
-| `--closest-term, --closest_term` | No |  | Explicit template term override, for example: B-N-B |  |
-| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | family, group, radius |
-| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. |  |
-| `--same-general-order` | No | False | Restrict candidate template terms to those with the same equality/order pattern as --term (example for angle: X-Y-X vs X-Y-Y). |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--field` | Yes |  | Target section for the term. Example: --field bond, which selects the bond-parameter section. | bond, off_diagonal, angle, torsion, hbond |
+| `--term` | Yes |  | Hyphen-separated atom symbols, for example: Al-N-Al. Example: --term C-H, which selects the carbon-hydrogen term. |  |
+| `--closest-term, --closest_term` | No |  | Explicit template term override, for example: B-N-B. Example: --closest-term B-N-B, which uses that term as the explicit parameter template. |  |
+| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group. | family, group, radius |
+| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Example: --radius-metrics atomic_radius, which compares templates using atomic radius only. |  |
+| `--same-general-order` | No | False | Restrict candidate template terms to those with the same equality/order pattern as --term (example for angle: X-Y-X vs X-Y-Y). Example: --same-general-order, which requires template terms to share the target's repeated-atom pattern. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--template-map` | No |  | Optional per-atom manual template mapping CSV, for example: Al:B,N:N |  |
+| `--template-map` | No |  | Optional per-atom manual template mapping CSV, for example: Al:B,N:N. Example: --template-map Al:B,N:N, which maps aluminum to boron and nitrogen to itself. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_with_term | Output expanded ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_with_term | Output expanded ffield path. Example: --output ffield_with_term, which writes generated output to ffield_with_term. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination row when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination row when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -1431,57 +1511,62 @@ Add one specific missing term (bond/off_diagonal/angle/torsion/hbond) to an exis
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--field` | Yes |  | Target section for the term. | bond, off_diagonal, angle, torsion, hbond |
-| `--term` | Yes |  | Hyphen-separated atom symbols, for example: Al-N-Al |  |
-| `--closest-term, --closest_term` | No |  | Explicit template term override, for example: B-N-B |  |
-| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen | family, group, radius |
-| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. |  |
-| `--same-general-order` | No | False | Restrict candidate template terms to those with the same equality/order pattern as --term (example for angle: X-Y-X vs X-Y-Y). |  |
-| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond |  |
-| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. |  |
+| `--field` | Yes |  | Target section for the term. Example: --field bond, which selects the bond-parameter section. | bond, off_diagonal, angle, torsion, hbond |
+| `--term` | Yes |  | Hyphen-separated atom symbols, for example: Al-N-Al. Example: --term C-H, which selects the carbon-hydrogen term. |  |
+| `--closest-term, --closest_term` | No |  | Explicit template term override, for example: B-N-B. Example: --closest-term B-N-B, which uses that term as the explicit parameter template. |  |
+| `--similarity` | No | group | Similarity rule for template-atom selection: 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other), 2. 'group' = same periodic-table group number (column), 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance. Priority order for selecting the single template atom is: 1. manual override by --closest-atom, 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group. | family, group, radius |
+| `--radius-metrics` | No | atomic_radius,covalent_radius,van_der_waals_radius | Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Example: --radius-metrics atomic_radius, which compares templates using atomic radius only. |  |
+| `--same-general-order` | No | False | Restrict candidate template terms to those with the same equality/order pattern as --term (example for angle: X-Y-X vs X-Y-Y). Example: --same-general-order, which requires template terms to share the target's repeated-atom pattern. |  |
+| `--fields` | No | atom,bond,off_diagonal,angle,torsion,hbond | Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only. |  |
+| `--disallow-torsion-wildcard` | No | False | Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--template-map` | No |  | Optional per-atom manual template mapping CSV, for example: Al:B,N:N |  |
+| `--template-map` | No |  | Optional per-atom manual template mapping CSV, for example: Al:B,N:N. Example: --template-map Al:B,N:N, which maps aluminum to boron and nitrogen to itself. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--destination, --dest` | Yes |  | Destination ffield path |  |
-| `--output` | No | ffield_with_term | Output expanded ffield path |  |
-| `--report-format` | No | both | Write merge-detail report files next to output ffield. | none, txt, csv, both |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--destination, --dest` | Yes |  | Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field. |  |
+| `--output` | No | ffield_with_term | Output expanded ffield path. Example: --output ffield_with_term, which writes generated output to ffield_with_term. |  |
+| `--report-format` | No | both | Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports. | none, txt, csv, both |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--replace-existing` | No | False | Replace destination row when the same atom tuple already exists. |  |
+| `--replace-existing` | No | False | Replace destination row when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows. |  |
 | `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
 | `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
 | `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

@@ -32,6 +32,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "ActiveSiteEventDiagnosticsResult",
       "streaming": true,
       "tables": [
@@ -93,6 +94,7 @@
         "request"
       ],
       "required_data": "ConnectivityTrajectoryData",
+      "result_checkpoint": false,
       "result_class": "ActiveSiteEventsResult",
       "streaming": true,
       "tables": [
@@ -147,6 +149,7 @@
         "soap_descriptors"
       ],
       "required_data": "ConnectivityTrajectoryData",
+      "result_checkpoint": false,
       "result_class": "ActiveSiteStructuralResult",
       "streaming": false,
       "tables": [
@@ -198,6 +201,7 @@
         "table"
       ],
       "required_data": "SimulationData",
+      "result_checkpoint": false,
       "result_class": "CellDimensionsResult",
       "streaming": false,
       "tables": [
@@ -241,6 +245,7 @@
         "table"
       ],
       "required_data": "ChargeData",
+      "result_checkpoint": true,
       "result_class": "ChargeSeriesResult",
       "streaming": true,
       "tables": [
@@ -284,6 +289,7 @@
         "request"
       ],
       "required_data": "ChargeData",
+      "result_checkpoint": false,
       "result_class": "ChargeTableResult",
       "streaming": true,
       "tables": [
@@ -327,6 +333,7 @@
         "table"
       ],
       "required_data": "ElectricFieldData",
+      "result_checkpoint": false,
       "result_class": "ElectricFieldSeriesResult",
       "streaming": false,
       "tables": [
@@ -370,6 +377,7 @@
         "table"
       ],
       "required_data": "EregimeData",
+      "result_checkpoint": false,
       "result_class": "EregimeSeriesResult",
       "streaming": false,
       "tables": [
@@ -413,6 +421,7 @@
         "request"
       ],
       "required_data": "ForceFieldParametersData",
+      "result_checkpoint": false,
       "result_class": "FFieldDataResult",
       "streaming": false,
       "tables": [
@@ -456,6 +465,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationProgressData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationProgressResult",
       "streaming": false,
       "tables": [
@@ -499,6 +509,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationParameterBundleData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationParameterResult",
       "streaming": false,
       "tables": [
@@ -542,6 +553,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationReportData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationReportResult",
       "streaming": false,
       "tables": [
@@ -585,6 +597,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationReportEOSBundleData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationReportBulkModulusResult",
       "streaming": false,
       "tables": [
@@ -628,6 +641,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationPlotBundleData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationReportEOSResult",
       "streaming": false,
       "tables": [
@@ -671,6 +685,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationPlotBundleData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationReportRestraintResult",
       "streaming": false,
       "tables": [
@@ -714,6 +729,7 @@
         "request"
       ],
       "required_data": "GeometryOptimizationProgressData",
+      "result_checkpoint": false,
       "result_class": "GeometryOptimizationResult",
       "streaming": false,
       "tables": [
@@ -765,6 +781,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "BasalPlaneDipoleResult",
       "streaming": true,
       "tables": [
@@ -841,6 +858,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "BasalPlaneLocalPolarizationResult",
       "streaming": true,
       "tables": [
@@ -908,6 +926,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "BasalPlanePolarizationResult",
       "streaming": true,
       "tables": [
@@ -976,6 +995,7 @@
         "profile_edges"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "BasalPlaneProjectedPolarityResult",
       "streaming": true,
       "tables": [
@@ -1038,6 +1058,7 @@
         "request"
       ],
       "required_data": "DataFrame",
+      "result_checkpoint": false,
       "result_class": "DielectricConstantResult",
       "streaming": false,
       "tables": [
@@ -1097,6 +1118,7 @@
         "request"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": false,
       "result_class": "DipoleResult",
       "streaming": true,
       "tables": [
@@ -1152,6 +1174,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "HBNReferenceLocalPolarizationResult",
       "streaming": true,
       "tables": [
@@ -1251,6 +1274,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "HBNReferencePolarizationResult",
       "streaming": true,
       "tables": [
@@ -1328,6 +1352,7 @@
         "profile_edges"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "HBNReferenceProjectedPolarityResult",
       "streaming": true,
       "tables": [
@@ -1395,6 +1420,7 @@
         "request"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": false,
       "result_class": "PolarizationResult",
       "streaming": true,
       "tables": [
@@ -1443,6 +1469,7 @@
         "iterations"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": true,
       "result_class": "PotentialElectricFieldResult",
       "streaming": true,
       "tables": [
@@ -1506,6 +1533,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "WurtziteNeighborResult",
       "streaming": true,
       "tables": [
@@ -1569,6 +1597,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "WurtzitePolarityResult",
       "streaming": true,
       "tables": [
@@ -1635,6 +1664,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "BinnedPolarizationResult",
       "streaming": true,
       "tables": [
@@ -1690,6 +1720,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "WurtziteNeighborResult",
       "streaming": true,
       "tables": [
@@ -1752,6 +1783,7 @@
         "iterations"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "WurtzitePolarityResult",
       "streaming": true,
       "tables": [
@@ -1820,6 +1852,7 @@
         "time_values"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": true,
       "result_class": "BinnedDynamicChargeResult",
       "streaming": true,
       "tables": [
@@ -1863,6 +1896,7 @@
         "request"
       ],
       "required_data": "ConnectivityData",
+      "result_checkpoint": true,
       "result_class": "BondEventsResult",
       "streaming": true,
       "tables": [
@@ -1912,6 +1946,7 @@
         "baseline_charges"
       ],
       "required_data": "ChargeData",
+      "result_checkpoint": true,
       "result_class": "ChargeFieldResult",
       "streaming": true,
       "tables": [
@@ -1955,6 +1990,7 @@
         "request"
       ],
       "required_data": "ConnectivityData",
+      "result_checkpoint": true,
       "result_class": "ConnectionListResult",
       "streaming": true,
       "tables": [
@@ -1998,6 +2034,7 @@
         "request"
       ],
       "required_data": "ConnectivityData",
+      "result_checkpoint": true,
       "result_class": "ConnectionStatsResult",
       "streaming": true,
       "tables": [
@@ -2041,6 +2078,7 @@
         "request"
       ],
       "required_data": "ConnectivityData",
+      "result_checkpoint": false,
       "result_class": "ConnectionTableResult",
       "streaming": false,
       "tables": [
@@ -2084,6 +2122,7 @@
         "request"
       ],
       "required_data": "ControlParametersData",
+      "result_checkpoint": false,
       "result_class": "ControlParametersTaskResult",
       "streaming": false,
       "tables": [
@@ -2127,6 +2166,7 @@
         "request"
       ],
       "required_data": "CoordinationStatusBundleData",
+      "result_checkpoint": true,
       "result_class": "CoordinationStatusResult",
       "streaming": true,
       "tables": [
@@ -2170,6 +2210,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "DiffusivityResult",
       "streaming": false,
       "tables": [
@@ -2213,6 +2254,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "DihedralResult",
       "streaming": true,
       "tables": [
@@ -2256,6 +2298,7 @@
         "request"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "DominantSpeciesResult",
       "streaming": true,
       "tables": [
@@ -2315,6 +2358,7 @@
         "detail_row_count"
       ],
       "required_data": "ChargeData",
+      "result_checkpoint": false,
       "result_class": "DynamicChargeChangeResult",
       "streaming": true,
       "tables": [
@@ -2374,6 +2418,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "FramesCountResult",
       "streaming": true,
       "tables": [],
@@ -2408,6 +2453,7 @@
         "request"
       ],
       "required_data": "ConnectivityData",
+      "result_checkpoint": true,
       "result_class": "HybridizationStatusResult",
       "streaming": true,
       "tables": [
@@ -2451,6 +2497,7 @@
         "request"
       ],
       "required_data": "AtomicKinematicsData",
+      "result_checkpoint": false,
       "result_class": "AtomicKinematicsResult",
       "streaming": false,
       "tables": [
@@ -2494,6 +2541,7 @@
         "request"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "LargestMoleculeByMassResult",
       "streaming": true,
       "tables": [
@@ -2537,6 +2585,7 @@
         "request"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "LargestMoleculeCompositionResult",
       "streaming": true,
       "tables": [
@@ -2580,6 +2629,7 @@
         "request"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "MoleculeLifetimeResult",
       "streaming": true,
       "tables": [
@@ -2623,6 +2673,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "MSDResult",
       "streaming": false,
       "tables": [
@@ -2669,6 +2720,7 @@
         "request"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": false,
       "result_class": "PolarizationFieldResult",
       "streaming": true,
       "tables": [
@@ -2720,6 +2772,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "RDFResult",
       "streaming": true,
       "tables": [
@@ -2763,6 +2816,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "RDFPropertyResult",
       "streaming": true,
       "tables": [
@@ -2805,6 +2859,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "VoronoiGeometryResult",
       "streaming": true,
       "tables": [
@@ -2848,6 +2903,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "VoronoiGeometryResult",
       "streaming": true,
       "tables": [
@@ -2890,6 +2946,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "VoronoiResult",
       "streaming": true,
       "tables": [
@@ -2933,6 +2990,7 @@
         "request"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "VoronoiResult",
       "streaming": true,
       "tables": [
@@ -2977,6 +3035,7 @@
         "request"
       ],
       "required_data": "ConnectivityTrajectoryData",
+      "result_checkpoint": false,
       "result_class": "IsomerRepresentativeDetectionResult",
       "streaming": true,
       "tables": [
@@ -3020,6 +3079,7 @@
         "table"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "MolecularFrequencySeriesResult",
       "streaming": true,
       "tables": [
@@ -3063,6 +3123,7 @@
         "table"
       ],
       "required_data": "MolecularAnalysisData",
+      "result_checkpoint": false,
       "result_class": "MolecularTotalsSeriesResult",
       "streaming": true,
       "tables": [
@@ -3109,6 +3170,7 @@
         "request"
       ],
       "required_data": "GeometryData",
+      "result_checkpoint": false,
       "result_class": "MoleculeIsomerDetectionResult",
       "streaming": false,
       "tables": [
@@ -3176,6 +3238,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationDiagnosticBundleData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationDiagnosticResult",
       "streaming": false,
       "tables": [
@@ -3221,6 +3284,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationDiagnosticPlotData",
+      "result_checkpoint": false,
       "result_class": "FFieldOptimizationDiagnosticBeeswarmResult",
       "streaming": false,
       "tables": [
@@ -3272,6 +3336,7 @@
         "table"
       ],
       "required_data": "PartialEnergyData",
+      "result_checkpoint": false,
       "result_class": "PartialEnergySeriesResult",
       "streaming": false,
       "tables": [
@@ -3315,6 +3380,7 @@
         "table"
       ],
       "required_data": "RestraintData",
+      "result_checkpoint": false,
       "result_class": "RestraintSeriesResult",
       "streaming": false,
       "tables": [
@@ -3358,6 +3424,7 @@
         "table"
       ],
       "required_data": "SimulationData",
+      "result_checkpoint": false,
       "result_class": "SimulationScalarSeriesResult",
       "streaming": false,
       "tables": [
@@ -3401,6 +3468,7 @@
         "request"
       ],
       "required_data": "EnergyMinimizationSummaryData",
+      "result_checkpoint": false,
       "result_class": "MMSummaryResult",
       "streaming": false,
       "tables": [
@@ -3445,6 +3513,7 @@
         "section_tables"
       ],
       "required_data": "ForceFieldOptimizationTrainingSetData",
+      "result_checkpoint": false,
       "result_class": "TrainsetDataResult",
       "streaming": false,
       "tables": [
@@ -3496,6 +3565,7 @@
         "request"
       ],
       "required_data": "ForceFieldOptimizationTrainingSetData",
+      "result_checkpoint": false,
       "result_class": "TrainsetGroupCommentsResult",
       "streaming": false,
       "tables": [
@@ -3539,6 +3609,7 @@
         "table"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": true,
       "result_class": "TrajectoryCoordinateSeriesResult",
       "streaming": true,
       "tables": [
@@ -3584,6 +3655,7 @@
         "table"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "TrajectoryDisplacementSeriesResult",
       "streaming": true,
       "tables": [
@@ -3628,6 +3700,7 @@
         "request"
       ],
       "required_data": "ConnectivityTrajectoryData",
+      "result_checkpoint": false,
       "result_class": "TrajectoryRelabelByCoordinationResult",
       "streaming": true,
       "tables": [
@@ -3677,6 +3750,7 @@
         "polarity_result"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "PolarityExtendedXYZResult",
       "streaming": true,
       "tables": [
@@ -3726,6 +3800,7 @@
         "polarity_result"
       ],
       "required_data": "TrajectoryData",
+      "result_checkpoint": false,
       "result_class": "PolarityExtendedXYZResult",
       "streaming": true,
       "tables": [
@@ -3773,6 +3848,7 @@
         "electrostatics_result"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": true,
       "result_class": "PotentialElectricFieldTrajectoryResult",
       "streaming": true,
       "tables": [
@@ -3819,6 +3895,7 @@
         "iterations"
       ],
       "required_data": "ElectrostaticsData",
+      "result_checkpoint": true,
       "result_class": "ChargeExtendedXYZResult",
       "streaming": true,
       "tables": [
@@ -4048,13 +4125,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -4076,7 +4153,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -4098,7 +4175,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -4150,13 +4227,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -4208,13 +4285,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -4236,7 +4313,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -4258,7 +4335,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -4310,13 +4387,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -4393,7 +4470,7 @@
       "workflow_output_sites": [
         {
           "expression": "summary_path.write_text(_summary_text(result), encoding='utf-8')",
-          "line": 791,
+          "line": 788,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -4480,7 +4557,7 @@
       "workflow_output_sites": [
         {
           "expression": "summary_path.write_text(_summary_text(result), encoding='utf-8')",
-          "line": 791,
+          "line": 788,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -4814,6 +4891,24 @@
           "writer": "prepare_generator_output"
         }
       ]
+    },
+    {
+      "aliases": [
+        "extract-frame",
+        "extract_trajectory_frame"
+      ],
+      "artifact_policy": "workflow_public_outputs",
+      "command": "extract_frame",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "analysis",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.trajectory_workflow",
+      "workflow_output_sites": []
     },
     {
       "aliases": [
@@ -5790,19 +5885,19 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 287,
+          "line": 284,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 338,
+          "line": 335,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "write_workflow_tables({local: result.table, summary: result.summary, dipoles: result.dipole_result.table, ions: result.dipole_result.ions}, args=args, summary=(summary.name,))",
-          "line": 357,
+          "line": 354,
           "tier": "declared",
           "writer": "write_workflow_tables"
         }
@@ -5938,31 +6033,31 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 230,
+          "line": 224,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(destination, dpi=int(dpi), bbox_inches='tight')",
-          "line": 268,
+          "line": 262,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "ArtifactSpec('centers', centers.name, 'detail', bool(args.write_centers), centers_format, True)",
-          "line": 287,
+          "line": 281,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('projected', projected.name, 'core', True, 'csv', True)",
-          "line": 288,
+          "line": 282,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('kymograph', kymograph.name, 'core', True, 'csv', True)",
-          "line": 289,
+          "line": 283,
           "tier": "declared",
           "writer": "ArtifactSpec"
         }
@@ -6134,7 +6229,7 @@
       "workflow_output_sites": [
         {
           "expression": "summary_path.write_text(_summary_text(result), encoding='utf-8')",
-          "line": 791,
+          "line": 788,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -6258,19 +6353,19 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 324,
+          "line": 310,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 378,
+          "line": 366,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name), details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())",
-          "line": 409,
+          "line": 397,
           "tier": "declared",
           "writer": "write_workflow_tables"
         }
@@ -6346,7 +6441,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_tables(tables, args=args, details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())",
-          "line": 254,
+          "line": 247,
           "tier": "declared",
           "writer": "write_workflow_tables"
         }
@@ -6422,37 +6517,37 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 276,
+          "line": 272,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(destination, dpi=int(dpi), bbox_inches='tight')",
-          "line": 318,
+          "line": 317,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "ArtifactSpec('centers', centers_path.name, 'detail', bool(args.write_centers), centers_format, True)",
-          "line": 340,
+          "line": 339,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('projected', projected_path.name, 'core', True, 'csv', True)",
-          "line": 341,
+          "line": 340,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('kymograph', kymograph_path.name, 'core', True, 'csv', True)",
-          "line": 342,
+          "line": 341,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('whole_slab_summary', whole_slab_summary_path.name, 'summary', True, 'csv', True)",
-          "line": 343,
+          "line": 342,
           "tier": "declared",
           "writer": "ArtifactSpec"
         }
@@ -6582,7 +6677,7 @@
       "workflow_output_sites": [
         {
           "expression": "summary_path.write_text(_summary_text(result), encoding='utf-8')",
-          "line": 791,
+          "line": 788,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -7095,7 +7190,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_tables({csv_path: result.table}, args=args)",
-          "line": 134,
+          "line": 143,
           "tier": "declared",
           "writer": "write_workflow_tables"
         }
@@ -7232,19 +7327,19 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(destination, dpi=int(dpi), bbox_inches='tight')",
-          "line": 228,
+          "line": 252,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "write_workflow_csv(result.table, destination, index=False)",
-          "line": 238,
+          "line": 262,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(result.table, csv_path, index=False)",
-          "line": 271,
+          "line": 295,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -7667,19 +7762,19 @@
       "workflow_output_sites": [
         {
           "expression": "ArtifactSpec(name, name + '.csv', 'core', True, 'csv')",
-          "line": 120,
+          "line": 126,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('charges', str(Path(detail_name).with_suffix('.' + detail_format)), 'detail', enabled, detail_format, True)",
-          "line": 122,
+          "line": 128,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "figure.savefig(destination, dpi=int(dpi), bbox_inches='tight')",
-          "line": 371,
+          "line": 377,
           "tier": "core_compatibility",
           "writer": "savefig"
         }
@@ -7761,13 +7856,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -7834,13 +7929,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -7892,13 +7987,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -7950,13 +8045,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8008,13 +8103,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8068,13 +8163,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8126,13 +8221,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8154,97 +8249,97 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(eos_result.table, eos_csv, index=False)",
-          "line": 619,
+          "line": 636,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(restraint_result.table, restraint_csv, index=False)",
-          "line": 620,
+          "line": 637,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(heatfo_table, heatfo_csv, index=False)",
-          "line": 621,
+          "line": 638,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(bond_table, bond_csv, index=False)",
-          "line": 622,
+          "line": 639,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(angle_table, angle_csv, index=False)",
-          "line": 623,
+          "line": 640,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(other_curve_table, other_curve_csv, index=False)",
-          "line": 624,
+          "line": 641,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(charge_table, charge_csv, index=False)",
-          "line": 625,
+          "line": 642,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(cell_parameter_table, cell_parameter_csv, index=False)",
-          "line": 626,
+          "line": 643,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(geometry_target_table, geometry_target_csv, index=False)",
-          "line": 627,
+          "line": 644,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(energy_curve_table, energy_curve_csv, index=False)",
-          "line": 628,
+          "line": 645,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(energy_difference_table, energy_difference_csv, index=False)",
-          "line": 629,
+          "line": 646,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(single_energy_table, single_energy_csv, index=False)",
-          "line": 630,
+          "line": 647,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(reaction_energy_table, reaction_energy_csv, index=False)",
-          "line": 631,
+          "line": 648,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(not_plotted_table, not_plotted_csv, index=False)",
-          "line": 632,
+          "line": 649,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "summary_path.write_text(summary_text + '\\n', encoding='utf-8')",
-          "line": 772,
+          "line": 826,
           "tier": "core_compatibility",
           "writer": "write_text"
         },
         {
           "expression": "settings_path.write_text(json.dumps(settings, indent=2, sort_keys=True), encoding='utf-8')",
-          "line": 816,
+          "line": 875,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -8296,13 +8391,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8354,13 +8449,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8538,7 +8633,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 236,
+          "line": 238,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -8820,7 +8915,7 @@
       "workflow_output_sites": [
         {
           "expression": "summary_path.write_text(_summary_text(result), encoding='utf-8')",
-          "line": 791,
+          "line": 788,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -9455,7 +9550,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 236,
+          "line": 238,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9477,7 +9572,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 236,
+          "line": 238,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9499,7 +9594,7 @@
       "workflow_output_sites": [
         {
           "expression": "write_workflow_csv(merged, out_csv, index=False)",
-          "line": 236,
+          "line": 238,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -9645,7 +9740,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -10012,13 +10107,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -10070,13 +10165,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -10275,7 +10370,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -10415,13 +10510,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -10473,13 +10568,13 @@
         },
         {
           "expression": "prepare_generator_output(args, command=command, output_value=str(args.output))",
-          "line": 845,
+          "line": 798,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         },
         {
           "expression": "write_workflow_csv(table, out_path / f'{section}_{suffix}.csv', index=True)",
-          "line": 1281,
+          "line": 1234,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         }
@@ -10541,7 +10636,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -10725,7 +10820,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }
@@ -11036,6 +11131,28 @@
     {
       "aliases": [],
       "artifact_policy": "workflow_public_outputs",
+      "command": "vasp2reax",
+      "execution": {
+        "shape": "single",
+        "thread_safe": false
+      },
+      "kind": "generator",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.file_tools.geo_workflow",
+      "workflow_output_sites": [
+        {
+          "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
+          "line": 533,
+          "tier": "core_compatibility",
+          "writer": "prepare_generator_output"
+        }
+      ]
+    },
+    {
+      "aliases": [],
+      "artifact_policy": "workflow_public_outputs",
       "command": "voronoi",
       "execution": {
         "shape": "global",
@@ -11269,7 +11386,7 @@
       "workflow_output_sites": [
         {
           "expression": "prepare_generator_output(args, command=canonical, output_value=str(output_value))",
-          "line": 495,
+          "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
         }

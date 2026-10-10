@@ -30,51 +30,56 @@ Incomplete or missing hf.out files are skipped by default and reported in the lo
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. |  |
-| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. |  |
-| `--temperature` | No | 273.0 | Temperature used for relative composition. |  |
-| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. |  |
-| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. |  |
+| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
+| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. Example: --reference-composition 100, which sets the lowest-energy reference composition to 100. |  |
+| `--temperature` | No | 273.0 | Temperature used for relative composition. Example: --temperature 300, which evaluates relative compositions at 300 K. |  |
+| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. Example: --gas-constant 1.987, which uses 1.987 cal/(mol K) in the composition calculation. |  |
+| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. Example: --require-all-complete, which fails if any expected isomer output is incomplete. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. |  |
-| `--geo-file` | No | geo | Output geo filename. |  |
-| `--trainset-file` | No | trainset.in | Output trainset filename. |  |
-| `--composition-file` | No | composition.txt | Output composition filename. |  |
-| `--log-file` | No | out_trainset_log.txt | Output log filename. |  |
+| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. Example: --job-dir isomer_jobs, which reads the per-isomer calculation folders there. |  |
+| `--geo-file` | No | geo | Output geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
+| `--trainset-file` | No | trainset.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--composition-file` | No | composition.txt | Output composition filename. Example: --composition-file composition.txt, which writes relative compositions to that file. |  |
+| `--log-file` | No | out_trainset_log.txt | Output log filename. Example: --log-file trainset.log, which writes generation diagnostics to that log. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. |  |
-| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. Example: --hf-output-name hf.out, which reads that filename in each isomer job folder. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -102,51 +107,56 @@ Incomplete or missing hf.out files are skipped by default and reported in the lo
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. |  |
-| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. |  |
-| `--temperature` | No | 273.0 | Temperature used for relative composition. |  |
-| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. |  |
-| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. |  |
+| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
+| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. Example: --reference-composition 100, which sets the lowest-energy reference composition to 100. |  |
+| `--temperature` | No | 273.0 | Temperature used for relative composition. Example: --temperature 300, which evaluates relative compositions at 300 K. |  |
+| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. Example: --gas-constant 1.987, which uses 1.987 cal/(mol K) in the composition calculation. |  |
+| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. Example: --require-all-complete, which fails if any expected isomer output is incomplete. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. |  |
-| `--geo-file` | No | geo | Output geo filename. |  |
-| `--trainset-file` | No | trainset.in | Output trainset filename. |  |
-| `--composition-file` | No | composition.txt | Output composition filename. |  |
-| `--log-file` | No | out_trainset_log.txt | Output log filename. |  |
+| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. Example: --job-dir isomer_jobs, which reads the per-isomer calculation folders there. |  |
+| `--geo-file` | No | geo | Output geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
+| `--trainset-file` | No | trainset.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--composition-file` | No | composition.txt | Output composition filename. Example: --composition-file composition.txt, which writes relative compositions to that file. |  |
+| `--log-file` | No | out_trainset_log.txt | Output log filename. Example: --log-file trainset.log, which writes generation diagnostics to that log. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. |  |
-| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. Example: --hf-output-name hf.out, which reads that filename in each isomer job folder. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -174,51 +184,56 @@ Incomplete or missing hf.out files are skipped by default and reported in the lo
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. |  |
-| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. |  |
-| `--temperature` | No | 273.0 | Temperature used for relative composition. |  |
-| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. |  |
-| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. |  |
+| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
+| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. Example: --reference-composition 100, which sets the lowest-energy reference composition to 100. |  |
+| `--temperature` | No | 273.0 | Temperature used for relative composition. Example: --temperature 300, which evaluates relative compositions at 300 K. |  |
+| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. Example: --gas-constant 1.987, which uses 1.987 cal/(mol K) in the composition calculation. |  |
+| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. Example: --require-all-complete, which fails if any expected isomer output is incomplete. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. |  |
-| `--geo-file` | No | geo | Output geo filename. |  |
-| `--trainset-file` | No | trainset.in | Output trainset filename. |  |
-| `--composition-file` | No | composition.txt | Output composition filename. |  |
-| `--log-file` | No | out_trainset_log.txt | Output log filename. |  |
+| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. Example: --job-dir isomer_jobs, which reads the per-isomer calculation folders there. |  |
+| `--geo-file` | No | geo | Output geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
+| `--trainset-file` | No | trainset.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--composition-file` | No | composition.txt | Output composition filename. Example: --composition-file composition.txt, which writes relative compositions to that file. |  |
+| `--log-file` | No | out_trainset_log.txt | Output log filename. Example: --log-file trainset.log, which writes generation diagnostics to that log. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. |  |
-| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. Example: --hf-output-name hf.out, which reads that filename in each isomer job folder. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -246,51 +261,56 @@ Incomplete or missing hf.out files are skipped by default and reported in the lo
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. |  |
-| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. |  |
-| `--temperature` | No | 273.0 | Temperature used for relative composition. |  |
-| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. |  |
-| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. |  |
+| `--weight` | No | 1.0 | Weight for generated ENERGY trainset lines. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
+| `--reference-composition` | No | 100.0 | Composition value assigned to the lowest-energy reference structure. Example: --reference-composition 100, which sets the lowest-energy reference composition to 100. |  |
+| `--temperature` | No | 273.0 | Temperature used for relative composition. Example: --temperature 300, which evaluates relative compositions at 300 K. |  |
+| `--gas-constant` | No | 1.987 | Gas constant used for relative composition. Example: --gas-constant 1.987, which uses 1.987 cal/(mol K) in the composition calculation. |  |
+| `--require-all-complete` | No | False | Fail if any isomer job folder is missing a completed hf.out. Example: --require-all-complete, which fails if any expected isomer output is incomplete. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. |  |
-| `--geo-file` | No | geo | Output geo filename. |  |
-| `--trainset-file` | No | trainset.in | Output trainset filename. |  |
-| `--composition-file` | No | composition.txt | Output composition filename. |  |
-| `--log-file` | No | out_trainset_log.txt | Output log filename. |  |
+| `--job-dir` | No | isomer_jobs | Directory containing per-isomer job folders. Example: --job-dir isomer_jobs, which reads the per-isomer calculation folders there. |  |
+| `--geo-file` | No | geo | Output geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
+| `--trainset-file` | No | trainset.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--composition-file` | No | composition.txt | Output composition filename. Example: --composition-file composition.txt, which writes relative compositions to that file. |  |
+| `--log-file` | No | out_trainset_log.txt | Output log filename. Example: --log-file trainset.log, which writes generation diagnostics to that log. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. |  |
-| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_trainset | Output directory for geo, trainset.in, composition.txt, and log files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--hf-output-name` | No | hf.out | Supported output filename inside each job folder. Example: --hf-output-name hf.out, which reads that filename in each isomer job folder. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

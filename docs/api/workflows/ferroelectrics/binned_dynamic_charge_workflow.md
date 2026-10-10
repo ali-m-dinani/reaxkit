@@ -11,7 +11,22 @@
 
 <div class="analysis-section-indent" markdown="1">
 
-Project atoms onto xy, xz, or yz using frame 0, sum charge and delta_charge through the perpendicular direction, and write globally scaled 2-D heatmaps.
+Project dynamic charges into fixed spatial bins and write charge heatmaps.
+
+Use frame-zero positions to compare charge changes in the same spatial regions.
+Values are summed through the omitted direction; --average reports per-particle averages.
+This analyzes existing trajectory and charge files.
+
+### Examples
+-----
+
+```text
+  1. Summed charges in the x-z plane:
+     reaxkit get-binned-dynamic-charges --fort7 fort.7 --xmolout xmolout --plane xz --bins-x 40 --bins-z 40
+
+  2. Per-particle averages without plots:
+     reaxkit get-binned-dynamic-charges --fort7 fort.7 --xmolout xmolout --average --skip-plots
+```
 
 ### Arguments
 
@@ -19,42 +34,43 @@ Project atoms onto xy, xz, or yz using frame 0, sum charge and delta_charge thro
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plane` | No | xz | Heatmap plane. | xy, xz, yz |
-| `--bins-x` | No |  | Number of bins along x. |  |
-| `--bins-y` | No |  | Number of bins along y. |  |
-| `--bins-z` | No |  | Number of bins along z. |  |
-| `--frames` | No |  | Frames, e.g. 0:101:10. |  |
-| `--every` | No | 1 | Keep every Nth selected frame. |  |
-| `--average` | No | False | Add average_charge and average_delta_charge to the CSV and plot those per-particle averages instead of bin sums. |  |
+| `--plane` | No | xz | Heatmap plane. Example: --plane xz, which projects onto the x-z plane. | xy, xz, yz |
+| `--bins-x` | No |  | Number of bins along x. Example: --bins-x 40, which splits the x extent into 40 bins. |  |
+| `--bins-y` | No |  | Number of bins along y. Example: --bins-y 40, which splits the y extent into 40 bins. |  |
+| `--bins-z` | No |  | Number of bins along z. Example: --bins-z 40, which splits the z extent into 40 bins. |  |
+| `--frames` | No |  | Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--average` | No | False | Add average_charge and average_delta_charge to the CSV and plot those per-particle averages instead of bin sums. Example: --average, which plots per-particle averages instead of summed bin charges. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input path used for engine detection. |  |
-| `--run-dir` | No | . | Fallback simulation directory. |  |
-| `--fort7` | No | fort.7 | Dynamic-charge source. |  |
-| `--xmolout` | No | xmolout | Coordinate and atom-id source. |  |
-| `--summary` | No |  | Optional summary.txt metadata source. |  |
-| `--control` | No | control | Control file used for frame progress. |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir` | No | . | Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--fort7` | No | fort.7 | Dynamic-charge source. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Coordinate and atom-id source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--summary` | No |  | Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file. |  |
+| `--control` | No | control | Control file used for frame progress. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--dpi` | No | 180 | Heatmap resolution in dots per inch. |  |
-| `--skip-plots` | No | False | Write the bin CSV without generating per-frame heatmaps. |  |
-| `--output-dir` | No |  | Output root for binned_dynamic_charge.csv and heatmaps/. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--dpi` | No | 180 | Heatmap resolution in dots per inch. Example: --dpi 300, which writes figures at 300 dots per inch. |  |
+| `--skip-plots` | No | False | Write the bin CSV without generating per-frame heatmaps. Example: --skip-plots, which exports the data without generating heatmaps. |  |
+| `--output-dir` | No |  | Output root for binned_dynamic_charge.csv and heatmaps/. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -66,14 +82,18 @@ Project atoms onto xy, xz, or yz using frame 0, sum charge and delta_charge thro
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No | quiet |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No | quiet | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

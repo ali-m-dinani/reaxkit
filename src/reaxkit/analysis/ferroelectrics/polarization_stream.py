@@ -13,15 +13,21 @@ from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import _traj
 
 
 def stream_polarization(task, frames, request, kind, reporter=None, pipeline=None):
+    store = getattr(request, "_result_store", None)
+    if store is not None:
+        from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator, trajectory_table, restore_trajectory
+        durable = CheckpointAccumulator(store)
+        if store.manifest["state"] in {"analysis_complete", "complete"}:
+            return restore_trajectory(durable.finish(request), store)
     pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(task, request))
     local = replace(request, frames=[0], every=1, reference_frame=0)
     wanted = None if request.frames is None else set(list(request.frames)[::request.every])
-    spool = TrajectorySpool() if kind in {"hbn_local", "basal_local"} else None
+    spool = TrajectorySpool() if kind in {"hbn_local", "basal_local"} and store is None else None
     profile = getattr(request, "_output_profile", None)
     detail_enabled = (profile not in {None, "minimal"} and kind.startswith("hbn")
                       and (profile in {"full", "legacy"} or kind == "hbn" and request.include_displacements
                            or bool(getattr(request, "_write_displacements", False))))
-    details = TableSpool() if detail_enabled else None
+    details = TableSpool() if detail_enabled and store is None else None
     succeeded = False
     try:
         with reference_frames(frames, request.reference_frame) as (reference, source):
@@ -64,10 +70,13 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
 
             def selected():
                 seen = set()
+                position = 0
                 for index, (frame, data) in enumerate(source):
                     if frame in wanted if wanted is not None else frame % request.every == 0:
                         seen.add(frame)
-                        yield FrameEnvelope(index, frame, data)
+                        if store is None or position >= store.committed_frames:
+                            yield FrameEnvelope(position, frame, data)
+                        position += 1
                 if wanted is not None and wanted-seen:
                     raise ValueError(f"Requested frames not found: {sorted(wanted-seen)}")
 
@@ -87,7 +96,7 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
                                 table = getattr(polarity, name, None)
                                 if table is not None:
                                     setattr(polarity, name, table.iloc[:0])
-                    if profile is not None and kind.startswith("hbn"):
+                    if profile is not None and kind.startswith("hbn") and (store is None or not detail_enabled):
                         target = result.reference_result if kind == "hbn_local" else result
                         if details is not None:
                             details.append(target.displacements)
@@ -96,10 +105,24 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
                         trajectory, _ = _trajectory_and_charges(item.envelope.payload)
                         spool.append(item.envelope.source_frame, trajectory)
                         result.trajectory = None
-                    results.add(result)
+                    if store is not None:
+                        from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
+                        if hasattr(request, "_control_file"):
+                            enrich_result_with_time(result, None, control_file=request._control_file)
+                        extra = {}
+                        if kind == "hbn_local":
+                            if getattr(request, "_write_extxyz", False):
+                                trajectory, _ = _trajectory_and_charges(item.envelope.payload)
+                                extra["_trajectory"] = trajectory_table(trajectory, item.envelope.source_frame)
+                            result.trajectory = None
+                        durable.add(result, item.envelope.sequence, item.envelope.source_frame, extra_tables=extra)
+                    else:
+                        results.add(result)
                     if reporter:
                         reporter("stream", count, 0, "Calculating polarization frames")
-            result = results.finish(request)
+            result = durable.finish(request) if store is not None else results.finish(request)
+            if store is not None:
+                restore_trajectory(result, store)
             if details is not None:
                 target = result.reference_result if kind == "hbn_local" else result
                 target.table_chunks = {"hbn_reference_displacements": TableChunks(details)}

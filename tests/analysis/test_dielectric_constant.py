@@ -122,6 +122,27 @@ def test_nonuniform_time_grid_is_rejected():
         )
 
 
+def test_electronic_permittivity_shifts_only_real_response():
+    time = np.arange(8, dtype=float)
+    dipole = np.asarray([-2.0, -1.0, 0.0, 1.0, 2.0, 1.0, 0.0, -1.0])
+    baseline = calculate_dielectric_constant(time, dipole, _request(dipole_kind="component"))
+    corrected = calculate_dielectric_constant(
+        time, dipole, _request(dipole_kind="component", epsilon_infinity=4.7)
+    )
+    assert corrected.static_dielectric_constant == pytest.approx(baseline.static_dielectric_constant + 3.7)
+    np.testing.assert_allclose(corrected.spectrum['epsilon real'], baseline.spectrum['epsilon real'] + 3.7)
+    np.testing.assert_array_equal(corrected.spectrum['epsilon imaginary'], baseline.spectrum['epsilon imaginary'])
+    pd.testing.assert_frame_equal(corrected.autocorrelation, baseline.autocorrelation)
+    assert corrected.summary.loc[0, 'electronic relative permittivity'] == 4.7
+    assert corrected.summary.loc[0, 'static MD contribution'] == pytest.approx(baseline.static_dielectric_constant - 1.0)
+
+
+@pytest.mark.parametrize('value', [0.0, -1.0, 0.9, np.nan, np.inf])
+def test_invalid_electronic_permittivity_is_rejected(value):
+    with pytest.raises(ValueError, match='epsilon_infinity'):
+        calculate_dielectric_constant(np.arange(3), np.arange(3), _request(epsilon_infinity=value))
+
+
 def test_trajectory_volume_supports_hull_bbox_and_cell():
     cube = np.asarray(
         [

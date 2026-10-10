@@ -134,7 +134,9 @@ class BoundedFramePipeline:
         try:
             return kernel(envelope.payload)
         except Exception as exc:
-            raise RuntimeError(f"Frame kernel failed at source frame {envelope.source_frame}: {exc}") from exc
+            error = RuntimeError(f"Frame kernel failed at source frame {envelope.source_frame}: {exc}")
+            error.source_frame = envelope.source_frame
+            raise error from exc
         finally:
             elapsed = perf_counter() - started
             with self._worker_lock:

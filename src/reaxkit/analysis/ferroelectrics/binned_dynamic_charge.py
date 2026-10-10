@@ -375,15 +375,17 @@ def generate_binned_charge_heatmaps(
         if result.request.average
         else ("charge", "delta_charge")
     )
-    occupied_rows = result.table["valid_charge_count"] > 0
-    limits = {
-        quantities[0]: _global_color_limits(
-            result.table.loc[occupied_rows, quantities[0]], symmetric=False
-        ),
-        quantities[1]: _global_color_limits(
-            result.table.loc[occupied_rows, quantities[1]], symmetric=True
-        ),
-    }
+    from reaxkit.core.runtime.result_store import table_chunks, frame_table as select_frame
+    extrema = {quantity: [np.inf, -np.inf] for quantity in quantities}
+    for chunk in table_chunks(result.table):
+        for quantity in quantities:
+            values = chunk.loc[chunk["valid_charge_count"] > 0, quantity].to_numpy(float)
+            values = values[np.isfinite(values)]
+            if len(values):
+                extrema[quantity][0] = min(extrema[quantity][0], values.min())
+                extrema[quantity][1] = max(extrema[quantity][1], values.max())
+    limits = {quantity: _global_color_limits(pd.Series(extrema[quantity]), symmetric=index == 1)
+              for index, quantity in enumerate(quantities)}
     bins_by_axis = {
         "x": result.request.bins_x,
         "y": result.request.bins_y,
@@ -408,7 +410,7 @@ def generate_binned_charge_heatmaps(
             destination_dir.mkdir(parents=True, exist_ok=True)
             norm = Normalize(*limits[quantity])
             for frame in result.frame_indices:
-                frame_table = result.table[result.table["frame"] == int(frame)]
+                frame_table = select_frame(result.table, int(frame), "frame")
                 values = frame_table[quantity].to_numpy(dtype=float).reshape(shape).T
                 figure, axis = plt.subplots(figsize=(7.2, 5.8))
                 image = axis.pcolormesh(
@@ -489,6 +491,13 @@ class BinnedDynamicChargeTask(AnalysisTask):
     ) -> BinnedDynamicChargeResult:
         """Aggregate charge-only frames without materializing ``fort.7``."""
 
+        from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
+        store = getattr(request, "_result_store", None)
+        durable = CheckpointAccumulator(store) if store is not None else None
+        if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+            return durable.finish(request)
+        position = 0
+
         plane, axis_labels, bins = _plane_configuration(request)
         requested = (
             None
@@ -563,6 +572,9 @@ class BinnedDynamicChargeTask(AnalysisTask):
                 else source_frame % int(request.every) == 0
             )
             if keep:
+                position += 1
+                if store is not None and position <= store.committed_frames:
+                    continue
                 missing = [
                     int(atom_id)
                     for atom_id in fixed_atom_ids
@@ -592,6 +604,16 @@ class BinnedDynamicChargeTask(AnalysisTask):
                     number_of_bins,
                     include_averages=bool(request.average),
                 )
+                if durable is not None:
+                    simulation = data.trajectory.simulation
+                    frame_result = BinnedDynamicChargeResult(
+                        table=frame_table[_result_columns(request)], request=request,
+                        frame_indices=np.asarray([source_frame]), iterations=np.asarray([iteration]),
+                        plane=plane, axis_labels=axis_labels, bin_edges=edges,
+                        atom_bin_numbers={int(atom): int(index) + 1 for atom, index in zip(fixed_atom_ids, fixed_bins)},
+                        time_values=None if simulation is None or simulation.time is None else np.asarray(simulation.time[:1]))
+                    durable.add(frame_result, position - 1, source_frame)
+                    continue
                 rows.append(frame_table)
                 output_frames.append(source_frame)
                 output_iterations.append(iteration)
@@ -616,6 +638,8 @@ class BinnedDynamicChargeTask(AnalysisTask):
                 raise ValueError(f"Requested frame(s) not found: {missing_frames}.")
         if callable(reporter):
             reporter("stream", processed, processed, "Finished binned charge streaming")
+        if durable is not None:
+            return durable.finish(request)
         table = (
             pd.concat(rows, ignore_index=True)[_result_columns(request)]
             if rows

@@ -567,8 +567,11 @@ def _table_for_trajectory_frame(
 ) -> tuple[int, pd.DataFrame]:
     """Return source-frame rows for one compact in-memory trajectory frame."""
 
-    source_frame = _source_frame(result.trajectory, int(frame))
+    source_frame = _source_frame(result.trajectory, int(frame)) if result.trajectory is not None else int(frame)
     source_table = result.table if table is None else table
+    from reaxkit.core.runtime.result_store import ResultTable
+    if isinstance(source_table, ResultTable):
+        return source_frame, source_table.select_frame(source_frame)
     frame_numbers = source_table["frame_index"].astype(int)
     frame_table = source_table[frame_numbers.eq(source_frame)]
     if frame_table.empty and source_frame != int(frame):

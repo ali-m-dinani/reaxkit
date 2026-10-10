@@ -30,45 +30,50 @@ The target formula, prefix, and legacy folder behavior are read from `control_pa
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. |  |
+| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. Example: --max-representatives 10, which limits downstream calculations to ten representatives. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. |  |
-| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. |  |
-| `--control` | No | control_params | Input legacy control_params file. |  |
+| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--control` | No | control_params | Input legacy control_params file. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. |  |
-| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. |  |
-| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. Example: --write-isomer-dirs, which writes individual representative folders. |  |
+| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. Example: --no-isomer-dirs, which suppresses individual representative folders. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -96,45 +101,50 @@ The target formula, prefix, and legacy folder behavior are read from `control_pa
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. |  |
+| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. Example: --max-representatives 10, which limits downstream calculations to ten representatives. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. |  |
-| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. |  |
-| `--control` | No | control_params | Input legacy control_params file. |  |
+| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--control` | No | control_params | Input legacy control_params file. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. |  |
-| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. |  |
-| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. Example: --write-isomer-dirs, which writes individual representative folders. |  |
+| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. Example: --no-isomer-dirs, which suppresses individual representative folders. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -162,45 +172,50 @@ The target formula, prefix, and legacy folder behavior are read from `control_pa
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. |  |
+| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. Example: --max-representatives 10, which limits downstream calculations to ten representatives. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. |  |
-| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. |  |
-| `--control` | No | control_params | Input legacy control_params file. |  |
+| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--control` | No | control_params | Input legacy control_params file. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. |  |
-| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. |  |
-| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. Example: --write-isomer-dirs, which writes individual representative folders. |  |
+| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. Example: --no-isomer-dirs, which suppresses individual representative folders. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -228,45 +243,50 @@ The target formula, prefix, and legacy folder behavior are read from `control_pa
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. |  |
+| `--max-representatives` | No |  | Optional cap on representatives, limiting downstream Jaguar jobs. Example: --max-representatives 10, which limits downstream calculations to ten representatives. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. |  |
-| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. |  |
-| `--control` | No | control_params | Input legacy control_params file. |  |
+| `--fort7` | No | fort.7 | Input ReaxFF fort.7 file. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Input ReaxFF xmolout file. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--control` | No | control_params | Input legacy control_params file. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. |  |
-| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. |  |
-| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | isomer_outputs | Output directory for xmolout_isomers, isomer_run_log.txt, and optional isomer folders. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-isomer-dirs` | No | False | Force writing per-isomer folders under output-dir/isomers. Example: --write-isomer-dirs, which writes individual representative folders. |  |
+| `--no-isomer-dirs` | No | False | Disable per-isomer folders even when control_params has isomer_run=2. Example: --no-isomer-dirs, which suppresses individual representative folders. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

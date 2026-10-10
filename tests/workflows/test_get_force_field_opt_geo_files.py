@@ -82,6 +82,23 @@ def test_refuses_to_overwrite_existing_outputs(tmp_path) -> None:
         workflow.extract_force_field_opt_geometries(source, output)
 
 
+@pytest.mark.parametrize("custom_root", [False, True])
+def test_default_output_uses_workspace(tmp_path, monkeypatch, capsys, custom_root):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "geo").write_text(MULTI_GEO, encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate_run_id", lambda: "run_test")
+    parser = workflow.build_parser(argparse.ArgumentParser(), command="get_force_field_opt_geo_files")
+    options = ["--project-root", "custom_workspace", "--analysis-id", "selected"] if custom_root else []
+    args = parser.parse_args(options)
+    assert workflow.run_main("get-force-field-opt-geo-files", args) == 0
+    root = tmp_path / ("custom_workspace" if custom_root else "reaxkit_workspace")
+    output = root / "analysis" / "get_force_field_opt_geo_files" / ("selected" if custom_root else "run_test")
+    assert (output / "molecule_one" / "molecule_one.geo").is_file()
+    assert (output / "bulk_e3_mp_2604" / "bulk_e3_mp_2604.xyz").is_file()
+    assert str(output.relative_to(tmp_path)) in capsys.readouterr().out
+    assert not (tmp_path / "force_field_opt_geo_files").exists()
+
+
 def test_preserves_duplicate_identifiers_with_numbered_folders(tmp_path) -> None:
     source = tmp_path / "geo"
     duplicate = MULTI_GEO + MULTI_GEO.split("\n\n", maxsplit=1)[0] + "\n"

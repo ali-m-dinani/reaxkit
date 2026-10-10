@@ -1,7 +1,16 @@
 """Reviewed canonical flag roles for the registered CLI."""
 
 FLAG_METADATA = {
+    '--type-map': ('Input and file selection', 'full'),
+    '--cell': ('Scientific choices', 'full'),
+    '--checkpoint': ('Storage and cache', 'full'),
+    '--resume': ('Storage and cache', 'full'),
+    '--checkpoint-buffer-mb': ('Storage and cache', 'full'),
+    '--checkpoint-interval-seconds': ('Storage and cache', 'full'),
     '--plot-style': ('Outputs and plots', 'short'),
+    '--color-style': ('Outputs and plots', 'short'),
+    '--formats': ('Outputs and plots', 'short'),
+    '--height': ('Outputs and plots', 'full'),
     '--make-powerpoint': ('Outputs and plots', 'short'),
     '--make-ppt': ('Outputs and plots', 'short'),
     # Legacy spellings and branch-specific flags also appear in generated docs.
@@ -114,6 +123,7 @@ FLAG_METADATA = {
     '--dipole-kind': ('Scientific choices', 'full'),
     '--dipole-unit': ('Scientific choices', 'short'),
     '--dipole-zero-tolerance': ('Scientific choices', 'full'),
+    '--epsilon-infinity': ('Scientific choices', 'full'),
     '--directed': ('Scientific choices', 'full'),
     '--direction': ('Scientific choices', 'short'),
     '--disable-taper': ('Scientific choices', 'full'),

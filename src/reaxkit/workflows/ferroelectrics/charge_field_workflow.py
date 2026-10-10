@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
 from reaxkit.analysis import ferroelectrics as _ferroelectric_tasks  # noqa: F401
 from reaxkit.analysis.ferroelectrics.charge_field import (
@@ -142,13 +143,26 @@ def generate_charge_field_plots(
     delta_dir.mkdir(parents=True, exist_ok=True)
     frame_x, xlabel = _x_values(result, x_axis, control_file)
     x_by_frame = dict(zip(result.frame_indices.tolist(), frame_x.tolist()))
-    groups = result.table.groupby("atom_number", sort=False)
+    from reaxkit.core.runtime.result_store import ResultTable, table_chunks
+    if isinstance(result.table, ResultTable):
+        atom_numbers = tuple(dict.fromkeys(result.request.atom_numbers))
+        def atom_groups():
+            for atom in atom_numbers:
+                parts = [chunk.loc[chunk["atom_number"] == atom] for chunk in table_chunks(result.table)]
+                group = pd.concat(parts, ignore_index=True)
+                if not group.empty:
+                    yield atom, group
+        groups = atom_groups()
+        group_count = len(atom_numbers)
+    else:
+        groups = result.table.groupby("atom_number", sort=False)
+        group_count = result.table["atom_number"].nunique()
     if progress:
         from tqdm.auto import tqdm
 
         groups = tqdm(
             groups,
-            total=result.table["atom_number"].nunique(),
+            total=group_count,
             desc="plots: generating charge-field plots",
             unit="atom",
             dynamic_ncols=True,

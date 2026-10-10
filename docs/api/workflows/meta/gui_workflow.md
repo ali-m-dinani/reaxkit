@@ -11,20 +11,18 @@
 
 <div class="analysis-section-indent" markdown="1">
 
-Launch the ReaxKit Web UI.
-Simply run 'reaxkit gui' to generate a GUI on localhost.
-Once you open the GUI, you need to follow these steps:
- 1. in the bottom left where you see the settings panel, click on 'Browse...' to locate the ReaxFF files, then clik 'Load Dataset' to automatically read the data and detect the engine. If the engine is detected, it will show the engine name and number of frames at the bottom of the screen.
+Launch the ReaxKit Web UI on localhost.
 
- 2. If the engine was no automatically detected (because it couldn't find the characteristicc files for each engine, such as xmolout for ReaxFF Standalone engine, you need to manually select the engine in 'Engine' in the pipeline browser.
+Load a simulation dataset, configure analysis tasks, and inspect tables and plots in a browser.
+The command starts the UI server; analyses run when requested through the interface.
 
- 3. once the data is loaded and the engine is detected, you can add analyzers by clicking on 'Analysis' in the pipeline browser, and then adding the appropriate analyzer.
+### Examples
+-----
 
- 4. Once the analyzer is added, it shows a list of settings for that analyzer in the settings panel (bottom left of the screen). Determine the settings, and start the analyzer. It takes some time to do the calculations and return the results.
-
- 5. for each analyzer, a number of default presentations (usually a table view and a plot) are generated. However, you are not limited to these presentations, and you can simply click on 'Presentation' to add more presentations.
-
- 6. If you want, you can apply some utilities such as signal processing utilities to smooth the data, etc. by clicking on 'Utilities' and selecting the approporiate utility. Once the utility is applied on your data, it generates a new column to you data, which can be visualized later on by adding presentation layers.
+```text
+  1. Start the local UI:
+     reaxkit gui
+```
 
 ### Arguments
 
@@ -32,28 +30,33 @@ Once you open the GUI, you need to follow these steps:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 <a id="ReaxKit_Graphical_User_Interface"></a>

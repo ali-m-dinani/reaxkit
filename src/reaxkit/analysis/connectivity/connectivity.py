@@ -831,14 +831,28 @@ class ConnectionStatsTask(AnalysisTask):
         """Reduce each frame immediately into per-pair counts, sums and maxima."""
         pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
         accumulator = ConnectionStatistics(request.how)
+        store = getattr(request, "_result_store", None)
+        if store is not None:
+            state = store.scientific_state()
+            if state is not None:
+                accumulator.restore(state)
+            if store.manifest["state"] in {"analysis_complete", "complete"}:
+                store.transition("analysis_complete")
+                return ConnectionStatsResult(table=accumulator.finalize(), request=request)
         local = ConnectionListRequest(frames=None, every=1, min_bo=request.min_bo,
                                       undirected=request.undirected)
-        with closing(pipeline.map_ordered(selected_frame_envelopes(frames, request),
+        committed = store.committed_frames if store is not None else 0
+        selected = (item for position, item in enumerate(selected_frame_envelopes(frames, request)) if position >= committed)
+        with closing(pipeline.map_ordered(selected,
                     lambda data: ConnectionListTask().run(data, local).table)) as results:
             for count, item in enumerate(results, 1):
                 accumulator.add(item.value)
+                if store is not None:
+                    store.append(committed + count - 1, item.envelope.source_frame, {}, state=accumulator.snapshot())
                 if reporter:
                     reporter("stream", count, 0, "Reducing connection statistics")
+        if store is not None:
+            store.transition("analysis_complete")
         return ConnectionStatsResult(table=accumulator.finalize(), request=request)
 
 
@@ -1069,6 +1083,9 @@ class BondEventsTask(AnalysisTask):
     )
 
     def run_stream(self, frames, request, reporter=None, pipeline=None):
+        if getattr(request, "_result_store", None) is not None:
+            from reaxkit.core.runtime.checkpoint_bonds import stream_bond_events
+            return stream_bond_events(frames, request, reporter)
         pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(self, request))
         traces, rows = {}, []
         local = ConnectionListRequest(frames=None, every=1, min_bo=0.0,

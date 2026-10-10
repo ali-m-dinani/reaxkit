@@ -126,6 +126,8 @@ _trajectory_from_xmolout_handler = trajectory_from_xmolout_handler
 class ReaxFFAdapter(EngineAdapter):
     """Adapter that loads ReaxFF outputs into domain models."""
 
+    HANDLER_VERSION = "2"
+
     @staticmethod
     def _resolve_reaxff_path(args: dict, *keys: str, default: str) -> Path:
         """Resolve reaxff path."""

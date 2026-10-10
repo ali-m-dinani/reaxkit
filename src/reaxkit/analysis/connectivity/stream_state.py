@@ -15,6 +15,14 @@ class ConnectionStatistics:
         self.how = how
         self.pairs = {}
 
+    def snapshot(self):
+        return {"version": 1, "how": self.how, "pairs": self.pairs.copy()}
+
+    def restore(self, state):
+        if state["version"] != 1 or state["how"] != self.how:
+            raise ValueError("Incompatible connection reducer checkpoint.")
+        self.pairs = state["pairs"].copy()
+
     def add(self, table):
         for source, source_type, destination, destination_type, value in table[PAIR_COLUMNS + ["BO"]].itertuples(index=False, name=None):
             key = (source, source_type, destination, destination_type)
@@ -77,6 +85,19 @@ class BondTraceState:
         self.run_length = 0
         self.run_start = None
         self.confirmed = None
+
+    def snapshot(self):
+        values = {name: value for name, value in vars(self).items() if name not in {"request", "samples"}}
+        return {"version": 1, "values": values, "samples": list(self.samples)}
+
+    def restore(self, state):
+        if state["version"] != 1:
+            raise ValueError("Incompatible ordered bond-state checkpoint.")
+        for name, value in state["values"].items():
+            if name not in vars(self) or name in {"request", "samples"}:
+                raise ValueError("Invalid ordered bond-state field.")
+            setattr(self, name, value)
+        self.samples = deque(state["samples"])
 
     def _state(self, sample, value):
         threshold = float(self.request.threshold)

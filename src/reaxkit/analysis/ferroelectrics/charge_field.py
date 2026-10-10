@@ -226,11 +226,20 @@ class ChargeFieldTask(AnalysisTask):
         return calculate_charge_field_response(data, self._field_data(), request)
 
     def run_stream(self, frames, request: ChargeFieldRequest, reporter=None) -> ChargeFieldResult:
+        from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
+        store = getattr(request, "_result_store", None)
+        durable = CheckpointAccumulator(store) if store is not None else None
+        if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+            return durable.finish(request)
+        position = 0
         selected_atoms = _validate_request(request)
         requested = None if request.frames is None else [int(v) for v in request.frames][:: int(request.every)]
         requested_set = set(requested or ())
         seen_frames: set[int] = set()
         seen_atoms: set[int] = set()
+        if store is not None and store.committed_frames:
+            for table in store.table("table"):
+                seen_atoms.update(int(value) for value in table["atom_number"])
         rows: list[dict[str, object]] = []
         frame_indices: list[int] = []
         iterations: list[int] = []
@@ -268,6 +277,9 @@ class ChargeFieldTask(AnalysisTask):
                 else source_frame % int(request.every) == 0
             )
             if keep:
+                position += 1
+                if store is not None and position <= store.committed_frames:
+                    continue
                 charges = np.asarray(data.charges, dtype=float)
                 if charges.shape[0] != 1:
                     raise ValueError("Streamed ChargeData must contain exactly one frame.")
@@ -301,6 +313,17 @@ class ChargeFieldTask(AnalysisTask):
                             "charge": charge,
                         }
                     )
+                if durable is not None:
+                    if baseline_charges is None:
+                        raise ValueError("Frame 0 is required to calculate delta_charge.")
+                    frame_result = _result_from_rows(rows, frame_indices, iterations, times,
+                        have_all_times=have_all_times, field_data=self._field_data(), request=request,
+                        baseline_charges=baseline_charges)
+                    durable.add(frame_result, position - 1, source_frame)
+                    rows.clear()
+                    frame_indices.clear()
+                    iterations.clear()
+                    times.clear()
             if callable(reporter):
                 reporter(
                     "stream",
@@ -320,6 +343,8 @@ class ChargeFieldTask(AnalysisTask):
             raise ValueError("Frame 0 is required to calculate delta_charge.")
         if callable(reporter):
             reporter("stream", processed, processed, "Finished reading selected-atom charges")
+        if durable is not None:
+            return durable.finish(request)
         return _result_from_rows(
             rows,
             frame_indices,

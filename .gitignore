@@ -17,6 +17,7 @@ venv/
 # BUILD / PACKAGING / TESTING
 # ------------------------------
 .cache/
+.validation/
 .coverage
 *.cover
 *.egg-info/

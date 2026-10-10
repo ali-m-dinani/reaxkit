@@ -289,6 +289,9 @@ class ChargeExtendedXYZTask(AnalysisTask):
             request: ChargeExtendedXYZRequest,
             reporter=None,
     ) -> ChargeExtendedXYZResult:
+        if getattr(request, "_result_store", None) is not None:
+            from reaxkit.core.runtime.checkpoint_trajectory import stream_charge_trajectory
+            return stream_charge_trajectory(frames, request, reporter)
         _validate_request(request)
         requested = (
             None
@@ -303,9 +306,10 @@ class ChargeExtendedXYZTask(AnalysisTask):
         atom_rows: list[int] = []
         processed = 0
         output_path = Path(request._output_path)
+        writer = ExtendedXYZWriter(output_path, precision=request.precision)
 
         try:
-            with ExtendedXYZWriter(output_path, precision=request.precision) as writer:
+            with writer:
                 for stream_index, data in enumerate(frames):
                     processed += 1
                     source_frame = _source_frame(data, stream_index)
@@ -341,20 +345,23 @@ class ChargeExtendedXYZTask(AnalysisTask):
                             int(request._expected_frames or 0),
                             "Reading coordinates and charges; writing Extended XYZ",
                         )
-        except Exception:
-            output_path.unlink(missing_ok=True)
+        except BaseException as error:
+            writer.preserve_incomplete(error)
             raise
 
         if baseline is None:
-            output_path.unlink(missing_ok=True)
+            writer.preserve_incomplete("Frame 0 is required to calculate delta_charge.")
             raise ValueError("Frame 0 is required to calculate delta_charge.")
         if requested is not None:
             missing = [frame for frame in requested if frame not in seen_frames]
             if missing:
-                output_path.unlink(missing_ok=True)
+                writer.preserve_incomplete(f"Requested frames not found: {missing}")
                 raise ValueError(f"Requested frame(s) not found in trajectory: {missing}.")
         if callable(reporter):
             reporter("stream", processed, processed, "Finished charge Extended XYZ")
+        if not frame_indices:
+            writer.preserve_incomplete("No selected frames were analyzed.")
+            raise ValueError("No selected frames were analyzed.")
         return _result(request, frame_indices, iterations, atom_rows)
 
 

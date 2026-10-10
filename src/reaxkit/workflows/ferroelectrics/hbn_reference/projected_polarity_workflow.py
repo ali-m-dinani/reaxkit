@@ -242,7 +242,9 @@ def generate_projected_polarity_heatmaps(
     destination = Path(output) / "projected_polarity_2d"
     destination.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    for frame, group in result.projected_bins.groupby("frame_index", sort=True):
+    from reaxkit.core.runtime.result_store import table_chunks
+    groups = (item for chunk in table_chunks(result.projected_bins) for item in chunk.groupby("frame_index", sort=True))
+    for frame, group in groups:
         values = (
             group.pivot(index="v_bin", columns="u_bin", values="mean_polarity")
             .reindex(index=range(nv), columns=range(nu))
@@ -283,6 +285,9 @@ def generate_polarity_kymograph(
 
     plt = _matplotlib()
     table = result.kymograph_bins
+    from reaxkit.core.runtime.result_store import ResultTable
+    if isinstance(table, ResultTable):
+        table = table.materialize()
     frames = np.sort(table["frame_index"].astype(int).unique())
     profile_axis_index = result.request.projection_plane.index(result.request.profile_axis)
     profile_bins = np.arange(int(result.request.projection_bins[profile_axis_index]))

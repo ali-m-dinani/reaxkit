@@ -214,7 +214,8 @@ def aggregate_local_values_2d(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Sum cell dipoles and volumes along the coordinate omitted from ``plane``."""
 
-    group = result.table[result.table["frame_index"].astype(int).eq(int(frame))]
+    from reaxkit.core.runtime.result_store import frame_table
+    group = frame_table(result.table, int(frame))
     coordinates = group[
         [f"center_{plane[0]} (angstrom)", f"center_{plane[1]} (angstrom)"]
     ].to_numpy(float)
@@ -271,36 +272,24 @@ def generate_local_2d_plots(
         dpi: int,
 ) -> list[Path]:
     plt, Normalize = _matplotlib()
-    all_coordinates = result.table[
-        [f"center_{plane[0]} (angstrom)", f"center_{plane[1]} (angstrom)"]
-    ].to_numpy(float)
+    from reaxkit.core.runtime.result_store import finite_extrema
+    lower, upper = finite_extrema(result.table, [f"center_{axis} (angstrom)" for axis in plane])
     shared_edges = (
-        _edges(all_coordinates[:, 0], bins[0]),
-        _edges(all_coordinates[:, 1], bins[1]),
+        _edges(np.array([lower[0], upper[0]]), bins[0]),
+        _edges(np.array([lower[1], upper[1]]), bins[1]),
     )
-    maps = {
-        source_frame: aggregate_local_values_2d(
-            result,
-            source_frame,
-            plane=plane,
-            component=component,
-            quantity=quantity,
-            bins=bins,
-            edges=shared_edges,
-        )[2]
-        for frame in result.frame_indices
-        for source_frame, _ in [_table_for_trajectory_frame(result, int(frame))]
-    }
-    shared_limits = (
-        _symmetric_limits(np.concatenate([values.ravel() for values in maps.values()]))
-        if maps
-        else (-1.0, 1.0)
-    )
+    def maps():
+        for frame in result.frame_indices:
+            source_frame, _ = _table_for_trajectory_frame(result, int(frame))
+            yield source_frame, aggregate_local_values_2d(result, source_frame, plane=plane,
+                component=component, quantity=quantity, bins=bins, edges=shared_edges)[2]
+    bound = max((_symmetric_limits(values)[1] for _, values in maps()), default=1.0) if global_scaling else 1.0
+    shared_limits = (-bound, bound)
     destination = Path(output) / "plots_2d" / f"{quantity}_{component}_{plane}"
     destination.mkdir(parents=True, exist_ok=True)
     units = "uC/cm^2" if quantity == "polarization" else "e*angstrom"
     written: list[Path] = []
-    for frame, values in maps.items():
+    for frame, values in maps():
         limits = shared_limits if global_scaling else _symmetric_limits(values)
         figure, axis = plt.subplots(figsize=(7.2, 5.8))
         image = axis.pcolormesh(
@@ -339,7 +328,9 @@ def generate_local_3d_plots(
         if quantity == "polarization"
         else f"dipole_{component} (e*angstrom)"
     )
-    shared_limits = _symmetric_limits(result.table[column].to_numpy(float))
+    from reaxkit.core.runtime.result_store import finite_extrema
+    lower, upper = finite_extrema(result.table, [column])
+    shared_limits = _symmetric_limits(np.concatenate((lower, upper)))
     destination = Path(output) / "plots_3d" / f"{quantity}_{component}"
     destination.mkdir(parents=True, exist_ok=True)
     units = "uC/cm^2" if quantity == "polarization" else "e*angstrom"

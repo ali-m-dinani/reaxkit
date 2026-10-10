@@ -116,6 +116,10 @@ class SinglePlotRenderer(PlotRenderer):
                     color=cfg.get("color"),
                 )
 
+        if cfg.get("xticks") is not None:
+            ax.set_xticks(cfg["xticks"], labels=cfg.get("xticklabels"),
+                          rotation=float(cfg.get("xtick_rotation", 0)))
+
         if hlines:
             for h in hlines:
                 if isinstance(h, Mapping):

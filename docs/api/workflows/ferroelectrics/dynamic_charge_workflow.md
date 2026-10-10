@@ -12,13 +12,22 @@
 <div class="analysis-section-indent" markdown="1">
 
 Compare each atom's dynamic charge with its charge at frame zero.
-Writes per-atom and per-frame summaries; per-atom detail is opt-in. --gen-plots writes one charge and one delta-charge trace per atom.
+
+Analyze existing charge and trajectory files to inspect charge transfer over time.
+Summary tables are written by default; detailed per-atom data and plots are opt-in.
 
 ### Examples
 -----
 
 ```text
-  reaxkit get_dynamic_charge_changes --fort7 fort.7 --xmolout xmolout --gen-plots --x-axis time
+  1. Export charge-change summaries:
+     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout
+
+  2. Plot per-atom time traces:
+     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout --gen-plots --x-axis time --control control
+
+  3. Retain detailed charges:
+     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout --write-detailed-charges
 ```
 
 ### Arguments
@@ -27,43 +36,44 @@ Writes per-atom and per-frame summaries; per-atom detail is opt-in. --gen-plots 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--atom-numbers, --atom-ids` | No |  |  |  |
-| `--frames` | No |  | Frames, e.g. 0:101:10. |  |
-| `--every` | No | 1 | Keep every Nth selected frame. |  |
+| `--atom-numbers, --atom-ids` | No |  | One-based atom identifiers to include. Example: --atom-numbers 1 2, which includes only atoms 1 and 2. |  |
+| `--frames` | No |  | Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No | . | Input path used for engine detection. |  |
-| `--run-dir` | No | . | Fallback simulation directory. |  |
-| `--fort7` | No | fort.7 | Dynamic charge input for ReaxFF. |  |
-| `--xmolout` | No | xmolout | Optional atom identity/time source. |  |
-| `--summary` | No |  | Optional summary.txt metadata source. |  |
-| `--control` | No | control | Control file used to derive time. |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No | . | Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir` | No | . | Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--fort7` | No | fort.7 | Dynamic charge input for ReaxFF. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file. |  |
+| `--xmolout` | No | xmolout | Optional atom identity/time source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
+| `--summary` | No |  | Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file. |  |
+| `--control` | No | control | Control file used to derive time. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--write-detailed-charges` | No | False | Stream per-atom details (Parquet by default). |  |
-| `--gen-plots` | No | False | Generate per-atom PNG plots. |  |
-| `--global-y-axis` | No | False | Use one shared charge y-axis across atoms and one shared delta-charge y-axis across atoms. |  |
-| `--skip-detailed-csv` | No | False | Do not create the potentially very large charges.csv file. |  |
-| `--x-axis, --xaxis` | No | frame | Horizontal axis for generated plots. | frame, time, iter |
-| `--dpi` | No | 180 | Plot resolution in dots per inch. |  |
-| `--output-dir` | No |  | Optional output root for charges.csv, the three summary CSVs, and plots/. |  |
-| `--export` | No |  | Optional CSV destination; all enabled CSV outputs are written beside it. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--write-detailed-charges` | No | False | Stream per-atom details (Parquet by default). Example: --write-detailed-charges, which writes per-atom charge detail in addition to summaries. |  |
+| `--gen-plots` | No | False | Generate per-atom PNG plots. Example: --gen-plots, which generates the workflow's plot files. |  |
+| `--global-y-axis` | No | False | Use one shared charge y-axis across atoms and one shared delta-charge y-axis across atoms. Example: --global-y-axis, which uses comparable charge scales across atom plots. |  |
+| `--skip-detailed-csv` | No | False | Do not create the potentially very large charges.csv file. Example: --skip-detailed-csv, which omits the large per-atom charges.csv export. |  |
+| `--x-axis, --xaxis` | No | frame | Horizontal axis for generated plots. Example: --x-axis time, which shows physical time on the horizontal axis. | frame, time, iter |
+| `--dpi` | No | 180 | Plot resolution in dots per inch. Example: --dpi 300, which writes figures at 300 dots per inch. |  |
+| `--output-dir` | No |  | Optional output root for charges.csv, the three summary CSVs, and plots/. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--export` | No |  | Optional CSV destination; all enabled CSV outputs are written beside it. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -75,14 +85,18 @@ Writes per-atom and per-frame summaries; per-atom detail is opt-in. --gen-plots 
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No | quiet |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No | quiet | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

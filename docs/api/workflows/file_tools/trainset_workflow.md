@@ -31,34 +31,35 @@ There are multiple sections in a training set file such as ENERGY, CHARGE, etc.,
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--section` | No | all | Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. |  |
+| `--section` | No | all | Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. Example: --section energy, which keeps only energy training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write one CSV per selected trainset section to DIRECTORY. If DIRECTORY is omitted, use 'trainset_data'. |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Render a plot. Example: --plot single, which combines selected series in one figure. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--export` | No |  | Write one CSV per selected trainset section to DIRECTORY. If DIRECTORY is omitted, use 'trainset_data'. Example: --export training_tables, which writes section CSV files under training_tables. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -70,14 +71,18 @@ There are multiple sections in a training set file such as ENERGY, CHARGE, etc.,
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 <a id="TrainsetDataTask"></a>
@@ -118,34 +123,35 @@ Getting these group comments helps user get a summary of training set and unders
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--section` | No | all | Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. |  |
+| `--section` | No | all | Section to keep: all, charge, heatfo, geometry, cell_parameters, energy. Example: --section energy, which keeps only energy training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--run-dir, --dir` | No | . | Run directory fallback for engine detection |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
+| `--run-dir, --dir` | No | . | Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--plot` | No |  | Render a plot | single, subplot |
-| `--show` | No | False | Show the generated plot window |  |
-| `--save` | No |  | Save the generated plot to a file path |  |
-| `--export` | No |  | Write the result table to CSV |  |
-| `--grid` | No |  | Subplot grid like 2x2 or 2*2 |  |
-| `--xaxis` | No |  | Optional x-axis column override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot` | No |  | Render a plot. Example: --plot single, which combines selected series in one figure. | single, subplot |
+| `--show` | No | False | Show the generated plot window. Example: --show, which opens generated figures interactively. |  |
+| `--save` | No |  | Save the generated plot to a file path. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--export` | No |  | Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--grid` | No |  | Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns. |  |
+| `--xaxis` | No |  | Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -157,14 +163,18 @@ Getting these group comments helps user get a summary of training set and unders
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  | Logging level | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Logging level. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>
@@ -193,17 +203,18 @@ This command only writes the template YAML file but does not generate any trains
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_settings.yaml | Output YAML path |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_settings.yaml | Output YAML path. Example: --output trainset_settings.yaml, which writes generated output to trainset_settings.yaml. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -215,13 +226,17 @@ This command only writes the template YAML file but does not generate any trains
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -230,15 +245,17 @@ This command only writes the template YAML file but does not generate any trains
 
 <div class="analysis-section-indent" markdown="1">
 
-Write a sample trainset settings YAML for generating heat-of-formation-based-training data.
-This command only writes the template YAML file but does not generate any trainset data. Once you have the YAML file, you can edit it to specify what materials/systems you want to generate heatfo (i.e., heat of formation) training data for and then run 'gen_heatfo_trainset' with '--input-mode yaml' to generate the trainset based on the YAML config.
+Write a starter YAML for heat-of-formation training-data generation.
+
+Edit the material and reference settings before running gen_heatfo_trainset.
+This command writes only the configuration template; it does not generate training data.
 
 ### Examples
 -----
 
 ```text
-  1. Generate a template YAML with default name 'trainset_heatfo_settings.yaml':
-  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml
+  1. Create the template:
+     reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml
 ```
 
 ### Arguments
@@ -247,17 +264,18 @@ This command only writes the template YAML file but does not generate any trains
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_heatfo_settings.yaml | Output YAML path |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_heatfo_settings.yaml | Output YAML path. Example: --output trainset_heatfo_settings.yaml, which writes generated output to trainset_heatfo_settings.yaml. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -269,13 +287,17 @@ This command only writes the template YAML file but does not generate any trains
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -312,9 +334,9 @@ This comamnd supports 3 input-mode options:
      - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:
        reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100
 
-[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
+[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.
 
-[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. Use --skip-not-orthogonal to restrict generation to cells with right angles. See [tensor conventions and compatibility](../../engine/reaxff/generators/trainset_elastic_energy_doc.md#full-tensor-generation).
+[Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. Use --skip-not-orthogonal to restrict generation to cells with right angles.
 ```
 
 ### Arguments
@@ -323,41 +345,42 @@ This comamnd supports 3 input-mode options:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O |  |
-| `--element-count-scope` | No | exact |  | exact, up-to |
-| `--max-materials` | No |  | Optional cap for batch mode. |  |
-| `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. | voigt, reuss, vrh |
-| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files | to-conventional, to-primitive |
-| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
-| `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. |  |
-| `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. |  |
+| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode. |  |
+| `--element-count-scope` | No | exact | Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements. | exact, up-to |
+| `--max-materials` | No |  | Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials. |  |
+| `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. Example: --bulk-mode vrh, which uses the Voigt-Reuss-Hill bulk modulus. | voigt, reuss, vrh |
+| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells. | to-conventional, to-primitive |
+| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). Example: --skip-not-orthogonal, which excludes structures whose cell angles are not all 90 degrees. |  |
+| `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. Example: --skip-negative-elastic-data, which excludes materials with negative elastic-tensor entries. |  |
+| `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--input-mode` | No | yaml |  | yaml, material-id, batch |
-| `--source` | No | mp | Data source. | mp, jarvis |
-| `--yaml` | No |  | Existing trainset_settings.yaml file (yaml mode). |  |
-| `--mat-id, --mp-id` | No |  | Material id (material-id mode). |  |
-| `--structure-dir` | No |  | Directory for downloaded source structures. |  |
+| `--input-mode` | No | yaml | Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML. | yaml, material-id, batch |
+| `--source` | No | mp | Data source. Example: --source mp, which fetches materials from Materials Project. | mp, jarvis |
+| `--yaml` | No |  | Existing trainset_settings.yaml file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration. |  |
+| `--mat-id, --mp-id` | No |  | Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode. |  |
+| `--structure-dir` | No |  | Directory for downloaded source structures. Example: --structure-dir structures, which stores downloaded crystal structures there. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--out-yaml` | No | trainset_settings_source.yaml | Generated YAML filename in source-backed modes. |  |
-| `--output` | No | trainset_elastic_generated | Directory for outputs. |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--out-yaml` | No | trainset_settings_source.yaml | Generated YAML filename in source-backed modes. Example: --out-yaml trainset_source.yaml, which writes fetched material settings to that YAML file. |  |
+| `--output` | No | trainset_elastic_generated | Directory for outputs. Example: --output trainset_elastic_generated, which writes generated artifacts under trainset_elastic_generated. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -369,15 +392,19 @@ This comamnd supports 3 input-mode options:
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--api-key` | Yes |  | Source API key (MP uses --api-key or MP_API_KEY). |  |
-| `--verbose` | No | False | Verbose source fetching/logging |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--api-key` | Yes |  | Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key. |  |
+| `--verbose` | No | False | Verbose source fetching/logging. Example: --verbose, which prints source-fetching details. |  |
 
 
 </div>
@@ -418,7 +445,7 @@ This comamnd supports 3 input-mode options:
     - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:
        reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100
 
-[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
+[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.
 ```
 
 ### Arguments
@@ -427,39 +454,40 @@ This comamnd supports 3 input-mode options:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O |  |
-| `--element-count-scope` | No | exact |  | exact, up-to |
-| `--max-materials` | No |  | Optional cap for batch mode. |  |
-| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. | to-conventional, to-primitive |
-| `--weight` | No | 1.0 | Weight used for heatfo ENERGY lines in the training set. |  |
+| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode. |  |
+| `--element-count-scope` | No | exact | Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements. | exact, up-to |
+| `--max-materials` | No |  | Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials. |  |
+| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells. | to-conventional, to-primitive |
+| `--weight` | No | 1.0 | Weight used for heatfo ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--source` | No | mp | Data source. | mp, jarvis |
-| `--input-mode` | No | batch |  | yaml, material-id, batch |
-| `--yaml` | No |  | Heatfo YAML settings file (yaml mode). |  |
-| `--mat-id, --mp-id` | No |  | Material id (material-id mode). |  |
-| `--references` | No |  | Optional reference map: element=identifier:atoms,... (example: "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"). If omitted, unary references are auto-selected from the source. |  |
-| `--trainset-file` | No | trainset_heatfo.in | Output trainset filename. |  |
-| `--geo-file` | No | geo | Output concatenated geo filename. |  |
+| `--source` | No | mp | Data source. Example: --source mp, which fetches materials from Materials Project. | mp, jarvis |
+| `--input-mode` | No | batch | Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML. | yaml, material-id, batch |
+| `--yaml` | No |  | Heatfo YAML settings file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration. |  |
+| `--mat-id, --mp-id` | No |  | Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode. |  |
+| `--references` | No |  | Optional reference map: element=identifier:atoms,... (example: "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"). If omitted, unary references are auto-selected from the source. Example: --references Al=Alfcc:4,N=N2:2, which uses the specified aluminum and nitrogen reference structures. |  |
+| `--trainset-file` | No | trainset_heatfo.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--geo-file` | No | geo | Output concatenated geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_heatfo_generated | Directory for outputs. |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_heatfo_generated | Directory for outputs. Example: --output trainset_heatfo_generated, which writes generated artifacts under trainset_heatfo_generated. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -471,15 +499,19 @@ This comamnd supports 3 input-mode options:
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--api-key` | No |  | Source API key (MP uses --api-key or MP_API_KEY). |  |
-| `--verbose` | No | False | Verbose source fetching/logging |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--api-key` | No |  | Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key. |  |
+| `--verbose` | No | False | Verbose source fetching/logging. Example: --verbose, which prints source-fetching details. |  |
 
 
 </div>
@@ -508,17 +540,18 @@ This command only writes the template YAML file but does not generate any trains
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_settings.yaml | Output YAML path |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_settings.yaml | Output YAML path. Example: --output trainset_settings.yaml, which writes generated output to trainset_settings.yaml. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -530,13 +563,17 @@ This command only writes the template YAML file but does not generate any trains
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -545,15 +582,17 @@ This command only writes the template YAML file but does not generate any trains
 
 <div class="analysis-section-indent" markdown="1">
 
-Write a sample trainset settings YAML for generating heat-of-formation-based-training data.
-This command only writes the template YAML file but does not generate any trainset data. Once you have the YAML file, you can edit it to specify what materials/systems you want to generate heatfo (i.e., heat of formation) training data for and then run 'gen_heatfo_trainset' with '--input-mode yaml' to generate the trainset based on the YAML config.
+Write a starter YAML for heat-of-formation training-data generation.
+
+Edit the material and reference settings before running gen_heatfo_trainset.
+This command writes only the configuration template; it does not generate training data.
 
 ### Examples
 -----
 
 ```text
-  1. Generate a template YAML with default name 'trainset_heatfo_settings.yaml':
-  reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml
+  1. Create the template:
+     reaxkit gen_template_yaml_for_heatfo_settings --output trainset_heatfo_settings.yaml
 ```
 
 ### Arguments
@@ -562,17 +601,18 @@ This command only writes the template YAML file but does not generate any trains
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_heatfo_settings.yaml | Output YAML path |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_heatfo_settings.yaml | Output YAML path. Example: --output trainset_heatfo_settings.yaml, which writes generated output to trainset_heatfo_settings.yaml. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -584,13 +624,17 @@ This command only writes the template YAML file but does not generate any trains
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -627,7 +671,7 @@ This comamnd supports 3 input-mode options:
      - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:
        reaxkit gen_elastic_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100
 
-[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
+[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.
 
 [Note] Source-backed elastic generation uses the full Cartesian stiffness tensor and supports non-orthogonal cells. Older nine-constant YAML files retain their orthogonal energy targets and use corrected ReaxFF geometry export. Use --skip-not-orthogonal to restrict generation to cells with right angles.
 ```
@@ -638,41 +682,42 @@ This comamnd supports 3 input-mode options:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O |  |
-| `--element-count-scope` | No | exact |  | exact, up-to |
-| `--max-materials` | No |  | Optional cap for batch mode. |  |
-| `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. | voigt, reuss, vrh |
-| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files | to-conventional, to-primitive |
-| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). |  |
-| `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. |  |
-| `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. |  |
+| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode. |  |
+| `--element-count-scope` | No | exact | Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements. | exact, up-to |
+| `--max-materials` | No |  | Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials. |  |
+| `--bulk-mode` | No | voigt | Bulk modulus mode for supported sources. Example: --bulk-mode vrh, which uses the Voigt-Reuss-Hill bulk modulus. | voigt, reuss, vrh |
+| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells. | to-conventional, to-primitive |
+| `--skip-not-orthogonal` | No | False | Skip lattices with non-orthogonal cell angles (alpha/beta/gamma not all 90). Example: --skip-not-orthogonal, which excludes structures whose cell angles are not all 90 degrees. |  |
+| `--skip-negative-elastic-data` | No | False | Skip materials whose elastic tensor contains negative cij values. Example: --skip-negative-elastic-data, which excludes materials with negative elastic-tensor entries. |  |
+| `--weight` | No | 1.0 | Weight used for elastic ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--input-mode` | No | yaml |  | yaml, material-id, batch |
-| `--source` | No | mp | Data source. | mp, jarvis |
-| `--yaml` | No |  | Existing trainset_settings.yaml file (yaml mode). |  |
-| `--mat-id, --mp-id` | No |  | Material id (material-id mode). |  |
-| `--structure-dir` | No |  | Directory for downloaded source structures. |  |
+| `--input-mode` | No | yaml | Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML. | yaml, material-id, batch |
+| `--source` | No | mp | Data source. Example: --source mp, which fetches materials from Materials Project. | mp, jarvis |
+| `--yaml` | No |  | Existing trainset_settings.yaml file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration. |  |
+| `--mat-id, --mp-id` | No |  | Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode. |  |
+| `--structure-dir` | No |  | Directory for downloaded source structures. Example: --structure-dir structures, which stores downloaded crystal structures there. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--out-yaml` | No | trainset_settings_source.yaml | Generated YAML filename in source-backed modes. |  |
-| `--output` | No | trainset_elastic_generated | Directory for outputs. |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--out-yaml` | No | trainset_settings_source.yaml | Generated YAML filename in source-backed modes. Example: --out-yaml trainset_source.yaml, which writes fetched material settings to that YAML file. |  |
+| `--output` | No | trainset_elastic_generated | Directory for outputs. Example: --output trainset_elastic_generated, which writes generated artifacts under trainset_elastic_generated. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -684,15 +729,19 @@ This comamnd supports 3 input-mode options:
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--api-key` | Yes |  | Source API key (MP uses --api-key or MP_API_KEY). |  |
-| `--verbose` | No | False | Verbose source fetching/logging |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--api-key` | Yes |  | Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key. |  |
+| `--verbose` | No | False | Verbose source fetching/logging. Example: --verbose, which prints source-fetching details. |  |
 
 
 </div>
@@ -733,7 +782,7 @@ This comamnd supports 3 input-mode options:
     - for materials containing any or all of Ba, B, O elements but with a cap of 100 materials to prevent large training set genration:
        reaxkit gen_heatfo_trainset --input-mode batch --elements Ba,B,O --api-key YOUR_KEY --element-count-scope up-to --max-materials 100
 
-[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. By default, it is set to 'to-primitive' to convert the fetched structure to its primitive setting, but you can also set it to 'to-conventional' to convert the fetched structure to its conventional setting.
+[NOTE] As the documentation on https://docs.materialsproject.org/methodology/materials-methodology/understanding-structures-and-properties-in-the-materials-project shows,  retrieved structures from the new Materials Project (MP) API may have different lattice parameters and angles thanthat of conventional or primitive unit cells you might expect from textbooks or the legacy MP database (i.e., seen on the website). For this purpose, we have a flag --crystallographic-setting-conversion which can convert the fetched crystal structure setting before generating files. The CLI defaults to 'to-conventional'; use 'to-primitive' for a primitive cell. This selects the crystallographic setting. Heatfo GEO export separately transforms Cartesian coordinates to standalone ReaxFF's cell orientation while preserving the selected lattice parameters and periodic geometry.
 ```
 
 ### Arguments
@@ -742,39 +791,40 @@ This comamnd supports 3 input-mode options:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O |  |
-| `--element-count-scope` | No | exact |  | exact, up-to |
-| `--max-materials` | No |  | Optional cap for batch mode. |  |
-| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. | to-conventional, to-primitive |
-| `--weight` | No | 1.0 | Weight used for heatfo ENERGY lines in the training set. |  |
+| `--elements` | No |  | Comma-separated elements for batch mode, for example Ba,B,O. Example: --elements Al,N, which queries aluminum-nitrogen materials in batch mode. |  |
+| `--element-count-scope` | No | exact | Number-of-elements filter used for batch material queries. Example: --element-count-scope exact, which requires the requested number of distinct elements. | exact, up-to |
+| `--max-materials` | No |  | Optional cap for batch mode. Example: --max-materials 10, which limits batch generation to ten materials. |  |
+| `--crystallographic-setting-conversion` | No | to-conventional | Convert fetched crystal structure setting before generating files. Example: --crystallographic-setting-conversion to-conventional, which converts fetched structures to conventional cells. | to-conventional, to-primitive |
+| `--weight` | No | 1.0 | Weight used for heatfo ENERGY lines in the training set. Example: --weight 1.0, which assigns unit weight to generated training entries. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--source` | No | mp | Data source. | mp, jarvis |
-| `--input-mode` | No | batch |  | yaml, material-id, batch |
-| `--yaml` | No |  | Heatfo YAML settings file (yaml mode). |  |
-| `--mat-id, --mp-id` | No |  | Material id (material-id mode). |  |
-| `--references` | No |  | Optional reference map: element=identifier:atoms,... (example: "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"). If omitted, unary references are auto-selected from the source. |  |
-| `--trainset-file` | No | trainset_heatfo.in | Output trainset filename. |  |
-| `--geo-file` | No | geo | Output concatenated geo filename. |  |
+| `--source` | No | mp | Data source. Example: --source mp, which fetches materials from Materials Project. | mp, jarvis |
+| `--input-mode` | No | batch | Source of material selections for training-data generation. Example: --input-mode yaml, which reads the material selection from a settings YAML. | yaml, material-id, batch |
+| `--yaml` | No |  | Heatfo YAML settings file (yaml mode). Example: --yaml trainset_settings.yaml, which loads the trainset-generation configuration. |  |
+| `--mat-id, --mp-id` | No |  | Material id (material-id mode). Example: --mat-id mp-149, which selects the silicon material in material-id mode. |  |
+| `--references` | No |  | Optional reference map: element=identifier:atoms,... (example: "Ba=Babcc_opt:2,B=B_alp:12,O=O2:2"). If omitted, unary references are auto-selected from the source. Example: --references Al=Alfcc:4,N=N2:2, which uses the specified aluminum and nitrogen reference structures. |  |
+| `--trainset-file` | No | trainset_heatfo.in | Output trainset filename. Example: --trainset-file trainset.in, which writes generated training entries to trainset.in. |  |
+| `--geo-file` | No | geo | Output concatenated geo filename. Example: --geo-file geo, which writes generated geometries to geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | trainset_heatfo_generated | Directory for outputs. |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | trainset_heatfo_generated | Directory for outputs. Example: --output trainset_heatfo_generated, which writes generated artifacts under trainset_heatfo_generated. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -786,15 +836,19 @@ This comamnd supports 3 input-mode options:
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--api-key` | No |  | Source API key (MP uses --api-key or MP_API_KEY). |  |
-| `--verbose` | No | False | Verbose source fetching/logging |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--api-key` | No |  | Source API key (MP uses --api-key or MP_API_KEY). Example: --api-key YOUR_MP_API_KEY, which authenticates source requests with the supplied key. |  |
+| `--verbose` | No | False | Verbose source fetching/logging. Example: --verbose, which prints source-fetching details. |  |
 
 
 </div>

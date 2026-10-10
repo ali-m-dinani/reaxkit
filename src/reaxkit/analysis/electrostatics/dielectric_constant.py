@@ -2,7 +2,7 @@
 
 The implementation follows the relation supplied with this feature::
 
-    epsilon(f) - 1 = 1 / (g epsilon_0 V k_B T)
+    epsilon(f) - epsilon_infinity = 1 / (g epsilon_0 V k_B T)
         [C(0) + i 2 pi f integral_0^inf exp(i 2 pi f t) C(t) dt]
 
 where ``C(t)`` is the autocorrelation of the mean-centered dipole moment.
@@ -81,6 +81,7 @@ class DielectricConstantRequest(BaseRequest):
     volume_frame_count: int | None = None
     volume_min: float | None = None
     volume_max: float | None = None
+    epsilon_infinity: float = 1.0
 
 
 @dataclass
@@ -158,6 +159,8 @@ def calculate_dielectric_constant(
         raise ValueError("Temperature must be a finite value greater than zero kelvin.")
     if not np.isfinite(request.volume) or request.volume <= 0.0:
         raise ValueError("Volume must be a finite value greater than zero.")
+    if not np.isfinite(request.epsilon_infinity) or request.epsilon_infinity < 1.0:
+        raise ValueError("epsilon_infinity must be finite and at least one.")
     if request.dipole_kind not in ("total", "component"):
         raise ValueError("dipole_kind must be 'total' or 'component'.")
 
@@ -191,7 +194,7 @@ def calculate_dielectric_constant(
     response_prefactor = 1.0 / (
         normalization_factor * epsilon_0 * volume_m3 * Boltzmann * float(request.temperature)
     )
-    static_dielectric = 1.0 + response_prefactor * float(autocorrelation_si[0])
+    static_dielectric = request.epsilon_infinity + response_prefactor * float(autocorrelation_si[0])
 
     frequencies_hz = np.fft.rfftfreq(autocorrelation_si.size, d=time_step_seconds)
     trapezoid_weights = np.ones(autocorrelation_si.size, dtype=float)
@@ -202,7 +205,7 @@ def calculate_dielectric_constant(
         np.fft.rfft(autocorrelation_si * trapezoid_weights)
     )
     omega = 2.0 * np.pi * frequencies_hz
-    epsilon = 1.0 + response_prefactor * (
+    epsilon = request.epsilon_infinity + response_prefactor * (
         autocorrelation_si[0] + 1j * omega * correlation_integral
     )
 
@@ -249,6 +252,8 @@ def calculate_dielectric_constant(
         [
             {
                 "static dielectric constant": static_dielectric,
+                "electronic relative permittivity": float(request.epsilon_infinity),
+                "static MD contribution": static_dielectric - request.epsilon_infinity,
                 "temperature (K)": float(request.temperature),
                 f"volume ({request.volume_unit})": float(request.volume),
                 "volume (m3)": volume_m3,

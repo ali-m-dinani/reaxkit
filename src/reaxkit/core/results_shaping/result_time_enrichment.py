@@ -153,6 +153,11 @@ def enrich_result_with_time(result: Any, data: Any, *, control_file: str = "cont
 
     def _enrich_attr(obj: Any, attr: str) -> None:
         value = getattr(obj, attr, None)
+        from reaxkit.core.runtime.result_store import ResultTable
+        if isinstance(value, ResultTable):
+            setattr(obj, attr, value.map_batches(lambda frame: _attach_time_to_frame(
+                frame, iter_to_time=iter_to_time, control_file=control_file)))
+            return
         if isinstance(value, pd.DataFrame):
             setattr(
                 obj,

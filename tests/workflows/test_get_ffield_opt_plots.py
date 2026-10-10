@@ -209,8 +209,13 @@ def test_aggregate_workflow_skips_empty_eos_and_finishes(stub_plot_workflow, tmp
     output = capsys.readouterr().out
     summary_path = tmp_path / "plots" / "plot_summary.txt"
     assert result == 0
-    assert "[Skipped] EOS: no plottable expressions" in output
-    assert "[Done] Restraints: 0 images" in output
+    assert "EOS:" not in output
+    assert "Restraints:" not in output
+    assert "Not plotted:" not in output
+    assert not list(summary_path.parent.glob("*_plots"))
+    assert not (summary_path.parent / "not_plotted_entries.csv").exists()
+    assert 'reaxkit plot-from-excel --input "' in output
+    assert "For more information, run: reaxkit plot-from-excel -h" in output
     assert summary_path.read_text(encoding="utf-8") == output
 
 
@@ -274,14 +279,32 @@ def test_powerpoint_export_uses_current_figures_and_records_artifact(
             assert sum(counts.values()) == 4
             assert counts["Energy differences"] == counts["Single-identifier energies"] == 1
             assert counts["Charges"] == 0
-            warning = next(line for line in output.splitlines() if line.startswith("[Warning] Not plotted:"))
-            assert warning in [element.text for element in summary.findall(".//a:t", namespaces)]
+            assert "[Warning] Not plotted:" not in output
         assert "[Done] PowerPoint:" in output
     else:
         assert "[Skipped] PowerPoint: no figures were generated" in output
     if workspace:
         settings = json.loads((root / "settings.json").read_text())
         assert settings["artifacts"]["presentations"] == ([deck.name] if with_figures else [])
+        assert settings["artifacts"]["csv"] == (
+            ["eos_plots/eos.csv", "angle_plots/angles.csv",
+             "other_bar_plots/energy_differences.csv",
+             "other_bar_plots/single_identifier_energies.csv"]
+            if with_figures else []
+        )
+
+
+def test_nonempty_unplotted_audit_is_written_and_reported(
+    stub_plot_workflow, monkeypatch, tmp_path, capsys,
+):
+    table = pd.DataFrame({"report_line_number": [12], "reason": ["unassigned"]})
+    monkeypatch.setattr(plots_module, "_not_plotted_entries", lambda *_args: table)
+    assert plots_module.run_main("get_ffield_opt_plots", argparse.Namespace(
+        output=str(tmp_path), entry_per_figure=6, flip_sign_for_eos=False,
+    )) == 0
+    pd.testing.assert_frame_equal(pd.read_csv(tmp_path / "not_plotted_entries.csv"), table)
+    assert "[Warning] Not plotted: 1 entries" in capsys.readouterr().out
+    assert not list(tmp_path.glob("*_plots"))
 
 
 def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:

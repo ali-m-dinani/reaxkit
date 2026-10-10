@@ -293,6 +293,13 @@ class PotentialElectricFieldTask(AnalysisTask):
         return calculate_potential_and_field(data, request)
 
     def run_stream(self, frames, request, reporter=None):
+        from dataclasses import replace
+        from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
+        store = getattr(request, "_result_store", None)
+        durable = CheckpointAccumulator(store) if store is not None else None
+        if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+            return durable.finish(request)
+        position = 0
         requested = None if request.frames is None else set(int(value) for value in request.frames[::int(request.every)])
         progress_total = len(requested) if requested is not None else 0
         results, seen = [], set()
@@ -304,15 +311,21 @@ class PotentialElectricFieldTask(AnalysisTask):
             seen.add(source)
             keep = source in requested if requested is not None else source % int(request.every) == 0
             if keep:
-                request_values = {**vars(request), "frames": [0], "every": 1}
+                request_values = {"frames": [0], "every": 1}
                 if str(request.potential_reference_mode).strip().lower() == "fixed-midpoint":
                     if fixed_reference is None:
                         valid = np.isfinite(trajectory.positions[0]).all(axis=1)
                         fixed_reference = tuple(material_midpoint(trajectory.positions[0][valid]))
                     request_values["potential_reference_position"] = fixed_reference
                     request_values["potential_reference_mode"] = "fixed-midpoint"
-                local_request = PotentialElectricFieldRequest(**request_values)
-                results.append(calculate_potential_and_field(data, local_request, preserve_source_indices=True))
+                if store is None or position >= store.committed_frames:
+                    local_request = replace(request, **request_values)
+                    result = calculate_potential_and_field(data, local_request, preserve_source_indices=True)
+                    if durable is not None:
+                        durable.add(result, position, source)
+                    else:
+                        results.append(result)
+                position += 1
             if callable(reporter):
                 reporter(
                     "stream",
@@ -322,6 +335,8 @@ class PotentialElectricFieldTask(AnalysisTask):
                 )
         if requested is not None and requested - seen:
             raise ValueError(f"Requested frame(s) not found: {sorted(requested - seen)}.")
+        if durable is not None:
+            return durable.finish(request)
         return combine_results(results, request)
 
 

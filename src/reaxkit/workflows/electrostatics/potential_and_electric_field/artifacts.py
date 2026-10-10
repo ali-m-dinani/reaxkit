@@ -100,37 +100,54 @@ def write_binning(result, output: Path, *, axes: str, bins, plot: bool,
     directory = output / "binned_data_and_plots"; directory.mkdir(parents=True, exist_ok=True)
     datasets = {**result.probe_tables, "average": result.table}
     edges = global_edges(list(datasets.values()), axes, bins)
-    binned: dict[tuple[str, int], pd.DataFrame] = {}
+    from contextlib import ExitStack
+    from reaxkit.core.runtime.artifacts import TableChunks, TableSpool
+    from reaxkit.core.runtime.result_store import table_chunks
     paths: list[Path] = []
-    for label, table in datasets.items():
-        chunks = []
-        for frame, frame_table in table.groupby("frame_index", sort=True):
-            values = bin_probe_table(frame_table, axes, edges)
-            values.insert(0, "probe_element", label); values.insert(0, "iter", int(frame_table["iter"].iloc[0])); values.insert(0, "frame_index", int(frame))
-            binned[(label, int(frame))] = values; chunks.append(values)
-        path = directory / f"probe_{_safe(label)}_bins_{axes}.csv"
-        write_workflow_csv(pd.concat(chunks, ignore_index=True), path, index=False); paths.append(path)
-    if plot:
-        suffix = "MV/cm" if units == "mv/cm" else "V/angstrom"
-        prefix = ("magnitude_of_average_total_local_electric_field" if component == "magnitude" else
-                  "total_local_electric_field_magnitude" if component == "mean-magnitude" else
-                  f"total_local_electric_field_{component}")
-        column = f"{prefix} ({suffix})"
-        finite = np.concatenate([table[column].to_numpy(dtype=float) for table in binned.values()])
-        finite = finite[np.isfinite(finite)]; vmin = float(finite.min()) if len(finite) else None; vmax = float(finite.max()) if len(finite) else None
-        for (label, frame), table in binned.items():
-            path = directory / f"probe_{_safe(label)}_bins_{axes}_frame_{frame}.png"
-            plot_binned_frame(table, axes, path, component=component, units=units, vmin=vmin, vmax=vmax, dpi=dpi); paths.append(path)
-    if kymograph:
-        if len(edges) != 1:
-            raise ValueError("Kymographs require exactly one bin axis: x, y, or z.")
-        if kymograph_time_axis not in {"frame", "iteration"}:
-            raise ValueError("Kymograph time axis must be frame or iteration.")
-        paths.extend(_write_kymographs(
-            binned, directory, axis=str(axes), spatial_edges=np.asarray(edges[0]),
-            values=kymograph_values, component=component, units=units,
-            time_axis=kymograph_time_axis, dpi=dpi,
-        ))
+    with ExitStack() as stack:
+        spools = {}
+        for label, table in datasets.items():
+            spool = spools[label] = TableSpool()
+            stack.callback(spool.close)
+            groups = (item for chunk in table_chunks(table) for item in chunk.groupby("frame_index", sort=True))
+            for frame, frame_data in groups:
+                values = bin_probe_table(frame_data, axes, edges)
+                values.insert(0, "probe_element", label)
+                values.insert(0, "iter", int(frame_data["iter"].iloc[0]))
+                values.insert(0, "frame_index", int(frame))
+                spool.append(values)
+            path = directory / f"probe_{_safe(label)}_bins_{axes}.csv"
+            write_workflow_csv(TableChunks(spool), path, index=False)
+            paths.append(path)
+        if plot:
+            suffix = "MV/cm" if units == "mv/cm" else "V/angstrom"
+            prefix = ("magnitude_of_average_total_local_electric_field" if component == "magnitude" else
+                      "total_local_electric_field_magnitude" if component == "mean-magnitude" else
+                      f"total_local_electric_field_{component}")
+            column = f"{prefix} ({suffix})"
+            lower, upper = np.inf, -np.inf
+            for spool in spools.values():
+                for table in spool:
+                    finite = table[column].to_numpy(dtype=float)
+                    finite = finite[np.isfinite(finite)]
+                    if len(finite):
+                        lower, upper = min(lower, finite.min()), max(upper, finite.max())
+            for label, spool in spools.items():
+                for table in spool:
+                    frame = int(table["frame_index"].iloc[0])
+                    path = directory / f"probe_{_safe(label)}_bins_{axes}_frame_{frame}.png"
+                    plot_binned_frame(table, axes, path, component=component, units=units,
+                        vmin=float(lower) if np.isfinite(lower) else None,
+                        vmax=float(upper) if np.isfinite(upper) else None, dpi=dpi)
+                    paths.append(path)
+        if kymograph:
+            if len(edges) != 1:
+                raise ValueError("Kymographs require exactly one bin axis: x, y, or z.")
+            if kymograph_time_axis not in {"frame", "iteration"}:
+                raise ValueError("Kymograph time axis must be frame or iteration.")
+            binned = {(label, int(table["frame_index"].iloc[0])): table for label, spool in spools.items() for table in spool}
+            paths.extend(_write_kymographs(binned, directory, axis=str(axes), spatial_edges=np.asarray(edges[0]),
+                values=kymograph_values, component=component, units=units, time_axis=kymograph_time_axis, dpi=dpi))
     return paths
 
 

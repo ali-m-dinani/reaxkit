@@ -13,13 +13,19 @@
 
 Print the number of frames in trajectory data loaded by any supported engine.
 
+Use this to check trajectory length before selecting frames for analysis.
+Only the frame count is printed; no simulation is run.
+
 ### Examples
 -----
 
 ```text
-  reaxkit get-frames-count --input runs/reaxff/xmolout
-  reaxkit get-frames-count --engine lammps --input dump.lammpstrj
-  reaxkit get-frames-count --engine ams --input reaxout.rkf
+  1. ReaxFF trajectory:
+     reaxkit get-frames-count --input runs/reaxff/xmolout
+  2. LAMMPS trajectory:
+     reaxkit get-frames-count --engine lammps --input dump.lammpstrj
+  3. AMS trajectory:
+     reaxkit get-frames-count --engine ams --input reaxout.rkf
 ```
 
 ### Arguments
@@ -28,27 +34,28 @@ Print the number of frames in trajectory data loaded by any supported engine.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `trajectory` | No |  | Trajectory file or run directory used for engine detection. |  |
-| `--input, --file` | No | . | Trajectory file or run directory (alternative to the positional path). |  |
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--run-dir` | No | . | Run directory used for trajectory discovery. |  |
-| `--xmolout` | No |  | Explicit ReaxFF xmolout path. |  |
-| `--rkf` | No |  | Explicit AMS RKF/KF path. |  |
+| `trajectory` | No |  | Trajectory file or run directory used for engine detection. Example: reaxkit get-frames-count runs/heating/xmolout, which prints that trajectory's frame count. |  |
+| `--input, --file` | No | . | Trajectory file or run directory, as an alternative to the positional path. Example: --input runs/heating/xmolout, which counts frames in that trajectory. |  |
+| `--engine` | No |  | Simulation engine used to load input data. Example: --engine reaxff, which selects ReaxFF readers instead of automatic detection. | reaxff, ams, lammps |
+| `--run-dir` | No | . | Fallback directory for input discovery. Example: --run-dir runs/heating, which searches that simulation directory. |  |
+| `--xmolout` | No |  | ReaxFF trajectory file to read. Example: --xmolout runs/heating/xmolout, which loads coordinates and frame metadata from that file. |  |
+| `--rkf` | No |  | AMS RKF/KF trajectory to read. Example: --rkf runs/heating/reaxout.rkf, which counts frames in that results file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--dump` | No |  | Explicit LAMMPS dump path. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--dump` | No |  | LAMMPS trajectory dump to read. Example: --dump runs/heating/dump.lammpstrj, which counts frames in that dump. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -60,14 +67,18 @@ Print the number of frames in trajectory data loaded by any supported engine.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No | quiet |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No | quiet | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

@@ -69,65 +69,70 @@ Follow these steps to design and run a study:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--analyze` | No |  | Execute analysis pipelines declared in top-level study 'analysis'. |  |
-| `--aggregate` | No |  | Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
-| `--strict-actions, --no-strict-actions` | No | False | Fail immediately when geometry generation or artifact propagation actions fail. |  |
-| `--replicate` | No |  | Optional replicate selector (e.g. rep_01). |  |
-| `--analysis` | No |  | Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. |  |
-| `--value-column` | No |  | For aggregate: explicit numeric column to extract from per-run analysis CSV exports. |  |
+| `--analyze` | No |  | Execute analysis pipelines declared in top-level study 'analysis'. Example: --analyze studies/heating, which runs the study's configured analysis pipelines. |  |
+| `--aggregate` | No |  | Aggregate mode. First value is STUDY_ROOT; optional second value is aggregate title filter. Example: --aggregate studies/heating, which aggregates results for that study. |  |
+| `--strict-actions, --no-strict-actions` | No | False | Fail immediately when geometry generation or artifact propagation actions fail. Example: --strict-actions, which stops initialization when a generation or transfer action fails. |  |
+| `--replicate` | No |  | Optional replicate selector (e.g. rep_01). Example: --replicate rep_01, which selects only the first named replicate. |  |
+| `--analysis` | No |  | Analysis title filter for --analyze. For legacy aggregate mode only, this can be a variable/title name. Example: --analysis temperature, which selects the analysis titled temperature. |  |
+| `--value-column` | No |  | For aggregate: explicit numeric column to extract from per-run analysis CSV exports. Example: --value-column temperature, which aggregates that numeric analysis column. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--init` | No |  | Initialize a study from a YAML file and generate folders/manifests. |  |
-| `--manage` | No |  | Manage study metadata/artifacts (path update and removals). |  |
+| `--init` | No |  | Initialize a study from a YAML file and generate folders/manifests. Example: --init study.yaml, which creates study folders from that configuration. |  |
+| `--manage` | No |  | Manage study metadata/artifacts (path update and removals). Example: --manage studies/heating, which targets that study for metadata or artifact management. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--make-yaml` | No |  | Write a starter study YAML template (default: study.yaml). |  |
-| `--gen-yaml` | No |  | Alias for --make-yaml. |  |
-| `--present` | No |  | Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. |  |
-| `--plot` | No |  | Deprecated alias for --present. |  |
-| `--root` | No | . | Root folder where the generated <study_name>/ tree will be created. |  |
-| `--analysis-title` | No |  | Manager filter: analysis title. |  |
-| `--aggregate-title` | No |  | Manager filter: aggregate title. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--make-yaml` | No |  | Write a starter study YAML template (default: study.yaml). Example: --make-yaml study.yaml, which writes a starter study configuration. |  |
+| `--gen-yaml` | No |  | Alias for --make-yaml. Example: --gen-yaml study.yaml, which writes a starter study configuration. |  |
+| `--present` | No |  | Presentation mode. First value is STUDY_ROOT; optional second value is aggregate title filter. Example: --present studies/heating, which renders presentations for that study. |  |
+| `--plot` | No |  | Deprecated alias for --present. Example: --plot studies/heating, which renders study presentations through the legacy alias. |  |
+| `--root` | No | . | Root folder where the generated <study_name>/ tree will be created. Example: --root studies, which creates the study tree under that directory. |  |
+| `--analysis-title` | No |  | Manager filter: analysis title. Example: --analysis-title temperature, which limits management to that analysis. |  |
+| `--aggregate-title` | No |  | Manager filter: aggregate title. Example: --aggregate-title mean_temperature, which limits management to that aggregate. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--run` | No |  | Execute study stages from an initialized study root folder. |  |
-| `--run-geometry-generator, --no-run-geometry-generator` | No | True | Execute geometry_generator.cli_template during study initialization (default: true). |  |
-| `--stage` | No |  | Run only one stage name (e.g. MM, NPT, NVT). |  |
-| `--parallel-workers` | No | 1 | Number of replicate pipelines to run in parallel for --run (default: 1). |  |
-| `--rerun-failed` | No | False | For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. |  |
-| `--dry-run` | No | False | Show what --manage would change without writing/removing. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--run` | No |  | Execute study stages from an initialized study root folder. Example: --run studies/heating, which executes stages in that initialized study. |  |
+| `--run-geometry-generator, --no-run-geometry-generator` | No | True | Execute geometry_generator.cli_template during study initialization (default: true). Example: --run-geometry-generator, which executes configured geometry generation during initialization. |  |
+| `--stage` | No |  | Run only one stage name (e.g. MM, NPT, NVT). Example: --stage NVT, which runs only the NVT stage. |  |
+| `--parallel-workers` | No | 1 | Number of replicate pipelines to run in parallel for --run (default: 1). Example: --parallel-workers 4, which runs up to four replicate pipelines concurrently. |  |
+| `--rerun-failed` | No | False | For --run, rerun only replicates with fail>0 or wait>0 in run_status.csv; cleans stage artifacts before rerun. Example: --rerun-failed, which reruns failed or waiting replicates after cleaning stage artifacts. |  |
+| `--dry-run` | No | False | Show what --manage would change without writing/removing. Example: --dry-run, which previews management changes without writing or removing artifacts. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting existing template file or reusing non-empty study directory. |  |
-| `--artifact-transfer` | No | copy | How consumed artifacts are propagated into downstream stage folders. | copy, hardlink, symlink |
-| `--case` | No |  | Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). |  |
-| `--action` | No |  | Manager action for --manage. | update-paths, rename-cases, remove |
-| `--target` | No |  | Manager target(s) for --manage. Can be repeated. | paths, case-names, analysis, aggregate, cache, run-status, analysis-status, aggregate-status, plot-status |
-| `--older-than` | No |  | For cache removal: only remove entries older than N days. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting existing template file or reusing non-empty study directory. Example: --force, which allows replacement of existing generated output. |  |
+| `--artifact-transfer` | No | copy | How consumed artifacts are propagated into downstream stage folders. Example: --artifact-transfer copy, which copies consumed artifacts into downstream stages. | copy, hardlink, symlink |
+| `--case` | No |  | Optional case selector (case_id, combo slug, or shorthand like mg_05__temp_300). Example: --case mg_05__temp_300, which selects that study case. |  |
+| `--action` | No |  | Manager action for --manage. Example: --action update-paths, which updates stored study paths. | update-paths, rename-cases, remove |
+| `--target` | No |  | Manager target(s) for --manage. Can be repeated. Example: --target cache, which targets cached artifacts for the selected manager action. | paths, case-names, analysis, aggregate, cache, run-status, analysis-status, aggregate-status, plot-status |
+| `--older-than` | No |  | For cache removal: only remove entries older than N days. Example: --older-than 30, which limits cache removal to entries older than 30 days. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

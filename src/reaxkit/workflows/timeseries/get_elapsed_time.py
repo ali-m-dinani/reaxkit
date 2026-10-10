@@ -11,15 +11,15 @@ def build_parser(parser, *, command: str):
         command=command,
         description=(
             "Get recorded elapsed time as a series.\n"
+            "Includes elapsed_time_per_iter: elapsed time divided by iteration.\n"
+            "Zero or missing iteration values have no rate (NaN).\n"
+            "Plots include elapsed time and elapsed time per iteration.\n"
             "\n"
             "Inspect changes in an existing simulation; no simulation is run.\n"
             "\n"
             "Examples:\n"
-            "  1. Plot the series:\n"
-            "     reaxkit get-elapsed-time --xmolout runs/heating/xmolout --plot single\n"
-            "\n"
-            "  2. Export sampled values:\n"
-            "     reaxkit get-elapsed-time --xmolout runs/heating/xmolout --every 5 --export elapsed_time.csv"
+            "  1. Plot both series separately:\n"
+            "     reaxkit get-elapsed-time --engine reaxff --summary summary.txt --plot separate --save elapsed_time_plots"
         ),
         inputs=("xmolout", "summary"),
     )

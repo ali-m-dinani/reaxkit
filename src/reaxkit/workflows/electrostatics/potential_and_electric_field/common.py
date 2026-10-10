@@ -165,17 +165,20 @@ def attach_energylog_reference(result, args) -> None:
         raise ValueError(f"No Ecoul component was found in {configured}.")
     references = {int(iteration): float(value) for iteration, value in
                   zip(partial.iterations, partial.values[:, component], strict=False)}
-    matched = result.totals["iter"].map(references)
-    if matched.isna().any():
-        missing = result.totals.loc[matched.isna(), "iter"].astype(int).tolist()
-        raise ValueError(f"Energylog contains no Coulomb value for iteration(s): {missing}.")
-    result.totals["energylog_coulomb (kcal/mol)"] = matched.to_numpy(dtype=float)
-    reference = matched.to_numpy(dtype=float)
-    calculated = result.totals["coulomb (kcal/mol)"].to_numpy(dtype=float)
-    result.totals["relative_difference_percent"] = np.divide(
-        calculated - reference, np.abs(reference),
-        out=np.full_like(reference, np.nan), where=reference != 0.0,
-    ) * 100.0
+    def enrich(table):
+        table = table.copy()
+        matched = table["iter"].map(references)
+        if matched.isna().any():
+            missing = table.loc[matched.isna(), "iter"].astype(int).tolist()
+            raise ValueError(f"Energylog contains no Coulomb value for iteration(s): {missing}.")
+        table["energylog_coulomb (kcal/mol)"] = matched.to_numpy(dtype=float)
+        reference = matched.to_numpy(dtype=float)
+        calculated = table["coulomb (kcal/mol)"].to_numpy(dtype=float)
+        table["relative_difference_percent"] = np.divide(calculated - reference, np.abs(reference),
+            out=np.full_like(reference, np.nan), where=reference != 0.0) * 100.0
+        return table
+    from reaxkit.core.runtime.result_store import ResultTable
+    result.totals = result.totals.map_batches(enrich) if isinstance(result.totals, ResultTable) else enrich(result.totals)
 
 
 def artifact_directory(args, command: str) -> Path:

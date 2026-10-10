@@ -49,7 +49,7 @@ It only generates the input file and does not execute the simulation.
 | `--start-iter` | No | 0 | Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000. |  |
 | `--max-magnitude` | No |  | Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength. |  |
 | `--points-per-cycle` | No |  | Preferred equal-increment sampling control for sin profiles. Counts the start and end rows of one cycle; the start, half-cycle, and end equal --dc-offset. Example: --points-per-cycle 17. Adjacent cycles share their boundary, so consecutive duplicate baseline rows are omitted. |  |
-| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. |  |
+| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. Example: --step-angle 0.1, which samples sinusoidal profiles at 0.1-radian intervals. |  |
 | `--num-cycles` | No |  | Number of cycles for sin or pulse profile. Example: --num-cycles 3, which repeats the waveform for three cycles. |  |
 | `--phase` | No | 0.0 | Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2. |  |
 | `--dc-offset` | No | 0.0 | DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform. |  |
@@ -70,15 +70,16 @@ It only generates the input file and does not execute the simulation.
 | `--output` | No | eregime.in | Output file path. Example: --output eregime_custom.in, which writes the generated file with that name. |  |
 | `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
 | `--width` | No |  | Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -90,13 +91,17 @@ It only generates the input file and does not execute the simulation.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -143,7 +148,7 @@ It only generates the input file and does not execute the simulation.
 | `--start-iter` | No | 0 | Starting iteration. Example: --start-iter 1000, which starts the generated schedule at iteration 1000. |  |
 | `--max-magnitude` | No |  | Peak amplitude for sin profile (V/A). Example: --max-magnitude 0.004, which sets the sine peak field strength. |  |
 | `--points-per-cycle` | No |  | Preferred equal-increment sampling control for sin profiles. Counts the start and end rows of one cycle; the start, half-cycle, and end equal --dc-offset. Example: --points-per-cycle 17. Adjacent cycles share their boundary, so consecutive duplicate baseline rows are omitted. |  |
-| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. |  |
+| `--step-angle` | No |  | Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. Example: --step-angle 0.1, which samples sinusoidal profiles at 0.1-radian intervals. |  |
 | `--num-cycles` | No |  | Number of cycles for sin or pulse profile. Example: --num-cycles 3, which repeats the waveform for three cycles. |  |
 | `--phase` | No | 0.0 | Phase offset for sin profile (radians). Example: --phase 1.57, which shifts the sine wave by roughly pi/2. |  |
 | `--dc-offset` | No | 0.0 | DC offset for sin profile (V/A). Example: --dc-offset 0.001, which adds a constant baseline to the sine waveform. |  |
@@ -164,15 +169,16 @@ It only generates the input file and does not execute the simulation.
 | `--output` | No | eregime.in | Output file path. Example: --output eregime_custom.in, which writes the generated file with that name. |  |
 | `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
 | `--width` | No |  | Flat-top width for pulse profile. Example: --width 50, which sets how long each pulse stays at peak level. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -184,13 +190,17 @@ It only generates the input file and does not execute the simulation.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

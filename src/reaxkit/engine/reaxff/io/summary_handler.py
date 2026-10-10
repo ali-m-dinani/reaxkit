@@ -60,7 +60,7 @@ class SummaryHandler(BaseHandler):
     - This handler represents a scalar-per-iteration time-series file.
     """
 
-    VERSION = "1"
+    VERSION = "2"
 
     def __init__(self, file_path: str | Path = "summary.txt", reporter=None) -> None:
         """
@@ -159,6 +159,8 @@ class SummaryHandler(BaseHandler):
 
         # Cleanup
         df = df.dropna(how="all").reset_index(drop=True)
+        if "elap_time" in df.columns:
+            df["elap_time"] = df["elap_time"].astype(str).str.replace(r"s$", "", regex=True)
         for col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
