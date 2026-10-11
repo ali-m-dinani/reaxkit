@@ -6179,7 +6179,7 @@
       "workflow_output_sites": [
         {
           "expression": "fig.savefig(output, dpi=200)",
-          "line": 294,
+          "line": 302,
           "tier": "core_compatibility",
           "writer": "savefig"
         }
@@ -8248,98 +8248,26 @@
       "workflow": "reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
       "workflow_output_sites": [
         {
-          "expression": "write_workflow_csv(eos_result.table, eos_csv, index=False)",
-          "line": 636,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(restraint_result.table, restraint_csv, index=False)",
-          "line": 637,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(heatfo_table, heatfo_csv, index=False)",
-          "line": 638,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(bond_table, bond_csv, index=False)",
-          "line": 639,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(angle_table, angle_csv, index=False)",
-          "line": 640,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(other_curve_table, other_curve_csv, index=False)",
-          "line": 641,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(charge_table, charge_csv, index=False)",
-          "line": 642,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(cell_parameter_table, cell_parameter_csv, index=False)",
-          "line": 643,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(geometry_target_table, geometry_target_csv, index=False)",
-          "line": 644,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(energy_curve_table, energy_curve_csv, index=False)",
-          "line": 645,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(energy_difference_table, energy_difference_csv, index=False)",
-          "line": 646,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(single_energy_table, single_energy_csv, index=False)",
-          "line": 647,
-          "tier": "core_compatibility",
-          "writer": "write_workflow_csv"
-        },
-        {
-          "expression": "write_workflow_csv(reaction_energy_table, reaction_energy_csv, index=False)",
-          "line": 648,
+          "expression": "write_workflow_csv(table, csv_path, index=False)",
+          "line": 721,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "write_workflow_csv(not_plotted_table, not_plotted_csv, index=False)",
-          "line": 649,
+          "line": 725,
           "tier": "core_compatibility",
           "writer": "write_workflow_csv"
         },
         {
           "expression": "summary_path.write_text(summary_text + '\\n', encoding='utf-8')",
-          "line": 826,
+          "line": 785,
           "tier": "core_compatibility",
           "writer": "write_text"
         },
         {
           "expression": "settings_path.write_text(json.dumps(settings, indent=2, sort_keys=True), encoding='utf-8')",
-          "line": 875,
+          "line": 821,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -8479,13 +8407,13 @@
       "workflow_output_sites": [
         {
           "expression": "geo_output.write_text(_block_text(block), encoding='utf-8', newline='')",
-          "line": 195,
+          "line": 201,
           "tier": "core_compatibility",
           "writer": "write_text"
         },
         {
           "expression": "xyz_output.write_text(_xyz_text(identifier, atoms), encoding='utf-8', newline='\\n')",
-          "line": 196,
+          "line": 202,
           "tier": "core_compatibility",
           "writer": "write_text"
         }
@@ -10639,6 +10567,30 @@
           "line": 533,
           "tier": "core_compatibility",
           "writer": "prepare_generator_output"
+        }
+      ]
+    },
+    {
+      "aliases": [
+        "plot_from_excel"
+      ],
+      "artifact_policy": "workflow_public_outputs",
+      "command": "plot-from-excel",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "analysis",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.force_field_opt.plot_from_excel",
+      "workflow_output_sites": [
+        {
+          "expression": "io_path(manifest).write_text(json.dumps({'input': str(Path(args.input).resolve()), 'plot_style': args.plot_style, 'color_style': color_style, 'figsize_inches': [args.width, args.height], 'outputs': [str(path) for path in outputs], 'figures': figures}, indent=2, default=str), encoding='utf-8')",
+          "line": 201,
+          "tier": "core_compatibility",
+          "writer": "write_text"
         }
       ]
     },
