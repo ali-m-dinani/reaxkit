@@ -45,3 +45,20 @@ def test_potential_field_parser_accepts_kymograph_controls():
     assert args.plot_kymograph
     assert args.kymograph_values == ["external-potential", "total-local-field"]
     assert args.kymograph_time_axis == "iteration"
+
+
+@pytest.mark.parametrize("workflow", [potential_and_electric_field_workflow, trajectory_workflow])
+def test_potential_field_workflows_accept_ams(workflow):
+    from reaxkit.workflows.electrostatics.potential_and_electric_field.common import runtime_arguments
+
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    args = parser.parse_args([
+        "--engine", "ams", "--input", "reaxout.kf", "--fort78", "fort.78",
+        "--frames", "0:54000:50",
+    ])
+    runtime = runtime_arguments(args)
+    assert runtime["engine"] == "ams"
+    assert runtime["input"] == "reaxout.kf"
+    assert runtime["fort78"] == "fort.78"
+    assert runtime["frames"] == ["0:54000:50"]
+    assert parser.parse_args([]).engine == "reaxff"

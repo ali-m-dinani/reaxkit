@@ -109,6 +109,45 @@ def test_ams_charged_trajectory_with_field_through_executor(tmp_path, monkeypatc
     assert list((tmp_path / "workspace" / "data" / "raw").glob("*/fort.78"))
 
 
+@pytest.mark.parametrize("trajectory_output", [False, True])
+def test_ams_potential_field_workflow_execution(tmp_path, monkeypatch, trajectory_output):
+    import argparse
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.parameters import ReaxFFCoulombParameters
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+    from reaxkit.workflows.electrostatics.potential_and_electric_field import (
+        potential_and_electric_field_workflow, trajectory_workflow,
+    )
+    from reaxkit.workflows.electrostatics.potential_and_electric_field.common import runtime_arguments
+
+    workflow = trajectory_workflow if trajectory_output else potential_and_electric_field_workflow
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    field_file = tmp_path / "fort.78"
+    field_file.write_text("0 0 0 0.1 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    parameters = ReaxFFCoulombParameters(0.0, 5.0, {"al": 1.0, "n": 1.0})
+    monkeypatch.setattr(ReaxFFCoulombParameters, "from_ffield", lambda path: parameters)
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    args = parser.parse_args([
+        "--engine", "ams", "--input", str(source), "--fort78", str(field_file),
+        "--frames", "0", "2", "--periodic", "none", "--project-root", str(tmp_path / "workspace"),
+    ])
+    request = workflow.build_request(args)
+    output = tmp_path / "potential.extxyz"
+    if trajectory_output:
+        request._output_path = str(output)
+    runtime = runtime_arguments(args)
+    runtime.update(checkpoint=False, progress=False)
+    result = AnalysisExecutor().run(TASK_REGISTRY[workflow.COMMAND](), request, runtime)
+    electrostatics = result.electrostatics_result if trajectory_output else result
+    table = electrostatics.table
+    fields = table.groupby("iter")["external_electric_field_z (V/angstrom)"].first()
+    assert fields.to_dict() == {0: 0.1, 2000: -0.3}
+    if trajectory_output:
+        assert output.is_file()
+
+
 class _FakeKF:
     def __init__(self):
         self.coordinate_reads: list[int] = []

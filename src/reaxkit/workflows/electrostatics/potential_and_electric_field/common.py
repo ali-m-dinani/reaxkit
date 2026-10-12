@@ -12,12 +12,12 @@ from reaxkit.core.utils.frame_utils import parse_frame_indices
 def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     """Add input, frame-selection, electrostatics, and storage arguments."""
     parser.add_argument(
-        "--engine", choices=["reaxff"], default="reaxff",
-        help="Select the simulation-data adapter. Example: --engine reaxff, reads standalone ReaxFF trajectory and charge files.",
+        "--engine", choices=["reaxff", "ams"], default="reaxff",
+        help="Select the simulation-data adapter; both adapters use ReaxFF ffield parameters. Example: --engine ams --input reaxout.kf --fort78 fort.78, reads KF coordinates/charges and the external field sidecar.",
     )
     parser.add_argument(
         "--input", default=".",
-        help="Set the path used for ReaxFF input discovery. Example: --input ./run, discovers simulation files under ./run.",
+        help="Set the simulation directory or AMS KF/RKF input. Example: --input ./run, discovers simulation files under ./run.",
     )
     parser.add_argument(
         "--run-dir", default=".",
