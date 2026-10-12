@@ -32,7 +32,7 @@ import pandas as pd
 from ase import Atoms
 from ase.geometry import cell_to_cellpar
 from scipy.sparse import coo_matrix
-from scipy.sparse.csgraph import min_weight_full_bipartite_matching
+from scipy.sparse.csgraph import maximum_flow, min_weight_full_bipartite_matching
 from scipy.spatial import cKDTree
 
 from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
@@ -421,6 +421,42 @@ def _assignment_for_translation(
     return assignment, score
 
 
+def _minimum_weight_reference_matching(graph):
+    """Seed SciPy's feasibility traversal with a complete unit-capacity flow.
+
+    Putting a known full matching first in each CSR row avoids pathological
+    feasibility searches on layered lattice graphs. Edge weights and the
+    minimum-weight objective remain unchanged.
+    """
+    count = graph.shape[0]
+    if graph.shape[1] != count:
+        raise ValueError("Reference matching requires a square graph.")
+    source = 2 * count
+    sink = source + 1
+    edges = graph.tocoo()
+    rows = np.concatenate((np.full(count, source), edges.row, np.arange(count) + count))
+    columns = np.concatenate((np.arange(count), edges.col + count, np.full(count, sink)))
+    network = coo_matrix(
+        (np.ones(len(rows), dtype=np.int32), (rows, columns)),
+        shape=(sink + 1, sink + 1),
+    ).tocsr()
+    flow = maximum_flow(network, source, sink)
+    if flow.flow_value != count:
+        raise ValueError("Candidate graph has no full atom/reference matching.")
+    matched = flow.flow[:count, count:2 * count].tocoo()
+    selected = matched.data > 0
+    assignment = np.empty(count, dtype=int)
+    assignment[matched.row[selected]] = matched.col[selected]
+    ordered = graph.copy()
+    for row in range(count):
+        start, end = ordered.indptr[row:row + 2]
+        offset = start + np.flatnonzero(ordered.indices[start:end] == assignment[row])[0]
+        ordered.indices[start], ordered.indices[offset] = ordered.indices[offset], ordered.indices[start]
+        ordered.data[start], ordered.data[offset] = ordered.data[offset], ordered.data[start]
+    ordered.has_sorted_indices = False
+    return min_weight_full_bipartite_matching(ordered)
+
+
 def _sparse_bijective_assignment(
         *,
         tree: cKDTree,
@@ -459,7 +495,7 @@ def _sparse_bijective_assignment(
         ).tocsr()
         try:
             # noinspection PyTypeChecker
-            matched_rows, matched_columns = min_weight_full_bipartite_matching(
+            matched_rows, matched_columns = _minimum_weight_reference_matching(
                 graph
             )
             if len(matched_rows) == len(query_positions):
