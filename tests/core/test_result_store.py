@@ -56,6 +56,33 @@ def test_resume_transactions_and_streaming_export(tmp_path, format_name):
         store.transition("complete")
 
 
+def test_static_checkpoint_descriptor_is_not_reencoded(tmp_path, monkeypatch):
+    from tests.analysis.test_hbn_reference_polarization import _trajectory_from_reference
+    from reaxkit.analysis.ferroelectrics.hbn_reference import polarization
+    from reaxkit.core.runtime import checkpoint_results
+    from reaxkit.core.runtime.result_stream import source_result
+
+    request = polarization.HBNReferencePolarizationRequest(
+        reference_path=polarization.REFERENCE_STRUCTURE_PATH, replication=(2, 1, 1),
+        charge_source="formal", volume_method="cell")
+    trajectory = _trajectory_from_reference(polarization.REFERENCE_STRUCTURE_PATH)
+    result = polarization.calculate_hbn_reference_polarization(trajectory, request)
+    with ResultStore(tmp_path, {}, batch_frames=1) as store:
+        accumulator = checkpoint_results.CheckpointAccumulator(store)
+        accumulator.add(source_result(result, 0), 0, 0)
+
+        def unexpected_encode(value):
+            raise AssertionError("Static metadata must only be encoded for the first frame")
+
+        monkeypatch.setattr(checkpoint_results, "encode", unexpected_encode)
+        accumulator.add(source_result(result, 1), 1, 1)
+        restored = checkpoint_results.CheckpointAccumulator(store)
+        restored.add(source_result(result, 2), 2, 2)
+        actual = restored.finish(request)
+        assert actual.table.materialize().frame_index.tolist() == [0, 1, 2]
+        pd.testing.assert_frame_equal(actual.mapping, result.mapping)
+
+
 @pytest.mark.parametrize("stage", ["writing", "staged", "published", "manifest"])
 def test_failure_never_commits_half_batch(tmp_path, stage):
     def fail(point):

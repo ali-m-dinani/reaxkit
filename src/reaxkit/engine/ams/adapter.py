@@ -30,6 +30,7 @@ from reaxkit.domain.data_models import (
     ConnectivityData,
     ConnectivityTrajectoryData,
     ElectrostaticsData,
+    ElectricFieldData,
     MolecularAnalysisData,
     PartialEnergyData,
     SimulationData,
@@ -53,7 +54,7 @@ class AMSAdapter(EngineAdapter):
     analysis clips explicit frame selections to the available frame count.
     """
 
-    HANDLER_VERSION = "4"
+    HANDLER_VERSION = "5"
 
     _AMS_ENERGY_COMPONENTS: tuple[str, ...] = (
         "E_pot",  # 1: Total potential
@@ -245,6 +246,8 @@ class AMSAdapter(EngineAdapter):
         files = adapter.required_input_files(TrajectoryData, {})
         ```
         """
+        if data_type is ElectricFieldData:
+            return (self._resolve_field_path(args).name,)
         if data_type in {
             AtomicKinematicsData,
             AtomStrainEnergyData,
@@ -262,8 +265,55 @@ class AMSAdapter(EngineAdapter):
             if explicit_input and str(explicit_input) != ".":
                 input_path = Path(str(explicit_input))
                 if input_path.suffix.lower() in {".kf", ".rkf"}:
-                    return (input_path.name,)
-            return ("reaxout.kf", "reaxout.rkf")
+                    names = (input_path.name,)
+                else:
+                    names = ("reaxout.kf", "reaxout.rkf")
+            else:
+                names = ("reaxout.kf", "reaxout.rkf")
+            if data_type in {ElectrostaticsData, ChargeData}:
+                names += (self._resolve_field_path(args).name,)
+            return names
+        return None
+
+    def _resolve_field_path(self, args: dict) -> Path:
+        """Resolve an explicit field file or the fort.78 beside the KF input."""
+        raw = args.get("fort78") or args.get("electric_field")
+        if raw:
+            configured = Path(raw)
+            if configured != Path("fort.78"):
+                return configured / "fort.78" if configured.is_dir() else configured
+        return self._resolve_kf_path(args).parent / "fort.78"
+
+    def load_electric_field(self, args: dict, reporter=None) -> ElectricFieldData:
+        """Read the external fort.78 field schedule without loading KF history."""
+        from time import perf_counter
+
+        from reaxkit.engine.reaxff.adapter_parts.normalizers import _electric_field_from_fort78_handler
+        from reaxkit.engine.reaxff.io.fort78_handler import Fort78Handler
+
+        source = self._resolve_field_path(args)
+        if not source.is_file():
+            raise FileNotFoundError(f"AMS external-field data not found: {source}. Provide --fort78 PATH.")
+        started = perf_counter()
+        field = _electric_field_from_fort78_handler(Fort78Handler(source, reporter=reporter))
+        self._emit_load_timing(
+            args, handler="Fort78Handler", source_path=source, seconds=perf_counter() - started,
+        )
+        if (not len(field.applied_field_values)
+                or not {"field_x", "field_y", "field_z"}.issubset(field.applied_field_components)
+                or not np.isfinite(field.applied_field_values).all()):
+            raise ValueError(f"Invalid applied electric-field data in {source}.")
+        field.metadata["source_path"] = str(source.resolve())
+        return field
+
+    def _optional_electric_field(self, args: dict, reporter=None) -> ElectricFieldData | None:
+        """Keep field-free AMS analyses working when no sidecar is present."""
+        source = self._resolve_field_path(args)
+        explicit = args.get("_fort78_was_explicit", False) or args.get("electric_field")
+        if "_fort78_was_explicit" not in args:
+            explicit = explicit or bool(args.get("fort78") and Path(args["fort78"]) != Path("fort.78"))
+        if source.is_file() or explicit:
+            return self.load_electric_field(args, reporter=reporter)
         return None
 
     def load_kf(self, args: dict):
@@ -809,6 +859,7 @@ class AMSAdapter(EngineAdapter):
         fixed_axes = self._molecule_lattice_vectors(kf)
         element_cache: dict[int, list[str]] = {}
         layout_cache: dict[str, str] = {}
+        electric_field = self._optional_electric_field(args, reporter=reporter) if include_charges else None
 
         for done, source_index in enumerate(source_indices, start=1):
             step_number = int(step_numbers[source_index]) if source_index < step_numbers.size else None
@@ -921,7 +972,7 @@ class AMSAdapter(EngineAdapter):
                     trajectory=trajectory,
                     charges=charges,
                     connectivity=None,
-                    electric_field=None,
+                    electric_field=electric_field,
                 )
             else:
                 yield trajectory
@@ -1757,7 +1808,7 @@ class AMSAdapter(EngineAdapter):
             trajectory=trajectory,
             charges=charges,
             connectivity=None,
-            electric_field=None,
+            electric_field=self._optional_electric_field(args, reporter=reporter),
         )
 
     def load_atomic_kinematics(self, args: dict, reporter=None) -> AtomicKinematicsData:

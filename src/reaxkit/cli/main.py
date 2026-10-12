@@ -27,6 +27,7 @@ from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.registry.command_catalog import get_registered_commands
 from reaxkit.core.platform.exceptions import AnalysisError, ParseError
 from reaxkit.core.platform.human_log import HumanReadableRunLog
+from reaxkit.core.runtime.command_diagnostics import CommandDiagnostics
 from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
 from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
 from reaxkit.core.storage.storage_layout import default_project_root
@@ -538,7 +539,16 @@ def main(*, announce: bool = True) -> int:
     from reaxkit.presentation.plot_styles import plot_style_context
     from reaxkit.presentation.color_styles import color_style_context
 
-    with trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)), color_style_context(getattr(args, "color_style", None)):
+    try:
+        diagnostics = CommandDiagnostics(
+            project_root, getattr(args, "command", selected_command), sys.argv[1:], trace.run_id,
+            interval=getattr(args, "diagnostic_interval_seconds", 60.0),
+            enabled=getattr(args, "diagnostics", True), trace=trace,
+            profile=getattr(args, "profile", False), profile_clock=getattr(args, "profile_clock", "wall"),
+        )
+    except ValueError as error:
+        parser.error(str(error))
+    with diagnostics, trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)), color_style_context(getattr(args, "color_style", None)):
         exit_code = 1
         try:
             with trace.step(
@@ -549,26 +559,32 @@ def main(*, announce: bool = True) -> int:
             if exit_code != 0:
                 trace.fail(f"Command returned exit code {exit_code}")
         except ParseError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             print(f"[Parse error] {exc}", file=sys.stderr)
             exit_code = 2
         except AnalysisError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             print(f"[Analysis error] {exc}", file=sys.stderr)
             exit_code = 3
         except FileNotFoundError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("File not found", str(exc), hints=_hints_for_filenotfound(exc, args))
             exit_code = 4
         except OSError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("OS error", str(exc), hints=_hints_for_oserror(exc, args))
             exit_code = 5
         except Exception as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("Error", str(exc))
             exit_code = 1
         finally:
+            diagnostics.exit_code = exit_code
             args._checkpoint_exit_code = exit_code
             for key, label in (
                 ("run_id", "runtime run_id"),

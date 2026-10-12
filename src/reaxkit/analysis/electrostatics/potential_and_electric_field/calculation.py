@@ -159,8 +159,15 @@ def _masked_kernel(vectors: np.ndarray, gamma_i, gamma_j, parameters, disable_ta
 def _tree_pairs(tree, xyz: np.ndarray, targets: np.ndarray, translation: np.ndarray,
                 cutoff: float, *, translation_sign: float) -> tuple[np.ndarray, np.ndarray]:
     """Flatten neighbor lists into aligned target/source index arrays."""
+    query_positions = xyz[targets] + translation_sign * translation
+    lower = np.nextafter(tree.mins - cutoff, -np.inf)
+    upper = np.nextafter(tree.maxes + cutoff, np.inf)
+    possible = np.all((query_positions >= lower) & (query_positions <= upper), axis=1)
+    if not np.any(possible):
+        return np.empty(0, dtype=int), np.empty(0, dtype=int)
+    targets = targets[possible]
     neighborhoods = tree.query_ball_point(
-        xyz[targets] + translation_sign * translation, cutoff,
+        query_positions[possible], cutoff,
         workers=-1 if len(xyz) >= 1000 else 1,
     )
     counts = np.fromiter((len(values) for values in neighborhoods), dtype=np.int64,

@@ -179,14 +179,9 @@ def _group_rows(
         .rename("count")
         .reset_index()
         .sort_values([group_column, "reference_element"])
-        .groupby(group_column, sort=True, observed=True)
-        .apply(
-            lambda group: ",".join(
-                f"{element}{count}"
-                for element, count in zip(group["reference_element"], group["count"])
-            ),
-            include_groups=False,
-        )
+        .assign(_composition=lambda counts: counts["reference_element"].astype(str) + counts["count"].astype(str))
+        .groupby(group_column, sort=True, observed=True)["_composition"]
+        .agg(",".join)
         .rename("composition")
         .reset_index()
     )

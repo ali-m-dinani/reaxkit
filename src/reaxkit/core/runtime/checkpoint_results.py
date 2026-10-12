@@ -102,7 +102,7 @@ class CheckpointAccumulator:
                             "fields": {field.name: visit(getattr(value, field.name), f"{path}.{field.name}".strip(".")) for field in fields(value)}}
             if isinstance(value, dict) and value and all(isinstance(item, pd.DataFrame) for item in value.values()):
                 return {"kind": "table_dict", "values": {key: visit(item, f"{path}.{key}") for key, item in value.items()}}
-            return encode(value)
+            return encode(value) if self.descriptor is None else None
 
         descriptor = visit(result, "")
         if self.descriptor is None:

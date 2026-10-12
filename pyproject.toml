@@ -47,6 +47,7 @@ Repository = "https://github.com/ali-m-dinani/reaxkit"
 Issues = "https://github.com/ali-m-dinani/reaxkit/issues"
 
 [project.optional-dependencies]
+profiling = ["yappi>=1.6,<2"]
 plot = [
     "seaborn",
     "plotly",
@@ -87,7 +88,7 @@ engines = [
     "plams",
 ]
 all = [
-    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines]",
+    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines,profiling]",
 ]
 
 [project.scripts]

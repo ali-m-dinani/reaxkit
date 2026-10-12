@@ -1,6 +1,7 @@
 """Advanced execution options shared by every CLI command."""
 
 import argparse
+import math
 
 from reaxkit.presentation.plot_styles import add_plot_style_argument
 from reaxkit.presentation.color_styles import add_color_style_argument
@@ -18,11 +19,29 @@ def automatic_positive_int(value):
     return number
 
 
+def positive_finite_seconds(value):
+    try:
+        seconds = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Use a positive finite number of seconds.") from exc
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("Use a positive finite number of seconds.")
+    return seconds
+
+
 def add_execution_arguments(parser, *, inherit=False):
     add_plot_style_argument(parser, inherit=inherit)
     add_color_style_argument(parser, inherit=inherit)
     options = parser._option_string_actions
     definitions = (
+        ("--profile", dict(action="store_true", default=False,
+                          help="Record deterministic function calls and timings for all Python threads (requires reaxkit[profiling]).")),
+        ("--profile-clock", dict(choices=("wall", "cpu"), default="wall",
+                                help="Profiler timer: elapsed wall time (default) or thread CPU time. Requires --profile to record.")),
+        ("--diagnostics", dict(action=argparse.BooleanOptionalAction, default=True,
+                              help="Write a per-command report, console log, resource samples, and periodic Python stacks under logs/diagnostics. Use --no-diagnostics to disable.")),
+        ("--diagnostic-interval-seconds", dict(type=positive_finite_seconds, default=60.0,
+                              help="Python stack sampling interval (default: 60 seconds). Example: --diagnostic-interval-seconds 30.")),
         ("--checkpoint", dict(action=argparse.BooleanOptionalAction, default=None,
                               help="Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage.")),
         ("--resume", dict(default=None, metavar="CHECKPOINT", help="Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations.")),

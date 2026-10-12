@@ -12,9 +12,101 @@ from reaxkit.domain.data_models import (
     ConnectivityData,
     ConnectivityTrajectoryData,
     ElectrostaticsData,
+    ElectricFieldData,
     TrajectoryData,
 )
 from reaxkit.engine.ams.adapter import AMSAdapter
+
+
+@pytest.mark.parametrize("width", [5, 8])
+def test_ams_reads_fort78_beside_kf(tmp_path, width):
+    source = tmp_path / "fort.78"
+    suffix = " 4" if width == 5 else " 1 2 3 4"
+    source.write_text(f"0 0 0 0.1{suffix}\n2000 0 0 -0.2{suffix}\n", encoding="utf-8")
+    field = AMSAdapter().load(ElectricFieldData, {"input": str(tmp_path / "reaxout.kf"), "progress": False})
+    np.testing.assert_allclose(field.applied_field_values, [[0, 0, 0.1], [0, 0, -0.2]])
+    assert field.sampled_field_iterations.tolist() == [0, 2000]
+    assert field.metadata["source_path"] == str(source.resolve())
+
+
+def test_ams_explicit_field_path_overrides_kf_sidecar(tmp_path):
+    source = tmp_path / "custom_field.dat"
+    source.write_text("0 0 0 0.25 0\n", encoding="utf-8")
+    args = {"input": str(tmp_path / "elsewhere" / "reaxout.kf"), "fort78": str(source)}
+    adapter = AMSAdapter()
+    assert adapter.load_electric_field(args).applied_field_values[0, 2] == 0.25
+    assert "custom_field.dat" in adapter.required_input_files(ElectrostaticsData, args)
+    with pytest.raises(FileNotFoundError, match="--fort78"):
+        adapter._optional_electric_field({**args, "fort78": str(tmp_path / "missing")})
+
+
+@pytest.mark.parametrize("contents", ["", "0 1 2\n", "0 0 0 nan 0\n"])
+def test_ams_rejects_invalid_field_sidecar(tmp_path, contents):
+    (tmp_path / "fort.78").write_text(contents, encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid applied"):
+        AMSAdapter().load_electric_field({"input": str(tmp_path / "reaxout.kf")})
+
+
+def test_ams_field_free_input_remains_supported(tmp_path):
+    args = {"input": str(tmp_path / "reaxout.kf")}
+    assert AMSAdapter()._optional_electric_field(args) is None
+    with pytest.raises(FileNotFoundError, match="--fort78"):
+        AMSAdapter().load_electric_field(args)
+
+
+def test_ams_stream_reuses_field_and_aligns_by_iteration(tmp_path, monkeypatch):
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.analysis import _external_field_at_iteration
+
+    (tmp_path / "fort.78").write_text("0 0 0 0.1 0\n1000 0 0 0.2 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    adapter = AMSAdapter()
+    monkeypatch.setattr(adapter, "load_kf", lambda args: _FakeStandaloneReaxoutKF())
+    timings = []
+    frames = list(adapter.stream(ElectrostaticsData, {
+        "input": str(tmp_path / "reaxout.kf"), "_frame_indices": [2, 0],
+        "progress": False, "_load_timing_callback": lambda **values: timings.append(values),
+    }))
+    assert len(timings) == 1
+    assert frames[0].electric_field is frames[1].electric_field
+    for frame, expected in zip(frames, [-0.3, 0.1]):
+        values = _external_field_at_iteration(frame.electric_field, int(frame.trajectory.iterations[0]),
+                                             int(frame.trajectory.source_frame_indices[0]))
+        assert values[2] == pytest.approx(expected)
+    with pytest.raises(ValueError, match="iteration 123"):
+        _external_field_at_iteration(frames[0].electric_field, 123, 0)
+
+
+def test_ams_eager_electrostatics_attaches_field(tmp_path, monkeypatch):
+    from reaxkit.domain.data_models import ChargeData
+
+    (tmp_path / "fort.78").write_text("0 0 0 0.4 0\n", encoding="utf-8")
+    adapter = AMSAdapter()
+    trajectory = TrajectoryData(positions=np.zeros((1, 1, 3)), elements=["Al"], atom_ids=[1])
+    charges = ChargeData(charges=np.ones((1, 1)))
+    monkeypatch.setattr(adapter, "load_trajectory", lambda *args, **kwargs: trajectory)
+    monkeypatch.setattr(adapter, "load_charges", lambda *args, **kwargs: charges)
+    result = adapter.load_electrostatics({"input": str(tmp_path / "reaxout.kf")})
+    assert result.electric_field.applied_field_values[0, 2] == 0.4
+
+
+def test_ams_charged_trajectory_with_field_through_executor(tmp_path, monkeypatch):
+    from reaxkit.analysis.ferroelectrics.charge_extxyz import ChargeExtendedXYZRequest, ChargeExtendedXYZTask
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    (tmp_path / "fort.78").write_text("0 0 0 0.1 0\n1000 0 0 0.2 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    output = tmp_path / "charged.xyz"
+    result = AnalysisExecutor().run(ChargeExtendedXYZTask(), ChargeExtendedXYZRequest(
+        frames=[0, 2], include_electric_field=True, _output_path=str(output),
+    ), {
+        "engine": "ams", "input": str(source), "fort78": "fort.78",
+        "project_root": str(tmp_path / "workspace"), "progress": False,
+        "cache": False, "checkpoint": False,
+    })
+    assert result.iterations.tolist() == [0, 2000]
+    assert output.is_file()
+    assert list((tmp_path / "workspace" / "data" / "raw").glob("*/fort.78"))
 
 
 class _FakeKF:
@@ -540,7 +632,7 @@ def test_ams_required_input_files_prefers_explicit_kf_input_name():
     assert adapter.required_input_files(
         ElectrostaticsData,
         {"input": "reaxout.kf"},
-    ) == ("reaxout.kf",)
+    ) == ("reaxout.kf", "fort.78")
 
 
 def test_ams_adapter_loaders_export_artifacts():

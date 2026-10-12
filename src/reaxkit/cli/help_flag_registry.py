@@ -1,6 +1,10 @@
 """Reviewed canonical flag roles for the registered CLI."""
 
 FLAG_METADATA = {
+    '--profile': ('Storage and cache', 'full'),
+    '--profile-clock': ('Storage and cache', 'full'),
+    '--diagnostics': ('Storage and cache', 'full'),
+    '--diagnostic-interval-seconds': ('Storage and cache', 'full'),
     '--type-map': ('Input and file selection', 'full'),
     '--cell': ('Scientific choices', 'full'),
     '--checkpoint': ('Storage and cache', 'full'),
