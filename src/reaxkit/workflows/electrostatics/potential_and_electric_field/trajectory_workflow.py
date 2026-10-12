@@ -73,7 +73,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     request = replace(build_request(args), _output_path=str(canonical))
     result = AnalysisExecutor().run(TASK_REGISTRY[COMMAND](), request, runtime_arguments(args))
     attach_energylog_reference(result.electrostatics_result, args)
-    write_tables(result.electrostatics_result, output_dir)
+    write_tables(result.electrostatics_result, output_dir, export_per_atom_csv=args.export_per_atom_csv)
     requested = _requested(args)
     if requested is not None and requested != canonical:
         requested.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(canonical, requested)

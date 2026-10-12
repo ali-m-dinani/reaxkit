@@ -62,3 +62,5 @@ def test_potential_field_workflows_accept_ams(workflow):
     assert runtime["fort78"] == "fort.78"
     assert runtime["frames"] == ["0:54000:50"]
     assert parser.parse_args([]).engine == "reaxff"
+    assert parser.parse_args([]).export_per_atom_csv is False
+    assert parser.parse_args(["--export-per-atom-csv"]).export_per_atom_csv is True

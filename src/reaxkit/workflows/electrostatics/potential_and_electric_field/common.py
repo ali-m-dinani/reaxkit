@@ -89,6 +89,10 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
         help="Choose console logging detail. Example: --log verbose, prints detailed loading and calculation progress.",
     )
     add_storage_cli_arguments(parser)
+    parser.add_argument(
+        "--export-per-atom-csv", action="store_true", default=False,
+        help="Opt in to large per-atom Coulomb and probe CSV tables; totals, bins, and requested plots remain available without them. Example: --export-per-atom-csv, writes per-atom CSVs in addition to the normal outputs.",
+    )
     storage_help = {
         "run_id": (
             "Select an existing run identifier for workspace organization. "

@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 from reaxkit.analysis import electrostatics as _tasks  # noqa: F401
 from reaxkit.analysis.electrostatics.potential_and_electric_field import PotentialElectricFieldRequest
+from reaxkit.analysis.electrostatics.potential_and_electric_field.trajectory import (
+    PotentialElectricFieldTrajectoryRequest, PotentialElectricFieldTrajectoryTask,
+)
 from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
 from reaxkit.presentation.dispatcher import present_result
@@ -27,9 +31,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
 
 The command reconstructs the internal shielded Coulomb contribution from xmolout,
 fort.7, and ffield, then adds the iteration-aligned external field from fort.78.
-External potential is zero at the material midpoint by default. It writes one
-potential/field CSV per +1e probe species and an equal-probe average. Optional
-spatial binning uses the total local electric field.
+External potential is zero at the material midpoint by default. Large per-atom
+CSVs require --export-per-atom-csv. Optional spatial binning uses the total local
+electric field. Use --write-extxyz to export the calculated trajectory without
+a second electrostatics calculation.
 
 Examples:
   1. Calculate every twentieth saved frame with automatic probe species:
@@ -45,6 +50,10 @@ Examples:
      reaxkit get-potential-and-electric-field --run-dir ./run --bin-axes z --bins 60 --plot-kymograph --plot-field-component z
 """
     add_input_arguments(parser)
+    parser.add_argument(
+        "--write-extxyz", action="store_true",
+        help="Write trajectory_with_local_electrostatics.extxyz using the same calculation, frames, and periodicity. Example: --write-extxyz, adds checkpoint-aware trajectory export without recalculating fields.",
+    )
     parser.add_argument(
         "--bin-axes", choices=["x", "y", "z", "xy", "xz", "yz", "xyz"], default=None,
         help="Choose coordinates used for spatial binning. Example: --bin-axes xz, produces x-z heatmap data by averaging atoms within each x-z bin.",
@@ -90,6 +99,8 @@ Examples:
 
 
 def build_request(args) -> PotentialElectricFieldRequest:
+    if args.write_extxyz:
+        return PotentialElectricFieldTrajectoryRequest(**request_kwargs(args))
     return PotentialElectricFieldRequest(**request_kwargs(args))
 
 
@@ -98,9 +109,23 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     if args.plot_kymograph and not args.bin_axes: raise ValueError("--plot-kymograph requires --bin-axes.")
     if args.plot_kymograph and len(str(args.bin_axes)) != 1:
         raise ValueError("--plot-kymograph requires one bin axis: x, y, or z.")
-    result = AnalysisExecutor().run(TASK_REGISTRY[COMMAND](), build_request(args), runtime_arguments(args))
+    request = build_request(args)
+    trajectory_path = None
+    if args.write_extxyz:
+        trajectory_path = (artifact_directory(args, COMMAND) / "trajectory_with_local_electrostatics.extxyz").resolve()
+        request = replace(request, _output_path=str(trajectory_path))
+        task = PotentialElectricFieldTrajectoryTask()
+    else:
+        task = TASK_REGISTRY[COMMAND]()
+    result = AnalysisExecutor().run(task, request, runtime_arguments(args))
+    if args.write_extxyz:
+        result = result.electrostatics_result
     attach_energylog_reference(result, args)
-    output = artifact_directory(args, COMMAND); paths = list(write_tables(result, output).values())
+    output = artifact_directory(args, COMMAND)
+    paths = list(write_tables(result, output, export_per_atom_csv=args.export_per_atom_csv).values())
+    if trajectory_path is not None:
+        paths.append(trajectory_path)
+        print(f"Wrote local electrostatics trajectory: {trajectory_path}")
     if args.bin_axes:
         paths.extend(write_binning(result, output, axes=args.bin_axes, bins=args.bins, plot=args.plot_bins,
                                    component=args.plot_field_component, units=args.plot_field_units, dpi=args.figure_dpi,

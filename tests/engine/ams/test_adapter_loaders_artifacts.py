@@ -148,6 +148,64 @@ def test_ams_potential_field_workflow_execution(tmp_path, monkeypatch, trajector
         assert output.is_file()
 
 
+@pytest.mark.parametrize("checkpoint", [False, True])
+def test_get_potential_writes_extxyz_once_and_resumes(tmp_path, monkeypatch, checkpoint):
+    import argparse
+    from reaxkit.analysis.electrostatics.potential_and_electric_field import analysis
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.parameters import ReaxFFCoulombParameters
+    from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
+    from reaxkit.workflows.electrostatics.potential_and_electric_field import potential_and_electric_field_workflow as workflow
+
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    field_file = tmp_path / "fort.78"
+    field_file.write_text("0 0 0 0.1 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    parameters = ReaxFFCoulombParameters(0.0, 5.0, {"al": 1.0, "n": 1.0})
+    monkeypatch.setattr(ReaxFFCoulombParameters, "from_ffield", lambda path: parameters)
+    calls = []
+    calculate = analysis.calculate_frame
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return calculate(*args, **kwargs)
+
+    monkeypatch.setattr(analysis, "calculate_frame", counted)
+    monkeypatch.setattr(workflow, "present_result", lambda *args, **kwargs: None)
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    output = tmp_path / "output"
+    args = parser.parse_args([
+        "--engine", "ams", "--input", str(source), "--fort78", str(field_file),
+        "--frames", "0", "2", "--periodic", "xy", "--write-extxyz",
+        "--bin-axes", "z", "--bins", "2", "--plot-kymograph",
+        "--project-root", str(tmp_path / "workspace"), "--output-dir", str(output),
+    ])
+    args.checkpoint = checkpoint
+    args.progress = False
+    with workflow_artifact_policy(args):
+        assert workflow.run_main(workflow.COMMAND, args) == 0
+    trajectory_path = output / "trajectory_with_local_electrostatics.extxyz"
+    original = trajectory_path.read_bytes()
+    assert len(calls) == 2
+    from ase.io import read
+    frames = read(trajectory_path, index=":")
+    assert len(frames) == 2
+    assert frames[0].pbc.tolist() == [True, True, False]
+    assert (output / "coulomb_totals.csv").is_file()
+    assert not (output / "coulomb_per_atom.csv").exists()
+    assert not (output / "voltages_and_electric_fields").exists()
+    assert list((output / "binned_data_and_plots" / "kymographs").glob("*.png"))
+    if checkpoint:
+        manifests = list((tmp_path / "workspace" / "analysis").glob("**/checkpoint/manifest.json"))
+        assert len(manifests) == 1
+        args.resume = str(manifests[0].parent)
+        trajectory_path.unlink()
+        with workflow_artifact_policy(args):
+            assert workflow.run_main(workflow.COMMAND, args) == 0
+        assert len(calls) == 2
+        assert trajectory_path.read_bytes() == original
+
+
 class _FakeKF:
     def __init__(self):
         self.coordinate_reads: list[int] = []

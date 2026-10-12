@@ -24,17 +24,21 @@ def _safe(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value.strip()) or "probe"
 
 
-def write_tables(result, output: Path) -> dict[str, Path]:
+def write_tables(result, output: Path, *, export_per_atom_csv: bool = False) -> dict[str, Path]:
     output.mkdir(parents=True, exist_ok=True)
-    fields = output / "voltages_and_electric_fields"; fields.mkdir(exist_ok=True)
-    paths = {"coulomb_per_atom": output / "coulomb_per_atom.csv",
-             "coulomb_totals": output / "coulomb_totals.csv",
-             "probe_average": fields / "probe_average_per_atom.csv"}
-    write_workflow_csv(result.coulomb_table, paths["coulomb_per_atom"], index=False)
+    paths = {"coulomb_totals": output / "coulomb_totals.csv"}
     write_workflow_csv(result.totals, paths["coulomb_totals"], index=False)
-    write_workflow_csv(result.table, paths["probe_average"], index=False)
-    for label, table in result.probe_tables.items():
-        path = fields / f"probe_{_safe(label)}_per_atom.csv"; write_workflow_csv(table, path, index=False); paths[f"probe_{label}"] = path
+    if export_per_atom_csv:
+        fields = output / "voltages_and_electric_fields"
+        fields.mkdir(exist_ok=True)
+        paths.update(coulomb_per_atom=output / "coulomb_per_atom.csv",
+                     probe_average=fields / "probe_average_per_atom.csv")
+        write_workflow_csv(result.coulomb_table, paths["coulomb_per_atom"], index=False)
+        write_workflow_csv(result.table, paths["probe_average"], index=False)
+        for label, table in result.probe_tables.items():
+            path = fields / f"probe_{_safe(label)}_per_atom.csv"
+            write_workflow_csv(table, path, index=False)
+            paths[f"probe_{label}"] = path
     result.prewritten_csvs = tuple(paths.values())
     result.skip_automatic_csv_persistence = True
     return paths
