@@ -52,7 +52,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.description = """Calculate cell- and layer-resolved local dipole and polarization.
 
 Each crystallographic cell is one Al2N2 reference cell. Each reference layer is
-one coplanar AlN pair, so both spatial resolutions are written on every run.
+one coplanar AlN pair. Both resolutions are calculated; large local, cell, and
+layer CSV tables are written only with --export-local-csv.
 --local-grouping selects the table used by plots and the generic local output.
 Equal volume shares the selected frame volume among groups; deformation uses
 normalized local affine-deformation weights. With the default hull volume,
@@ -64,11 +65,15 @@ Examples:
   reaxkit get-hbn-reference-local-polarization --replication 19 19 10 --charge-source formal --formal-charge Al=3 N=-3 --local-volume-method deformation --plot-2d --plot-plane xz --plot-component c
 """
     parser.add_argument(
+        "--export-local-csv", action="store_true",
+        help="Write the large local, cell, and layer polarization CSVs (off by default). Example: --export-local-csv, adds all three detailed tables while summaries and requested Extended XYZ output are retained by default.",
+    )
+    parser.add_argument(
         "--local-grouping",
         choices=["cell", "layer"],
         default="cell",
         help=(
-            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and the generic local table. Both explicit tables are always written. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output."
+            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and the optional generic local CSV. Explicit cell and layer CSVs require --export-local-csv. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output."
         ),
     )
     parser.add_argument(
@@ -392,10 +397,15 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     detail_format = getattr(args, "detail_format", None) or ("csv" if args.output_profile == "legacy" else "parquet")
     displacement_path = output / f"hbn_reference_displacements.{detail_format}"
     mapping_path = output / "hbn_reference_mapping.csv"
-    tables = {local_path: result.table, summary_path: result.summary, cell_path: result.cell_table, cell_summary_path: result.cell_summary, layer_path: result.layer_table, layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    tables = {summary_path: result.summary, cell_summary_path: result.cell_summary,
+              layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    if args.export_local_csv:
+        tables.update({local_path: result.table, cell_path: result.cell_table, layer_path: result.layer_table})
     tables[displacement_path] = getattr(result.reference_result, "table_chunks", {}).get("hbn_reference_displacements", result.reference_result.displacements)
-    write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name),
-                          details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())
+    written = write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name),
+                                   details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())
+    result.prewritten_csvs = tuple(path for path in written if path.suffix == ".csv")
+    result.skip_automatic_csv_persistence = True
     plots_2d = (
         generate_local_2d_plots(
             result,
@@ -433,14 +443,12 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     args.suppress_table = True
     present_result(canonical, result, args)
-    print(
-        f"Wrote selected ({result.request.local_grouping}) h-BN-reference "
-        f"polarization to {local_path}"
-    )
+    if args.export_local_csv:
+        print(f"Wrote selected ({result.request.local_grouping}) h-BN-reference polarization to {local_path}")
+        print(f"Wrote crystallographic-cell polarization to {cell_path}")
+        print(f"Wrote layer-resolved polarization to {layer_path}")
     if getattr(args, "output_profile", "standard") != "minimal":
         print(f"Wrote local/global closure summary to {summary_path}")
-    print(f"Wrote crystallographic-cell polarization to {cell_path}")
-    print(f"Wrote layer-resolved polarization to {layer_path}")
     if args.write_displacements:
         print(f"Wrote per-atom source displacements to {displacement_path}")
     print(f"Wrote atom-to-cell mapping to {mapping_path}")

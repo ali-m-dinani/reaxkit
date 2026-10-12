@@ -163,6 +163,34 @@ def test_hbn_projected_parser_accepts_only_native_auto_or_formal_charge_modes() 
         parser.parse_args([*required, "--engine", "lammps"])
 
 
+@pytest.mark.parametrize("export_csv", [False, True])
+def test_local_csvs_are_opt_in_without_disabling_extxyz(tmp_path, monkeypatch, export_csv):
+    from reaxkit.presentation.persist import _write_csvs
+
+    workflow = local_polarization_workflow
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    options = ["--replication", "2", "1", "1", "--write-extxyz",
+               "--output-dir", str(tmp_path), "--output-profile", "standard"]
+    assert parser.parse_args(options).export_local_csv is False
+    if export_csv:
+        options.append("--export-local-csv")
+    args = parser.parse_args(options)
+    result = _local_result()
+    monkeypatch.setattr(workflow.AnalysisExecutor, "run", lambda *args, **kwargs: result)
+    monkeypatch.setattr(workflow, "present_result", lambda *args, **kwargs: _write_csvs(tmp_path, result))
+    assert workflow.run_main(workflow.COMMAND, args) == 0
+    for grouping in ("local", "cell", "layer"):
+        assert (tmp_path / f"hbn_reference_{grouping}_polarization.csv").exists() == export_csv
+        assert (tmp_path / f"hbn_reference_{grouping}_polarization_summary.csv").is_file()
+    assert (tmp_path / "hbn_reference_mapping.csv").is_file()
+    assert not (tmp_path / "table.csv").exists()
+    assert not (tmp_path / "cell_table.csv").exists()
+    assert not (tmp_path / "layer_table.csv").exists()
+    frames = read(tmp_path / "hbn_reference_local_polarization.extxyz", index=":")
+    assert len(frames) == 1
+    assert len(frames[0]) == len(result.trajectory.atom_ids)
+
+
 def test_extxyz_contains_full_atoms_and_local_cell_properties(tmp_path) -> None:
     result = _local_result()
     destination = write_local_polarization_extxyz(result, tmp_path / "local.extxyz")

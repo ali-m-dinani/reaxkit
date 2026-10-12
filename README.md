@@ -16,6 +16,7 @@ ReaxKit is designed for researchers who want a transparent, scriptable bridge be
   - Input generators for `control`, `geo`, `eregime`, `tregime`, and related files
 
 ### Analysis
+- `get-hbn-reference-local-polarization` skips the large local, cell, and layer CSV tables by default; add `--export-local-csv` to request them. Summary/mapping output and requested plots or `--write-extxyz` remain available. This only changes exports, not calculations or checkpoint data, and does not delete older CSVs. Per-atom displacement exports remain separately controlled by `--write-displacements` and the output profile.
 - AMS analyses can combine KF/RKF coordinates and charges with an external `fort.78` field schedule: use `--engine ams --input reaxout.kf --fort78 /path/to/fort.78`. Without an override, the adapter looks beside the KF/RKF file. The existing ReaxFF field reader preserves field components and MD iteration numbers; field-dependent analyses require matching iterations, not matching row numbers. Streaming parses the field schedule once. This supports charged-trajectory field export, local potential/field analyses, and charge-versus-field analysis. Missing fields are not replaced with zero.
 - Engine-agnostic analyzers built on ReaxKit's domain data models
 - Analyzer tasks organized around separated request, result, and task objects
