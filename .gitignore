@@ -100,6 +100,7 @@ improvement plans and files/HBN_REAXFF_POLARIZATION_PERFORMANCE_PLAN.md
 *.h5
 *.hdf5
 cache/
+/.reaxkit-benchmark/
 
 # ------------------------------
 # OS-SPECIFIC
