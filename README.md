@@ -76,7 +76,8 @@ to test the package and get the timing for their execution.
 
 ## Command diagnostics
 
-Every parsed CLI command writes a unique report folder under
+Diagnostics are disabled by default for every CLI command. Pass `--diagnostics`
+after the command name to write a unique report folder under
 `reaxkit_workspace/logs/diagnostics/<command>_<UTC timestamp>_<unique suffix>/`
 (or beneath your `--project-root`). Its location is printed at command startup.
 Help and argument-parsing errors do not create reports. Recording starts after
@@ -86,10 +87,11 @@ CLI imports and argument parsing, before command execution.
   timestamps, exit status, and the execution-step report.
 - `console.log`: Python stdout/stderr, including progress, also displayed normally.
 - `stacks.log`: Python stacks for all threads every 60 seconds, annotated with
-  UTC timestamps and elapsed seconds. Times reflect observation within roughly
-  0.25 seconds; native stack collection does not need the Python GIL.
-- `stacks.raw.log`: original native watchdog output, retained independently of
-  the observer. Its `Timeout` messages indicate scheduled samples, not errors.
+  UTC timestamps and elapsed seconds. Sample headers contain collection times;
+  observer annotations follow within roughly 0.25 seconds. The sampler's own
+  stack is excluded, and each stack is limited to 100 frames.
+- `stacks.raw.log`: original cooperative Python stack samples, retained
+  independently of the observer.
 - `stack_summary.txt` and `stack_summary.json`: live per-function tables grouped
   by thread, with self/inclusive sample counts and estimated seconds (count times
   sampling interval). Self means the top Python frame; inclusive means anywhere
@@ -103,13 +105,20 @@ CLI imports and argument parsing, before command execution.
 - `steps.log`: finalized human-readable execution report; `exception.log` records
   Python exceptions when present. `observer.log` contains observer errors, if any.
 
-Use `--diagnostic-interval-seconds 30` to change the stack interval or
-`--no-diagnostics` to disable this feature. Place these flags after the command
-name. A separate lightweight observer annotates dumps while native analysis
-code holds the GIL. Stack traces are written to files, not repeated on the console.
-Do not also install another `faulthandler.dump_traceback_later` timer in a wrapper:
-Python has one process-wide watchdog timer. The normal ReaxKit command replaces
-the old `formal_diagnostic.sh` wrapper.
+Use `--diagnostics --diagnostic-interval-seconds 30` to enable diagnostics with a
+different stack interval. Place these flags after the command
+name. A Python thread collects referenced frames through `sys._current_frames()`.
+Native code holding the GIL delays stack sampling; missed samples are not
+backfilled, and estimated times can undercount that work. A separate lightweight
+observer continues resource monitoring even while analysis holds the GIL.
+Stack traces are written to files, not repeated on the console.
+
+Periodic diagnostics no longer use `faulthandler.dump_traceback_later`: its native
+watchdog can race with thread/frame teardown and crash the interpreter itself.
+ReaxKit does not install or cancel process-wide faulthandler timers or change
+fatal-signal handlers. `PYTHONFAULTHANDLER=1` can still record fatal errors in the
+scheduler log. Remove legacy watchdog wrappers such as `formal_diagnostic.sh`
+when using these built-in diagnostics.
 
 On forced termination (including Slurm time limits), finalization may not run.
 Existing console, stack, and resource samples remain; a `running` report with no
@@ -120,7 +129,7 @@ Reports contain supplied command arguments; inspect them before sharing.
 ### Deterministic profiling (optional)
 
 Install from your clone with `python -m pip install -e '.[profiling]'`, using the
-same interpreter as the ReaxKit executable. Add `--profile` after the command name to
+same interpreter as the ReaxKit executable. Add `--diagnostics --profile` after the command name to
 record actual function-call events and measured durations with Yappi, across the
 main thread and Python worker threads. This is opt-in because instrumentation
 adds overhead. `--profile-clock wall` (default) includes waiting; use

@@ -1,10 +1,10 @@
-"""Per-command reports with a native stack watchdog and independent observer."""
+"""Per-command reports with cooperative stack sampling and an independent observer."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import faulthandler
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -49,6 +49,52 @@ class _ConsoleTee:
         return getattr(self.original, name)
 
 
+class _StackSampler(threading.Thread):
+    """Sample referenced Python frames without the native faulthandler watchdog."""
+
+    def __init__(self, stream, interval, started):
+        super().__init__(name="reaxkit-stack-sampler", daemon=True)
+        self.stream = stream
+        self.interval = interval
+        self.started = started
+        self.stopping = threading.Event()
+        self.error = None
+        self.samples = 0
+
+    def _snapshot(self):
+        lines = [f"Stack sample (elapsed {time.monotonic() - self.started:.3f} s) | {_timestamp()}"]
+        frames = sys._current_frames()
+        frame = None
+        try:
+            for thread_id, frame in frames.items():
+                if thread_id == self.ident:
+                    continue
+                lines.append(f"Thread {thread_id:#x} (most recent call first):")
+                depth = 0
+                while frame is not None and depth < 100:
+                    lines.append(f'  File "{frame.f_code.co_filename}", line {frame.f_lineno} in {frame.f_code.co_name}')
+                    frame = frame.f_back
+                    depth += 1
+                if frame is not None:
+                    lines.append("  ... (stack truncated at 100 frames)")
+                lines.append("")
+        finally:
+            frame = None
+            frames.clear()
+        return "\n".join(lines) + "\n"
+
+    def run(self):
+        try:
+            while not self.stopping.wait(self.interval):
+                payload = self._snapshot().encode("utf-8", errors="backslashreplace")
+                self.stream.write(payload)
+                self.samples += 1
+        except Exception as error:
+            self.error = f"{type(error).__name__}: {error}"
+        finally:
+            self.stream.close()
+
+
 class CommandDiagnostics:
     """Capture one parsed CLI invocation without replacing signal handlers."""
 
@@ -57,11 +103,13 @@ class CommandDiagnostics:
         self.profile = None
         if profile:
             if not enabled:
-                raise ValueError("--profile requires diagnostics; remove --no-diagnostics.")
+                raise ValueError("--profile requires diagnostics; pass --diagnostics to enable them.")
             from reaxkit.core.runtime.command_profile import CommandProfile
             self.profile = CommandProfile(profile_clock)
         self.enabled = enabled
-        self.interval = interval
+        self.interval = float(interval)
+        if not math.isfinite(self.interval) or self.interval <= 0:
+            raise ValueError("Diagnostic interval must be finite and positive.")
         self.trace = trace
         self.started = time.monotonic()
         name = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(command))[:80]
@@ -77,9 +125,15 @@ class CommandDiagnostics:
                                "SLURM_MEM_PER_NODE", "SLURM_JOB_NODELIST") if key in os.environ})
         self.exit_code = None
         self.observer = None
+        self.sampler = None
         self.raw = None
         self.console = None
         self.report["profiling"] = dict(enabled=profile, clock=profile_clock if profile else None)
+        self.report["stack_sampling"] = dict(
+            method="cooperative Python thread (sys._current_frames)",
+            requires_gil=True, excludes_sampler_thread=True,
+            limitations="Native code holding the GIL delays samples; missed intervals are not backfilled.",
+        )
 
     def __enter__(self):
         if not self.enabled:
@@ -96,7 +150,8 @@ class CommandDiagnostics:
             sys.stderr = _ConsoleTee(sys.stderr, self.console, lock)
             print(f"[ReaxKit] Diagnostic report: {self.directory}", file=sys.stderr, flush=True)
             self.raw = (self.directory / "stacks.raw.log").open("wb", buffering=0)
-            faulthandler.dump_traceback_later(self.interval, repeat=True, file=self.raw)
+            self.sampler = _StackSampler(self.raw, self.interval, self.started)
+            self.sampler.start()
             creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             with (self.directory / "observer.log").open("wb") as errors:
                 self.observer = subprocess.Popen(
@@ -125,8 +180,15 @@ class CommandDiagnostics:
             except Exception as error:
                 self.report["profiling"]["error"] = str(error)
                 print(f"[ReaxKit] Could not finalize profile: {error}", file=sys.stderr)
-        if self.raw is not None:
-            faulthandler.cancel_dump_traceback_later()
+        if self.sampler is not None and self.sampler.ident is not None:
+            self.sampler.stopping.set()
+            self.sampler.join(timeout=5)
+            self.report["stack_sampling"]["samples"] = self.sampler.samples
+            if self.sampler.is_alive():
+                self.report["stack_sampling"]["error"] = "Sampler did not stop within five seconds."
+            elif self.sampler.error is not None:
+                self.report["stack_sampling"]["error"] = self.sampler.error
+        elif self.raw is not None:
             self.raw.close()
         sys.stdout, sys.stderr = self.original_stdout, self.original_stderr
         if self.console is not None:
@@ -154,7 +216,7 @@ class CommandDiagnostics:
 
 
 def _observe(directory, pid, started):
-    """Annotate native dumps and sample resources even when the parent holds the GIL."""
+    """Annotate dumps and sample resources even when the parent holds the GIL."""
     import psutil
     from reaxkit.core.runtime.stack_summary import StackSummary
 
@@ -168,7 +230,8 @@ def _observe(directory, pid, started):
     with (directory / "stacks.raw.log").open("rb") as source, \
             (directory / "stacks.log").open("w", encoding="utf-8", buffering=1) as stacks, \
             (directory / "resources.jsonl").open("w", encoding="utf-8", buffering=1) as resources:
-        stacks.write("Elapsed times are observer timestamps (approximately 0.25-second resolution).\n")
+        stacks.write("Stack sample headers contain collection times; annotations contain observer times.\n"
+                     "Cooperative sampling can be delayed by native code holding the GIL.\n")
         while True:
             elapsed = time.monotonic() - started
             stopping = (directory / "observer.stop").exists() or not process.is_running()
@@ -176,7 +239,7 @@ def _observe(directory, pid, started):
             pending += received
             while b"\n" in pending:
                 line, pending = pending.split(b"\n", 1)
-                if line.startswith(b"Timeout ("):
+                if line.startswith((b"Timeout (", b"Stack sample (")):
                     samples += 1
                     stacks.write(f"\n=== Stack sample {samples} | elapsed {elapsed:.3f} s | {_timestamp()} ===\n")
                 stacks.write(line.decode("utf-8", errors="replace") + "\n")

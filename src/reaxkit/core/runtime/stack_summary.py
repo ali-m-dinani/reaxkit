@@ -1,4 +1,4 @@
-"""Incremental, explicitly statistical summaries of faulthandler samples."""
+"""Incremental, explicitly statistical summaries of Python stack samples."""
 
 import json
 import os
@@ -17,7 +17,7 @@ class StackSummary:
         self.counts = {}
 
     def feed(self, line):
-        if line.startswith("Timeout ("):
+        if line.startswith(("Timeout (", "Stack sample (")):
             self.samples += 1
             self.thread = None
             self.seen.clear()
@@ -59,6 +59,8 @@ class StackSummary:
             "Inclusive values overlap; different threads overlap. Do not sum them as command elapsed time.\n"
             "Short work between samples and the final unsampled interval are not attributed. Native work is\n"
             "attributed to its Python caller. This is a live partial summary, not a completion indicator.\n"
+            "Cooperative sampling may be delayed by native code holding the GIL; missed intervals are\n"
+            "not backfilled. Estimates can undercount such work; consult resources.jsonl and --profile.\n"
         )
         table = ["STACK SAMPLING SUMMARY", f"Stack dumps observed: {self.samples}; interval: {self.interval:g} seconds",
                  explanation, f"{'Thread':<18} {'Self samples':>12} {'Incl samples':>12} {'Est self s':>12} {'Est incl s':>12}  Function (source)",

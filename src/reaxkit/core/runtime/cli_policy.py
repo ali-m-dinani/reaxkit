@@ -35,11 +35,11 @@ def add_execution_arguments(parser, *, inherit=False):
     options = parser._option_string_actions
     definitions = (
         ("--profile", dict(action="store_true", default=False,
-                          help="Record deterministic function calls and timings for all Python threads (requires reaxkit[profiling]).")),
+                          help="Record deterministic function calls and timings for all Python threads (requires --diagnostics and reaxkit[profiling]).")),
         ("--profile-clock", dict(choices=("wall", "cpu"), default="wall",
                                 help="Profiler timer: elapsed wall time (default) or thread CPU time. Requires --profile to record.")),
-        ("--diagnostics", dict(action=argparse.BooleanOptionalAction, default=True,
-                              help="Write a per-command report, console log, resource samples, and periodic Python stacks under logs/diagnostics. Use --no-diagnostics to disable.")),
+        ("--diagnostics", dict(action=argparse.BooleanOptionalAction, default=False,
+                              help="Enable a per-command report, console log, resource samples, and periodic Python stacks under logs/diagnostics (disabled by default).")),
         ("--diagnostic-interval-seconds", dict(type=positive_finite_seconds, default=60.0,
                               help="Python stack sampling interval (default: 60 seconds). Example: --diagnostic-interval-seconds 30.")),
         ("--checkpoint", dict(action=argparse.BooleanOptionalAction, default=None,

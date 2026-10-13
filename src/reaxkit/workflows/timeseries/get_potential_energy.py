@@ -13,7 +13,10 @@ def build_parser(parser, *, command: str):
             "Get potential energy as a time series.\n"
             "\n"
             "Compare total or per-atom potential energy in existing simulation output.\n"
-            "Per-atom normalization requires frame atom counts from xmolout.\n"
+            "Per-atom normalization uses --num-atoms N or frame atom counts from xmolout.\n"
+            "Use --relative to also output E(frame) - E(reference_frame).\n"
+            "The reference defaults to source frame 0, before sampling; change it with --reference-frame.\n"
+            "With --per-atom, normalize each frame before subtracting the reference.\n"
             "\n"
             "Examples:\n"
             "  1. Total energy:\n"
@@ -28,6 +31,23 @@ def build_parser(parser, *, command: str):
         "--per-atom",
         action="store_true",
         help="Divide potential energy by each frame's atom count from xmolout. Example: --per-atom, which reports energy per atom instead of total energy.",
+    )
+    parser.add_argument(
+        "--num-atoms",
+        type=int,
+        default=None,
+        help="Positive atom count used to normalize every frame; implies --per-atom and overrides xmolout atom counts. Example: --num-atoms 100 --relative.",
+    )
+    parser.add_argument(
+        "--relative",
+        action="store_true",
+        help="Also output E(frame) - E(reference_frame), after any per-atom normalization. Example: --relative.",
+    )
+    parser.add_argument(
+        "--reference-frame",
+        type=int,
+        default=0,
+        help="Zero-based source frame for --relative, before --frames/--every sampling (default: 0). Example: --relative --reference-frame 10.",
     )
     return parser
 

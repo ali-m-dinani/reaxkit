@@ -246,6 +246,64 @@ def test_elapsed_time_plot_includes_both_series(mode, tmp_path) -> None:
         assert np.isfinite(line.get_ydata()).any()
 
 
+@pytest.mark.parametrize("reference_frame", [0, 1])
+@pytest.mark.parametrize("per_atom", [False, True])
+def test_relative_energy_uses_source_reference_before_sampling(reference_frame, per_atom) -> None:
+    data = SimulationData(
+        atom_ids=[],
+        potential_energy=np.asarray([-40.0, -30.0, -10.0]),
+        num_of_atoms=np.asarray([4, 3, 2]),
+    )
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy", frames=[2, 1], every=2,
+        relative=True, reference_frame=reference_frame, per_atom=per_atom,
+    )
+    result = SimulationScalarSeriesTask().run(data, request)
+    expected = np.asarray([-10.0, -10.0, -5.0]) if per_atom else data.potential_energy
+    assert result.table["frame_index"].tolist() == [2]
+    assert result.table["value"].tolist() == [expected[2]]
+    assert result.table["relative_energy"].tolist() == [expected[2] - expected[reference_frame]]
+
+
+@pytest.mark.parametrize("reference_frame", [-1, 3])
+def test_relative_energy_rejects_invalid_reference(reference_frame) -> None:
+    data = SimulationData(atom_ids=[], potential_energy=np.asarray([-40.0, -30.0, -10.0]))
+    with pytest.raises(ValueError, match="Reference frame"):
+        SimulationScalarSeriesTask().run(
+            data, SimulationScalarSeriesRequest(field="potential_energy", relative=True, reference_frame=reference_frame)
+        )
+
+
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("per_atom", [False, True])
+@pytest.mark.parametrize("counts", [None, np.asarray([2, 3, 4])])
+def test_fixed_atom_count_normalizes_energy_and_reference(relative, per_atom, counts) -> None:
+    data = SimulationData(
+        atom_ids=[], potential_energy=np.asarray([-40.0, -30.0, -10.0]), num_of_atoms=counts,
+    )
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy", num_atoms=10, relative=relative, per_atom=per_atom,
+        reference_frame=1, frames=[2],
+    )
+    assert SimulationScalarSeriesTask.required_data_fields_for(request, {}) == ("potential_energy",)
+    result = SimulationScalarSeriesTask().run(data, request)
+    assert result.table["value"].tolist() == [-1.0]
+    assert result.table["field"].tolist() == ["potential_energy_per_atom"]
+    if relative:
+        assert result.table["relative_energy"].tolist() == [2.0]
+    else:
+        assert "relative_energy" not in result.table
+
+
+@pytest.mark.parametrize("num_atoms", [0, -1, 1.5, True])
+def test_fixed_atom_count_must_be_positive_integer(num_atoms) -> None:
+    data = SimulationData(atom_ids=[], potential_energy=np.asarray([-40.0]))
+    with pytest.raises(ValueError, match="positive integer"):
+        SimulationScalarSeriesTask().run(
+            data, SimulationScalarSeriesRequest(field="potential_energy", num_atoms=num_atoms)
+        )
+
+
 def main() -> None:
     if not RUN_DIR.exists():
         return

@@ -82,6 +82,11 @@ def test_get_potential_energy_supports_per_atom_request() -> None:
             "Potential Energy per Atom",
             "Potential Energy per Atom (kcal/mole/atom)",
         ),
+        (
+            ["--num-atoms", "100"],
+            "Potential Energy per Atom",
+            "Potential Energy per Atom (kcal/mole/atom)",
+        ),
     ],
 )
 def test_get_potential_energy_plot_has_physical_label(
@@ -103,6 +108,97 @@ def test_get_potential_energy_plot_has_physical_label(
 
     assert payload["title"] == expected_title
     assert payload["ylabel"] == expected_ylabel
+
+
+@pytest.mark.parametrize("reference_args,reference_frame", [([], 0), (["--reference-frame", "1"], 1)])
+@pytest.mark.parametrize("mode", ["single", "subplot", "separate"])
+def test_relative_energy_request_and_plot(reference_args, reference_frame, mode) -> None:
+    from reaxkit.analysis.timeseries.timeseries import SimulationScalarSeriesTask
+    from reaxkit.domain.data_models import SimulationData
+
+    module = import_module("reaxkit.workflows.timeseries.get_potential_energy")
+    args = _parser_for("get_potential_energy").parse_args(["--relative", "--plot", mode, *reference_args])
+    request = module.build_request(args)
+    assert request.relative is True
+    assert request.reference_frame == reference_frame
+    result = SimulationScalarSeriesTask().run(
+        SimulationData(atom_ids=[], potential_energy=np.asarray([-20.0, -10.0])), request
+    )
+    payload = common.build_plot_payload("get_potential_energy", result, args)
+    if mode == "separate":
+        series = [item["series"][0] for item in payload]
+    elif mode == "subplot":
+        series = [items[0] for items in payload["subplots"]]
+    else:
+        series = payload["series"]
+    assert len(series) == 2
+    assert series[0]["y"] == [-20.0, -10.0]
+    assert series[1]["y"] == ([0.0, 10.0] if reference_frame == 0 else [-10.0, 0.0])
+
+
+@pytest.mark.parametrize("mode", ["single", "subplot", "separate"])
+def test_partial_relative_per_atom_plot(mode):
+    from reaxkit.analysis.timeseries.timeseries import PartialEnergySeriesTask
+    from reaxkit.domain.data_models import PartialEnergyData
+
+    module = import_module("reaxkit.workflows.timeseries.get_partial_energy")
+    args = _parser_for("get_partial_energy").parse_args([
+        "--relative", "--reference-frame", "1", "--num-atoms", "10", "--per-atom", "--plot", mode,
+    ])
+    request = module.build_request(args)
+    assert request.num_atoms == 10 and request.per_atom and request.reference_frame == 1
+    result = PartialEnergySeriesTask().run(PartialEnergyData(
+        iterations=np.asarray([0, 10]), components=("Ebond", "Eatom"),
+        values=np.asarray([[-40., 20.], [-30., 40.]]),
+    ), request)
+    payload = common.build_plot_payload("get_partial_energy", result, args)
+    if mode == "separate":
+        series = [item["series"][0] for item in payload]
+        assert all("/atom" in item["ylabel"] for item in payload)
+    elif mode == "subplot":
+        series = [items[0] for items in payload["subplots"]]
+        assert all("/atom" in label for label in payload["ylabel"])
+    else:
+        series = payload["series"]
+        assert "/atom" in payload["ylabel"]
+    assert len(series) == 4
+    by_label = {item["label"]: item["y"] for item in series}
+    assert by_label["component=Ebond"] == [-4., -3.]
+    assert by_label["component=Ebond (relative)"] == [-1., 0.]
+    assert by_label["component=Eatom (relative)"] == [-2., 0.]
+
+
+def test_partial_energy_split_csv_persistence_and_export(tmp_path):
+    from reaxkit.presentation.persist import _write_csvs
+    from reaxkit.presentation.dispatcher import export_result_csv
+
+    args = _parser_for("get_partial_energy").parse_args([])
+    assert not hasattr(args, "split_csv")
+    result = SimpleNamespace(table=pd.DataFrame({
+        "frame_index": [0, 0, 1, 1], "iter": [0, 0, 10, 10],
+        "component": ["Ebond", "Eatom", "Ebond", "Eatom"],
+        "value": [-4., 2., -3., 4.], "relative_energy": [0., 0., 1., 2.],
+    }))
+    common._split_partial_energy_csvs(result)
+    written = _write_csvs(tmp_path, result)
+    assert set(written) == {"Ebond.csv", "Eatom.csv"}
+    assert not (tmp_path / "result.csv").exists()
+    assert pd.read_csv(tmp_path / "Ebond.csv")["relative_energy"].tolist() == [0., 1.]
+    export_result_csv(result, str(tmp_path / "energy.csv"))
+    assert not (tmp_path / "energy.csv").exists()
+    assert pd.read_csv(tmp_path / "energy_Eatom.csv")["value"].tolist() == [2., 4.]
+
+
+def test_partial_energy_split_csv_names_are_safe_and_unique():
+    result = SimpleNamespace(table=pd.DataFrame({
+        "component": ["../Ebond", "Ebond", "ebond", "CON", "table"],
+        "value": [1., 2., 3., 4., 5.],
+    }))
+    common._split_partial_energy_csvs(result)
+    names = list(result.csv_tables)
+    assert len({name.casefold() for name in names}) == 5
+    assert all("/" not in name and "." not in name for name in names)
+    assert "CON" not in names and "table" not in names
 
 
 def test_family_getters_build_requests_without_field_expressions() -> None:

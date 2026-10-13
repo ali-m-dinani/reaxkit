@@ -1,18 +1,21 @@
 import json
 
+import pytest
+
 from reaxkit.core.runtime.stack_summary import StackSummary
 
 
-def test_sample_counts_recursion_and_thread_separation(tmp_path):
+@pytest.mark.parametrize("header", ["Timeout (0:01:00)!", "Stack sample (elapsed 60.002 s) | timestamp"])
+def test_sample_counts_recursion_and_thread_separation(tmp_path, header):
     summary = StackSummary(60, 1)
     for line in [
-        "Timeout (0:01:00)!", "Thread 0x1 (most recent call first):",
+        header, "Thread 0x1 (most recent call first):",
         '  File "/src/work.py", line 10 in solve',
         '  File "/src/work.py", line 20 in solve',
         '  File "/src/cli.py", line 30 in main',
         "Thread 0x2 (most recent call first):",
         '  File "/lib/threading.py", line 10 in wait',
-        "Timeout (0:01:00)!", "Thread 0x1 (most recent call first):",
+        header, "Thread 0x1 (most recent call first):",
         '  File "/src/reader.py", line 40 in read',
         '  File "/src/cli.py", line 30 in main',
     ]:

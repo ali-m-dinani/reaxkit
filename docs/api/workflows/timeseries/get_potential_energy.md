@@ -14,7 +14,17 @@
 Get potential energy as a time series.
 
 Compare total or per-atom potential energy in existing simulation output.
-Per-atom normalization requires frame atom counts from xmolout.
+Per-atom normalization uses `--num-atoms N` or frame atom counts from xmolout.
+
+`--num-atoms 100` enables per-atom energy using a fixed positive atom count,
+without requiring xmolout. With `--relative`, relative energy is also divided
+by this count. This option overrides frame atom counts, including with `--per-atom`.
+
+Use `--relative` to also output a `relative_energy` column and plot series:
+`E(frame) - E(reference_frame)`. The original energy remains in `value`.
+The reference defaults to source frame 0; use `--reference-frame 10` to change it.
+Reference indices apply before `--frames` and `--every` sampling. With `--per-atom`,
+each energy is divided by its own frame's atom count before subtraction.
 
 ### Examples
 -----

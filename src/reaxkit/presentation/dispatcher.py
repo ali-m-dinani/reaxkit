@@ -103,7 +103,8 @@ def export_result_csv(result, path: str) -> None:
         all_frames = csv_tables.get("all_frames")
         if not hasattr(all_frames, "to_csv"):
             all_frames = result.table
-        all_frames.to_csv(out, index=False)
+        if not getattr(result, "csv_export_separate_only", False):
+            all_frames.to_csv(out, index=False)
         for name, table in csv_tables.items():
             if name == "all_frames" or not hasattr(table, "to_csv"):
                 continue

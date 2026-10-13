@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import numpy as np
+from reaxkit.domain.data_models import PartialEnergyData
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.timeseries.timeseries import PartialEnergySeriesRequest, PartialEnergySeriesTask
 from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
@@ -15,6 +17,43 @@ RUN_DIR = Path(
     r"C:\Users\alimo\PycharmProjects\pythonProject\reaxkit\examples_to_test"
 )
 ARTIFACTS_DIR = Path(__file__).resolve().parent / "artifacts"
+
+
+@pytest.mark.parametrize("num_atoms", [None, 10])
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("reference_frame", [0, 1])
+def test_partial_energy_normalization_and_reference(num_atoms, relative, reference_frame):
+    data = PartialEnergyData(
+        iterations=np.asarray([0, 10, 20]), components=("Ebond", "Eatom"),
+        values=np.asarray([[-40., 20.], [-30., 40.], [-10., 80.]]),
+    )
+    request = PartialEnergySeriesRequest(
+        num_atoms=num_atoms, relative=relative, reference_frame=reference_frame,
+        frames=[2, 1], every=2,
+    )
+    table = PartialEnergySeriesTask().run(data, request).table.set_index("component")
+    divisor = num_atoms or 1
+    assert table["frame_index"].tolist() == [2, 2]
+    assert table.loc["Ebond", "value"] == -10 / divisor
+    assert table.loc["Eatom", "value"] == 80 / divisor
+    if relative:
+        assert table.loc["Ebond", "relative_energy"] == (30 if reference_frame == 0 else 20) / divisor
+        assert table.loc["Eatom", "relative_energy"] == (60 if reference_frame == 0 else 40) / divisor
+    else:
+        assert "relative_energy" not in table
+
+
+@pytest.mark.parametrize("options,match", [
+    ({"num_atoms": 0}, "positive integer"),
+    ({"num_atoms": -1}, "positive integer"),
+    ({"per_atom": True}, "requires --num-atoms"),
+    ({"relative": True, "reference_frame": -1}, "Reference frame"),
+    ({"relative": True, "reference_frame": 1}, "Reference frame"),
+])
+def test_partial_energy_invalid_normalization(options, match):
+    data = PartialEnergyData(iterations=np.asarray([0]), components=("Ebond",), values=np.asarray([[-40.]]))
+    with pytest.raises(ValueError, match=match):
+        PartialEnergySeriesTask().run(data, PartialEnergySeriesRequest(**options))
 
 
 def _run_and_save() -> Path:

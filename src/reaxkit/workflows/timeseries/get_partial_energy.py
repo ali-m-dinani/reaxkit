@@ -14,6 +14,8 @@ def build_parser(parser, *, command: str):
             "\n"
             "Inspect individual energy contributions in existing fort.73 output.\n"
             "Omit --components to include all available components.\n"
+            "Use --relative for differences from --reference-frame (default: 0), before sampling.\n"
+            "Use --num-atoms N for per-atom energies, including relative energies.\n"
             "\n"
             "Examples:\n"
             "  1. Combined plot:\n"
@@ -37,6 +39,10 @@ def build_parser(parser, *, command: str):
             "to include all available components."
         ),
     )
+    parser.add_argument("--relative", action="store_true", help="Also output each component's energy minus its reference-frame energy. Example: --relative.")
+    parser.add_argument("--reference-frame", type=int, default=0, help="Zero-based source frame for --relative, before sampling (default: 0). Example: --reference-frame 10.")
+    parser.add_argument("--num-atoms", type=int, default=None, help="Positive atom count used to normalize all components; implies --per-atom. Example: --num-atoms 100.")
+    parser.add_argument("--per-atom", action="store_true", help="Report energies per atom; requires --num-atoms. Example: --per-atom --num-atoms 100 --relative.")
     return parser
 
 

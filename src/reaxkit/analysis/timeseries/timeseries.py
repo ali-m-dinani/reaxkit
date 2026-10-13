@@ -408,6 +408,12 @@ class SimulationScalarSeriesRequest(BaseRequest):
         Sampling stride applied after frame selection.
     per_atom : bool
         Divide potential energy by the atom count in each selected frame.
+    relative : bool
+        Also report energy relative to the reference frame, after normalization.
+    num_atoms : Optional[int]
+        Fixed positive atom count; enables per-atom normalization and overrides frame counts.
+    reference_frame : int
+        Zero-based source frame used as the reference, before sampling.
     """
     field: str = dc_field(
         metadata={
@@ -444,6 +450,18 @@ class SimulationScalarSeriesRequest(BaseRequest):
             "label": "Per atom",
             "help": "Normalize potential energy by the atom count in each frame.",
         },
+    )
+    num_atoms: Optional[int] = dc_field(
+        default=None,
+        metadata={"label": "Number of atoms", "help": "Fixed atom count for per-atom energy; overrides frame counts.", "min": 1},
+    )
+    relative: bool = dc_field(
+        default=False,
+        metadata={"label": "Relative energy", "help": "Also report energy relative to the reference frame."},
+    )
+    reference_frame: int = dc_field(
+        default=0,
+        metadata={"label": "Reference frame", "help": "Zero-based source frame for relative energy, before sampling.", "min": 0},
     )
 
 
@@ -709,6 +727,10 @@ class PartialEnergySeriesRequest(BaseRequest):
         default=1,
         metadata={'label': 'Every', 'help': 'Every parameter for PartialEnergySeriesRequest.', 'min': 1, 'units': 'frames'},
     )
+    relative: bool = dc_field(default=False, metadata={"label": "Relative energy", "help": "Also report each component relative to its reference-frame energy."})
+    reference_frame: int = dc_field(default=0, metadata={"label": "Reference frame", "help": "Zero-based source frame before sampling.", "min": 0})
+    per_atom: bool = dc_field(default=False, metadata={"label": "Per atom", "help": "Normalize energies using num_atoms."})
+    num_atoms: Optional[int] = dc_field(default=None, metadata={"label": "Number of atoms", "help": "Fixed positive atom count; enables per-atom normalization.", "min": 1})
 
 
 @dataclass
@@ -874,15 +896,17 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
 class SimulationScalarSeriesTask(AnalysisTask):
     """Build a scalar time series from ``SimulationData``."""
 
-    VERSION = "4"
+    VERSION = "6"
     required_data = SimulationData
 
     @staticmethod
     def required_data_fields_for(request: SimulationScalarSeriesRequest, _args: dict) -> tuple[str, ...]:
         """Declare the simulation field that must be populated by the loader."""
-        if request.per_atom:
+        if request.per_atom or request.num_atoms is not None:
             if request.field != "potential_energy":
                 raise ValueError("Per-atom normalization is only supported for potential energy.")
+            if request.num_atoms is not None:
+                return (str(request.field),)
             return (str(request.field), "num_of_atoms")
         return (str(request.field),)
 
@@ -956,14 +980,25 @@ class SimulationScalarSeriesTask(AnalysisTask):
             raise ValueError("SimulationData.iterations length must match simulation scalar length.")
 
         sampled_values = np.asarray(values[frame_idx], dtype=float)
-        if request.per_atom:
+        if request.relative:
+            if request.field != "potential_energy":
+                raise ValueError("Relative energy is only supported for potential energy.")
+            if not 0 <= request.reference_frame < n_frames:
+                raise ValueError(f"Reference frame must be between 0 and {n_frames - 1}.")
+            reference_value = float(values[request.reference_frame])
+        if request.per_atom or request.num_atoms is not None:
             if request.field != "potential_energy":
                 raise ValueError("Per-atom normalization is only supported for potential energy.")
-            if data.num_of_atoms is None:
+            if request.num_atoms is not None:
+                if isinstance(request.num_atoms, bool) or not isinstance(request.num_atoms, (int, np.integer)) or request.num_atoms <= 0:
+                    raise ValueError("Number of atoms must be a positive integer.")
+                atom_counts = np.full(n_frames, request.num_atoms, dtype=float)
+            elif data.num_of_atoms is None:
                 raise ValueError(
                     "Per-atom potential energy requires an atom count for every frame."
                 )
-            atom_counts = np.asarray(data.num_of_atoms, dtype=float)
+            else:
+                atom_counts = np.asarray(data.num_of_atoms, dtype=float)
             if atom_counts.shape[0] != n_frames:
                 raise ValueError(
                     "SimulationData.num_of_atoms length must match potential-energy length."
@@ -976,6 +1011,11 @@ class SimulationScalarSeriesTask(AnalysisTask):
                 )
             sampled_values = sampled_values / sampled_counts
             label = "potential_energy_per_atom"
+            if request.relative:
+                reference_count = atom_counts[request.reference_frame]
+                if not np.isfinite(reference_count) or reference_count <= 0:
+                    raise ValueError("Per-atom potential energy requires a positive, finite atom count in the reference frame.")
+                reference_value /= reference_count
 
         table = pd.DataFrame(
             {
@@ -985,6 +1025,8 @@ class SimulationScalarSeriesTask(AnalysisTask):
                 "value": sampled_values,
             }
         )
+        if request.relative:
+            table["relative_energy"] = sampled_values - reference_value
         if label == "elapsed_time":
             elapsed_per_iter = np.full(n_frames, np.nan, dtype=float)
             if data.iterations is not None:
@@ -1938,7 +1980,7 @@ class EregimeSeriesTask(AnalysisTask):
 class PartialEnergySeriesTask(AnalysisTask):
     """Build iteration-based series for one or more fort.73 energy components."""
 
-    VERSION = "1"
+    VERSION = "2"
     required_data = PartialEnergyData
 
     @staticmethod
@@ -2007,10 +2049,22 @@ class PartialEnergySeriesTask(AnalysisTask):
 
         components = _resolve_partial_energy_components(df, request.components)
         frame_idx = _frame_indices(n_frames, request.frames, request.every)
+        if request.relative and not 0 <= request.reference_frame < n_frames:
+            raise ValueError(f"Reference frame must be between 0 and {n_frames - 1}.")
+        if request.per_atom and request.num_atoms is None:
+            raise ValueError("Per-atom partial energy requires --num-atoms.")
+        divisor = 1
+        if request.num_atoms is not None:
+            if isinstance(request.num_atoms, bool) or not isinstance(request.num_atoms, (int, np.integer)) or request.num_atoms <= 0:
+                raise ValueError("Number of atoms must be a positive integer.")
+            divisor = request.num_atoms
 
         rows: list[dict[str, object]] = []
         for component in components:
             y = pd.to_numeric(df.iloc[frame_idx][component], errors="coerce").to_numpy(dtype=float)
+            y = y / divisor
+            if request.relative:
+                reference_value = float(pd.to_numeric(df[component], errors="coerce").iloc[request.reference_frame]) / divisor
             for rel_i, fi in enumerate(frame_idx):
                 rows.append(
                     {
@@ -2018,6 +2072,7 @@ class PartialEnergySeriesTask(AnalysisTask):
                         "iter": int(iterations[fi]),
                         "component": str(component),
                         "value": float(y[rel_i]),
+                        **({"relative_energy": float(y[rel_i] - reference_value)} if request.relative else {}),
                     }
                 )
 

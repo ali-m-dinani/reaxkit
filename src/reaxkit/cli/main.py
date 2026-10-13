@@ -543,7 +543,7 @@ def main(*, announce: bool = True) -> int:
         diagnostics = CommandDiagnostics(
             project_root, getattr(args, "command", selected_command), sys.argv[1:], trace.run_id,
             interval=getattr(args, "diagnostic_interval_seconds", 60.0),
-            enabled=getattr(args, "diagnostics", True), trace=trace,
+            enabled=getattr(args, "diagnostics", False), trace=trace,
             profile=getattr(args, "profile", False), profile_clock=getattr(args, "profile_clock", "wall"),
         )
     except ValueError as error:

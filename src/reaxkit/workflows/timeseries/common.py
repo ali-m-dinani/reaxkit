@@ -149,6 +149,9 @@ def build_simulation_request(args: argparse.Namespace, field: str) -> Simulation
         frames=_frames(args),
         every=int(args.every),
         per_atom=bool(getattr(args, "per_atom", False)),
+        num_atoms=getattr(args, "num_atoms", None),
+        relative=bool(getattr(args, "relative", False)),
+        reference_frame=int(getattr(args, "reference_frame", 0)),
     )
 
 
@@ -197,7 +200,13 @@ def build_eregime_request(args: argparse.Namespace) -> EregimeSeriesRequest:
 
 def build_partial_energy_request(args: argparse.Namespace) -> PartialEnergySeriesRequest:
     components = tuple(args.components) if args.components else None
-    return PartialEnergySeriesRequest(components=components, frames=_frames(args), every=int(args.every))
+    return PartialEnergySeriesRequest(
+        components=components, frames=_frames(args), every=int(args.every),
+        relative=bool(getattr(args, "relative", False)),
+        reference_frame=int(getattr(args, "reference_frame", 0)),
+        per_atom=bool(getattr(args, "per_atom", False)),
+        num_atoms=getattr(args, "num_atoms", None),
+    )
 
 
 def build_restraint_request(args: argparse.Namespace) -> RestraintSeriesRequest:
@@ -373,6 +382,23 @@ def build_plot_payload(
                 "label": y_col,
             }
         )
+    if command == "get_potential_energy" and "relative_energy" in working:
+        series.append(
+            {
+                "x": working["__plot_x"].tolist(),
+                "y": pd.to_numeric(working["relative_energy"], errors="coerce").tolist(),
+                "label": "relative_energy",
+            }
+        )
+    if command == "get_partial_energy" and "relative_energy" in working:
+        for component, group in working.groupby("component", sort=False):
+            series.append(
+                {
+                    "x": group["__plot_x"].tolist(),
+                    "y": pd.to_numeric(group["relative_energy"], errors="coerce").tolist(),
+                    "label": f"component={component} (relative)",
+                }
+            )
     if command == "get_elapsed_time" and "elapsed_time_per_iter" in working:
         for item in series:
             item["label"] = "elapsed_time"
@@ -389,13 +415,16 @@ def build_plot_payload(
     title = command.removeprefix("get_").replace("_", " ").title()
     ylabel = y_col
     if command == "get_potential_energy":
-        if bool(getattr(args, "per_atom", False)):
+        if bool(getattr(args, "per_atom", False)) or getattr(args, "num_atoms", None) is not None:
             title = "Potential Energy per Atom"
             ylabel = "Potential Energy per Atom (kcal/mole/atom)"
         else:
             ylabel = "Potential Energy (kcal/mole)"
     elif command == "get_partial_energy":
         ylabel = "Partial Energy (kcal/mole)"
+        if getattr(args, "num_atoms", None) is not None:
+            title = "Partial Energy per Atom"
+            ylabel = "Partial Energy per Atom (kcal/mole/atom)"
     elif command == "get_elapsed_time":
         ylabel = "Elapsed time (s) / elapsed time per iteration (s/iter)"
     if getattr(args, "plot", None) == "separate":
@@ -413,7 +442,8 @@ def build_plot_payload(
                 )
             if command == "get_partial_energy" and label.startswith("component="):
                 filename_label = label.partition("=")[2]
-                item_ylabel = f"{filename_label} (kcal/mole)"
+                units = "kcal/mole/atom" if getattr(args, "num_atoms", None) is not None else "kcal/mole"
+                item_ylabel = f"{filename_label} ({units})"
             # Keep generated filenames portable and prevent labels from becoming paths.
             stem = "".join(
                 character if character.isalnum() or character in {"-", "_"} else "_"
@@ -448,7 +478,8 @@ def build_plot_payload(
                     if label.startswith("component=")
                     else label
                 )
-                subplot_ylabels.append(f"{component} (kcal/mole)")
+                units = "kcal/mole/atom" if getattr(args, "num_atoms", None) is not None else "kcal/mole"
+                subplot_ylabels.append(f"{component} ({units})")
         return {
             "plot_type": "multi_subplots",
             "subplots": [[item] for item in series],
@@ -510,11 +541,35 @@ def _apply_frame_axis_to_result(
         )
 
 
+def _split_partial_energy_csvs(result: object) -> None:
+    """Prepare separate component tables with portable, unique filenames."""
+    tables: dict[str, pd.DataFrame] = {}
+    used_names: set[str] = set()
+    for component, table in result.table.groupby("component", sort=False):
+        stem = "".join(
+            character if character.isalnum() or character in {"-", "_"} else "_"
+            for character in str(component)
+        ).strip("_") or "energy"
+        if stem.upper() in {"CON", "PRN", "AUX", "NUL", *(f"COM{number}" for number in range(1, 10)), *(f"LPT{number}" for number in range(1, 10))}:
+            stem = f"energy_{stem}"
+        name = stem
+        suffix = 2
+        while name.casefold() in used_names or name in {"table", "all_frames"}:
+            name = f"{stem}_{suffix}"
+            suffix += 1
+        used_names.add(name.casefold())
+        tables[name] = table.reset_index(drop=True)
+    result.csv_tables = tables
+    result.csv_export_separate_only = True
+
+
 def run_task(command: str, task_name: str, request: object, args: argparse.Namespace) -> int:
     """Execute and present one dedicated time-series workflow."""
     task_cls = TASK_REGISTRY[task_name]
     result = AnalysisExecutor().run(task_cls(), request, vars(args))
     _apply_frame_axis_to_result(command, result, args)
+    if command == "get_partial_energy":
+        _split_partial_energy_csvs(result)
     present_result(command, result, args, plot_payload_builder=build_plot_payload)
     return 0
 
