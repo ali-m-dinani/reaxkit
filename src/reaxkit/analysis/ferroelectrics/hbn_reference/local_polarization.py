@@ -88,6 +88,8 @@ class HBNReferenceLocalPolarizationRequest(HBNReferencePolarizationRequest):
 class HBNReferenceLocalPolarizationResult(BaseResult):
     """Cell- and layer-resolved dipoles, assigned volumes, and polarizations."""
 
+    time_unit = "ps"
+
     table: pd.DataFrame
     summary: pd.DataFrame
     cell_table: pd.DataFrame
@@ -501,7 +503,7 @@ def calculate_hbn_reference_local_polarization(
         trajectory,
         {axis: f"P_{axis} (uC/cm^2)" for axis in "xyz"},
     )
-    return HBNReferenceLocalPolarizationResult(
+    result = HBNReferenceLocalPolarizationResult(
         table=table,
         summary=summary,
         cell_table=cell_table,
@@ -515,6 +517,8 @@ def calculate_hbn_reference_local_polarization(
         frame_indices=reference_result.frame_indices,
         iterations=reference_result.iterations,
     )
+    from reaxkit.core.results_shaping.result_time_enrichment import enrich_result_with_time
+    return enrich_result_with_time(result, data, control_file=getattr(request, "_control_file", "control"))
 
 
 @register_task(
@@ -530,7 +534,7 @@ class HBNReferenceLocalPolarizationTask(AnalysisTask):
         thread_safe=True, automatic_parallel=False, supports_selective_frames=True,
         reference_fields=("reference_frame",), estimated_frame_bytes=16 * 1024 * 1024)
     supports_selective_streaming = False
-    VERSION = "6"
+    VERSION = "7"
 
     def required_data_for(
             self, request: HBNReferenceLocalPolarizationRequest, args: dict | None = None
@@ -665,6 +669,8 @@ def write_local_polarization_extxyz(
                     metadata={
                         "local_volume_method": "hull" if result.request.volume_method == "local-hull" else result.request.local_volume_method,
                         "local_grouping": "neighborhood",
+                        "time": float(neighborhoods["time"].iloc[0]) if "time" in neighborhoods and not neighborhoods.empty else np.nan,
+                        "time_unit": "ps",
                         "frame_volume_method": result.request.volume_method,
                         "local_charge_method": result.request.local_charge_method,
                         "geometric_zero_tolerance": result.request.geometric_zero_tolerance,

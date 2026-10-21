@@ -2,6 +2,20 @@
 
 ## Al-centered neighborhoods
 
+### Time units
+
+Local polarization and projected polarity export `time` in picoseconds and
+`time_unit=ps`. Native simulation times in femtoseconds are divided by 1000;
+iteration and source-frame numbers are unchanged. If native time is unavailable,
+control-file timestep conversion is normalized to ps regardless of time span.
+Missing physical time remains unavailable rather than treating frame indices as
+time. EXTXYZ metadata also reports `time` and `time_unit=ps`; projected
+kymographs use Time (ps) when finite increasing physical times are available,
+otherwise explicitly fall back to source frame. Streaming and checkpoint
+re-export preserve the same units without repeated division. Rerun old outputs
+to obtain the new convention, and use `--time-unit ps` in downstream velocity
+commands reading these new tables. Do not divide the exported times again.
+
 `get-hbn-reference-local-polarization` now defaults to one neighborhood per Al.
 Each Al uses the three nearest coplanar N images in the prepared hBN reference.
 Neighbors and reference positions are fixed throughout the trajectory; there is
@@ -135,6 +149,13 @@ to invalidate old scientific caches/checkpoints. Shared bounded streaming and
 recovery mechanisms are retained.
 
 ### Projected-polarity Extended XYZ
+
+Detailed center CSV/Parquet export is off by default for all CLI output profiles,
+including full and legacy. Use `--write-centers --centers-format csv` to opt in,
+or `--no-write-centers` to explicitly skip it. Minimal profile suppresses center
+export even when requested. Skipping also avoids building the detailed center
+rows; projected bins, kymographs, summaries, and requested EXTXYZ still work.
+Previously written center files are not deleted automatically.
 
 Add `--write-extxyz` to projected polarity to write
 `hbn_reference_projected_polarity.extxyz`, with optional

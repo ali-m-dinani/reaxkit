@@ -107,8 +107,9 @@ Examples:
     )
     parser.add_argument(
         "--write-centers",
-        action="store_true",
-        help="Write the optional detailed per-Al geometric polarity table. Example: --write-centers.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Write the large per-Al geometric polarity table (off by default, including full/legacy profiles). Use --no-write-centers to explicitly skip it. Example: --write-centers --centers-format csv.",
     )
     parser.add_argument(
         "--write-extxyz", action="store_true",
@@ -274,6 +275,8 @@ def generate_polarity_kymograph(
     if isinstance(table, ResultTable):
         table = table.materialize()
     frames = np.sort(table["frame_index"].astype(int).unique())
+    time_values = table.groupby("frame_index")["time"].first().reindex(frames).to_numpy(float) if "time" in table else np.full(len(frames), np.nan)
+    use_time = np.isfinite(time_values).all() and (len(time_values) < 2 or np.all(np.diff(time_values) > 0))
     profile_axis_index = result.request.projection_plane.index(result.request.profile_axis)
     profile_bins = np.arange(int(result.request.projection_bins[profile_axis_index]))
     values = (
@@ -283,7 +286,7 @@ def generate_polarity_kymograph(
     )
     figure, axis = plt.subplots(figsize=(9.0, 5.8))
     image = axis.pcolormesh(
-        _center_edges(frames),
+        _center_edges(time_values if use_time else frames),
         result.profile_edges,
         values,
         cmap="coolwarm_r",
@@ -291,7 +294,7 @@ def generate_polarity_kymograph(
         vmax=1.0,
         shading="flat",
     )
-    axis.set_xlabel("source frame")
+    axis.set_xlabel("Time (ps)" if use_time else "source frame")
     axis.set_ylabel(f"{result.request.profile_axis} (angstrom)")
     axis.set_title(
         f"Mean h-BN-reference {result.request.component}-polarity kymograph"
@@ -312,7 +315,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
     profile = str(getattr(args, "output_profile", "standard"))
-    args.write_centers = (bool(args.write_centers) or profile in {"full", "legacy"}) and profile != "minimal"
+    args.write_centers = bool(args.write_centers) and profile != "minimal"
     args.write_extxyz = (bool(args.write_extxyz) or profile in {"full", "legacy"}) and profile != "minimal"
     extxyz_path = output / "hbn_reference_projected_polarity.extxyz"
     centers_format = str(getattr(args, "detail_format", None) or ("csv" if profile == "legacy" else args.centers_format))
@@ -324,11 +327,12 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     specs = (
         ArtifactSpec("extxyz", extxyz_path.name, "detail", args.write_extxyz, "extxyz", True),
-        ArtifactSpec("centers", centers_path.name, "detail", bool(args.write_centers), centers_format, True),
         ArtifactSpec("projected", projected_path.name, "core", True, "csv", True),
         ArtifactSpec("kymograph", kymograph_path.name, "core", True, "csv", True),
         ArtifactSpec("whole_slab_summary", whole_slab_summary_path.name, "summary", True, "csv", True),
     )
+    if args.write_centers:
+        specs += (ArtifactSpec("centers", centers_path.name, "detail", True, centers_format, True),)
     with ArtifactWriter(output, specs, profile=profile, overwrite=True) as writer:
         run_args = runtime_arguments(args)
         run_args["_artifact_writer"] = writer

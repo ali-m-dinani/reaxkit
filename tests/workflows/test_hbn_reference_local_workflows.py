@@ -316,18 +316,23 @@ def test_local_and_projected_plot_generators_write_artifacts(tmp_path) -> None:
     assert kymograph.is_file()
 
 
-@pytest.mark.parametrize("profile", ["standard", "minimal", "full"])
-def test_projected_workflow_extxyz_without_centers(tmp_path, monkeypatch, profile):
+@pytest.mark.parametrize("profile", ["standard", "minimal", "full", "legacy"])
+@pytest.mark.parametrize("center_flags", [[], ["--no-write-centers"], ["--write-centers"], ["--write-centers", "--no-write-centers"]])
+def test_projected_workflow_extxyz_without_centers(tmp_path, monkeypatch, profile, center_flags):
     workflow = projected_polarity_workflow
     parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
-    args = parser.parse_args(["--replication", "2", "1", "1", "--write-extxyz", "--extxyz-precision", "10"])
+    args = parser.parse_args(["--replication", "2", "1", "1", "--write-extxyz", "--extxyz-precision", "10", "--centers-format", "csv", *center_flags])
     args.output_profile = profile
+    expected_centers = center_flags == ["--write-centers"] and profile != "minimal"
     assert "--write-extxyz" in parser.format_help()
+    assert "--no-write-centers" in parser.format_help()
 
     class StubExecutor:
         @staticmethod
         def run(task, request, run_args):
             assert request.write_extxyz == (profile != "minimal")
+            assert request.include_centers == expected_centers
+            assert ("centers" in run_args["_artifact_writer"].specs) == expected_centers
             if request.write_extxyz:
                 assert run_args["no_cache"]
             return task.run(_trajectory(), request)
@@ -340,8 +345,7 @@ def test_projected_workflow_extxyz_without_centers(tmp_path, monkeypatch, profil
     assert path.exists() == (profile != "minimal")
     if path.exists():
         assert len(read(path)) == len(_trajectory().atom_ids)
-    if profile == "standard":
-        assert not list(tmp_path.glob("*centers.*"))
+    assert bool(list(tmp_path.glob("*centers.csv"))) == expected_centers
 
 
 def test_projected_workflow_writes_whole_slab_polarity_summary(

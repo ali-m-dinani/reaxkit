@@ -92,6 +92,8 @@ class HBNReferenceProjectedPolarityRequest(HBNReferenceLocalPolarizationRequest)
 class HBNReferenceProjectedPolarityResult(BaseResult):
     """Local-group signs plus projected and frame-resolved mean-polarity tables."""
 
+    time_unit = "ps"
+
     artifact_tiers = {
         "hbn_reference_projected_polarity_2d": "core",
         "hbn_reference_projected_polarity_kymograph": "core",
@@ -149,6 +151,7 @@ class _FramePayload:
     labels: np.ndarray
     cell: np.ndarray
     charges: np.ndarray | None
+    time_ps: float
 
 
 def _validate_request(request: HBNReferenceProjectedPolarityRequest) -> None:
@@ -241,6 +244,12 @@ def _build_context(trajectory, request) -> _ProjectionContext:
 
 def _payload(data, frame: int, source_frame: int, request) -> _FramePayload:
     trajectory, dynamic_charges = _trajectory_and_charges(data)
+    from reaxkit.core.results_shaping.result_time_enrichment import _attach_time_to_frame, _iter_time_mapping_from_data
+    timing = _attach_time_to_frame(
+        pd.DataFrame({"iter": [_iteration(trajectory, frame)]}),
+        iter_to_time=_iter_time_mapping_from_data(data),
+        control_file=getattr(request, "_control_file", "control"), time_unit="ps",
+    )
     return _FramePayload(
         frame_index=int(source_frame),
         iteration=_iteration(trajectory, frame),
@@ -248,6 +257,7 @@ def _payload(data, frame: int, source_frame: int, request) -> _FramePayload:
         labels=_frame_labels(trajectory, frame),
         cell=_frame_cell(trajectory, request, frame),
         charges=None,
+        time_ps=float(timing["time"].iloc[0]) if "time" in timing else np.nan,
     )
 
 
@@ -398,6 +408,9 @@ def _frame_rows(payload, request, context):
             "mean_polarity": stats[4],
             "bin_reference_frame": int(request.reference_frame),
         })
+    for row in [*center_rows, *projected_rows, *kymograph_rows, slab_row]:
+        row["time"] = payload.time_ps
+        row["time_unit"] = "ps"
     extended = None
     if request.write_extxyz:
         count = len(xyz)
@@ -423,6 +436,7 @@ def _frame_rows(payload, request, context):
             frame=payload.frame_index, iteration=payload.iteration, lattice=payload.cell,
             pbc=tuple(bool(value) for value in request.periodic),
             metadata={"polarity_method": "geometric", "polarity_component": request.component,
+                      "time": payload.time_ps, "time_unit": "ps",
                       "local_grouping": "neighborhood", "geometric_displacement_units": "angstrom",
                       "geometric_zero_tolerance": request.geometric_zero_tolerance,
                       "geometric_polarity_convention": "Al_minus_mean_N_displacement"},
@@ -549,7 +563,7 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
     supports_selective_streaming = True
     native_charges_required_for_auto = False
     execution_capabilities = _PIPELINE_CAPABILITIES
-    VERSION = "7"
+    VERSION = "8"
 
     def required_data_for(self, request, args: dict | None = None):
         return TrajectoryData
