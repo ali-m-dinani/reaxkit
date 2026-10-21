@@ -1,8 +1,9 @@
-"""Projected polarity fractions from local h-BN-reference group dipoles."""
+"""Projected signs of Al displacement relative to coplanar reference N neighbors."""
 
 from __future__ import annotations
 
 import copy
+from contextlib import nullcontext
 from dataclasses import dataclass, field as dc_field
 from typing import Any, ClassVar, Iterable, Literal, cast
 
@@ -12,16 +13,13 @@ import pandas as pd
 from reaxkit.analysis.base import AnalysisTask
 from reaxkit.analysis.ferroelectrics.four_folded_wurtzite.neighbors import (
     _trajectory_and_charges,
-    required_wurtzite_data_type,
 )
 from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
     HBNReferenceLocalPolarizationRequest,
     HBNReferenceLocalPolarizationResult,
 )
 from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
-    ELECTRON_CHARGE_SIGN,
     PreparedHBNReference,
-    _formal_charge_map,
     _frame_cell,
     _frame_labels,
     _iteration,
@@ -32,6 +30,7 @@ from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
     _unit_vector,
     prepare_hbn_reference,
 )
+from reaxkit.analysis.ferroelectrics.hbn_reference.al_neighborhoods import AlNeighborhoods, build_al_neighborhoods
 from reaxkit.core.registry.analysis_task_registry import register_task
 from reaxkit.core.runtime.execution_contracts import (
     ExecutionShape,
@@ -44,6 +43,7 @@ from reaxkit.core.runtime.reducers import TableAccumulator
 from reaxkit.domain.base_result import BaseResult
 from reaxkit.domain.data_models import ElectrostaticsData, TrajectoryData
 from reaxkit.presentation.specs import PresentationSpec
+from reaxkit.engine.common.generators.extended_xyz_generator import ExtendedXYZFrame, ExtendedXYZWriter
 
 ProjectionPlane = Literal["xy", "xz", "yz"]
 PolarityComponent = Literal["x", "y", "z", "c"]
@@ -79,8 +79,11 @@ class HBNReferenceProjectedPolarityRequest(HBNReferenceLocalPolarizationRequest)
         default=None,
         metadata={"label": "Kymograph profile axis", "choices": ["x", "y", "z"]},
     )
-    dipole_zero_tolerance: float = 0.0
+    dipole_zero_tolerance: float | None = None
     include_centers: bool = True
+    write_extxyz: bool = False
+    extxyz_precision: int = 8
+    _output_path: str | None = dc_field(default=None, repr=False, compare=False)
     workers: int = 0
     chunk_size: int = 0
 
@@ -126,7 +129,8 @@ class HBNReferenceProjectedPolarityResult(BaseResult):
 @dataclass(frozen=True)
 class _ProjectionContext:
     prepared: PreparedHBNReference
-    atom_group_ids: np.ndarray
+    neighborhoods: AlNeighborhoods
+    atom_ids: np.ndarray
     reference_centers: np.ndarray
     u_edges: np.ndarray
     v_edges: np.ndarray
@@ -135,7 +139,6 @@ class _ProjectionContext:
     profile_bins: np.ndarray
     profile_edges: np.ndarray
     c_hat: np.ndarray
-    formal_charges: dict[str, float]
 
 
 @dataclass(frozen=True)
@@ -157,8 +160,18 @@ def _validate_request(request: HBNReferenceProjectedPolarityRequest) -> None:
         raise ValueError("profile_axis must be one of the two projection-plane axes.")
     if len(request.projection_bins) != 2 or any(int(value) <= 0 for value in request.projection_bins):
         raise ValueError("projection_bins must contain two positive integers.")
-    if float(request.dipole_zero_tolerance) < 0.0:
-        raise ValueError("dipole_zero_tolerance must be non-negative.")
+    if request.dipole_zero_tolerance is not None:
+        raise ValueError("Projected polarity is geometric; use geometric_zero_tolerance in angstrom.")
+    if not np.isfinite(request.geometric_zero_tolerance) or request.geometric_zero_tolerance < 0:
+        raise ValueError("geometric_zero_tolerance must be finite and non-negative.")
+    if request.local_grouping not in {"al", "layer"}:
+        raise ValueError("Geometric projected polarity is per Al; use local_grouping='al'.")
+    if request.local_charge_treatment is not None:
+        raise ValueError("Geometric projected polarity does not use local_charge_treatment.")
+    if request.write_extxyz and not request._output_path:
+        raise ValueError("EXTXYZ export requires an output path.")
+    if int(request.extxyz_precision) < 1:
+        raise ValueError("extxyz_precision must be at least 1.")
     if int(request.workers) < 0:
         raise ValueError("workers must be zero (automatic) or at least 1.")
     if int(request.chunk_size) < 0:
@@ -199,13 +212,8 @@ def _polarity_statistics(values: np.ndarray):
 
 def _build_context(trajectory, request) -> _ProjectionContext:
     prepared = prepare_hbn_reference(trajectory, request)
-    assignment = prepared.simulation_to_reference
-    if request.local_grouping == "cell":
-        atom_group_ids = prepared.local_cell_ids[assignment]
-        reference_centers = prepared.local_cell_centers
-    else:
-        atom_group_ids = prepared.local_layer_ids[assignment]
-        reference_centers = prepared.local_layer_centers
+    neighborhoods = build_al_neighborhoods(prepared)
+    reference_centers = neighborhoods.reference_centers
     u_axis, v_axis = request.projection_plane
     u_reference = reference_centers[:, "xyz".index(u_axis)]
     v_reference = reference_centers[:, "xyz".index(v_axis)]
@@ -218,7 +226,8 @@ def _build_context(trajectory, request) -> _ProjectionContext:
     )
     return _ProjectionContext(
         prepared=prepared,
-        atom_group_ids=np.asarray(atom_group_ids, dtype=int),
+        neighborhoods=neighborhoods,
+        atom_ids=np.asarray(trajectory.atom_ids, dtype=int),
         reference_centers=np.asarray(reference_centers, dtype=float),
         u_edges=u_edges,
         v_edges=v_edges,
@@ -227,7 +236,6 @@ def _build_context(trajectory, request) -> _ProjectionContext:
         profile_bins=profile_bins,
         profile_edges=profile_edges,
         c_hat=_unit_vector(request.c_axis, "c_axis"),
-        formal_charges=_formal_charge_map(request.formal_charges),
     )
 
 
@@ -239,32 +247,10 @@ def _payload(data, frame: int, source_frame: int, request) -> _FramePayload:
         xyz=np.asarray(trajectory.positions[frame], dtype=float),
         labels=_frame_labels(trajectory, frame),
         cell=_frame_cell(trajectory, request, frame),
-        charges=None if dynamic_charges is None else np.asarray(dynamic_charges[frame], dtype=float),
+        charges=None,
     )
 
 
-def _resolve_charges(payload, request, context) -> np.ndarray:
-    use_dynamic = request.charge_source == "reaxff" or (
-        request.charge_source == "auto" and payload.charges is not None
-    )
-    if use_dynamic:
-        if payload.charges is None:
-            raise ValueError("--charge-source reaxff requires per-atom charges from fort.7.")
-        charges = np.asarray(payload.charges, dtype=float)
-    else:
-        charges = np.asarray(
-            [context.formal_charges.get(str(label).casefold(), np.nan) for label in payload.labels]
-        )
-    if not np.isfinite(charges).all():
-        bad = sorted({str(payload.labels[index]) for index in np.flatnonzero(~np.isfinite(charges))})
-        raise ValueError(
-            f"Frame {payload.frame_index} has missing or non-finite atomic charge(s): {', '.join(bad)}."
-        )
-    return charges
-
-
-def _sum_by_group(values, groups, count) -> np.ndarray:
-    return np.bincount(groups, weights=np.asarray(values, dtype=float), minlength=count)
 
 
 def _frame_rows(payload, request, context):
@@ -286,48 +272,32 @@ def _frame_rows(payload, request, context):
     displacement = _minimum_image(
         fractional - reference_for_atoms, _periodic_axes(request.periodic)
     ) @ payload.cell
-    component_displacement = (
-        displacement[:, "xyz".index(request.component)]
+    relative_xyz = context.neighborhoods.relative_displacement(displacement, payload.cell, request.periodic)
+    relative = (
+        relative_xyz[:, "xyz".index(request.component)]
         if request.component in "xyz"
-        else displacement @ context.c_hat
+        else relative_xyz @ context.c_hat
     )
-    charges = _resolve_charges(payload, request, context)
-    groups = context.atom_group_ids
+    neighborhoods = context.neighborhoods
     group_count = len(context.reference_centers)
-    atom_count = np.bincount(groups, minlength=group_count).astype(float)
-    net_charge = _sum_by_group(charges, groups, group_count)
-    displacement_sum = _sum_by_group(component_displacement, groups, group_count)
-    raw_dipole = _sum_by_group(
-        ELECTRON_CHARGE_SIGN * charges * component_displacement, groups, group_count
-    )
-    neutralize = np.full(group_count, request.local_charge_treatment == "neutralize")
-    if request.local_charge_treatment == "auto":
-        neutralize = np.abs(net_charge) > 1.0e-10
-    neutralized = raw_dipole - ELECTRON_CHARGE_SIGN * net_charge / atom_count * displacement_sum
-    dipole = np.where(neutralize, neutralized, raw_dipole)
-    polarity = np.sign(dipole)
-    polarity[np.abs(dipole) <= float(request.dipole_zero_tolerance)] = 0.0
-    polarity[~np.isfinite(dipole)] = np.nan
+    polarity = np.sign(relative)
+    polarity[np.abs(relative) <= float(request.geometric_zero_tolerance)] = 0.0
+    polarity[~np.isfinite(relative)] = np.nan
 
     center_rows = []
     if request.include_centers:
-        mean_displacement = np.column_stack(
-            [_sum_by_group(displacement[:, axis], groups, group_count) / atom_count for axis in range(3)]
-        )
-        current_centers = context.reference_centers + mean_displacement
-        group_column = "local_cell_id" if request.local_grouping == "cell" else "local_layer_id"
+        current_centers = context.reference_centers + displacement[neighborhoods.al_indices]
         for group_id in range(group_count):
             row = {
                 "frame_index": payload.frame_index,
                 "iter": payload.iteration,
-                group_column: group_id,
-                "local_group_id": group_id,
-                "local_grouping": request.local_grouping,
-                "atom_count": int(atom_count[group_id]),
-                "net_charge (e)": float(net_charge[group_id]),
-                "charge_neutralization_applied": bool(neutralize[group_id]),
-                f"raw_dipole_{request.component} (e*angstrom)": float(raw_dipole[group_id]),
-                f"dipole_{request.component} (e*angstrom)": float(dipole[group_id]),
+                "local_neighborhood_id": int(neighborhoods.layer_ids[group_id]),
+                "local_grouping": "al",
+                "representative_atom_id": int(context.atom_ids[neighborhoods.al_indices[group_id]]),
+                "neighbor_count": 3,
+                "polarity_method": "geometric",
+                f"geometric_displacement_{request.component} (angstrom)": float(relative[group_id]),
+                "geometric_zero_tolerance (angstrom)": float(request.geometric_zero_tolerance),
                 "polarity_component": request.component,
                 "has_defined_polarity": bool(np.isfinite(polarity[group_id])),
                 "polarity": float(polarity[group_id]),
@@ -347,7 +317,8 @@ def _frame_rows(payload, request, context):
         "frame_index": payload.frame_index,
         "iter": payload.iteration,
         "component": request.component,
-        "local_grouping": request.local_grouping,
+        "local_grouping": "al",
+        "polarity_method": "geometric",
         "spatial_scope": "whole_slab",
         "total_group_count": group_count,
         "defined_group_count": stats[0],
@@ -378,7 +349,8 @@ def _frame_rows(payload, request, context):
                 "iter": payload.iteration,
                 "plane": request.projection_plane,
                 "component": request.component,
-                "local_grouping": request.local_grouping,
+                "local_grouping": "al",
+                "polarity_method": "geometric",
                 "u_axis": u_axis,
                 "v_axis": v_axis,
                 "u_bin": u_bin,
@@ -409,7 +381,8 @@ def _frame_rows(payload, request, context):
             "iter": payload.iteration,
             "profile_axis": request.profile_axis,
             "component": request.component,
-            "local_grouping": request.local_grouping,
+            "local_grouping": "al",
+            "polarity_method": "geometric",
             "profile_bin": profile_bin,
             "coordinate_min (angstrom)": float(context.profile_edges[profile_bin]),
             "coordinate_max (angstrom)": float(context.profile_edges[profile_bin + 1]),
@@ -425,7 +398,45 @@ def _frame_rows(payload, request, context):
             "mean_polarity": stats[4],
             "bin_reference_frame": int(request.reference_frame),
         })
-    return center_rows, projected_rows, kymograph_rows, slab_row
+    extended = None
+    if request.write_extxyz:
+        count = len(xyz)
+        centers = neighborhoods.al_indices
+        ids = np.full(count, -1, dtype=int)
+        ids[centers] = neighborhoods.layer_ids
+        is_center = np.zeros(count, dtype=int)
+        is_center[centers] = 1
+        properties = {"atom_number": context.atom_ids, "local_neighborhood_id": ids, "is_local_center": is_center}
+        relative_c = relative_xyz @ context.c_hat
+        for name, values in {
+            "geometric_displacement": relative_xyz,
+            "geometric_displacement_c": relative_c,
+            "geometric_polarity": np.where(np.abs(relative_xyz) <= request.geometric_zero_tolerance, 0.0, np.sign(relative_xyz)),
+            "geometric_polarity_c": np.where(np.abs(relative_c) <= request.geometric_zero_tolerance, 0.0, np.sign(relative_c)),
+            "polarity": polarity,
+        }.items():
+            array = np.full((count, *values.shape[1:]), np.nan)
+            array[centers] = values
+            properties[name] = array
+        extended = ExtendedXYZFrame(
+            species=payload.labels.astype(str).tolist(), positions=xyz, properties=properties,
+            frame=payload.frame_index, iteration=payload.iteration, lattice=payload.cell,
+            pbc=tuple(bool(value) for value in request.periodic),
+            metadata={"polarity_method": "geometric", "polarity_component": request.component,
+                      "local_grouping": "neighborhood", "geometric_displacement_units": "angstrom",
+                      "geometric_zero_tolerance": request.geometric_zero_tolerance,
+                      "geometric_polarity_convention": "Al_minus_mean_N_displacement"},
+        )
+    return center_rows, projected_rows, kymograph_rows, slab_row, extended
+
+
+def _finish_checkpoint(durable, request, store):
+    result = durable.finish(request)
+    if request.write_extxyz:
+        from reaxkit.core.runtime.checkpoint_trajectory import publish_segments
+        publish_segments(store, request._output_path)
+    result.skip_result_cache = True
+    return result
 
 
 def _run_payloads(
@@ -439,7 +450,7 @@ def _run_payloads(
     store = getattr(request, "_result_store", None)
     durable = CheckpointAccumulator(store) if store is not None else None
     if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
-        return durable.finish(request)
+        return _finish_checkpoint(durable, request, store)
     writer = getattr(pipeline, "artifact_writer", None) if pipeline is not None else None
     center_sink = (
         writer.sink("centers")
@@ -453,7 +464,7 @@ def _run_payloads(
     frame_indices, iterations = [], []
 
     def consume(result):
-        center_rows, projected_rows, kymograph_rows, slab_row = result
+        center_rows, projected_rows, kymograph_rows, slab_row, extended = result
         if durable is not None:
             position = store.committed_frames + len(store.pending)
             frame_result = HBNReferenceProjectedPolarityResult(
@@ -462,8 +473,14 @@ def _run_payloads(
                 request=request, local_result=None,
                 frame_indices=np.asarray([int(slab_row["frame_index"])]), iterations=np.asarray([int(slab_row["iter"])]),
                 projection_edges=(context.u_edges, context.v_edges), profile_edges=context.profile_edges)
-            durable.add(frame_result, position, int(slab_row["frame_index"]))
+            extra = {}
+            if extended is not None:
+                from reaxkit.core.runtime.checkpoint_trajectory import segment_table
+                extra["_extxyz"] = segment_table(extended, request.extxyz_precision)
+            durable.add(frame_result, position, int(slab_row["frame_index"]), extra_tables=extra)
             return
+        if extended is not None:
+            xyz_writer.write_frame(extended)
         centers.add(center_rows)
         projected.add(projected_rows)
         kymograph.add(kymograph_rows)
@@ -477,15 +494,20 @@ def _run_payloads(
         policy = resolve_execution_policy(_PipelineContract(), request, {})
         pipeline = BoundedFramePipeline(policy)
     selected_payloads = (item for position, item in enumerate(payloads) if store is None or position >= store.committed_frames)
-    for completed in pipeline.map_reference(
-        selected_payloads,
-        lambda: context,
-        lambda item, state: _frame_rows(item, request, state),
-    ):
-        consume(completed.value)
+    xyz_context = (
+        ExtendedXYZWriter(request._output_path, precision=request.extxyz_precision)
+        if request.write_extxyz and store is None else nullcontext()
+    )
+    with xyz_context as xyz_writer:
+        for completed in pipeline.map_reference(
+            selected_payloads,
+            lambda: context,
+            lambda item, state: _frame_rows(item, request, state),
+        ):
+            consume(completed.value)
 
     if durable is not None:
-        return durable.finish(request)
+        return _finish_checkpoint(durable, request, store)
 
     return HBNReferenceProjectedPolarityResult(
         centers=centers.finalize(),
@@ -525,16 +547,16 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
 
     required_data = TrajectoryData
     supports_selective_streaming = True
-    native_charges_required_for_auto = True
+    native_charges_required_for_auto = False
     execution_capabilities = _PIPELINE_CAPABILITIES
-    VERSION = "3"
+    VERSION = "7"
 
     def required_data_for(self, request, args: dict | None = None):
-        return required_wurtzite_data_type(request, args)
+        return TrajectoryData
 
     @staticmethod
     def required_data_fields_for(request, args: dict) -> tuple[str, ...]:
-        return (("trajectory",) if required_wurtzite_data_type(request, args) is TrajectoryData else ("trajectory", "charges"))
+        return ("trajectory",)
 
     @staticmethod
     def recommended_presentations(_result, _payload: dict[str, Any]) -> list[PresentationSpec]:
@@ -547,7 +569,7 @@ class HBNReferenceProjectedPolarityTask(AnalysisTask):
         store = getattr(request, "_result_store", None)
         if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
             from reaxkit.core.runtime.checkpoint_results import CheckpointAccumulator
-            return CheckpointAccumulator(store).finish(request)
+            return _finish_checkpoint(CheckpointAccumulator(store), request, store)
         _validate_request(request)
         if request.profile_axis is None:
             request.profile_axis = cast(CartesianAxis, request.projection_plane[1])

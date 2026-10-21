@@ -1195,8 +1195,8 @@ workflows:
     command: get-hbn-reference-local-polarization
     command_kind: analysis
     analysis_task: get-hbn-reference-local-polarization
-    description: Calculates local dipole and polarization for both four-atom crystallographic cells and
-      two-atom AlN reference layers using equal or deformation-weighted volumes.
+    description: Calculates Al-centered local dipoles using partitioned atomic contributions or neutral-Al
+      neighbor weights, with equal or deformation-weighted volumes and reference-cell aggregates.
     tags:
     - ferroelectrics
     - local polarization
@@ -1239,8 +1239,8 @@ workflows:
     command: get-hbn-reference-projected-polarity
     command_kind: analysis
     analysis_task: get-hbn-reference-projected-polarity
-    description: Averages fixed-reference-cell polarity signs in spatial projections and frame-resolved
-      kymographs.
+    description: Averages charge-independent geometric Al-centered polarity signs in fixed spatial
+      projections and frame-resolved kymographs.
     tags:
     - ferroelectrics
     - polarity
@@ -3547,6 +3547,54 @@ workflows:
     help_search_examples:
     - reaxkit help "polarization field"
     - reaxkit polarization-field -h
+  get-hbn-domain-wall-fraction-velocity:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow: get-hbn-domain-wall-fraction-velocity'
+    command: get-hbn-domain-wall-fraction-velocity
+    command_kind: analysis
+    description: Run the get hbn domain wall fraction velocity workflow command provided by hbn_reference_workflow.
+    tags:
+    - get hbn domain wall fraction velocity
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-domain-wall-fraction-velocity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "get hbn domain wall fraction velocity"
+    - reaxkit get-hbn-domain-wall-fraction-velocity -h
+  get-hbn-domain-wall-crossing-velocity:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow: get-hbn-domain-wall-crossing-velocity'
+    command: get-hbn-domain-wall-crossing-velocity
+    command_kind: analysis
+    description: Run the get hbn domain wall crossing velocity workflow command provided by hbn_reference_workflow.
+    tags:
+    - get hbn domain wall crossing velocity
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-domain-wall-crossing-velocity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "get hbn domain wall crossing velocity"
+    - reaxkit get-hbn-domain-wall-crossing-velocity -h
+  get-hbn-domain-wall-tracking-velocity:
+    parent_workflow: hbn_reference_workflow
+    implementation_module: 'reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow: get-hbn-domain-wall-tracking-velocity'
+    command: get-hbn-domain-wall-tracking-velocity
+    command_kind: analysis
+    description: Run the get hbn domain wall tracking velocity workflow command provided by hbn_reference_workflow.
+    tags:
+    - get hbn domain wall tracking velocity
+    - hbn reference workflow
+    - analysis workflow command
+    notes:
+    - 'How to use the workflow: reaxkit get-hbn-domain-wall-tracking-velocity -h'
+    aliases: []
+    help_search_examples:
+    - reaxkit help "get hbn domain wall tracking velocity"
+    - reaxkit get-hbn-domain-wall-tracking-velocity -h
   # END GENERATED COMMAND WORKFLOWS
 dataclass_usage:
   AtomicKinematicsData:
@@ -3598,6 +3646,9 @@ dataclass_usage:
   - trajectory_workflow
   - stress_strain_workflow
 command_to_workflow_module:
+  get-hbn-domain-wall-fraction-velocity: reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow
+  get-hbn-domain-wall-crossing-velocity: reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow
+  get-hbn-domain-wall-tracking-velocity: reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow
   get-potential-and-electric-field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow
   get_potential_and_electric_field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow
   reaxff-local-field: reaxkit.workflows.electrostatics.potential_and_electric_field.potential_and_electric_field_workflow

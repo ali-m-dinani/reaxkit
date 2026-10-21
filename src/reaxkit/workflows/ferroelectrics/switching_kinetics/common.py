@@ -613,7 +613,7 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentPa
     parser.add_argument("--nucleation-density", type=float, default=None, help="Supply positive SNNG nucleation density and --thickness to derive wall velocity from the fitted prefactor. Example: --nucleation-density 1e12, use 1e12 per cubic length unit.")
     parser.add_argument("--time-unit", default="input units", help="Label plot time axes without rescaling times or fitted parameters. Example: --time-unit ps, label plotted times as picoseconds.")
     parser.add_argument("--figure-dpi", type=int, default=180, help="Set positive PNG resolution in dots per inch; larger values produce more pixels. Example: --figure-dpi 300, export plots at 300 dpi.")
-    parser.add_argument("--output", type=Path, default=None, help="Name an .xlsx/.xlsm workbook or suffix-free CSV directory inside the unique run folder; parent paths are ignored. Defaults to <input-stem>_switching_fits.xlsx. Example: --output switching_fits.xlsx, write that workbook and sibling plots directory.")
+    parser.add_argument("--output", type=Path, default=None, help="Name an .xlsx/.xlsm workbook, or use a suffix-free name to select CSV files directly in the unique run folder; parent paths are ignored. Defaults to <input-stem>_switching_fits.xlsx. Example: --output kai_fit, write CSV files in the run folder without an extra subdirectory.")
     return parser
 
 
@@ -626,7 +626,8 @@ def run_workflow(
     """Read, normalize, fit, rank, and export switching-model results.
 
     Write under the project storage root in other/<command>/<run-id>, using
-    only the basename of args.output. Export PNG fit and residual plots plus
+    the workbook basename of args.output, or CSV files directly in the run folder.
+    Export PNG fit and residual plots plus
     sweep or model-comparison plots when applicable, then return zero.
     All fitted, exported, and plotted times share the explicit field onset
     as zero, or each group's earliest sample when onset is omitted. For input
@@ -645,7 +646,7 @@ def run_workflow(
         if args.output is not None
         else f"{source.stem}_switching_fits.xlsx"
     )
-    destination = run_directory / output_name
+    destination = run_directory / output_name if Path(output_name).suffix else run_directory
     saved = write_results(result, Path(destination))
     plot_directory = (
         Path(saved) / "plots" if Path(saved).is_dir() else Path(saved).parent / "plots"

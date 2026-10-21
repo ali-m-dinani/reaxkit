@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -237,7 +238,8 @@ def test_field_onset_recovers_kai_parameters_for_groups_and_sweeps():
     assert result.sweep_curves["time"].min() == pytest.approx(0.5)
 
 
-def test_default_output_uses_workspace_other_command_folder(tmp_path, monkeypatch):
+@pytest.mark.parametrize("output_name", [None, "kai_fit"])
+def test_default_output_uses_workspace_other_command_folder(tmp_path, monkeypatch, output_name):
     monkeypatch.chdir(tmp_path)
     source = tmp_path / "switching.csv"
     time = np.linspace(0.0, 6.0, 21)
@@ -256,10 +258,17 @@ def test_default_output_uses_workspace_other_command_folder(tmp_path, monkeypatc
         ]
     )
 
+    if output_name is not None:
+        args.output = Path(output_name)
     assert kai_workflow.run_main("fit-kai-switching", args) == 0
     command_dir = tmp_path / "reaxkit_workspace" / "other" / "fit-kai-switching"
     first_run = next(command_dir.glob("run_*"))
-    assert (first_run / "switching_switching_fits.xlsx").is_file()
+    if output_name is None:
+        assert (first_run / "switching_switching_fits.xlsx").is_file()
+    else:
+        assert (first_run / "normalized_data.csv").is_file()
+        assert (first_run / "parameters.csv").is_file()
+        assert not (first_run / output_name).exists()
     assert (first_run / "plots" / "all_kai_best_fit.png").is_file()
 
     assert kai_workflow.run_main("fit-kai-switching", args) == 0

@@ -26,6 +26,9 @@ polarity columns converted to the fraction opposite its initial sign. Use
 
 Each command writes every invocation to a new
 `reaxkit_workspace/other/<command-name>/run_<timestamp>_<token>/` directory.
+Suffix-free `--output` values such as `--output kai_fit` select CSV files
+directly in that run directory, with figures in its `plots/` subdirectory.
+Workbook output names (`.xlsx` or `.xlsm`) remain files in the run directory.
 Every model produces a best-fit plot
 and a residual plot; the combined command also produces a best-model overlay.
 Parameter sweeps conditionally refit all remaining free parameters at every
@@ -33,7 +36,9 @@ requested value and add the sweep curves, parameters, and metrics to the output
 workbook. For example, `--sweep kai.n=1:6` produces KAI curves for every integer
 `n` from 1 through 6. Observations are marker-only, sweep lines progress from
 dark blue to dark red with increasing parameter value, and the unconstrained
-best fit is green. Comma-separated values and `START:STOP:STEP` are also
+best fit is red. Observations have light-blue fills and dark-blue borders;
+residuals use a blue line with markers. Plots use the shared publication style
+by default, without grids. Comma-separated values and `START:STOP:STEP` are also
 accepted, such as `--sweep snng.m=0.5:3:0.5`.
 
 For KAI, `--fixed t0` needs no numeric value. The workflow sorts and normalizes

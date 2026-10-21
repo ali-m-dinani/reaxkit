@@ -208,7 +208,7 @@ def generate_projected_polarity_heatmaps(
         )
         figure, axis = plt.subplots(figsize=(7.2, 5.8))
         image = axis.pcolormesh(
-            u_edges, v_edges, values, cmap="coolwarm", vmin=-1.0, vmax=1.0,
+            u_edges, v_edges, values, cmap="coolwarm_r", vmin=-1.0, vmax=1.0,
             shading="flat",
         )
         axis.set_xlabel(f"{u_axis} (angstrom)")
@@ -248,7 +248,7 @@ def generate_polarity_kymograph(
     figure, axis = plt.subplots(figsize=(9.0, 5.8))
     image = axis.pcolormesh(
         _center_edges(frames), result.profile_edges, values,
-        cmap="coolwarm", vmin=-1.0, vmax=1.0, shading="flat",
+        cmap="coolwarm_r", vmin=-1.0, vmax=1.0, shading="flat",
     )
     axis.set_xlabel("source frame")
     axis.set_ylabel(f"{result.request.profile_axis} (angstrom)")

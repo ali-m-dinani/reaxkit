@@ -36,7 +36,8 @@ def stream_polarization(task, frames, request, kind, reporter=None, pipeline=Non
             def prepare():
                 if kind.startswith("hbn"):
                     from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import prepare_hbn_reference
-                    return prepare_hbn_reference(reference_trajectory, local)
+                    reference_request = replace(local, volume_method="bbox") if kind == "hbn_local" and local.volume_method == "local-hull" else local
+                    return prepare_hbn_reference(reference_trajectory, reference_request)
                 from reaxkit.analysis.ferroelectrics.three_folded_wurtzite import polarity as pol
                 trajectory, charges = pol._charges_for_request(reference, local)
                 neighbors = pol.extract_wurtzite_neighbors(trajectory, local, charges=charges)

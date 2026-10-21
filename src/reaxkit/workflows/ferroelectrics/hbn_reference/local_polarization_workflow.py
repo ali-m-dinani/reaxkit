@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+from reaxkit.analysis.ferroelectrics.hbn_reference.al_neighborhoods import neighborhood_mapping
+from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
+    write_aligned_reference_xyz,
+    write_oriented_reference_cif,
+)
 
 import argparse
 from pathlib import Path
@@ -13,7 +18,6 @@ import numpy as np
 from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
     HBNReferenceLocalPolarizationRequest,
     HBNReferenceLocalPolarizationResult,
-    LocalChargeTreatment,
     LocalGrouping,
     LocalVolumeMethod,
     _table_for_trajectory_frame,
@@ -48,16 +52,34 @@ def _canonical_command(command: str) -> str:
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = _canonical_command(command)
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
-    parser.set_defaults(command=canonical, progress=True)
-    parser.description = """Calculate cell- and layer-resolved local dipole and polarization.
+    parser.set_defaults(command=canonical, progress=True, volume_method="bbox")
+    volume_option = parser._option_string_actions["--volume-method"]
+    volume_option.choices = ["bbox", "hull", "cell", "local-hull"]
+    volume_option.help = (
+        "Volume convention: bbox (default) or hull measures the slab; cell includes the full box. "
+        "local-hull uses a separate unnormalized hull around each Al and its three N images. "
+        "Example: --volume-method local-hull."
+    )
+    parser.description = """Calculate Al-centered local dipole and polarization.
 
-Each crystallographic cell is one Al2N2 reference cell. Each reference layer is
-one coplanar AlN pair. Both resolutions are calculated; large local, cell, and
-layer CSV tables are written only with --export-local-csv.
---local-grouping selects the table used by plots and the generic local output.
-Equal volume shares the selected frame volume among groups; deformation uses
-normalized local affine-deformation weights. With the default hull volume,
-vacuum is excluded before either assignment.
+Each Al uses three nearest coplanar N images in the fixed hBN reference.
+Partition weights share each N contribution among its Al neighborhoods, preserving
+the global dipole. --local-charge-method neutral-center instead keeps the Al charge
+and assigns -q_Al/3 to each neighbor contribution, enforcing local neutrality.
+Al-centered values are the default; cell output sums pairs of Al neighborhoods.
+The layer output is an alias for Al-centered output, not a disjoint AlN pair.
+Large local, cell, and layer CSVs require --export-local-csv.
+Equal volume shares the selected frame volume among Al centers; deformation uses
+normalized local affine-deformation weights. The default slab volume is bbox,
+measured after reference-based unwrapping. --volume-method local-hull instead
+uses each Al and its three N images as an independent tetrahedral hull.
+Coplanar neighborhoods have zero volume and undefined polarization.
+
+AlN_hbn_oriented.cif contains the selected small reference cell before replication.
+AlN_hbn_replicated_aligned.xyz contains the aligned reference supercell.
+The local Extended XYZ records local_neighborhood_id on Al centers (-1 on N)
+and one set of Al-centered local properties, even when cell CSVs are selected.
+Reference-cell bookkeeping remains in the separate reference mapping artifacts.
 
 Examples:
   reaxkit get-hbn-reference-local-polarization --replication 19 19 10 --periodic xy --charge-source reaxff --volume-method hull --write-extxyz
@@ -70,18 +92,18 @@ Examples:
     )
     parser.add_argument(
         "--local-grouping",
-        choices=["cell", "layer"],
-        default="cell",
+        choices=["al", "cell", "layer"],
+        default="al",
         help=(
-            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and the optional generic local CSV. Explicit cell and layer CSVs require --export-local-csv. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output."
+            "Select Al-centered values (default), sums over reference cells, or layer (alias for Al-centered values). Example: --local-grouping al."
         ),
     )
     parser.add_argument(
         "--local-volume-method",
-        choices=["equal", "deformation"],
+        choices=["equal", "deformation", "hull"],
         default="equal",
         help=(
-            "Choose equal shares of the selected frame volume (default), or normalized local-deformation weights. Example: --local-volume-method equal, which divides the selected frame volume among local groups."
+            "Choose equal shares (default), normalized deformation weights, or independent neighborhood hull volumes. Example: --local-volume-method hull; equivalent to --volume-method local-hull."
         ),
     )
     parser.add_argument(
@@ -91,12 +113,16 @@ Examples:
         help="Set the maximum neighboring reference cells used by local affine fits. Default: 12. Example: --deformation-neighbors 12, which uses at most twelve neighboring reference cells in each affine fit.",
     )
     parser.add_argument(
-        "--local-charge-treatment",
-        choices=["auto", "raw", "neutralize"],
-        default="auto",
+        "--local-charge-method",
+        choices=["partition", "neutral-center"],
+        default="partition",
         help=(
-            "Choose raw atomic charges, per-cell charge neutralization, or auto neutralization only when a cell is charged. Default: auto. Example: --local-charge-treatment neutralize, which neutralizes each local group's charges."
+            "Partition actual atomic contributions to preserve the total (default), or keep each Al charge and compensate it equally on three N images. Example: --local-charge-method neutral-center."
         ),
+    )
+    parser.add_argument(
+        "--geometric-zero-tolerance", type=float, default=1.0e-6,
+        help="Zero threshold in angstrom for Al-minus-neighbor-mean displacement. Default: 1e-6. Example: --geometric-zero-tolerance 0.001.",
     )
     parser.add_argument(
         "--plot-2d",
@@ -164,9 +190,8 @@ def build_request(args: argparse.Namespace) -> HBNReferenceLocalPolarizationRequ
         **vars(base),
         local_volume_method=cast(LocalVolumeMethod, str(args.local_volume_method)),
         deformation_neighbors=int(args.deformation_neighbors),
-        local_charge_treatment=cast(
-            LocalChargeTreatment, str(args.local_charge_treatment)
-        ),
+        local_charge_method=str(args.local_charge_method),
+        geometric_zero_tolerance=float(args.geometric_zero_tolerance),
         local_grouping=cast(LocalGrouping, str(args.local_grouping)),
     )
 
@@ -397,8 +422,14 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     detail_format = getattr(args, "detail_format", None) or ("csv" if args.output_profile == "legacy" else "parquet")
     displacement_path = output / f"hbn_reference_displacements.{detail_format}"
     mapping_path = output / "hbn_reference_mapping.csv"
+    reference_path = output / "AlN_hbn_replicated_aligned.xyz"
+    reference_cif_path = output / "AlN_hbn_oriented.cif"
+    write_aligned_reference_xyz(result.reference_result, reference_path)
+    write_oriented_reference_cif(result.reference_result, reference_cif_path)
     tables = {summary_path: result.summary, cell_summary_path: result.cell_summary,
               layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    neighbor_path = output / "hbn_reference_al_neighbors.csv"
+    tables[neighbor_path] = neighborhood_mapping(result.reference_result)
     if args.export_local_csv:
         tables.update({local_path: result.table, cell_path: result.cell_table, layer_path: result.layer_table})
     tables[displacement_path] = getattr(result.reference_result, "table_chunks", {}).get("hbn_reference_displacements", result.reference_result.displacements)
@@ -452,6 +483,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     if args.write_displacements:
         print(f"Wrote per-atom source displacements to {displacement_path}")
     print(f"Wrote atom-to-cell mapping to {mapping_path}")
+    print(f"Wrote Al-N neighborhood membership and weights to {neighbor_path}")
+    print(f"Wrote replicated aligned reference to {reference_path}")
+    print(f"Wrote small oriented reference cell to {reference_cif_path}")
     if plots_2d:
         print(f"Wrote {len(plots_2d):,} projected plot(s) under {output / 'plots_2d'}")
     if plots_3d:

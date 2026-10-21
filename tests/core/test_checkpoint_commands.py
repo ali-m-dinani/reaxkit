@@ -21,7 +21,7 @@ def compare_tables(actual, expected):
     np.testing.assert_array_equal(actual.frame_indices, expected.frame_indices)
 
 
-@pytest.mark.parametrize("kind", ["local", "projected", "potential", "binned", "charge_field"])
+@pytest.mark.parametrize("kind", ["local", "local_neutral", "local_hull", "local_neutral_hull", "projected", "potential", "binned", "charge_field"])
 def test_commands_resume_after_input_failure(tmp_path, kind):
     from tests.analysis.test_charge_extxyz import _frame
     from tests.analysis.test_charge_field import _field_data
@@ -35,12 +35,16 @@ def test_commands_resume_after_input_failure(tmp_path, kind):
 
     data = [_frame(index, index * 10, ["Al", "N"], [[0, 0, index * .1], [2, 0, 1]], [.1 + index * .01, -.1]) for index in range(3)]
     add_field(data)
-    if kind in {"local", "projected"}:
+    if kind.startswith("local") or kind == "projected":
         data = [_trajectory_from_reference(REFERENCE_STRUCTURE_PATH) for _ in range(3)]
         for index, trajectory in enumerate(data):
             trajectory.source_frame_indices = [index]
         settings = dict(reference_path=REFERENCE_STRUCTURE_PATH, replication=(2, 1, 1), charge_source="formal", volume_method="cell")
-        task, request = ((HBNReferenceLocalPolarizationTask(), HBNReferenceLocalPolarizationRequest(**settings)) if kind == "local"
+        if "neutral" in kind:
+            settings["local_charge_method"] = "neutral-center"
+        if "hull" in kind:
+            settings["volume_method"] = "local-hull"
+        task, request = ((HBNReferenceLocalPolarizationTask(), HBNReferenceLocalPolarizationRequest(**settings)) if kind.startswith("local")
                          else (HBNReferenceProjectedPolarityTask(), HBNReferenceProjectedPolarityRequest(**settings)))
     elif kind == "potential":
         task, request = PotentialElectricFieldTask(), PotentialElectricFieldRequest(gamma_by_symbol={"al": 1.2, "n": 1.5}, periodic=(False, False, False), potential_reference_mode="fixed-midpoint")
@@ -50,7 +54,7 @@ def test_commands_resume_after_input_failure(tmp_path, kind):
         task, request = ChargeFieldTask(_field_data()), ChargeFieldRequest(atom_numbers=[1, 2])
         data = [frame.charges for frame in data]
     expected = task.run_stream(iter(data), request)
-    if kind == "local":
+    if kind.startswith("local"):
         request._write_extxyz = True
     def broken():
         yield data[0]
@@ -65,7 +69,7 @@ def test_commands_resume_after_input_failure(tmp_path, kind):
         request._result_store = store
         actual = task.run_stream(iter(data), request)
         compare_tables(actual, expected)
-        if kind == "local":
+        if kind.startswith("local"):
             from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import write_local_polarization_extxyz
             write_local_polarization_extxyz(expected, tmp_path / "expected.extxyz")
             write_local_polarization_extxyz(actual, tmp_path / "actual.extxyz")

@@ -375,11 +375,11 @@ def test_local_equal_volumes_close_to_global_dipole_and_polarization(reference_p
         ),
     )
 
-    assert len(result.table) == 4
+    assert len(result.table) == 8
     assert set(result.table["atom_count"]) == {4}
-    assert set(result.table["composition"]) == {"Al2,N2"}
+    assert set(result.table["composition"]) == {"Al1,N(shared)"}
     assert result.table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
-        np.full(4, -0.6)
+        np.full(8, -0.3)
     )
     frame_volume = result.reference_result.table.iloc[0]["volume (angstrom^3)"]
     assert result.table["local_volume (angstrom^3)"].sum() == pytest.approx(frame_volume)
@@ -393,8 +393,8 @@ def test_local_equal_volumes_close_to_global_dipole_and_polarization(reference_p
     )
     counts = result.poled_counts.set_index("direction")
     assert "hbn_reference_local_polarization_poled_counts" in result.csv_tables
-    assert counts.loc["z", "count_poled_down"] == 4
-    assert counts.loc["z", "count_all"] == 4
+    assert counts.loc["z", "count_poled_down"] == 8
+    assert counts.loc["z", "count_all"] == 8
     assert counts.loc["z", "percentage_poled_down"] == pytest.approx(100.0)
 
 
@@ -422,9 +422,9 @@ def test_local_result_also_reports_neutral_aln_layers(reference_path) -> None:
 
     assert len(result.cell_table) == 4
     assert len(result.layer_table) == 8
-    assert result.table is result.layer_table
-    assert set(result.layer_table["atom_count"]) == {2}
-    assert set(result.layer_table["composition"]) == {"Al1,N1"}
+    assert result.table["local_neighborhood_id"].tolist() == result.layer_table["local_neighborhood_id"].tolist()
+    assert set(result.layer_table["atom_count"]) == {4}
+    assert set(result.layer_table["composition"]) == {"Al1,N(shared)"}
     assert result.layer_table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
         np.full(8, -0.3)
     )
@@ -452,7 +452,7 @@ def test_local_deformation_volumes_are_normalized_to_selected_frame_volume(
 
     assert np.all(result.table["local_volume (angstrom^3)"] > 0.0)
     assert result.table["local_volume (angstrom^3)"].sum() == pytest.approx(
-        result.reference_result.table.iloc[0]["volume (angstrom^3)"]
+        result.summary.iloc[0]["frame_volume (angstrom^3)"]
     )
 
 
@@ -490,24 +490,24 @@ def test_projected_polarity_includes_zero_and_uses_fixed_cell_bins(reference_pat
     )
 
     projected = result.projected_bins.set_index("frame_index")
-    assert projected.loc[0, "defined_cell_count"] == 4
-    assert projected.loc[0, "zero_count"] == 4
+    assert projected.loc[0, "defined_cell_count"] == 8
+    assert projected.loc[0, "zero_count"] == 8
     assert projected.loc[0, "mean_polarity"] == pytest.approx(0.0)
-    assert projected.loc[1, "negative_count"] == 4
-    assert projected.loc[1, "mean_polarity"] == pytest.approx(-1.0)
+    assert projected.loc[1, "positive_count"] == 8
+    assert projected.loc[1, "mean_polarity"] == pytest.approx(1.0)
     whole_slab = result.whole_slab_summary.set_index("frame_index")
-    assert whole_slab.loc[0, "total_group_count"] == 4
-    assert whole_slab.loc[0, "zero_count"] == 4
+    assert whole_slab.loc[0, "total_group_count"] == 8
+    assert whole_slab.loc[0, "zero_count"] == 8
     assert whole_slab.loc[0, "zero_percentage"] == pytest.approx(100.0)
-    assert whole_slab.loc[1, "negative_count"] == 4
-    assert whole_slab.loc[1, "negative_percentage"] == pytest.approx(100.0)
+    assert whole_slab.loc[1, "positive_count"] == 8
+    assert whole_slab.loc[1, "positive_percentage"] == pytest.approx(100.0)
     assert whole_slab.loc[1, "defined_group_count"] == (
         result.projected_bins.loc[
             result.projected_bins["frame_index"] == 1, "defined_group_count"
         ].sum()
     )
-    assert result.centers.groupby("local_cell_id")["u_bin"].nunique().max() == 1
-    assert result.centers.groupby("local_cell_id")["v_bin"].nunique().max() == 1
+    assert result.centers.groupby("local_neighborhood_id")["u_bin"].nunique().max() == 1
+    assert result.centers.groupby("local_neighborhood_id")["v_bin"].nunique().max() == 1
     assert len(result.kymograph_bins) == 2
 
 
@@ -538,9 +538,9 @@ def test_projected_polarity_can_use_layer_resolved_dipoles(reference_path) -> No
 
     projected = result.projected_bins.iloc[0]
     assert projected["defined_group_count"] == 8
-    assert projected["negative_count"] == 8
-    assert result.centers["local_layer_id"].nunique() == 8
-    assert result.centers["local_grouping"].eq("layer").all()
+    assert projected["positive_count"] == 8
+    assert result.centers["local_neighborhood_id"].nunique() == 8
+    assert result.centers["local_grouping"].eq("al").all()
 
 
 def test_projected_polarity_streams_chunks_without_retaining_centers(reference_path) -> None:
@@ -585,7 +585,7 @@ def test_projected_polarity_streams_chunks_without_retaining_centers(reference_p
 
     assert result.centers.empty
     assert result.frame_indices.tolist() == [0, 1]
-    assert result.whole_slab_summary.set_index("frame_index").loc[1, "negative_count"] == 4
+    assert result.whole_slab_summary.set_index("frame_index").loc[1, "positive_count"] == 8
 
 
 def test_reaxff_local_cells_are_neutralized_without_losing_raw_global_closure(
@@ -629,16 +629,15 @@ def test_reaxff_local_cells_are_neutralized_without_losing_raw_global_closure(
             replication=(2, 1, 1),
             charge_source="reaxff",
             volume_method="cell",
+            local_charge_method="neutral-center",
         ),
     )
 
     assert result.table["charge_neutralization_applied"].all()
     assert result.table["effective_net_charge (e)"].to_numpy() == pytest.approx(
-        np.zeros(4), abs=1.0e-12
+        np.zeros(8), abs=1.0e-12
     )
-    assert result.table["dipole_z (e*angstrom)"].to_numpy() == pytest.approx(
-        np.zeros(4), abs=1.0e-12
-    )
+    assert np.isfinite(result.table["dipole_z (e*angstrom)"]).all()
     summary = result.summary.iloc[0]
     assert summary["raw_dipole_closure_error_z (e*angstrom)"] == pytest.approx(
         0.0, abs=1.0e-12

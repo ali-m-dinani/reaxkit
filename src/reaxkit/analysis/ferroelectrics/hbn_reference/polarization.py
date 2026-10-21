@@ -980,6 +980,20 @@ def calculate_hbn_reference_polarization(
     )
 
 
+def write_oriented_reference_cif(
+        result: HBNReferencePolarizationResult, path: str | Path
+) -> Path:
+    """Write the selected small reference cell before replication and strain."""
+
+    source = read_structure(result.request.reference_path)
+    oriented, _ = _orient_reference(
+        source, result.reference.trajectory_angles,
+        "always" if result.reference.orthogonalized else "never",
+        float(result.request.angle_tolerance_degrees),
+    )
+    return write_structure(oriented, path, format="cif")
+
+
 def write_aligned_reference_xyz(
         result: HBNReferencePolarizationResult, path: str | Path
 ) -> Path:
@@ -988,6 +1002,12 @@ def write_aligned_reference_xyz(
     atoms = result.reference.atoms.copy()
     atoms.info["reference_repeats"] = " ".join(map(str, result.reference.repeats))
     atoms.info["orthogonalized"] = bool(result.reference.orthogonalized)
+    atoms.set_array("reference_atom_index", np.arange(len(atoms), dtype=int))
+    atoms.set_array("simulation_atom_id", result.mapping["atom_id"].to_numpy()[
+        result.reference.reference_to_simulation
+    ])
+    atoms.set_array("local_cell_id", result.reference.local_cell_ids)
+    atoms.set_array("local_layer_id", result.reference.local_layer_ids)
     return write_structure(atoms, path, format="extxyz")
 
 

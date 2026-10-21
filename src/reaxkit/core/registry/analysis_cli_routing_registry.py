@@ -119,6 +119,17 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
     return dict(ANALYSIS_COMMAND_REGISTRY)
 
 
+for velocity_command in (
+    "get-hbn-domain-wall-fraction-velocity",
+    "get-hbn-domain-wall-crossing-velocity",
+    "get-hbn-domain-wall-tracking-velocity",
+):
+    register_analysis_command(
+        velocity_command,
+        module_path="reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow",
+    )
+
+
 register_analysis_command(
     "extract_frame",
     module_path="reaxkit.workflows.trajectory_workflow",

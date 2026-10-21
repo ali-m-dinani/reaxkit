@@ -7,6 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
+from reaxkit.presentation.plot_styles import plot_render_context, resolve_plot_style
+
 
 def _safe_name(value: object) -> str:
     """Make a group or parameter label safe for use in an output filename."""
@@ -44,7 +46,7 @@ def _base_axis(ax, *, model: str, group: object, time_unit: str) -> None:
     ax.set_ylabel("Flipped fraction")
     ax.set_ylim(-0.03, 1.03)
     ax.set_title(f"{model.upper()} switching fit - group {group}")
-    ax.grid(alpha=0.2)
+    ax.grid(False)
 
 
 def _draw_observations(ax, table) -> None:
@@ -55,8 +57,8 @@ def _draw_observations(ax, table) -> None:
         linestyle="None",
         marker="o",
         markersize=4.5,
-        markerfacecolor="white",
-        markeredgecolor="black",
+        markerfacecolor="#9ECAE1",
+        markeredgecolor="#08306B",
         markeredgewidth=0.9,
         label="data",
         zorder=5,
@@ -64,11 +66,11 @@ def _draw_observations(ax, table) -> None:
 
 
 def _draw_best_fit(ax, table) -> None:
-    """Draw the baseline fit as a green line."""
+    """Draw the baseline fit as a red line."""
     ax.plot(
         table["time"],
         table["predicted_fraction"],
-        color="#15803d",
+        color="#D62728",
         linewidth=2.8,
         label="best fit",
         zorder=4,
@@ -86,13 +88,26 @@ def generate_switching_plots(
 
     Observations use markers without connecting lines. Parameter-sweep curves
     progress from dark blue at the smallest value to dark red at the largest;
-    the baseline fit, including any user-fixed parameters, is always green.
+    the baseline fit, including any user-fixed parameters, is always red.
     Return the written paths. time_unit labels axes without converting values;
     dpi sets PNG resolution and must be positive.
     Plot time zero is the field onset supplied during normalization, or the
     earliest input sample in each group if no onset was supplied. Plotting
     preserves those elapsed times and does not reset the first sample to zero.
     """
+    style = resolve_plot_style()
+    with plot_render_context({
+        "plot_style": "publication" if style == "default" else style,
+        "dpi": dpi,
+    }):
+        return _generate_switching_plots(
+            result, output_directory, time_unit=time_unit, dpi=dpi,
+        )
+
+
+def _generate_switching_plots(
+    result, output_directory: Path, *, time_unit: str, dpi: int,
+) -> list[Path]:
     if dpi <= 0:
         raise ValueError("figure_dpi must be greater than zero.")
     plt, LinearSegmentedColormap, Normalize = _plot_imports()
@@ -170,15 +185,18 @@ def generate_switching_plots(
         ax.plot(
             best["time"],
             best["residual"],
-            linestyle="None",
+            linestyle="-",
             marker="o",
             markersize=4.0,
-            color="#15803d",
+            color="#0072B2",
+            markerfacecolor="#9ECAE1",
+            markeredgecolor="#08306B",
+            linewidth=1.5,
         )
         ax.set_xlabel(f"Time ({time_unit})")
         ax.set_ylabel("Fit residual")
         ax.set_title(f"{str(model).upper()} best-fit residuals - group {group}")
-        ax.grid(alpha=0.2)
+        ax.grid(False)
         fig.tight_layout()
         path = destination / f"{group_name}_{model_name}_residuals.png"
         fig.savefig(path, dpi=dpi, bbox_inches="tight")
@@ -202,7 +220,7 @@ def generate_switching_plots(
         ax.set_ylabel("Flipped fraction")
         ax.set_ylim(-0.03, 1.03)
         ax.set_title(f"Best switching-model fits - group {group}")
-        ax.grid(alpha=0.2)
+        ax.grid(False)
         ax.legend(frameon=False)
         fig.tight_layout()
         path = destination / f"{_safe_name(group)}_model_comparison.png"
