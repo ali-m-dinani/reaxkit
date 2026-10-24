@@ -6260,6 +6260,108 @@
       ]
     },
     {
+      "aliases": [],
+      "artifact_policy": "workflow_public_outputs",
+      "command": "get-hbn-domain-wall-crossing-velocity",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "analysis",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow",
+      "workflow_output_sites": [
+        {
+          "expression": "write_workflow_csv(table, destination / f'{name}.csv', index=False)",
+          "line": 73,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "write_workflow_csv(result.intervals, destination / 'velocity_intervals.csv', index=False)",
+          "line": 75,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "(destination / 'settings.json').write_text(json.dumps(settings, indent=2), encoding='utf-8')",
+          "line": 78,
+          "tier": "core_compatibility",
+          "writer": "write_text"
+        }
+      ]
+    },
+    {
+      "aliases": [],
+      "artifact_policy": "workflow_public_outputs",
+      "command": "get-hbn-domain-wall-fraction-velocity",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "analysis",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow",
+      "workflow_output_sites": [
+        {
+          "expression": "write_workflow_csv(table, destination / f'{name}.csv', index=False)",
+          "line": 73,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "write_workflow_csv(result.intervals, destination / 'velocity_intervals.csv', index=False)",
+          "line": 75,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "(destination / 'settings.json').write_text(json.dumps(settings, indent=2), encoding='utf-8')",
+          "line": 78,
+          "tier": "core_compatibility",
+          "writer": "write_text"
+        }
+      ]
+    },
+    {
+      "aliases": [],
+      "artifact_policy": "workflow_public_outputs",
+      "command": "get-hbn-domain-wall-tracking-velocity",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "analysis",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow",
+      "workflow_output_sites": [
+        {
+          "expression": "write_workflow_csv(table, destination / f'{name}.csv', index=False)",
+          "line": 73,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "write_workflow_csv(result.intervals, destination / 'velocity_intervals.csv', index=False)",
+          "line": 75,
+          "tier": "core_compatibility",
+          "writer": "write_workflow_csv"
+        },
+        {
+          "expression": "(destination / 'settings.json').write_text(json.dumps(settings, indent=2), encoding='utf-8')",
+          "line": 78,
+          "tier": "core_compatibility",
+          "writer": "write_text"
+        }
+      ]
+    },
+    {
       "aliases": [
         "get_hbn_reference_local_polarization",
         "hbn-reference-local-polarization"
@@ -6353,19 +6455,19 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 310,
+          "line": 340,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 366,
+          "line": 396,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name), details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())",
-          "line": 397,
+          "line": 436,
           "tier": "declared",
           "writer": "write_workflow_tables"
         }
@@ -6517,37 +6619,43 @@
       "workflow_output_sites": [
         {
           "expression": "figure.savefig(path, dpi=int(dpi), bbox_inches='tight')",
-          "line": 272,
+          "line": 258,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
           "expression": "figure.savefig(destination, dpi=int(dpi), bbox_inches='tight')",
-          "line": 317,
+          "line": 305,
           "tier": "core_compatibility",
           "writer": "savefig"
         },
         {
-          "expression": "ArtifactSpec('centers', centers_path.name, 'detail', bool(args.write_centers), centers_format, True)",
-          "line": 339,
+          "expression": "ArtifactSpec('extxyz', extxyz_path.name, 'detail', args.write_extxyz, 'extxyz', True)",
+          "line": 329,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('projected', projected_path.name, 'core', True, 'csv', True)",
-          "line": 340,
+          "line": 330,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('kymograph', kymograph_path.name, 'core', True, 'csv', True)",
-          "line": 341,
+          "line": 331,
           "tier": "declared",
           "writer": "ArtifactSpec"
         },
         {
           "expression": "ArtifactSpec('whole_slab_summary', whole_slab_summary_path.name, 'summary', True, 'csv', True)",
-          "line": 342,
+          "line": 332,
+          "tier": "declared",
+          "writer": "ArtifactSpec"
+        },
+        {
+          "expression": "ArtifactSpec('centers', centers_path.name, 'detail', True, centers_format, True)",
+          "line": 335,
           "tier": "declared",
           "writer": "ArtifactSpec"
         }

@@ -13,7 +13,12 @@ def test_generated_command_inventory_matches_checked_in_contract(tmp_path):
     subprocess.run([sys.executable, "-m", "reaxkit.core.runtime.command_inventory", "--output", str(output)],
                    cwd=root, check=True, capture_output=True, text=True)
     generated = json.loads(output.read_text())
-    assert generated == json.loads((root / "docs/command_execution_inventory.json").read_text())
+    matches_contract = generated == json.loads((root / "docs/command_execution_inventory.json").read_text())
+    assert matches_contract, (
+        "Command/output inventory is stale. Regenerate it with "
+        "`python -m reaxkit.core.runtime.command_inventory`, review the changes, "
+        "and commit docs/command_execution_inventory.json with the workflow changes."
+    )
     for task in generated["analysis_tasks"]:
         assert task["result_class"] and task["capabilities"]["shape"]
         assert task["tables"] or task["public_result_fields"]
