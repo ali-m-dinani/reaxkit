@@ -896,7 +896,7 @@ def _simulation_field_array(data: SimulationData, field: str) -> tuple[np.ndarra
 class SimulationScalarSeriesTask(AnalysisTask):
     """Build a scalar time series from ``SimulationData``."""
 
-    VERSION = "6"
+    VERSION = "7"
     required_data = SimulationData
 
     @staticmethod
@@ -1027,6 +1027,14 @@ class SimulationScalarSeriesTask(AnalysisTask):
         )
         if request.relative:
             table["relative_energy"] = sampled_values - reference_value
+        if request.field == "potential_energy":
+            table["potential_energy"] = np.asarray(values[frame_idx], dtype=float)
+            if request.relative:
+                table["relative_potential_energy"] = table["potential_energy"] - float(values[request.reference_frame])
+            if request.per_atom or request.num_atoms is not None:
+                table["potential_energy_per_atom"] = sampled_values
+                if request.relative:
+                    table["relative_potential_energy_per_atom"] = table["relative_energy"]
         if label == "elapsed_time":
             elapsed_per_iter = np.full(n_frames, np.nan, dtype=float)
             if data.iterations is not None:

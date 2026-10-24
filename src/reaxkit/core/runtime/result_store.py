@@ -178,12 +178,14 @@ class ResultStore:
     def _read(self, path):
         schema = next(value for value in self.manifest["tables"].values() if value["file"] == path.name)
         if path.suffix == ".parquet":
-            table = pd.read_parquet(path)
+            with path.open("rb") as stream:
+                table = pd.read_parquet(stream)
             return table.astype(dict(zip(schema["columns"], schema["dtypes"]))) if table.empty else table
         if not schema["columns"]:
             return pd.DataFrame()
-        return pd.read_csv(path, dtype=dict(zip(schema["columns"], schema["dtypes"])), float_precision="round_trip",
-                           keep_default_na=False, na_values=[self.manifest["null_token"]])
+        with path.open("rb") as stream:
+            return pd.read_csv(stream, dtype=dict(zip(schema["columns"], schema["dtypes"])), float_precision="round_trip",
+                               keep_default_na=False, na_values=[self.manifest["null_token"]])
 
     def append(self, position, source_frame, tables, *, state=None):
         self._owned()

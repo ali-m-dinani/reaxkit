@@ -17,6 +17,7 @@ def build_parser(parser, *, command: str):
             "Use --relative to also output E(frame) - E(reference_frame).\n"
             "The reference defaults to source frame 0, before sampling; change it with --reference-frame.\n"
             "With --per-atom, normalize each frame before subtracting the reference.\n"
+            "CSV exports retain total energy; --relative with --num-atoms or --per-atom includes total, relative total, per-atom, and relative per-atom columns.\n"
             "\n"
             "Examples:\n"
             "  1. Total energy:\n"

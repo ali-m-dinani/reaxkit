@@ -29,10 +29,10 @@ def checkpoint_enabled(task, args):
     return supported and (explicit or args.get("checkpoint") is not False and "output_profile" in args)
 
 
-def open_checkpoint(task, request, args, source, directory):
+def checkpoint_identity(task, request, args, source):
     paths = [item["path"] for item in source["sources"]]
     for name, value in asdict(request).items():
-        if (name.endswith("path") or name.endswith("file")) and isinstance(value, (str, Path)) and Path(value).is_file():
+        if name != "_output_path" and (name.endswith("path") or name.endswith("file")) and isinstance(value, (str, Path)) and Path(value).is_file():
             paths.append(value)
     normalized_request = encode(request)
     normalized_request["fields"].pop("_output_path", None)
@@ -42,11 +42,15 @@ def open_checkpoint(task, request, args, source, directory):
         if Path(item["path"]).is_relative_to(raw_root):
             item["path"] = f"snapshot:{Path(item['path']).name}"
     sources.sort(key=lambda item: item["path"])
-    identity = {"task": f"{type(task).__module__}.{type(task).__name__}",
+    return {"task": f"{type(task).__module__}.{type(task).__name__}",
                 "algorithm_version": str(getattr(task, "VERSION", "1")), "checkpoint_algorithm": 1,
                 "request": normalized_request, "sources": sources,
                 "engine": source["adapter"],
                 "artifacts": {name: args.get(name) for name in ("output_profile", "write_displacements", "write_extxyz", "detail_format")}}
+
+
+def open_checkpoint(task, request, args, source, directory, *, identity=None):
+    identity = identity if identity is not None else checkpoint_identity(task, request, args, source)
     destination = Path(args["resume"]) if args.get("resume") else Path(directory) / f"recovery-{uuid4().hex[:12]}" / "checkpoint"
     store = ResultStore(destination, identity, resume=bool(args.get("resume")),
                         buffer_bytes=int(float(args.get("checkpoint_buffer_mb", 32)) * 1024 * 1024),

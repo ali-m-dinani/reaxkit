@@ -263,6 +263,13 @@ def test_relative_energy_uses_source_reference_before_sampling(reference_frame, 
     assert result.table["frame_index"].tolist() == [2]
     assert result.table["value"].tolist() == [expected[2]]
     assert result.table["relative_energy"].tolist() == [expected[2] - expected[reference_frame]]
+    assert result.table["potential_energy"].tolist() == [-10.0]
+    assert result.table["relative_potential_energy"].tolist() == [-10.0 - data.potential_energy[reference_frame]]
+    if per_atom:
+        assert result.table["potential_energy_per_atom"].tolist() == [-5.0]
+        assert result.table["relative_potential_energy_per_atom"].tolist() == [expected[2] - expected[reference_frame]]
+    else:
+        assert "potential_energy_per_atom" not in result.table
 
 
 @pytest.mark.parametrize("reference_frame", [-1, 3])
@@ -289,10 +296,16 @@ def test_fixed_atom_count_normalizes_energy_and_reference(relative, per_atom, co
     result = SimulationScalarSeriesTask().run(data, request)
     assert result.table["value"].tolist() == [-1.0]
     assert result.table["field"].tolist() == ["potential_energy_per_atom"]
+    assert result.table["potential_energy"].tolist() == [-10.0]
+    assert result.table["potential_energy_per_atom"].tolist() == [-1.0]
     if relative:
         assert result.table["relative_energy"].tolist() == [2.0]
+        assert result.table["relative_potential_energy"].tolist() == [20.0]
+        assert result.table["relative_potential_energy_per_atom"].tolist() == [2.0]
     else:
         assert "relative_energy" not in result.table
+        assert "relative_potential_energy" not in result.table
+        assert "relative_potential_energy_per_atom" not in result.table
 
 
 @pytest.mark.parametrize("num_atoms", [0, -1, 1.5, True])
@@ -302,6 +315,31 @@ def test_fixed_atom_count_must_be_positive_integer(num_atoms) -> None:
         SimulationScalarSeriesTask().run(
             data, SimulationScalarSeriesRequest(field="potential_energy", num_atoms=num_atoms)
         )
+
+
+def test_potential_energy_export_contains_all_four_variants(tmp_path, monkeypatch):
+    from reaxkit.workflows.timeseries.get_potential_energy import build_parser, run_main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "control").write_text("# MD\n10 iout2\n", encoding="utf-8")
+    (tmp_path / "summary.txt").write_text(
+        "0 1 0 -40 100 300 1 1 5\n10 1 1 -30 100 300 1 1 25\n30 1 3 -10 100 300 1 1 85\n",
+        encoding="utf-8",
+    )
+    parser = build_parser(argparse.ArgumentParser(), command="get_potential_energy")
+    args = parser.parse_args([
+        "--summary", "summary.txt", "--plot", "single", "--xaxis", "frame",
+        "--save", str(tmp_path / "pot_en.png"), "--export", str(tmp_path / "pot_en.csv"),
+        "--engine", "reaxff", "--relative", "--num-atoms", "28880",
+        "--project-root", str(tmp_path / "workspace"),
+    ])
+    assert run_main("get_potential_energy", args) == 0
+    exported = pd.read_csv(tmp_path / "pot_en.csv")
+    np.testing.assert_allclose(exported["potential_energy"], [-40, -30, -10])
+    np.testing.assert_allclose(exported["relative_potential_energy"], [0, 10, 30])
+    np.testing.assert_allclose(exported["potential_energy_per_atom"], np.asarray([-40, -30, -10]) / 28880)
+    np.testing.assert_allclose(exported["relative_potential_energy_per_atom"], np.asarray([0, 10, 30]) / 28880)
+    assert (tmp_path / "pot_en.png").is_file()
 
 
 def main() -> None:

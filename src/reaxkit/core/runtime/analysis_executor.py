@@ -978,6 +978,34 @@ class AnalysisExecutor:
                 task_version=task_version,
             )
             args["_analysis_id"] = analysis_id
+            recovery_identity = None
+            if checkpointing:
+                import hashlib
+                import json
+                from reaxkit.core.runtime.checkpoint_policy import checkpoint_identity
+                from reaxkit.core.runtime.packed_results import PackedResultStore
+                recovery_identity = checkpoint_identity(task, request, args, identity)
+                analysis_id = hashlib.sha256(json.dumps(recovery_identity, sort_keys=True,
+                                                       allow_nan=False).encode("utf-8")).hexdigest()
+                args["_analysis_id"] = analysis_id
+                packed_path = cache.checkpoint_path(analysis_id)
+                if use_cache and not args.get("resume") and packed_path.exists():
+                    try:
+                        packed = PackedResultStore(packed_path, recovery_identity)
+                    except Exception as exc:
+                        logger.warning("Ignoring unreadable result cache %s: %s", packed_path, exc)
+                    else:
+                        self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (packed results)")
+                        request._result_store = packed
+                        request._control_file = str(args.get("control") or "control")
+                        request._write_extxyz = bool(args.get("write_extxyz", False))
+                        try:
+                            cached = self._run_stream_task(task, iter(()), request, reporter, args)
+                        except BaseException:
+                            packed.close()
+                            raise
+                        return self._ready_for_result_saving(
+                            enrich_result_with_time(cached, None, control_file=request._control_file), args)
             if use_cache and not checkpointing and cache.exists(analysis_id):
                 self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                 cached = cache.load(analysis_id)
@@ -998,8 +1026,10 @@ class AnalysisExecutor:
                 if checkpointing:
                     from reaxkit.core.runtime.checkpoint_policy import open_checkpoint
                     from reaxkit.presentation.workflow_artifacts import register_checkpoint
-                    checkpoint = open_checkpoint(task, request, args, identity, self._analysis_output_dir(args))
-                    managed_checkpoint = register_checkpoint(checkpoint)
+                    checkpoint = open_checkpoint(task, request, args, identity, self._analysis_output_dir(args),
+                                                 identity=recovery_identity)
+                    managed_checkpoint = register_checkpoint(
+                        checkpoint, cache_destination=cache.checkpoint_path(analysis_id) if use_cache else None)
                     request._result_store = checkpoint
                     request._control_file = str(args.get("control") or "control")
                     request._write_extxyz = bool(args.get("write_extxyz", False))
