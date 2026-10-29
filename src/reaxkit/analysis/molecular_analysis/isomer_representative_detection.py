@@ -279,6 +279,7 @@ def _records_table(records: list[IsomerRepresentativeRecord]) -> pd.DataFrame:
 class IsomerRepresentativeDetectionTask(AnalysisTask):
     """Detect coarse same-formula isomer representatives from canonical data."""
 
+    VERSION = "1"
     required_data = ConnectivityTrajectoryData
 
     @staticmethod

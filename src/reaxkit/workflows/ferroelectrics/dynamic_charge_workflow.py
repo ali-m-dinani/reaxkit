@@ -36,52 +36,58 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Compare each atom's dynamic charge with its charge at frame zero.\n"
-        "Writes per-atom and per-frame summaries; per-atom detail is opt-in. "
-        "--gen-plots writes one charge and "
-        "one delta-charge trace per atom.\n\n"
-        "Example:\n"
-        "  reaxkit get_dynamic_charge_changes --fort7 fort.7 --xmolout xmolout "
-        "--gen-plots --x-axis time"
+        "\n"
+        "Analyze existing charge and trajectory files to inspect charge transfer over time.\n"
+        "Summary tables are written by default; detailed per-atom data and plots are opt-in.\n"
+        "\n"
+        "Examples:\n"
+        "  1. Export charge-change summaries:\n"
+        "     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout\n"
+        "\n"
+        "  2. Plot per-atom time traces:\n"
+        "     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout --gen-plots --x-axis time --control control\n"
+        "\n"
+        "  3. Retain detailed charges:\n"
+        "     reaxkit get-dynamic-charge-changes --fort7 fort.7 --xmolout xmolout --write-detailed-charges"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection.")
-    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory.")
-    parser.add_argument("--fort7", default="fort.7", help="Dynamic charge input for ReaxFF.")
-    parser.add_argument("--xmolout", default="xmolout", help="Optional atom identity/time source.")
-    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source.")
-    parser.add_argument("--atom-numbers", "--atom-ids", type=int, nargs="+", default=None)
-    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10.")
-    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame.")
-    parser.add_argument("--write-detailed-charges", action="store_true", help="Stream per-atom details (Parquet by default).")
-    parser.add_argument("--gen-plots", action="store_true", help="Generate per-atom PNG plots.")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", default=".", help="Fallback simulation directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--fort7", default="fort.7", help="Dynamic charge input for ReaxFF. Example: --fort7 runs/heating/fort.7, which reads atomic charges and connectivity from that file.")
+    parser.add_argument("--xmolout", default="xmolout", help="Optional atom identity/time source. Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.")
+    parser.add_argument("--summary", default=None, help="Optional summary.txt metadata source. Example: --summary runs/heating/summary.txt, which reads simulation summary values from that file.")
+    parser.add_argument("--atom-numbers", "--atom-ids", type=int, nargs="+", default=None, help="One-based atom identifiers to include. Example: --atom-numbers 1 2, which includes only atoms 1 and 2.")
+    parser.add_argument("--frames", nargs="*", default=None, help="Frames, e.g. 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18.")
+    parser.add_argument("--every", type=int, default=1, help="Keep every Nth selected frame. Example: --every 5, which keeps every fifth selected frame.")
+    parser.add_argument("--write-detailed-charges", action="store_true", help="Stream per-atom details (Parquet by default). Example: --write-detailed-charges, which writes per-atom charge detail in addition to summaries.")
+    parser.add_argument("--gen-plots", action="store_true", help="Generate per-atom PNG plots. Example: --gen-plots, which generates the workflow's plot files.")
     parser.add_argument(
         "--global-y-axis",
         action="store_true",
         help=(
-            "Use one shared charge y-axis across atoms and one shared "
-            "delta-charge y-axis across atoms."
+            "Use one shared charge y-axis across atoms and one shared delta-charge y-axis across atoms. Example: --global-y-axis, which uses comparable charge scales across atom plots."
         ),
     )
     parser.add_argument(
         "--skip-detailed-csv",
         action="store_true",
-        help="Do not create the potentially very large charges.csv file.",
+        help="Do not create the potentially very large charges.csv file. Example: --skip-detailed-csv, which omits the large per-atom charges.csv export.",
     )
     parser.add_argument(
         "--x-axis", "--xaxis", dest="x_axis", choices=["frame", "time", "iter"],
-        default="frame", help="Horizontal axis for generated plots.",
+        default="frame", help="Horizontal axis for generated plots. Example: --x-axis time, which shows physical time on the horizontal axis.",
     )
-    parser.add_argument("--control", default="control", help="Control file used to derive time.")
-    parser.add_argument("--dpi", type=int, default=180, help="Plot resolution in dots per inch.")
+    parser.add_argument("--control", default="control", help="Control file used to derive time. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata.")
+    parser.add_argument("--dpi", type=int, default=180, help="Plot resolution in dots per inch. Example: --dpi 300, which writes figures at 300 dots per inch.")
     parser.add_argument(
         "--output-dir", type=Path, default=None,
-        help="Optional output root for charges.csv, the three summary CSVs, and plots/.",
+        help="Optional output root for charges.csv, the three summary CSVs, and plots/. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     parser.add_argument(
         "--export", default=None,
-        help="Optional CSV destination; all enabled CSV outputs are written beside it.",
+        help="Optional CSV destination; all enabled CSV outputs are written beside it. Example: --export analysis.csv, which writes the result table for further analysis.",
     )
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

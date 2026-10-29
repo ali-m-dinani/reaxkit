@@ -20,6 +20,7 @@ import pandas as pd
 
 from reaxkit.core.platform.log import get_logger
 from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter, TableChunks
+from reaxkit.core.runtime.result_store import ResultTable
 from reaxkit.core.runtime.provenance import (
     json_safe,
     effective_settings_from_args,
@@ -40,18 +41,18 @@ def _result_frames(result: Any) -> dict[str, pd.DataFrame]:
         named_frames = {
             str(name): frame
             for name, frame in csv_tables.items()
-            if isinstance(frame, pd.DataFrame)
+            if isinstance(frame, (pd.DataFrame, ResultTable))
         }
         if named_frames:
             return named_frames
 
     frames: dict[str, pd.DataFrame] = {}
-    if hasattr(result, "table") and isinstance(getattr(result, "table"), pd.DataFrame):
+    if hasattr(result, "table") and isinstance(getattr(result, "table"), (pd.DataFrame, ResultTable)):
         frames["table"] = getattr(result, "table")
     if is_dataclass(result):
         for f in fields(result):
             value = getattr(result, f.name)
-            if isinstance(value, pd.DataFrame):
+            if isinstance(value, (pd.DataFrame, ResultTable)):
                 frames[f.name] = value
     return frames
 

@@ -24,6 +24,8 @@ from ase.geometry import cellpar_to_cell
 
 from reaxkit.engine.common.io.geo_io import read_structure
 
+VERSION = "1"
+
 
 TerminationSide = Literal["top", "bottom"]
 Axis = Literal[0, 1, 2]

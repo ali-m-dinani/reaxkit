@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 import reaxkit.engine  # noqa: F401 (register engine adapters)
 from reaxkit.analysis.timeseries.timeseries import SimulationScalarSeriesRequest, SimulationScalarSeriesTask
@@ -110,6 +112,234 @@ def test_potential_energy_per_atom_requests_atom_counts_from_loader() -> None:
         "potential_energy",
         "num_of_atoms",
     )
+
+
+@pytest.mark.parametrize("field", ["elapsed_time", "elap_time"])
+@pytest.mark.parametrize("frames,every", [(None, 1), (None, 2), ([3, 1], 1)])
+def test_elapsed_time_per_iter_divides_by_iteration(field, frames, every) -> None:
+    data = SimulationData(
+        atom_ids=[],
+        iterations=np.asarray([0, 10, 30, 40]),
+        elapsed_time=np.asarray([5.0, 25.0, 85.0, 125.0]),
+    )
+    result = SimulationScalarSeriesTask().run(
+        data, SimulationScalarSeriesRequest(field=field, frames=frames, every=every)
+    )
+    selected = result.table["frame_index"].to_numpy()
+    np.testing.assert_allclose(result.table["value"], data.elapsed_time[selected])
+    np.testing.assert_allclose(
+        result.table["elapsed_time_per_iter"],
+        np.asarray([np.nan, 2.5, 85.0 / 30, 125.0 / 40])[selected],
+        equal_nan=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "iterations,elapsed,expected",
+    [
+        ([0], [5.0], [np.nan]),
+        ([10], [5.0], [0.5]),
+        (None, [5.0, 10.0], [np.nan, np.nan]),
+        ([0, 0, 10, 5, 15, 25], [5, 10, 20, 25, 2, 12],
+         [np.nan, np.nan, 2.0, 5.0, 2.0 / 15, 12.0 / 25]),
+        ([0, 10, 20, 30], [5, np.nan, 15, 15], [np.nan, np.nan, 0.75, 0.5]),
+    ],
+)
+def test_elapsed_time_per_iter_handles_zero_and_missing_values(iterations, elapsed, expected) -> None:
+    data = SimulationData(
+        atom_ids=[],
+        iterations=None if iterations is None else np.asarray(iterations),
+        elapsed_time=np.asarray(elapsed),
+    )
+    result = SimulationScalarSeriesTask().run(
+        data, SimulationScalarSeriesRequest(field="elapsed_time")
+    )
+    np.testing.assert_allclose(
+        result.table["elapsed_time_per_iter"], expected, equal_nan=True
+    )
+
+
+@pytest.mark.parametrize("suffix", ["", "s"])
+def test_elapsed_time_per_iter_from_summary_without_trajectory(tmp_path, monkeypatch, suffix) -> None:
+    summary = tmp_path / "summary.txt"
+    summary.write_text(
+        f"0 1 0 -10 100 300 1 1 5{suffix}\n"
+        f"10 1 1 -10 100 300 1 1 25{suffix}\n"
+        f"30 1 3 -10 100 300 1 1 85{suffix}\n",
+        encoding="utf-8",
+    )
+    result = AnalysisExecutor().run(
+        SimulationScalarSeriesTask(),
+        SimulationScalarSeriesRequest(field="elapsed_time", every=2),
+        {
+            "engine": "reaxff",
+            "summary": str(summary),
+            "run_dir": str(tmp_path),
+            "project_root": str(tmp_path / "workspace"),
+            "cache": False,
+        },
+    )
+    np.testing.assert_allclose(
+        result.table["elapsed_time_per_iter"], [np.nan, 85.0 / 30], equal_nan=True
+    )
+    from reaxkit.workflows.timeseries.get_elapsed_time import build_parser, run_main
+
+    monkeypatch.chdir(tmp_path)
+    parser = build_parser(argparse.ArgumentParser(), command="get_elapsed_time")
+    args = parser.parse_args([
+        "--engine", "reaxff", "--summary", "summary.txt", "--plot", "single",
+        "--export", str(tmp_path / "elapsed.csv"),
+        "--save", str(tmp_path / "elapsed.png"),
+    ])
+    args.project_root = str(tmp_path / "workspace")
+    args.cache = False
+    assert run_main("get_elapsed_time", args) == 0
+    exported = pd.read_csv(tmp_path / "elapsed.csv")
+    np.testing.assert_allclose(exported["value"], [5.0, 25.0, 85.0])
+    np.testing.assert_allclose(
+        exported["elapsed_time_per_iter"], [np.nan, 2.5, 85.0 / 30], equal_nan=True
+    )
+    assert (tmp_path / "elapsed.png").is_file()
+
+
+@pytest.mark.parametrize("mode", ["single", "subplot", "separate"])
+def test_elapsed_time_plot_includes_both_series(mode, tmp_path) -> None:
+    from reaxkit.workflows.timeseries.common import build_plot_payload
+    from reaxkit.presentation.plot.registry import plot
+
+    result = SimulationScalarSeriesTask().run(
+        SimulationData(
+            atom_ids=[], iterations=np.asarray([0, 10, 30]),
+            elapsed_time=np.asarray([0.0, 25.0, 85.0]),
+        ),
+        SimulationScalarSeriesRequest(field="elapsed_time"),
+    )
+    payload = build_plot_payload(
+        "get_elapsed_time", result, argparse.Namespace(plot=mode, xaxis="iter")
+    )
+    if mode == "separate":
+        series = [item["series"][0] for item in payload]
+        assert [item["ylabel"] for item in payload] == [
+            "Elapsed time (s)", "Elapsed time per iteration (s/iter)"
+        ]
+    elif mode == "subplot":
+        series = [panel[0] for panel in payload["subplots"]]
+        assert payload["ylabel"] == [
+            "Elapsed time (s)", "Elapsed time per iteration (s/iter)"
+        ]
+    else:
+        series = payload["series"]
+        assert payload["legend"]
+        assert payload["ylabel"] == "Elapsed time (s) / elapsed time per iteration (s/iter)"
+    assert [item["label"] for item in series] == ["elapsed_time", "elapsed_time_per_iter"]
+    np.testing.assert_allclose(series[0]["y"], [0.0, 25.0, 85.0])
+    np.testing.assert_allclose(series[1]["y"], [np.nan, 2.5, 85.0 / 30], equal_nan=True)
+    assert all(item["x"] == [0, 10, 30] for item in series)
+    payloads = payload if mode == "separate" else [payload]
+    rendered_lines = []
+    for index, item in enumerate(payloads):
+        figure = plot({**item, "save": str(tmp_path / f"plot_{index}.png")})
+        rendered_lines.extend(line for axis in figure.axes for line in axis.lines)
+    assert len(rendered_lines) == 2
+    for line, expected in zip(rendered_lines, series):
+        np.testing.assert_allclose(line.get_ydata(), expected["y"], equal_nan=True)
+        assert np.isfinite(line.get_ydata()).any()
+
+
+@pytest.mark.parametrize("reference_frame", [0, 1])
+@pytest.mark.parametrize("per_atom", [False, True])
+def test_relative_energy_uses_source_reference_before_sampling(reference_frame, per_atom) -> None:
+    data = SimulationData(
+        atom_ids=[],
+        potential_energy=np.asarray([-40.0, -30.0, -10.0]),
+        num_of_atoms=np.asarray([4, 3, 2]),
+    )
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy", frames=[2, 1], every=2,
+        relative=True, reference_frame=reference_frame, per_atom=per_atom,
+    )
+    result = SimulationScalarSeriesTask().run(data, request)
+    expected = np.asarray([-10.0, -10.0, -5.0]) if per_atom else data.potential_energy
+    assert result.table["frame_index"].tolist() == [2]
+    assert result.table["value"].tolist() == [expected[2]]
+    assert result.table["relative_energy"].tolist() == [expected[2] - expected[reference_frame]]
+    assert result.table["potential_energy"].tolist() == [-10.0]
+    assert result.table["relative_potential_energy"].tolist() == [-10.0 - data.potential_energy[reference_frame]]
+    if per_atom:
+        assert result.table["potential_energy_per_atom"].tolist() == [-5.0]
+        assert result.table["relative_potential_energy_per_atom"].tolist() == [expected[2] - expected[reference_frame]]
+    else:
+        assert "potential_energy_per_atom" not in result.table
+
+
+@pytest.mark.parametrize("reference_frame", [-1, 3])
+def test_relative_energy_rejects_invalid_reference(reference_frame) -> None:
+    data = SimulationData(atom_ids=[], potential_energy=np.asarray([-40.0, -30.0, -10.0]))
+    with pytest.raises(ValueError, match="Reference frame"):
+        SimulationScalarSeriesTask().run(
+            data, SimulationScalarSeriesRequest(field="potential_energy", relative=True, reference_frame=reference_frame)
+        )
+
+
+@pytest.mark.parametrize("relative", [False, True])
+@pytest.mark.parametrize("per_atom", [False, True])
+@pytest.mark.parametrize("counts", [None, np.asarray([2, 3, 4])])
+def test_fixed_atom_count_normalizes_energy_and_reference(relative, per_atom, counts) -> None:
+    data = SimulationData(
+        atom_ids=[], potential_energy=np.asarray([-40.0, -30.0, -10.0]), num_of_atoms=counts,
+    )
+    request = SimulationScalarSeriesRequest(
+        field="potential_energy", num_atoms=10, relative=relative, per_atom=per_atom,
+        reference_frame=1, frames=[2],
+    )
+    assert SimulationScalarSeriesTask.required_data_fields_for(request, {}) == ("potential_energy",)
+    result = SimulationScalarSeriesTask().run(data, request)
+    assert result.table["value"].tolist() == [-1.0]
+    assert result.table["field"].tolist() == ["potential_energy_per_atom"]
+    assert result.table["potential_energy"].tolist() == [-10.0]
+    assert result.table["potential_energy_per_atom"].tolist() == [-1.0]
+    if relative:
+        assert result.table["relative_energy"].tolist() == [2.0]
+        assert result.table["relative_potential_energy"].tolist() == [20.0]
+        assert result.table["relative_potential_energy_per_atom"].tolist() == [2.0]
+    else:
+        assert "relative_energy" not in result.table
+        assert "relative_potential_energy" not in result.table
+        assert "relative_potential_energy_per_atom" not in result.table
+
+
+@pytest.mark.parametrize("num_atoms", [0, -1, 1.5, True])
+def test_fixed_atom_count_must_be_positive_integer(num_atoms) -> None:
+    data = SimulationData(atom_ids=[], potential_energy=np.asarray([-40.0]))
+    with pytest.raises(ValueError, match="positive integer"):
+        SimulationScalarSeriesTask().run(
+            data, SimulationScalarSeriesRequest(field="potential_energy", num_atoms=num_atoms)
+        )
+
+
+def test_potential_energy_export_contains_all_four_variants(tmp_path, monkeypatch):
+    from reaxkit.workflows.timeseries.get_potential_energy import build_parser, run_main
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "control").write_text("# MD\n10 iout2\n", encoding="utf-8")
+    (tmp_path / "summary.txt").write_text(
+        "0 1 0 -40 100 300 1 1 5\n10 1 1 -30 100 300 1 1 25\n30 1 3 -10 100 300 1 1 85\n",
+        encoding="utf-8",
+    )
+    parser = build_parser(argparse.ArgumentParser(), command="get_potential_energy")
+    args = parser.parse_args([
+        "--summary", "summary.txt", "--plot", "single", "--xaxis", "frame",
+        "--save", str(tmp_path / "pot_en.png"), "--export", str(tmp_path / "pot_en.csv"),
+        "--engine", "reaxff", "--relative", "--num-atoms", "28880",
+        "--project-root", str(tmp_path / "workspace"),
+    ])
+    assert run_main("get_potential_energy", args) == 0
+    exported = pd.read_csv(tmp_path / "pot_en.csv")
+    np.testing.assert_allclose(exported["potential_energy"], [-40, -30, -10])
+    np.testing.assert_allclose(exported["relative_potential_energy"], [0, 10, 30])
+    np.testing.assert_allclose(exported["potential_energy_per_atom"], np.asarray([-40, -30, -10]) / 28880)
+    np.testing.assert_allclose(exported["relative_potential_energy_per_atom"], np.asarray([0, 10, 30]) / 28880)
+    assert (tmp_path / "pot_en.png").is_file()
 
 
 def main() -> None:

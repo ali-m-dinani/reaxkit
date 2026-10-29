@@ -36,7 +36,8 @@ def add_trainset_export_argument(parser: argparse.ArgumentParser) -> None:
         metavar="DIRECTORY",
         help=(
             "Write one CSV per selected trainset section to DIRECTORY. "
-            f"If DIRECTORY is omitted, use '{DEFAULT_TRAINSET_EXPORT_DIRECTORY}'."
+            f"If DIRECTORY is omitted, use '{DEFAULT_TRAINSET_EXPORT_DIRECTORY}'. "
+            "Example: --export training_tables, which writes section CSV files under training_tables."
         ),
     )
 

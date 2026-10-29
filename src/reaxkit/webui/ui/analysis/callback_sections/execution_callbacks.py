@@ -1,4 +1,4 @@
-﻿"""Register execution and utility callback section for analysis UI.
+"""Register execution and utility callback section for analysis UI.
 
 This module contains a responsibility-focused subset of analysis callback
 registrations extracted from `reaxkit.webui.ui.analysis.callbacks`.
@@ -294,6 +294,8 @@ def register_execution_callbacks(app, service: WebUIApiService) -> None:
         State("pipeline-store", "data"),
         State("result-store", "data"),
         State("viz-row-filters-store", "data"),
+        State({"type": "analysis-auto-field", "name": ALL}, "value"),
+        State({"type": "analysis-auto-field", "name": ALL}, "id"),
         prevent_initial_call=True,
     )
     def on_apply_node(
@@ -302,6 +304,8 @@ def register_execution_callbacks(app, service: WebUIApiService) -> None:
         snapshot: dict[str, Any] | None,
         result_store: dict[str, Any] | None,
         viz_row_filters_store: dict[str, Any] | None,
+        auto_values=None,
+        auto_ids=None,
     ):
         _trace(f"[UI_TRACE] on_apply_node called n_clicks={n_clicks} has_session={bool(session)} has_snapshot={bool(snapshot)}")
         if not n_clicks or not session or not snapshot:
@@ -332,101 +336,15 @@ def register_execution_callbacks(app, service: WebUIApiService) -> None:
         logger.info("ui.on_apply_node click=%s pipeline_id=%s node_id=%s node_kind=%s", n_clicks, pipeline_id, node_id, node.get("kind"))
 
         try:
-            run_result = service.apply_node(pipeline_id, node_id)
+            if node.get("kind") == "analysis" and auto_ids:
+                from reaxkit.webui.ui.analysis.tasks.validation import task_schema, validate_request
+                request, errors = validate_request(task_schema(service, node), node.get("request"), auto_ids, auto_values)
+                if errors:
+                    return no_update, no_update, no_update, "Check parameters: " + "; ".join(errors)
+                if node.get("status") in {"running", "queued"}:
+                    return no_update, no_update, no_update, "This analysis is already running."
+                service.update_node(pipeline_id, node_id, {"request": request})
+            job = service.submit_node(pipeline_id, node_id)
+            return service.get_pipeline(pipeline_id), no_update, html.Span(str(n_clicks)), f"Queued {job['id']}"
         except Exception as exc:
-            _trace(f"[UI_TRACE] on_apply_node error node_id={node_id} error={exc}")
-            logger.exception("ui.on_apply_node failed pipeline_id=%s node_id=%s error=%s", pipeline_id, node_id, exc)
-            return no_update, no_update, html.Span(str(n_clicks), style={"display": "none"}), f"ERROR: Execute failed: {exc}"
-
-        artifact = run_result.get("artifact") if isinstance(run_result, dict) else None
-        next_store = dict(result_store or {})
-        if isinstance(artifact, dict) and "id" in artifact:
-            _prime_rows_cache_from_artifact(artifact)
-            _artifact_cache_put(artifact)
-            artifact_id = str(artifact.get("id") or "").strip()
-            if artifact_id:
-                next_store[node_id] = artifact_id
-            payload = artifact.get("payload", {})
-            rows = extract_tabular_rows(payload if isinstance(payload, dict) else None)
-            _trace(
-                f"[UI_TRACE] on_apply_node artifact_id={artifact.get('id')} payload_keys={sorted(payload.keys()) if isinstance(payload, dict) else []} rows={len(rows)} cols={list(rows[0].keys()) if rows else []}"
-            )
-            logger.info(
-                "ui.on_apply_node artifact_id=%s payload_keys=%s rows=%s cols=%s",
-                artifact.get("id"),
-                sorted(payload.keys()) if isinstance(payload, dict) else [],
-                len(rows),
-                list(rows[0].keys()) if rows else [],
-            )
-            if str(node.get("kind")) == "utility":
-                nodes = snapshot.get("nodes", {}) if isinstance(snapshot, dict) else {}
-                if isinstance(nodes, dict):
-                    analysis_id = _ancestor_analysis_id(nodes, node_id)
-                    if analysis_id and artifact_id:
-                        next_store[str(analysis_id)] = artifact_id
-        next_snapshot = service.get_pipeline(pipeline_id)
-        if str(node.get("kind")) == "analysis" and isinstance(artifact, dict):
-            # Create recommended visualization nodes under this analysis (once).
-            children = next_snapshot.get("children", {})
-            existing_vis = []
-            if isinstance(children, dict):
-                for child_id in children.get(str(node["id"]), []):
-                    cn = next_snapshot.get("nodes", {}).get(str(child_id), {}) if isinstance(next_snapshot.get("nodes", {}), dict) else {}
-                    if isinstance(cn, dict) and str(cn.get("kind")) == "visualization":
-                        existing_vis.append(cn)
-            if not existing_vis:
-                recs = artifact.get("recommended_views", [])
-                if isinstance(recs, list):
-                    for rec in recs:
-                        if not isinstance(rec, dict):
-                            continue
-                        spec = ensure_presentation_spec(rec)
-                        req = spec_to_dash_request(spec or rec)
-                        vtype = str(req.get("visualization_type") or "plot2d").lower()
-                        name = str((spec.label if spec else rec.get("label")) or vtype)
-                        service.add_node(
-                            pipeline_id,
-                            {
-                                "parent_id": str(node["id"]),
-                                "kind": "visualization",
-                                "name": name,
-                                "metadata": {
-                                    "visualization_type": vtype,
-                                    "auto_recommended": True,
-                                    "presentation_spec": rec,
-                                },
-                                "request": req,
-                            },
-                        )
-                next_snapshot = service.get_pipeline(pipeline_id)
-        try:
-            if isinstance(artifact, dict):
-                kind = str(node.get("kind") or "")
-                prime_analysis_id = ""
-                if kind == "analysis":
-                    prime_analysis_id = str(node_id)
-                elif kind == "utility":
-                    nodes_latest = next_snapshot.get("nodes", {}) if isinstance(next_snapshot, dict) else {}
-                    if isinstance(nodes_latest, dict):
-                        prime_analysis_id = str(_ancestor_analysis_id(nodes_latest, node_id) or "")
-                if prime_analysis_id:
-                    primed = _precompute_plot2d_cache_for_analysis(
-                        snapshot=next_snapshot,
-                        analysis_id=prime_analysis_id,
-                        result_store=next_store,
-                    )
-                    if primed > 0:
-                        logger.info(
-                            "ui.precompute_plot2d_cache pipeline_id=%s analysis_id=%s primed=%s",
-                            pipeline_id,
-                            prime_analysis_id,
-                            primed,
-                        )
-        except Exception as exc:
-            logger.debug(
-                "ui.precompute_plot2d_cache skipped pipeline_id=%s node_id=%s error=%s",
-                pipeline_id,
-                node_id,
-                exc,
-            )
-        return next_snapshot, next_store, html.Span(str(n_clicks), style={"display": "none"}), "Node executed"
+            return no_update, no_update, no_update, f"ERROR: {exc}"

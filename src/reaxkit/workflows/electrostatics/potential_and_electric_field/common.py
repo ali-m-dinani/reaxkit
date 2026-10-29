@@ -12,12 +12,12 @@ from reaxkit.core.utils.frame_utils import parse_frame_indices
 def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     """Add input, frame-selection, electrostatics, and storage arguments."""
     parser.add_argument(
-        "--engine", choices=["reaxff"], default="reaxff",
-        help="Select the simulation-data adapter. Example: --engine reaxff, reads standalone ReaxFF trajectory and charge files.",
+        "--engine", choices=["reaxff", "ams"], default="reaxff",
+        help="Select the simulation-data adapter; both adapters use ReaxFF ffield parameters. Example: --engine ams --input reaxout.kf --fort78 fort.78, reads KF coordinates/charges and the external field sidecar.",
     )
     parser.add_argument(
         "--input", default=".",
-        help="Set the path used for ReaxFF input discovery. Example: --input ./run, discovers simulation files under ./run.",
+        help="Set the simulation directory or AMS KF/RKF input. Example: --input ./run, discovers simulation files under ./run.",
     )
     parser.add_argument(
         "--run-dir", default=".",
@@ -89,6 +89,10 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
         help="Choose console logging detail. Example: --log verbose, prints detailed loading and calculation progress.",
     )
     add_storage_cli_arguments(parser)
+    parser.add_argument(
+        "--export-per-atom-csv", action="store_true", default=False,
+        help="Opt in to large per-atom Coulomb and probe CSV tables; totals, bins, and requested plots remain available without them. Example: --export-per-atom-csv, writes per-atom CSVs in addition to the normal outputs.",
+    )
     storage_help = {
         "run_id": (
             "Select an existing run identifier for workspace organization. "
@@ -165,17 +169,20 @@ def attach_energylog_reference(result, args) -> None:
         raise ValueError(f"No Ecoul component was found in {configured}.")
     references = {int(iteration): float(value) for iteration, value in
                   zip(partial.iterations, partial.values[:, component], strict=False)}
-    matched = result.totals["iter"].map(references)
-    if matched.isna().any():
-        missing = result.totals.loc[matched.isna(), "iter"].astype(int).tolist()
-        raise ValueError(f"Energylog contains no Coulomb value for iteration(s): {missing}.")
-    result.totals["energylog_coulomb (kcal/mol)"] = matched.to_numpy(dtype=float)
-    reference = matched.to_numpy(dtype=float)
-    calculated = result.totals["coulomb (kcal/mol)"].to_numpy(dtype=float)
-    result.totals["relative_difference_percent"] = np.divide(
-        calculated - reference, np.abs(reference),
-        out=np.full_like(reference, np.nan), where=reference != 0.0,
-    ) * 100.0
+    def enrich(table):
+        table = table.copy()
+        matched = table["iter"].map(references)
+        if matched.isna().any():
+            missing = table.loc[matched.isna(), "iter"].astype(int).tolist()
+            raise ValueError(f"Energylog contains no Coulomb value for iteration(s): {missing}.")
+        table["energylog_coulomb (kcal/mol)"] = matched.to_numpy(dtype=float)
+        reference = matched.to_numpy(dtype=float)
+        calculated = table["coulomb (kcal/mol)"].to_numpy(dtype=float)
+        table["relative_difference_percent"] = np.divide(calculated - reference, np.abs(reference),
+            out=np.full_like(reference, np.nan), where=reference != 0.0) * 100.0
+        return table
+    from reaxkit.core.runtime.result_store import ResultTable
+    result.totals = result.totals.map_batches(enrich) if isinstance(result.totals, ResultTable) else enrich(result.totals)
 
 
 def artifact_directory(args, command: str) -> Path:

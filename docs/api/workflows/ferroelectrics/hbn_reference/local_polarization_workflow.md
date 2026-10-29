@@ -35,27 +35,27 @@ vacuum is excluded before either assignment.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--reference` | No | WindowsPath('C:/Users/alimo/PycharmProjects/pythonProject/reaxkit/src/reaxkit/analysis/ferroelectrics/hbn_reference/AlN_hbn.cif') | Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif. |  |
+| `--reference` | No | WindowsPath('C:/Users/alimo/PycharmProjects/pythonProject/reaxkit/src/reaxkit/analysis/ferroelectrics/hbn_reference/AlN_hbn.cif') | Select the nonpolar reference CIF. Default: bundled AlN_hbn.cif. Example: --reference AlN_hbn.cif, which reads that nonpolar reference structure. |  |
 | `--replication` | Yes |  | Repeat the oriented reference explicitly. Example: --replication 19 19 10 repeats an orthogonalized AlN_hbn cell by those counts. |  |
 | `--charge-source` | No | auto | Choose ReaxFF or formal charges. Example: --charge-source formal --formal-charge Al=3 N=-3, uses the configured species charges; auto uses fort.7 when available. | auto, reaxff, formal |
-| `--formal-charge` | No | ['Al=3.0', 'N=-3.0'] | Assign species formal charges in e. Defaults: Al=3 N=-3; provide values for additional trajectory species. |  |
-| `--reference-species` | No | ['B=Al'] | Map substitutions onto reference sites. Default: B=Al. |  |
-| `--c-axis` | No | 0.0, 0.0, 1.0 | Set the Cartesian longitudinal direction. Default: 0 0 1. |  |
-| `--periodic` | No | xyz | Choose periodic directions used for matching and displacement. | none, x, y, z, xy, xz, yz, xyz |
-| `--cell-lengths` | No |  | Override trajectory cell lengths in angstrom for every frame. |  |
-| `--cell-angles` | No | 90.0, 90.0, 90.0 | Set angles for --cell-lengths in degrees. |  |
-| `--frames` | No |  | Select zero-based source frames, for example --frames 0:101:10. |  |
-| `--every` | No | 1 | Stride selected frames. |  |
-| `--reference-frame` | No | 0 | Choose the frame used to size, assign, and write the reference lattice. |  |
-| `--orthogonalize-reference, --no-orthogonalize-reference` | No |  | Apply ReaxKit's hexagonal-to-orthogonal transform before replication. Use --no-orthogonalize-reference to retain the CIF cell. If omitted, the cell angles select the better representation automatically. |  |
-| `--angle-tolerance` | No | 1.0 | Set the cell-angle comparison tolerance in degrees. |  |
-| `--max-reference-strain` | No | 0.15 | Scale a replicated reference axis to the trajectory box only when the relative length change is at most this value. Larger gaps are treated as vacuum. Default: 0.15. |  |
-| `--volume-method` | No | hull | Choose the polarization volume: occupied atomic convex hull (default), occupied bounding box, or full simulation cell. | hull, bbox, cell |
-| `--max-alignment-candidates` | No | 8 | Limit periodic origin candidates considered during initial atom assignment. |  |
-| `--local-grouping` | No | cell | Use four-atom Al2N2 cells or two-atom AlN layers for plots and the generic local table. Both explicit tables are always written. Default: cell. | cell, layer |
-| `--local-volume-method` | No | equal | Choose equal shares of the selected frame volume (default), or normalized local-deformation weights. | equal, deformation |
-| `--deformation-neighbors` | No | 12 | Set the maximum neighboring reference cells used by local affine fits. Default: 12. |  |
-| `--local-charge-treatment` | No | auto | Choose raw atomic charges, per-cell charge neutralization, or auto neutralization only when a cell is charged. Default: auto. | auto, raw, neutralize |
+| `--formal-charge` | No | ['Al=3.0', 'N=-3.0'] | Assign species formal charges in e. Defaults: Al=3 N=-3; provide values for additional trajectory species. Example: --formal-charge Al=3 N=-3, which assigns aluminum and nitrogen their specified charges in e. |  |
+| `--reference-species` | No | ['B=Al'] | Map substitutions onto reference sites. Default: B=Al. Example: --reference-species B=Al, which maps boron substitutions onto aluminum reference sites. |  |
+| `--c-axis` | No | 0.0, 0.0, 1.0 | Set the Cartesian longitudinal direction. Default: 0 0 1. Example: --c-axis 0 0 1, which uses the Cartesian z direction as the longitudinal axis. |  |
+| `--periodic` | No | xyz | Choose periodic directions used for matching and displacement. Example: --periodic xy, which applies periodic matching in x and y only. | none, x, y, z, xy, xz, yz, xyz |
+| `--cell-lengths` | No |  | Override trajectory cell lengths in angstrom for every frame. Example: --cell-lengths 30 30 60, which uses those cell lengths in angstrom for every frame. |  |
+| `--cell-angles` | No | 90.0, 90.0, 90.0 | Set angles for --cell-lengths in degrees. Example: --cell-angles 90 90 90, which uses an orthogonal cell with the supplied lengths. |  |
+| `--frames` | No |  | Select zero-based source frames, for example --frames 0:101:10. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--every` | No | 1 | Stride selected frames. Example: --every 5, which keeps every fifth selected frame. |  |
+| `--reference-frame` | No | 0 | Choose the frame used to size, assign, and write the reference lattice. Example: --reference-frame 0, which uses the initial frame to establish the reference assignment. |  |
+| `--orthogonalize-reference, --no-orthogonalize-reference` | No |  | Apply ReaxKit's hexagonal-to-orthogonal transform before replication. Use --no-orthogonalize-reference to retain the CIF cell. If omitted, the cell angles select the better representation automatically. Example: --orthogonalize-reference, which converts the hexagonal reference cell before replication. |  |
+| `--angle-tolerance` | No | 1.0 | Set the cell-angle comparison tolerance in degrees. Example: --angle-tolerance 1, which allows a one-degree cell-angle mismatch. |  |
+| `--max-reference-strain` | No | 0.15 | Scale a replicated reference axis to the trajectory box only when the relative length change is at most this value. Larger gaps are treated as vacuum. Default: 0.15. Example: --max-reference-strain 0.15, which allows at most 15 percent reference-axis scaling. |  |
+| `--volume-method` | No | hull | Choose the polarization volume: occupied atomic convex hull (default), occupied bounding box, or full simulation cell. Example: --volume-method cell, which uses the full simulation-cell volume. | hull, bbox, cell |
+| `--max-alignment-candidates` | No | 8 | Limit periodic origin candidates considered during initial atom assignment. Example: --max-alignment-candidates 8, which tests at most eight periodic-origin candidates. |  |
+| `--local-grouping` | No | cell | Use four-atom Al2N2 cells or two-atom AlN layers for plots and the generic local table. Both explicit tables are always written. Default: cell. Example: --local-grouping layer, which uses two-atom AlN layers for local output. | cell, layer |
+| `--local-volume-method` | No | equal | Choose equal shares of the selected frame volume (default), or normalized local-deformation weights. Example: --local-volume-method equal, which divides the selected frame volume among local groups. | equal, deformation |
+| `--deformation-neighbors` | No | 12 | Set the maximum neighboring reference cells used by local affine fits. Default: 12. Example: --deformation-neighbors 12, which uses at most twelve neighboring reference cells in each affine fit. |  |
+| `--local-charge-treatment` | No | auto | Choose raw atomic charges, per-cell charge neutralization, or auto neutralization only when a cell is charged. Default: auto. Example: --local-charge-treatment neutralize, which neutralizes each local group's charges. | auto, raw, neutralize |
 
 #### Input and file selection
 
@@ -73,27 +73,28 @@ vacuum is excluded before either assignment.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No |  | Choose the output directory for CSV and XYZ artifacts. |  |
-| `--write-displacements` | No | False | Write the per-atom displacement table. Disabled by default because the table can be very large. |  |
-| `--plot-2d` | No | False | Write per-frame 2D maps after aggregating along the omitted coordinate. |  |
-| `--plot-3d` | No | False | Write per-frame 3D cell-center scatter plots. |  |
-| `--plot-plane` | No | xy | Choose the displayed plane for --plot-2d. Default: xy. | xy, xz, yz |
-| `--plot-component` | No | c | Choose the dipole or polarization component used as plot color. Default: c. | x, y, z, c |
-| `--plot-quantity` | No | polarization | Plot local polarization (default) or local dipole. | polarization, dipole |
-| `--plot-bins` | No | 40, 40 | Set the two in-plane bin counts for --plot-2d. Default: 40 40. |  |
-| `--global-scaling, --no-global-scaling` | No | False | Use shared symmetric color limits across frames. |  |
-| `--figure-dpi` | No | 180 | Set PNG resolution. Default: 180. |  |
-| `--write-extxyz` | No | False | Write an OVITO-compatible trajectory with local vector properties. |  |
-| `--extxyz-precision` | No | 8 | Set significant digits in Extended XYZ output. Default: 8. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No |  | Choose the output directory for CSV and XYZ artifacts. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-displacements` | No | False | Write the per-atom displacement table. Disabled by default because the table can be very large. Example: --write-displacements, which writes the optional per-atom displacement table. |  |
+| `--plot-2d` | No | False | Write per-frame 2D maps after aggregating along the omitted coordinate. Example: --plot-2d, which writes projected spatial heatmaps. |  |
+| `--plot-3d` | No | False | Write per-frame 3D cell-center scatter plots. Example: --plot-3d, which writes three-dimensional center scatter plots. |  |
+| `--plot-plane` | No | xy | Choose the displayed plane for --plot-2d. Default: xy. Example: --plot-plane xy, which displays x and y while aggregating along z. | xy, xz, yz |
+| `--plot-component` | No | c | Choose the dipole or polarization component used as plot color. Default: c. Example: --plot-component z, which colors plots by the z component. | x, y, z, c |
+| `--plot-quantity` | No | polarization | Plot local polarization (default) or local dipole. Example: --plot-quantity dipole, which colors plots by local dipole instead of polarization. | polarization, dipole |
+| `--plot-bins` | No | 40, 40 | Set the two in-plane bin counts for --plot-2d. Default: 40 40. Example: --plot-bins 40 40, which uses 40 bins along each displayed axis. |  |
+| `--global-scaling, --no-global-scaling` | No | False | Use shared symmetric color limits across frames. Example: --global-scaling, which uses shared symmetric color limits across frames. |  |
+| `--figure-dpi` | No | 180 | Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch. |  |
+| `--write-extxyz` | No | False | Write an OVITO-compatible trajectory with local vector properties. Example: --write-extxyz, which exports local vector properties for OVITO. |  |
+| `--extxyz-precision` | No | 8 | Set significant digits in Extended XYZ output. Default: 8. Example: --extxyz-precision 8, which writes eight significant digits in Extended XYZ properties. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -105,13 +106,17 @@ vacuum is excluded before either assignment.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

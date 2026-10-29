@@ -307,6 +307,10 @@ class CacheManager:
         """Portable cache path used when HDF5 is unavailable."""
         return self._root / f"{analysis_id}.pkl"
 
+    def checkpoint_path(self, analysis_id: str) -> Path:
+        """Single-file cache for completed streaming checkpoint results."""
+        return self._root / f"{analysis_id}.results.zip"
+
     def _index_path(self) -> Path:
         """
         Index path.

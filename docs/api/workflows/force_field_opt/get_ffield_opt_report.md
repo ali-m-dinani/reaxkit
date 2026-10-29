@@ -36,37 +36,38 @@ By default, results are written under:
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--min-points` | No | 6 | Minimum EOS points required for each bulk-modulus fit (default: 6) |  |
-| `--flip-sign` | No | False | Flip energy signs during bulk-modulus fitting |  |
-| `--no-shift-min-to-zero` | No | False | Do not shift minimum energy to zero during bulk-modulus fitting |  |
+| `--min-points` | No | 6 | Minimum EOS points required for each bulk-modulus fit (default: 6). Example: --min-points 6, which requires six finite points per fitted structure group. |  |
+| `--flip-sign` | No | False | Flip energy signs during bulk-modulus fitting. Example: --flip-sign, which negates energies before plotting and export. |  |
+| `--no-shift-min-to-zero` | No | False | Do not shift minimum energy to zero during bulk-modulus fitting. Example: --no-shift-min-to-zero, which preserves the original energy offset during fitting. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  |  | reaxff, ams, lammps |
-| `--input` | No |  | Input path used for engine detection |  |
-| `--run-dir, --dir` | No | . | Force-field optimization run directory |  |
-| `--fort99` | No | fort.99 | Path to fort.99 |  |
-| `--fort74` | No | fort.74 | Path to fort.74 |  |
-| `--trainset` | No | trainset.in | Path to trainset file |  |
-| `--geo` | No | geo | Path to the geo file |  |
+| `--engine` | No |  | Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers. | reaxff, ams, lammps |
+| `--input` | No |  | Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run. |  |
+| `--run-dir, --dir` | No | . | Force-field optimization run directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery. |  |
+| `--fort99` | No | fort.99 | Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file. |  |
+| `--fort74` | No | fort.74 | Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file. |  |
+| `--trainset` | No | trainset.in | Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file. |  |
+| `--geo` | No | geo | Path to the geo file. Example: --geo geo, which reads the multi-structure geometry file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--entry-per-figure` | No | 6 | Maximum entries per grouped-bar figure (default: 6) |  |
-| `--output, --outdir` | No |  | Optional report-directory override |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--entry-per-figure` | No | 6 | Maximum entries per grouped-bar figure (default: 6). Example: --entry-per-figure 6, which places at most six comparison entries in each figure. |  |
+| `--output, --outdir` | No |  | Optional report-directory override. Example: --output analysis/results, which writes generated artifacts under analysis/results. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -78,14 +79,18 @@ By default, results are written under:
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--log` | No |  |  | verbose, quiet |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--log` | No |  | Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages. | verbose, quiet |
 
 
 </div>

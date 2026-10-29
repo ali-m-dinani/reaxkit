@@ -30,32 +30,33 @@ Convert an XYZ file to ReaxFF GEO format.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--dims` | Yes |  | Box dimensions a,b,c |  |
-| `--angles` | Yes |  | Box angles alpha,beta,gamma |  |
-| `--sort` | No |  | Sort atoms before writing | x, y, z, atom_type |
-| `--descending` | No | False | Sort in descending order |  |
+| `--dims` | Yes |  | Box dimensions a,b,c. Example: --dims 30,30,60, which sets box lengths to 30, 30, and 60 angstrom. |  |
+| `--angles` | Yes |  | Box angles alpha,beta,gamma. Example: --angles 90,90,90, which sets an orthogonal box. |  |
+| `--sort` | No |  | Sort atoms before writing. Example: --sort z, which orders atoms by their z coordinates. | x, y, z, atom_type |
+| `--descending` | No | False | Sort in descending order. Example: --descending, which reverses the selected sort order. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | Yes |  | Input XYZ file |  |
+| `--file` | Yes |  | Input XYZ file. Example: --file slab.xyz, which reads the structure or data from slab.xyz. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No | geo | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No | geo | Output GEO file. Example: --output geo, which writes generated output to geo. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -67,13 +68,93 @@ Convert an XYZ file to ReaxFF GEO format.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+
+
+</div>
+
+## Command: `vasp2reax`
+
+<div class="analysis-section-indent" markdown="1">
+
+Convert a VASP POSCAR/CONTCAR or CIF to standalone ReaxFF geometry.
+Preserves the cell setting and atom order, transforming Cartesian coordinates so c lies along z and b lies in the yz plane. No Fortran compiler is needed.
+
+Outputs:
+  reaxff.geo: ReaxFF XTLGRF/BGF geometry with CRYSTX cell parameters and HETATM coordinates; this replaces the Fortran fort.15 output.
+  reaxff_coordinates.xyz: standard XYZ with the same ReaxFF Cartesian coordinates; this replaces the coordinate listing in Fortran fort.51.
+  --output changes the GEO filename; the XYZ uses <output-stem>_coordinates.xyz.
+  Both files are saved in the input run directory; --copy-to-dot also copies both to the current directory.
+
+[NOTE] VASP Direct and Cartesian coordinates and Selective Dynamics syntax are supported. Selective Dynamics flags are not converted to ReaxFF restraints. CIF input must describe an ordered structure. No conventional/primitive cell conversion is performed.
+
+### Examples
+-----
+
+```text
+  reaxkit vasp2reax --file CONTCAR --copy-to-dot
+  reaxkit vasp2reax --file POSCAR --output MgTeO.geo
+  reaxkit vasp2reax --file structure.cif --output MgTeO.geo
+  reaxkit vasp2reax --file structure.dat --format vasp --output MgTeO.geo
+```
+
+### Arguments
+
+#### Input and file selection
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--file` | Yes |  | Input VASP POSCAR/CONTCAR or CIF file. Example: --file POSCAR, which reads the structure or data from POSCAR. |  |
+
+#### Outputs and plots
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--format` | No |  | Input format override; .cif selects CIF, otherwise VASP. Example: --format vasp, which reads the input as a VASP structure. | vasp, cif |
+| `--output` | No | reaxff.geo | ReaxFF GEO filename (legacy fort.15); also writes <stem>_coordinates.xyz (legacy fort.51). Example: --output reaxff.geo, which writes generated output to reaxff.geo. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
+
+#### Execution
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
+
+#### Storage and cache
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `--run-id` | No |  | Run identifier for run-scoped layout. Example: --run-id run_91ac0e, which reuses that run identifier. |  |
+| `--project-root` | No | reaxkit_workspace | Project root that contains inputs/, data/, analysis/, etc. Example: --project-root ./workspace, which stores run artifacts there. |  |
+| `--analysis-id` | No |  | Optional analysis artifact id; defaults to run id. Example: --analysis-id comparison-a, which names the analysis artifact explicitly. |  |
+| `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
+| `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
+| `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+
+#### Diagnostics and compatibility
+
+| Flag | Required | Default | Help | Choices |
+|---|---|---|---|---|
+| `-h, --help` | No |  | show this help message and exit |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -98,31 +179,32 @@ Build a surface slab from a bulk structure and write it to an ASE-supported form
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--surface` | Yes |  | Miller indices h,k,l; reversing the signs exchanges the top and bottom faces |  |
-| `--expand` | Yes |  | Supercell and layers nx,ny,layers |  |
-| `--vacuum` | Yes |  | Vacuum thickness in angstrom |  |
+| `--surface` | Yes |  | Miller indices h,k,l; reversing the signs exchanges the top and bottom faces. Example: --surface 0,0,1, which cuts a surface normal to the third lattice direction. |  |
+| `--expand` | Yes |  | Supercell and layers nx,ny,layers. Example: --expand 2,2,4, which uses a 2-by-2 in-plane supercell with four layers. |  |
+| `--vacuum` | Yes |  | Vacuum thickness in angstrom. Example: --vacuum 15, which adds a 15-angstrom vacuum region. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | Yes |  | Input bulk structure file |  |
+| `--file` | Yes |  | Input bulk structure file. Example: --file AlN.cif, which reads the structure or data from AlN.cif. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | Yes |  | Output file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | Yes |  | Output file. Example: --output slab.xyz, which writes generated output to slab.xyz. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -134,13 +216,17 @@ Build a surface slab from a bulk structure and write it to an ASE-supported form
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -168,30 +254,31 @@ Sort atoms in a GEO file and write a new GEO file.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--sort` | Yes |  | Sort key | m, x, y, z, atom_type |
-| `--descending` | No | False | Sort in descending order |  |
+| `--sort` | Yes |  | Sort key. Example: --sort z, which orders atoms by their z coordinates. | m, x, y, z, atom_type |
+| `--descending` | No | False | Sort in descending order. Example: --descending, which reverses the selected sort order. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | Yes |  | Input GEO file |  |
+| `--file` | Yes |  | Input GEO file. Example: --file geo, which reads the structure or data from geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | Yes |  | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | Yes |  | Output GEO file. Example: --output geo_out, which writes generated output to geo_out. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -203,13 +290,17 @@ Sort atoms in a GEO file and write a new GEO file.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -234,23 +325,24 @@ In other words, change the angles from 90,90,120 to 90,90,90.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | Yes |  | Input structure file |  |
+| `--file` | Yes |  | Input structure file. Example: --file AlN.cif, which reads the structure or data from AlN.cif. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | Yes |  | Output structure file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | Yes |  | Output structure file. Example: --output AlN_orthogonal.cif, which writes generated output to AlN_orthogonal.cif. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -262,13 +354,17 @@ In other words, change the angles from 90,90,120 to 90,90,90.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -298,36 +394,37 @@ Randomly place copies of a molecule into an empty box, optionally around a base 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--insert` | Yes |  | Insert molecule |  |
-| `--ncopy` | Yes |  | Number of copies to place |  |
-| `--dims` | Yes |  | Box dimensions a,b,c |  |
-| `--angles` | Yes |  | Box angles alpha,beta,gamma |  |
-| `--mindist` | No | 2.0 | Minimum interatomic distance |  |
-| `--baseplace` | No | as-is | Base placement mode | as-is, center, origin |
-| `--maxattempt` | No | 50000 | Maximum placement attempts per copy |  |
-| `--randomseed` | No |  | Random seed |  |
+| `--insert` | Yes |  | Insert molecule. Example: --insert water.xyz, which reads the molecule to insert from water.xyz. |  |
+| `--ncopy` | Yes |  | Number of copies to place. Example: --ncopy 20, which places 20 copies of the inserted molecule. |  |
+| `--dims` | Yes |  | Box dimensions a,b,c. Example: --dims 30,30,60, which sets box lengths to 30, 30, and 60 angstrom. |  |
+| `--angles` | Yes |  | Box angles alpha,beta,gamma. Example: --angles 90,90,90, which sets an orthogonal box. |  |
+| `--mindist` | No | 2.0 | Minimum interatomic distance. Example: --mindist 2.0, which requires inserted atoms to remain at least 2 angstrom apart. |  |
+| `--baseplace` | No | as-is | Base placement mode. Example: --baseplace center, which centers the base structure in the target box. | as-is, center, origin |
+| `--maxattempt` | No | 50000 | Maximum placement attempts per copy. Example: --maxattempt 50000, which allows up to 50000 placement attempts per molecule. |  |
+| `--randomseed` | No |  | Random seed. Example: --randomseed 42, which makes randomized placement reproducible. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--base` | No |  | Optional base structure |  |
+| `--base` | No |  | Optional base structure. Example: --base substrate.xyz, which reads the starting substrate structure. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | Yes |  | Output file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | Yes |  | Output file. Example: --output slab.xyz, which writes generated output to slab.xyz. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -339,13 +436,17 @@ Randomly place copies of a molecule into an empty box, optionally around a base 
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -373,32 +474,33 @@ Insert sample or explicit (i.e., settings are defined) restraint blocks into a G
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--bond` | No |  | Add one bond restraint |  |
-| `--angle` | No |  | Add one angle restraint |  |
-| `--torsion` | No |  | Add one torsion restraint |  |
-| `--mascen` | No |  | Add one mass-center restraint |  |
+| `--bond` | No |  | Add one bond restraint. Example: --bond, which inserts a sample bond restraint block. |  |
+| `--angle` | No |  | Add one angle restraint. Example: --angle, which inserts a sample angle restraint block. |  |
+| `--torsion` | No |  | Add one torsion restraint. Example: --torsion, which inserts a sample torsion restraint block. |  |
+| `--mascen` | No |  | Add one mass-center restraint. Example: --mascen, which inserts a sample mass-center restraint block. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | geo | Input GEO file |  |
+| `--file` | No | geo | Input GEO file. Example: --file geo, which reads the structure or data from geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No |  | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No |  | Output GEO file. Example: --output geo_out, which writes generated output to geo_out. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -410,13 +512,17 @@ Insert sample or explicit (i.e., settings are defined) restraint blocks into a G
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -444,32 +550,33 @@ Insert sample or explicit (i.e., settings are defined) restraint blocks into a G
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--bond` | No |  | Add one bond restraint |  |
-| `--angle` | No |  | Add one angle restraint |  |
-| `--torsion` | No |  | Add one torsion restraint |  |
-| `--mascen` | No |  | Add one mass-center restraint |  |
+| `--bond` | No |  | Add one bond restraint. Example: --bond, which inserts a sample bond restraint block. |  |
+| `--angle` | No |  | Add one angle restraint. Example: --angle, which inserts a sample angle restraint block. |  |
+| `--torsion` | No |  | Add one torsion restraint. Example: --torsion, which inserts a sample torsion restraint block. |  |
+| `--mascen` | No |  | Add one mass-center restraint. Example: --mascen, which inserts a sample mass-center restraint block. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | geo | Input GEO file |  |
+| `--file` | No | geo | Input GEO file. Example: --file geo, which reads the structure or data from geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No |  | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No |  | Output GEO file. Example: --output geo_out, which writes generated output to geo_out. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -481,13 +588,17 @@ Insert sample or explicit (i.e., settings are defined) restraint blocks into a G
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -515,31 +626,32 @@ Use this command if you want to fix charges for specific atoms or parts of your 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--per-atom` | No |  | Per-atom charge by atom range using start:end:charge (repeatable) |  |
-| `--per-atom-type` | No |  | Per-atom charge by atom type using atom_type:charge (repeatable) |  |
-| `--rest` | No |  | Total charge for remaining atoms (outside per-atom selections) |  |
+| `--per-atom` | No |  | Per-atom charge by atom range using start:end:charge (repeatable). Example: --per-atom 1:10:0.1, which assigns charge 0.1 to the selected atom range. |  |
+| `--per-atom-type` | No |  | Per-atom charge by atom type using atom_type:charge (repeatable). Example: --per-atom-type O:-0.5, which assigns charge -0.5 to oxygen atoms. |  |
+| `--rest` | No |  | Total charge for remaining atoms (outside per-atom selections). Example: --rest 0, which sets the total charge assigned to unselected atoms to zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | geo | Input GEO file |  |
+| `--file` | No | geo | Input GEO file. Example: --file geo, which reads the structure or data from geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No |  | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No |  | Output GEO file. Example: --output geo_out, which writes generated output to geo_out. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -551,13 +663,17 @@ Use this command if you want to fix charges for specific atoms or parts of your 
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -585,31 +701,32 @@ Use this command if you want to fix charges for specific atoms or parts of your 
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--per-atom` | No |  | Per-atom charge by atom range using start:end:charge (repeatable) |  |
-| `--per-atom-type` | No |  | Per-atom charge by atom type using atom_type:charge (repeatable) |  |
-| `--rest` | No |  | Total charge for remaining atoms (outside per-atom selections) |  |
+| `--per-atom` | No |  | Per-atom charge by atom range using start:end:charge (repeatable). Example: --per-atom 1:10:0.1, which assigns charge 0.1 to the selected atom range. |  |
+| `--per-atom-type` | No |  | Per-atom charge by atom type using atom_type:charge (repeatable). Example: --per-atom-type O:-0.5, which assigns charge -0.5 to oxygen atoms. |  |
+| `--rest` | No |  | Total charge for remaining atoms (outside per-atom selections). Example: --rest 0, which sets the total charge assigned to unselected atoms to zero. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | geo | Input GEO file |  |
+| `--file` | No | geo | Input GEO file. Example: --file geo, which reads the structure or data from geo. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output` | No |  | Output GEO file |  |
-| `--copy-to-dot` | No | False | Also copy generated output to current directory |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output` | No |  | Output GEO file. Example: --output geo_out, which writes generated output to geo_out. |  |
+| `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -621,13 +738,17 @@ Use this command if you want to fix charges for specific atoms or parts of your 
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

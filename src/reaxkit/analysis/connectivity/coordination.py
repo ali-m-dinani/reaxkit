@@ -261,6 +261,7 @@ def _sum_bond_orders_matrix(data: ConnectivityData) -> np.ndarray:
 class CoordinationStatusTask(AnalysisTask):
     """Per-atom coordination status over selected frames."""
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,

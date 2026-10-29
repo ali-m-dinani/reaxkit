@@ -37,7 +37,7 @@ Each span averages multiple coordinate extrema and is compared with frame zero.
 | `--frames` | No |  | Frame selector syntax. Example: --frames 0:101:10, which reports frames 0 through 100 every ten frames. |  |
 | `--every` | No | 1 | Stride over the selected frame list. Example: --every 5, which keeps every fifth selected frame. |  |
 | `--unwrap, --no-unwrap` | No | True | Cumulatively unwrap selected periodic axes. Example: --no-unwrap, which analyzes raw wrapped coordinates. |  |
-| `--wrapped` | No | True | Standalone-compatible alias for --no-unwrap. |  |
+| `--wrapped` | No | True | Standalone-compatible alias for --no-unwrap. Example: --wrapped, which keeps wrapped coordinates instead of unwrapping. |  |
 | `--periodic` | No | xyz | Axes treated as periodic during unwrapping. Example: --periodic xy, which leaves slab-normal z unwrapped as-is. | none, x, y, z, xy, xz, yz, xyz |
 | `--top-bottom-count, --n-extreme-atoms` | No | 5 | Atoms averaged at each coordinate extreme. Example: --top-bottom-count 8, which averages eight top and eight bottom atoms. |  |
 | `--zero-tolerance` | No | 1e-12 | Smallest usable frame-zero span. Example: --zero-tolerance 1e-10, which leaves strain blank for smaller baselines. |  |
@@ -60,20 +60,21 @@ Each span averages multiple coordinate extrema and is compared with frame zero.
 | `--save` | No |  | Save the generated plot. Example: --save strain.png, which writes a combined profile figure. |  |
 | `--export` | No |  | Export the result table to CSV. Example: --export strain.csv, which writes all frame/bin rows. |  |
 | `--grid` | No |  | Subplot grid dimensions. Example: --grid 2x3, which arranges six frame panels. |  |
-| `--gen-plots` | No | False | Generate all four standalone-compatible frame/bin plot directories. |  |
-| `--y-scale` | No | global | Batch-plot scaling. Global keeps axes consistent across each complete plot family. | global, frame |
-| `--plot-every` | No | 1 | Generate every Nth frame plot; bin-history plots always include every bin. |  |
-| `--dpi` | No | 180 | Resolution of batch PNG plots. |  |
-| `--output-dir` | No |  | Batch plot root. Defaults to a method-specific directory beside xmolout. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--gen-plots` | No | False | Generate all four standalone-compatible frame/bin plot directories. Example: --gen-plots, which generates the workflow's plot files. |  |
+| `--y-scale` | No | global | Batch-plot scaling. Global keeps axes consistent across each complete plot family. Example: --y-scale global, which keeps plot scales comparable across frames. | global, frame |
+| `--plot-every` | No | 1 | Generate every Nth frame plot; bin-history plots always include every bin. Example: --plot-every 5, which writes every fifth frame plot. |  |
+| `--dpi` | No | 180 | Resolution of batch PNG plots. Example: --dpi 300, which writes figures at 300 dots per inch. |  |
+| `--output-dir` | No |  | Batch plot root. Defaults to a method-specific directory beside xmolout. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -85,13 +86,17 @@ Each span averages multiple coordinate extrema and is compared with frame zero.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 | `--log` | No | quiet | Logging detail. Example: --log verbose, which prints additional runtime progress. | verbose, quiet |
 
 
@@ -127,7 +132,7 @@ Frame-zero atom groups define material regions and fit diagnostics are retained.
 | `--frames` | No |  | Frame selector syntax. Example: --frames 0:101:10, which reports frames 0 through 100 every ten frames. |  |
 | `--every` | No | 1 | Stride over the selected frame list. Example: --every 5, which keeps every fifth selected frame. |  |
 | `--unwrap, --no-unwrap` | No | True | Cumulatively unwrap selected periodic axes. Example: --no-unwrap, which analyzes raw wrapped coordinates. |  |
-| `--wrapped` | No | True | Standalone-compatible alias for --no-unwrap. |  |
+| `--wrapped` | No | True | Standalone-compatible alias for --no-unwrap. Example: --wrapped, which keeps wrapped coordinates instead of unwrapping. |  |
 | `--periodic` | No | xyz | Axes treated as periodic during unwrapping. Example: --periodic xy, which leaves slab-normal z unwrapped as-is. | none, x, y, z, xy, xz, yz, xyz |
 | `--minimum-atoms` | No | 4 | Minimum atoms required for a 3D affine fit. Example: --minimum-atoms 8, which leaves smaller bins undefined. |  |
 | `--max-condition-number` | No | 1000000000000.0 | Largest accepted reference-fit condition number. Example: --max-condition-number 1e8, which rejects less stable bin geometries. |  |
@@ -150,20 +155,21 @@ Frame-zero atom groups define material regions and fit diagnostics are retained.
 | `--save` | No |  | Save the generated plot. Example: --save strain.png, which writes a combined profile figure. |  |
 | `--export` | No |  | Export the result table to CSV. Example: --export strain.csv, which writes all frame/bin rows. |  |
 | `--grid` | No |  | Subplot grid dimensions. Example: --grid 2x3, which arranges six frame panels. |  |
-| `--gen-plots` | No | False | Generate all four standalone-compatible frame/bin plot directories. |  |
-| `--y-scale` | No | global | Batch-plot scaling. Global keeps axes consistent across each complete plot family. | global, frame |
-| `--plot-every` | No | 1 | Generate every Nth frame plot; bin-history plots always include every bin. |  |
-| `--dpi` | No | 180 | Resolution of batch PNG plots. |  |
-| `--output-dir` | No |  | Batch plot root. Defaults to a method-specific directory beside xmolout. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--gen-plots` | No | False | Generate all four standalone-compatible frame/bin plot directories. Example: --gen-plots, which generates the workflow's plot files. |  |
+| `--y-scale` | No | global | Batch-plot scaling. Global keeps axes consistent across each complete plot family. Example: --y-scale global, which keeps plot scales comparable across frames. | global, frame |
+| `--plot-every` | No | 1 | Generate every Nth frame plot; bin-history plots always include every bin. Example: --plot-every 5, which writes every fifth frame plot. |  |
+| `--dpi` | No | 180 | Resolution of batch PNG plots. Example: --dpi 300, which writes figures at 300 dots per inch. |  |
+| `--output-dir` | No |  | Batch plot root. Defaults to a method-specific directory beside xmolout. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -175,13 +181,17 @@ Frame-zero atom groups define material regions and fit diagnostics are retained.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 | `--log` | No | quiet | Logging detail. Example: --log verbose, which prints additional runtime progress. | verbose, quiet |
 
 

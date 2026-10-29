@@ -74,6 +74,8 @@ class GeoHandler(BaseHandler):
     - This handler is not frame-based; the file represents a single structure.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "geo", reporter=None):
         """
         Initialize the instance.

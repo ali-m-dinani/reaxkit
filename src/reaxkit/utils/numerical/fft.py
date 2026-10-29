@@ -13,6 +13,8 @@ from typing import Literal, Optional, Sequence, Union
 
 import numpy as np
 
+VERSION = "1"
+
 ArrayLike = Union[np.ndarray, Sequence[float], list, tuple]
 DetrendMode = Literal["none", "mean", "linear"]
 WindowName = Literal["none", "hann", "hamming", "blackman", "bartlett"]

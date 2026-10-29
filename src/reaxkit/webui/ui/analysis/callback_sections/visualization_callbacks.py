@@ -1,4 +1,4 @@
-﻿"""Register visualization-parameter callback section for analysis UI.
+"""Register visualization-parameter callback section for analysis UI.
 
 This module contains a responsibility-focused subset of analysis callback
 registrations extracted from `reaxkit.webui.ui.analysis.callbacks`.
@@ -203,7 +203,7 @@ def register_visualization_callbacks(app, service: WebUIApiService) -> None:
             "line_width": float(line_width if line_width is not None else 2.0),
             "font_size": float(font_size if font_size is not None else 12.0),
             "marker_size": float(marker_size if marker_size is not None else 0.0),
-            "theme": _safe_theme(theme or "plotly_white"),
+            "theme": ("workspace" if theme in (None, "", "workspace") else _safe_theme(theme)),
             "axis_title_size": float(axis_title_size if axis_title_size is not None else 13.0),
             "grid_on": bool("on" in (grid_on_values or [])),
             "axis_box_on": bool("on" in (axis_box_on_values or [])),
@@ -322,7 +322,7 @@ def register_visualization_callbacks(app, service: WebUIApiService) -> None:
                 "line_width": float(line_width if line_width is not None else float(payload.get("line_width") or 2.0)),
                 "font_size": float(font_size if font_size is not None else float(payload.get("font_size") or 12.0)),
                 "marker_size": float(marker_size if marker_size is not None else float(payload.get("marker_size") or 0.0)),
-                "theme": _safe_theme(theme or payload.get("theme") or "plotly_white"),
+                "theme": str(theme or payload.get("theme") or "workspace"),
                 "axis_title_size": float(axis_title_size if axis_title_size is not None else float(payload.get("axis_title_size") or 13.0)),
                 "grid_on": bool("on" in (grid_on_values or [])),
                 "axis_box_on": bool("on" in (axis_box_on_values or [])),

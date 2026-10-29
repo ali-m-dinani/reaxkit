@@ -11,40 +11,57 @@
 
 <div class="analysis-section-indent" markdown="1">
 
-Dispatcher for time-series and related sequential analyses.
-This command routes `--field` expressions to the appropriate analysis backend
-for simulation scalars, trajectory coordinates, charges, fields, energies, restraints,
-molecular frequencies/totals, and geometry-optimization data.
+Extract time-series and sequential data from existing simulation output.
+
+Use --field to select simulation scalars, coordinates, charges, fields, energies, or molecular data.
+Combined coordinate axes report vector magnitudes; displacement uses --reference-frame.
+This command analyzes recorded data or a field schedule; it does not run a simulation.
 
 ### Examples
 -----
 
 ```text
-  1. Plot simulation scalar series such as temperature:
-   reaxkit timeseries --field temperature --summary summary.txt --plot single
+  1. Simulation temperature:
+     reaxkit timeseries --field temperature --summary summary.txt --plot single
 
-  2. Plot trajectory/displacement series on time axis:
-   - getting the trajectory of atoms 1 and 2 in z dimension:
-       reaxkit timeseries --field trajectory[1,2].z --xaxis time --save atom_z.png
-   - getting the displacement of atoms 1 to 20 in x and y dimensions with reference frame 0:
-     [Note] when more than 1 dimension is selected, it finds the magnitude of the combined components (i.e., sqrt(dx^2 + dy^2) in the example below).
-       reaxkit timeseries --field displacement[1:20].xy --reference-frame 0 --xaxis time --plot single
+  2. Atom coordinates:
+     reaxkit timeseries --field "trajectory[1,2].z" --xmolout xmolout --plot single
 
-  3. Export charge series for atom 1:
-   reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv
+  3. Displacement magnitude for atoms 1 through 20:
+     reaxkit timeseries --field "displacement[1:21].xy" --reference-frame 0 --plot single
 
-  4. Plot molecular frequency/totals series:
-   reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single
-   reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot
+  4. Atomic charges:
+     reaxkit timeseries --field "charge[1]" --fort7 fort.7 --export charges.csv
 
-  5. Plot restraint/electric-field/energy series:
-   reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single
-   reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single
-   reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single
+  5. Cell lengths:
+     reaxkit timeseries --field "cell[a,b,c]" --xmolout xmolout --plot subplot
 
-  6. Plot geometry-optimization results (i.e., energy vs iter):
-   reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single
-   reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot
+  6. Applied electric field:
+     reaxkit timeseries --field "electric_field[field_z]" --fort78 fort.78 --plot single
+
+  7. Prescribed field program:
+     reaxkit timeseries --field eregime.field --eregime eregime.in --export field_program.csv
+
+  8. Partial energies:
+     reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single
+
+  9. Restraint energy:
+     reaxkit timeseries --field restraint.E_res --fort76 fort.76 --plot single
+
+  10. Molecular frequencies:
+     reaxkit timeseries --field "molecule[H2O,OH]" --molfra molfra.out --plot single
+
+  11. Molecular totals:
+     reaxkit timeseries --field "totals[total_molecules,total_atoms]" --molfra molfra.out --plot subplot
+
+  12. Geometry-optimization progress:
+     reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot
+
+  13. Legacy coordinate selectors:
+     reaxkit timeseries --atoms "1,5,12" --dims z --xmolout xmolout --plot single
+
+  14. Legacy cell selectors:
+     reaxkit timeseries --boxdims --cell-fields a b c --xmolout xmolout --plot subplot
 ```
 
 ### Arguments
@@ -54,7 +71,7 @@ molecular frequencies/totals, and geometry-optimization data.
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--field` | No |  | Dispatcher field expression. Example: --field temperature, which selects simulation temperature time series. |  |
-| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20. |  |
+| `--frames` | No |  | Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,18 (stop excluded). |  |
 | `--every` | No | 1 | Use every Nth selected frame. Example: --every 5, which subsamples selected frames by five. |  |
 | `--atoms` | No |  | Legacy trajectory atom selector. Example: --atoms "1,5,12", which limits trajectory-series extraction to those atom ids. |  |
 | `--atom-types` | No |  | Legacy trajectory atom-type selector. Example: --atom-types O H, which limits trajectory-series extraction to oxygen/hydrogen. |  |
@@ -95,15 +112,16 @@ molecular frequencies/totals, and geometry-optimization data.
 | `--xaxis` | No | iter | X-axis domain. Example: --xaxis time, which converts iterations to physical time when possible. | iter, frame, time |
 | `--format` | No | long | Trajectory output table format. Example: --format wide, which pivots compatible outputs into wide columns. | long, wide |
 | `--include-geo-descriptor` | No | False | Include geo descriptor for geometry optimization data. Example: --include-geo-descriptor, which keeps descriptor annotations in output. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -115,13 +133,17 @@ molecular frequencies/totals, and geometry-optimization data.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 | `--log` | No |  | Logging level. Example: --log verbose, which prints more runtime details. | verbose, quiet |
 
 

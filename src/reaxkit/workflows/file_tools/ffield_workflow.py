@@ -299,7 +299,8 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 parser,
                 save_help=(
                     "Save plots. With --plot single, provide an output directory; "
-                    "with --plot subplot, provide one figure path."
+                    "with --plot subplot, provide one figure path. "
+                    "Example: --plot single --save eos_plots, which writes individual EOS figures under eos_plots."
                 ),
             )
         else:
@@ -322,33 +323,33 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--field",
                 default=None,
-                help="Single section to query: general, atom, bond, off_diagonal, angle, torsion, hbond.",
+                help="Single section to query: general, atom, bond, off_diagonal, angle, torsion, hbond. Example: --field bond, which selects the bond-parameter section.",
             )
             parser.add_argument(
                 "--format",
                 choices=["raw", "indices", "interpreted"],
                 default="interpreted",
-                help="Output format: raw/indices atom ids or interpreted atom symbols.",
+                help="Output format: raw/indices atom ids or interpreted atom symbols. Example: --format interpreted, which displays element symbols instead of numeric atom indices.",
             )
             parser.add_argument(
                 "--term",
                 default=None,
-                help="Optional term filter, for example C-H, CCH, C-C-H, or 1-2.",
+                help="Optional term filter, for example C-H, CCH, C-C-H, or 1-2. Example: --term C-H, which selects the carbon-hydrogen term.",
             )
             parser.add_argument(
                 "--ordered-2body",
                 action="store_true",
-                help="For bond/off_diagonal terms, treat i-j and j-i as distinct.",
+                help="For bond/off_diagonal terms, treat i-j and j-i as distinct. Example: --ordered-2body, which keeps C-H and H-C as distinct terms.",
             )
             parser.add_argument(
                 "--any-order",
                 action="store_true",
-                help="For angle/torsion/hbond terms, match any atom-order permutation.",
+                help="For angle/torsion/hbond terms, match any atom-order permutation. Example: --any-order, which matches terms regardless of atom ordering.",
             )
             parser.add_argument(
                 "--outdir",
                 default=None,
-                help="Write per-section CSV exports into this output directory.",
+                help="Write per-section CSV exports into this output directory. Example: --outdir analysis/ffield, which writes per-section CSV tables under that directory.",
             )
         elif command == "get_ffield_opt_progress_data":
             parser.description = (
@@ -366,7 +367,7 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 type=int,
                 nargs="*",
                 default=None,
-                help="Optional epoch numbers to keep; default uses all available epochs.",
+                help="Optional epoch numbers to keep; default uses all available epochs. Example: --epochs 1 5, which includes only optimization epochs 1 and 5.",
             )
         elif command == "get_energy_min_summary_data":
             parser.description = (
@@ -381,7 +382,7 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--col",
                 default="all",
-                help="Single column to keep (identifier is retained when present), or 'all'.",
+                help="Single column to keep (identifier is retained when present), or 'all'. Example: --col all, which retains every diagnostic column.",
             )
         elif command == "get_ffield_diagnostic_data":
             parser.description = (
@@ -408,41 +409,41 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--interpret",
                 action="store_true",
-                help="Interpret identifier triplets with ffield symbol mapping when possible.",
+                help="Interpret identifier triplets with ffield symbol mapping when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels.",
             )
             parser.add_argument(
                 "--report-most-sensitive",
                 action="store_true",
-                help="Return only the minimum-sensitivity parameter view.",
+                help="Return only the minimum-sensitivity parameter view. Example: --report-most-sensitive, which returns the minimum-sensitivity parameter view.",
             )
             parser.add_argument(
                 "--export-all",
                 default=None,
-                help="Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive).",
+                help="Optional CSV path to export the full diagnostic table (useful with --report-most-sensitive). Example: --export-all diagnostics.csv, which writes the full diagnostic table even when the displayed view is filtered.",
             )
             parser.add_argument(
                 "--top",
                 type=int,
                 default=0,
-                help="For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all.",
+                help="For tornado or beeswarm views, keep top-N widest response spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans.",
             )
             parser.add_argument(
                 "--vline",
                 type=float,
                 default=1.0,
-                help="For tornado view, reference x-value for the guide line.",
+                help="For tornado view, reference x-value for the guide line. Example: --vline 1, which draws the tornado reference line at x = 1.",
             )
             parser.add_argument(
                 "--sort",
                 dest="diagnostic_sort",
                 choices=["parameter", "final", "starting"],
                 default="parameter",
-                help="For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value.",
+                help="For beeswarm view, sort rows by numeric parameter pointer, final value, or starting value. Example: --sort parameter, which orders diagnostic rows by parameter pointer.",
             )
             parser.add_argument(
                 "--global-objective-scale",
                 action="store_true",
-                help="For beeswarm view, use one objective-function color range across all parameters.",
+                help="For beeswarm view, use one objective-function color range across all parameters. Example: --global-objective-scale, which uses one objective color scale across parameters.",
             )
         elif command == "get_ffield_diagnostics_sensitivity":
             parser.description = (
@@ -458,19 +459,19 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--interpret",
                 action="store_true",
-                help="Use interpreted force-field section, term, and component labels when possible.",
+                help="Use interpreted force-field section, term, and component labels when possible. Example: --interpret, which replaces recognized parameter pointers with atom-symbol labels.",
             )
             parser.add_argument(
                 "--top",
                 type=int,
                 default=0,
-                help="Keep the top-N parameters with the widest sensitivity spans; 0 keeps all.",
+                help="Keep the top-N parameters with the widest sensitivity spans; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans.",
             )
             parser.add_argument(
                 "--vline",
                 type=float,
                 default=1.0,
-                help="Reference sensitivity value drawn on tornado and beeswarm plots.",
+                help="Reference sensitivity value drawn on tornado and beeswarm plots. Example: --vline 1, which draws the tornado reference line at x = 1.",
             )
         elif command == "get_ffield_diagnostics_evolution":
             parser.description = (
@@ -493,27 +494,26 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
                 choices=["bound_min", "first"],
                 default="bound_min",
                 help=(
-                    "Scatter normalization origin. bound_min uses (value-lower)/(upper-lower); "
-                    "first uses (value-first)/(upper-lower)."
+                    "Scatter normalization origin. bound_min uses (value-lower)/(upper-lower); first uses (value-first)/(upper-lower). Example: --normalization bound_min, which measures parameter changes from the lower bound in units of the bounds span."
                 ),
             )
             parser.add_argument(
                 "--top",
                 type=int,
                 default=0,
-                help="Keep the top-N parameters with the widest objective ranges; 0 keeps all.",
+                help="Keep the top-N parameters with the widest objective ranges; 0 keeps all. Example: --top 20, which limits the view to 20 widest response spans.",
             )
             parser.add_argument(
                 "--sort",
                 dest="diagnostic_sort",
                 choices=["parameter", "final", "starting"],
                 default="parameter",
-                help="Sort parameter rows by numeric pointer, final value, or starting value.",
+                help="Sort parameter rows by numeric pointer, final value, or starting value. Example: --sort parameter, which orders diagnostic rows by parameter pointer.",
             )
             parser.add_argument(
                 "--global-objective-scale",
                 action="store_true",
-                help="Use one objective-function color range across all parameters.",
+                help="Use one objective-function color range across all parameters. Example: --global-objective-scale, which uses one objective color scale across parameters.",
             )
         elif command == "get_ffield_opt_results":
             parser.description = (
@@ -545,12 +545,12 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--iden",
                 default=None,
-                help="Identifier (or base identifier) to keep; use 'all' for all rows.",
+                help="Identifier (or base identifier) to keep; use 'all' for all rows. Example: --iden all, which includes all structure identifiers.",
             )
             parser.add_argument(
                 "--flip-sign",
                 action="store_true",
-                help="Flip sign of energy values before plotting/export.",
+                help="Flip sign of energy values before plotting/export. Example: --flip-sign, which negates energies before plotting and export.",
             )
         elif command == "get_ffield_opt_bulk_modulus":
             parser.description = (
@@ -568,23 +568,23 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             parser.add_argument(
                 "--iden",
                 default=None,
-                help="Optional base identifier to fit; use 'all' for all eligible bases.",
+                help="Optional base identifier to fit; use 'all' for all eligible bases. Example: --iden all, which includes all structure identifiers.",
             )
             parser.add_argument(
                 "--no-shift-min-to-zero",
                 action="store_true",
-                help="Do not shift minimum energy to zero before fitting.",
+                help="Do not shift minimum energy to zero before fitting. Example: --no-shift-min-to-zero, which preserves the original energy offset during fitting.",
             )
             parser.add_argument(
                 "--flip-sign",
                 action="store_true",
-                help="Flip sign of energy values before fitting.",
+                help="Flip sign of energy values before fitting. Example: --flip-sign, which negates energies before plotting and export.",
             )
             parser.add_argument(
                 "--min-points",
                 type=int,
                 default=6,
-                help="Minimum number of finite points required per base identifier.",
+                help="Minimum number of finite points required per base identifier. Example: --min-points 6, which requires six finite points per fitted structure group.",
             )
         else:
             raise KeyError(f"Unsupported ffield command '{command}'.")
@@ -609,53 +609,33 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             " 4. the most similar atom is explicitly selected using --closest-atom flag\n"
             "   reaxkit add-element-to-ffield --dest ffield --element Al --closest-atom B\n\n"
         )
-        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
-        parser.add_argument("--output", default="ffield_with_element", help="Output expanded ffield path")
-        parser.add_argument("--element", required=True, help="Element symbol to add, for example: Al")
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field.")
+        parser.add_argument("--output", default="ffield_with_element", help="Output expanded ffield path. Example: --output ffield_with_element, which writes generated output to ffield_with_element.")
+        parser.add_argument("--element", required=True, help="Element symbol to add, for example: Al. Example: --element Al, which adds aluminum using a template atom.")
         parser.add_argument(
             "--similarity",
             default="group",
             choices=["group", "family", "radius"],
             help=(
-                "Similarity rule for template-atom selection: \n"
-                " 1. 'family' = chemical family match "
-                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
-                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
-                " 2. 'group' = same periodic-table group number (column),\n"
-                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
-                "Priority order for selecting the single template atom is:\n"
-                " 1. manual override by --closest-atom,\n"
-                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
-                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
-                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
-                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
+                "Similarity rule for template-atom selection: \n 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other),\n 2. 'group' = same periodic-table group number (column),\n 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\nPriority order for selecting the single template atom is:\n 1. manual override by --closest-atom,\n 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on.  3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group."
             ),
         )
         parser.add_argument(
             "--radius-metrics",
             default="atomic_radius,covalent_radius,van_der_waals_radius",
             help=(
-                "Comma-separated radius metrics used when --similarity radius is selected. "
-                "Use 'all' to include every supported metric. \n"
-                "Options: \n"
-                " 1. atomic_radius (empirical neutral-atom radius), \n"
-                " 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), \n"
-                " 3. van_der_waals_radius (non-bonded contact radius), \n"
-                " 4. atomic_radius_calculated (theoretical neutral-atom radius), \n"
-                " 5. average_ionic_radius (mean ionic radius over known oxidation states), \n"
-                " 6. average_cationic_radius (mean radius over positive oxidation states), \n"
-                " 7. average_anionic_radius (mean radius over negative oxidation states).\n"
+                "Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. \nOptions: \n 1. atomic_radius (empirical neutral-atom radius), \n 2. covalent_radius (mapped to pymatgen atomic_radius_calculated proxy), \n 3. van_der_waals_radius (non-bonded contact radius), \n 4. atomic_radius_calculated (theoretical neutral-atom radius), \n 5. average_ionic_radius (mean ionic radius over known oxidation states), \n 6. average_cationic_radius (mean radius over positive oxidation states), \n 7. average_anionic_radius (mean radius over negative oxidation states). Example: --radius-metrics atomic_radius, which compares templates using atomic radius only."
             ),
         )
         parser.add_argument(
             "--closest-atom",
             default=None,
-            help="Override automatic selection and force template atom symbol, for example: B",
+            help="Override automatic selection and force template atom symbol, for example: B. Example: --closest-atom B, which forces boron as the template atom.",
         )
         parser.add_argument(
             "--replace-existing",
             action="store_true",
-            help="Replace destination rows when the same atom tuple already exists.",
+            help="Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows.",
         )
     elif command in {"add-term-to-ffield", "add_term_to_ffield"}:
         parser.description = (
@@ -678,69 +658,56 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             "if they are similar by other criteria.\n"
             "   reaxkit add-term-to-ffield --dest ffield --field angle --term Al-N-Al --same-general-order --output ffield_with_term\n\n"
         )
-        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
-        parser.add_argument("--output", default="ffield_with_term", help="Output expanded ffield path")
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field.")
+        parser.add_argument("--output", default="ffield_with_term", help="Output expanded ffield path. Example: --output ffield_with_term, which writes generated output to ffield_with_term.")
         parser.add_argument(
             "--field",
             required=True,
             choices=["bond", "off_diagonal", "angle", "torsion", "hbond"],
-            help="Target section for the term.",
+            help="Target section for the term. Example: --field bond, which selects the bond-parameter section.",
         )
         parser.add_argument(
             "--term",
             required=True,
-            help="Hyphen-separated atom symbols, for example: Al-N-Al",
+            help="Hyphen-separated atom symbols, for example: Al-N-Al. Example: --term C-H, which selects the carbon-hydrogen term.",
         )
         parser.add_argument(
             "--closest-term",
             "--closest_term",
             dest="closest_term",
             default=None,
-            help="Explicit template term override, for example: B-N-B",
+            help="Explicit template term override, for example: B-N-B. Example: --closest-term B-N-B, which uses that term as the explicit parameter template.",
         )
         parser.add_argument(
             "--template-map",
             default="",
-            help="Optional per-atom manual template mapping CSV, for example: Al:B,N:N",
+            help="Optional per-atom manual template mapping CSV, for example: Al:B,N:N. Example: --template-map Al:B,N:N, which maps aluminum to boron and nitrogen to itself.",
         )
         parser.add_argument(
             "--similarity",
             default="group",
             choices=["family", "group", "radius"],
             help=(
-                "Similarity rule for template-atom selection: \n"
-                " 1. 'family' = chemical family match "
-                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
-                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
-                " 2. 'group' = same periodic-table group number (column),\n"
-                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
-                "Priority order for selecting the single template atom is:\n"
-                " 1. manual override by --closest-atom,\n"
-                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
-                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
-                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
-                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
+                "Similarity rule for template-atom selection: \n 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other),\n 2. 'group' = same periodic-table group number (column),\n 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\nPriority order for selecting the single template atom is:\n 1. manual override by --closest-atom,\n 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on.  3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --similarity group, which prefers template atoms in the same periodic-table group."
             ),
         )
         parser.add_argument(
             "--radius-metrics",
             default="atomic_radius,covalent_radius,van_der_waals_radius",
             help=(
-                "Comma-separated radius metrics used when --similarity radius is selected. "
-                "Use 'all' to include every supported metric."
+                "Comma-separated radius metrics used when --similarity radius is selected. Use 'all' to include every supported metric. Example: --radius-metrics atomic_radius, which compares templates using atomic radius only."
             ),
         )
         parser.add_argument(
             "--replace-existing",
             action="store_true",
-            help="Replace destination row when the same atom tuple already exists.",
+            help="Replace destination row when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows.",
         )
         parser.add_argument(
             "--same-general-order",
             action="store_true",
             help=(
-                "Restrict candidate template terms to those with the same equality/order pattern as --term "
-                "(example for angle: X-Y-X vs X-Y-Y)."
+                "Restrict candidate template terms to those with the same equality/order pattern as --term (example for angle: X-Y-X vs X-Y-Y). Example: --same-general-order, which requires template terms to share the target's repeated-atom pattern."
             ),
         )
     else:
@@ -760,82 +727,68 @@ def _build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.
             "(for example, transition metal, halogen, noble gas, etc. See --template-similarity options for more details):\n"
             "  reaxkit merge-ffield --source f_src --destination f_dst --output ffield_merged --atom-types W,Mo --fields atom,bond,angle,torsion --fill-missing-with-template --template-similarity family\n\n"
         )
-        parser.add_argument("--source", "--src", required=True, dest="source", help="Source ffield path")
-        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path")
-        parser.add_argument("--output", default="ffield_merged", help="Output merged ffield path")
+        parser.add_argument("--source", "--src", required=True, dest="source", help="Source ffield path. Example: --source ffield_BN, which reads parameters from that source force field.")
+        parser.add_argument("--destination", "--dest", required=True, dest="destination", help="Destination ffield path. Example: --destination ffield_AlN, which reads that destination force field.")
+        parser.add_argument("--output", default="ffield_merged", help="Output merged ffield path. Example: --output ffield_merged, which writes generated output to ffield_merged.")
         parser.add_argument(
             "--atom-types",
             required=True,
-            help="Comma-separated source atom symbols to merge, for example: W or W,Mo",
+            help="Comma-separated source atom symbols to merge, for example: W or W,Mo. Example: --atom-types W,Mo, which merges tungsten and molybdenum source parameters.",
         )
         parser.add_argument(
             "--keep-atoms-in-dest",
             default=None,
             help=(
-                "Comma-separated destination atom symbols to retain before merging, for example: Al,N. "
-                "All other destination atoms and parameter rows involving them are removed."
+                "Comma-separated destination atom symbols to retain before merging, for example: Al,N. All other destination atoms and parameter rows involving them are removed. Example: --keep-atoms-in-dest Al,N, which retains only aluminum and nitrogen before merging."
             ),
         )
         parser.add_argument(
             "--replace-existing",
             action="store_true",
-            help="Replace destination rows when the same atom tuple already exists.",
+            help="Replace destination rows when the same atom tuple already exists. Example: --replace-existing, which replaces matching destination parameter rows.",
         )
         parser.add_argument(
             "--fill-missing-with-template",
             action="store_true",
-            help="After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination.",
+            help="After direct merge, fill missing terms for merged atom-types by templating from the most similar atom in destination. Example: --fill-missing-with-template, which fills missing merged terms from similar destination atoms.",
         )
         parser.add_argument(
             "--template-similarity",
             default="group",
             choices=["family", "group", "radius"],
             help=(
-                "Similarity rule for template-atom selection: \n"
-                " 1. 'family' = chemical family match "
-                "(transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, "
-                "halogen, noble_gas, metalloid, post_transition_metal, other),\n"
-                " 2. 'group' = same periodic-table group number (column),\n"
-                " 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\n"
-                "Priority order for selecting the single template atom is:\n"
-                " 1. manual override by --closest-atom,\n"
-                " 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example "
-                "that if --similarity group is selected, the most similar atom will be the one with the same group number, "
-                "and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on. "
-                " 3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen"
+                "Similarity rule for template-atom selection: \n 1. 'family' = chemical family match (transition_metal, lanthanoid, actinoid, alkali_metal, alkaline_earth_metal, halogen, noble_gas, metalloid, post_transition_metal, other),\n 2. 'group' = same periodic-table group number (column),\n 3. 'radius' = closest by atomic/covalent-proxy/van-der-Waals radii distance.\n\nPriority order for selecting the single template atom is:\n 1. manual override by --closest-atom,\n 2. similarity by --similarity mode, where priority is family > group > radius, meaning for example that if --similarity group is selected, the most similar atom will be the one with the same group number, and if multiple candidates have the same group number, then similarity by radius will be used to break ties, and so on.  3. if multiple candidates are tied by similarity, the one with the smallest radius distance (if radius metrics are available) is chosen. Example: --template-similarity group, which prefers same-group destination atoms when filling terms."
             ),
         )
         parser.add_argument(
             "--template-closest-atom",
             default=None,
-            help="Manual destination template atom override for --fill-missing-with-template, for example: B",
+            help="Manual destination template atom override for --fill-missing-with-template, for example: B. Example: --template-closest-atom B, which forces boron as the missing-term template.",
         )
         parser.add_argument(
             "--template-radius-metrics",
             default="atomic_radius,covalent_radius,van_der_waals_radius",
             help=(
-                "Radius metrics for template selection when --template-similarity radius. "
-                "Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,"
-                "atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius."
+                "Radius metrics for template selection when --template-similarity radius. Use 'all' or a CSV subset of: atomic_radius,covalent_radius,van_der_waals_radius,atomic_radius_calculated,average_ionic_radius,average_cationic_radius,average_anionic_radius. Example: --template-radius-metrics atomic_radius, which uses atomic radii to compare missing-term templates."
             ),
         )
     parser.add_argument(
         "--fields",
         default="atom,bond,off_diagonal,angle,torsion,hbond",
-        help="Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond",
+        help="Comma-separated fields to process: atom,bond,off_diagonal,angle,torsion,hbond. Example: --fields atom,bond, which processes atom and bond sections only.",
     )
     parser.add_argument(
         "--disallow-torsion-wildcard",
         action="store_true",
-        help="Reject torsion rows containing atom index 0 wildcard.",
+        help="Reject torsion rows containing atom index 0 wildcard. Example: --disallow-torsion-wildcard, which rejects torsion rows with wildcard atom index zero.",
     )
     parser.add_argument(
         "--report-format",
         choices=["none", "txt", "csv", "both"],
         default="both",
-        help="Write merge-detail report files next to output ffield.",
+        help="Write merge-detail report files next to output ffield. Example: --report-format both, which writes both text and CSV merge reports.",
     )
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
     add_storage_cli_arguments(parser)
     return parser
 
@@ -1283,17 +1236,17 @@ def _export_force_field_tables(tables: dict[str, pd.DataFrame], outdir: str | Pa
 
 def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     """Add runtime arguments."""
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution")
-    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection")
-    parser.add_argument("--ffield", default="ffield", help="Path to ffield")
-    parser.add_argument("--params", default="params", help="Path to optimization parameter bounds")
-    parser.add_argument("--fort13", default="fort.13", help="Path to fort.13")
-    parser.add_argument("--fort79", default="fort.79", help="Path to fort.79")
-    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99")
-    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74")
-    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input file or directory for engine resolution. Example: --input runs/heating, which detects the engine from that run.")
+    parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory fallback for engine detection. Example: --run-dir runs/heating, which uses that directory for fallback discovery.")
+    parser.add_argument("--ffield", default="ffield", help="Path to ffield. Example: --ffield runs/heating/ffield, which reads force-field parameters from that file.")
+    parser.add_argument("--params", default="params", help="Path to optimization parameter bounds. Example: --params runs/heating/params, which reads optimization parameter bounds from that file.")
+    parser.add_argument("--fort13", default="fort.13", help="Path to fort.13. Example: --fort13 runs/heating/fort.13, which reads optimization diagnostics from that file.")
+    parser.add_argument("--fort79", default="fort.79", help="Path to fort.79. Example: --fort79 runs/heating/fort.79, which reads optimization diagnostics from that file.")
+    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file.")
+    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file.")
+    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Logging level. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
 
 
@@ -1302,20 +1255,28 @@ def _add_presentation_arguments(
     *,
     plot_choices: tuple[str, ...] = ("single", "subplot", "tornado", "beeswarm"),
     default_plot: str | None = None,
-    save_help: str = "Save the generated plot to a file path",
+    save_help: str = "Save the generated plot to a file path. Example: --save optimization.png, which writes the optimization figure to that image.",
 ) -> None:
     """Add presentation arguments."""
     parser.add_argument(
         "--plot",
         choices=list(plot_choices),
         default=default_plot,
-        help="Render a plot",
+        help=(
+            "Plot selected force-field data or optimization diagnostics. "
+            f"Example: --plot {plot_choices[0]}, which "
+            + {
+                "single": "combines selected series in one figure.",
+                "tornado": "compares parameter response spans as horizontal bars.",
+                "beeswarm": "compares parameter samples and their objective values.",
+            }[plot_choices[0]]
+        ),
     )
-    parser.add_argument("--show", action="store_true", help="Show the generated plot window")
+    parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens generated figures interactively.")
     parser.add_argument("--save", default=None, help=save_help)
-    parser.add_argument("--export", default=None, help="Write the result table to CSV")
-    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2")
-    parser.add_argument("--xaxis", default=None, help="Optional x-axis column override")
+    parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export analysis.csv, which writes the result table for further analysis.")
+    parser.add_argument("--grid", default=None, help="Subplot grid like 2x2 or 2*2. Example: --grid 2x2, which arranges subplot panels in two rows and two columns.")
+    parser.add_argument("--xaxis", default=None, help="Optional x-axis column override. Example: --xaxis iteration, which uses the iteration column as the horizontal coordinate.")
 
 
 def _build_force_field_data_request(args: argparse.Namespace) -> FFieldDataRequest:
@@ -1709,6 +1670,37 @@ def _eos_material_name(identifier: object) -> str:
     return safe or "unclassified"
 
 
+def _eos_plot_payload(group: dict[str, object]) -> dict[str, object]:
+    """Build the shared single-figure specification for one EOS group."""
+    series: list[dict[str, object]] = []
+    for prefix, label, color in (
+        ("reaxff", "ReaxFF", REAXFF_PLOT_COLOR),
+        ("qm", "QM/Literature", QM_PLOT_COLOR),
+    ):
+        if group[f"{prefix}_x"]:
+            series.append(
+                {
+                    "x": group[f"{prefix}_x"],
+                    "y": group[f"{prefix}_y"],
+                    "label": label,
+                    "marker": "o",
+                    "color": color,
+                }
+            )
+    identifier = str(group["identifier"])
+    return {
+        "plot_type": "single_plot",
+        "series": series,
+        "xlabel": group.get("xlabel", "Volume"),
+        "ylabel": "Energy",
+        "title": f"EOS {identifier}",
+        "legend": True,
+        "figsize": EOS_SINGLE_FIGSIZE,
+        "filename": _eos_plot_filename(str(group.get("filename_identifier", identifier))),
+        "subdirectory": _eos_material_name(identifier),
+    }
+
+
 def _validate_eos_save_target(args: argparse.Namespace) -> None:
     """Require a directory target when single mode emits one plot per identifier."""
     save = getattr(args, "save", None)
@@ -1998,54 +1990,18 @@ def _plot_payload(
         if not groups:
             return None
 
-        def _series_for_group(group: dict[str, object]) -> list[dict[str, object]]:
-            series: list[dict[str, object]] = []
-            if group["reaxff_x"]:
-                series.append(
-                    {
-                        "x": group["reaxff_x"],
-                        "y": group["reaxff_y"],
-                        "label": "ReaxFF",
-                        "marker": "o",
-                        "color": REAXFF_PLOT_COLOR,
-                    }
-                )
-            if group["qm_x"]:
-                series.append(
-                    {
-                        "x": group["qm_x"],
-                        "y": group["qm_y"],
-                        "label": "QM/Literature",
-                        "marker": "o",
-                        "color": QM_PLOT_COLOR,
-                    }
-                )
-            return series
-
+        payloads = [_eos_plot_payload(group) for group in groups]
         if getattr(args, "plot", None) == "subplot":
             return {
                 "plot_type": "multi_subplots",
-                "subplots": [_series_for_group(group) for group in groups],
-                "xlabel": [group["xlabel"] for group in groups],
-                "ylabel": "Energy",
-                "title": [f"EOS {group['identifier']}" for group in groups],
-                "legend": True,
+                "subplots": [payload["series"] for payload in payloads],
+                "xlabel": [payload["xlabel"] for payload in payloads],
+                "ylabel": payloads[0]["ylabel"],
+                "title": [payload["title"] for payload in payloads],
+                "legend": payloads[0]["legend"],
                 "grid": getattr(args, "grid", None),
             }
-        return [
-            {
-                "plot_type": "single_plot",
-                "series": _series_for_group(group),
-                "xlabel": group["xlabel"],
-                "ylabel": "Energy",
-                "title": f"EOS {group['identifier']}",
-                "legend": True,
-                "figsize": EOS_SINGLE_FIGSIZE,
-                "filename": _eos_plot_filename(str(group["identifier"])),
-                "subdirectory": _eos_material_name(group["identifier"]),
-            }
-            for group in groups
-        ]
+        return payloads
 
     if command == "get_energy_min_summary_data":
         x_col = getattr(args, "xaxis", None) or "identifier"
@@ -2282,7 +2238,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     -----
     >>> # See workflow CLI usage for concrete examples.
     """
-    return _build_parser(parser, command=command)
+    from reaxkit.presentation.plot_styles import add_plot_style_argument
+
+    parser = _build_parser(parser, command=command)
+    add_plot_style_argument(parser)
+    return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:

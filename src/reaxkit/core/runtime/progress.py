@@ -281,7 +281,7 @@ def tqdm_reporter_factory() -> ProgressReporter:
                 delta = cur - prev
                 if delta > 0:
                     bar.update(delta)
-            last_seen[key] = cur
+                last_seen[key] = cur
 
             if tot > 0 and cur >= tot:
                 _stop_animation(key)

@@ -67,12 +67,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--output",
         default="charges",
-        help="Output filename to write under <project_root>/input/",
+        help="Output filename to write under <project_root>/input/. Example: --output charges, which writes generated artifacts under charges.",
     )
     parser.add_argument(
         "--copy-to-dot",
         action="store_true",
-        help="Also copy generated output to the current directory.",
+        help="Also copy generated output to the current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.",
     )
     add_storage_cli_arguments(parser)
     return parser

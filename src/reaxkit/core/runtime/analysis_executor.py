@@ -855,7 +855,25 @@ class AnalysisExecutor:
             f"Resolved engine={resolved_engine} adapter={adapter.__class__.__name__}",
         )
         streaming = self._streaming_enabled(task, adapter, required_data, args, requested_frame_indices)
+        frame_count_reader = getattr(adapter, "quick_n_frames", None)
+        selected_frames = getattr(request, "frames", None)
+        if streaming and resolved_engine == "ams" and selected_frames is not None and callable(frame_count_reader):
+            frame_count = frame_count_reader(args)
+            if frame_count is not None:
+                bounded_frames = [int(frame) for frame in selected_frames if 0 <= int(frame) < frame_count]
+                if not bounded_frames:
+                    raise AnalysisError(f"No requested frames exist in the trajectory ({frame_count} frames).")
+                request = copy.copy(request)
+                request.frames = bounded_frames
+                requested_frame_indices = self._requested_frame_indices(request, required_data, task)
+                args["_frame_indices"] = requested_frame_indices
         args["_streaming"] = streaming
+        from reaxkit.core.runtime.checkpoint_policy import checkpoint_enabled
+        checkpointing = checkpoint_enabled(task, args)
+        if checkpointing and not streaming:
+            if args.get("checkpoint") is True or args.get("resume"):
+                raise ValueError("Result checkpointing requires the audited streaming execution path.")
+            checkpointing = False
         policy = resolve_execution_policy(task, request, args)
         args["_execution_policy"] = policy.as_dict()
         self._record_timing(
@@ -960,7 +978,35 @@ class AnalysisExecutor:
                 task_version=task_version,
             )
             args["_analysis_id"] = analysis_id
-            if use_cache and cache.exists(analysis_id):
+            recovery_identity = None
+            if checkpointing:
+                import hashlib
+                import json
+                from reaxkit.core.runtime.checkpoint_policy import checkpoint_identity
+                from reaxkit.core.runtime.packed_results import PackedResultStore
+                recovery_identity = checkpoint_identity(task, request, args, identity)
+                analysis_id = hashlib.sha256(json.dumps(recovery_identity, sort_keys=True,
+                                                       allow_nan=False).encode("utf-8")).hexdigest()
+                args["_analysis_id"] = analysis_id
+                packed_path = cache.checkpoint_path(analysis_id)
+                if use_cache and not args.get("resume") and packed_path.exists():
+                    try:
+                        packed = PackedResultStore(packed_path, recovery_identity)
+                    except Exception as exc:
+                        logger.warning("Ignoring unreadable result cache %s: %s", packed_path, exc)
+                    else:
+                        self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (packed results)")
+                        request._result_store = packed
+                        request._control_file = str(args.get("control") or "control")
+                        request._write_extxyz = bool(args.get("write_extxyz", False))
+                        try:
+                            cached = self._run_stream_task(task, iter(()), request, reporter, args)
+                        except BaseException:
+                            packed.close()
+                            raise
+                        return self._ready_for_result_saving(
+                            enrich_result_with_time(cached, None, control_file=request._control_file), args)
+            if use_cache and not checkpointing and cache.exists(analysis_id):
                 self._console_step(args, f"Analysis cache hit analysis_id={analysis_id[:12]} (returning cached result)")
                 cached = cache.load(analysis_id)
                 return self._ready_for_result_saving(
@@ -974,15 +1020,45 @@ class AnalysisExecutor:
 
             self._console_step(args, f"Streaming data and running task={task_name}")
             t_stream0 = perf_counter()
+            checkpoint = None
+            managed_checkpoint = False
             try:
+                if checkpointing:
+                    from reaxkit.core.runtime.checkpoint_policy import open_checkpoint
+                    from reaxkit.presentation.workflow_artifacts import register_checkpoint
+                    checkpoint = open_checkpoint(task, request, args, identity, self._analysis_output_dir(args),
+                                                 identity=recovery_identity)
+                    managed_checkpoint = register_checkpoint(
+                        checkpoint, cache_destination=cache.checkpoint_path(analysis_id) if use_cache else None)
+                    request._result_store = checkpoint
+                    request._control_file = str(args.get("control") or "control")
+                    request._write_extxyz = bool(args.get("write_extxyz", False))
                 frames = adapter.stream(required_data, args, reporter=reporter)
                 result = self._run_stream_task(task, frames, request, reporter, args)
+                if checkpoint is not None:
+                    result.skip_result_cache = True
             except (ParseError, AnalysisError):
+                if checkpoint is not None:
+                    checkpoint.transition("failed", error=str(sys.exc_info()[1]))
                 raise
             except Exception as exc:
+                if checkpoint is not None:
+                    try:
+                        state = "analysis_complete" if checkpoint.manifest["state"] == "analysis_complete" else "failed"
+                        checkpoint.transition(state, error=str(exc), failed_source_frame=getattr(exc, "source_frame", None))
+                    except OSError:
+                        pass
                 raise AnalysisError(
                     f"Task '{task_name}' failed during streaming analysis: {exc}"
+                    + (f"; recovery checkpoint: {checkpoint.directory}; last committed selection position: {checkpoint.manifest['last_position']}; repeat the original command with --resume \"{checkpoint.directory}\"" if checkpoint else "")
                 ) from exc
+            except BaseException as exc:
+                if checkpoint is not None:
+                    checkpoint.transition("interrupted", error=str(exc))
+                raise
+            finally:
+                if checkpoint is not None and not managed_checkpoint:
+                    checkpoint.close()
             result = enrich_result_with_time(
                 result,
                 None,

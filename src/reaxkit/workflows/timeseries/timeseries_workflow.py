@@ -175,7 +175,7 @@ def _add_common_arguments(parser: argparse.ArgumentParser) -> None:
         "--frames",
         nargs="*",
         default=None,
-        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,20.',
+        help='Frame selector syntax. Example: --frames 0:20:2, which selects frames 0,2,4,...,18 (stop excluded).',
     )
     parser.add_argument("--every", type=int, default=1, help="Use every Nth selected frame. Example: --every 5, which subsamples selected frames by five.")
     parser.add_argument("--format", choices=["long", "wide"], default="long", help="Trajectory output table format. Example: --format wide, which pivots compatible outputs into wide columns.")
@@ -491,37 +491,54 @@ def build_parser(p: argparse.ArgumentParser) -> None:
     p.set_defaults(progress=True)
     p.formatter_class = argparse.RawTextHelpFormatter
     p.description = (
-        "Dispatcher for time-series and related sequential analyses.\n"
-        "This command routes `--field` expressions to the appropriate analysis backend\n"
-        "for simulation scalars, trajectory coordinates, charges, fields, energies, restraints,\n"
-        "molecular frequencies/totals, and geometry-optimization data.\n\n"
-        
+        "Extract time-series and sequential data from existing simulation output.\n"
+        "\n"
+        "Use --field to select simulation scalars, coordinates, charges, fields, energies, or molecular data.\n"
+        "Combined coordinate axes report vector magnitudes; displacement uses --reference-frame.\n"
+        "This command analyzes recorded data or a field schedule; it does not run a simulation.\n"
+        "\n"
         "Examples:\n"
-        "  1. Plot simulation scalar series such as temperature:\n"
-        "   reaxkit timeseries --field temperature --summary summary.txt --plot single\n\n"
-        
-        "  2. Plot trajectory/displacement series on time axis:\n"
-        "   - getting the trajectory of atoms 1 and 2 in z dimension:\n"
-        "       reaxkit timeseries --field trajectory[1,2].z --xaxis time --save atom_z.png\n"
-        "   - getting the displacement of atoms 1 to 20 in x and y dimensions with reference frame 0:\n"
-        "     [Note] when more than 1 dimension is selected, it finds the magnitude of the combined components (i.e., sqrt(dx^2 + dy^2) in the example below).\n"
-        "       reaxkit timeseries --field displacement[1:20].xy --reference-frame 0 --xaxis time --plot single\n\n"
-        
-        "  3. Export charge series for atom 1:\n"
-        "   reaxkit timeseries --field charge[1] --fort7 fort.7 --export charges.csv\n\n"
-        
-        "  4. Plot molecular frequency/totals series:\n"
-        "   reaxkit timeseries --field molecule[H2O,OH] --molfra molfra.out --plot single\n"
-        "   reaxkit timeseries --field totals[total_molecules,total_atoms] --molfra molfra.out --plot subplot\n\n"
-        
-        "  5. Plot restraint/electric-field/energy series:\n"
-        "   reaxkit timeseries --field restraint.E_res --fort76 fort.76 --xaxis time --plot single\n"
-        "   reaxkit timeseries --field electric_field.E_field_x --fort78 fort.78 --xaxis time --plot single\n"
-        "   reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n\n"
-        
-        "  6. Plot geometry-optimization results (i.e., energy vs iter):\n"
-        "   reaxkit timeseries --field geo_opt.E_pot --fort57 fort.57 --plot single\n"
-        "   reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n\n"
+        "  1. Simulation temperature:\n"
+        "     reaxkit timeseries --field temperature --summary summary.txt --plot single\n"
+        "\n"
+        "  2. Atom coordinates:\n"
+        "     reaxkit timeseries --field \"trajectory[1,2].z\" --xmolout xmolout --plot single\n"
+        "\n"
+        "  3. Displacement magnitude for atoms 1 through 20:\n"
+        "     reaxkit timeseries --field \"displacement[1:21].xy\" --reference-frame 0 --plot single\n"
+        "\n"
+        "  4. Atomic charges:\n"
+        "     reaxkit timeseries --field \"charge[1]\" --fort7 fort.7 --export charges.csv\n"
+        "\n"
+        "  5. Cell lengths:\n"
+        "     reaxkit timeseries --field \"cell[a,b,c]\" --xmolout xmolout --plot subplot\n"
+        "\n"
+        "  6. Applied electric field:\n"
+        "     reaxkit timeseries --field \"electric_field[field_z]\" --fort78 fort.78 --plot single\n"
+        "\n"
+        "  7. Prescribed field program:\n"
+        "     reaxkit timeseries --field eregime.field --eregime eregime.in --export field_program.csv\n"
+        "\n"
+        "  8. Partial energies:\n"
+        "     reaxkit timeseries --field energy.Ebond --fort73 fort.73 --plot single\n"
+        "\n"
+        "  9. Restraint energy:\n"
+        "     reaxkit timeseries --field restraint.E_res --fort76 fort.76 --plot single\n"
+        "\n"
+        "  10. Molecular frequencies:\n"
+        "     reaxkit timeseries --field \"molecule[H2O,OH]\" --molfra molfra.out --plot single\n"
+        "\n"
+        "  11. Molecular totals:\n"
+        "     reaxkit timeseries --field \"totals[total_molecules,total_atoms]\" --molfra molfra.out --plot subplot\n"
+        "\n"
+        "  12. Geometry-optimization progress:\n"
+        "     reaxkit timeseries --field geo_opt.all --fort57 fort.57 --plot subplot\n"
+        "\n"
+        "  13. Legacy coordinate selectors:\n"
+        "     reaxkit timeseries --atoms \"1,5,12\" --dims z --xmolout xmolout --plot single\n"
+        "\n"
+        "  14. Legacy cell selectors:\n"
+        "     reaxkit timeseries --boxdims --cell-fields a b c --xmolout xmolout --plot subplot"
     )
     _add_runtime_arguments(p)
     _add_presentation_arguments(p)

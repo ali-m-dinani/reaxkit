@@ -34,11 +34,13 @@ from reaxkit.engine.reaxff.generators.geo_generator import (
     add_molcharge_to_geo,
     add_restraints_to_geo,
     sort_geo,
+    vasp2reax,
     xtob,
 )
 
 ALL_COMMANDS = (
     "xtob",
+    "vasp2reax",
     "make-geo",
     "sort_geo",
     "orthogonalize-geo",
@@ -142,6 +144,15 @@ def _run_xtob(args: argparse.Namespace) -> int:
         ascending=not args.descending,
     )
     print(f"[Done] Converted {xyz_path} to {args.output}")
+    return 0
+
+
+def _run_vasp2reax(args: argparse.Namespace) -> int:
+    """Write ReaxFF GEO (legacy fort.15) and Cartesian XYZ (legacy fort.51)."""
+    geo_path, xyz_path = vasp2reax(args.file, args.output, format=args.format)
+    args.coordinates_output = str(xyz_path)
+    print(f"[Done] ReaxFF GEO: {geo_path}")
+    print(f"[Done] ReaxFF Cartesian coordinates: {xyz_path}")
     return 0
 
 
@@ -297,6 +308,7 @@ def _run_add_geo_molcharge(args: argparse.Namespace) -> int:
 
 RUNNERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "xtob": _run_xtob,
+    "vasp2reax": _run_vasp2reax,
     "make-geo": _run_make_geo,
     "sort_geo": _run_sort_geo,
     "orthogonalize-geo": _run_orthogonalize_geo,
@@ -341,12 +353,38 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Same as above but sort atoms by z-coordinate in descending order and write to slab_geo:\n"
             "   reaxkit xtob --file slab.xyz --dims 11,12,100 --angles 90,90,90 --sort z --output slab_geo"
         )
-        parser.add_argument("--file", required=True, help="Input XYZ file")
-        parser.add_argument("--dims", required=True, help="Box dimensions a,b,c")
-        parser.add_argument("--angles", required=True, help="Box angles alpha,beta,gamma")
-        parser.add_argument("--output", default="geo", help="Output GEO file")
-        parser.add_argument("--sort", choices=["x", "y", "z", "atom_type"], help="Sort atoms before writing")
-        parser.add_argument("--descending", action="store_true", help="Sort in descending order")
+        parser.add_argument("--file", required=True, help="Input XYZ file. Example: --file slab.xyz, which reads the structure or data from slab.xyz.")
+        parser.add_argument("--dims", required=True, help="Box dimensions a,b,c. Example: --dims 30,30,60, which sets box lengths to 30, 30, and 60 angstrom.")
+        parser.add_argument("--angles", required=True, help="Box angles alpha,beta,gamma. Example: --angles 90,90,90, which sets an orthogonal box.")
+        parser.add_argument("--output", default="geo", help="Output GEO file. Example: --output geo, which writes generated output to geo.")
+        parser.add_argument("--sort", choices=["x", "y", "z", "atom_type"], help="Sort atoms before writing. Example: --sort z, which orders atoms by their z coordinates.")
+        parser.add_argument("--descending", action="store_true", help="Sort in descending order. Example: --descending, which reverses the selected sort order.")
+    elif canonical == "vasp2reax":
+        parser.description = (
+            "Convert a VASP POSCAR/CONTCAR or CIF to standalone ReaxFF geometry.\n"
+            "Preserves the cell setting and atom order, transforming Cartesian coordinates "
+            "so c lies along z and b lies in the yz plane. No Fortran compiler is needed.\n\n"
+            "Outputs:\n"
+            "  reaxff.geo: ReaxFF XTLGRF/BGF geometry with CRYSTX cell parameters and HETATM "
+            "coordinates; this replaces the Fortran fort.15 output.\n"
+            "  reaxff_coordinates.xyz: standard XYZ with the same ReaxFF Cartesian coordinates; "
+            "this replaces the coordinate listing in Fortran fort.51.\n"
+            "  --output changes the GEO filename; the XYZ uses <output-stem>_coordinates.xyz.\n"
+            "  Both files are saved in the input run directory; --copy-to-dot also copies both "
+            "to the current directory.\n\n"
+            "[NOTE] VASP Direct and Cartesian coordinates and Selective Dynamics syntax are supported. "
+            "Selective Dynamics flags are not converted to ReaxFF restraints. "
+            "CIF input must describe an ordered structure. No conventional/primitive cell conversion is performed.\n\n"
+            "Examples:\n"
+            "  reaxkit vasp2reax --file CONTCAR --copy-to-dot\n"
+            "  reaxkit vasp2reax --file POSCAR --output MgTeO.geo\n"
+            "  reaxkit vasp2reax --file structure.cif --output MgTeO.geo\n"
+            "  reaxkit vasp2reax --file structure.dat --format vasp --output MgTeO.geo\n"
+        )
+        parser.add_argument("--file", required=True, help="Input VASP POSCAR/CONTCAR or CIF file. Example: --file POSCAR, which reads the structure or data from POSCAR.")
+        parser.add_argument("--format", choices=["vasp", "cif"], default=None,
+                            help="Input format override; .cif selects CIF, otherwise VASP. Example: --format vasp, which reads the input as a VASP structure.")
+        parser.add_argument("--output", default="reaxff.geo", help="ReaxFF GEO filename (legacy fort.15); also writes <stem>_coordinates.xyz (legacy fort.51). Example: --output reaxff.geo, which writes generated output to reaxff.geo.")
     elif canonical == "make-geo":
         parser.description = (
             "Build a surface slab from a bulk structure and write it to an ASE-supported format.\n\n"
@@ -354,11 +392,11 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 1. Build a slab with surface normal (1,0,0), 4x4 supercell expansion in the surface plane, 6 layers in the normal direction, and 15 angstrom vacuum, from AlN.cif and write to slab.xyz:\n"
             "   reaxkit make-geo --file AlN.cif --output slab.xyz --surface 1,0,0 --expand 4,4,6 --vacuum 15\n"
         )
-        parser.add_argument("--file", required=True, help="Input bulk structure file")
-        parser.add_argument("--output", required=True, help="Output file")
-        parser.add_argument("--surface", required=True, help="Miller indices h,k,l; reversing the signs exchanges the top and bottom faces")
-        parser.add_argument("--expand", required=True, help="Supercell and layers nx,ny,layers")
-        parser.add_argument("--vacuum", required=True, help="Vacuum thickness in angstrom")
+        parser.add_argument("--file", required=True, help="Input bulk structure file. Example: --file AlN.cif, which reads the structure or data from AlN.cif.")
+        parser.add_argument("--output", required=True, help="Output file. Example: --output slab.xyz, which writes generated output to slab.xyz.")
+        parser.add_argument("--surface", required=True, help="Miller indices h,k,l; reversing the signs exchanges the top and bottom faces. Example: --surface 0,0,1, which cuts a surface normal to the third lattice direction.")
+        parser.add_argument("--expand", required=True, help="Supercell and layers nx,ny,layers. Example: --expand 2,2,4, which uses a 2-by-2 in-plane supercell with four layers.")
+        parser.add_argument("--vacuum", required=True, help="Vacuum thickness in angstrom. Example: --vacuum 15, which adds a 15-angstrom vacuum region.")
     elif canonical == "sort_geo":
         parser.description = (
             "Sort atoms in a GEO file and write a new GEO file.\n\n"
@@ -368,10 +406,10 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Sort atoms in geo by atom type in descending order and write to sorted_geo:\n"
             "   reaxkit sort_geo --file geo --output sorted_geo --sort atom_type --descending"
         )
-        parser.add_argument("--file", required=True, help="Input GEO file")
-        parser.add_argument("--output", required=True, help="Output GEO file")
-        parser.add_argument("--sort", required=True, choices=["m", "x", "y", "z", "atom_type"], help="Sort key")
-        parser.add_argument("--descending", action="store_true", help="Sort in descending order")
+        parser.add_argument("--file", required=True, help="Input GEO file. Example: --file geo, which reads the structure or data from geo.")
+        parser.add_argument("--output", required=True, help="Output GEO file. Example: --output geo_out, which writes generated output to geo_out.")
+        parser.add_argument("--sort", required=True, choices=["m", "x", "y", "z", "atom_type"], help="Sort key. Example: --sort z, which orders atoms by their z coordinates.")
+        parser.add_argument("--descending", action="store_true", help="Sort in descending order. Example: --descending, which reverses the selected sort order.")
     elif canonical == "orthogonalize-geo":
         parser.description = (
             "Convert a hexagonal cell into an orthorhombic cell.\n"
@@ -379,8 +417,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "Examples:\n"
             "  reaxkit orthogonalize-geo --file AlN.cif --output AlN_ortho.cif"
         )
-        parser.add_argument("--file", required=True, help="Input structure file")
-        parser.add_argument("--output", required=True, help="Output structure file")
+        parser.add_argument("--file", required=True, help="Input structure file. Example: --file AlN.cif, which reads the structure or data from AlN.cif.")
+        parser.add_argument("--output", required=True, help="Output structure file. Example: --output AlN_orthogonal.cif, which writes generated output to AlN_orthogonal.cif.")
     elif canonical == "place-geo":
         parser.description = (
             "Randomly place copies of a molecule into an empty box, optionally around a base structure.\n\n"
@@ -393,16 +431,16 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             "[Note] Flag --baseplace is sometimes used to control how the base structure is placed in the box. "
             "By default, it is 'as-is', meaning the base structure is not changed and is placed in the box according to its own coordinates.\n\n"
         )
-        parser.add_argument("--insert", required=True, help="Insert molecule")
-        parser.add_argument("--ncopy", required=True, help="Number of copies to place")
-        parser.add_argument("--dims", required=True, help="Box dimensions a,b,c")
-        parser.add_argument("--angles", required=True, help="Box angles alpha,beta,gamma")
-        parser.add_argument("--output", required=True, help="Output file")
-        parser.add_argument("--base", help="Optional base structure")
-        parser.add_argument("--mindist", default=2.0, help="Minimum interatomic distance")
-        parser.add_argument("--baseplace", default="as-is", choices=["as-is", "center", "origin"], help="Base placement mode")
-        parser.add_argument("--maxattempt", default=50000, help="Maximum placement attempts per copy")
-        parser.add_argument("--randomseed", default=None, help="Random seed")
+        parser.add_argument("--insert", required=True, help="Insert molecule. Example: --insert water.xyz, which reads the molecule to insert from water.xyz.")
+        parser.add_argument("--ncopy", required=True, help="Number of copies to place. Example: --ncopy 20, which places 20 copies of the inserted molecule.")
+        parser.add_argument("--dims", required=True, help="Box dimensions a,b,c. Example: --dims 30,30,60, which sets box lengths to 30, 30, and 60 angstrom.")
+        parser.add_argument("--angles", required=True, help="Box angles alpha,beta,gamma. Example: --angles 90,90,90, which sets an orthogonal box.")
+        parser.add_argument("--output", required=True, help="Output file. Example: --output slab.xyz, which writes generated output to slab.xyz.")
+        parser.add_argument("--base", help="Optional base structure. Example: --base substrate.xyz, which reads the starting substrate structure.")
+        parser.add_argument("--mindist", default=2.0, help="Minimum interatomic distance. Example: --mindist 2.0, which requires inserted atoms to remain at least 2 angstrom apart.")
+        parser.add_argument("--baseplace", default="as-is", choices=["as-is", "center", "origin"], help="Base placement mode. Example: --baseplace center, which centers the base structure in the target box.")
+        parser.add_argument("--maxattempt", default=50000, help="Maximum placement attempts per copy. Example: --maxattempt 50000, which allows up to 50000 placement attempts per molecule.")
+        parser.add_argument("--randomseed", default=None, help="Random seed. Example: --randomseed 42, which makes randomized placement reproducible.")
     elif canonical == "add_restraints_to_geo":
         parser.description = (
             "Insert sample or explicit (i.e., settings are defined) restraint blocks into a GEO file.\n\n"
@@ -412,12 +450,12 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Adding an explicit angle restraint to a geo file:\n"
             "   reaxkit add_restraints_to_geo --file geo --angle '1 2 3 109.5000 600.00 0.25000 0.0000000' --output geo_r"
         )
-        parser.add_argument("--file", default="geo", help="Input GEO file")
-        parser.add_argument("--output", default=None, help="Output GEO file")
-        parser.add_argument("--bond", nargs="?", const="", default=None, help="Add one bond restraint")
-        parser.add_argument("--angle", nargs="?", const="", default=None, help="Add one angle restraint")
-        parser.add_argument("--torsion", nargs="?", const="", default=None, help="Add one torsion restraint")
-        parser.add_argument("--mascen", nargs="?", const="", default=None, help="Add one mass-center restraint")
+        parser.add_argument("--file", default="geo", help="Input GEO file. Example: --file geo, which reads the structure or data from geo.")
+        parser.add_argument("--output", default=None, help="Output GEO file. Example: --output geo_out, which writes generated output to geo_out.")
+        parser.add_argument("--bond", nargs="?", const="", default=None, help="Add one bond restraint. Example: --bond, which inserts a sample bond restraint block.")
+        parser.add_argument("--angle", nargs="?", const="", default=None, help="Add one angle restraint. Example: --angle, which inserts a sample angle restraint block.")
+        parser.add_argument("--torsion", nargs="?", const="", default=None, help="Add one torsion restraint. Example: --torsion, which inserts a sample torsion restraint block.")
+        parser.add_argument("--mascen", nargs="?", const="", default=None, help="Add one mass-center restraint. Example: --mascen, which inserts a sample mass-center restraint block.")
     elif canonical == "add_molcharge_to_geo":
         parser.description = (
             "Use this command if you want to fix charges for specific atoms or parts of your system."
@@ -428,26 +466,26 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             " 2. Set charge -1 on all atoms of type 'e' (electrons in the system) and charge 0 on all other atoms:\n"
             "   reaxkit add_molcharge_to_geo --file geo --per-atom-type e:-1 --rest 0 --output geo_m"
         )
-        parser.add_argument("--file", default="geo", help="Input GEO file")
-        parser.add_argument("--output", default=None, help="Output GEO file")
+        parser.add_argument("--file", default="geo", help="Input GEO file. Example: --file geo, which reads the structure or data from geo.")
+        parser.add_argument("--output", default=None, help="Output GEO file. Example: --output geo_out, which writes generated output to geo_out.")
         parser.add_argument(
             "--per-atom",
             action="append",
             dest="per_atom",
             default=[],
-            help="Per-atom charge by atom range using start:end:charge (repeatable)",
+            help="Per-atom charge by atom range using start:end:charge (repeatable). Example: --per-atom 1:10:0.1, which assigns charge 0.1 to the selected atom range.",
         )
         parser.add_argument(
             "--per-atom-type",
             action="append",
             dest="per_atom_type",
             default=[],
-            help="Per-atom charge by atom type using atom_type:charge (repeatable)",
+            help="Per-atom charge by atom type using atom_type:charge (repeatable). Example: --per-atom-type O:-0.5, which assigns charge -0.5 to oxygen atoms.",
         )
         parser.add_argument(
             "--rest",
             default=None,
-            help="Total charge for remaining atoms (outside per-atom selections)",
+            help="Total charge for remaining atoms (outside per-atom selections). Example: --rest 0, which sets the total charge assigned to unselected atoms to zero.",
         )
         # Backward-compatible hidden aliases
         parser.add_argument("--each-range", action="append", dest="per_atom", help=argparse.SUPPRESS)
@@ -457,7 +495,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     else:
         raise KeyError(f"Unsupported GEO file-tool command {canonical!r}.")
 
-    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory")
+    parser.add_argument("--copy-to-dot", action="store_true", help="Also copy generated output to current directory. Example: --copy-to-dot, which adds copies of generated artifacts in the current directory.")
     add_storage_cli_arguments(parser)
     return parser
 
@@ -508,5 +546,7 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     dirs = [out_path.parent]
     if copied is not None:
         dirs.append(copied.parent)
+    if canonical == "vasp2reax":
+        maybe_copy_output_to_dot(Path(args.coordinates_output), enabled=bool(getattr(args, "copy_to_dot", False)))
     print_saved_dirs(dirs)
     return 0

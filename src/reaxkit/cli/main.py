@@ -27,6 +27,7 @@ from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
 from reaxkit.core.registry.command_catalog import get_registered_commands
 from reaxkit.core.platform.exceptions import AnalysisError, ParseError
 from reaxkit.core.platform.human_log import HumanReadableRunLog
+from reaxkit.core.runtime.command_diagnostics import CommandDiagnostics
 from reaxkit.core.registry.generator_cli_routing_registry import get_registered_generators
 from reaxkit.core.registry.workflow_cli_routing_registry import get_registered_workflows
 from reaxkit.core.storage.storage_layout import default_project_root
@@ -52,7 +53,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
         self._selected_command = selected_command
         self._known_commands = known_commands or set()
         self.add_argument("--help-all", "--all-flags", action=_FullHelpAction,
-                          help="Show every option, grouped by purpose.")
+                          help="Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output.")
 
     def _print_message(self, message: str, file=None) -> None:
         """Write long help output incrementally for terminals with write limits."""
@@ -192,18 +193,7 @@ class _ReaxKitArgumentParser(argparse.ArgumentParser):
                     if self.prog == "reaxkit CLI" else "[options]"), ""])
 
         if self.description:
-            description = self.description.rstrip()
-            if not full:
-                sections = description.split("\n\n")
-                description = sections[0].strip()
-                example = next((line.strip() for line in self.description.splitlines()
-                                if line.lstrip().startswith("reaxkit ")), None)
-                if example:
-                    description += "\n\n" + textwrap.fill(f"Example: {example}", width=width,
-                                                             subsequent_indent="  ")
-            out.append("\n".join(textwrap.fill(line, width=width,
-                                           subsequent_indent="  ") if line.strip() else ""
-                                 for line in description.splitlines()))
+            out.append(self.description.rstrip())
             out.append("")
 
         commands = self._commands_rows()
@@ -445,7 +435,25 @@ def build_parser(selected_command: str | None = None) -> _ReaxKitArgumentParser:
                 module.build_parser(wp)
             wp.set_defaults(_run=module.run_main)
         else:
-            tasks = wp.add_subparsers(dest="task", required=True)
+            wp.formatter_class = argparse.RawTextHelpFormatter
+            wp.description = (
+                "Show the compatibility interface for retired fort.7 analysis tasks.\n\n"
+                "The nested task parsers remain available, but their production analyzers have been retired.\n"
+                "Use direct get-charge, get_connection_* and get_bond_events commands for analysis.\n\n"
+                "Examples:\n"
+                "  1. Inspect the legacy charge interface:\n"
+                "     reaxkit fort7 get --help\n\n"
+                "  2. Inspect the legacy edge interface:\n"
+                "     reaxkit fort7 edges --help\n\n"
+                "  3. Inspect legacy connectivity statistics:\n"
+                "     reaxkit fort7 constats --help\n\n"
+                "  4. Inspect legacy bond histories:\n"
+                "     reaxkit fort7 bond-ts --help\n\n"
+                "  5. Inspect the legacy event interface:\n"
+                "     reaxkit fort7 bond-events --help"
+            )
+            tasks = wp.add_subparsers(dest="task", required=True,
+                                     help="Analysis task to run. Example: edges, which extracts bond connections from fort.7.")
             module.register_tasks(tasks)
 
     from reaxkit.core.runtime.cli_policy import add_execution_arguments
@@ -498,6 +506,8 @@ def main(*, announce: bool = True) -> int:
     if announce:
         announce_command_start(sys.argv)
     sys_argv = _canonicalize_direct_command(sys.argv)
+    if sys_argv[1:] == ["plot-from-excel"]:
+        sys_argv.append("--help")
     full_requested = any(arg in ("--help-all", "--all-flags") for arg in sys_argv)
     help_tokens = {"-h", "--help", "--help-all", "--all-flags"}
     requested_help = [arg for arg in sys_argv[1:] if arg in help_tokens]
@@ -512,6 +522,7 @@ def main(*, announce: bool = True) -> int:
 
     parser = build_parser(selected_command)
     args = parser.parse_args(sys_argv[1:])
+    args._invocation_argv = sys_argv[1:]
     project_root = Path(getattr(args, "project_root", None) or default_project_root())
     trace = HumanReadableRunLog(
         project_root / "logs",
@@ -525,8 +536,20 @@ def main(*, announce: bool = True) -> int:
         setattr(args, "project_root", str(project_root))
 
     from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
+    from reaxkit.presentation.plot_styles import plot_style_context
+    from reaxkit.presentation.color_styles import color_style_context
 
-    with trace, workflow_artifact_policy(args):
+    try:
+        diagnostics = CommandDiagnostics(
+            project_root, getattr(args, "command", selected_command), sys.argv[1:], trace.run_id,
+            interval=getattr(args, "diagnostic_interval_seconds", 60.0),
+            enabled=getattr(args, "diagnostics", False), trace=trace,
+            profile=getattr(args, "profile", False), profile_clock=getattr(args, "profile_clock", "wall"),
+        )
+    except ValueError as error:
+        parser.error(str(error))
+    with diagnostics, trace, workflow_artifact_policy(args), plot_style_context(getattr(args, "plot_style", None)), color_style_context(getattr(args, "color_style", None)):
+        exit_code = 1
         try:
             with trace.step(
                 f"Execute {getattr(args, 'command', selected_command)} command"
@@ -536,26 +559,33 @@ def main(*, announce: bool = True) -> int:
             if exit_code != 0:
                 trace.fail(f"Command returned exit code {exit_code}")
         except ParseError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             print(f"[Parse error] {exc}", file=sys.stderr)
             exit_code = 2
         except AnalysisError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             print(f"[Analysis error] {exc}", file=sys.stderr)
             exit_code = 3
         except FileNotFoundError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("File not found", str(exc), hints=_hints_for_filenotfound(exc, args))
             exit_code = 4
         except OSError as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("OS error", str(exc), hints=_hints_for_oserror(exc, args))
             exit_code = 5
         except Exception as exc:
+            diagnostics.record_exception(exc)
             trace.fail(exc)
             _print_error_with_hints("Error", str(exc))
             exit_code = 1
         finally:
+            diagnostics.exit_code = exit_code
+            args._checkpoint_exit_code = exit_code
             for key, label in (
                 ("run_id", "runtime run_id"),
                 ("_parsed_id", "parsed data id"),

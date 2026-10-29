@@ -23,6 +23,7 @@ class GroupedBarPlotRenderer(PlotRenderer):
         count = len(labels)
         x = np.arange(count, dtype=float)
         width = float(cfg.get("group_width", 0.8)) / max(1, len(series))
+        bar_width = width * 0.85 if len(series) > 1 else width
         figsize = cfg.get("figsize", (max(8.0, count * 2.2), 5.0))
         fig, ax = plt.subplots(figsize=figsize)
 
@@ -34,7 +35,7 @@ class GroupedBarPlotRenderer(PlotRenderer):
             ax.bar(
                 x + offset,
                 values,
-                width,
+                bar_width,
                 label=item.get("label"),
                 color=item.get("color"),
                 alpha=float(item.get("alpha", 0.9)),
@@ -55,6 +56,7 @@ class GroupedBarPlotRenderer(PlotRenderer):
             shown_labels,
             rotation=float(cfg.get("label_rotation", 15)),
             ha=str(cfg.get("label_horizontal_alignment", "right")),
+            multialignment=cfg.get("label_multialignment", cfg.get("label_horizontal_alignment", "right")),
         )
         if cfg.get("title"):
             ax.set_title(str(cfg["title"]))

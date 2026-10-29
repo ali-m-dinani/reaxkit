@@ -1,4 +1,4 @@
-"""CLI for projected h-BN-reference local-cell polarity maps."""
+"""CLI for projected hBN-reference Al-centered geometric polarity maps."""
 
 from __future__ import annotations
 
@@ -49,60 +49,37 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     canonical = _canonical_command(command)
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
     restrict_native_charge_input(parser)
+    parser._option_string_actions["--charge-source"].choices = ["auto", "formal", "reaxff"]
     parser.set_defaults(command=canonical, progress=True)
-    parser.description = """Average h-BN-reference local-cell polarity in fixed spatial bins.
+    parser.description = """Project geometric polarity of each Al in fixed reference bins.
 
-Each neutral reference cell contributes -1, 0, or +1 from the selected local
-dipole component. Zero dipoles remain in the average. Spatial assignments are
-made once from --reference-frame and remain fixed as atoms move. --plot-2d
-writes one TEM-like projection per frame; --plot-kymograph writes the complete
-frame-versus-position evolution map. Detailed per-group centers are omitted by
-default; --write-centers writes them as Parquet unless CSV is requested.
-
-Example:
-  reaxkit get-hbn-reference-projected-polarity --replication 19 19 10 --periodic xy --charge-source auto --component c --projection-plane xz --projection-bins 1 40 --profile-axis z --plot-2d --plot-kymograph
-
-AMS KF input:
-  reaxkit get-hbn-reference-projected-polarity --engine ams --input reaxout.kf --replication 19 19 10 --charge-source auto --frames 0:4000:5 --plot-kymograph
+Polarity is the sign of the Al displacement minus the mean displacement of its
+three nearest coplanar N images in the hBN reference. Positive means Al moves
+along the selected positive axis relative to its N neighborhood.
+Charges and volumes are not used. Spatial bins and neighbors stay fixed.
+Use --geometric-zero-tolerance in angstrom to classify planar sites.
+Examples:
+  reaxkit get-hbn-reference-projected-polarity --replication 19 19 10
+    --engine ams --input reaxout.kf --periodic xy --frames 0
+    --write-centers --centers-format csv --plot-2d
 """
     parser.add_argument(
-        "--local-grouping",
-        choices=["cell", "layer"],
-        default="cell",
-        help="Project four-atom crystallographic cells or two-atom AlN layers. Default: cell.",
+        "--local-grouping", choices=["al", "layer"], default="al",
+        help="Geometric polarity is per Al. Layer is a compatibility alias for al. Default: al. Example: --local-grouping al.",
     )
-    parser.add_argument(
-        "--local-volume-method",
-        choices=["equal", "deformation"],
-        default="equal",
-        help="Set the local-volume convention retained in the cell table. Default: equal.",
-    )
-    parser.add_argument(
-        "--deformation-neighbors",
-        type=int,
-        default=12,
-        help="Set neighboring reference cells used by local affine fits. Default: 12.",
-    )
-    parser.add_argument(
-        "--local-charge-treatment",
-        choices=["auto", "raw", "neutralize"],
-        default="auto",
-        help=(
-            "Choose raw atomic charges, per-cell charge neutralization, or auto "
-            "neutralization for charged cells. Default: auto."
-        ),
-    )
+    for flag in ("--charge-source", "--formal-charge", "--volume-method"):
+        parser._option_string_actions[flag].help = "Accepted for compatibility; ignored by geometric projected polarity."
     parser.add_argument(
         "--component",
         choices=["x", "y", "z", "c"],
         default="c",
-        help="Choose the local dipole component whose sign defines polarity. Default: c.",
+        help="Choose the geometric relative-displacement component whose sign defines polarity. Default: c. Example: --component z.",
     )
     parser.add_argument(
         "--projection-plane",
         choices=["xy", "xz", "yz"],
         default="xz",
-        help="Choose the two coordinates shown in each per-frame map. Default: xz.",
+        help="Choose the two coordinates shown in each per-frame map. Default: xz. Example: --projection-plane xz, which displays x and z in the spatial projection.",
     )
     parser.add_argument(
         "--projection-bins",
@@ -110,44 +87,50 @@ AMS KF input:
         type=int,
         default=(40, 40),
         metavar=("NU", "NV"),
-        help="Set bin counts along the projection-plane axes. Default: 40 40.",
+        help="Set bin counts along the projection-plane axes. Default: 40 40. Example: --projection-bins 1 40, which averages across x and resolves 40 bins along z.",
     )
     parser.add_argument(
         "--profile-axis",
         choices=["x", "y", "z"],
         default=None,
         help=(
-            "Choose the projection-plane axis on the kymograph vertical axis. "
-            "Its --projection-bins count is reused. Default: the second axis."
+            "Choose the projection-plane axis on the kymograph vertical axis. Its --projection-bins count is reused. Default: the second axis. Example: --profile-axis z, which places z position on the kymograph's vertical axis."
         ),
     )
     parser.add_argument(
-        "--dipole-zero-tolerance",
+        "--geometric-zero-tolerance",
         type=float,
-        default=0.0,
+        default=1.0e-6,
         help=(
-            "Map local dipole magnitudes at or below this value to polarity 0; "
-            "zero remains included in bin means. Default: 0."
+            "Map relative displacement magnitudes at or below this value in angstrom to polarity 0. Default: 1e-6. Example: --geometric-zero-tolerance 0.001."
         ),
     )
     parser.add_argument(
         "--write-centers",
-        action="store_true",
-        help="Write the optional detailed per-cell/per-layer polarity table.",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Write the large per-Al geometric polarity table (off by default, including full/legacy profiles). Use --no-write-centers to explicitly skip it. Example: --write-centers --centers-format csv.",
+    )
+    parser.add_argument(
+        "--write-extxyz", action="store_true",
+        help="Write all atoms with geometric neighborhood values on Al centers for OVITO. Example: --write-extxyz.",
+    )
+    parser.add_argument(
+        "--extxyz-precision", type=int, default=8,
+        help="Significant digits in Extended XYZ output. Default: 8. Example: --extxyz-precision 10.",
     )
     parser.add_argument(
         "--centers-format",
         choices=["parquet", "csv"],
         default="parquet",
-        help="Choose the detailed centers-table format. Default: parquet.",
+        help="Choose the detailed centers-table format. Default: parquet. Example: --centers-format csv, which writes the detailed centers table as CSV.",
     )
     parser.add_argument(
         "--workers",
         type=int,
         default=0,
         help=(
-            "Override the automatically selected frame-worker count. "
-            "Use 0 for automatic selection. Default: 0."
+            "Override the automatically selected frame-worker count. Use 0 for automatic selection. Default: 0. Example: --workers 4, which uses four frame workers."
         ),
     )
     parser.add_argument(
@@ -155,14 +138,13 @@ AMS KF input:
         type=int,
         default=0,
         help=(
-            "Override the maximum number of in-flight frames. "
-            "Use 0 for the memory-aware automatic limit. Default: 0."
+            "Override the maximum number of in-flight frames. Use 0 for the memory-aware automatic limit. Default: 0. Example: --chunk-size 8, which allows at most eight frames in flight."
         ),
     )
     parser.add_argument(
         "--plot-2d",
         action="store_true",
-        help="Write one projection-plane mean-polarity heatmap per selected frame.",
+        help="Write one projection-plane mean-polarity heatmap per selected frame. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-kymograph",
@@ -170,12 +152,11 @@ AMS KF input:
         dest="plot_kymograph",
         action="store_true",
         help=(
-            "Write a frame-versus-position polarity heatmap. "
-            "--plot-evolution is an alias."
+            "Write a frame-versus-position polarity heatmap. --plot-evolution is an alias. Example: --plot-kymograph, which writes the frame-versus-position polarity heatmap."
         ),
     )
     parser.add_argument(
-        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180."
+        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch."
     )
     return parser
 
@@ -190,16 +171,15 @@ def build_request(args: argparse.Namespace) -> HBNReferenceProjectedPolarityRequ
     )
     return HBNReferenceProjectedPolarityRequest(
         **vars(base),
-        local_volume_method=str(args.local_volume_method),
-        deformation_neighbors=int(args.deformation_neighbors),
-        local_charge_treatment=str(args.local_charge_treatment),
         local_grouping=cast(LocalGrouping, str(args.local_grouping)),
         component=cast(PolarityComponent, str(args.component)),
         projection_plane=projection_plane,
         projection_bins=tuple(int(value) for value in args.projection_bins),
         profile_axis=profile_axis,
-        dipole_zero_tolerance=float(args.dipole_zero_tolerance),
+        geometric_zero_tolerance=float(args.geometric_zero_tolerance),
         include_centers=bool(args.write_centers),
+        write_extxyz=bool(args.write_extxyz),
+        extxyz_precision=int(args.extxyz_precision),
         workers=int(args.workers),
         chunk_size=int(args.chunk_size),
     )
@@ -248,7 +228,9 @@ def generate_projected_polarity_heatmaps(
     destination = Path(output) / "projected_polarity_2d"
     destination.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    for frame, group in result.projected_bins.groupby("frame_index", sort=True):
+    from reaxkit.core.runtime.result_store import table_chunks
+    groups = (item for chunk in table_chunks(result.projected_bins) for item in chunk.groupby("frame_index", sort=True))
+    for frame, group in groups:
         values = (
             group.pivot(index="v_bin", columns="u_bin", values="mean_polarity")
             .reindex(index=range(nv), columns=range(nu))
@@ -259,7 +241,7 @@ def generate_projected_polarity_heatmaps(
             u_edges,
             v_edges,
             values,
-            cmap="coolwarm",
+            cmap="coolwarm_r",
             vmin=-1.0,
             vmax=1.0,
             shading="flat",
@@ -289,7 +271,12 @@ def generate_polarity_kymograph(
 
     plt = _matplotlib()
     table = result.kymograph_bins
+    from reaxkit.core.runtime.result_store import ResultTable
+    if isinstance(table, ResultTable):
+        table = table.materialize()
     frames = np.sort(table["frame_index"].astype(int).unique())
+    time_values = table.groupby("frame_index")["time"].first().reindex(frames).to_numpy(float) if "time" in table else np.full(len(frames), np.nan)
+    use_time = np.isfinite(time_values).all() and (len(time_values) < 2 or np.all(np.diff(time_values) > 0))
     profile_axis_index = result.request.projection_plane.index(result.request.profile_axis)
     profile_bins = np.arange(int(result.request.projection_bins[profile_axis_index]))
     values = (
@@ -299,15 +286,15 @@ def generate_polarity_kymograph(
     )
     figure, axis = plt.subplots(figsize=(9.0, 5.8))
     image = axis.pcolormesh(
-        _center_edges(frames),
+        _center_edges(time_values if use_time else frames),
         result.profile_edges,
         values,
-        cmap="coolwarm",
+        cmap="coolwarm_r",
         vmin=-1.0,
         vmax=1.0,
         shading="flat",
     )
-    axis.set_xlabel("source frame")
+    axis.set_xlabel("Time (ps)" if use_time else "source frame")
     axis.set_ylabel(f"{result.request.profile_axis} (angstrom)")
     axis.set_title(
         f"Mean h-BN-reference {result.request.component}-polarity kymograph"
@@ -328,7 +315,9 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     output = artifact_directory(args, canonical)
     output.mkdir(parents=True, exist_ok=True)
     profile = str(getattr(args, "output_profile", "standard"))
-    args.write_centers = (bool(args.write_centers) or profile in {"full", "legacy"}) and profile != "minimal"
+    args.write_centers = bool(args.write_centers) and profile != "minimal"
+    args.write_extxyz = (bool(args.write_extxyz) or profile in {"full", "legacy"}) and profile != "minimal"
+    extxyz_path = output / "hbn_reference_projected_polarity.extxyz"
     centers_format = str(getattr(args, "detail_format", None) or ("csv" if profile == "legacy" else args.centers_format))
     centers_path = output / f"hbn_reference_projected_polarity_centers.{centers_format}"
     projected_path = output / "hbn_reference_projected_polarity_2d.csv"
@@ -337,19 +326,24 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             output / "hbn_reference_projected_polarity_whole_slab_summary.csv"
     )
     specs = (
-        ArtifactSpec("centers", centers_path.name, "detail", bool(args.write_centers), centers_format, True),
+        ArtifactSpec("extxyz", extxyz_path.name, "detail", args.write_extxyz, "extxyz", True),
         ArtifactSpec("projected", projected_path.name, "core", True, "csv", True),
         ArtifactSpec("kymograph", kymograph_path.name, "core", True, "csv", True),
         ArtifactSpec("whole_slab_summary", whole_slab_summary_path.name, "summary", True, "csv", True),
     )
+    if args.write_centers:
+        specs += (ArtifactSpec("centers", centers_path.name, "detail", True, centers_format, True),)
     with ArtifactWriter(output, specs, profile=profile, overwrite=True) as writer:
         run_args = runtime_arguments(args)
         run_args["_artifact_writer"] = writer
-        if args.write_centers:
+        if args.write_centers or args.write_extxyz:
             run_args["no_cache"] = True
+        request = REQUEST_BUILDERS[canonical](args)
+        if args.write_extxyz:
+            request._output_path = str(writer.sink("extxyz").temporary)
         result = AnalysisExecutor().run(
             TASK_REGISTRY[TASK_KEY_BY_COMMAND[canonical]](),
-            REQUEST_BUILDERS[canonical](args),
+            request,
             run_args,
         )
         writer.metadata.update(execution_policy=run_args.get("_execution_policy", {}), source_frames=getattr(result.request, "frames", None))
@@ -372,6 +366,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         present_result(canonical, result, args)
     if args.write_centers:
         print(f"Wrote detailed per-group polarity signs to {centers_path}")
+    if args.write_extxyz:
+        print(f"Wrote geometric neighborhood trajectory to {extxyz_path}")
     print(f"Wrote projected mean-polarity bins to {projected_path}")
     print(f"Wrote kymograph bins to {kymograph_path}")
     if writer.enabled("whole_slab_summary"):

@@ -67,8 +67,7 @@ Examples:
         choices=["equal", "coordination"],
         default="equal",
         help=(
-            "Choose the per-center volume: equal shares the selected frame volume "
-            "among valid centers (default); coordination uses each N-neighbor tetrahedron."
+            "Choose the per-center volume: equal shares the selected frame volume among valid centers (default); coordination uses each N-neighbor tetrahedron. Example: --local-volume-method equal, which divides the selected frame volume among local groups."
         ),
     )
     parser.add_argument(
@@ -76,66 +75,64 @@ Examples:
         choices=["hull", "bbox", "cell"],
         default="hull",
         help=(
-            "Choose the frame volume used by --local-volume-method equal: occupied "
-            "convex hull (default), bounding box, or simulation cell."
+            "Choose the frame volume used by --local-volume-method equal: occupied convex hull (default), bounding box, or simulation cell. Example: --volume-method cell, which uses the full simulation-cell volume."
         ),
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="Choose the output directory for local polarization and source dipole CSV files.",
+        help="Choose the output directory for local polarization and source dipole CSV files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory.",
     )
     parser.add_argument(
         "--plot-2d", action="store_true",
-        help="Write per-frame 2D maps after aggregating along the coordinate omitted from --plot-plane.",
+        help="Write per-frame 2D maps after aggregating along the coordinate omitted from --plot-plane. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-3d", action="store_true",
-        help="Write per-frame 3D center scatter plots colored by the selected local value.",
+        help="Write per-frame 3D center scatter plots colored by the selected local value. Example: --plot-3d, which writes three-dimensional center scatter plots.",
     )
     parser.add_argument(
         "--plot-plane", choices=["xy", "xz", "yz"], default="xy",
-        help="Choose the displayed plane for --plot-2d. The remaining coordinate is aggregated.",
+        help="Choose the displayed plane for --plot-2d. The remaining coordinate is aggregated. Example: --plot-plane xy, which displays x and y while aggregating along z.",
     )
     parser.add_argument(
         "--plot-component", choices=["x", "y", "z"], default="z",
-        help="Choose the dipole or polarization component used as plot color.",
+        help="Choose the dipole or polarization component used as plot color. Example: --plot-component z, which colors plots by the z component.",
     )
     parser.add_argument(
         "--plot-quantity", choices=["polarization", "dipole"], default="polarization",
-        help="Plot local polarization (default) or local dipole.",
+        help="Plot local polarization (default) or local dipole. Example: --plot-quantity dipole, which colors plots by local dipole instead of polarization.",
     )
     parser.add_argument(
         "--plot-bins", nargs=2, type=int, default=(40, 40), metavar=("NU", "NV"),
-        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40.",
+        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40. Example: --plot-bins 40 40, which uses 40 bins along each displayed axis.",
     )
     parser.add_argument(
         "--global-scaling", action=argparse.BooleanOptionalAction, default=False,
-        help="Use shared symmetric color limits across frames for both 2D and 3D plots.",
+        help="Use shared symmetric color limits across frames for both 2D and 3D plots. Example: --global-scaling, which uses shared symmetric color limits across frames.",
     )
     parser.add_argument(
         "--figure-dpi", type=int, default=180,
-        help="Set PNG resolution for 2D and 3D plots. Default: 180.",
+        help="Set PNG resolution for 2D and 3D plots. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch.",
     )
     parser.add_argument(
         "--write-extxyz", action="store_true",
-        help="Write an OVITO-compatible Extended XYZ trajectory with local vector properties.",
+        help="Write an OVITO-compatible Extended XYZ trajectory with local vector properties. Example: --write-extxyz, which exports local vector properties for OVITO.",
     )
     parser.add_argument(
         "--include-electric-field", action="store_true",
         help=(
-            "Add the iteration-aligned electric-field value from fort.78 to each "
-            "Extended XYZ frame header."
+            "Add the iteration-aligned electric-field value from fort.78 to each Extended XYZ frame header. Example: --include-electric-field, which adds iteration-matched field data to exported frames."
         ),
     )
     parser.add_argument(
         "--field-direction", choices=["x", "y", "z"], default="z",
-        help="Choose the electric-field component written to frame metadata. Default: z.",
+        help="Choose the electric-field component written to frame metadata. Default: z. Example: --field-direction z, which selects the z-directed electric-field component.",
     )
     parser.add_argument(
         "--extxyz-precision", type=int, default=8,
-        help="Set significant digits in the Extended XYZ output. Default: 8.",
+        help="Set significant digits in the Extended XYZ output. Default: 8. Example: --extxyz-precision 8, which writes eight significant digits in Extended XYZ properties.",
     )
     return parser
 

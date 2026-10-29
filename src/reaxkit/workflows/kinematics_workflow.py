@@ -149,15 +149,17 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         _add_spatial_plot_arguments(parser)
         parser.description = (
             "Plot an atomic velocity or acceleration component at atom coordinates.\n\n"
-            f"Example:\n  reaxkit {canonical} --value vz --save kinematics.png"
+            "Inspect spatial variations in an existing kinematics dataset.\n"
+            "The 3D view colors atom positions; the heatmap aggregates values into spatial bins.\n\n"
+            f"Examples:\n  1. Plot the z velocity component:\n     reaxkit {canonical} --value vz --save kinematics.png"
         )
         if canonical == "kinematics_heatmap2d":
             parser.add_argument("--plane", choices=["xy", "xz", "yz"], default="xy",
-                                help="Coordinate plane onto which atoms are projected.")
+                                help="Coordinate plane onto which atoms are projected. Example: --plane xz, which projects onto the x-z plane.")
             parser.add_argument("--bins", default="100",
-                                help="Number of spatial bins, or a pair such as 100,50.")
+                                help="Number of spatial bins, or a pair such as 100,50. Example: --bins 100,50, which uses 100 bins along the first axis and 50 along the second.")
             parser.add_argument("--agg", choices=["mean", "max", "min", "sum", "count"], default="mean",
-                                help="Reduction of atom values in each spatial bin.")
+                                help="Reduction of atom values in each spatial bin. Example: --agg mean, which averages atom values within each spatial bin.")
     else:
         raise KeyError(f"Unsupported kinematics command '{canonical}'.")
 

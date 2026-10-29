@@ -23,6 +23,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from functools import lru_cache
 from pathlib import Path
 import re
+from difflib import SequenceMatcher
 
 try:
     import yaml  # pyyaml
@@ -1087,9 +1088,13 @@ def load_help_command_index() -> Dict[str, Dict[str, Any]]:
         {str(x) for x in [*ext.keys(), *registry_meta.keys()] if str(x).strip()}
     )
     out: Dict[str, Dict[str, Any]] = {}
+    workflow_metadata = {}
+    for source in _iter_workflow_sources():
+        workflow_metadata.update(_load_yaml_rel_cached(source).get("workflows") or {})
 
     for command_name in all_names:
         ext_meta = ext.get(command_name) if isinstance(ext.get(command_name), dict) else {}
+        workflow_meta = workflow_metadata.get(command_name) or {}
         reg_meta = registry_meta.get(command_name, {})
 
         kind = str(
@@ -1101,13 +1106,16 @@ def load_help_command_index() -> Dict[str, Dict[str, Any]]:
         desc = str(
             ext_meta.get("desc")
             or ext_meta.get("description")
+            or workflow_meta.get("description")
             or ""
         ).strip()
         aliases = _unique_strs([
             *_as_list(ext_meta.get("aliases")),
             *_as_list(reg_meta.get("aliases")),
+            *_as_list(workflow_meta.get("aliases")),
         ])
-        examples = _unique_strs(_as_list(ext_meta.get("examples")))
+        examples = _unique_strs([*_as_list(ext_meta.get("examples")),
+                                 *_as_list(workflow_meta.get("help_search_examples"))])
         directory = str(ext_meta.get("directory") or "").strip()
         if not directory:
             directory = _infer_directory_for_command(command_name, kind)
@@ -1198,7 +1206,7 @@ def search_help_commands(
 ) -> List[CommandHit]:
     """Search command index from natural-language queries."""
     q_raw = str(query or "")
-    q_proc = _expand_query_text(q_raw) or q_raw
+    q_proc = q_raw
     q = _norm(q_proc)
     q_toks = _token_set(q_proc)
     raw = load_help_command_index()
@@ -1211,33 +1219,13 @@ def search_help_commands(
         kind = str(meta.get("kind") or "analysis").strip().lower()
         directory = str(meta.get("directory") or "").strip()
 
-        alias_blob = " ".join(aliases) if aliases else str(command_name)
-        examples_blob = " ".join(examples)
-        combined_blob = " ".join([alias_blob, help_text, examples_blob])
-        alias_tokens = _token_set(alias_blob)
-        example_tokens = _token_set(examples_blob)
-        desc_tokens = _token_set(help_text)
+        score = _score_metadata_entry(command_name, {
+            "aliases": aliases,
+            "help_search_examples": examples,
+            "description": help_text,
+        }, q, q_toks)
 
-        score = 0.0
-        overlap_aliases = q_toks & alias_tokens
-        overlap_examples = q_toks & example_tokens
-        overlap_desc = q_toks & desc_tokens
-        if overlap_aliases:
-            score += 45.0 + 6.0 * len(overlap_aliases)
-        if overlap_examples:
-            score += 24.0 + 3.0 * len(overlap_examples)
-        if overlap_desc:
-            score += 18.0 + 3.0 * len(overlap_desc)
-
-        score += 0.34 * _token_set_fuzzy_ratio(q, alias_blob)
-        score += 0.30 * _token_set_fuzzy_ratio(q, examples_blob)
-        score += 0.24 * _token_set_fuzzy_ratio(q, help_text)
-        score += 0.18 * _token_set_fuzzy_ratio(q, combined_blob)
-
-        if q and q in _norm(alias_blob):
-            score += 30.0
-
-        if score >= min_score:
+        if score > 0 and score >= min_score:
             module_path = _resolve_module_path(str(command_name), kind)
             hits.append(
                 CommandHit(
@@ -1931,42 +1919,70 @@ def _searchable_text(value: Any) -> str:
     return str(value)
 
 
+@lru_cache(maxsize=1)
+def _search_alias_pattern():
+    replacements = {}
+    for canonical, aliases in (load_help_intents().get("wording_alias") or {}).items():
+        short_aliases = [alias for alias in _as_list(aliases)
+                         if len(_tokens(alias)) == 1 and len(alias) >= 3]
+        concept = min(short_aliases, key=len) if short_aliases else "".join(_tokens(str(canonical)))
+        for phrase in [canonical, *_as_list(aliases)]:
+            replacements[_norm(str(phrase))] = concept
+    phrases = sorted(replacements, key=len, reverse=True)
+    pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(p) for p in phrases) + r")(?!\w)")
+    return pattern, replacements
+
+
+@lru_cache(maxsize=8192)
+def _search_terms(text: str) -> frozenset[str]:
+    pattern, replacements = _search_alias_pattern()
+    normalized = pattern.sub(lambda match: replacements[match.group()], _norm(text))
+    ignored = {"a", "an", "the", "of", "for", "to", "in", "on", "and", "with", "using",
+               "how", "do", "i", "can", "please", "reaxkit", "help", "run", "command"}
+    actions = {"gen", "generate", "generating", "generator", "make", "create", "creating"}
+    return frozenset("generate" if term in actions else term
+                     for term in _tokens(normalized) if term not in ignored)
+
+
+def _term_match(term: str, candidates: Iterable[str]) -> float:
+    if term in candidates:
+        return 1.0
+    if len(term) < 5:
+        return 0.0
+    return max((0.85 for candidate in candidates
+                if len(candidate) >= 5 and abs(len(term) - len(candidate)) <= 2
+                and SequenceMatcher(None, term, candidate).ratio() >= 0.84), default=0.0)
+
+
 def _score_metadata_entry(name: str, entry: Dict[str, Any], q: str, q_toks: set[str]) -> float:
-    """
-    Weighted ranking over standardized help fields.
-
-    Priority:
-    aliases/help_search_examples/tags > description > notes
-    """
-    field_weights = {
-        "aliases": 56.0,
-        "help_search_examples": 52.0,
-        "tags": 48.0,
-        "description": 24.0,
-        "notes": 16.0,
-    }
-
-    score = 0.0
-    name_blob = _searchable_text(name)
-    name_toks = _token_set(name_blob)
-    overlap_name = q_toks & name_toks
-    if overlap_name:
-        score += 44.0 + 6.0 * len(overlap_name)
-    score += 0.30 * _token_set_fuzzy_ratio(q, name_blob)
-
-    for field, weight in field_weights.items():
-        blob = _searchable_text((entry or {}).get(field))
-        if not blob:
-            continue
-        toks = _token_set(blob)
-        overlap = q_toks & toks
-        if overlap:
-            score += weight + 3.5 * len(overlap)
-        score += 0.08 * weight * (_token_set_fuzzy_ratio(q, blob) / 100.0)
-
-    if q and q in _norm(name_blob):
-        score += 35.0
-    return score
+    """Rank by concept coverage, then name precision, without additive field bonuses."""
+    query_terms = _search_terms(q)
+    if not query_terms:
+        return 0.0
+    aliases = _as_list(entry.get("aliases"))
+    if _norm(q) == _norm(name):
+        return 200.0
+    if _norm(q) in {_norm(alias) for alias in aliases}:
+        return 190.0
+    name_terms = _search_terms(name)
+    fields = [name_terms, *(_search_terms(alias) for alias in aliases)]
+    fields.extend(_search_terms(_searchable_text(entry.get(field))) for field in
+                  ("help_search_examples", "tags", "description", "notes"))
+    all_terms = frozenset().union(*fields)
+    if "generate" in query_terms and "generate" not in all_terms:
+        return 0.0
+    subjects = query_terms - {"generate", "get", "plot", "compute", "calculate", "show"}
+    required = subjects or query_terms
+    coverage = sum(_term_match(term, all_terms) for term in required) / len(required)
+    if coverage < 0.8:
+        return 0.0
+    name_coverage = sum(_term_match(term, name_terms) for term in query_terms) / len(query_terms)
+    name_precision = len(query_terms & name_terms) / max(len(name_terms), 1)
+    field_coverage = max(sum(_term_match(term, field) for term in query_terms) / len(query_terms)
+                         for field in fields)
+    literal_overlap = len(_token_set(q) & _token_set(name)) / max(len(_token_set(q)), 1)
+    return (50.0 * coverage + 65.0 * name_coverage + 30.0 * name_precision
+            + 15.0 * field_coverage + 5.0 * literal_overlap)
 
 
 def _iter_engine_generator_sources(engine: str) -> List[str]:
@@ -2084,7 +2100,7 @@ def _search_named_section(
             hits.append((str(name), float(score), entry, rel_path))
             continue
         score = _score_metadata_entry(str(name), entry, q, q_toks)
-        if score >= min_score:
+        if score > 0 and score >= min_score:
             hits.append((str(name), float(score), entry, rel_path))
     hits.sort(key=lambda x: x[1], reverse=True)
     return hits[:top_k]
@@ -2189,7 +2205,7 @@ def _search_mapping_file_refs(
 
         # Reuse weighted scorer: title + aliases + description text from mapping rows.
         score = _score_metadata_entry(file_key, pseudo_entry, q, q_toks)
-        if score >= min_score:
+        if score > 0 and score >= min_score:
             hits.append((file_key, float(score), row))
 
     hits.sort(key=lambda x: x[1], reverse=True)
@@ -2254,13 +2270,13 @@ def _append_all_fields_bulleted(
 def _search_score_label(score: float) -> str:
     """Map numeric search score to qualitative likelihood label."""
     s = float(score)
-    if s >= 121.0:
+    if s >= 150.0:
         return "extremely likely"
-    if 86.0 <= s <= 120.0:
+    if s >= 120.0:
         return "very likely"
-    if 61.0 <= s <= 85.0:
+    if s >= 90.0:
         return "likely"
-    if 35.0 <= s <= 60.0:
+    if s >= 35.0:
         return "probably"
     return "possible"
 
@@ -2293,7 +2309,7 @@ def build_help_relationship_report(
     exact_match: bool = False,
 ) -> str:
     """Build layered help report from `help_information_sources.yaml`."""
-    q_proc = _norm(query) if exact_match else _normalize_help_query(query)
+    q_proc = _norm(query)
     if not q_proc:
         return "No matches."
     q = _norm(q_proc)
@@ -2302,6 +2318,9 @@ def build_help_relationship_report(
 
     out: List[str] = [f"Normalized query: {q_proc}"]
     command_hits = search_help_commands(query, top_k=top_k, min_score=min_score)
+    if exact_match:
+        command_hits = [hit for hit in command_hits
+                        if q_exact in {_norm(hit.command), *(_norm(alias) for alias in hit.aliases)}]
     if command_hits:
         out.extend(["", _format_command_hits(command_hits)])
 
@@ -2526,6 +2545,6 @@ def build_help_relationship_report(
                 _append_notes_lines(out, entry.get("notes"), indent="  • ")
                 out.append(" ")
 
-    if len(out) == 1:
+    if not any((command_hits, generator_hits, file_hits, utility_hits, analyzer_hits, workflow_hits)):
         return f"No matches for: {query!r}"
     return "\n".join(out).rstrip()

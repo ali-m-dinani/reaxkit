@@ -15,6 +15,8 @@ from __future__ import annotations
 import numpy as np
 from typing import Optional
 
+VERSION = "1"
+
 def schmitt_hysteresis(y: np.ndarray, th: float, hys: float, init_on: Optional[bool] = None) -> np.ndarray:
     """Apply Schmitt-trigger hysteresis to a 1D signal.
 

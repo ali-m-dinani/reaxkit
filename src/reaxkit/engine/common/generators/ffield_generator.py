@@ -22,6 +22,8 @@ import pandas as pd
 
 from reaxkit.engine.common.io.ffield_handler import FFieldHandler
 
+VERSION = "1"
+
 try:
     from pymatgen.core.periodic_table import Element as _PMElement
 except Exception:  # pragma: no cover - optional dependency in some environments

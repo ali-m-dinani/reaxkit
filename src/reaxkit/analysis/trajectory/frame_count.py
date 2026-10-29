@@ -28,6 +28,7 @@ class FramesCountResult(BaseResult):
 class FramesCountTask(AnalysisTask):
     """Count frames in any normalized :class:`TrajectoryData` instance."""
 
+    VERSION = "1"
     required_data = TrajectoryData
 
     def run_stream(self, frames, request, reporter=None) -> FramesCountResult:

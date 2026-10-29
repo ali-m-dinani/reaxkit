@@ -40,11 +40,17 @@ def _resolve_logs_root(config: dict[str, Any] | None) -> Path:
     return (deduped[0] / "logs") if deduped else (default_workspace_dir_for_dataset(str(Path.cwd())) / "logs")
 
 
-def _read_tail(path: Path | None, *, max_lines: int = 400, newest_first: bool = True) -> str:
+def _read_tail(path: Path | None, *, max_lines: int = 400, newest_first: bool = True, max_bytes: int = 256 * 1024) -> str:
     if path is None or not path.exists():
         return "No log file found."
     try:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        with path.open('rb') as stream:
+            stream.seek(0, 2)
+            offset = max(0, stream.tell() - max_bytes)
+            stream.seek(offset)
+            text = stream.read(max_bytes).decode('utf-8', errors='replace')
+        if offset:
+            text = text.partition('\n')[2] or text
     except Exception as exc:
         return f"Failed to read log file: {exc}"
     lines = text.splitlines()
@@ -74,6 +80,7 @@ def register_log_callbacks(app) -> None:
         Input("pipeline-store", "data"),
         Input("log-refresh-tick", "n_intervals"),
         Input("config-store", "data"),
+        Input('workspace-state', 'data'),
         prevent_initial_call=False,
     )
     def render_log_page(
@@ -81,9 +88,11 @@ def register_log_callbacks(app) -> None:
         _snapshot: dict[str, Any] | None,
         _tick: int,
         config_input: dict[str, Any] | None,
+        workspace: dict[str, Any] | None = None,
     ):
         page = str((ui_data or {}).get("page") or "analysis").lower()
-        if page != "log":
+        visible = (workspace.get('drawerOpen') and workspace.get('drawerTab') == 'logs' and not workspace.get('maximized')) if workspace else page == 'log'
+        if not visible:
             return no_update, no_update, no_update, no_update
         general, timing = _select_log_files(config_input if isinstance(config_input, dict) else None)
         human_name = str(general) if general else "(missing)"

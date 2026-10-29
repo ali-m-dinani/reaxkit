@@ -159,6 +159,9 @@ class PotentialElectricFieldTrajectoryTask(AnalysisTask):
         return _summary(request, request._output_path, results, sum(len(v.table) for v in results))
 
     def run_stream(self, frames, request, reporter=None):
+        if getattr(request, "_result_store", None) is not None:
+            from reaxkit.core.runtime.checkpoint_trajectory import stream_potential_trajectory
+            return stream_potential_trajectory(frames, request, reporter)
         if not request._output_path or int(request.precision) < 1:
             raise ValueError("A trajectory output path and precision >= 1 are required.")
         requested = None if request.frames is None else set(int(v) for v in request.frames[::int(request.every)])
@@ -167,8 +170,9 @@ class PotentialElectricFieldTrajectoryTask(AnalysisTask):
         fixed_reference = (None if request.potential_reference_position is None
                            else tuple(request.potential_reference_position))
         output = Path(request._output_path)
+        writer = ExtendedXYZWriter(output, precision=request.precision)
         try:
-            with ExtendedXYZWriter(output, precision=request.precision) as writer:
+            with writer:
                 for count, data in enumerate(frames, 1):
                     source = _source_frame(data.trajectory, 0); seen.add(source)
                     if source in requested if requested is not None else source % int(request.every) == 0:
@@ -189,10 +193,15 @@ class PotentialElectricFieldTrajectoryTask(AnalysisTask):
                             progress_total,
                             "Calculating and writing local electrostatics",
                         )
-        except Exception:
-            output.unlink(missing_ok=True); raise
+        except BaseException as error:
+            writer.preserve_incomplete(error)
+            raise
         if requested is not None and requested - seen:
-            output.unlink(missing_ok=True); raise ValueError(f"Requested frame(s) not found: {sorted(requested - seen)}.")
+            writer.preserve_incomplete(f"Requested frames not found: {sorted(requested - seen)}")
+            raise ValueError(f"Requested frame(s) not found: {sorted(requested - seen)}.")
+        if not results:
+            writer.preserve_incomplete("No selected frames were analyzed.")
+            raise ValueError("No selected frames were analyzed.")
         return _summary(request, str(output), results, rows)
 
 

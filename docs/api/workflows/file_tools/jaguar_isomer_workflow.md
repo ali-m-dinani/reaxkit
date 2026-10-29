@@ -31,42 +31,47 @@ or diagnose Jaguar/runtime/license failures.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. |  |
-| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. |  |
-| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. |  |
+| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. Example: --isomer-dir analysis/isomers, which reads per-isomer input folders there. |  |
+| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. Example: --hf-base hf_base.in, which reads the molecular-system-specific Jaguar template. |  |
+| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. Example: --job-config jaguar_jobs.yaml, which reads Slurm and Jaguar job settings. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. |  |
-| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. Example: --write-example-config jaguar_jobs.yaml, which writes an editable job-settings template and exits. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. |  |
-| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. |  |
-| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. Example: --submit, which submits generated jobs through sbatch. |  |
+| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. Example: --no-skip-completed, which regenerates jobs even when completed output exists. |  |
+| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. Example: --no-skip-queued, which permits submission despite a matching queued job. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -95,42 +100,47 @@ or diagnose Jaguar/runtime/license failures.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. |  |
-| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. |  |
-| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. |  |
+| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. Example: --isomer-dir analysis/isomers, which reads per-isomer input folders there. |  |
+| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. Example: --hf-base hf_base.in, which reads the molecular-system-specific Jaguar template. |  |
+| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. Example: --job-config jaguar_jobs.yaml, which reads Slurm and Jaguar job settings. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. |  |
-| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. Example: --write-example-config jaguar_jobs.yaml, which writes an editable job-settings template and exits. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. |  |
-| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. |  |
-| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. Example: --submit, which submits generated jobs through sbatch. |  |
+| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. Example: --no-skip-completed, which regenerates jobs even when completed output exists. |  |
+| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. Example: --no-skip-queued, which permits submission despite a matching queued job. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -159,42 +169,47 @@ or diagnose Jaguar/runtime/license failures.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. |  |
-| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. |  |
-| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. |  |
+| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. Example: --isomer-dir analysis/isomers, which reads per-isomer input folders there. |  |
+| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. Example: --hf-base hf_base.in, which reads the molecular-system-specific Jaguar template. |  |
+| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. Example: --job-config jaguar_jobs.yaml, which reads Slurm and Jaguar job settings. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. |  |
-| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. Example: --write-example-config jaguar_jobs.yaml, which writes an editable job-settings template and exits. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. |  |
-| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. |  |
-| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. Example: --submit, which submits generated jobs through sbatch. |  |
+| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. Example: --no-skip-completed, which regenerates jobs even when completed output exists. |  |
+| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. Example: --no-skip-queued, which permits submission despite a matching queued job. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -223,42 +238,47 @@ or diagnose Jaguar/runtime/license failures.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. |  |
-| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. |  |
-| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. |  |
+| `--isomer-dir` | No |  | Directory containing per-isomer folders from detect-isomer-representatives --write-isomer-dirs. Example: --isomer-dir analysis/isomers, which reads per-isomer input folders there. |  |
+| `--hf-base` | No |  | Jaguar hf_base.in template. This is molecular-system specific and must be reviewed. Example: --hf-base hf_base.in, which reads the molecular-system-specific Jaguar template. |  |
+| `--job-config` | No |  | Slurm/Jaguar YAML settings file. Use --write-example-config to create a template. Example: --job-config jaguar_jobs.yaml, which reads Slurm and Jaguar job settings. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. |  |
-| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No | jaguar_jobs | Output directory for generated Jaguar job folders and manifest. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--write-example-config` | No |  | Write an editable Slurm/Jaguar YAML config template and exit. Example: --write-example-config jaguar_jobs.yaml, which writes an editable job-settings template and exits. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. |  |
-| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. |  |
-| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--submit` | No | False | Submit generated jobs with sbatch. Submission success does not mean Jaguar completed successfully. Example: --submit, which submits generated jobs through sbatch. |  |
+| `--no-skip-completed` | No | False | Regenerate jobs even when an existing hf.out contains 'final geometry:'. Example: --no-skip-completed, which regenerates jobs even when completed output exists. |  |
+| `--no-skip-queued` | No | False | With --submit, do not skip structures that already have a matching Slurm job name in squeue. Example: --no-skip-queued, which permits submission despite a matching queued job. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--force` | No | False | Allow overwriting files in an existing non-empty output directory or example config. Example: --force, which allows replacement of existing generated output. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

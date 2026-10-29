@@ -1,0 +1,340 @@
+{
+  "machine": "Windows-11-10.0.26200-SP0",
+  "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "ram_bytes": 33945935872,
+  "versions": {
+    "numpy": "2.5.1",
+    "pyarrow": "25.0.1",
+    "duckdb": "1.5.5",
+    "plotly": "6.9.0",
+    "dash": "4.4.1"
+  },
+  "fixture": "seed=42; numeric step/sine with late spike and missing interval; normal xyz with stable IDs",
+  "scope": "Summary/serialization timings are in-process with first and warm OS-cache runs retained. job_path separately includes Windows spawn or cached submission plus JSON. No handler, HTTP, browser or GPU timing.",
+  "results": [
+    {
+      "kind": "plot2d",
+      "rows": 100000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          74.92669997736812,
+          39.762599975802004,
+          38.89660001732409,
+          36.48320003412664,
+          38.35379995871335
+        ],
+        "median_ms": 38.89660001732409,
+        "sampled_process_peak_rss_bytes": 139165696
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          820.6968000158668,
+          34.27529998589307,
+          28.530900017358363,
+          30.904199928045273,
+          26.3492000522092
+        ],
+        "median_ms": 30.904199928045273,
+        "sampled_process_peak_rss_bytes": 197926912
+      },
+      "displayed_points": 2315,
+      "json_bytes": 180592,
+      "parquet_bytes": 1591580,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          18.582599936053157,
+          17.345900065265596,
+          19.53650009818375,
+          17.956399940885603,
+          18.505000043660402
+        ],
+        "median_ms": 18.505000043660402,
+        "sampled_process_peak_rss_bytes": 199131136,
+        "bins": 250,
+        "exact_count": 99900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          16.428599948994815,
+          17.859600018709898,
+          14.536899980157614,
+          15.38489991798997,
+          15.747800003737211
+        ],
+        "median_ms": 15.747800003737211,
+        "sampled_process_peak_rss_bytes": 199266304,
+        "displayed_points": 101,
+        "reduced": false
+      }
+    },
+    {
+      "kind": "plot2d",
+      "rows": 1000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          241.76459992304444,
+          306.8409999832511,
+          359.5339000457898,
+          424.71509997267276,
+          403.9631999330595
+        ],
+        "median_ms": 359.5339000457898,
+        "sampled_process_peak_rss_bytes": 268070912
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          90.57880006730556,
+          55.68160000257194,
+          68.46990005578846,
+          105.31359992455691,
+          62.259500031359494
+        ],
+        "median_ms": 68.46990005578846,
+        "sampled_process_peak_rss_bytes": 218705920
+      },
+      "displayed_points": 4008,
+      "json_bytes": 325841,
+      "parquet_bytes": 15941081,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          135.8411000110209,
+          89.50769994407892,
+          106.01440002210438,
+          126.18100002873689,
+          112.08999995142221
+        ],
+        "median_ms": 112.08999995142221,
+        "sampled_process_peak_rss_bytes": 234082304,
+        "bins": 250,
+        "exact_count": 999900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          26.207099901512265,
+          21.460900083184242,
+          36.74040001351386,
+          36.62809997331351,
+          34.80899997521192
+        ],
+        "median_ms": 34.80899997521192,
+        "sampled_process_peak_rss_bytes": 218759168,
+        "displayed_points": 101,
+        "reduced": false
+      },
+      "job_path": {
+        "cold_spawn_and_render": {
+          "repetitions": 5,
+          "milliseconds": [
+            1874.1305000148714,
+            1783.0930999480188,
+            1723.8490000599995,
+            1724.4534000055864,
+            1735.5300999479368
+          ],
+          "median_ms": 1735.5300999479368,
+          "sampled_process_peak_rss_bytes": 217518080
+        },
+        "cached_submission_and_json": {
+          "repetitions": 5,
+          "milliseconds": [
+            18.611400038935244,
+            34.77140003815293,
+            26.53549995739013,
+            36.255299928598106,
+            19.73810000345111
+          ],
+          "median_ms": 26.53549995739013,
+          "sampled_process_peak_rss_bytes": 217743360
+        },
+        "response_bytes": 306712
+      }
+    },
+    {
+      "kind": "plot2d",
+      "rows": 10000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          4810.052799992263,
+          4271.8677000375465,
+          4468.224600073881,
+          4656.446999986656,
+          5227.506599971093
+        ],
+        "median_ms": 4656.446999986656,
+        "sampled_process_peak_rss_bytes": 649981952
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          75.57210000231862,
+          96.23119991738349,
+          66.2177000194788,
+          81.11650007776916,
+          57.27519991341978
+        ],
+        "median_ms": 75.57210000231862,
+        "sampled_process_peak_rss_bytes": 371634176
+      },
+      "displayed_points": 4008,
+      "json_bytes": 344981,
+      "parquet_bytes": 159442952,
+      "histogram": {
+        "repetitions": 5,
+        "milliseconds": [
+          891.4680000161752,
+          943.9690000144765,
+          862.9940999671817,
+          931.2887999694794,
+          875.5815000040457
+        ],
+        "median_ms": 891.4680000161752,
+        "sampled_process_peak_rss_bytes": 493989888,
+        "bins": 250,
+        "exact_count": 9999900
+      },
+      "zoom": {
+        "repetitions": 5,
+        "milliseconds": [
+          36.24600009061396,
+          26.910900021903217,
+          30.679400078952312,
+          33.5899000056088,
+          33.97129999939352
+        ],
+        "median_ms": 33.5899000056088,
+        "sampled_process_peak_rss_bytes": 372875264,
+        "displayed_points": 101,
+        "reduced": false
+      }
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 10000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          83.58229999430478,
+          71.2309000082314,
+          68.92729992978275,
+          73.85669997893274,
+          76.6343999421224
+        ],
+        "median_ms": 73.85669997893274,
+        "sampled_process_peak_rss_bytes": 378245120
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          188.37810005061328,
+          181.5013000741601,
+          147.52979995682836,
+          144.5468000601977,
+          183.54580004233867
+        ],
+        "median_ms": 181.5013000741601,
+        "sampled_process_peak_rss_bytes": 384622592
+      },
+      "displayed_points": 10000,
+      "json_bytes": 952980,
+      "parquet_bytes": 351527
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 100000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          175.97560002468526,
+          135.61110000591725,
+          176.79179995320737,
+          151.6194000141695,
+          159.63060001377016
+        ],
+        "median_ms": 159.63060001377016,
+        "sampled_process_peak_rss_bytes": 407805952
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          401.38900000602007,
+          424.85509999096394,
+          424.8405999969691,
+          416.35920002590865,
+          412.99560002516955
+        ],
+        "median_ms": 416.35920002590865,
+        "sampled_process_peak_rss_bytes": 392282112
+      },
+      "displayed_points": 20000,
+      "json_bytes": 1956905,
+      "parquet_bytes": 3584758
+    },
+    {
+      "kind": "scatter3d",
+      "rows": 1000000,
+      "summary": {
+        "repetitions": 5,
+        "milliseconds": [
+          598.5661000013351,
+          546.3184000691399,
+          579.7420999733731,
+          656.8603999912739,
+          562.0169999310747
+        ],
+        "median_ms": 579.7420999733731,
+        "sampled_process_peak_rss_bytes": 535064576
+      },
+      "figure_serialization": {
+        "repetitions": 5,
+        "milliseconds": [
+          416.5601000422612,
+          451.8041000701487,
+          445.83010009955615,
+          448.2041000155732,
+          440.16429991461337
+        ],
+        "median_ms": 445.83010009955615,
+        "sampled_process_peak_rss_bytes": 438915072
+      },
+      "displayed_points": 20000,
+      "json_bytes": 2017444,
+      "parquet_bytes": 35882308,
+      "job_path": {
+        "cold_spawn_and_render": {
+          "repetitions": 5,
+          "milliseconds": [
+            2706.7085000453517,
+            2583.217900013551,
+            2552.358200075105,
+            2493.673700024374,
+            2465.8800000324845
+          ],
+          "median_ms": 2552.358200075105,
+          "sampled_process_peak_rss_bytes": 444432384
+        },
+        "cached_submission_and_json": {
+          "repetitions": 5,
+          "milliseconds": [
+            120.98140001762658,
+            126.47109990939498,
+            121.51500000618398,
+            125.41920004878193,
+            126.35529995895922
+          ],
+          "median_ms": 125.41920004878193,
+          "sampled_process_peak_rss_bytes": 442335232
+        },
+        "response_bytes": 1903056
+      }
+    }
+  ]
+}

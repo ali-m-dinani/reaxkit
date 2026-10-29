@@ -1358,6 +1358,7 @@ def _run_electrostatics_stream(
 class DipoleTask(AnalysisTask):
     """Compute dipole series as total or local."""
 
+    VERSION = "1"
     required_data = ElectrostaticsData
     supports_selective_streaming = True
     execution_capabilities = TaskCapabilities(
@@ -1498,6 +1499,7 @@ class DipoleTask(AnalysisTask):
 class PolarizationTask(AnalysisTask):
     """Compute polarization series as total or local."""
 
+    VERSION = "1"
     required_data = ElectrostaticsData
     supports_selective_streaming = True
     execution_capabilities = TaskCapabilities(
@@ -1642,6 +1644,7 @@ class PolarizationTask(AnalysisTask):
 class PolarizationFieldTask(AnalysisTask):
     """Compute polarization-field data and hysteresis roots."""
 
+    VERSION = "1"
     required_data = ElectrostaticsData
 
     @staticmethod

@@ -309,6 +309,20 @@ def spec_to_plot_payload(value: Any, result: Any) -> dict[str, Any] | None:
     if not rows:
         return payload
 
+    filter_column = spec.options.get("filter_column")
+    if filter_column:
+        rows = [row for row in rows if row.get(filter_column) == spec.options.get("filter_value")]
+
+    if spec.renderer == "kymograph":
+        from reaxkit.presentation.kymograph import kymograph_grid
+
+        coordinates, radii, values = kymograph_grid(
+            rows, spec.mapping.get("x_col", "frame_index"),
+            spec.mapping.get("y_col", "r"), spec.mapping.get("color_col", "g"),
+        )
+        payload.update(x=coordinates.tolist(), y=radii.tolist(), z=values.tolist())
+        return payload
+
     x_col = spec.mapping.get("x_col")
     y_col = spec.mapping.get("y_col")
     g_col = spec.mapping.get("group_by_col")

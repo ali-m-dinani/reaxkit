@@ -173,7 +173,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         "--step-angle",
         type=float,
         default=None,
-        help="Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries.",
+        help="Legacy angular sampling step for sin profiles (radians); use --points-per-cycle for exact cycle boundaries. Example: --step-angle 0.1, which samples sinusoidal profiles at 0.1-radian intervals.",
     )
     parser.add_argument(
         "--num-cycles",

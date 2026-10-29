@@ -37,7 +37,7 @@ as Parquet unless CSV is explicitly requested.
 | `--center, --cation` | No | Al | Choose center species. Example: --center Al Ga, analyzes Al- and Ga-centered sites. |  |
 | `--neighbor, --anion` | No | N | Choose neighbor species. Example: --neighbor N, searches nitrogen atoms for basal and apical roles. |  |
 | `--proton` | No | H | Choose proton-like species. Example: --proton H, groups sites by nearby hydrogen atoms. |  |
-| `--charge-source` | No | auto | Use charges from the selected/detected engine, or use the values provided by --formal-charge. Default: auto. | auto, formal |
+| `--charge-source` | No | auto | Use charges from the selected/detected engine, or use the values provided by --formal-charge. Default: auto. Example: --charge-source formal, which uses assigned species charges instead of engine charges. | auto, formal |
 | `--formal-charge` | No |  | Assign species formal charges. Example: --formal-charge Al=3 N=-3 H=1, uses charges in elementary-charge units. |  |
 | `--neighbor-cutoff` | No | 3.0 | Set the candidate radius in angstrom. Example: --neighbor-cutoff 2.5, excludes neighbors farther than 2.5 angstrom. |  |
 | `--proton-cutoff` | No | 2.0 | Set the proton-proximity radius in angstrom. Example: --proton-cutoff 1.8, marks sites within 1.8 angstrom of H. |  |
@@ -48,18 +48,18 @@ as Parquet unless CSV is explicitly requested.
 | `--frames` | No |  | Select zero-based source frames. Example: --frames 0:101:10, includes frames 0 through 100 every 10 frames. |  |
 | `--every` | No | 1 | Stride the selected frames. Example: --every 5, keeps every fifth selected frame. |  |
 | `--polarity-tolerance` | No | 1e-10 | Set the zero-polarity tolerance in angstrom. Example: --polarity-tolerance 1e-6, treats smaller basal means as zero. |  |
-| `--component` | No | z | Choose the local dipole component whose sign defines polarity. Default: z. | x, y, z |
-| `--projection-plane` | No | xz | Choose the two spatial coordinates shown in each per-frame map. Default: xz. | xy, xz, yz |
-| `--projection-bins` | No | 40, 40 | Set bin counts along the two projection-plane axes. Default: 40 40. |  |
-| `--reference-frame` | No | 0 | Assign each center to a fixed spatial bin using this source frame, then retain that atom-to-bin assignment for every analyzed frame. Default: 0. |  |
-| `--profile-axis` | No |  | Choose the projection-plane axis on the vertical axis of the kymograph. It reuses that axis's --projection-bins count. Default: the second axis. | x, y, z |
-| `--dipole-zero-tolerance` | No | 0.0 | Map selected dipole magnitudes at or below this value to polarity 0. They remain included in bin means. Default: 0. |  |
+| `--component` | No | z | Choose the local dipole component whose sign defines polarity. Default: z. Example: --component z, which defines polarity from the sign of the z dipole component. | x, y, z |
+| `--projection-plane` | No | xz | Choose the two spatial coordinates shown in each per-frame map. Default: xz. Example: --projection-plane xz, which displays x and z in the spatial projection. | xy, xz, yz |
+| `--projection-bins` | No | 40, 40 | Set bin counts along the two projection-plane axes. Default: 40 40. Example: --projection-bins 1 40, which averages across x and resolves 40 bins along z. |  |
+| `--reference-frame` | No | 0 | Assign each center to a fixed spatial bin using this source frame, then retain that atom-to-bin assignment for every analyzed frame. Default: 0. Example: --reference-frame 0, which uses the initial frame to establish the reference assignment. |  |
+| `--profile-axis` | No |  | Choose the projection-plane axis on the vertical axis of the kymograph. It reuses that axis's --projection-bins count. Default: the second axis. Example: --profile-axis z, which places z position on the kymograph's vertical axis. | x, y, z |
+| `--dipole-zero-tolerance` | No | 0.0 | Map selected dipole magnitudes at or below this value to polarity 0. They remain included in bin means. Default: 0. Example: --dipole-zero-tolerance 0.001, which treats magnitudes up to 0.001 as zero polarity. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--engine` | No |  | Select AMS/KF or ReaxFF text input. If omitted, ReaxKit detects the engine from the input path. | ams, reaxff |
+| `--engine` | No |  | Select AMS/KF or ReaxFF text input. If omitted, ReaxKit detects the engine from the input path. Example: --engine ams, which reads AMS KF charge and trajectory data. | ams, reaxff |
 | `--input` | No | . | Set the path used for engine detection. Example: --input ./run, inspects ./run. |  |
 | `--run-dir` | No | . | Set the fallback simulation directory. Example: --run-dir ./run, resolves default files there. |  |
 | `--fort7` | No | fort.7 | Select the ReaxFF charge file. Example: --fort7 ./run/fort.7, streams charges from that file. |  |
@@ -71,21 +71,22 @@ as Parquet unless CSV is explicitly requested.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--write-centers` | No | False | Write the optional detailed per-center polarity table. |  |
-| `--centers-format` | No | parquet | Choose the detailed centers-table format. Default: parquet. | parquet, csv |
-| `--plot-2d` | No | False | Write one projection-plane mean-polarity heatmap per selected frame. |  |
-| `--plot-kymograph, --plot-evolution` | No | False | Write a kymograph: a frame-versus-position heatmap. --plot-evolution is retained as an alias. |  |
-| `--figure-dpi` | No | 180 | Set PNG resolution. Default: 180. |  |
-| `--output-dir` | No |  | Choose the output directory for polarity tables and heatmaps. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--write-centers` | No | False | Write the optional detailed per-center polarity table. Example: --write-centers, which exports the detailed local polarity table. |  |
+| `--centers-format` | No | parquet | Choose the detailed centers-table format. Default: parquet. Example: --centers-format csv, which writes the detailed centers table as CSV. | parquet, csv |
+| `--plot-2d` | No | False | Write one projection-plane mean-polarity heatmap per selected frame. Example: --plot-2d, which writes projected spatial heatmaps. |  |
+| `--plot-kymograph, --plot-evolution` | No | False | Write a kymograph: a frame-versus-position heatmap. --plot-evolution is retained as an alias. Example: --plot-kymograph, which writes the frame-versus-position polarity heatmap. |  |
+| `--figure-dpi` | No | 180 | Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch. |  |
+| `--output-dir` | No |  | Choose the output directory for polarity tables and heatmaps. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--workers` | No | 0 | Override the automatically selected frame-worker count. Use 0 for automatic selection. Default: 0. |  |
-| `--chunk-size` | No | 0 | Override the maximum number of in-flight frames. Use 0 for the memory-aware automatic limit. Default: 0. |  |
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Override the automatically selected frame-worker count. Use 0 for automatic selection. Default: 0. Example: --workers 4, which uses four frame workers. |  |
+| `--chunk-size` | No | 0 | Override the maximum number of in-flight frames. Use 0 for the memory-aware automatic limit. Default: 0. Example: --chunk-size 8, which allows at most eight frames in flight. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
 
 #### Storage and cache
 
@@ -97,13 +98,17 @@ as Parquet unless CSV is explicitly requested.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 | `--log` | No | quiet | Choose console logging detail. Example: --log verbose, prints diagnostic progress information. | verbose, quiet |
 
 

@@ -5,8 +5,19 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter, TableChunks
+from reaxkit.core.runtime.result_store import ResultTable
 
 _CURRENT_ARGS = ContextVar("reaxkit_artifact_args", default=None)
+_CURRENT_CHECKPOINTS = ContextVar("reaxkit_checkpoints", default=None)
+
+
+def register_checkpoint(store, *, cache_destination=None):
+    stores = _CURRENT_CHECKPOINTS.get()
+    if stores is not None:
+        store.cache_destination = cache_destination
+        stores.append(store)
+        return True
+    return False
 
 
 @contextmanager
@@ -48,9 +59,49 @@ def workflow_csv_rows(path, columns, *, args=None):
 def workflow_artifact_policy(args):
     """Make the invocation policy available to nested artifact helpers."""
     token = _CURRENT_ARGS.set(args)
+    stores = []
+    checkpoint_token = _CURRENT_CHECKPOINTS.set(stores)
+    packed_stores = []
     try:
         yield
+        if getattr(args, "_checkpoint_exit_code", 0) == 0:
+            from reaxkit.core.runtime.packed_results import publish_packed_results
+            for store in stores:
+                if store.cache_destination is not None:
+                    packed = publish_packed_results(store, store.cache_destination)
+                    packed_stores.append((store, packed))
+        for store in stores:
+            if getattr(args, "_checkpoint_exit_code", 0) == 0:
+                store.transition("complete")
+            else:
+                state = "analysis_complete" if store.manifest["state"] == "analysis_complete" else "failed"
+                store.transition(state, error=store.manifest.get("error") or "Command failed; see the command log.",
+                                 failed_source_frame=store.manifest.get("failed_source_frame"))
+                print(f"Recovery checkpoint: {store.directory}; last committed selection position: {store.manifest['last_position']}")
+                if store.manifest.get("resume_command"):
+                    print(f"Resume: {store.manifest['resume_command']}")
+    except BaseException as error:
+        for store in stores:
+            if store.manifest["state"] == "complete":
+                continue
+            elif store.manifest["state"] == "analysis_complete":
+                store.transition("analysis_complete", error=str(error))
+            else:
+                store.transition("interrupted" if isinstance(error, (KeyboardInterrupt, SystemExit)) else "failed", error=str(error))
+            print(f"Recovery checkpoint: {store.directory}; last committed selection position: {store.manifest['last_position']}")
+        raise
+    else:
+        from reaxkit.core.runtime.packed_results import remove_packed_checkpoint
+        for store, packed in packed_stores:
+            try:
+                remove_packed_checkpoint(store, packed)
+                print(f"Result cache: {packed.directory.archive.filename}; recovery checkpoint removed.")
+            except (OSError, ValueError) as error:
+                print(f"Result cache saved, but checkpoint cleanup was skipped: {error}")
     finally:
+        for store in stores:
+            store.close()
+        _CURRENT_CHECKPOINTS.reset(checkpoint_token)
         _CURRENT_ARGS.reset(token)
 
 
@@ -96,7 +147,7 @@ def write_workflow_tables(tables, *, args=None, summary=(), details=(), enabled_
     with ArtifactWriter(directory, specs, profile=profile, detail_format=detail_format,
                         overwrite=True, metadata={"command": getattr(args, "command", None)}) as writer:
         for path, table in zip(paths, tables.values()):
-            if isinstance(table, TableChunks):
+            if isinstance(table, (TableChunks, ResultTable)):
                 writer.write_chunks(path.name, table)
             else:
                 writer.write_table(path.name, table)

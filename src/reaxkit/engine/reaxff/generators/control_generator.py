@@ -20,6 +20,8 @@ import re
 
 from reaxkit.domain.data_models import ControlParametersData
 
+VERSION = "1"
+
 CONTROL_VALUE_WIDTH = 7
 CONTROL_KEY_WIDTH = 10
 

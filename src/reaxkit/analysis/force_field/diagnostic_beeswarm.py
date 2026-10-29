@@ -363,6 +363,7 @@ class FFieldOptimizationDiagnosticBeeswarmResult(BaseResult):
 class FFieldOptimizationDiagnosticBeeswarmTask(AnalysisTask):
     """Prepare the bounded samples used by the diagnostic beeswarm renderer."""
 
+    VERSION = "1"
     required_data = ForceFieldOptimizationDiagnosticPlotData
 
     def run(

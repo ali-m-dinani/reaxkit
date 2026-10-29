@@ -9,7 +9,18 @@ def build_parser(parser, *, command: str):
     configure_parser(
         parser,
         command=command,
-        description="Get selected cell lengths and angles as time series.",
+        description=(
+            "Get selected cell lengths and angles as time series.\n"
+            "\n"
+            "Compare cell expansion and angular distortion in existing trajectory data.\n"
+            "\n"
+            "Examples:\n"
+            "  1. Cell lengths:\n"
+            "     reaxkit get-cell-dimensions --xmolout runs/heating/xmolout --fields a b c --plot subplot\n"
+            "\n"
+            "  2. Cell angles:\n"
+            "     reaxkit get-cell-dimensions --xmolout runs/heating/xmolout --fields alpha beta gamma --export cell_angles.csv"
+        ),
         inputs=("xmolout", "summary"),
     )
     parser.add_argument(
@@ -17,6 +28,7 @@ def build_parser(parser, *, command: str):
         nargs="+",
         choices=["a", "b", "c", "alpha", "beta", "gamma"],
         default=("a", "b", "c", "alpha", "beta", "gamma"),
+        help="Cell lengths and angles to include. Example: --fields a b c, which extracts lengths and excludes angles.",
     )
     return parser
 

@@ -24,6 +24,8 @@ import threading
 class RKFHandler:
     """Cached loader for AMS ``KFFile`` handles."""
 
+    VERSION = "1"
+
     _CACHE_VERSION = "1"
     _MEMORY_CACHE: dict[str, Any] = {}
     _MEMORY_LOCK = threading.Lock()

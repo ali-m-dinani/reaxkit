@@ -21,6 +21,8 @@ import numpy as np
 class LAMMPSLogHandler:
     """Reader for ``log.lammps`` files using ``lammps.formats.LogFile``."""
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path):
         """Initialize a handler for one ``log.lammps`` path."""
         self.path = Path(file_path)

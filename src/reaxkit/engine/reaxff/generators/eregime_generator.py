@@ -27,6 +27,8 @@ import math
 
 import numpy as np
 
+VERSION = "1"
+
 
 __all__ = [
     "HEADER_LINES",

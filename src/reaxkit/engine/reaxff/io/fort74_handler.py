@@ -99,6 +99,8 @@ class Fort74Handler(BaseHandler):
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "fort.74", reporter=None):
         """
         Initialize the instance.

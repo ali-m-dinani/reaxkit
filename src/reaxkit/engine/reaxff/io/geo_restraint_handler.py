@@ -37,6 +37,8 @@ _CELL_COLUMNS = [
 class GeoRestraintHandler(BaseHandler):
     """Return one row per BOND or ANGLE restraint in a multi-structure geo file."""
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "geo", reporter=None):
         super().__init__(file_path)
         self._reporter = reporter

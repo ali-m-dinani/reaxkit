@@ -18,6 +18,11 @@ INTERNAL_ARG_NAMES = {
 }
 
 
+def _is_secret_field(name: str) -> bool:
+    normalized = name.lower().replace("-", "").replace("_", "")
+    return normalized.endswith(("apikey", "password", "passwd", "secret", "token"))
+
+
 def _mapping_from_args(args: Any) -> dict[str, Any]:
     if args is None:
         return {}
@@ -31,7 +36,7 @@ def _mapping_from_args(args: Any) -> dict[str, Any]:
 
 
 def json_safe(value: Any) -> Any:
-    """Convert common runtime values into JSON-serializable values."""
+    """Convert runtime values to JSON-safe provenance, redacting credentials."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     if isinstance(value, (np.integer,)):
@@ -47,7 +52,10 @@ def json_safe(value: Any) -> Any:
     if is_dataclass(value) and not isinstance(value, type):
         return json_safe(asdict(value))
     if isinstance(value, dict):
-        return {str(k): json_safe(v) for k, v in value.items()}
+        return {
+            str(key): "[REDACTED]" if _is_secret_field(str(key)) and item is not None else json_safe(item)
+            for key, item in value.items()
+        }
     if isinstance(value, (list, tuple, set, frozenset)):
         return [json_safe(v) for v in value]
     if isinstance(value, np.ndarray):
@@ -70,7 +78,7 @@ def effective_settings_from_args(args: Any) -> dict[str, Any]:
         if key_str in INTERNAL_ARG_NAMES or key_str.startswith(INTERNAL_ARG_PREFIXES):
             continue
         settings[key_str] = json_safe(value)
-    return settings
+    return json_safe(settings)
 
 
 def user_settings_from_args(args: Any) -> dict[str, Any]:

@@ -14,6 +14,11 @@
 Split a force-field optimization GEO file into one folder per DESCRP identifier.
 Each folder contains <identifier>.geo and <identifier>.xyz.
 
+By default, exports are saved under
+`reaxkit_workspace/analysis/get_force_field_opt_geo_files/<run-id>/`.
+Use `--project-root` to choose a workspace, `--analysis-id` to name the export,
+or `--output` / `--outdir` to override the destination entirely.
+
 ### Examples
 -----
 
@@ -29,42 +34,47 @@ Each folder contains <identifier>.geo and <identifier>.xyz.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--identifier, --iden` | No |  | Extract only this DESCRP identifier (repeatable; default: all) |  |
+| `--identifier, --iden` | No |  | Extract only this DESCRP identifier (repeatable; default: all). Example: --identifier AlN_eq, which extracts only the structure with that DESCRP identifier. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--geo` | No | geo | Multi-geometry GEO input file (default: geo) |  |
+| `--geo` | No | geo | Multi-geometry GEO input file (default: geo). Example: --geo geo, which reads the multi-structure geometry file. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output, --outdir` | No | force_field_opt_geo_files | Output root containing one folder per identifier |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output, --outdir` | No |  | Output root override (default: reaxkit_workspace/analysis/get_force_field_opt_geo_files/<run-id>/). Example: --output force_field_opt_geo_files, which writes generated artifacts under force_field_opt_geo_files. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--overwrite` | No | False | Replace GEO/XYZ files that already exist |  |
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--overwrite` | No | False | Replace GEO/XYZ files that already exist. Example: --overwrite, which replaces existing geometry and XYZ exports. |  |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

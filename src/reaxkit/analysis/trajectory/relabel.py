@@ -244,6 +244,7 @@ def _empty_force_field_parameters() -> ForceFieldParametersData:
 class TrajectoryRelabelByCoordinationTask(AnalysisTask):
     """Build a relabeled trajectory from coordination-status output."""
 
+    VERSION = "1"
     required_data = ConnectivityTrajectoryData
     from reaxkit.core.runtime.execution_contracts import TaskCapabilities, ExecutionShape
     execution_capabilities = TaskCapabilities(

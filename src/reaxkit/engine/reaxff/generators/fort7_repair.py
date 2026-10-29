@@ -19,6 +19,8 @@ from typing import Any, TextIO
 
 from tqdm.auto import tqdm
 
+VERSION = "1"
+
 _BONDS_RE = re.compile(r"#Bonds:\s*(\d+)")
 _ITERATION_RE = re.compile(r"Iteration:\s*(\d+)")
 _LEGACY_REPAIRED_ROW_RE = re.compile(r"^\d+ \d+ ")

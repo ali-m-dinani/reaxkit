@@ -84,6 +84,8 @@ class FFieldHandler(BaseHandler):
     - Section headers and ordering are detected automatically.
     """
 
+    VERSION = "1"
+
     SECTION_GENERAL = "general"
     SECTION_ATOM = "atom"
     SECTION_BOND = "bond"

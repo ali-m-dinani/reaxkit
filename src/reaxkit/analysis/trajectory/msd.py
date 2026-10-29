@@ -167,6 +167,7 @@ class MSDTask(AnalysisTask):
     as the joined label (for example ``"x,y,z"``).
     """
 
+    VERSION = "1"
     required_data = TrajectoryData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.GLOBAL, supports_selective_frames=True,

@@ -91,13 +91,29 @@ def test_analysis_outputs_species_and_average_tables():
     )
 
 
-def test_organized_csvs_suppress_duplicate_root_probe_tables(tmp_path: Path):
+def test_default_csv_export_skips_per_atom_tables(tmp_path: Path):
     request = PotentialElectricFieldRequest(
         lower_taper_radius=0.0, upper_taper_radius=10.0,
         gamma_by_symbol={"al": 1.2, "n": 1.5}, periodic=(False, False, False),
     )
     result = calculate_potential_and_field(_data(), request)
     paths = write_tables(result, tmp_path)
+    assert set(paths) == {"coulomb_totals"}
+    assert paths["coulomb_totals"].is_file()
+    assert set(_write_csvs(tmp_path, result)) == {"coulomb_totals.csv"}
+    assert not (tmp_path / "coulomb_per_atom.csv").exists()
+    assert not (tmp_path / "voltages_and_electric_fields").exists()
+    assert len(result.table) == 2
+    assert set(result.probe_tables) == {"Al", "N"}
+
+
+def test_organized_csvs_suppress_duplicate_root_probe_tables(tmp_path: Path):
+    request = PotentialElectricFieldRequest(
+        lower_taper_radius=0.0, upper_taper_radius=10.0,
+        gamma_by_symbol={"al": 1.2, "n": 1.5}, periodic=(False, False, False),
+    )
+    result = calculate_potential_and_field(_data(), request)
+    paths = write_tables(result, tmp_path, export_per_atom_csv=True)
     recorded = _write_csvs(tmp_path, result)
     assert paths["probe_Al"].is_file()
     assert paths["probe_N"].is_file()

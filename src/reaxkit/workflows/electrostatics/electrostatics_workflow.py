@@ -599,9 +599,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             choices=["hull", "bbox", "cell"],
             default=None,
             help=(
-                "Choose convex-hull, occupied bounding-box, or simulation-cell volume. "
-                "Polarization is normalized by this volume; dipole output reports it without changing the dipole. "
-                "Defaults for polarization: hull in total scope and bbox in local scope."
+                "Choose convex-hull, occupied bounding-box, or simulation-cell volume. Polarization is normalized by this volume; dipole output reports it without changing the dipole. Defaults for polarization: hull in total scope and bbox in local scope. Example: --volume-method cell, which uses the full simulation-cell volume."
             ),
         )
         parser.add_argument(
@@ -698,8 +696,7 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
             choices=["hull", "bbox", "cell"],
             default="hull",
             help=(
-                "Volume used to normalize polarization. 'bbox' excludes vacuum "
-                "outside the occupied coordinate extents; default: hull."
+                "Volume used to normalize polarization. 'bbox' excludes vacuum outside the occupied coordinate extents; default: hull. Example: --volume-method cell, which uses the full simulation-cell volume."
             ),
         )
         parser.add_argument(

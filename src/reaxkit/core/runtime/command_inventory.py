@@ -85,6 +85,7 @@ def _execution_note(cls, capabilities):
 
 
 def build_inventory():
+    from reaxkit.core.runtime.checkpoint_policy import AUDITED_TASKS
     import reaxkit.analysis  # noqa: F401
     from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
     from reaxkit.core.registry.command_catalog import get_registered_commands
@@ -124,6 +125,7 @@ def build_inventory():
             "capabilities": asdict(capabilities),
             "execution_note": _execution_note(cls, capabilities),
             "streaming": callable(getattr(cls, "run_stream", None)),
+            "result_checkpoint": cls.__name__ in AUDITED_TASKS,
             "blocked": callable(getattr(cls, "run_blocks", None)),
             "required_data": getattr(getattr(cls, "required_data", None), "__name__", None),
             "result_class": getattr(result_cls, "__name__", None),

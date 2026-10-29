@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 from reaxkit.presentation.workflow_artifacts import write_workflow_tables
+from reaxkit.analysis.ferroelectrics.hbn_reference.al_neighborhoods import neighborhood_mapping
+from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
+    write_aligned_reference_xyz,
+    write_oriented_reference_cif,
+)
 
 import argparse
 from pathlib import Path
@@ -13,7 +18,6 @@ import numpy as np
 from reaxkit.analysis.ferroelectrics.hbn_reference.local_polarization import (
     HBNReferenceLocalPolarizationRequest,
     HBNReferenceLocalPolarizationResult,
-    LocalChargeTreatment,
     LocalGrouping,
     LocalVolumeMethod,
     _table_for_trajectory_frame,
@@ -48,15 +52,34 @@ def _canonical_command(command: str) -> str:
 def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.ArgumentParser:
     canonical = _canonical_command(command)
     global_workflow.build_parser(parser, command=global_workflow.COMMAND)
-    parser.set_defaults(command=canonical, progress=True)
-    parser.description = """Calculate cell- and layer-resolved local dipole and polarization.
+    parser.set_defaults(command=canonical, progress=True, volume_method="bbox")
+    volume_option = parser._option_string_actions["--volume-method"]
+    volume_option.choices = ["bbox", "hull", "cell", "local-hull"]
+    volume_option.help = (
+        "Volume convention: bbox (default) or hull measures the slab; cell includes the full box. "
+        "local-hull uses a separate unnormalized hull around each Al and its three N images. "
+        "Example: --volume-method local-hull."
+    )
+    parser.description = """Calculate Al-centered local dipole and polarization.
 
-Each crystallographic cell is one Al2N2 reference cell. Each reference layer is
-one coplanar AlN pair, so both spatial resolutions are written on every run.
---local-grouping selects the table used by plots and the generic local output.
-Equal volume shares the selected frame volume among groups; deformation uses
-normalized local affine-deformation weights. With the default hull volume,
-vacuum is excluded before either assignment.
+Each Al uses three nearest coplanar N images in the fixed hBN reference.
+Partition weights share each N contribution among its Al neighborhoods, preserving
+the global dipole. --local-charge-method neutral-center instead keeps the Al charge
+and assigns -q_Al/3 to each neighbor contribution, enforcing local neutrality.
+Al-centered values are the default; cell output sums pairs of Al neighborhoods.
+The layer output is an alias for Al-centered output, not a disjoint AlN pair.
+Large local, cell, and layer CSVs require --export-local-csv.
+Equal volume shares the selected frame volume among Al centers; deformation uses
+normalized local affine-deformation weights. The default slab volume is bbox,
+measured after reference-based unwrapping. --volume-method local-hull instead
+uses each Al and its three N images as an independent tetrahedral hull.
+Coplanar neighborhoods have zero volume and undefined polarization.
+
+AlN_hbn_oriented.cif contains the selected small reference cell before replication.
+AlN_hbn_replicated_aligned.xyz contains the aligned reference supercell.
+The local Extended XYZ records local_neighborhood_id on Al centers (-1 on N)
+and one set of Al-centered local properties, even when cell CSVs are selected.
+Reference-cell bookkeeping remains in the separate reference mapping artifacts.
 
 Examples:
   reaxkit get-hbn-reference-local-polarization --replication 19 19 10 --periodic xy --charge-source reaxff --volume-method hull --write-extxyz
@@ -64,65 +87,70 @@ Examples:
   reaxkit get-hbn-reference-local-polarization --replication 19 19 10 --charge-source formal --formal-charge Al=3 N=-3 --local-volume-method deformation --plot-2d --plot-plane xz --plot-component c
 """
     parser.add_argument(
+        "--export-local-csv", action="store_true",
+        help="Write the large local, cell, and layer polarization CSVs (off by default). Example: --export-local-csv, adds all three detailed tables while summaries and requested Extended XYZ output are retained by default.",
+    )
+    parser.add_argument(
         "--local-grouping",
-        choices=["cell", "layer"],
-        default="cell",
+        choices=["al", "cell", "layer"],
+        default="al",
         help=(
-            "Use four-atom Al2N2 cells or two-atom AlN layers for plots and "
-            "the generic local table. Both explicit tables are always written. Default: cell."
+            "Select Al-centered values (default), sums over reference cells, or layer (alias for Al-centered values). Example: --local-grouping al."
         ),
     )
     parser.add_argument(
         "--local-volume-method",
-        choices=["equal", "deformation"],
+        choices=["equal", "deformation", "hull"],
         default="equal",
         help=(
-            "Choose equal shares of the selected frame volume (default), or "
-            "normalized local-deformation weights."
+            "Choose equal shares (default), normalized deformation weights, or independent neighborhood hull volumes. Example: --local-volume-method hull; equivalent to --volume-method local-hull."
         ),
     )
     parser.add_argument(
         "--deformation-neighbors",
         type=int,
         default=12,
-        help="Set the maximum neighboring reference cells used by local affine fits. Default: 12.",
+        help="Set the maximum neighboring reference cells used by local affine fits. Default: 12. Example: --deformation-neighbors 12, which uses at most twelve neighboring reference cells in each affine fit.",
     )
     parser.add_argument(
-        "--local-charge-treatment",
-        choices=["auto", "raw", "neutralize"],
-        default="auto",
+        "--local-charge-method",
+        choices=["partition", "neutral-center"],
+        default="partition",
         help=(
-            "Choose raw atomic charges, per-cell charge neutralization, or auto "
-            "neutralization only when a cell is charged. Default: auto."
+            "Partition actual atomic contributions to preserve the total (default), or keep each Al charge and compensate it equally on three N images. Example: --local-charge-method neutral-center."
         ),
+    )
+    parser.add_argument(
+        "--geometric-zero-tolerance", type=float, default=1.0e-6,
+        help="Zero threshold in angstrom for Al-minus-neighbor-mean displacement. Default: 1e-6. Example: --geometric-zero-tolerance 0.001.",
     )
     parser.add_argument(
         "--plot-2d",
         action="store_true",
-        help="Write per-frame 2D maps after aggregating along the omitted coordinate.",
+        help="Write per-frame 2D maps after aggregating along the omitted coordinate. Example: --plot-2d, which writes projected spatial heatmaps.",
     )
     parser.add_argument(
         "--plot-3d",
         action="store_true",
-        help="Write per-frame 3D cell-center scatter plots.",
+        help="Write per-frame 3D cell-center scatter plots. Example: --plot-3d, which writes three-dimensional center scatter plots.",
     )
     parser.add_argument(
         "--plot-plane",
         choices=["xy", "xz", "yz"],
         default="xy",
-        help="Choose the displayed plane for --plot-2d. Default: xy.",
+        help="Choose the displayed plane for --plot-2d. Default: xy. Example: --plot-plane xy, which displays x and y while aggregating along z.",
     )
     parser.add_argument(
         "--plot-component",
         choices=["x", "y", "z", "c"],
         default="c",
-        help="Choose the dipole or polarization component used as plot color. Default: c.",
+        help="Choose the dipole or polarization component used as plot color. Default: c. Example: --plot-component z, which colors plots by the z component.",
     )
     parser.add_argument(
         "--plot-quantity",
         choices=["polarization", "dipole"],
         default="polarization",
-        help="Plot local polarization (default) or local dipole.",
+        help="Plot local polarization (default) or local dipole. Example: --plot-quantity dipole, which colors plots by local dipole instead of polarization.",
     )
     parser.add_argument(
         "--plot-bins",
@@ -130,27 +158,27 @@ Examples:
         type=int,
         default=(40, 40),
         metavar=("NU", "NV"),
-        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40.",
+        help="Set the two in-plane bin counts for --plot-2d. Default: 40 40. Example: --plot-bins 40 40, which uses 40 bins along each displayed axis.",
     )
     parser.add_argument(
         "--global-scaling",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Use shared symmetric color limits across frames.",
+        help="Use shared symmetric color limits across frames. Example: --global-scaling, which uses shared symmetric color limits across frames.",
     )
     parser.add_argument(
-        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180."
+        "--figure-dpi", type=int, default=180, help="Set PNG resolution. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch."
     )
     parser.add_argument(
         "--write-extxyz",
         action="store_true",
-        help="Write an OVITO-compatible trajectory with local vector properties.",
+        help="Write an OVITO-compatible trajectory with local vector properties. Example: --write-extxyz, which exports local vector properties for OVITO.",
     )
     parser.add_argument(
         "--extxyz-precision",
         type=int,
         default=8,
-        help="Set significant digits in Extended XYZ output. Default: 8.",
+        help="Set significant digits in Extended XYZ output. Default: 8. Example: --extxyz-precision 8, which writes eight significant digits in Extended XYZ properties.",
     )
     return parser
 
@@ -162,9 +190,8 @@ def build_request(args: argparse.Namespace) -> HBNReferenceLocalPolarizationRequ
         **vars(base),
         local_volume_method=cast(LocalVolumeMethod, str(args.local_volume_method)),
         deformation_neighbors=int(args.deformation_neighbors),
-        local_charge_treatment=cast(
-            LocalChargeTreatment, str(args.local_charge_treatment)
-        ),
+        local_charge_method=str(args.local_charge_method),
+        geometric_zero_tolerance=float(args.geometric_zero_tolerance),
         local_grouping=cast(LocalGrouping, str(args.local_grouping)),
     )
 
@@ -217,7 +244,8 @@ def aggregate_local_values_2d(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Sum cell dipoles and volumes along the coordinate omitted from ``plane``."""
 
-    group = result.table[result.table["frame_index"].astype(int).eq(int(frame))]
+    from reaxkit.core.runtime.result_store import frame_table
+    group = frame_table(result.table, int(frame))
     coordinates = group[
         [f"center_{plane[0]} (angstrom)", f"center_{plane[1]} (angstrom)"]
     ].to_numpy(float)
@@ -274,36 +302,24 @@ def generate_local_2d_plots(
         dpi: int,
 ) -> list[Path]:
     plt, Normalize = _matplotlib()
-    all_coordinates = result.table[
-        [f"center_{plane[0]} (angstrom)", f"center_{plane[1]} (angstrom)"]
-    ].to_numpy(float)
+    from reaxkit.core.runtime.result_store import finite_extrema
+    lower, upper = finite_extrema(result.table, [f"center_{axis} (angstrom)" for axis in plane])
     shared_edges = (
-        _edges(all_coordinates[:, 0], bins[0]),
-        _edges(all_coordinates[:, 1], bins[1]),
+        _edges(np.array([lower[0], upper[0]]), bins[0]),
+        _edges(np.array([lower[1], upper[1]]), bins[1]),
     )
-    maps = {
-        source_frame: aggregate_local_values_2d(
-            result,
-            source_frame,
-            plane=plane,
-            component=component,
-            quantity=quantity,
-            bins=bins,
-            edges=shared_edges,
-        )[2]
-        for frame in result.frame_indices
-        for source_frame, _ in [_table_for_trajectory_frame(result, int(frame))]
-    }
-    shared_limits = (
-        _symmetric_limits(np.concatenate([values.ravel() for values in maps.values()]))
-        if maps
-        else (-1.0, 1.0)
-    )
+    def maps():
+        for frame in result.frame_indices:
+            source_frame, _ = _table_for_trajectory_frame(result, int(frame))
+            yield source_frame, aggregate_local_values_2d(result, source_frame, plane=plane,
+                component=component, quantity=quantity, bins=bins, edges=shared_edges)[2]
+    bound = max((_symmetric_limits(values)[1] for _, values in maps()), default=1.0) if global_scaling else 1.0
+    shared_limits = (-bound, bound)
     destination = Path(output) / "plots_2d" / f"{quantity}_{component}_{plane}"
     destination.mkdir(parents=True, exist_ok=True)
     units = "uC/cm^2" if quantity == "polarization" else "e*angstrom"
     written: list[Path] = []
-    for frame, values in maps.items():
+    for frame, values in maps():
         limits = shared_limits if global_scaling else _symmetric_limits(values)
         figure, axis = plt.subplots(figsize=(7.2, 5.8))
         image = axis.pcolormesh(
@@ -342,7 +358,9 @@ def generate_local_3d_plots(
         if quantity == "polarization"
         else f"dipole_{component} (e*angstrom)"
     )
-    shared_limits = _symmetric_limits(result.table[column].to_numpy(float))
+    from reaxkit.core.runtime.result_store import finite_extrema
+    lower, upper = finite_extrema(result.table, [column])
+    shared_limits = _symmetric_limits(np.concatenate((lower, upper)))
     destination = Path(output) / "plots_3d" / f"{quantity}_{component}"
     destination.mkdir(parents=True, exist_ok=True)
     units = "uC/cm^2" if quantity == "polarization" else "e*angstrom"
@@ -404,10 +422,21 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     detail_format = getattr(args, "detail_format", None) or ("csv" if args.output_profile == "legacy" else "parquet")
     displacement_path = output / f"hbn_reference_displacements.{detail_format}"
     mapping_path = output / "hbn_reference_mapping.csv"
-    tables = {local_path: result.table, summary_path: result.summary, cell_path: result.cell_table, cell_summary_path: result.cell_summary, layer_path: result.layer_table, layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    reference_path = output / "AlN_hbn_replicated_aligned.xyz"
+    reference_cif_path = output / "AlN_hbn_oriented.cif"
+    write_aligned_reference_xyz(result.reference_result, reference_path)
+    write_oriented_reference_cif(result.reference_result, reference_cif_path)
+    tables = {summary_path: result.summary, cell_summary_path: result.cell_summary,
+              layer_summary_path: result.layer_summary, mapping_path: result.reference_result.mapping}
+    neighbor_path = output / "hbn_reference_al_neighbors.csv"
+    tables[neighbor_path] = neighborhood_mapping(result.reference_result)
+    if args.export_local_csv:
+        tables.update({local_path: result.table, cell_path: result.cell_table, layer_path: result.layer_table})
     tables[displacement_path] = getattr(result.reference_result, "table_chunks", {}).get("hbn_reference_displacements", result.reference_result.displacements)
-    write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name),
-                          details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())
+    written = write_workflow_tables(tables, args=args, summary=(summary_path.name, cell_summary_path.name, layer_summary_path.name),
+                                   details=(displacement_path.name,), enabled_details=(displacement_path.name,) if args.write_displacements else ())
+    result.prewritten_csvs = tuple(path for path in written if path.suffix == ".csv")
+    result.skip_automatic_csv_persistence = True
     plots_2d = (
         generate_local_2d_plots(
             result,
@@ -445,17 +474,18 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     )
     args.suppress_table = True
     present_result(canonical, result, args)
-    print(
-        f"Wrote selected ({result.request.local_grouping}) h-BN-reference "
-        f"polarization to {local_path}"
-    )
+    if args.export_local_csv:
+        print(f"Wrote selected ({result.request.local_grouping}) h-BN-reference polarization to {local_path}")
+        print(f"Wrote crystallographic-cell polarization to {cell_path}")
+        print(f"Wrote layer-resolved polarization to {layer_path}")
     if getattr(args, "output_profile", "standard") != "minimal":
         print(f"Wrote local/global closure summary to {summary_path}")
-    print(f"Wrote crystallographic-cell polarization to {cell_path}")
-    print(f"Wrote layer-resolved polarization to {layer_path}")
     if args.write_displacements:
         print(f"Wrote per-atom source displacements to {displacement_path}")
     print(f"Wrote atom-to-cell mapping to {mapping_path}")
+    print(f"Wrote Al-N neighborhood membership and weights to {neighbor_path}")
+    print(f"Wrote replicated aligned reference to {reference_path}")
+    print(f"Wrote small oriented reference cell to {reference_cif_path}")
     if plots_2d:
         print(f"Wrote {len(plots_2d):,} projected plot(s) under {output / 'plots_2d'}")
     if plots_3d:

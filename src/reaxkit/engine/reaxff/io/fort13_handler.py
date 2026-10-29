@@ -52,6 +52,8 @@ class Fort13Handler(BaseHandler):
     - This handler represents a single-scalar-per-iteration data source.
     """
 
+    VERSION = "1"
+
     _CACHE_VERSION = "3"
 
     def __init__(self, file_path: str | Path = "fort.13", reporter=None):

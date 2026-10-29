@@ -10,11 +10,23 @@ def build_parser(parser, *, command: str):
     configure_parser(
         parser,
         command=command,
-        description="Get selected geometry-optimization progress components; omit --components to get all.",
+        description=(
+            "Get selected geometry-optimization progress components; omit --components to get all.\n"
+            "\n"
+            "Inspect convergence in existing fort.57 output; this does not run an optimization.\n"
+            "Omit --components to include all available progress quantities.\n"
+            "\n"
+            "Examples:\n"
+            "  1. All quantities:\n"
+            "     reaxkit get-geometry-optimization --fort57 runs/relaxation/fort.57 --export optimization.csv\n"
+            "\n"
+            "  2. Energy and gradient:\n"
+            "     reaxkit get-geometry-optimization --fort57 runs/relaxation/fort.57 --components E_pot RMSG --plot subplot"
+        ),
         inputs=("fort57",),
     )
-    parser.add_argument("--components", nargs="*", choices=list(COMPONENTS), default=None)
-    parser.add_argument("--include-geo-descriptor", action="store_true")
+    parser.add_argument("--components", nargs="*", choices=list(COMPONENTS), default=None, help="Optimization quantities to include; omit to include all. Example: --components E_pot RMSG, which extracts energy and gradient convergence.")
+    parser.add_argument("--include-geo-descriptor", action="store_true", help="Retain geometry descriptor annotations in the optimization table. Example: --include-geo-descriptor, which adds descriptors to exported results.")
     return parser
 
 

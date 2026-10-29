@@ -51,8 +51,30 @@ class WebUIApiService:
     def __init__(self) -> None:
         self.store = PipelineStore()
         self.runtime = PipelineRuntime(self.store)
+        from reaxkit.webui.backend.jobs import JobService
+        self.jobs = JobService(self.store)
+        from reaxkit.webui.backend.metrics import Metrics
+        self.metrics = Metrics()
+
+    def close(self):
+        self.jobs.close()
+        self.store.close()
+
+    def submit_node(self, pipeline_id, node_id):
+        self.store.get_node(pipeline_id, node_id)
+        return self.jobs.submit(pipeline_id, 'apply', {'node_id': node_id})
+
+    def query_table(self, pipeline_id, artifact_id, **query):
+        from reaxkit.webui.backend.artifact_tables import table_descriptor
+        artifact = self.store.get_artifact(pipeline_id, artifact_id)
+        descriptor = table_descriptor(artifact.payload)
+        if descriptor is None:
+            raise ValueError('Artifact has no queryable table')
+        with self.metrics.stage('table_query'):
+            return self.store.tables.query(descriptor, **query)
 
     def create_pipeline(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.jobs.collect()
         payload = payload or {}
         logger.debug("create_pipeline payload_keys=%s", _payload_keys(payload))
         out = self.runtime.create_pipeline(name=str(payload.get("name") or "Untitled Pipeline"))
@@ -61,7 +83,8 @@ class WebUIApiService:
 
     def get_pipeline(self, pipeline_id: str) -> dict[str, Any]:
         logger.debug("get_pipeline pipeline_id=%s", pipeline_id)
-        out = _snapshot_shallow(self.runtime.get_pipeline(pipeline_id))
+        with self.metrics.stage('metadata_snapshot'):
+            out = self.runtime.get_pipeline(pipeline_id)
         logger.debug("get_pipeline -> keys=%s", _payload_keys(out))
         return out
 
@@ -79,7 +102,9 @@ class WebUIApiService:
             engine=payload.get("engine"),
             sources=payload.get("sources") or {},
             project_root=str(payload.get("project_root") or "") or None,
+            probe=False,
         )
+        self.jobs.submit(pipeline_id, 'probe', {'node_id': out['id']})
         logger.debug("load_dataset -> keys=%s", _payload_keys(out))
         return out
 
@@ -135,6 +160,8 @@ class WebUIApiService:
     def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
         logger.debug("delete_node pipeline_id=%s node_id=%s", pipeline_id, node_id)
         out = self.runtime.delete_node(pipeline_id, node_id)
+        self.jobs.cancel_deleted(pipeline_id, out['deleted_node_ids'], out['deleted_artifact_ids'])
+        self.jobs.collect()
         logger.debug(
             "delete_node -> deleted_nodes=%s deleted_artifacts=%s",
             len(out.get("deleted_node_ids", [])),
@@ -176,7 +203,7 @@ class WebUIApiService:
         out_path = str(payload.get("path") or f"./{pipeline_id}.pipeline.json")
         logger.debug("export_pipeline pipeline_id=%s path=%s", pipeline_id, out_path)
         snapshot = self.store.snapshot(pipeline_id)
-        written = save_snapshot(snapshot, out_path)
+        written = save_snapshot(snapshot, out_path, tables=self.store.tables)
         logger.debug("export_pipeline -> path=%s", written)
         return {"path": written}
 
@@ -185,7 +212,7 @@ class WebUIApiService:
         if not path:
             raise ValueError("Snapshot path is required")
         logger.debug("load_pipeline_snapshot path=%s", path)
-        snapshot = load_snapshot(path)
+        snapshot = load_snapshot(path, tables=self.store.tables)
         pipeline = self.store.load_snapshot(snapshot)
         logger.debug("load_pipeline_snapshot -> nodes=%s", len(pipeline.nodes))
         return _snapshot_shallow(pipeline.to_dict())
@@ -215,12 +242,13 @@ class WebUIApiService:
             output_dir=out_dir,
             selected_node_id=str(selected_node_id) if selected_node_id else None,
             selected_artifact=selected_artifact,
+            tables=self.store.tables,
         )
         logger.debug("export_pipeline_bundle -> files=%s", sorted((out.get("files") or {}).keys()))
         return out
 
 
-def create_fastapi_app():
+def create_fastapi_app(service=None):
     """Create FastAPI app for the Web UI backend.
 
     Raises:
@@ -233,8 +261,25 @@ def create_fastapi_app():
             "FastAPI is not installed. Install it to run ReaxKit Web UI HTTP endpoints."
         ) from exc
 
-    service = WebUIApiService()
+    service = service or WebUIApiService()
     app = FastAPI(title="ReaxKit Web UI API", version="0.1.0")
+
+    @app.post('/api/pipelines/{pipeline_id}/nodes/{node_id}/jobs')
+    def submit_node(pipeline_id: str, node_id: str):
+        return service.submit_node(pipeline_id, node_id)
+
+    @app.get('/api/pipelines/{pipeline_id}/jobs/{job_id}')
+    def get_job(pipeline_id: str, job_id: str):
+        return service.jobs.get(pipeline_id, job_id)
+
+    @app.delete('/api/pipelines/{pipeline_id}/jobs/{job_id}')
+    def cancel_job(pipeline_id: str, job_id: str):
+        return service.jobs.cancel(pipeline_id, job_id)
+
+    @app.post('/api/pipelines/{pipeline_id}/artifacts/{artifact_id}/query')
+    def query_table(pipeline_id: str, artifact_id: str, payload: dict[str, Any]):
+        service.store.get_artifact(pipeline_id, artifact_id)
+        return service.jobs.submit(pipeline_id, 'query', {'artifact_id': artifact_id, 'query': payload})
 
     @app.post("/api/pipelines")
     def create_pipeline(payload: dict[str, Any] | None = None):

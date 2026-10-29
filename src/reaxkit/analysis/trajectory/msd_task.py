@@ -12,6 +12,7 @@ from reaxkit.domain.data_models import TrajectoryData
 class MSDTask(AnalysisTask):
     """Compute the former per-atom displacement relative to an origin frame."""
 
+    VERSION = "1"
     required_data = TrajectoryData
 
     def run(self, data: TrajectoryData, request: MSDRequest, reporter=None) -> MSDResult:

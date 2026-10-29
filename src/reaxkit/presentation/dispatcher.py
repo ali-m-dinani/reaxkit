@@ -103,7 +103,8 @@ def export_result_csv(result, path: str) -> None:
         all_frames = csv_tables.get("all_frames")
         if not hasattr(all_frames, "to_csv"):
             all_frames = result.table
-        all_frames.to_csv(out, index=False)
+        if not getattr(result, "csv_export_separate_only", False):
+            all_frames.to_csv(out, index=False)
         for name, table in csv_tables.items():
             if name == "all_frames" or not hasattr(table, "to_csv"):
                 continue
@@ -147,7 +148,18 @@ def print_result_table(result) -> None:
     ```
     The output type reflects the return contract for this API call.
     """
-    print(result.table.to_string(index=False))
+    from reaxkit.core.runtime.result_store import ResultTable
+    if isinstance(result.table, ResultTable):
+        remaining = 20
+        for table in result.table:
+            selected = table.head(remaining)
+            print(selected.to_string(index=False))
+            remaining -= len(selected)
+            if remaining <= 0:
+                break
+        print(f"Showing up to 20 of {len(result.table):,} saved rows.")
+    else:
+        print(result.table.to_string(index=False))
 
 
 def _print_output_dirs(paths: list[Path]) -> None:
@@ -259,7 +271,9 @@ def present_result(
         if plot_payload_builder is None:
             print("Plotting is not available for this command.")
         else:
-            payload = plot_payload_builder(command, result, args)
+            from reaxkit.core.runtime.checkpoint_results import materialize_for_global_presentation
+            plot_result = materialize_for_global_presentation(result)
+            payload = plot_payload_builder(command, plot_result, args)
             if payload is None:
                 print("No data available for plotting.")
             else:
@@ -278,11 +292,15 @@ def present_result(
                                 spec = cand
                                 break
                     if spec is not None:
-                        payload = spec_to_plot_payload(spec, result)
+                        payload = spec_to_plot_payload(spec, plot_result)
                         if payload is None:
                             print("No plot-compatible presentation available for this result.")
                             return
                 plot_payloads = list(payload) if payload_batch else [payload]
+                if getattr(args, "plot_style", None) is not None:
+                    plot_payloads = [
+                        {**item, "plot_style": args.plot_style} for item in plot_payloads
+                    ]
                 if save:
                     save_path = resolve_output_path(
                         save,
@@ -338,7 +356,8 @@ def present_result(
         if report_payload_builder is None:
             print("Report generation is not available for this command.")
         else:
-            payload = report_payload_builder(command, result, args, analysis_dir)
+            from reaxkit.core.runtime.checkpoint_results import materialize_for_global_presentation
+            payload = report_payload_builder(command, materialize_for_global_presentation(result), args, analysis_dir)
             if payload is None:
                 print("No data available for report generation.")
             else:

@@ -79,6 +79,12 @@ def register_analysis_callbacks(app: Any, service: WebUIApiService) -> None:
     register_properties_callbacks(app, service)
     register_visualization_callbacks(app, service)
     register_canvas_callbacks(app, service)
+    from reaxkit.webui.ui.analysis.callback_sections.job_callbacks import register_job_callbacks
+    register_job_callbacks(app, service)
+    from reaxkit.webui.ui.analysis.callback_sections.table_callbacks import register_table_callbacks
+    register_table_callbacks(app, service)
+    from reaxkit.webui.ui.analysis.callback_sections.plot_callbacks import register_plot_callbacks
+    register_plot_callbacks(app, service)
 
 
 __all__ = ["register_analysis_callbacks"]

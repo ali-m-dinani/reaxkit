@@ -11,10 +11,14 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
+from reaxkit.presentation.plot.renderers.base import as_dict
+from reaxkit.presentation.plot_styles import plot_render_context, styled_payload
+
 from reaxkit.presentation.plot.renderers.directed import DirectedPlotRenderer
 from reaxkit.presentation.plot.renderers.dual_yaxis import DualYaxisPlotRenderer
 from reaxkit.presentation.plot.renderers.errorbar import ErrorbarPlotRenderer
 from reaxkit.presentation.plot.renderers.heatmap2d import Heatmap2DRenderer
+from reaxkit.presentation.plot.renderers.kymograph import KymographRenderer
 from reaxkit.presentation.plot.renderers.grouped_bar import GroupedBarPlotRenderer
 from reaxkit.presentation.plot.renderers.multi_subplots import MultiSubplotsRenderer
 from reaxkit.presentation.plot.renderers.scatter3d import Scatter3DRenderer
@@ -27,6 +31,7 @@ from reaxkit.presentation.plot.renderers.wireframe3d import Wireframe3DRenderer
 from reaxkit.presentation.plot.renderers.wireframe3d_subplots import Wireframe3DSubplotsRenderer
 
 PLOT_REGISTRY = {
+    "kymograph": KymographRenderer(),
     "single_plot": SinglePlotRenderer(),
     "directed_plot": DirectedPlotRenderer(),
     "dual_yaxis_plot": DualYaxisPlotRenderer(),
@@ -67,7 +72,7 @@ def _plot_type_of(result: Any) -> str:
     return str(p)
 
 
-def plot(result: Any, style: Optional[Mapping[str, Any]] = None):
+def plot(result: Any, style: Optional[Mapping[str, Any] | str] = None):
     """
     Dispatch to renderer by ``result.plot_type``.
     
@@ -78,8 +83,9 @@ def plot(result: Any, style: Optional[Mapping[str, Any]] = None):
     -----
     result : Any
         Input parameter used by this function.
-    style : Optional[Mapping[str, Any]], optional
-        Input parameter used by this function.
+    style : str or Mapping[str, Any], optional
+        Named preset (default, publication, publication-bold), or explicit plot
+        options. A mapping can select a preset with its plot_style key.
     
     Returns
     -----
@@ -103,4 +109,11 @@ def plot(result: Any, style: Optional[Mapping[str, Any]] = None):
     renderer = PLOT_REGISTRY.get(ptype)
     if renderer is None:
         raise KeyError(f"Unknown plot_type '{ptype}'. Available: {sorted(PLOT_REGISTRY.keys())}")
-    return renderer.render(result, style)
+    payload = as_dict(result)
+    if isinstance(style, str):
+        payload["plot_style"] = style
+    elif style:
+        payload.update(style)
+    payload = styled_payload(payload)
+    with plot_render_context(payload):
+        return renderer.render(payload)

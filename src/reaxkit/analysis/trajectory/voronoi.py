@@ -671,6 +671,7 @@ class VoronoiScipyTask(AnalysisTask):
     SciPy Voronoi is non-periodic and can yield unbounded cells near boundaries.
     """
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
@@ -729,6 +730,7 @@ class VoronoiPyvoroTask(AnalysisTask):
     lengths are available and consistent with frame coordinates.
     """
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
@@ -784,6 +786,7 @@ class VoronoiGeometryScipyTask(AnalysisTask):
     structures to produce per-cell geometry records.
     """
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,
@@ -836,6 +839,7 @@ class VoronoiGeometryScipyTask(AnalysisTask):
 class VoronoiGeometryPyvoroTask(AnalysisTask):
     """Compute per-atom Voronoi geometry using pyvoro native cell outputs."""
 
+    VERSION = "1"
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=False,
         supports_selective_frames=True, estimated_frame_bytes=8 * 1024 * 1024,

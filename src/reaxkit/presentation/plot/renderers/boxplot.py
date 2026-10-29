@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import matplotlib.pyplot as plt
 
-from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged
+from reaxkit.presentation.plot.renderers.base import PlotRenderer, merged, save_or_show
 
 
 class BoxWhiskerPlotRenderer(PlotRenderer):
@@ -56,7 +56,6 @@ class BoxWhiskerPlotRenderer(PlotRenderer):
         title = cfg.get("title")
         xlabel = cfg.get("xlabel")
         ylabel = cfg.get("ylabel")
-        save = cfg.get("save")
         figsize = cfg.get("figsize", (8.0, 4.5))
         notch = bool(cfg.get("notch", False))
         showfliers = bool(cfg.get("showfliers", True))
@@ -90,20 +89,5 @@ class BoxWhiskerPlotRenderer(PlotRenderer):
             ax.grid(True, axis="y", alpha=0.3)
 
         fig.tight_layout()
-        if save:
-            from pathlib import Path
-
-            p = Path(save)
-            exts = {".png", ".jpg", ".jpeg", ".svg", ".pdf", ".tif", ".tiff", ".bmp"}
-            if p.suffix.lower() in exts:
-                p.parent.mkdir(parents=True, exist_ok=True)
-                out = p
-            else:
-                p.mkdir(parents=True, exist_ok=True)
-                out = p / f"{(title or 'box_whisker_plot').replace(' ', '_')}.png"
-            fig.savefig(out, dpi=300, bbox_inches="tight")
-            plt.close(fig)
-        else:
-            plt.show()
-        return fig
+        return save_or_show(fig, {"plot_type": "box_whisker_plot", **cfg})
 

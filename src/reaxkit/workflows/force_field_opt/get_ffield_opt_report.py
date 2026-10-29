@@ -77,49 +77,49 @@ def build_parser(
         "  2. Build a report from another run and choose the output directory:\n"
         "     reaxkit get-ffield-opt-report --run-dir run --output report\n"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=None, help="Input path used for engine detection")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=None, help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
     parser.add_argument(
         "--run-dir",
         "--dir",
         dest="run_dir",
         default=".",
-        help="Force-field optimization run directory",
+        help="Force-field optimization run directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery.",
     )
-    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99")
-    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74")
-    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
-    parser.add_argument("--geo", default="geo", help="Path to the geo file")
+    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file.")
+    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file.")
+    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
+    parser.add_argument("--geo", default="geo", help="Path to the geo file. Example: --geo geo, which reads the multi-structure geometry file.")
     parser.add_argument(
         "--entry-per-figure",
         type=_positive_int,
         default=6,
-        help="Maximum entries per grouped-bar figure (default: 6)",
+        help="Maximum entries per grouped-bar figure (default: 6). Example: --entry-per-figure 6, which places at most six comparison entries in each figure.",
     )
     parser.add_argument(
         "--min-points",
         type=_positive_int,
         default=6,
-        help="Minimum EOS points required for each bulk-modulus fit (default: 6)",
+        help="Minimum EOS points required for each bulk-modulus fit (default: 6). Example: --min-points 6, which requires six finite points per fitted structure group.",
     )
     parser.add_argument(
         "--flip-sign",
         action="store_true",
-        help="Flip energy signs during bulk-modulus fitting",
+        help="Flip energy signs during bulk-modulus fitting. Example: --flip-sign, which negates energies before plotting and export.",
     )
     parser.add_argument(
         "--no-shift-min-to-zero",
         action="store_true",
-        help="Do not shift minimum energy to zero during bulk-modulus fitting",
+        help="Do not shift minimum energy to zero during bulk-modulus fitting. Example: --no-shift-min-to-zero, which preserves the original energy offset during fitting.",
     )
     parser.add_argument(
         "--output",
         "--outdir",
         dest="output",
         default=None,
-        help="Optional report-directory override",
+        help="Optional report-directory override. Example: --output analysis/results, which writes generated artifacts under analysis/results.",
     )
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None)
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

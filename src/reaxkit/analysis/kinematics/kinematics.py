@@ -137,6 +137,7 @@ class AtomicKinematicsResult(BaseResult):
 class AtomicKinematicsTask(AnalysisTask):
     """Return metadata or a selected atomic-kinematics table from vels-style files."""
 
+    VERSION = "1"
     required_data = AtomicKinematicsData
 
     @staticmethod

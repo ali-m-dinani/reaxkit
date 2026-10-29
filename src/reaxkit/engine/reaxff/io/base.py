@@ -69,6 +69,8 @@ class BaseHandler(ABC):
     - Subclasses must implement the private ``_parse()`` method.
     """
 
+    VERSION = "1"
+
     _CACHE_ENV_VAR = "REAXKIT_HANDLER_CACHE_DIR"
     _CACHE_VERSION = "2"
     _MEMORY_CACHE: dict[str, bytes] = {}

@@ -70,6 +70,8 @@ class ControlHandler(BaseHandler):
     - Content before the first recognized section header is ignored.
     """
 
+    VERSION = "1"
+
     def __init__(self, file_path: str | Path = "control", reporter=None):
         """
         Initialize the instance.

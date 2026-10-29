@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 from types import SimpleNamespace
+from xml.etree import ElementTree as ET
+from zipfile import ZipFile
 
 import pandas as pd
+from PIL import Image
+import pytest
 import reaxkit.workflows.force_field_opt.get_ffield_opt_plots as plots_module
 
 from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
@@ -20,7 +25,11 @@ from reaxkit.workflows.force_field_opt.get_ffield_opt_plots import (
     _not_plotted_entries,
     build_parser,
 )
-from reaxkit.workflows.file_tools.ffield_workflow import EOS_SINGLE_FIGSIZE
+from reaxkit.workflows.file_tools.ffield_workflow import (
+    EOS_SINGLE_FIGSIZE,
+    _eos_plot_groups,
+    _plot_payload,
+)
 from reaxkit.workflows.force_field_opt.heatfo import (
     _plot_identifier,
     heatfo_plot_payloads,
@@ -45,6 +54,9 @@ def test_build_parser_documents_examples_and_defaults_to_workspace() -> None:
     assert parser.parse_args([]).geo == "geo"
     assert parser.parse_args([]).progress is True
     assert parser.parse_args([]).flip_sign_for_eos is False
+    assert parser.parse_args([]).make_powerpoint is False
+    assert parser.parse_args(["--make-powerpoint"]).make_powerpoint is True
+    assert parser.parse_args(["--make-ppt"]).make_powerpoint is True
     assert parser.parse_args(["--entry-per-figure", "3"]).entry_per_figure == 3
     assert parser.parse_args(["--flip-sign-for-eos"]).flip_sign_for_eos is True
 
@@ -94,9 +106,36 @@ def test_eos_group_renderer_uses_word_table_friendly_dimensions(
     assert rendered_payloads[0]["figsize"] == EOS_SINGLE_FIGSIZE == (6.0, 5.0)
 
 
-def test_aggregate_workflow_skips_empty_eos_and_finishes(
-    monkeypatch, tmp_path, capsys
-) -> None:
+def test_aggregate_eos_matches_dedicated_plot_specifications(monkeypatch, tmp_path):
+    table = pd.DataFrame(
+        {
+            "base_iden": ["bulk_0_mgo", "bulk_0_mgo"],
+            "other_iden": ["bulk_0.9_mgo", "bulk_1.0_mgo"],
+            "V_other_iden": [9.0, 10.0],
+            "E_other_iden": [-4.1, -5.1],
+            "ffield_value": [-4.0, -5.0],
+            "qm_value": [-4.1, -5.1],
+        }
+    )
+    dedicated = _plot_payload(
+        "get_ffield_opt_eos",
+        SimpleNamespace(table=table),
+        argparse.Namespace(plot="single"),
+    )
+    rendered = []
+    monkeypatch.setattr(plots_module, "render_plot", rendered.append)
+
+    paths = _render_groups(_eos_plot_groups(table), tmp_path, curve_type="eos")
+
+    assert len(rendered) == len(dedicated) == 1
+    expected = dict(dedicated[0])
+    expected_path = tmp_path / expected.pop("subdirectory") / expected.pop("filename")
+    assert paths == [expected_path]
+    assert rendered == [{**expected, "save": expected_path}]
+
+
+@pytest.fixture
+def stub_plot_workflow(monkeypatch):
     empty = pd.DataFrame()
     empty_result = lambda: SimpleNamespace(table=empty.copy())
     fake_task = lambda: SimpleNamespace(run=lambda *_args, **_kwargs: empty_result())
@@ -157,6 +196,7 @@ def test_aggregate_workflow_skips_empty_eos_and_finishes(
     ):
         monkeypatch.setattr(plots_module, name, lambda *_args, **_kwargs: [])
 
+def test_aggregate_workflow_skips_empty_eos_and_finishes(stub_plot_workflow, tmp_path, capsys):
     result = plots_module.run_main(
         "get_ffield_opt_plots",
         argparse.Namespace(
@@ -169,9 +209,102 @@ def test_aggregate_workflow_skips_empty_eos_and_finishes(
     output = capsys.readouterr().out
     summary_path = tmp_path / "plots" / "plot_summary.txt"
     assert result == 0
-    assert "[Skipped] EOS: no plottable expressions" in output
-    assert "[Done] Restraints: 0 images" in output
+    assert "EOS:" not in output
+    assert "Restraints:" not in output
+    assert "Not plotted:" not in output
+    assert not list(summary_path.parent.glob("*_plots"))
+    assert not (summary_path.parent / "not_plotted_entries.csv").exists()
+    assert 'reaxkit plot-from-excel --input "' in output
+    assert "For more information, run: reaxkit plot-from-excel -h" in output
     assert summary_path.read_text(encoding="utf-8") == output
+
+
+@pytest.mark.parametrize("workspace", [False, True])
+@pytest.mark.parametrize("with_figures", [False, True])
+def test_powerpoint_export_uses_current_figures_and_records_artifact(
+    stub_plot_workflow, monkeypatch, tmp_path, capsys, workspace, with_figures,
+):
+    root = tmp_path / "plots"
+    root.mkdir()
+
+    def persist(*args, **kwargs):
+        (root / "settings.json").write_text(json.dumps({"artifacts": {}}))
+        return root
+
+    monkeypatch.setattr(plots_module, "persist_analysis_result", persist)
+
+    def image(path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (60, 40), "white").save(path)
+        return path
+
+    image(root / "eos_plots" / "stale.png")
+    if with_figures:
+        def render_groups(groups, directory, *, curve_type):
+            if curve_type == "eos":
+                return [image(directory / "material" / "eos_current.png")]
+            if curve_type == "angle":
+                return [image(directory / "angle_current.png")]
+            return []
+
+        def render_bars(table, directory, **kwargs):
+            prefix = kwargs["filename_prefix"]
+            if prefix in {"energy_differences", "single_identifier_energies"}:
+                return [image(directory / f"{prefix}.png")]
+            return []
+
+        monkeypatch.setattr(plots_module, "_render_groups", render_groups)
+        monkeypatch.setattr(plots_module, "_render_energy_bars", render_bars)
+    assert plots_module.run_main("get_ffield_opt_plots", argparse.Namespace(
+        output=None if workspace else str(root), entry_per_figure=6,
+        flip_sign_for_eos=False, make_powerpoint=True,
+    )) == 0
+    output = capsys.readouterr().out
+    deck = root / "ffield_opt_plots.pptx"
+    assert deck.exists() is with_figures
+    if with_figures:
+        with ZipFile(deck) as archive:
+            assert len([name for name in archive.namelist() if name.startswith("ppt/media/")]) == 4
+            first_titles = []
+            for index in (2, 4, 6):
+                slide = ET.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
+                first_titles.append(slide.find(".//{http://schemas.openxmlformats.org/drawingml/2006/main}t").text)
+            assert first_titles == ["Equation of state", "Angle scans", "Other energy bars"]
+            summary = ET.fromstring(archive.read("ppt/slides/slide1.xml"))
+            namespaces = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+            rows = summary.findall(".//a:tbl/a:tr", namespaces)[1:]
+            counts = {row.find(".//a:t", namespaces).text:
+                      int(row.findall(".//a:t", namespaces)[1].text) for row in rows}
+            assert len(counts) == 13
+            assert sum(counts.values()) == 4
+            assert counts["Energy differences"] == counts["Single-identifier energies"] == 1
+            assert counts["Charges"] == 0
+            assert "[Warning] Not plotted:" not in output
+        assert "[Done] PowerPoint:" in output
+    else:
+        assert "[Skipped] PowerPoint: no figures were generated" in output
+    if workspace:
+        settings = json.loads((root / "settings.json").read_text())
+        assert settings["artifacts"]["presentations"] == ([deck.name] if with_figures else [])
+        assert settings["artifacts"]["csv"] == (
+            ["eos_plots/eos.csv", "angle_plots/angles.csv",
+             "other_bar_plots/energy_differences.csv",
+             "other_bar_plots/single_identifier_energies.csv"]
+            if with_figures else []
+        )
+
+
+def test_nonempty_unplotted_audit_is_written_and_reported(
+    stub_plot_workflow, monkeypatch, tmp_path, capsys,
+):
+    table = pd.DataFrame({"report_line_number": [12], "reason": ["unassigned"]})
+    monkeypatch.setattr(plots_module, "_not_plotted_entries", lambda *_args: table)
+    assert plots_module.run_main("get_ffield_opt_plots", argparse.Namespace(
+        output=str(tmp_path), entry_per_figure=6, flip_sign_for_eos=False,
+    )) == 0
+    pd.testing.assert_frame_equal(pd.read_csv(tmp_path / "not_plotted_entries.csv"), table)
+    assert "[Warning] Not plotted: 1 entries" in capsys.readouterr().out
+    assert not list(tmp_path.glob("*_plots"))
 
 
 def test_heatfo_payloads_limit_expressions_and_keep_series_colors() -> None:

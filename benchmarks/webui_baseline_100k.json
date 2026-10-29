@@ -1,0 +1,62 @@
+{
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10",
+    "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+    "logical_cpus": 22,
+    "ram_bytes": 33945935872,
+    "versions": {
+      "dash": "4.4.1",
+      "plotly": "6.9.0",
+      "pandas": "3.0.5",
+      "pyarrow": "25.0.1"
+    }
+  },
+  "fixture": {
+    "rows": 100000,
+    "columns": [
+      "step",
+      "value",
+      "atom_id"
+    ],
+    "seed": "deterministic-sine",
+    "repeats": 5,
+    "cache": "first sample cold; remaining warm"
+  },
+  "timings": {
+    "normalize_and_persist": {
+      "median_ms": 49.13409997243434,
+      "samples_ms": [
+        48.023900017142296,
+        49.13409997243434,
+        51.54659994877875,
+        49.249300034716725,
+        48.76100004184991
+      ]
+    },
+    "metadata_snapshot": {
+      "median_ms": 94.50590005144477,
+      "samples_ms": [
+        96.8450999353081,
+        94.50590005144477,
+        97.83419989980757,
+        93.76439999323338,
+        94.13109999150038
+      ]
+    },
+    "table_first_page": {
+      "median_ms": 0.12530002277344465,
+      "samples_ms": [
+        8.488300023600459,
+        0.15009997878223658,
+        0.12530002277344465,
+        0.11539994738996029,
+        0.11010002344846725
+      ]
+    }
+  },
+  "metadata_bytes": 626,
+  "page_bytes": 6293,
+  "process_rss_bytes": 185634816,
+  "scope": "Python GUI data path only; excludes browser, disk discovery, and scientific compute"
+}

@@ -11,34 +11,64 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Show the compatibility interface for retired fort.7 analysis tasks.
+
+The nested task parsers remain available, but their production analyzers have been retired.
+Use direct get-charge, get_connection_* and get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the legacy charge interface:
+     reaxkit fort7 get --help
+
+  2. Inspect the legacy edge interface:
+     reaxkit fort7 edges --help
+
+  3. Inspect legacy connectivity statistics:
+     reaxkit fort7 constats --help
+
+  4. Inspect legacy bond histories:
+     reaxkit fort7 bond-ts --help
+
+  5. Inspect the legacy event interface:
+     reaxkit fort7 bond-events --help
+```
+
 ### Arguments
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No | standard | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No | standard | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -47,54 +77,72 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Inspect the legacy fort7 interface for atomic-property extraction.
+
+This parser is retained for compatibility; its production analyzer has been retired.
+Use direct get-charge, get_connection_* or get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the retained options:
+     reaxkit fort7 get --help
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--yaxis` | Yes |  |  |  |
-| `--atom` | No |  |  |  |
-| `--frames` | No |  |  |  |
-| `--regex` | No | False |  |  |
+| `--yaxis` | Yes |  | Atomic property to extract from fort.7. Example: --yaxis charge, which extracts atomic charge as the plotted quantity. |  |
+| `--atom` | No |  | Atom identifier used to select an atomic series. Example: --atom 1, which selects atom 1. |  |
+| `--frames` | No |  | Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--regex` | No | False | Interpret the atomic-property selector as a regular expression. Example: --regex, which interprets the property selector as a regular expression. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | fort.7 |  |  |
-| `--control` | No | control |  |  |
+| `--file` | No | fort.7 | Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7. |  |
+| `--control` | No | control | Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--xaxis` | No | iter |  | iter, frame, time |
-| `--export` | No |  |  |  |
-| `--save` | No |  |  |  |
-| `--plot` | No | False |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--xaxis` | No | iter | Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position. | iter, frame, time |
+| `--export` | No |  | CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--save` | No |  | Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--plot` | No | False | Generate a plot of the extracted data. Example: --plot, which enables plotting of the extracted data. |  |
+| `--plot-style` | No |  | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No |  | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No |  | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No |  | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No |  | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No |  | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No |  | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -103,55 +151,73 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Inspect the legacy fort7 interface for bond-edge extraction.
+
+This parser is retained for compatibility; its production analyzer has been retired.
+Use direct get-charge, get_connection_* or get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the retained options:
+     reaxkit fort7 edges --help
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  |  |  |
-| `--min-bo` | No | 0.0 |  |  |
-| `--directed` | No | False |  |  |
-| `--aggregate` | No | max |  | max, mean |
-| `--include-self` | No | False |  |  |
+| `--frames` | No |  | Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--min-bo` | No | 0.0 | Minimum bond order to retain. Example: --min-bo 0.3, which excludes bonds below order 0.3. |  |
+| `--directed` | No | False | Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction. |  |
+| `--aggregate` | No | max | Reduction applied to repeated bond entries. Example: --aggregate mean, which averages repeated bond entries. | max, mean |
+| `--include-self` | No | False | Retain edges whose source and destination are the same atom. Example: --include-self, which retains self-pairs in bond data. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | fort.7 |  |  |
-| `--control` | No | control |  |  |
+| `--file` | No | fort.7 | Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7. |  |
+| `--control` | No | control | Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--xaxis` | No | frame |  | iter, frame, time |
-| `--export` | No |  |  |  |
-| `--save` | No |  |  |  |
-| `--plot` | No | False |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--xaxis` | No | frame | Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position. | iter, frame, time |
+| `--export` | No |  | CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--save` | No |  | Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--plot` | No | False | Generate a plot of the extracted data. Example: --plot, which enables plotting of the extracted data. |  |
+| `--plot-style` | No |  | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No |  | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No |  | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No |  | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No |  | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No |  | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No |  | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -160,51 +226,69 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Inspect the legacy fort7 interface for connectivity statistics.
+
+This parser is retained for compatibility; its production analyzer has been retired.
+Use direct get-charge, get_connection_* or get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the retained options:
+     reaxkit fort7 constats --help
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  |  |  |
-| `--min-bo` | No | 0.0 |  |  |
-| `--directed` | No | False |  |  |
-| `--how` | No | mean |  | mean, max, count |
+| `--frames` | No |  | Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--min-bo` | No | 0.0 | Minimum bond order to retain. Example: --min-bo 0.3, which excludes bonds below order 0.3. |  |
+| `--directed` | No | False | Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction. |  |
+| `--how` | No | mean | Reduction used to summarize connectivity. Example: --how mean, which averages bond values in the aggregate. | mean, max, count |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | fort.7 |  |  |
+| `--file` | No | fort.7 | Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--export` | No |  |  |  |
-| `--save` | No |  |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--export` | No |  | CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--save` | No |  | Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--plot-style` | No |  | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No |  | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No |  | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No |  | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No |  | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No |  | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No |  | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -213,56 +297,74 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Inspect the legacy fort7 interface for bond histories.
+
+This parser is retained for compatibility; its production analyzer has been retired.
+Use direct get-charge, get_connection_* or get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the retained options:
+     reaxkit fort7 bond-ts --help
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  |  |  |
-| `--directed` | No | False |  |  |
-| `--bo-threshold` | No | 0.0 |  |  |
-| `--src` | No |  |  |  |
-| `--dst` | No |  |  |  |
+| `--frames` | No |  | Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--directed` | No | False | Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction. |  |
+| `--bo-threshold` | No | 0.0 | Minimum bond order to include in the series. Example: --bo-threshold 0.4, which requires a bond order of at least 0.4 for retained connectivity. |  |
+| `--src` | No |  | Source atom identifier for bond selection. Example: --src 1, which restricts bonds to source atom 1. |  |
+| `--dst` | No |  | Destination atom identifier for bond selection. Example: --dst 2, which restricts bonds to destination atom 2. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | fort.7 |  |  |
-| `--control` | No | control |  |  |
+| `--file` | No | fort.7 | Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7. |  |
+| `--control` | No | control | Control file supplying timestep and output cadence. Example: --control runs/heating/control, which reads simulation cadence and timestep metadata. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--wide` | No | False |  |  |
-| `--xaxis` | No | iter |  | iter, frame, time |
-| `--export` | No |  |  |  |
-| `--save` | No |  |  |  |
-| `--plot` | No | False |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--wide` | No | False | Return one column per bond instead of a long table. Example: --wide, which places series in separate table columns. |  |
+| `--xaxis` | No | iter | Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position. | iter, frame, time |
+| `--export` | No |  | CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--save` | No |  | Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--plot` | No | False | Generate a plot of the extracted data. Example: --plot, which enables plotting of the extracted data. |  |
+| `--plot-style` | No |  | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No |  | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No |  | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No |  | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No |  | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No |  | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No |  | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>
@@ -271,58 +373,76 @@
 
 <div class="analysis-section-indent" markdown="1">
 
+Inspect the legacy fort7 interface for bond-event detection.
+
+This parser is retained for compatibility; its production analyzer has been retired.
+Use direct get-charge, get_connection_* or get_bond_events commands for analysis.
+
+### Examples
+-----
+
+```text
+  1. Inspect the retained options:
+     reaxkit fort7 bond-events --help
+```
+
 ### Arguments
 
 #### Scientific choices
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--frames` | No |  |  |  |
-| `--src` | No |  |  |  |
-| `--dst` | No |  |  |  |
-| `--threshold` | No | 0.35 |  |  |
-| `--hysteresis` | No | 0.05 |  |  |
-| `--smooth` | No | ma |  | ma, ema, none |
-| `--window` | No | 7 |  |  |
-| `--ema-alpha` | No |  |  |  |
-| `--min-run` | No | 3 |  |  |
-| `--directed` | No | False |  |  |
+| `--frames` | No |  | Zero-based source frames to include. Example: --frames 0:20:2, which includes source frames 0, 2, ..., 18. |  |
+| `--src` | No |  | Source atom identifier for bond selection. Example: --src 1, which restricts bonds to source atom 1. |  |
+| `--dst` | No |  | Destination atom identifier for bond selection. Example: --dst 2, which restricts bonds to destination atom 2. |  |
+| `--threshold` | No | 0.35 | Bond-order threshold for bond-state detection. Example: --threshold 0.35, which centers bond-state detection on bond order 0.35. |  |
+| `--hysteresis` | No | 0.05 | Bond-order margin around the state threshold. Example: --hysteresis 0.05, which uses a 0.05 bond-order hysteresis margin. |  |
+| `--smooth` | No | ma | Smoothing method applied before bond-event detection. Example: --smooth ma, which applies moving-average smoothing. | ma, ema, none |
+| `--window` | No | 7 | Number of samples in the moving-average window. Example: --window 7, which smooths over seven samples. |  |
+| `--ema-alpha` | No |  | New-sample weight for exponential moving-average smoothing. Example: --ema-alpha 0.2, which weights each new sample by 0.2 in exponential smoothing. |  |
+| `--min-run` | No | 3 | Minimum number of consecutive samples for an accepted state. Example: --min-run 3, which requires a state to persist for three samples. |  |
+| `--directed` | No | False | Keep directed atom pairs instead of merging opposite directions. Example: --directed, which keeps source-to-target bond direction. |  |
 
 #### Input and file selection
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--file` | No | fort.7 |  |  |
+| `--file` | No | fort.7 | Input fort.7 file containing charges and bond orders. Example: --file fort.7, which reads the structure or data from fort.7. |  |
 
 #### Outputs and plots
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--xaxis` | No | iter |  | iter, frame |
-| `--export` | No |  |  |  |
-| `--save` | No |  |  |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--xaxis` | No | iter | Horizontal axis for the extracted series. Example: --xaxis frame, which labels the series by trajectory-frame position. | iter, frame |
+| `--export` | No |  | CSV destination for extracted data. Example: --export analysis.csv, which writes the result table for further analysis. |  |
+| `--save` | No |  | Image destination for generated plots. Example: --save analysis.png, which writes the generated figure to that image. |  |
+| `--plot-style` | No |  | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No |  | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No |  | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No |  | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No |  | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-profile` | No |  | Artifact profile (default: standard). | standard, minimal, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No |  | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No |  | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
+| `--output-profile` | No |  | Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts. | standard, minimal, full, legacy |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 
 
 </div>

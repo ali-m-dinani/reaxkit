@@ -72,6 +72,7 @@ def _attach_time_to_frame(
     *,
     iter_to_time: dict[int, float] | None,
     control_file: str,
+    time_unit: str | None = None,
 ) -> pd.DataFrame:
     """
     Attach time to frame.
@@ -80,6 +81,10 @@ def _attach_time_to_frame(
         return frame
 
     out = frame.copy()
+    if time_unit == "ps":
+        if "time" in out and "time_unit" not in out:
+            out["time"] = pd.to_numeric(out["time"], errors="coerce") / 1000.0
+        out["time_unit"] = "ps"
     iter_values = pd.to_numeric(out["iter"], errors="coerce")
     if "time" in out.columns:
         time_values = pd.to_numeric(out["time"], errors="coerce").to_numpy(
@@ -94,14 +99,14 @@ def _attach_time_to_frame(
     if iter_to_time:
         iter_int = iter_values[valid_mask].astype(int).to_numpy()
         time_values[valid_mask.to_numpy()] = np.asarray(
-            [iter_to_time.get(int(value), np.nan) for value in iter_int],
+            [iter_to_time.get(int(value), np.nan) / (1000.0 if time_unit == "ps" else 1.0) for value in iter_int],
             dtype=float,
         )
         out["time"] = time_values
         return out
 
     try:
-        converted, _ = convert_xaxis(
+        converted, label = convert_xaxis(
             iter_values[valid_mask].astype(int).to_numpy(),
             "time",
             control_file=control_file,
@@ -109,7 +114,8 @@ def _attach_time_to_frame(
     except Exception:
         return out
 
-    time_values[valid_mask.to_numpy()] = np.asarray(converted, dtype=float)
+    scale = {"Time (fs)": 0.001, "Time (ps)": 1.0, "Time (ns)": 1000.0}.get(label, 1.0) if time_unit == "ps" else 1.0
+    time_values[valid_mask.to_numpy()] = np.asarray(converted, dtype=float) * scale
     out["time"] = time_values
     return out
 
@@ -117,6 +123,10 @@ def _attach_time_to_frame(
 def enrich_result_with_time(result: Any, data: Any, *, control_file: str = "control") -> Any:
     """
     Attach a ``time`` column to tabular result frames when ``iter`` exists.
+
+    Results declaring ``time_unit = "ps"`` normalize native femtoseconds and
+    automatically scaled control-file times to ps. Their tables carry a unit
+    marker so repeated enrichment preserves already converted values.
     
     This function is part of the ReaxKit core API and performs the operation
     described by its name and arguments.
@@ -150,14 +160,20 @@ def enrich_result_with_time(result: Any, data: Any, *, control_file: str = "cont
     The output type reflects the return contract for this API call.
     """
     iter_to_time = _iter_time_mapping_from_data(data)
+    time_unit = getattr(result, "time_unit", None)
 
     def _enrich_attr(obj: Any, attr: str) -> None:
         value = getattr(obj, attr, None)
+        from reaxkit.core.runtime.result_store import ResultTable
+        if isinstance(value, ResultTable):
+            setattr(obj, attr, value.map_batches(lambda frame: _attach_time_to_frame(
+                frame, iter_to_time=iter_to_time, control_file=control_file, time_unit=time_unit)))
+            return
         if isinstance(value, pd.DataFrame):
             setattr(
                 obj,
                 attr,
-                _attach_time_to_frame(value, iter_to_time=iter_to_time, control_file=control_file),
+                _attach_time_to_frame(value, iter_to_time=iter_to_time, control_file=control_file, time_unit=time_unit),
             )
 
     if is_dataclass(result):

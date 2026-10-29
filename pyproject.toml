@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reaxkit"
-version = "3.1.0"
+version = "3.2.0"
 description = "A toolkit for parsing, analyzing, and visualizing ReaxFF simulation data."
 authors = [
-    { name = "Ali Mohammadi Dinani" },
-    { email = "alimohammadi2265@gmail.com" },
+    { name = "Ali Mohammadi Dinani", email = "alimohammadi2265@gmail.com" },
     { name = "Adri van Duin", email = "acv13@psu.edu" },
     { name = "Yun Kyung Shin", email = "yks2@psu.edu" },
     { name = "Alireza Sepehrinezhad", email = "alireza.sepehri@psu.edu" },
@@ -48,15 +47,17 @@ Repository = "https://github.com/ali-m-dinani/reaxkit"
 Issues = "https://github.com/ali-m-dinani/reaxkit/issues"
 
 [project.optional-dependencies]
+profiling = ["yappi>=1.6,<2"]
 plot = [
     "seaborn",
     "plotly",
     "imageio[ffmpeg]",
 ]
 webui = [
-    "dash",
+    "dash>=3.1,<5",
     "dash_bootstrap_templates",
     "fastapi",
+    "duckdb>=1.1,<2",
 ]
 trajectory = [
     "MDAnalysis",
@@ -87,7 +88,7 @@ engines = [
     "plams",
 ]
 all = [
-    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines]",
+    "reaxkit[plot,webui,trajectory,materials,graph,ml,io,engines,profiling]",
 ]
 
 [project.scripts]
@@ -100,7 +101,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-reaxkit = ["**/*.yaml", "**/*.xlsx", "**/*.cif"]
+reaxkit = ["**/*.yaml", "**/*.xlsx", "**/*.cif", "webui/**/*.json", "webui/assets/*.js", "webui/assets/*.css", "webui/assets/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

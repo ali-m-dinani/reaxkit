@@ -27,15 +27,20 @@ def selected_frame_envelopes(frames, request):
     wanted = None if selection is None else set(list(selection)[::stride])
     iterator = iter(frames)
     position = 0
+    seen = set()
     try:
         for fallback, data in enumerate(iterator):
             source = source_frame_index(data, fallback)
             if wanted is not None and source not in wanted:
                 continue
+            if wanted is not None:
+                seen.add(source)
             take = wanted is not None or position % stride == 0
             position += 1
             if take:
                 yield FrameEnvelope(position - 1, source, data, estimate_payload_bytes(data))
+        if wanted is not None and wanted - seen:
+            raise ValueError(f"Requested frames not found: {sorted(wanted - seen)}")
     finally:
         close = getattr(iterator, "close", None)
         if close:
@@ -49,21 +54,34 @@ def map_frame_tables(task, frames, request, *, pipeline=None, reporter=None, sor
     and other trajectory fields remain bounded by the shared queue.
     """
     local_request = replace(request, frames=None, every=1)
+    store = getattr(request, "_result_store", None)
+    if store is not None and store.manifest["state"] in {"analysis_complete", "complete"}:
+        store.transition("analysis_complete")
+        return store.table("table")
     pipeline = pipeline or BoundedFramePipeline(resolve_execution_policy(task, request))
 
     tables = []
     empty = pd.DataFrame()
-    with closing(pipeline.map_ordered(selected_frame_envelopes(frames, request), lambda data: task.run(data, local_request).table)) as completed:
+    committed = store.committed_frames if store is not None else 0
+    envelopes = (item for position, item in enumerate(selected_frame_envelopes(frames, request)) if position >= committed)
+    with closing(pipeline.map_ordered(envelopes, lambda data: task.run(data, local_request).table)) as completed:
         for count, item in enumerate(completed, 1):
             table = item.value.copy()
             empty = table.iloc[:0]
             for column in ("frame_index", "frame_idx"):
                 if column in table:
                     table[column] = item.envelope.source_frame
-            if not table.empty:
+            if store is not None:
+                if not table.empty and sort_columns:
+                    table = table.sort_values(list(sort_columns), kind="stable").reset_index(drop=True)
+                store.append(committed + count - 1, item.envelope.source_frame, {"table": table})
+            elif not table.empty:
                 tables.append(table)
             if reporter:
                 reporter("stream", count, 0, "Processing selected frames")
+    if store is not None:
+        store.transition("analysis_complete")
+        return store.table("table")
     table = pd.concat(tables, ignore_index=True).infer_objects() if tables else empty
     if not table.empty and sort_columns:
         table = table.sort_values(list(sort_columns), kind="stable").reset_index(drop=True)

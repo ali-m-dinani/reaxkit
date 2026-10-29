@@ -294,7 +294,7 @@ def test_artifact_commit_failure_rolls_back_and_cleans_temporary_files(tmp_path,
     (tmp_path / "a.csv").write_text("previous\n")
     original = artifacts.os.replace
     def fail_second(source, destination):
-        if destination == tmp_path / "b.csv":
+        if destination == artifacts.io_path(tmp_path / "b.csv"):
             raise OSError("disk unavailable")
         return original(source, destination)
     monkeypatch.setattr(artifacts.os, "replace", fail_second)

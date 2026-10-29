@@ -119,6 +119,22 @@ def get_registered_analysis_commands() -> dict[str, AnalysisCommandSpec]:
     return dict(ANALYSIS_COMMAND_REGISTRY)
 
 
+for velocity_command in (
+    "get-hbn-domain-wall-fraction-velocity",
+    "get-hbn-domain-wall-crossing-velocity",
+    "get-hbn-domain-wall-tracking-velocity",
+):
+    register_analysis_command(
+        velocity_command,
+        module_path="reaxkit.workflows.ferroelectrics.hbn_reference.domain_wall_velocity_workflow",
+    )
+
+
+register_analysis_command(
+    "extract_frame",
+    module_path="reaxkit.workflows.trajectory_workflow",
+    aliases=("extract-frame", "extract_trajectory_frame"),
+)
 register_analysis_command(
     "get-dipole",
     module_path="reaxkit.workflows.electrostatics.electrostatics_workflow",
@@ -383,6 +399,11 @@ register_analysis_command(
 register_analysis_command(
     "get_ffield_opt_plots",
     module_path="reaxkit.workflows.force_field_opt.get_ffield_opt_plots",
+)
+register_analysis_command(
+    "plot-from-excel",
+    module_path="reaxkit.workflows.force_field_opt.plot_from_excel",
+    aliases=("plot_from_excel",),
 )
 register_analysis_command(
     "get_force_field_opt_geo_files",

@@ -1,11 +1,30 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from reaxkit.core.runtime.artifacts import ArtifactSpec, ArtifactWriter
+from reaxkit.core.platform.paths import io_path
+
+
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_long_relative_manifest_path(tmp_path, monkeypatch, overwrite):
+    monkeypatch.chdir(tmp_path)
+    output = Path("nested")
+    while len(str((tmp_path / output).absolute())) < 230:
+        output /= "long_directory"
+    manifest_name = "cell_parameters.csv.artifacts.json"
+    assert len(str((tmp_path / output / manifest_name).absolute())) >= 260
+    spec = ArtifactSpec("cell", "cell_parameters.csv", "core", True, "csv", True)
+    with ArtifactWriter(output, [spec], overwrite=overwrite, manifest_name=manifest_name) as writer:
+        writer.append("cell", [{"value": 3.9474}])
+
+    manifest = json.loads(io_path(output / manifest_name).read_text())
+    assert manifest["artifacts"][0]["status"] == "written"
+    assert pd.read_csv(io_path(output / spec.filename))["value"].tolist() == [3.9474]
 
 
 def test_csv_batches_are_published_atomically_with_manifest(tmp_path):

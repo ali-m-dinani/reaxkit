@@ -12,9 +12,198 @@ from reaxkit.domain.data_models import (
     ConnectivityData,
     ConnectivityTrajectoryData,
     ElectrostaticsData,
+    ElectricFieldData,
     TrajectoryData,
 )
 from reaxkit.engine.ams.adapter import AMSAdapter
+
+
+@pytest.mark.parametrize("width", [5, 8])
+def test_ams_reads_fort78_beside_kf(tmp_path, width):
+    source = tmp_path / "fort.78"
+    suffix = " 4" if width == 5 else " 1 2 3 4"
+    source.write_text(f"0 0 0 0.1{suffix}\n2000 0 0 -0.2{suffix}\n", encoding="utf-8")
+    field = AMSAdapter().load(ElectricFieldData, {"input": str(tmp_path / "reaxout.kf"), "progress": False})
+    np.testing.assert_allclose(field.applied_field_values, [[0, 0, 0.1], [0, 0, -0.2]])
+    assert field.sampled_field_iterations.tolist() == [0, 2000]
+    assert field.metadata["source_path"] == str(source.resolve())
+
+
+def test_ams_explicit_field_path_overrides_kf_sidecar(tmp_path):
+    source = tmp_path / "custom_field.dat"
+    source.write_text("0 0 0 0.25 0\n", encoding="utf-8")
+    args = {"input": str(tmp_path / "elsewhere" / "reaxout.kf"), "fort78": str(source)}
+    adapter = AMSAdapter()
+    assert adapter.load_electric_field(args).applied_field_values[0, 2] == 0.25
+    assert "custom_field.dat" in adapter.required_input_files(ElectrostaticsData, args)
+    with pytest.raises(FileNotFoundError, match="--fort78"):
+        adapter._optional_electric_field({**args, "fort78": str(tmp_path / "missing")})
+
+
+@pytest.mark.parametrize("contents", ["", "0 1 2\n", "0 0 0 nan 0\n"])
+def test_ams_rejects_invalid_field_sidecar(tmp_path, contents):
+    (tmp_path / "fort.78").write_text(contents, encoding="utf-8")
+    with pytest.raises(ValueError, match="Invalid applied"):
+        AMSAdapter().load_electric_field({"input": str(tmp_path / "reaxout.kf")})
+
+
+def test_ams_field_free_input_remains_supported(tmp_path):
+    args = {"input": str(tmp_path / "reaxout.kf")}
+    assert AMSAdapter()._optional_electric_field(args) is None
+    with pytest.raises(FileNotFoundError, match="--fort78"):
+        AMSAdapter().load_electric_field(args)
+
+
+def test_ams_stream_reuses_field_and_aligns_by_iteration(tmp_path, monkeypatch):
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.analysis import _external_field_at_iteration
+
+    (tmp_path / "fort.78").write_text("0 0 0 0.1 0\n1000 0 0 0.2 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    adapter = AMSAdapter()
+    monkeypatch.setattr(adapter, "load_kf", lambda args: _FakeStandaloneReaxoutKF())
+    timings = []
+    frames = list(adapter.stream(ElectrostaticsData, {
+        "input": str(tmp_path / "reaxout.kf"), "_frame_indices": [2, 0],
+        "progress": False, "_load_timing_callback": lambda **values: timings.append(values),
+    }))
+    assert len(timings) == 1
+    assert frames[0].electric_field is frames[1].electric_field
+    for frame, expected in zip(frames, [-0.3, 0.1]):
+        values = _external_field_at_iteration(frame.electric_field, int(frame.trajectory.iterations[0]),
+                                             int(frame.trajectory.source_frame_indices[0]))
+        assert values[2] == pytest.approx(expected)
+    with pytest.raises(ValueError, match="iteration 123"):
+        _external_field_at_iteration(frames[0].electric_field, 123, 0)
+
+
+def test_ams_eager_electrostatics_attaches_field(tmp_path, monkeypatch):
+    from reaxkit.domain.data_models import ChargeData
+
+    (tmp_path / "fort.78").write_text("0 0 0 0.4 0\n", encoding="utf-8")
+    adapter = AMSAdapter()
+    trajectory = TrajectoryData(positions=np.zeros((1, 1, 3)), elements=["Al"], atom_ids=[1])
+    charges = ChargeData(charges=np.ones((1, 1)))
+    monkeypatch.setattr(adapter, "load_trajectory", lambda *args, **kwargs: trajectory)
+    monkeypatch.setattr(adapter, "load_charges", lambda *args, **kwargs: charges)
+    result = adapter.load_electrostatics({"input": str(tmp_path / "reaxout.kf")})
+    assert result.electric_field.applied_field_values[0, 2] == 0.4
+
+
+def test_ams_charged_trajectory_with_field_through_executor(tmp_path, monkeypatch):
+    from reaxkit.analysis.ferroelectrics.charge_extxyz import ChargeExtendedXYZRequest, ChargeExtendedXYZTask
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    (tmp_path / "fort.78").write_text("0 0 0 0.1 0\n1000 0 0 0.2 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    output = tmp_path / "charged.xyz"
+    result = AnalysisExecutor().run(ChargeExtendedXYZTask(), ChargeExtendedXYZRequest(
+        frames=[0, 2], include_electric_field=True, _output_path=str(output),
+    ), {
+        "engine": "ams", "input": str(source), "fort78": "fort.78",
+        "project_root": str(tmp_path / "workspace"), "progress": False,
+        "cache": False, "checkpoint": False,
+    })
+    assert result.iterations.tolist() == [0, 2000]
+    assert output.is_file()
+    assert list((tmp_path / "workspace" / "data" / "raw").glob("*/fort.78"))
+
+
+@pytest.mark.parametrize("trajectory_output", [False, True])
+def test_ams_potential_field_workflow_execution(tmp_path, monkeypatch, trajectory_output):
+    import argparse
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.parameters import ReaxFFCoulombParameters
+    from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+    from reaxkit.workflows.electrostatics.potential_and_electric_field import (
+        potential_and_electric_field_workflow, trajectory_workflow,
+    )
+    from reaxkit.workflows.electrostatics.potential_and_electric_field.common import runtime_arguments
+
+    workflow = trajectory_workflow if trajectory_output else potential_and_electric_field_workflow
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    field_file = tmp_path / "fort.78"
+    field_file.write_text("0 0 0 0.1 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    parameters = ReaxFFCoulombParameters(0.0, 5.0, {"al": 1.0, "n": 1.0})
+    monkeypatch.setattr(ReaxFFCoulombParameters, "from_ffield", lambda path: parameters)
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    args = parser.parse_args([
+        "--engine", "ams", "--input", str(source), "--fort78", str(field_file),
+        "--frames", "0", "2", "--periodic", "none", "--project-root", str(tmp_path / "workspace"),
+    ])
+    request = workflow.build_request(args)
+    output = tmp_path / "potential.extxyz"
+    if trajectory_output:
+        request._output_path = str(output)
+    runtime = runtime_arguments(args)
+    runtime.update(checkpoint=False, progress=False)
+    result = AnalysisExecutor().run(TASK_REGISTRY[workflow.COMMAND](), request, runtime)
+    electrostatics = result.electrostatics_result if trajectory_output else result
+    table = electrostatics.table
+    fields = table.groupby("iter")["external_electric_field_z (V/angstrom)"].first()
+    assert fields.to_dict() == {0: 0.1, 2000: -0.3}
+    if trajectory_output:
+        assert output.is_file()
+
+
+@pytest.mark.parametrize("checkpoint", [False, True])
+def test_get_potential_writes_extxyz_once_and_resumes(tmp_path, monkeypatch, checkpoint):
+    import argparse
+    from reaxkit.analysis.electrostatics.potential_and_electric_field import analysis
+    from reaxkit.analysis.electrostatics.potential_and_electric_field.parameters import ReaxFFCoulombParameters
+    from reaxkit.presentation.workflow_artifacts import workflow_artifact_policy
+    from reaxkit.workflows.electrostatics.potential_and_electric_field import potential_and_electric_field_workflow as workflow
+
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    field_file = tmp_path / "fort.78"
+    field_file.write_text("0 0 0 0.1 0\n2000 0 0 -0.3 0\n", encoding="utf-8")
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: _FakeStandaloneReaxoutKF())
+    parameters = ReaxFFCoulombParameters(0.0, 5.0, {"al": 1.0, "n": 1.0})
+    monkeypatch.setattr(ReaxFFCoulombParameters, "from_ffield", lambda path: parameters)
+    calls = []
+    calculate = analysis.calculate_frame
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return calculate(*args, **kwargs)
+
+    monkeypatch.setattr(analysis, "calculate_frame", counted)
+    monkeypatch.setattr(workflow, "present_result", lambda *args, **kwargs: None)
+    parser = workflow.build_parser(argparse.ArgumentParser(), command=workflow.COMMAND)
+    output = tmp_path / "output"
+    args = parser.parse_args([
+        "--engine", "ams", "--input", str(source), "--fort78", str(field_file),
+        "--frames", "0", "2", "--periodic", "xy", "--write-extxyz",
+        "--bin-axes", "z", "--bins", "2", "--plot-kymograph",
+        "--project-root", str(tmp_path / "workspace"), "--output-dir", str(output),
+    ])
+    args.checkpoint = checkpoint
+    args.progress = False
+    with workflow_artifact_policy(args):
+        assert workflow.run_main(workflow.COMMAND, args) == 0
+    trajectory_path = output / "trajectory_with_local_electrostatics.extxyz"
+    original = trajectory_path.read_bytes()
+    assert len(calls) == 2
+    from ase.io import read
+    frames = read(trajectory_path, index=":")
+    assert len(frames) == 2
+    assert frames[0].pbc.tolist() == [True, True, False]
+    assert (output / "coulomb_totals.csv").is_file()
+    assert not (output / "coulomb_per_atom.csv").exists()
+    assert not (output / "voltages_and_electric_fields").exists()
+    assert list((output / "binned_data_and_plots" / "kymographs").glob("*.png"))
+    if checkpoint:
+        manifests = list((tmp_path / "workspace" / "analysis").glob("**/checkpoint/manifest.json"))
+        assert len(manifests) == 1
+        args.resume = str(manifests[0].parent)
+        trajectory_path.unlink()
+        with workflow_artifact_policy(args):
+            assert workflow.run_main(workflow.COMMAND, args) == 0
+        assert len(calls) == 2
+        assert trajectory_path.read_bytes() == original
 
 
 class _FakeKF:
@@ -259,6 +448,102 @@ def test_ams_adapter_streams_history_as_one_frame_payloads(monkeypatch):
     assert all(frame.positions.shape == (1, 2, 3) for frame in frames)
 
 
+@pytest.mark.parametrize("metadata_count", [None, 5])
+@pytest.mark.parametrize("selected", [None, list(range(10)), [2, 0, 4]])
+@pytest.mark.parametrize("data_type", [TrajectoryData, ElectrostaticsData])
+def test_ams_ignores_padded_trailing_steps(monkeypatch, metadata_count, selected, data_type):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read(section, variable):
+        if (section, variable) == ("General", "Step numbers"):
+            return np.array([0, 1000, 2000, -1, -1])
+        if variable == "nEntries" and metadata_count is not None:
+            return metadata_count
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read)
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+    assert adapter.quick_n_frames({}) == 3
+    frames = list(adapter.stream(data_type, {"_frame_indices": selected}))
+    trajectories = [frame.trajectory if data_type is ElectrostaticsData else frame for frame in frames]
+    expected = [0, 1, 2] if selected is None else [frame for frame in selected if frame < 3]
+    assert [frame.source_frame_indices.item() for frame in trajectories] == expected
+    assert not any("-1" in name for name in fake.history_reads)
+
+
+@pytest.mark.parametrize("steps, expected", [([-1, -1], 0), ([0, -1, 2000, -1], 3), ([0], 1)])
+def test_ams_frame_count_only_trims_trailing_padding(monkeypatch, steps, expected):
+    fake = _FakeStandaloneReaxoutKF()
+    fake.steps = np.array(steps)
+    assert AMSAdapter._history_frame_count_from_metadata(fake) == expected
+
+
+def test_ams_missing_coordinates_inside_valid_history_still_fail(monkeypatch):
+    adapter = AMSAdapter()
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read(section, variable):
+        if (section, variable) == ("History", "Coordinates 1000"):
+            raise KeyError(variable)
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read)
+    monkeypatch.setattr(adapter, "load_kf", lambda _args: fake)
+    with pytest.raises(RuntimeError, match="missing coordinates for source frame 1"):
+        list(adapter.stream(TrajectoryData, {}))
+
+
+@pytest.mark.parametrize("charge_source", ["formal", "reaxff"])
+@pytest.mark.parametrize("selected", [None, list(range(10)), [0, 2, 4, 6]])
+def test_ams_hbn_polarization_finishes_with_padded_history(monkeypatch, tmp_path, charge_source, selected):
+    from ase.io import read
+    from reaxkit.analysis.ferroelectrics.hbn_reference.polarization import (
+        HBNReferencePolarizationRequest, HBNReferencePolarizationTask, REFERENCE_STRUCTURE_PATH,
+    )
+    from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
+    from reaxkit.engine.common.generators.structure_transformers import orthogonalize_hexagonal_cell
+
+    reference = orthogonalize_hexagonal_cell(read(REFERENCE_STRUCTURE_PATH)).repeat((1, 1, 2))
+    fake = _FakeStandaloneReaxoutKF()
+    original_read = fake.read
+
+    def read_variable(section, variable):
+        if (section, variable) == ("General", "Step numbers"):
+            return np.array([0, 1000, 2000, -1, -1])
+        if (section, variable) == ("Molecule", "AtomSymbols"):
+            return " ".join(reference.get_chemical_symbols())
+        if section == "History":
+            for step in (0, 1000, 2000):
+                if variable == f"Coordinates {step}":
+                    return reference.positions.ravel()
+                if variable == f"Unit cell axes {step}":
+                    return reference.cell.array.ravel()
+                if variable == f"Atomic charges {step}":
+                    return [3.0 if symbol == "Al" else -3.0 for symbol in reference.get_chemical_symbols()]
+        return original_read(section, variable)
+
+    monkeypatch.setattr(fake, "read", read_variable)
+    monkeypatch.setattr(AMSAdapter, "load_kf", lambda self, args: fake)
+    source = tmp_path / "reaxout.kf"
+    source.touch()
+    request = HBNReferencePolarizationRequest(
+        reference_path=REFERENCE_STRUCTURE_PATH, replication=(1, 1, 2),
+        orthogonalize="always", charge_source=charge_source, frames=selected,
+        volume_method="cell",
+    )
+    result = AnalysisExecutor().run(HBNReferencePolarizationTask(), request, {
+        "engine": "ams", "input": str(source), "project_root": str(tmp_path / "workspace"),
+        "workers": 4, "progress": False, "cache": False, "output_profile": "minimal",
+    })
+    expected = [0, 1, 2] if selected is None else [frame for frame in selected if frame < 3]
+    assert result.table["frame_index"].tolist() == expected
+    assert request.frames == selected
+    np.testing.assert_allclose(result.table[["P_x (uC/cm^2)", "P_y (uC/cm^2)", "P_z (uC/cm^2)"]], 0, atol=1e-10)
+
+
 def test_ams_streams_selected_standalone_kf_electrostatics_without_section_load(monkeypatch):
     adapter = AMSAdapter()
     fake = _FakeStandaloneReaxoutKF()
@@ -444,7 +729,7 @@ def test_ams_required_input_files_prefers_explicit_kf_input_name():
     assert adapter.required_input_files(
         ElectrostaticsData,
         {"input": "reaxout.kf"},
-    ) == ("reaxout.kf",)
+    ) == ("reaxout.kf", "fort.78")
 
 
 def test_ams_adapter_loaders_export_artifacts():

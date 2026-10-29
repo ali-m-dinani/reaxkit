@@ -554,6 +554,7 @@ def _label_edge_atoms(
 class ActiveSiteStructuralTask(AnalysisTask):
     """Compute per-atom active-site structural descriptors on one frame."""
 
+    VERSION = "1"
     required_data = ConnectivityTrajectoryData
 
     def required_data_for(self, request: object, args: dict | None = None):

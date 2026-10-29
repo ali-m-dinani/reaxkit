@@ -22,30 +22,35 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Print the number of frames in trajectory data loaded by any supported engine.\n\n"
+        "Use this to check trajectory length before selecting frames for analysis.\n"
+        "Only the frame count is printed; no simulation is run.\n\n"
         "Examples:\n"
-        "  reaxkit get-frames-count --input runs/reaxff/xmolout\n"
-        "  reaxkit get-frames-count --engine lammps --input dump.lammpstrj\n"
-        "  reaxkit get-frames-count --engine ams --input reaxout.rkf"
+        "  1. ReaxFF trajectory:\n"
+        "     reaxkit get-frames-count --input runs/reaxff/xmolout\n"
+        "  2. LAMMPS trajectory:\n"
+        "     reaxkit get-frames-count --engine lammps --input dump.lammpstrj\n"
+        "  3. AMS trajectory:\n"
+        "     reaxkit get-frames-count --engine ams --input reaxout.rkf"
     )
     parser.add_argument(
         "trajectory",
         nargs="?",
         default=None,
-        help="Trajectory file or run directory used for engine detection.",
+        help="Trajectory file or run directory used for engine detection. Example: reaxkit get-frames-count runs/heating/xmolout, which prints that trajectory's frame count.",
     )
     parser.add_argument(
         "--input",
         "--file",
         dest="input",
         default=".",
-        help="Trajectory file or run directory (alternative to the positional path).",
+        help="Trajectory file or run directory, as an alternative to the positional path. Example: --input runs/heating/xmolout, which counts frames in that trajectory.",
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--run-dir", default=".", help="Run directory used for trajectory discovery.")
-    parser.add_argument("--xmolout", default=None, help="Explicit ReaxFF xmolout path.")
-    parser.add_argument("--dump", default=None, help="Explicit LAMMPS dump path.")
-    parser.add_argument("--rkf", default=None, help="Explicit AMS RKF/KF path.")
-    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Simulation engine used to load input data. Example: --engine reaxff, which selects ReaxFF readers instead of automatic detection.")
+    parser.add_argument("--run-dir", default=".", help="Fallback directory for input discovery. Example: --run-dir runs/heating, which searches that simulation directory.")
+    parser.add_argument("--xmolout", default=None, help="ReaxFF trajectory file to read. Example: --xmolout runs/heating/xmolout, which loads coordinates and frame metadata from that file.")
+    parser.add_argument("--dump", default=None, help="LAMMPS trajectory dump to read. Example: --dump runs/heating/dump.lammpstrj, which counts frames in that dump.")
+    parser.add_argument("--rkf", default=None, help="AMS RKF/KF trajectory to read. Example: --rkf runs/heating/reaxout.rkf, which counts frames in that results file.")
+    parser.add_argument("--log", choices=["verbose", "quiet"], default="quiet", help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
     add_storage_cli_arguments(parser)
     return parser
 

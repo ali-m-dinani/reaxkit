@@ -383,6 +383,7 @@ class LargestMoleculeCompositionResult(BaseResult):
 class DominantSpeciesTask(AnalysisTask):
     """Return the dominant molecular species per selected iteration."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
@@ -554,6 +555,7 @@ class DominantSpeciesTask(AnalysisTask):
 class LargestMoleculeByMassTask(AnalysisTask):
     """Return the heaviest individual molecular species per selected iteration."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
@@ -710,6 +712,7 @@ class LargestMoleculeByMassTask(AnalysisTask):
 class LargestMoleculeCompositionTask(AnalysisTask):
     """Return per-element composition of the heaviest molecule per selected iteration."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP, thread_safe=True, automatic_parallel=False,
@@ -863,6 +866,7 @@ class LargestMoleculeCompositionTask(AnalysisTask):
 class MoleculeLifetimeTask(AnalysisTask):
     """Compute active lifetimes and birth/death events for molecular species."""
 
+    VERSION = "1"
     required_data = MolecularAnalysisData
 
     supports_selective_streaming = True

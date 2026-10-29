@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 from reaxkit.core.resolve.command_alias_resolver import resolve_command_name
+from reaxkit.core.storage.storage_layout import (
+    ReaxkitStorageLayout,
+    add_storage_cli_arguments,
+    default_project_root,
+    generate_run_id,
+)
 
 ALL_COMMANDS = ("get_force_field_opt_geo_files",)
 ALL_LEGACY_COMMANDS = ("get-force-field-opt-geo-files",)
@@ -222,6 +228,7 @@ def build_parser(
     """Configure the ``get_force_field_opt_geo_files`` command parser."""
     canonical = _canonical_command(command)
     parser.set_defaults(command=canonical)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Split a force-field optimization GEO file into one folder per DESCRP identifier.\n"
         "Each folder contains <identifier>.geo and <identifier>.xyz.\n\n"
@@ -230,13 +237,13 @@ def build_parser(
         "  reaxkit get_force_field_opt_geo_files --geo geo --identifier bulk_e3_mp_2604\n"
         "  reaxkit get_force_field_opt_geo_files --geo geo --output extracted --overwrite"
     )
-    parser.add_argument("--geo", default="geo", help="Multi-geometry GEO input file (default: geo)")
+    parser.add_argument("--geo", default="geo", help="Multi-geometry GEO input file (default: geo). Example: --geo geo, which reads the multi-structure geometry file.")
     parser.add_argument(
         "--output",
         "--outdir",
         dest="output",
-        default="force_field_opt_geo_files",
-        help="Output root containing one folder per identifier",
+        default=None,
+        help="Output root override (default: reaxkit_workspace/analysis/get_force_field_opt_geo_files/<run-id>/). Example: --output force_field_opt_geo_files, which writes generated artifacts under force_field_opt_geo_files.",
     )
     parser.add_argument(
         "--identifier",
@@ -244,27 +251,34 @@ def build_parser(
         action="append",
         dest="identifiers",
         default=[],
-        help="Extract only this DESCRP identifier (repeatable; default: all)",
+        help="Extract only this DESCRP identifier (repeatable; default: all). Example: --identifier AlN_eq, which extracts only the structure with that DESCRP identifier.",
     )
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Replace GEO/XYZ files that already exist",
+        help="Replace GEO/XYZ files that already exist. Example: --overwrite, which replaces existing geometry and XYZ exports.",
     )
+    add_storage_cli_arguments(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run the geometry extraction command."""
-    _canonical_command(command)
+    canonical = _canonical_command(command)
+    if args.output is not None:
+        output = Path(args.output).expanduser()
+    else:
+        project_root = Path(getattr(args, "project_root", None) or default_project_root()).expanduser()
+        analysis_id = getattr(args, "analysis_id", None) or getattr(args, "run_id", None) or generate_run_id()
+        output = ReaxkitStorageLayout(project_root=project_root).analysis_root / canonical / analysis_id
     results = extract_force_field_opt_geometries(
         args.geo,
-        args.output,
+        output,
         identifiers=args.identifiers,
         overwrite=bool(args.overwrite),
     )
     print(f"[Done] Extracted {len(results)} geometries from {Path(args.geo)}")
-    print(f"Results saved in:\n  {Path(args.output)}")
+    print(f"Results saved in:\n  {output}")
     return 0
 
 

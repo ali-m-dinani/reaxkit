@@ -21,6 +21,15 @@ def run_analysis_task(task_name: str, request_payload: dict[str, Any], runtime_a
     from reaxkit.core.runtime.analysis_executor import AnalysisExecutor
     from reaxkit.core.registry.analysis_task_registry import TASK_REGISTRY
 
+    registration_error = None
+    if task_name not in TASK_REGISTRY:
+        # Spawned workers do not inherit the GUI catalog's import side effects.
+        # Internal task names (e.g. partial_energy_series) are not CLI routes.
+        try:
+            importlib.import_module("reaxkit.analysis")
+        except Exception as exc:
+            registration_error = exc
+
     if task_name not in TASK_REGISTRY:
         try:
             from reaxkit.core.registry.analysis_cli_routing_registry import get_registered_analysis_commands
@@ -29,10 +38,12 @@ def run_analysis_task(task_name: str, request_payload: dict[str, Any], runtime_a
             module_path = str(getattr(spec, "module_path", "")).strip() if spec is not None else ""
             if module_path:
                 importlib.import_module(module_path)
-        except Exception:
-            pass
+        except Exception as exc:
+            registration_error = exc
 
     if task_name not in TASK_REGISTRY:
+        if registration_error is not None:
+            raise RuntimeError(f"Could not register analysis task '{task_name}': {registration_error}") from registration_error
         raise KeyError(f"Unknown analysis task '{task_name}'. Available: {sorted(TASK_REGISTRY)}")
 
     task_cls = TASK_REGISTRY[task_name]

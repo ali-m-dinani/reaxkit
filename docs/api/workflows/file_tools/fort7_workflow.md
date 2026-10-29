@@ -34,7 +34,7 @@ failures, which happen in +9999-atom-simulations using Standalone ReaxFF, in tra
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `--file` | No | fort.7 | Input fort.7 file. Example: --file runs/job1/fort.7, which reads that file as repair source. |  |
-| `--xmolout` | No | xmolout | Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist). |  |
+| `--xmolout` | No | xmolout | Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist). Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file. |  |
 
 #### Outputs and plots
 
@@ -42,15 +42,16 @@ failures, which happen in +9999-atom-simulations using Standalone ReaxFF, in tra
 |---|---|---|---|---|
 | `--output` | No | fort7_fixed | Output repaired fort.7 file. Example: --output fort7_repaired, which writes repaired content using that output name. |  |
 | `--copy-to-dot` | No | False | Also copy generated output to current directory. Example: --copy-to-dot, which keeps a convenience copy where you run the command. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -62,14 +63,18 @@ failures, which happen in +9999-atom-simulations using Standalone ReaxFF, in tra
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
-| `--progress-every` | No | 5000 | Number of input lines between progress-bar updates (default: 5000). |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
+| `--progress-every` | No | 5000 | Number of input lines between progress-bar updates (default: 5000). Example: --progress-every 5000, which updates progress after each 5000 input lines. |  |
 
 
 </div>

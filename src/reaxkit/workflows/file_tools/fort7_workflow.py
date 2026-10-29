@@ -76,13 +76,13 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.add_argument(
         "--xmolout",
         default="xmolout",
-        help="Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist).",
+        help="Trajectory coordinates for resolving fused atom ids (default: ./xmolout; the file must exist). Example: --xmolout runs/heating/xmolout, which reads trajectory coordinates from that file.",
     )
     parser.add_argument(
         "--progress-every",
         type=int,
         default=5000,
-        help="Number of input lines between progress-bar updates (default: 5000).",
+        help="Number of input lines between progress-bar updates (default: 5000). Example: --progress-every 5000, which updates progress after each 5000 input lines.",
     )
     parser.add_argument(
         "--copy-to-dot",

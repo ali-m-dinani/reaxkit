@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from typing import Callable, Sequence
@@ -31,8 +32,8 @@ from reaxkit.core.storage.storage_layout import add_storage_cli_arguments
 from reaxkit.presentation.dispatcher import present_result
 from reaxkit.presentation.convert import convert_xaxis
 
-ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi")
-COMMAND_ALIASES = {"get_voronoi": ("voronoi",)}
+ALL_COMMANDS = ("get_dihedral", "get_diffusivity", "get_msd", "get_rdf", "get_rdf_property", "get_voronoi", "extract_frame")
+COMMAND_ALIASES = {"get_voronoi": ("voronoi",), "extract_frame": ("extract_trajectory_frame",)}
 ALL_LEGACY_COMMANDS = (
     "dihedral",
     "diffusivity",
@@ -58,9 +59,10 @@ def _add_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     add_storage_cli_arguments(parser)
 
 
-def _add_presentation_arguments(parser: argparse.ArgumentParser) -> None:
+def _add_presentation_arguments(parser: argparse.ArgumentParser, command: str = "") -> None:
     """Add presentation arguments."""
-    parser.add_argument("--plot", choices=["single", "subplot"], default=None, help="Render a plot. Example: --plot single, which creates one combined figure.")
+    plot_choices = ["single", "subplot", "kymograph", "separate"] if command == "get_rdf" else ["single", "subplot"]
+    parser.add_argument("--plot", choices=plot_choices, default=None, help="Render a plot. RDF supports a kymograph or separate figures per frame (save to a directory).")
     parser.add_argument("--show", action="store_true", help="Show the generated plot window. Example: --show, which opens the figure interactively.")
     parser.add_argument("--save", default=None, help="Save the generated plot to a file path. Example: --save msd.png, which writes the figure image to disk.")
     parser.add_argument("--export", default=None, help="Write the result table to CSV. Example: --export rdf.csv, which saves tabular analysis output.")
@@ -132,6 +134,7 @@ def _build_rdf_request(args: argparse.Namespace) -> RDFRequest:
         bins=args.bins,
         r_max=args.r_max,
         backend=args.backend,
+        plot_mode=getattr(args, "plot", None) if getattr(args, "plot", None) in {"kymograph", "separate"} else "single",
     )
 
 
@@ -179,8 +182,32 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
     parser.set_defaults(progress=True)
     parser.formatter_class = argparse.RawTextHelpFormatter
 
+    if canonical == "extract_frame":
+        parser.description = (
+            "Extract one complete ReaxFF, AMS, or LAMMPS frame as XYZ and ReaxFF GEO.\n"
+            "Frame indices are zero-based; last (or -1) selects the last complete frame,\n"
+            "ignoring an incomplete trailing frame from an interrupted simulation.\n"
+            "The selected cell supplies a, b, c, alpha, beta, gamma to xtob.\n"
+            "AMS/LAMMPS cells and coordinates are oriented together for ReaxFF GEO.\n"
+            "Outputs contain geometry only, not velocities or thermostat state.\n\n"
+            "Examples:\n"
+            "  reaxkit extract_frame --file runs/job1/xmolout --frame last --output restart\n"
+            "  reaxkit extract_frame --run-dir runs/job1 --frame 25 --output frame25\n"
+            "  reaxkit extract_trajectory_frame --engine ams --file ams.rkf --output restart\n"
+            "  reaxkit extract_frame --engine lammps --file dump.lammpstrj --type-map Al N --output restart"
+        )
+        parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default="reaxff", help="Source engine. Example: --engine ams, which reads KF/RKF History frames.")
+        parser.add_argument("--run-dir", "--dir", dest="run_dir", default=".", help="Run directory used when --file is omitted. Example: --run-dir runs/job1, which discovers the selected engine's trajectory there.")
+        parser.add_argument("--xmolout", "--file", dest="xmolout", default=None, help="Explicit trajectory path, relative to the current directory. Example: --file runs/job1/xmolout, which selects the source trajectory.")
+        parser.add_argument("--frame", default="last", help="Zero-based frame index, last, or -1 (default: last). Example: --frame 25, which selects the 26th frame.")
+        parser.add_argument("--output", default="frame", help="Output prefix; writes PREFIX.xyz and PREFIX.geo (default: frame). Example: --output restart, which writes restart.xyz and restart.geo.")
+        parser.add_argument("--type-map", nargs="+", default=None, help="LAMMPS elements for numeric types 1, 2, ... . Example: --type-map Al N, which maps type 1 to Al and type 2 to N.")
+        parser.add_argument("--cell", nargs=6, type=float, default=None, help="Cell for LAMMPS XYZ without lattice metadata: a b c alpha beta gamma in angstrom/degrees. Example: --cell 10 11 12 90 90 90, which supplies an orthogonal box.")
+        parser.add_argument("--units", choices=["metal", "real"], default="metal", help="LAMMPS source units (both use angstrom distances). Example: --units real, which reads a real-units dump.")
+        return parser
+
     _add_runtime_arguments(parser)
-    _add_presentation_arguments(parser)
+    _add_presentation_arguments(parser, canonical)
     _add_common_arguments(parser)
 
     if canonical == "get_dihedral":
@@ -256,8 +283,8 @@ def build_parser(parser: argparse.ArgumentParser, *, command: str) -> argparse.A
         parser.add_argument("--dims", nargs="*", default=("x", "y", "z"), help="Coordinate dimensions to include. Example: --dims x y z, which uses full 3D displacement.")
         parser.add_argument("--origin", default="first", help="Reference frame: 'first' or explicit index. Example: --origin first, which measures displacement from initial frame.")
         parser.add_argument("--d", type=float, default=3.0, help="Einstein dimensionality in MSD = 2*d*D*t. Example: --d 2, which applies 2D diffusivity relation.")
-        parser.add_argument("--max-lag", type=int, default=None)
-        parser.add_argument("--delta-t-ps", type=float, default=1.0)
+        parser.add_argument("--max-lag", type=int, default=None, help="Maximum frame lag used for the MSD-based diffusion estimate. Example: --max-lag 100, which limits the MSD curve to separations of 100 selected frames.")
+        parser.add_argument("--delta-t-ps", type=float, default=1.0, help="Time interval between consecutive samples in picoseconds. Example: --delta-t-ps 0.5, which uses a 0.5-ps interval between samples.")
         parser.add_argument(
             "--unwrap",
             action=argparse.BooleanOptionalAction,
@@ -811,7 +838,7 @@ def _voronoi_diagram_payload_3d(table: pd.DataFrame, args: argparse.Namespace) -
     }
 
 
-def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | None:
+def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, object] | list[dict[str, object]] | None:
     """Plot payload."""
     command = {
         "msd": "get_msd",
@@ -914,6 +941,19 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
         }
 
     if command == "get_rdf":
+        if getattr(args, "plot", None) == "kymograph":
+            from reaxkit.presentation.kymograph import kymograph_grid
+
+            axis = getattr(args, "xaxis", "frame")
+            x_col = "iter" if axis == "iter" else "frame_index"
+            if axis == "time":
+                raise ValueError("RDF kymographs support --xaxis frame or iter; physical time is not stored in the RDF table.")
+            coordinates, radii, values = kymograph_grid(table, x_col=x_col)
+            return {
+                "plot_type": "kymograph", "x": coordinates.tolist(), "y": radii.tolist(), "z": values.tolist(),
+                "xlabel": "Iteration" if axis == "iter" else "Frame index", "ylabel": "r (Å)",
+                "title": "RDF evolution", "colorbar_label": "g(r)", "vmin": 0.0,
+            }
         if "frame_index" not in table.columns or "iter" not in table.columns:
             return {
                 "plot_type": "single_plot",
@@ -936,6 +976,14 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
             }
             series.append(payload)
             subplots.append([payload])
+
+        if getattr(args, "plot", None) == "separate":
+            return [
+                {"plot_type": "single_plot", "x": item["x"], "y": item["y"],
+                 "xlabel": "r (Å)", "ylabel": "g(r)", "title": f"RDF — {item['label']}",
+                 "filename": f"rdf_frame_{int(frame_index):06d}.png", "legend": False}
+                for frame_index, item in zip(table["frame_index"].sort_values().unique(), series)
+            ]
 
         if getattr(args, "plot", None) == "subplot":
             return {
@@ -1071,6 +1119,28 @@ def _plot_payload(command: str, result, args: argparse.Namespace) -> dict[str, o
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Run a direct trajectory command."""
     canonical = resolve_command_name(command, task_names=ALL_COMMANDS, aliases=COMMAND_ALIASES)
+    if canonical == "extract_frame":
+        from reaxkit.engine.common.generators.trajectory_frame import extract_frame
+
+        if args.xmolout:
+            source = Path(args.xmolout)
+        elif args.engine == "ams":
+            from reaxkit.engine.ams.adapter import AMSAdapter
+
+            source = AMSAdapter._resolve_kf_path({"run_dir": args.run_dir})
+        elif args.engine == "lammps":
+            from reaxkit.engine.lammps.adapter import LAMMPSAdapter
+
+            source = LAMMPSAdapter()._resolve_dump_path({"run_dir": args.run_dir})
+        else:
+            source = Path(args.run_dir) / "xmolout"
+        xyz_path, geo_path = extract_frame(
+            source, engine=args.engine, frame=args.frame,
+            xyz_file=f"{args.output}.xyz", geo_file=f"{args.output}.geo",
+            type_map=args.type_map, cell=args.cell, units=args.units,
+        )
+        print(f"Wrote {xyz_path} and {geo_path}")
+        return 0
     task_key = canonical
     if canonical == "get_voronoi":
         backend = str(getattr(args, "backend", "scipy")).strip().lower()

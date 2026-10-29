@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+VERSION = "1"
+
 
 CHARGES_TEMPLATE = """
    REMARK 1: Charges file will be used when When a value of 5 is given for icharge keyword in the control-file

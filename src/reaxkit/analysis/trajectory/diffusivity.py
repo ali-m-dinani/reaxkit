@@ -172,6 +172,7 @@ class DiffusivityTask(AnalysisTask):
         MSD(t) = 2 * d * D * t
     """
 
+    VERSION = "1"
     required_data = TrajectoryData
     supports_selective_streaming = True
 

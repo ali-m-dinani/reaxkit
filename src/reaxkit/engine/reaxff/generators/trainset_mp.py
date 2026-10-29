@@ -16,6 +16,12 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 import os
 
+from ase import Atoms
+from ase.geometry import cellpar_to_cell
+from pymatgen.core import Structure
+from pymatgen.core.tensors import Tensor
+from pymatgen.analysis.elasticity.elastic import ElasticTensor
+
 from mp_api.client import MPRester
 
 from reaxkit.engine.common.io.geo_io import read_structure, write_structure
@@ -24,6 +30,8 @@ from reaxkit.engine.reaxff.generators.trainset_yaml import (
     _filesystem_safe_material_id,
     _write_trainset_settings_yaml,
 )
+
+VERSION = "1"
 
 
 BulkModulusMode = Literal["voigt", "reuss", "vrh"]
@@ -341,6 +349,18 @@ def _extract_tensor6(elastic_tensor_obj: Any):
     return None
 
 
+def _tensor_in_structure_frame(elastic_tensor_obj: Any, structure, original_structure=None):
+    """Map an explicitly oriented MP tensor into the structure's Cartesian frame."""
+    ieee = _mp_doc_field(elastic_tensor_obj, "ieee_format")
+    if ieee is not None:
+        rotation = Tensor.get_ieee_rotation(structure)
+        return ElasticTensor.from_voigt(ieee).rotate(rotation.T).voigt.tolist()
+    raw = _mp_doc_field(elastic_tensor_obj, "raw")
+    if raw is not None and original_structure is not None:
+        return ElasticTensor.from_voigt(raw).structure_transform(original_structure, structure).voigt_symmetrized.voigt.tolist()
+    raise ValueError("An IEEE elastic tensor, or a raw tensor with its original structure, is required for orientation-safe generation.")
+
+
 def _pick_bulk_modulus(bm: Any, mode: BulkModulusMode) -> Optional[float]:
     """Pick bulk modulus."""
     if bm is None:
@@ -397,47 +417,7 @@ def _convert_structure_setting(structure: Any, conversion: str):
     else:
         conventional = structure.to_conventional()
         converted = conventional.get_primitive_structure()
-    return _normalize_non_orthogonal_angle_to_gamma(converted)
-
-
-def _is_close_90(value: float, tol: float = 1e-6) -> bool:
-    """Is close 90."""
-    return abs(float(value) - 90.0) <= tol
-
-
-def _normalize_non_orthogonal_angle_to_gamma(structure: Any):
-    """Normalize non orthogonal angle to gamma."""
-    lat = structure.lattice
-    alpha = float(lat.alpha)
-    beta = float(lat.beta)
-    gamma = float(lat.gamma)
-
-    # If exactly one lattice angle is non-orthogonal, canonicalize axis order so that
-    # the non-90 angle appears as gamma (a,b), matching expected ReaxFF-style ordering.
-    non_orth = [not _is_close_90(alpha), not _is_close_90(beta), not _is_close_90(gamma)]
-    if sum(non_orth) != 1:
-        return structure
-    if non_orth[2]:
-        return structure
-
-    if non_orth[0]:
-        # alpha = angle(b,c) -> make it new gamma by (a', b', c') = (b, c, a)
-        perm = (1, 2, 0)
-    else:
-        # beta = angle(a,c) -> make it new gamma by (a', b', c') = (a, c, b)
-        perm = (0, 2, 1)
-
-    m = lat.matrix
-    new_matrix = [m[perm[0]], m[perm[1]], m[perm[2]]]
-    frac = structure.frac_coords
-    new_frac = [[f[perm[0]], f[perm[1]], f[perm[2]]] for f in frac]
-    return structure.__class__(
-        lattice=new_matrix,
-        species=structure.species,
-        coords=new_frac,
-        coords_are_cartesian=False,
-        site_properties=structure.site_properties,
-    )
+    return converted
 
 
 def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict[str, str]:
@@ -481,7 +461,7 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
         print("Retrieving ElasticityDoc documents")
         edocs = mpr.materials.elasticity.search(
             material_ids=[spec.mp_id],
-            fields=["material_id", "elastic_tensor", "bulk_modulus"],
+            fields=["material_id", "elastic_tensor", "bulk_modulus", "structure"],
         )
         if not edocs:
             print("[RetrievalResult] No elastic data found!")
@@ -490,13 +470,23 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
         tensor6 = _extract_tensor6(getattr(edoc, "elastic_tensor", None))
         if tensor6 is None:
             raise ValueError(f"{spec.mp_id}: elastic_tensor missing/unreadable.")
+        canonical_cell = cellpar_to_cell([lat.a, lat.b, lat.c, lat.alpha, lat.beta, lat.gamma])
+        canonical_structure = Structure(canonical_cell, structure.species, structure.frac_coords)
+        tensor6 = _tensor_in_structure_frame(
+            getattr(edoc, "elastic_tensor", None), canonical_structure, getattr(edoc, "structure", None)
+        )
         cij = _tensor6x6_to_cij_dict(tensor6)
         bulk_modulus = _pick_bulk_modulus(getattr(edoc, "bulk_modulus", None), spec.bulk_mode)
         if bulk_modulus is None:
             raise ValueError(f"{spec.mp_id}: bulk_modulus.{spec.bulk_mode} missing/unreadable.")
 
     structure.to(filename=str(cif_path), fmt="cif")
-    atoms = read_structure(cif_path, format="cif")
+    atoms = Atoms(
+        symbols=[str(site.specie) for site in canonical_structure],
+        scaled_positions=canonical_structure.frac_coords,
+        cell=canonical_cell,
+        pbc=True,
+    )
     write_structure(atoms, xyz_path, format="xyz", comment=spec.mp_id)
 
     relative_xyz = xyz_path.resolve().relative_to(out_yaml.resolve().parent).as_posix()
@@ -508,6 +498,8 @@ def _write_trainset_settings_from_mp(spec: MaterialsProjectTrainsetSpec) -> Dict
         formula_pretty=(str(formula_pretty) if formula_pretty is not None else None),
         crystal_system=crystal_system,
         cij_gpa=cij,
+        tensor_gpa=tensor6,
+        elastic_response="relaxed_ion",
         B0_gpa=bulk_modulus,
         elastic_cell=cell.as_dict(),
         bulk_cell=cell.as_dict(),

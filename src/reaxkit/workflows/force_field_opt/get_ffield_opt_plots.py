@@ -30,6 +30,9 @@ from reaxkit.core.storage.storage_layout import (
 from reaxkit.domain.data_models import ForceFieldOptimizationPlotBundleData
 from reaxkit.presentation.persist import persist_analysis_result
 from reaxkit.presentation.plot import plot as render_plot
+from reaxkit.presentation.plot_styles import add_plot_style_argument, plot_style_context
+from reaxkit.presentation.color_styles import add_color_style_argument, color_style_context
+from reaxkit.presentation.powerpoint import write_figure_presentation
 from reaxkit.workflows.force_field_opt.charge import (
     build_charge_table,
     charge_plot_payloads,
@@ -56,12 +59,10 @@ from reaxkit.workflows.force_field_opt.report_linkage import (
     build_report_trainset_links,
 )
 from reaxkit.workflows.file_tools.ffield_workflow import (
-    EOS_SINGLE_FIGSIZE,
     QM_PLOT_COLOR,
     REAXFF_PLOT_COLOR,
-    _eos_material_name,
-    _eos_plot_filename,
     _eos_plot_groups,
+    _eos_plot_payload,
     _prepare_eos_table,
 )
 
@@ -221,10 +222,11 @@ def _render_groups(
         identifier = str(group["identifier"])
         filename_identifier = str(group.get("filename_identifier", identifier))
         if curve_type == "eos":
-            filename = _eos_plot_filename(filename_identifier)
-            curve_dir = output_dir / _eos_material_name(identifier)
-            xlabel = str(group.get("xlabel", "Volume"))
-            title = f"EOS {identifier}"
+            payload = _eos_plot_payload(group)
+            path = output_dir / str(payload.pop("subdirectory")) / str(payload.pop("filename"))
+            render_plot({**payload, "save": path})
+            paths.append(path)
+            continue
         else:
             prefix = {
                 "bond": "bond",
@@ -254,7 +256,6 @@ def _render_groups(
                 "title": title,
                 "legend": True,
                 "save": path,
-                **({"figsize": EOS_SINGLE_FIGSIZE} if curve_type == "eos" else {}),
             }
         )
         paths.append(path)
@@ -423,6 +424,7 @@ def build_parser(
     if command not in ALL_COMMANDS:
         raise ValueError(f"Unsupported command: {command}")
     parser.set_defaults(progress=True)
+    parser.formatter_class = argparse.RawTextHelpFormatter
     parser.description = (
         "Classify optimization ENERGY expressions using fort.99, trainset comments, "
         "fort.74 volumes, and geo BOND/ANGLE restraints. Write separate EOS, bond, "
@@ -430,13 +432,12 @@ def build_parser(
         "single-identifier ENERGY, "
         "restraint, Charge, Geometry, Cell Parameters, and HeatFO "
         "collections. "
-        "Every collection "
+        "Only collections with figures are written and reported. Every generated collection "
         "contains a CSV with ReaxFF, QM/literature, group-comment, and inline-comment data. "
-        "The root not_plotted_entries.csv audits fort.99 entries not assigned to any "
+        "When unassigned entries exist, the root not_plotted_entries.csv audits fort.99 entries not assigned to any "
         "plotted data type.\n\n"
         "Examples:\n"
         "  1. Analyze fort.99, fort.74, trainset.in, and geo in the current directory and save under\n"
-        "     reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/:\n"
         "       reaxkit get_ffield_opt_plots\n\n"
         "  2. Save the complete classified plot collection to an explicit folder:\n"
         "       reaxkit get_ffield_opt_plots --output ffield_opt_plots\n\n"
@@ -446,36 +447,36 @@ def build_parser(
         "  4. Limit each grouped-bar figure to three entries (six paired bars):\n"
         "       reaxkit get_ffield_opt_plots --entry-per-figure 3\n\n"
         "  5. Flip the sign of EOS energies before exporting and plotting them:\n"
-        "       reaxkit get_ffield_opt_plots --flip-sign-for-eos"
+        "       reaxkit get_ffield_opt_plots --flip-sign-for-eos\n\n"
+        "  6. Assemble a PowerPoint with a title slide and figures for each category:\n"
+        "       reaxkit get_ffield_opt_plots --make-powerpoint --plot-style publication-bold"
     )
-    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None)
-    parser.add_argument("--input", default=".", help="Input path used for engine detection")
+    parser.add_argument("--engine", choices=["reaxff", "ams", "lammps"], default=None, help="Engine used to load simulation inputs. Example: --engine reaxff, which selects ReaxFF input readers.")
+    parser.add_argument("--input", default=".", help="Input path used for engine detection. Example: --input runs/heating, which detects the engine from that run.")
     parser.add_argument(
-        "--run-dir", "--dir", dest="run_dir", default=".", help="Optimization run directory"
+        "--run-dir", "--dir", dest="run_dir", default=".", help="Optimization run directory. Example: --run-dir runs/heating, which uses that directory for fallback discovery."
     )
-    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99")
-    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74")
-    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file")
+    parser.add_argument("--fort99", default="fort.99", help="Path to fort.99. Example: --fort99 runs/heating/fort.99, which reads training-set comparison data from that file.")
+    parser.add_argument("--fort74", default="fort.74", help="Path to fort.74. Example: --fort74 runs/heating/fort.74, which reads optimization data from that file.")
+    parser.add_argument("--trainset", default="trainset.in", help="Path to trainset file. Example: --trainset runs/heating/trainset.in, which reads training targets from that file.")
     parser.add_argument(
         "--geo",
         default="geo",
-        help="Path to the multi-structure geo file containing scan restraints",
+        help="Path to the multi-structure geo file containing scan restraints. Example: --geo geo, which reads the multi-structure geometry file.",
     )
     parser.add_argument(
         "--entry-per-figure",
         type=_positive_int,
         default=6,
         help=(
-            "Maximum entries per grouped-bar figure; every entry contributes "
-            "one ReaxFF and one QM/literature bar (default: 6)."
+            "Maximum entries per grouped-bar figure; every entry contributes one ReaxFF and one QM/literature bar (default: 6). Example: --entry-per-figure 6, which places at most six comparison entries in each figure."
         ),
     )
     parser.add_argument(
         "--flip-sign-for-eos",
         action="store_true",
         help=(
-            "Flip the sign of EOS energy values before exporting and plotting; "
-            "equivalent to get_ffield_opt_eos --flip-sign."
+            "Flip the sign of EOS energy values before exporting and plotting; equivalent to get_ffield_opt_eos --flip-sign. Example: --flip-sign-for-eos, which negates equation-of-state energies before export and plotting."
         ),
     )
     parser.add_argument(
@@ -485,17 +486,34 @@ def build_parser(
         dest="output",
         default=None,
         help=(
-            "Optional output-folder override. By default, save under "
-            "reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/."
+            "Optional output-folder override. By default, save under reaxkit_workspace/analysis/get_ffield_opt_plots/<run-id>/. Example: --output analysis/results, which writes generated artifacts under analysis/results."
         ),
     )
-    parser.add_argument("--log", choices=["verbose", "quiet"], default=None)
+    parser.add_argument("--log", choices=["verbose", "quiet"], default=None, help="Runtime logging verbosity. Example: --log verbose, which prints detailed execution messages.")
+    parser.add_argument(
+        "--make-powerpoint",
+        "--make-ppt",
+        action="store_true",
+        help=(
+            "Also write ffield_opt_plots.pptx in the results folder, with a category "
+            "title slide followed by one figure per slide. Empty categories are skipped. "
+            "Example: --make-powerpoint, which assembles this run's generated figures into a PowerPoint."
+        ),
+    )
     add_storage_cli_arguments(parser)
+    add_plot_style_argument(parser)
+    add_color_style_argument(parser)
     return parser
 
 
 def run_main(command: str, args: argparse.Namespace) -> int:
     """Generate EOS, geo-classified curve, restraint, and HeatFO collections."""
+    with plot_style_context(getattr(args, "plot_style", None)), color_style_context(getattr(args, "color_style", None)):
+        return _run_main(command, args)
+
+
+def _run_main(command: str, args: argparse.Namespace) -> int:
+    """Execute the plot collection within the selected presentation style."""
     if command not in ALL_COMMANDS:
         raise ValueError(f"Unsupported command: {command}")
 
@@ -505,7 +523,8 @@ def run_main(command: str, args: argparse.Namespace) -> int:
 
     reporter = resolve_reporter(vars(args))
     progress_stage = "ffield optimization plots"
-    progress_total = 19
+    wants_powerpoint = bool(getattr(args, "make_powerpoint", False))
+    progress_total = 7 if wants_powerpoint else 6
     reporter(progress_stage, 0, progress_total, "Loading optimization files")
     data = _load_plot_bundle(args, normalized=normalized)
     reporter(progress_stage, 1, progress_total, "Classifying training data")
@@ -587,21 +606,10 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     energy_curve_dir = root / "energy_curve_plots"
     other_bar_dir = root / "other_bar_plots"
     reaction_energy_dir = root / "reaction_energy_plots"
-    eos_dir.mkdir(parents=True, exist_ok=True)
-    restraint_dir.mkdir(parents=True, exist_ok=True)
-    heatfo_dir.mkdir(parents=True, exist_ok=True)
-    bond_dir.mkdir(parents=True, exist_ok=True)
-    angle_dir.mkdir(parents=True, exist_ok=True)
-    other_curve_dir.mkdir(parents=True, exist_ok=True)
-    charge_dir.mkdir(parents=True, exist_ok=True)
-    cell_parameter_dir.mkdir(parents=True, exist_ok=True)
-    geometry_target_dir.mkdir(parents=True, exist_ok=True)
-    energy_curve_dir.mkdir(parents=True, exist_ok=True)
-    other_bar_dir.mkdir(parents=True, exist_ok=True)
-    reaction_energy_dir.mkdir(parents=True, exist_ok=True)
+    root.mkdir(parents=True, exist_ok=True)
     figure_generator_template = _copy_figure_generator_template(root)
 
-    reporter(progress_stage, 4, progress_total, "Writing CSV collections")
+    reporter(progress_stage, 4, progress_total, "Rendering available plots")
     eos_csv = eos_dir / "eos.csv"
     restraint_csv = restraint_dir / "restraints.csv"
     heatfo_csv = heatfo_dir / "heatfo.csv"
@@ -616,80 +624,55 @@ def run_main(command: str, args: argparse.Namespace) -> int:
     single_energy_csv = other_bar_dir / "single_identifier_energies.csv"
     reaction_energy_csv = reaction_energy_dir / "reaction_energies.csv"
     not_plotted_csv = root / "not_plotted_entries.csv"
-    write_workflow_csv(eos_result.table, eos_csv, index=False)
-    write_workflow_csv(restraint_result.table, restraint_csv, index=False)
-    write_workflow_csv(heatfo_table, heatfo_csv, index=False)
-    write_workflow_csv(bond_table, bond_csv, index=False)
-    write_workflow_csv(angle_table, angle_csv, index=False)
-    write_workflow_csv(other_curve_table, other_curve_csv, index=False)
-    write_workflow_csv(charge_table, charge_csv, index=False)
-    write_workflow_csv(cell_parameter_table, cell_parameter_csv, index=False)
-    write_workflow_csv(geometry_target_table, geometry_target_csv, index=False)
-    write_workflow_csv(energy_curve_table, energy_curve_csv, index=False)
-    write_workflow_csv(energy_difference_table, energy_difference_csv, index=False)
-    write_workflow_csv(single_energy_table, single_energy_csv, index=False)
-    write_workflow_csv(reaction_energy_table, reaction_energy_csv, index=False)
-    write_workflow_csv(not_plotted_table, not_plotted_csv, index=False)
 
-    reporter(progress_stage, 5, progress_total, "Rendering EOS plots")
     eos_images = _render_groups(
         _eos_plot_groups(eos_result.table), eos_dir, curve_type="eos"
     )
-    reporter(progress_stage, 6, progress_total, "Rendering restraint plots")
     restraint_images = _render_groups(
         _restraint_plot_groups(restraint_result.table),
         restraint_dir,
         curve_type="restraint",
     )
-    reporter(progress_stage, 7, progress_total, "Rendering bond plots")
     bond_images = _render_groups(
         _scan_plot_groups(bond_table, curve_type="bond"),
         bond_dir,
         curve_type="bond",
     )
-    reporter(progress_stage, 8, progress_total, "Rendering angle plots")
     angle_images = _render_groups(
         _scan_plot_groups(angle_table, curve_type="angle"),
         angle_dir,
         curve_type="angle",
     )
-    reporter(progress_stage, 9, progress_total, "Rendering other curve plots")
     other_curve_images = _render_groups(
         _scan_plot_groups(other_curve_table, curve_type="other_curve"),
         other_curve_dir,
         curve_type="other_curve",
     )
-    reporter(progress_stage, 10, progress_total, "Rendering charge plots")
     charge_images = _render_charge(
         charge_table,
         charge_dir,
         entries_per_figure=int(args.entry_per_figure),
     )
-    reporter(progress_stage, 11, progress_total, "Rendering cell-parameter plots")
     cell_parameter_images = _render_cell_parameters(
         cell_parameter_table,
         cell_parameter_dir,
         entries_per_figure=int(args.entry_per_figure),
     )
-    reporter(progress_stage, 12, progress_total, "Rendering geometry plots")
     geometry_target_images = _render_geometry_targets(
         geometry_target_table,
         geometry_target_dir,
         entries_per_figure=int(args.entry_per_figure),
     )
-    reporter(progress_stage, 13, progress_total, "Rendering heat-of-formation plots")
     heatfo_images = _render_heatfo(
         heatfo_table,
         heatfo_dir,
         expressions_per_figure=int(args.entry_per_figure),
     )
-    reporter(progress_stage, 14, progress_total, "Rendering energy-curve plots")
     energy_curve_images = _render_groups(
         energy_curve_plot_groups(energy_curve_table),
         energy_curve_dir,
         curve_type="energy_curve",
     )
-    reporter(progress_stage, 15, progress_total, "Rendering energy-difference plots")
     energy_difference_images = _render_energy_bars(
         energy_difference_table,
         other_bar_dir,
@@ -698,7 +681,6 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         title="Energy Differences",
         ylabel="Energy difference (kcal/mol)",
     )
-    reporter(progress_stage, 16, progress_total, "Rendering single-identifier plots")
     single_energy_images = _render_energy_bars(
         single_energy_table,
         other_bar_dir,
@@ -707,7 +689,6 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         title="Single-Identifier Energies",
         ylabel="Energy (kcal/mol)",
     )
-    reporter(progress_stage, 17, progress_total, "Rendering reaction-energy plots")
     reaction_energy_images = _render_energy_bars(
         reaction_energy_table,
         reaction_energy_dir,
@@ -717,79 +698,98 @@ def run_main(command: str, args: argparse.Namespace) -> int:
         ylabel="Reaction energy (kcal/mol)",
     )
 
-    eos_summary = (
-        f"[Done] EOS: {len(eos_images)} images and {eos_csv}"
-        if eos_images
-        else f"[Skipped] EOS: no plottable expressions; wrote {eos_csv}"
+    collections = [
+        ("EOS", eos_images, eos_result.table, eos_csv),
+        ("Restraints", restraint_images, restraint_result.table, restraint_csv),
+        ("Bond scans", bond_images, bond_table, bond_csv),
+        ("Angle scans", angle_images, angle_table, angle_csv),
+        ("Other curves", other_curve_images, other_curve_table, other_curve_csv),
+        ("Charges", charge_images, charge_table, charge_csv),
+        ("Cell parameters", cell_parameter_images, cell_parameter_table, cell_parameter_csv),
+        ("Geometry targets", geometry_target_images, geometry_target_table, geometry_target_csv),
+        ("Heat of formation", heatfo_images, heatfo_table, heatfo_csv),
+        ("Energy curves", energy_curve_images, energy_curve_table, energy_curve_csv),
+        ("Energy differences", energy_difference_images, energy_difference_table, energy_difference_csv),
+        ("Single-identifier energies", single_energy_images, single_energy_table, single_energy_csv),
+        ("Reaction energies", reaction_energy_images, reaction_energy_table, reaction_energy_csv),
+    ]
+    csv_paths = []
+    summary_lines = []
+    for label, images, table, csv_path in collections:
+        if not images:
+            continue
+        write_workflow_csv(table, csv_path, index=False)
+        csv_paths.append(csv_path)
+        summary_lines.append(f"[Done] {label}: {len(images)} images and {csv_path}")
+    if not not_plotted_table.empty:
+        write_workflow_csv(not_plotted_table, not_plotted_csv, index=False)
+        csv_paths.append(not_plotted_csv)
+
+    not_plotted_warning = (
+        f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
+        f"{not_plotted_csv}"
+        if not not_plotted_table.empty else None
     )
-    summary_lines = [
-        eos_summary,
-        f"[Done] Restraints: {len(restraint_images)} images and {restraint_csv}",
-        f"[Done] Bond scans: {len(bond_images)} images and {bond_csv}",
-        f"[Done] Angle scans: {len(angle_images)} images and {angle_csv}",
-        (
-            f"[Done] Other curves: {len(other_curve_images)} images and "
-            f"{other_curve_csv}"
-        ),
-        f"[Done] Charges: {len(charge_images)} images and {charge_csv}",
-        (
-            f"[Done] Cell parameters: {len(cell_parameter_images)} images and "
-            f"{cell_parameter_csv}"
-        ),
-        (
-            f"[Done] Geometry targets: {len(geometry_target_images)} images and "
-            f"{geometry_target_csv}"
-        ),
-        f"[Done] Heat of formation: {len(heatfo_images)} images and {heatfo_csv}",
-        (
-            f"[Done] Energy curves: {len(energy_curve_images)} images and "
-            f"{energy_curve_csv}"
-        ),
-        (
-            f"[Done] Energy differences: {len(energy_difference_images)} images "
-            f"and {energy_difference_csv}"
-        ),
-        (
-            f"[Done] Single-identifier energies: {len(single_energy_images)} "
-            f"images and {single_energy_csv}"
-        ),
-        (
-            f"[Done] Reaction energies: {len(reaction_energy_images)} images and "
-            f"{reaction_energy_csv}"
-        ),
-        (
-            f"[Warning] Not plotted: {len(not_plotted_table)} entries and "
-            f"{not_plotted_csv}"
-        ),
+    if not_plotted_warning:
+        summary_lines.append(not_plotted_warning)
+    presentation_path = None
+    if wants_powerpoint:
+        reporter(progress_stage, 5, progress_total, "Building PowerPoint presentation")
+        categories = {
+            "Equation of state": eos_images,
+            "Restraints": restraint_images,
+            "Bond scans": bond_images,
+            "Angle scans": angle_images,
+            "Other curves": other_curve_images,
+            "Charges": charge_images,
+            "Cell parameters": cell_parameter_images,
+            "Geometry targets": geometry_target_images,
+            "Heat of formation": heatfo_images,
+            "Energy curves": energy_curve_images,
+            "Other energy bars": [*energy_difference_images, *single_energy_images],
+            "Reaction energies": reaction_energy_images,
+        }
+        if any(categories.values()):
+            summary_counts = {}
+            for category, images in categories.items():
+                if category == "Other energy bars":
+                    summary_counts["Energy differences"] = len(energy_difference_images)
+                    summary_counts["Single-identifier energies"] = len(single_energy_images)
+                else:
+                    summary_counts["EOS" if category == "Equation of state" else category] = len(images)
+            presentation_path = write_figure_presentation(
+                categories, root / "ffield_opt_plots.pptx",
+                summary_counts=summary_counts, warning=not_plotted_warning,
+            )
+
+    summary_lines.extend([
         (
             f"[Info] Custom plots: use {figure_generator_template} with the dedicated "
             "CSV files in each plot subfolder."
         ),
+        (
+            "[Info] After preparing the Excel data, generate figures with:\n"
+            f'  reaxkit plot-from-excel --input "{figure_generator_template}"\n'
+            "  For more information, run: reaxkit plot-from-excel -h"
+        ),
         f"Results saved in:\n  {root}",
-    ]
+    ])
+    if wants_powerpoint:
+        summary_lines.insert(-1, (
+            f"[Done] PowerPoint: {presentation_path}"
+            if presentation_path is not None
+            else "[Skipped] PowerPoint: no figures were generated"
+        ))
     summary_text = "\n".join(summary_lines)
     summary_path = root / "plot_summary.txt"
     summary_path.write_text(summary_text + "\n", encoding="utf-8")
 
-    reporter(progress_stage, 18, progress_total, "Finalizing result metadata")
+    reporter(progress_stage, progress_total - 1, progress_total, "Finalizing result metadata")
     if uses_workspace:
         settings_path = root / "settings.json"
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
         settings["artifacts"]["csv"] = [
-            eos_csv.relative_to(root).as_posix(),
-            restraint_csv.relative_to(root).as_posix(),
-            heatfo_csv.relative_to(root).as_posix(),
-            bond_csv.relative_to(root).as_posix(),
-            angle_csv.relative_to(root).as_posix(),
-            other_curve_csv.relative_to(root).as_posix(),
-            charge_csv.relative_to(root).as_posix(),
-            cell_parameter_csv.relative_to(root).as_posix(),
-            geometry_target_csv.relative_to(root).as_posix(),
-            not_plotted_csv.relative_to(root).as_posix(),
-            energy_curve_csv.relative_to(root).as_posix(),
-            energy_difference_csv.relative_to(root).as_posix(),
-            single_energy_csv.relative_to(root).as_posix(),
-            reaction_energy_csv.relative_to(root).as_posix(),
+            path.relative_to(root).as_posix() for path in csv_paths
         ]
         settings["artifacts"]["figures"] = [
             path.relative_to(root).as_posix()
@@ -813,6 +813,11 @@ def run_main(command: str, args: argparse.Namespace) -> int:
             figure_generator_template.relative_to(root).as_posix()
         ]
         settings["artifacts"]["text"] = [summary_path.relative_to(root).as_posix()]
+        if wants_powerpoint:
+            settings["artifacts"]["presentations"] = (
+                [presentation_path.relative_to(root).as_posix()]
+                if presentation_path is not None else []
+            )
         settings_path.write_text(
             json.dumps(settings, indent=2, sort_keys=True), encoding="utf-8"
         )

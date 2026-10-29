@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from threading import RLock
+from tempfile import TemporaryDirectory
+from copy import deepcopy
 from typing import Any
+from time import monotonic
 
 from reaxkit.webui.backend.schemas import PipelineNode, PipelineState, ResultArtifact, make_id
 
@@ -12,21 +15,39 @@ from reaxkit.webui.backend.schemas import PipelineNode, PipelineState, ResultArt
 class PipelineStore:
     """Thread-safe in-memory storage for UI pipelines."""
 
-    def __init__(self) -> None:
+    def __init__(self, table_root=None) -> None:
+        from reaxkit.webui.backend.artifact_tables import ArtifactTables
         self._lock = RLock()
         self._pipelines: dict[str, PipelineState] = {}
+        self._last_access = {}
+        self._temporary = TemporaryDirectory(prefix='reaxkit-ui-') if table_root is None else None
+        self.tables = ArtifactTables(table_root or self._temporary.name)
+
+    def close(self):
+        if self._temporary:
+            self._temporary.cleanup()
 
     def create_pipeline(self, name: str = "Untitled Pipeline") -> PipelineState:
         with self._lock:
             pipeline = PipelineState(id=make_id("pipe"), name=name)
             self._pipelines[pipeline.id] = pipeline
+            self._last_access[pipeline.id] = monotonic()
             return pipeline
 
     def get_pipeline(self, pipeline_id: str) -> PipelineState:
         with self._lock:
             if pipeline_id not in self._pipelines:
                 raise KeyError(f"Unknown pipeline '{pipeline_id}'")
+            self._last_access[pipeline_id] = monotonic()
             return self._pipelines[pipeline_id]
+
+    def expire_idle(self, *, protected=(), seconds=3600):
+        with self._lock:
+            expired = [pid for pid, seen in self._last_access.items()
+                       if pid not in protected and monotonic() - seen > seconds]
+            for pid in expired:
+                self._pipelines.pop(pid, None)
+                self._last_access.pop(pid, None)
 
     def upsert_node(self, pipeline_id: str, node: PipelineNode) -> PipelineNode:
         with self._lock:
@@ -58,6 +79,8 @@ class PipelineStore:
     ) -> PipelineNode:
         with self._lock:
             node = self.get_node(pipeline_id, node_id)
+            if propagate_dirty and (request is not None or metadata is not None):
+                node.revision += 1
             if request is not None:
                 node.request = request
             if metadata is not None:
@@ -71,6 +94,7 @@ class PipelineStore:
             return node
 
     def store_artifact(self, pipeline_id: str, artifact: ResultArtifact) -> ResultArtifact:
+        artifact.payload = self.tables.persist_payload(artifact.payload)
         with self._lock:
             pipeline = self.get_pipeline(pipeline_id)
             pipeline.artifacts[artifact.id] = artifact
@@ -85,8 +109,41 @@ class PipelineStore:
 
     def snapshot(self, pipeline_id: str) -> dict[str, Any]:
         """Return a JSON-serializable pipeline snapshot."""
-        pipeline = self.get_pipeline(pipeline_id)
-        return asdict(pipeline)
+        with self._lock:
+            pipeline = self.get_pipeline(pipeline_id)
+            return asdict(pipeline)
+
+    def metadata_snapshot(self, pipeline_id: str) -> dict[str, Any]:
+        """Never traverse artifact payloads when refreshing UI state."""
+        with self._lock:
+            pipeline = self.get_pipeline(pipeline_id)
+            return {'id': pipeline.id, 'name': pipeline.name,
+                    'created_at': pipeline.created_at, 'updated_at': pipeline.updated_at,
+                    'nodes': {key: asdict(node) for key, node in pipeline.nodes.items()},
+                    'children': deepcopy(pipeline.children),
+                    'artifacts': {key: {'id': art.id, 'node_id': art.node_id,
+                        'metadata': deepcopy(art.metadata), 'created_at': art.created_at,
+                        'recommended_views': deepcopy(art.recommended_views)}
+                        for key, art in pipeline.artifacts.items()}}
+
+    def prune_artifacts(self, protected=()):
+        """Release superseded results; callers protect descriptors used by jobs."""
+        from reaxkit.webui.backend.artifact_tables import is_table
+        with self._lock:
+            protected_ids = {a['id'] for snapshot in protected for a in snapshot.get('artifacts', {}).values()}
+            keep_files = set()
+            for pipeline in self._pipelines.values():
+                live = {str(n.result_ref) for n in pipeline.nodes.values() if n.result_ref}
+                live.update(str(n.metadata['last_artifact_id']) for n in pipeline.nodes.values() if n.metadata.get('last_artifact_id'))
+                for aid in list(pipeline.artifacts):
+                    if aid not in live and aid not in protected_ids:
+                        del pipeline.artifacts[aid]
+                for art in pipeline.artifacts.values():
+                    keep_files.update(v['file'] for v in art.payload.values() if is_table(v))
+            for snapshot in protected:
+                for art in snapshot.get('artifacts', {}).values():
+                    keep_files.update(v['file'] for v in art.get('payload', {}).values() if is_table(v))
+            return keep_files
 
     def delete_node(self, pipeline_id: str, node_id: str) -> dict[str, Any]:
         """Delete a node and its descendants, including associated artifacts."""
@@ -177,6 +234,7 @@ class PipelineStore:
                         metadata=dict(raw.get("metadata") or {}),
                         created_at=str(raw.get("created_at") or ""),
                         updated_at=str(raw.get("updated_at") or ""),
+                        revision=int(raw.get('revision', 0)),
                     )
                     pipeline.nodes[node.id] = node
 
@@ -194,7 +252,7 @@ class PipelineStore:
                     artifact = ResultArtifact(
                         id=str(raw.get("id") or key),
                         node_id=str(raw.get("node_id") or ""),
-                        payload=dict(raw.get("payload") or {}),
+                        payload=self.tables.persist_payload(dict(raw.get("payload") or {})),
                         metadata=dict(raw.get("metadata") or {}),
                         recommended_views=list(raw.get("recommended_views") or []),
                         created_at=str(raw.get("created_at") or ""),
@@ -202,6 +260,7 @@ class PipelineStore:
                     pipeline.artifacts[artifact.id] = artifact
 
             self._pipelines[pipeline.id] = pipeline
+            self._last_access[pipeline.id] = monotonic()
             return pipeline
 
     def _mark_descendants_dirty(self, pipeline_id: str, node_id: str) -> None:

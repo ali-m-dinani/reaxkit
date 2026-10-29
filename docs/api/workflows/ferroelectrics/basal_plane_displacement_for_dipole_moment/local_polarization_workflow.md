@@ -47,9 +47,9 @@ three basal and one apical N neighbors.
 | `--frames` | No |  | Select zero-based source frames. Example: --frames 0:101:10, includes frames 0 through 100 every 10 frames. |  |
 | `--every` | No | 1 | Stride the selected frames. Example: --every 5, keeps every fifth selected frame. |  |
 | `--polarity-tolerance` | No | 1e-10 | Set the zero-polarity tolerance in angstrom. Example: --polarity-tolerance 1e-6, treats smaller basal means as zero. |  |
-| `--local-volume-method` | No | equal | Choose the per-center volume: equal shares the selected frame volume among valid centers (default); coordination uses each N-neighbor tetrahedron. | equal, coordination |
-| `--volume-method` | No | hull | Choose the frame volume used by --local-volume-method equal: occupied convex hull (default), bounding box, or simulation cell. | hull, bbox, cell |
-| `--field-direction` | No | z | Choose the electric-field component written to frame metadata. Default: z. | x, y, z |
+| `--local-volume-method` | No | equal | Choose the per-center volume: equal shares the selected frame volume among valid centers (default); coordination uses each N-neighbor tetrahedron. Example: --local-volume-method equal, which divides the selected frame volume among local groups. | equal, coordination |
+| `--volume-method` | No | hull | Choose the frame volume used by --local-volume-method equal: occupied convex hull (default), bounding box, or simulation cell. Example: --volume-method cell, which uses the full simulation-cell volume. | hull, bbox, cell |
+| `--field-direction` | No | z | Choose the electric-field component written to frame metadata. Default: z. Example: --field-direction z, which selects the z-directed electric-field component. | x, y, z |
 
 #### Input and file selection
 
@@ -67,27 +67,28 @@ three basal and one apical N neighbors.
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--output-dir` | No |  | Choose the output directory for local polarization and source dipole CSV files. |  |
-| `--plot-2d` | No | False | Write per-frame 2D maps after aggregating along the coordinate omitted from --plot-plane. |  |
-| `--plot-3d` | No | False | Write per-frame 3D center scatter plots colored by the selected local value. |  |
-| `--plot-plane` | No | xy | Choose the displayed plane for --plot-2d. The remaining coordinate is aggregated. | xy, xz, yz |
-| `--plot-component` | No | z | Choose the dipole or polarization component used as plot color. | x, y, z |
-| `--plot-quantity` | No | polarization | Plot local polarization (default) or local dipole. | polarization, dipole |
-| `--plot-bins` | No | 40, 40 | Set the two in-plane bin counts for --plot-2d. Default: 40 40. |  |
-| `--global-scaling, --no-global-scaling` | No | False | Use shared symmetric color limits across frames for both 2D and 3D plots. |  |
-| `--figure-dpi` | No | 180 | Set PNG resolution for 2D and 3D plots. Default: 180. |  |
-| `--write-extxyz` | No | False | Write an OVITO-compatible Extended XYZ trajectory with local vector properties. |  |
-| `--include-electric-field` | No | False | Add the iteration-aligned electric-field value from fort.78 to each Extended XYZ frame header. |  |
-| `--extxyz-precision` | No | 8 | Set significant digits in the Extended XYZ output. Default: 8. |  |
-| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). | parquet, csv |
+| `--output-dir` | No |  | Choose the output directory for local polarization and source dipole CSV files. Example: --output-dir analysis/charges, which writes generated artifacts beneath that directory. |  |
+| `--plot-2d` | No | False | Write per-frame 2D maps after aggregating along the coordinate omitted from --plot-plane. Example: --plot-2d, which writes projected spatial heatmaps. |  |
+| `--plot-3d` | No | False | Write per-frame 3D center scatter plots colored by the selected local value. Example: --plot-3d, which writes three-dimensional center scatter plots. |  |
+| `--plot-plane` | No | xy | Choose the displayed plane for --plot-2d. The remaining coordinate is aggregated. Example: --plot-plane xy, which displays x and y while aggregating along z. | xy, xz, yz |
+| `--plot-component` | No | z | Choose the dipole or polarization component used as plot color. Example: --plot-component z, which colors plots by the z component. | x, y, z |
+| `--plot-quantity` | No | polarization | Plot local polarization (default) or local dipole. Example: --plot-quantity dipole, which colors plots by local dipole instead of polarization. | polarization, dipole |
+| `--plot-bins` | No | 40, 40 | Set the two in-plane bin counts for --plot-2d. Default: 40 40. Example: --plot-bins 40 40, which uses 40 bins along each displayed axis. |  |
+| `--global-scaling, --no-global-scaling` | No | False | Use shared symmetric color limits across frames for both 2D and 3D plots. Example: --global-scaling, which uses shared symmetric color limits across frames. |  |
+| `--figure-dpi` | No | 180 | Set PNG resolution for 2D and 3D plots. Default: 180. Example: --figure-dpi 300, which writes PNG plots at 300 dots per inch. |  |
+| `--write-extxyz` | No | False | Write an OVITO-compatible Extended XYZ trajectory with local vector properties. Example: --write-extxyz, which exports local vector properties for OVITO. |  |
+| `--include-electric-field` | No | False | Add the iteration-aligned electric-field value from fort.78 to each Extended XYZ frame header. Example: --include-electric-field, which adds iteration-matched field data to exported frames. |  |
+| `--extxyz-precision` | No | 8 | Set significant digits in the Extended XYZ output. Default: 8. Example: --extxyz-precision 8, which writes eight significant digits in Extended XYZ properties. |  |
+| `--plot-style` | No | default | Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript. | default, publication, publication-bold |
+| `--detail-format` | No |  | Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV. | parquet, csv |
 
 #### Execution
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
-| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. | auto, serial, threads, processes |
-| `--workers` | No | 0 | Frame workers: auto or N (default: auto). |  |
-| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. |  |
+| `--execution` | No | auto | Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially. | auto, serial, threads, processes |
+| `--workers` | No | 0 | Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers. |  |
+| `--chunk-size` | No | 0 | Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames. |  |
 
 #### Storage and cache
 
@@ -99,13 +100,17 @@ three basal and one apical N neighbors.
 | `--input-cache, --no-input-cache` | No | True | Reuse parsed input frames across commands (default: enabled; use --no-input-cache to force source reads for reproducibility checks or benchmarks). Example: --no-input-cache, which reloads frames from their source files. |  |
 | `--frame-cache-max-gb` | No | 10.0 | Maximum workspace frame-cache size in GiB (default: 10; use 0 for unlimited). Example: --frame-cache-max-gb 20, which caps cached frames at 20 GiB. |  |
 | `--output-profile` | No | standard | Select the shared artifact policy. Standard writes declared default outputs; minimal keeps core tables; full and legacy include optional details. Default: standard. Example: --output-profile full, which includes declared optional detail tables. | minimal, standard, full, legacy |
+| `--checkpoint, --no-checkpoint` | No |  | Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage. |  |
+| `--resume` | No |  | Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations. |  |
+| `--checkpoint-buffer-mb` | No | 32 | Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB. |  |
+| `--checkpoint-interval-seconds` | No | 30 | Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds. |  |
 
 #### Diagnostics and compatibility
 
 | Flag | Required | Default | Help | Choices |
 |---|---|---|---|---|
 | `-h, --help` | No |  | show this help message and exit |  |
-| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. |  |
+| `--help-all, --all-flags` | No |  | Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output. |  |
 | `--log` | No | quiet | Choose console logging detail. Example: --log verbose, prints diagnostic progress information. | verbose, quiet |
 
 

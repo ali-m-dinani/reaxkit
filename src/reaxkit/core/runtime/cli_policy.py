@@ -1,6 +1,10 @@
 """Advanced execution options shared by every CLI command."""
 
 import argparse
+import math
+
+from reaxkit.presentation.plot_styles import add_plot_style_argument
+from reaxkit.presentation.color_styles import add_color_style_argument
 
 
 def automatic_positive_int(value):
@@ -15,16 +19,41 @@ def automatic_positive_int(value):
     return number
 
 
+def positive_finite_seconds(value):
+    try:
+        seconds = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("Use a positive finite number of seconds.") from exc
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("Use a positive finite number of seconds.")
+    return seconds
+
+
 def add_execution_arguments(parser, *, inherit=False):
+    add_plot_style_argument(parser, inherit=inherit)
+    add_color_style_argument(parser, inherit=inherit)
     options = parser._option_string_actions
     definitions = (
+        ("--profile", dict(action="store_true", default=False,
+                          help="Record deterministic function calls and timings for all Python threads (requires --diagnostics and reaxkit[profiling]).")),
+        ("--profile-clock", dict(choices=("wall", "cpu"), default="wall",
+                                help="Profiler timer: elapsed wall time (default) or thread CPU time. Requires --profile to record.")),
+        ("--diagnostics", dict(action=argparse.BooleanOptionalAction, default=False,
+                              help="Enable a per-command report, console log, resource samples, and periodic Python stacks under logs/diagnostics (disabled by default).")),
+        ("--diagnostic-interval-seconds", dict(type=positive_finite_seconds, default=60.0,
+                              help="Python stack sampling interval (default: 60 seconds). Example: --diagnostic-interval-seconds 30.")),
+        ("--checkpoint", dict(action=argparse.BooleanOptionalAction, default=None,
+                              help="Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage.")),
+        ("--resume", dict(default=None, metavar="CHECKPOINT", help="Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations.")),
+        ("--checkpoint-buffer-mb", dict(type=float, default=32, help="Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB.")),
+        ("--checkpoint-interval-seconds", dict(type=float, default=30, help="Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds.")),
         ("--execution", dict(choices=("auto", "serial", "threads", "processes"), default="auto",
-                             help="Execution backend; unsupported backends fall back to serial with a logged reason.")),
-        ("--workers", dict(type=automatic_positive_int, default=0, help="Frame workers: auto or N (default: auto).")),
-        ("--chunk-size", dict(type=automatic_positive_int, default=0, help="Maximum in-flight frames: auto or N.")),
-        ("--detail-format", dict(choices=("parquet", "csv"), default=None, help="Optional detail format (default: Parquet; legacy: CSV).")),
+                             help="Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially.")),
+        ("--workers", dict(type=automatic_positive_int, default=0, help="Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers.")),
+        ("--chunk-size", dict(type=automatic_positive_int, default=0, help="Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames.")),
+        ("--detail-format", dict(choices=("parquet", "csv"), default=None, help="Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV.")),
         ("--output-profile", dict(choices=("standard", "minimal", "full", "legacy"), default="standard",
-                                  help="Artifact profile (default: standard).")),
+                                  help="Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts.")),
     )
     for flag, kwargs in definitions:
         if inherit:

@@ -186,6 +186,7 @@ class GeometryOptimizationResult(BaseResult):
 class GeometryOptimizationTask(AnalysisTask):
     """Return selected geometry-optimization summary data from fort.57."""
 
+    VERSION = "1"
     required_data = GeometryOptimizationProgressData
 
     @staticmethod

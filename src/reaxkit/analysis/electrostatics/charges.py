@@ -130,6 +130,7 @@ class ChargeTableResult(BaseResult):
 class ChargeTableTask(AnalysisTask):
     """Return per-atom charges across selected frames as a tidy table."""
 
+    VERSION = "1"
     required_data = ChargeData
     execution_capabilities = TaskCapabilities(
         shape=ExecutionShape.INDEPENDENT_FRAME_MAP,

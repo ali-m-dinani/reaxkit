@@ -68,6 +68,9 @@ dipole column. Volume is calculated from a trajectory with hull (default), bbox,
 or cell. Hull and bbox exclude empty cell vacuum; cell includes it. The mean
 frame volume is used in the Kubo--Green prefactor. The dipole mean is removed
 before the autocorrelation is formed.
+Use --epsilon-infinity to supply a constant electronic relative permittivity
+(default 1). This replaces the vacuum baseline in the static and real spectral
+response; it does not change the dipole fluctuations or dielectric loss.
 Use --dipole-kind total for the isotropic 1/3 relation shown in the supplied
 equation, or component for one signed Cartesian dipole component. A magnitude-
 only series cannot retain vector orientation, so its dynamic response is an
@@ -107,6 +110,10 @@ Examples:
     parser.add_argument(
         "--temperature", type=_positive_float, required=True,
         help="Set the simulation temperature in kelvin. Example: --temperature 300.",
+    )
+    parser.add_argument(
+        "--epsilon-infinity", type=float, default=1.0,
+        help="Set the electronic relative permittivity (finite, at least 1; default 1). Example: --epsilon-infinity 4.7.",
     )
     parser.add_argument(
         "--trajectory", "--xmolout", dest="trajectory", type=Path, default=None,
@@ -182,6 +189,7 @@ def build_request(
         )
     return DielectricConstantRequest(
         temperature=float(args.temperature),
+        epsilon_infinity=float(args.epsilon_infinity),
         volume=resolved.value,
         time_unit=args.time_unit,
         dipole_unit=args.dipole_unit,

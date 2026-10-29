@@ -63,6 +63,26 @@ def render_figure(
     if spec is None:
         return None
     renderer = str(spec.renderer).lower()
+    filter_column = spec.options.get("filter_column")
+    if filter_column:
+        rows = [row for row in rows if row.get(filter_column) == spec.options.get("filter_value")]
+    if renderer == "kymograph":
+        from reaxkit.presentation.kymograph import kymograph_grid
+
+        if not rows:
+            return go.Figure().update_layout(title="No plottable data")
+        coordinates, radii, values = kymograph_grid(
+            rows, x_col or spec.mapping.get("x_col", "frame_index"),
+            y_col or spec.mapping.get("y_col", "r"), color_col or spec.mapping.get("color_col", "g"),
+        )
+        figure = go.Figure(go.Heatmap(
+            x=coordinates, y=radii, z=values, colorscale="Viridis",
+            zmin=spec.options.get("vmin", 0.0), zmax=spec.options.get("vmax"),
+            colorbar={"title": spec.options.get("colorbar_label", "g(r)")},
+        ))
+        figure.update_layout(template="plotly_white", title=spec.options.get("title", "RDF evolution"),
+                             xaxis_title=spec.options.get("xlabel", "Frame index"), yaxis_title=spec.options.get("ylabel", "r (Å)"))
+        return figure
     if renderer == "single_plot":
         return render_single_plot(rows, spec=spec, x_col=x_col, y_col=y_col, group_col=group_col)
     if renderer in {"scatter3d_points", "scatter3d"}:

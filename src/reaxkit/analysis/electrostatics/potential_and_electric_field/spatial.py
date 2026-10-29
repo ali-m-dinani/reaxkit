@@ -25,11 +25,13 @@ def global_edges(tables: Sequence[pd.DataFrame], axes: str, bins: Sequence[int])
         counts *= len(axes)
     if len(counts) != len(axes) or any(value < 1 for value in counts):
         raise ValueError("Provide one positive bin count or one per selected axis.")
-    combined = pd.concat(tables, ignore_index=True)
+    from reaxkit.core.runtime.result_store import finite_extrema
+    limits = [finite_extrema(table, [AXIS_COLUMN[axis] for axis in axes]) for table in tables]
+    minimum = np.min([lower for lower, _ in limits], axis=0)
+    maximum = np.max([upper for _, upper in limits], axis=0)
     edges = []
-    for axis, count in zip(axes, counts):
-        values = combined[AXIS_COLUMN[axis]].to_numpy(dtype=float)
-        lower, upper = float(np.nanmin(values)), float(np.nanmax(values))
+    for dimension, (axis, count) in enumerate(zip(axes, counts)):
+        lower, upper = float(minimum[dimension]), float(maximum[dimension])
         if np.isclose(lower, upper):
             lower -= 0.5; upper += 0.5
         edges.append(np.linspace(lower, upper, count + 1))
