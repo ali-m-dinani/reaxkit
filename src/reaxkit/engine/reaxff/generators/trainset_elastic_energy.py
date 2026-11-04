@@ -282,7 +282,7 @@ def _generate_bulk_data(spec: BulkEnergySpec) -> Tuple[List[Tuple[float, float]]
         if eos_energy == 0.0:
             eos_energy = 1e-4
         label = _make_label("bulk", signed_step_index)
-        trainset_lines.append(f" {spec.weight:.4f}   +   {label:<11} /1  -  bulk_0 /1          {eos_energy:12.4f}")
+        trainset_lines.append(f" {spec.weight:.4f}   +   {label:<11} /1  -  bulk_0 /1          {str(eos_energy):>12}")
         bulk_table.append((strained_volume, eos_energy))
     return bulk_table, trainset_lines
 
@@ -322,7 +322,7 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
                     energy = 1e-4
                 label = _make_label(mode, index)
                 rows.append((strain, energy))
-                lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode}_0 /1          {energy:12.4f}")
+                lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode}_0 /1          {str(energy):>12}")
             result[mode] = (rows, lines)
         return result
     c = spec.elastic_constants_gpa
@@ -419,7 +419,7 @@ def _generate_elastic_data(spec: ElasticEnergySpec) -> Dict[str, Tuple[List[Tupl
             if energy == 0.0:
                 energy = 1e-4
             label = _make_label(mode_name, signed_step_index)
-            trainset_lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode_name}_0 /1          {energy:12.4f}")
+            trainset_lines.append(f" {spec.weight:.4f}   +   {label:<12} /1  -  {mode_name}_0 /1          {str(energy):>12}")
             table_rows.append((linear_strain, energy))
         result[mode_name] = (table_rows, trainset_lines)
     return result
@@ -496,7 +496,7 @@ def _write_trainset_energy(
         with path.open("w", encoding="utf-8") as fh:
             fh.write(header.rstrip() + "\n")
             for x, y in rows:
-                fh.write(f"{x:8.3f}  {y:12.4f}\n")
+                fh.write(f"{x:8.3f}  {str(y):>12}\n")
 
     written: Dict[str, Path] = {"trainset": trainset_path}
     bulk_path = out_dir / "EvsStrain_bulk.dat"

@@ -422,7 +422,9 @@ def _build_energy_line(
         denominator = (float(total_atoms) * float(ref.atoms_per_structure)) / numerator
         terms.append(f"- {ref.iden}/{_format_denominator(denominator)}")
     terms_joined = " ".join(terms)
-    return f"{weight:7.3f}  {terms_joined}   {per_atom_heat_kcal_mol:11.4f}"
+    if per_atom_heat_kcal_mol == 0.0:
+        per_atom_heat_kcal_mol = 0.0001
+    return f"{weight:7.3f}  {terms_joined}   {str(per_atom_heat_kcal_mol):>11}"
 
 
 def _generate_heatfo_trainset_from_mp(spec: MaterialsProjectHeatFoSpec) -> MaterialsProjectHeatFoResult:
