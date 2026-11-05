@@ -42,7 +42,9 @@ class ParamsHandler(BaseHandler):
     Summary table
         One row per parameter entry, returned by ``dataframe()``, with columns:
         ["ff_section", "ff_section_line", "ff_parameter",
-         "search_interval", "min_value", "max_value", "inline_comment"]
+         "search_interval", "raw_bound_1", "raw_bound_2",
+         "min_value", "max_value", "lower_bound", "upper_bound",
+         "inline_comment"]
 
         The columns map to ReaxFF force-field definitions as follows:
         - ``ff_section``: force-field section identifier
@@ -57,6 +59,8 @@ class ParamsHandler(BaseHandler):
     Notes
     -----
     - Inline comments following ``!`` are preserved verbatim.
+    - ``raw_bound_1`` and ``raw_bound_2`` retain source positions;
+      complete bounds are ordered numerically in the remaining bound columns.
     - Lines with incorrect token counts raise a parsing error.
     - This handler is not frame-based; ``n_frames()`` always returns 0.
     """
@@ -68,8 +72,12 @@ class ParamsHandler(BaseHandler):
         "ff_section_line",
         "ff_parameter",
         "search_interval",
+        "raw_bound_1",
+        "raw_bound_2",
         "min_value",
         "max_value",
+        "lower_bound",
+        "upper_bound",
         "inline_comment",
     ]
 
@@ -94,7 +102,8 @@ class ParamsHandler(BaseHandler):
         -------
         df : DataFrame
             With columns: ff_section, ff_section_line, ff_parameter,
-            search_interval, min_value, max_value, inline_comment.
+            search_interval, raw_bound_1, raw_bound_2, min_value,
+            max_value, lower_bound, upper_bound, inline_comment.
         meta : dict
             Metadata with keys: n_records, n_frames.
         """
@@ -121,7 +130,7 @@ class ParamsHandler(BaseHandler):
                     continue
 
                 # Bounds are optional in legacy and generated params files.
-                # ff_section ff_section_line ff_parameter search_interval min_value max_value
+                # ff_section ff_section_line ff_parameter search_interval bound_1 bound_2
                 if len(tokens) not in (4, 5, 6):
                     raise ValueError(
                         "Expected 4 to 6 tokens in params line "
@@ -133,8 +142,14 @@ class ParamsHandler(BaseHandler):
                 ff_section_line = int(tokens[1])
                 ff_parameter = int(tokens[2])
                 search_interval = float(tokens[3])
-                min_value = float(tokens[4]) if len(tokens) >= 5 else float("nan")
-                max_value = float(tokens[5]) if len(tokens) >= 6 else float("nan")
+                raw_bound_1 = float(tokens[4]) if len(tokens) >= 5 else float("nan")
+                raw_bound_2 = float(tokens[5]) if len(tokens) >= 6 else float("nan")
+                if len(tokens) == 6:
+                    min_value = min(raw_bound_1, raw_bound_2)
+                    max_value = max(raw_bound_1, raw_bound_2)
+                else:
+                    min_value = raw_bound_1
+                    max_value = float("nan")
 
                 rows.append(
                     {
@@ -142,8 +157,12 @@ class ParamsHandler(BaseHandler):
                         "ff_section_line": ff_section_line,
                         "ff_parameter": ff_parameter,
                         "search_interval": search_interval,
+                        "raw_bound_1": raw_bound_1,
+                        "raw_bound_2": raw_bound_2,
                         "min_value": min_value,
                         "max_value": max_value,
+                        "lower_bound": min_value,
+                        "upper_bound": max_value,
                         "inline_comment": inline_comment,
                     }
                 )

@@ -40,7 +40,7 @@ not replaced with invented limits.
 
 **Line format**
 ```
-<section> <type> <parameter> <step> <min> <max>
+<section> <type> <parameter> <step> <bound_1> <bound_2>
 ```
 
 Using fixed-width formatting:
@@ -58,13 +58,15 @@ Using fixed-width formatting:
 | `type` | Atom/bond/angle/torsion type index |
 | `parameter` | Parameter index within that type |
 | `step` | Relative perturbation factor |
-| `min` | Minimum allowed value |
-| `max` | Maximum allowed value |
+| `bound_1` | First bound value as written; may be the lower or upper limit |
+| `bound_2` | Second bound value as written; may be the lower or upper limit |
 
 The historical files in circulation are not consistent about whether the two
-declared bound values are ordered numerically. ReaxKit therefore preserves
-their source positions in `min_value` and `max_value` and leaves scientific
-validation of a particular file to the consuming workflow.
+declared bound values are ordered numerically. ReaxKit preserves their source
+positions in `raw_bound_1` and `raw_bound_2`. For complete pairs, `min_value`
+and `lower_bound` contain the smaller number, while `max_value` and
+`upper_bound` contain the larger number. A single supplied bound retains its
+source value in `raw_bound_1` and `min_value`; the other bound remains missing.
 
 ---
 
