@@ -184,7 +184,17 @@ Snapshots reference rather than copy force fields: preserve the whole campaign.
 OGolem artifacts are relative to native_results_relative (native/bundle under
 the run directory). Collection also works on a copied campaign; execution still
 requires original staged paths or a newly prepared campaign.
-AMS requires version-specific column mappings; fort.99 parity is not guessed.
+Recognized AMS 2023.103 MCFF headers and CMA-ES scalar report blocks are parsed
+automatically. Explicit conversion options retain the generic mapped-table reader;
+unknown layouts still require version-specific mappings. MCFF records distinguish
+initial/current errors and the running minimum of observed current errors per native
+replica. Its native elapsed column is not assumed cumulative. CMA-ES uses reported
+candidate evaluation counts (not invented generation numbers), generation-best
+scores, candidate-best scores and CPU time (not walltime). A fort.13 initial baseline
+is associated only when its count and candidate minima agree with the report blocks;
+it does not replace the optimizer's candidate-best score. Missing predictions remain
+missing; fort.99 parity is not guessed. These reports alone do not certify convergence
+or scientific equivalence between methods.
 See the backend README for mapping examples.
 
 Submission intent is durable before sbatch. Ambiguous jobs are never retried
