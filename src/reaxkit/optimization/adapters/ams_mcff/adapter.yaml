@@ -1,0 +1,94 @@
+{
+  "engine": "SCM OldReaxFF",
+  "objective": "sum_squared_accuracy_divided_residuals",
+  "license": "Proprietary SCM installation; user supplied",
+  "revision": "OldReaxFF online documentation (2026-11-05); AMS 2023.103 output unverified",
+  "seed": "unsupported",
+  "resume": "parameter_only",
+  "settings": {
+    "mcffit": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1,
+      "native": "control:mcffit"
+    },
+    "mcbeta": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "native": "control:mcbeta"
+    },
+    "mcdbet": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "native": "control:mcdbet"
+    },
+    "mcbsca": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "control:mcbsca"
+    },
+    "mcacpf": {
+      "type": "number",
+      "default": 0.2,
+      "minimum": 0,
+      "maximum": 1,
+      "native": "control:mcacpf"
+    },
+    "mcrxdd": {
+      "type": "integer",
+      "default": 100,
+      "minimum": 1,
+      "native": "control:mcrxdd"
+    },
+    "mcstep": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "control:mcstep"
+    },
+    "mcmxst": {
+      "type": "number",
+      "default": 100,
+      "minimum": 0,
+      "native": "control:mcmxst"
+    },
+    "mcscps": {
+      "type": "number",
+      "default": 1.1,
+      "minimum": 0,
+      "native": "control:mcscps"
+    },
+    "mctart": {
+      "type": "number",
+      "default": 30,
+      "minimum": 0,
+      "maximum": 100,
+      "native": "control:mctart"
+    },
+    "mcmart": {
+      "type": "number",
+      "default": 70,
+      "minimum": 0,
+      "maximum": 100,
+      "native": "control:mcmart"
+    },
+    "mcmini": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "control:mcmini"
+    },
+    "replic": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "native": "control:replic"
+    }
+  },
+  "id": "ams_mcff",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

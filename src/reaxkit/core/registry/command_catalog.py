@@ -333,3 +333,4 @@ def get_registered_commands(include_analysis_tasks: bool = True) -> dict[str, Co
 
 
 _register_packaged_commands()
+register_command("optimize-ffield", kind="workflow", help_text="Configure, submit, and inspect force-field optimization campaigns.")

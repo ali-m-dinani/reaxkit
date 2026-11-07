@@ -1,0 +1,78 @@
+{
+  "engine": "Native standalone ReaxFF (default); explicit existing short JAX mode",
+  "objective": "engine_squared_accuracy_divided_residuals; surrogate_scores_are_distinct",
+  "license": "MIT (LICENSE)",
+  "revision": "3112946",
+  "seed": "unsupported",
+  "resume": "parameter_only",
+  "settings": {
+    "engine": {
+      "type": "string",
+      "default": "reaxff",
+      "choices": [
+        "reaxff",
+        "jax-md"
+      ],
+      "native": "env: INDEEDOPT_ENGINE"
+    },
+    "short_samples": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "env: INDEEDOPT_SHORT_SAMPLES"
+    },
+    "jax_python": {
+      "type": "path",
+      "default": null,
+      "native": "env: INDEEDOPT_JAX_PYTHON"
+    },
+    "jaxreaxff_source": {
+      "type": "path",
+      "default": null,
+      "native": "env: INDEEDOPT_JAXREAXFF_SOURCE"
+    },
+    "jaxmd_source": {
+      "type": "path",
+      "default": null,
+      "native": "env: INDEEDOPT_JAXMD_SOURCE"
+    },
+    "nos": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1,
+      "support": "external_runner_only",
+      "native": "script constant: nos"
+    },
+    "nos_2": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "support": "external_runner_only",
+      "native": "script constant: nos_2"
+    },
+    "lm_iter": {
+      "type": "integer",
+      "default": 2,
+      "minimum": 1,
+      "support": "external_runner_only",
+      "native": "script constant: lm_iter"
+    },
+    "bn": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "support": "external_runner_only",
+      "native": "script constant: bn"
+    },
+    "num_prop": {
+      "type": "integer",
+      "default": 96,
+      "minimum": 1,
+      "support": "external_runner_only",
+      "native": "script constant: num_prop"
+    }
+  },
+  "id": "indeedopt",
+  "launch": "external_runner_contract_v1",
+  "cluster_validated": false
+}

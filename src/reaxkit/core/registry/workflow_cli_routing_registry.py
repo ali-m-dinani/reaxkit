@@ -116,6 +116,7 @@ def get_registered_workflows() -> dict[str, WorkflowSpec]:
 
 register_workflow("intspec", module_path="reaxkit.workflows.meta.introspection_workflow", dispatch_mode="intspec_runner")
 register_workflow("gui", module_path="reaxkit.workflows.meta.gui_workflow", dispatch_mode="kind_runner")
+register_workflow("optimize-ffield", module_path="reaxkit.optimization.cli", dispatch_mode="kind_runner")
 register_workflow("help", module_path="reaxkit.workflows.meta.help_workflow", dispatch_mode="kind_runner")
 register_workflow("fort7", module_path="reaxkit.workflows.per_file.fort7_workflow")
 register_workflow(

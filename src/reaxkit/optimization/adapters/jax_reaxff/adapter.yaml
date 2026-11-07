@@ -1,0 +1,123 @@
+{
+  "engine": "JAX-MD ReaxFF",
+  "objective": "sum_squared_accuracy_divided_residuals",
+  "license": "GPL-3.0 (LICENSE)",
+  "revision": "144ee1c",
+  "seed": "native",
+  "resume": "parameter_only",
+  "settings": {
+    "opt_method": {
+      "type": "string",
+      "default": "L-BFGS-B",
+      "choices": [
+        "L-BFGS-B",
+        "SLSQP"
+      ],
+      "native": "--opt_method"
+    },
+    "num_trials": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 0,
+      "native": "--num_trials"
+    },
+    "num_steps": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "native": "--num_steps"
+    },
+    "init_FF_type": {
+      "type": "string",
+      "default": "fixed",
+      "choices": [
+        "fixed",
+        "random",
+        "educated"
+      ],
+      "native": "--init_FF_type"
+    },
+    "random_sample_count": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "--random_sample_count"
+    },
+    "num_e_minim_steps": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "--num_e_minim_steps"
+    },
+    "e_minim_LR": {
+      "type": "number",
+      "default": 0.0005,
+      "minimum": 0,
+      "native": "--e_minim_LR"
+    },
+    "end_RMSG": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "--end_RMSG"
+    },
+    "use_valid": {
+      "type": "boolean",
+      "default": false,
+      "native": "--use_valid"
+    },
+    "valid_file": {
+      "type": "path",
+      "default": null,
+      "native": "--valid_file"
+    },
+    "valid_geo_file": {
+      "type": "path",
+      "default": null,
+      "native": "--valid_geo_file"
+    },
+    "bonded_cutoff": {
+      "type": "number",
+      "default": 5,
+      "minimum": 0,
+      "native": "--bonded_cutoff"
+    },
+    "cutoff2": {
+      "type": "number",
+      "default": 0.001,
+      "minimum": 0,
+      "native": "--cutoff2"
+    },
+    "max_num_clusters": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 15,
+      "native": "--max_num_clusters"
+    },
+    "perc_noise_when_stuck": {
+      "type": "number",
+      "default": 0.04,
+      "minimum": 0,
+      "maximum": 0.1,
+      "native": "--perc_noise_when_stuck"
+    },
+    "save_opt": {
+      "type": "string",
+      "default": "best",
+      "choices": [
+        "best",
+        "all"
+      ],
+      "native": "--save_opt"
+    },
+    "machine_report": {
+      "type": "boolean",
+      "default": false,
+      "native": "--machine_report PATH (evaluation-only branch); runner chooses path"
+    }
+  },
+  "id": "jax_reaxff",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

@@ -24,6 +24,27 @@ CATEGORIES = (
 # Parser paths have the same spelling in terminal help and generated docs.
 # These flags describe management/output selection rather than scientific data.
 PARSER_OVERRIDES = {
+    "optimize-ffield": {
+        "--generate-template": ("Input and file selection", "short"),
+        "--generate-job-template": ("Input and file selection", "short"),
+        "--settings": ("Input and file selection", "short"),
+        "--submit": ("Input and file selection", "short"),
+        "--status": ("Input and file selection", "short"),
+        "--collect": ("Input and file selection", "short"),
+        "--smoke-report": ("Input and file selection", "short"),
+        "--convert": ("Input and file selection", "short"),
+        "--list-optimizers": ("Scientific choices", "short"),
+        "--validate": ("Execution", "short"),
+        "--dry-run": ("Execution", "short"),
+        "--ffield": ("Input and file selection", "short"),
+        "--params": ("Input and file selection", "short"),
+        "--trainset": ("Input and file selection", "short"),
+        "--geo": ("Input and file selection", "short"),
+        "--control": ("Input and file selection", "short"),
+        "--optimizer": ("Scientific choices", "short"),
+        "--output": ("Outputs and plots", "short"),
+        "--conversion-config": ("Input and file selection", "full"),
+    },
     "study": {
         "--root": ("Outputs and plots", "short"),
         "--analysis": ("Scientific choices", "short"),

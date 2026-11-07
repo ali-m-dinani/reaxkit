@@ -1,0 +1,46 @@
+{
+  "engine": "Legacy Fortran ReaxFF",
+  "objective": "sum_squared_accuracy_divided_residuals",
+  "license": "Source headers request no redistribution; user-supplied executable only",
+  "revision": "ffopt.f SHA256 d87c7a1f7dcfb6a37379f93d618547492d3e91577576c8eb7e6fdeb732750227",
+  "seed": "not_applicable",
+  "resume": "parameter_only",
+  "settings": {
+    "random_file": {
+      "type": "path",
+      "default": null,
+      "native": "required native unit 35 input; not an orchestrator RNG seed"
+    },
+    "parsca": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "control:parsca"
+    },
+    "parext": {
+      "type": "number",
+      "default": 0.001,
+      "minimum": 0,
+      "native": "control:parext"
+    },
+    "igeopt": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 0,
+      "choices": [
+        0,
+        1
+      ],
+      "native": "control:igeopt"
+    },
+    "accerr": {
+      "type": "number",
+      "default": 2.5,
+      "minimum": 0,
+      "native": "control:accerr"
+    }
+  },
+  "id": "standalone_soppi",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

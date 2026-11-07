@@ -1,0 +1,42 @@
+{
+  "engine": "SCM OldReaxFF",
+  "objective": "sum_squared_accuracy_divided_residuals",
+  "license": "Proprietary SCM installation; user supplied",
+  "revision": "OldReaxFF online documentation (2026-11-05); AMS 2023.103 output unverified",
+  "seed": "unsupported",
+  "resume": "native_state_at_last_improvement",
+  "settings": {
+    "ffotol": {
+      "type": "number",
+      "default": 0.000001,
+      "minimum": 0,
+      "native": "control:ffotol"
+    },
+    "mcffit": {
+      "type": "integer",
+      "default": 10000,
+      "minimum": 1,
+      "native": "control:mcffit"
+    },
+    "mcrxdd": {
+      "type": "integer",
+      "default": 100,
+      "minimum": 1,
+      "native": "control:mcrxdd"
+    },
+    "replic": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "control:replic"
+    },
+    "restart": {
+      "type": "path",
+      "default": null,
+      "native": "input file: cmaes_restart.txt"
+    }
+  },
+  "id": "ams_cmaes",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

@@ -1,0 +1,25 @@
+name: Optimization contracts (Linux)
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  optimization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -e . pytest
+      - name: Native mapping, conversion and Linux process contracts (no engines)
+        run: python -m pytest tests/optimization -q --junitxml=optimization-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: optimization-tests-${{ matrix.python-version }}
+          path: optimization-tests.xml

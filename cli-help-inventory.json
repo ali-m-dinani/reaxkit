@@ -70662,6 +70662,475 @@
     "visibility": "full"
   },
   {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--checkpoint",
+      "--no-checkpoint"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Enable durable result batches for audited commands. Example: --no-checkpoint, disables recovery storage.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--checkpoint-buffer-mb"
+    ],
+    "required": false,
+    "default": "32",
+    "choices": null,
+    "help": "Result buffer in MiB, plus one oversized frame. Example: --checkpoint-buffer-mb 32, bounds pending result payloads to approximately 32 MiB.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--checkpoint-interval-seconds"
+    ],
+    "required": false,
+    "default": "30",
+    "choices": null,
+    "help": "Flush at the next completed frame after this interval. Example: --checkpoint-interval-seconds 30, commits roughly every 30 seconds.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--chunk-size"
+    ],
+    "required": false,
+    "default": "0",
+    "choices": null,
+    "help": "Maximum in-flight frames: auto or N. Example: --chunk-size 8, which limits concurrent frame processing to eight frames.",
+    "category": "Execution",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--collect"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Collect current native outputs from every campaign run.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--color-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "light-fill"
+    ],
+    "help": "Color treatment: default preserves existing colors; light-fill uses lighter bar and marker interiors with the original outlines and lines. Example: --color-style light-fill, which adds contrast between fills and borders.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--control"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Override the control input path; relative to the current directory.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--conversion-config"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Optional YAML converter options, including version-specific columns.",
+    "category": "Input and file selection",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--convert"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Convert one existing native output directory without running an optimizer.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--detail-format"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": [
+      "parquet",
+      "csv"
+    ],
+    "help": "Optional detail format (default: Parquet; legacy: CSV). Example: --detail-format csv, which writes requested detail tables as CSV.",
+    "category": "Outputs and plots",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--diagnostic-interval-seconds"
+    ],
+    "required": false,
+    "default": "60.0",
+    "choices": null,
+    "help": "Python stack sampling interval (default: 60 seconds). Example: --diagnostic-interval-seconds 30.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--diagnostics",
+      "--no-diagnostics"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Enable a per-command report, console log, resource samples, and periodic Python stacks under logs/diagnostics (disabled by default).",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--dry-run"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Prepare reviewable run files without calling Slurm.",
+    "category": "Execution",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--execution"
+    ],
+    "required": false,
+    "default": "'auto'",
+    "choices": [
+      "auto",
+      "serial",
+      "threads",
+      "processes"
+    ],
+    "help": "Execution backend; unsupported backends fall back to serial with a logged reason. Example: --execution serial, which processes work sequentially.",
+    "category": "Execution",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--ffield"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Override the ffield input path; relative to the current directory.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--generate-job-template"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Write the site-neutral Slurm worker-contract template.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--generate-template"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Write a commented YAML settings template; refuse overwrite.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--geo"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Override the geo input path; relative to the current directory.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--help-all",
+      "--all-flags"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": null,
+    "help": "Show every option, grouped by purpose. Example: --help-all, which includes advanced flags in the help output.",
+    "category": "Diagnostics and compatibility",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--list-optimizers"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Show audited adapter capabilities and native setting mappings.",
+    "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--optimizer"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": [
+      "ams_mcff",
+      "ams_cmaes",
+      "standalone_soppi",
+      "jax_soppi",
+      "jax_reaxff",
+      "indeedopt",
+      "ogolem",
+      "pibo",
+      "ezff"
+    ],
+    "help": "Optimizer format for --convert.",
+    "category": "Scientific choices",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--output"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Normalized output directory for --convert.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--output-profile"
+    ],
+    "required": false,
+    "default": "'standard'",
+    "choices": [
+      "standard",
+      "minimal",
+      "full",
+      "legacy"
+    ],
+    "help": "Artifact profile (default: standard). Example: --output-profile full, which includes declared optional detail artifacts.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--params"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Override the params input path; relative to the current directory.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--plot-style"
+    ],
+    "required": false,
+    "default": "'default'",
+    "choices": [
+      "default",
+      "publication",
+      "publication-bold"
+    ],
+    "help": "Plot appearance: default preserves existing styling; publication uses clear fonts and an accessible palette; publication-bold uses larger bold text and heavier lines. Example: --plot-style publication-bold, which improves readability when figures are reduced in a manuscript.",
+    "category": "Outputs and plots",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--profile"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Record deterministic function calls and timings for all Python threads (requires --diagnostics and reaxkit[profiling]).",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--profile-clock"
+    ],
+    "required": false,
+    "default": "'wall'",
+    "choices": [
+      "wall",
+      "cpu"
+    ],
+    "help": "Profiler timer: elapsed wall time (default) or thread CPU time. Requires --profile to record.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--resume"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Resume a compatible result checkpoint; repeat the original scientific options. Example: --resume ./checkpoint, skips committed calculations.",
+    "category": "Storage and cache",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--settings"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Validate and submit a YAML campaign; use --dry-run to prepare only.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--smoke-report"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Inspect cluster smoke-test evidence without submitting or certifying scientific validity.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--status"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Inspect campaign scheduler and worker status without resubmission.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--submit"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Submit an existing prepared campaign once; never retry attempted jobs.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--trainset"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Override the trainset input path; relative to the current directory.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--validate"
+    ],
+    "required": false,
+    "default": "False",
+    "choices": null,
+    "help": "Check settings, inputs, and job contract without staging or submission.",
+    "category": "Execution",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "--workers"
+    ],
+    "required": false,
+    "default": "0",
+    "choices": null,
+    "help": "Frame workers: auto or N (default: auto). Example: --workers 4, which requests four frame workers.",
+    "category": "Execution",
+    "visibility": "full"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
+      "-h",
+      "--help"
+    ],
+    "required": false,
+    "default": "'==SUPPRESS=='",
+    "choices": null,
+    "help": "show this help message and exit",
+    "category": "Diagnostics and compatibility",
+    "visibility": "full"
+  },
+  {
     "parser": "reaxkit orthogonalize-geo",
     "flags": [
       "--analysis-id"

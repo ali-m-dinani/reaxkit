@@ -1,0 +1,144 @@
+{
+  "engine": "JAX-ReaxFF/JAX-MD",
+  "objective": "sum_squared_accuracy_divided_residuals",
+  "license": "No license found in JAX-SOPPI; JAX-ReaxFF dependency GPL-3.0",
+  "revision": "061b9e8",
+  "seed": "not_applicable",
+  "resume": "native_state_matching_fingerprint",
+  "settings": {
+    "device": {
+      "type": "string",
+      "default": "auto",
+      "choices": [
+        "auto",
+        "cpu",
+        "gpu"
+      ],
+      "native": "--device"
+    },
+    "profile": {
+      "type": "string",
+      "default": "modern",
+      "choices": [
+        "modern",
+        "legacy_fortran"
+      ],
+      "native": "--profile"
+    },
+    "acceptance": {
+      "type": "string",
+      "default": "non_increasing",
+      "choices": [
+        "non_increasing",
+        "always_candidate"
+      ],
+      "native": "--acceptance"
+    },
+    "parsca": {
+      "type": "number",
+      "default": null,
+      "minimum": 0,
+      "native": "--parsca"
+    },
+    "parext": {
+      "type": "number",
+      "default": null,
+      "minimum": 0,
+      "native": "--parext"
+    },
+    "accerr": {
+      "type": "number",
+      "default": null,
+      "minimum": 0,
+      "native": "--accerr"
+    },
+    "igeopt": {
+      "type": "integer",
+      "default": null,
+      "minimum": 0,
+      "choices": [
+        0,
+        1
+      ],
+      "native": "--igeopt"
+    },
+    "max_extrapolation_fraction": {
+      "type": "number",
+      "default": 0.001,
+      "minimum": 0,
+      "native": "--max-extrapolation-fraction"
+    },
+    "max_retries": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 0,
+      "native": "--max-retries"
+    },
+    "minimization_steps": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "--minimization-steps"
+    },
+    "minimization_lr": {
+      "type": "number",
+      "default": 0.0005,
+      "minimum": 0,
+      "native": "--minimization-lr"
+    },
+    "minimization_rmsg": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "--minimization-rmsg"
+    },
+    "max_clusters": {
+      "type": "integer",
+      "default": 4,
+      "minimum": 1,
+      "native": "--max-clusters"
+    },
+    "candidate_batch_size": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "--candidate-batch-size"
+    },
+    "max_rows": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "--max-rows"
+    },
+    "koppel2": {
+      "type": "path",
+      "default": null,
+      "native": "--koppel2"
+    },
+    "jax_reaxff_root": {
+      "type": "path",
+      "default": null,
+      "native": "--jax-reaxff-root"
+    },
+    "jax_md_root": {
+      "type": "path",
+      "default": null,
+      "native": "--jax-md-root"
+    },
+    "cutoff": {
+      "type": "number",
+      "default": 5,
+      "minimum": 0,
+      "native": "--cutoff"
+    },
+    "cutoff2": {
+      "type": "number",
+      "default": 0.001,
+      "minimum": 0,
+      "native": "--cutoff2"
+    }
+  },
+  "id": "jax_soppi",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

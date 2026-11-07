@@ -1,0 +1,45 @@
+schema_version: 1
+replicas: 2
+optimizers: [jax_soppi, jax_reaxff]
+seed: 42
+output: ./smoke_campaign
+job: ./roar_job.sh
+inputs:
+  ffield: /path/to/your/small/ffield
+  params: /path/to/your/small/params
+  trainset: /path/to/your/small/trainset.in
+  geo: /path/to/your/small/geo
+  control: null
+  params_bounds_order: max_min
+scheduler:
+  type: slurm
+  profile: roar_collab
+collection_interval_seconds: 5
+optimizer_settings:
+  jax_soppi:
+    runtime:
+      mode: native
+      command: [/path/soppi-env/bin/python, -u, -m, soppi.cli]
+      version: null
+      engine_version: null
+      timeout_seconds: 300
+      environment: {}
+    settings:
+      device: cpu
+      max_rows: 1
+      minimization_steps: 0
+      jax_reaxff_root: /path/JAX-ReaxFF
+      jax_md_root: /path/jax-md
+  jax_reaxff:
+    runtime:
+      mode: native
+      command: [/path/jax-env/bin/python, -u, -m, jaxreaxff.driver]
+      version: null
+      engine_version: null
+      timeout_seconds: 300
+      environment:
+        JAX_PLATFORMS: cpu
+    settings:
+      num_trials: 1
+      num_steps: 1
+      num_e_minim_steps: 0

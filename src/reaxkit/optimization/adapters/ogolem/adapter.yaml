@@ -1,0 +1,81 @@
+{
+  "engine": "Existing external evaluator bridge",
+  "objective": "adapter_defined_nonnegative_fitness_or_squared_accuracy_divided_residuals",
+  "license": "BSD-style license with advertising acknowledgement (LICENSE); inspect full terms",
+  "revision": "a66dae3",
+  "seed": "unsupported",
+  "resume": "native_population_state",
+  "settings": {
+    "evaluator_command": {
+      "type": "list",
+      "default": null,
+      "native": "evaluator.json command; custom backend only"
+    },
+    "profile": {
+      "type": "string",
+      "default": "basic",
+      "choices": [
+        "basic",
+        "s4-inspired"
+      ],
+      "native": "bridge --profile"
+    },
+    "iterations": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "bridge --iterations / ParamGlobOptIter"
+    },
+    "population": {
+      "type": "integer",
+      "default": null,
+      "minimum": 2,
+      "native": "bridge --population"
+    },
+    "backend": {
+      "type": "string",
+      "default": "custom",
+      "choices": [
+        "custom",
+        "ams",
+        "jax-md"
+      ],
+      "native": "bridge --backend"
+    },
+    "include_initial": {
+      "type": "boolean",
+      "default": false,
+      "native": "bridge --seed (include initial vector, not RNG seed)"
+    },
+    "normalize_bounds": {
+      "type": "boolean",
+      "default": false,
+      "native": "bridge --normalize-bounds"
+    },
+    "engine_python": {
+      "type": "path",
+      "default": null,
+      "native": "bridge --engine-python"
+    },
+    "ams_job_file": {
+      "type": "path",
+      "default": null,
+      "native": "bridge --ams-job-file"
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "default": 3600,
+      "minimum": 0,
+      "native": "evaluator.json: timeout_seconds"
+    },
+    "workers": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "native": "OGolem adaptive positional WORKERS"
+    }
+  },
+  "id": "ogolem",
+  "launch": "native_or_external_runner_v1",
+  "cluster_validated": false
+}

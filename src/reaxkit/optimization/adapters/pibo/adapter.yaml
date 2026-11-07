@@ -1,0 +1,132 @@
+{
+  "engine": "LAMMPS ReaxFF",
+  "objective": "profile_specific_energy_geometry_loss; cobalt_normalized_RMS",
+  "license": "MIT declared in pyproject.toml; no top-level LICENSE found",
+  "revision": "1ebd482",
+  "seed": "profile_dependent",
+  "resume": "parameter_only",
+  "settings": {
+    "acknowledge_cobalt_subset": {
+      "type": "boolean",
+      "default": false,
+      "native": "orchestrator consent to native cobalt training-group subset"
+    },
+    "driver": {
+      "type": "string",
+      "default": "mos2",
+      "choices": [
+        "mos2",
+        "cobalt"
+      ],
+      "native": "runner driver selection: run.py or pibo_calculation/cobalt_pibo.py"
+    },
+    "config": {
+      "type": "path",
+      "default": null,
+      "native": "--config"
+    },
+    "profile": {
+      "type": "string",
+      "default": "demo",
+      "choices": [
+        "demo",
+        "manuscript"
+      ],
+      "native": "--profile"
+    },
+    "budget": {
+      "type": "integer",
+      "default": 400,
+      "minimum": 1,
+      "native": "--budget / bo.budget"
+    },
+    "replicates": {
+      "type": "integer",
+      "default": 1,
+      "minimum": 1,
+      "choices": [
+        1
+      ],
+      "native": "--replicates / bo.replicates (forced to 1 per orchestrated run)"
+    },
+    "init_lhs": {
+      "type": "integer",
+      "default": 30,
+      "minimum": 1,
+      "native": "--init-lhs / bo.init_lhs_points"
+    },
+    "optimizers": {
+      "type": "list",
+      "default": [
+        "pibo"
+      ],
+      "native": "--optimizers / bo.optimizers"
+    },
+    "patience": {
+      "type": "integer",
+      "default": 40,
+      "minimum": 0,
+      "native": "bo.patience"
+    },
+    "burn_in": {
+      "type": "integer",
+      "default": 80,
+      "minimum": 0,
+      "native": "bo.burn_in"
+    },
+    "stage_ucb_until": {
+      "type": "number",
+      "default": 0.3,
+      "minimum": 0,
+      "maximum": 1,
+      "native": "--stage-ucb-until / acquisition.stage_ucb_until"
+    },
+    "stage_ei_until": {
+      "type": "number",
+      "default": 0.7,
+      "minimum": 0,
+      "maximum": 1,
+      "native": "--stage-ei-until / acquisition.stage_ei_until"
+    },
+    "w_energy": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "--w-energy"
+    },
+    "w_forces": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "choices": [
+        0
+      ],
+      "native": "--w-forces (no force term implemented; only zero allowed)"
+    },
+    "w_geometry": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "native": "--w-geometry"
+    },
+    "validation_enabled": {
+      "type": "boolean",
+      "default": false,
+      "native": "validation.enabled / --no-validation"
+    },
+    "staged": {
+      "type": "boolean",
+      "default": false,
+      "native": "--staged"
+    },
+    "convergence_retries": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0,
+      "native": "--convergence-retries"
+    }
+  },
+  "id": "pibo",
+  "launch": "native_cobalt_or_external_runner_v1",
+  "cluster_validated": false
+}

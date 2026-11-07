@@ -1,0 +1,73 @@
+{
+  "engine": "User-supplied existing external engine/objective runner",
+  "objective": "user_defined_vector",
+  "license": "MIT (LICENSE)",
+  "revision": "6d39f8e",
+  "seed": "runner_defined",
+  "resume": "parameter_only",
+  "settings": {
+    "num_errors": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "FFParam(num_errors=...)"
+    },
+    "variable_bounds": {
+      "type": "path",
+      "default": null,
+      "native": "read_variable_bounds(path)"
+    },
+    "forcefield_template": {
+      "type": "path",
+      "default": null,
+      "native": "read_forcefield_template(path)"
+    },
+    "algorithm": {
+      "type": "string",
+      "default": null,
+      "native": "set_algorithm(algo_string)"
+    },
+    "population_size": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "set_algorithm(population_size=...)"
+    },
+    "partial_grid": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "set_algorithm(partial_grid=...)"
+    },
+    "full_grid": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "set_algorithm(full_grid=...)"
+    },
+    "num_epochs": {
+      "type": "integer",
+      "default": null,
+      "minimum": 1,
+      "native": "parameterize(num_epochs=...)"
+    },
+    "pool": {
+      "type": "string",
+      "default": null,
+      "choices": [
+        "multi",
+        "mpi"
+      ],
+      "native": "generate_pool(pool_type)"
+    },
+    "normalize_errors": {
+      "type": "number",
+      "default": 2,
+      "minimum": 0,
+      "native": "normalize_errors(scale)"
+    }
+  },
+  "id": "ezff",
+  "launch": "external_runner_contract_v1",
+  "cluster_validated": false
+}
