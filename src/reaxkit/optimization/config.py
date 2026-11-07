@@ -64,14 +64,14 @@ def check_value(value, rule, location):
         raise OptimizationError(f"{location}: choose from {rule['choices']}")
 
 
-def path_value(value, base, location, exists=True):
+def path_value(value, base, location, exists=True, resolve_symlinks=True):
     check_value(value, {"type": "path"}, location)
     if value is None:
         return None
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = base / path
-    path = path.resolve()
+    path = path.resolve() if resolve_symlinks else path.absolute()
     if exists and not path.exists():
         raise OptimizationError(f"{location}: not found: {path}")
     return str(path)
@@ -204,7 +204,7 @@ def load_config(filename, overrides=None):
         if runtime["source"] and not Path(runtime["source"]).is_dir():
             raise OptimizationError(prefix + ".runtime.source: expected a directory")
         if runtime.get("bridge_python"):
-            runtime["bridge_python"] = path_value(runtime["bridge_python"], base, prefix + ".runtime.bridge_python")
+            runtime["bridge_python"] = path_value(runtime["bridge_python"], base, prefix + ".runtime.bridge_python", resolve_symlinks=False)
         section["job"] = path_value(section.get("job"), base, prefix + ".job") or config["job"]
         if not section["job"]:
             raise OptimizationError(prefix + ".job: a Slurm job file is required")
@@ -219,7 +219,7 @@ def load_config(filename, overrides=None):
         for key, rule in rules.items():
             settings.setdefault(key, copy.deepcopy(rule["default"]))
             if rule["type"] == "path":
-                settings[key] = path_value(settings[key], base, prefix + ".settings." + key)
+                settings[key] = path_value(settings[key], base, prefix + ".settings." + key, resolve_symlinks=key != "engine_python")
         section["explicit_settings"] = sorted(supplied)
         if optimizer == "jax_reaxff" and settings["use_valid"] and not all(settings[key] for key in ("valid_file", "valid_geo_file")):
             raise OptimizationError(prefix + ": validation requires valid_file and valid_geo_file")

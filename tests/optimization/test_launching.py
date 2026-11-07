@@ -186,19 +186,36 @@ def test_legacy_units_and_required_random_input(settings_file):
     assert request["launch"]["seed_forwarded"] is None
 
 
-def test_ogolem_external_bridge_plan_and_custom_evaluator(settings_file):
+@pytest.mark.parametrize("linked_interpreters", [False, True])
+def test_ogolem_external_bridge_plan_and_custom_evaluator(settings_file, linked_interpreters):
     source = settings_file.parent / "ogolem"
     (source / "tools").mkdir(parents=True)
     (source / "tools/reaxff_bridge.py").write_text("fixture")
-    native_config(settings_file, "ogolem", {"backend": "custom", "evaluator_command": ["engine-runner"], "include_initial": True},
-                  {"source": str(source), "bridge_python": sys.executable})
+    bridge_python = sys.executable
+    engine_python = None
+    if linked_interpreters:
+        interpreter = settings_file.parent / "bridge-env" / "bin" / "python"
+        interpreter.parent.mkdir(parents=True)
+        try:
+            interpreter.symlink_to(Path(sys.executable).resolve())
+        except OSError as error:
+            pytest.skip(f"Interpreter symlinks unavailable: {error}")
+        bridge_python = str(interpreter.relative_to(settings_file.parent))
+        engine_python = bridge_python
+    native_config(settings_file, "ogolem", {"backend": "custom", "evaluator_command": ["engine-runner"], "include_initial": True,
+                                           "engine_python": engine_python},
+                  {"source": str(source), "bridge_python": bridge_python})
     directory, request = first_run(load_config(settings_file))
     steps = request["launch"]["commands"]
     assert len(steps) == 2 and steps[0]["phase"] == "prepare"
     assert "--seed" in steps[0]["argv"]
     assert steps[1]["argv"][-3:] == ["--adaptive", "fit.ogo", "1"]
-    assert request["settings"]["engine_python"] is None
-    assert request["runtime"]["bridge_python"] == sys.executable
+    expected_python = str(interpreter) if linked_interpreters else sys.executable
+    assert request["settings"]["engine_python"] == (expected_python if linked_interpreters else None)
+    assert request["runtime"]["bridge_python"] == expected_python
+    assert steps[0]["argv"][0] == expected_python
+    if linked_interpreters:
+        assert steps[0]["argv"][steps[0]["argv"].index("--engine-python") + 1] == expected_python
     assert request["launch"]["seed_forwarded"] is None
     from reaxkit.optimization.adapters.ogolem.launch import after_prepare
     bundle = Path(request["launch"]["results_directory"])

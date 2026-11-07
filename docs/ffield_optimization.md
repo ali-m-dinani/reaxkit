@@ -36,6 +36,8 @@ never merge incompatible NumPy/JAX/LAMMPS requirements. Set absolute executable,
 interpreter, script and jar paths in runtime.command. Install each optimizer into
 its own environment or explicitly configure its process's PYTHONPATH.
 runtime.source records provenance; it does not install packages or change imports.
+OGolem's bridge_python and engine_python paths retain interpreter symlinks so
+Linux virtual environments are not bypassed when their Python links to a system binary.
 
 Prepare on Linux using the ReaxKit environment that workers will use. Its absolute
 interpreter is captured in job/worker.sh; activating another environment in the
