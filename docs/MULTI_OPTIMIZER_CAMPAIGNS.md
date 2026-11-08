@@ -83,6 +83,12 @@ optimizer_settings sections. Within each section, retain runtime.command,
 environment, source and engine-specific paths. Set job to null to use the
 shared template, or retain that method's tested job file.
 
+When sharing a legacy control file with AMS, add `inputs: {control: null}`
+inside the jax_reaxff and pibo sections: these native drivers reject that file.
+Use the same explicit omission for other methods whose tested configuration
+did not supply control (for example the INDEEDopt and EZFF cobalt runners).
+Omitting this per-method override inherits the shared control file.
+
 Set runtime.shutdown_grace_seconds to 600 and runtime.timeout_seconds to 4380
 in each selected section. Remove stale per-method
 runtime.optimization_time_limit_seconds overrides, or set them to 3600.

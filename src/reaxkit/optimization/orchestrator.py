@@ -38,19 +38,20 @@ def prepare(config):
     atomic_text(root / "settings.original.yaml", config["_original"])
     resolved = {key: value for key, value in config.items() if not key.startswith("_")}
     atomic_text(root / "settings.resolved.yaml", yaml.safe_dump(resolved, sort_keys=False))
-    input_hashes = {key: digest(Path(value)) for key, value in config["inputs"].items()
-                    if key != "params_bounds_order" and value}
-    dataset_fingerprint = identity({key: value for key, value in input_hashes.items() if key in ("trainset", "geo")})
     for optimizer in config["optimizers"]:
         spec = specification(optimizer)
         section = config["optimizer_settings"][optimizer]
+        inputs = {**config["inputs"], **section.get("inputs", {})}
+        input_hashes = {key: digest(Path(value)) for key, value in inputs.items()
+                        if key != "params_bounds_order" and value}
+        dataset_fingerprint = identity({key: value for key, value in input_hashes.items() if key in ("trainset", "geo")})
         for replica in range(1, config["replicas"] + 1):
             relative = f"runs/{optimizer}/replica-{replica:04d}"
             directory = root / relative
             for child in ("input", "native", "job"):
                 (directory / child).mkdir(parents=True)
             input_paths = {}
-            for key, source in config["inputs"].items():
+            for key, source in inputs.items():
                 if key == "params_bounds_order" or not source:
                     continue
                 target = directory / "input" / ("trainset.in" if key == "trainset" else key)

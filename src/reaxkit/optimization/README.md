@@ -43,6 +43,14 @@ ReaxKit tests.
 
 ## Slurm job names
 
+The optional `optimizer_settings.<optimizer>.inputs.control` overrides the shared
+control file for that method. Set it to `null` for methods that do not consume
+legacy control files, such as native JAX-ReaxFF and PIBO cobalt. Omit the key
+to inherit the shared control, or supply a YAML-relative file path. This override
+also takes precedence over the shared CLI `--control` input. Only `control`
+currently supports per-method input overrides; scientific dataset files remain
+shared. Validation, staged files and input hashes use the effective inputs.
+
 New campaigns use names such as `ogo-r01-<campaign-id>`: a three-letter
 optimizer abbreviation, a replica number padded to at least two digits, and
 a unique campaign suffix for submission reconciliation. Each optimizer/replica

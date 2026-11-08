@@ -75,6 +75,51 @@ def test_unique_three_letter_job_abbreviations():
         assert f"#SBATCH --job-name={abbreviation}\n" in render_job(JOB_TEMPLATE, optimizer, {})
 
 
+@pytest.mark.parametrize("override", [None, "alternate.control"])
+def test_per_method_control_validation_staging_and_hashes(settings_file, monkeypatch, override):
+    shared = settings_file.parent / "control"
+    shared.write_text("1 igeopt\n")
+    alternate = settings_file.parent / "alternate.control"
+    alternate.write_text("0 igeopt\n")
+    def update(data):
+        data["inputs"]["control"] = "control"
+        data["optimizers"] = ["jax_soppi", "jax_reaxff"]
+        data["optimizer_settings"]["jax_reaxff"] = {
+            "runtime": {"command": ["runner", "{run_config}"]},
+            "inputs": {"control": override},
+        }
+    edit_config(settings_file, update)
+    observed = {}
+    def validate(config, optimizer, section):
+        observed[optimizer] = config["inputs"]["control"]
+    monkeypatch.setattr("reaxkit.optimization.launching.validate_native", validate)
+    config = load_config(settings_file)
+    assert observed["jax_soppi"] == str(shared)
+    assert observed["jax_reaxff"] == (str(alternate) if override else None)
+    root = prepare(config)
+    from reaxkit.optimization.storage import digest
+    for relative in read_json(root / "campaign.json")["runs"]:
+        directory = root / relative
+        request = read_json(directory / "run-config.json")
+        metadata = read_json(directory / "run.json")
+        expected = shared if request["optimizer"] == "jax_soppi" else alternate if override else None
+        assert (directory / "input/control").exists() == (expected is not None)
+        assert ("control" in request["inputs"]) == (expected is not None)
+        assert metadata["input_hashes"] == request["input_hashes"]
+        assert metadata["input_hashes"].get("control") == (digest(expected) if expected else None)
+    reloaded = load_config(root / "settings.resolved.yaml")
+    assert reloaded["optimizer_settings"]["jax_reaxff"]["inputs"] == config["optimizer_settings"]["jax_reaxff"]["inputs"]
+
+
+def test_control_override_must_exist_and_dataset_override_rejected(settings_file):
+    edit_config(settings_file, lambda data: data["optimizer_settings"]["jax_soppi"].update(inputs={"control": "missing"}))
+    with pytest.raises(OptimizationError, match="not found"):
+        load_config(settings_file)
+    edit_config(settings_file, lambda data: data["optimizer_settings"]["jax_soppi"].update(inputs={"geo": "geo"}))
+    with pytest.raises(OptimizationError, match="unknown keys"):
+        load_config(settings_file)
+
+
 def test_resource_aliases_and_serial_constraints():
     assert resolve_resources("ams_mcff", {"nodes": 2}, {"ntasks": 16, "ntasks_per_node": 8})["ntasks"] == 16
     template = JOB_TEMPLATE.replace("#SBATCH --cpus-per-task=1", "#SBATCH -c 16")

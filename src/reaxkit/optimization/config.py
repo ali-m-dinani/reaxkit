@@ -165,7 +165,12 @@ def load_config(filename, overrides=None):
     all_settings = mapping(config.setdefault("optimizer_settings", {}), OPTIMIZERS, "optimizer_settings")
     for optimizer, section in all_settings.items():
         prefix = f"optimizer_settings.{optimizer}"
-        mapping(section, ("runtime", "job", "settings", "conversion", "prepared_inputs", "explicit_settings", "resources"), prefix)
+        mapping(section, ("runtime", "job", "settings", "conversion", "prepared_inputs", "explicit_settings", "resources", "inputs"), prefix)
+        input_overrides = mapping(section.setdefault("inputs", {}), ("control",), prefix + ".inputs")
+        if "control" in input_overrides:
+            input_overrides["control"] = path_value(input_overrides["control"], base, prefix + ".inputs.control")
+            if input_overrides["control"] is not None and not Path(input_overrides["control"]).is_file():
+                raise OptimizationError(prefix + ".inputs.control: expected a file")
         section["resources"] = resolve_resources(optimizer, config["resources"], section.get("resources", {}))
         rules = specification(optimizer)["settings"]
         settings = mapping(section.setdefault("settings", {}), rules, prefix + ".settings")
@@ -254,7 +259,7 @@ def load_config(filename, overrides=None):
             if ucb_limit > ei_limit:
                 raise OptimizationError(prefix + ": stage_ucb_until must not exceed stage_ei_until")
         from .launching import validate_native
-        validate_native(config, optimizer, section)
+        validate_native({**config, "inputs": {**inputs, **input_overrides}}, optimizer, section)
     for optimizer in selected:
         if optimizer not in all_settings:
             raise OptimizationError(f"optimizer_settings.{optimizer}: required")
