@@ -12,7 +12,7 @@ from .models import OptimizationError
 
 OPTIMIZERS = (
     "ams_mcff", "ams_cmaes", "standalone_soppi", "jax_soppi",
-    "jax_reaxff", "indeedopt", "ogolem", "pibo", "ezff", "glompo",
+    "jax_reaxff", "indeedopt", "ogolem", "pibo", "ezff", "glompo", "flocky",
 )
 
 

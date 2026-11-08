@@ -158,6 +158,25 @@ path from that example is hard-coded into ReaxKit.
   No parity predictions, reproducible RNG forwarding or exact restart claimed.
   See `docs/GLOMPO.md` for the prerequisite gate and subsequent submission path.
 
+### Flocky integration (2026-11-08)
+
+- Forked df398/flocky at a472e3c to ali-m-dinani/flocky and cloned locally.
+- Separate C++ optimizer/Fortran engine, with file-only ReaxKit integration.
+  C++ GPL-3.0-or-later; upstream Fortran headers restrict redistribution.
+  No engine sources or binaries are added to ReaxKit or modified in our commits.
+- Added a conservative serial external runner, explicit params.mod mapping,
+  registry/template settings and cycle-aware native progress converter.
+- Source inspection and upstream saved example output validation only so far.
+  Cygwin GCC/Fortran/Boost installed locally; NLopt unavailable in that install.
+  Additional installer invocation was blocked and a fallback source download
+  was stopped after failing to complete. No fresh native sample run is claimed.
+- Native serial build, engine compatibility, actual execution and Roar submission
+  remain unverified. Native fixed-charge parsing treats any token '5' in control
+  as activation; the runner rejects this unsupported auxiliary-file case.
+- Checkpoints are best-so-far by cycle, not all evaluations. Prediction report
+  candidate association, cross-engine objective equivalence, RNG forwarding and
+  exact restart are not established. See docs/FLOCKY.md for prerequisite gates.
+
 ### Reference links
 
 - [SCM MCFF documentation](https://www.scm.com/doc/OldReaxFF/MCFFOptimizer.html)

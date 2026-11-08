@@ -1,0 +1,16 @@
+id: flocky
+engine: Tapered ReaxFF (user-supplied tapreaxff)
+objective: Native Tapered ReaxFF training error; regularization disabled in smoke profile
+license: GPL-3.0-or-later optimizer; bundled engine headers restrict redistribution
+revision: a472e3c plus external runner
+seed: unsupported
+resume: parameter_only
+launch: external_runner_contract_v1
+cluster_validated: false
+settings:
+  executable: {type: path, default: null, native: Serial Flocky executable}
+  engine_executable: {type: path, default: null, native: User-supplied compatible tapreaxff executable}
+  params_mod: {type: path, default: null, native: Explicit seven-column absolute force-field coordinate map}
+  iterations: {type: integer, default: 2, minimum: 1, native: Maximum iterations per cycle}
+  swarm_size: {type: integer, default: 2, minimum: 2, native: NumP}
+  cycles: {type: integer, default: 1, minimum: 1, native: maxcycles}

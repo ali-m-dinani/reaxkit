@@ -70932,7 +70932,8 @@
       "ogolem",
       "pibo",
       "ezff",
-      "glompo"
+      "glompo",
+      "flocky"
     ],
     "help": "Optimizer format for --convert.",
     "category": "Scientific choices",
