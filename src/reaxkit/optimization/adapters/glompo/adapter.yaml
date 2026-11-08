@@ -9,6 +9,7 @@
   "launch": "external_runner_contract_v1",
   "cluster_validated": false,
   "settings": {
+    "job_workers": {"type": "integer", "default": 1, "minimum": 1, "native": "ParAMS ParallelLevels.jobs; one CPU per geometry job"},
     "max_function_calls": {"type": "integer", "default": 12, "minimum": 1, "native": "MaxFuncCalls"},
     "max_seconds": {"type": "number", "default": 300, "minimum": 0.001, "native": "MaxSeconds session_max"},
     "population_size": {"type": "integer", "default": 4, "minimum": 2, "native": "CMAOptimizer popsize"},

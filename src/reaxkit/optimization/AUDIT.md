@@ -141,7 +141,16 @@ path from that example is hard-coded into ReaxKit.
   parameter-space/profile metadata. No HDF5 optimizer objects are deserialized.
 - Initial external runner uses the upstream AMS/ParAMS ReaxFF SSE interface,
   one CMA worker, strict classic-input conversion and parameter-only best field.
-- ReaxFF execution, SCM API compatibility and Roar acceptance remain unverified.
+- Serial AMS 2023.103 smoke job 57122639 completed successfully: 11 evaluations
+  in 328.7 seconds, stopped by the 300-second manager limit, not convergence.
+  The exact initial candidate was evaluated and remained best at
+  1451.4515029431068. Conversion preserved 11 progress records and four artifacts.
+- Optional `job_workers` controls ParAMS geometry jobs per candidate (default 1).
+  CMA candidates remain serial; each geometry uses one process and one thread.
+  Parallel runs require a single-node, single-task Slurm allocation with enough
+  CPUs and affinity. Parallel AMS execution still requires a Roar smoke test;
+  local resource/API mocks do not establish SCM runtime compatibility.
+  Full acceptance and scientific equivalence remain unverified.
   No parity predictions, reproducible RNG forwarding or exact restart claimed.
   See `docs/GLOMPO.md` for the prerequisite gate and subsequent submission path.
 

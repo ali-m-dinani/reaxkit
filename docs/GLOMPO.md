@@ -117,3 +117,21 @@ for scientific and converter review; do not commit it.
 If interrupted, use the GloMPO interpreter to run
 `glompo/reaxkit_runner.py --export-native <run>/native/manager` after the job
 stops, then collect again. No automatic resubmission or exact restart is implied.
+# Geometry-level parallel smoke test
+
+The serial AMS 2023.103 job 57122639 completed 11 evaluations in 328.7 seconds.
+Its exact initial candidate remained best (1451.4515029431068); termination was
+the manager time limit, not scientific convergence. No parity data is available.
+
+Set `optimizer_settings.glompo.settings.job_workers: 4` in a fresh campaign to
+request four concurrent ParAMS geometry jobs per candidate. Keep one node, one
+Slurm task, and request `--cpus-per-task=4`. Keep NSCM, OMP_NUM_THREADS and
+SCM_USE_THREADS at 1: the four CPUs are for separate geometry jobs, not MPI ranks.
+Do not add a hardware constraint. The default `job_workers: 1` remains serial.
+
+This does not enable concurrent CMA candidates, multiple optimizers, or
+multi-node execution. The runner rejects insufficient allocation/affinity and
+records its resource plan in `manager/glompo-profile.json`. Check-only validates
+the installed ParallelLevels constructor but defers allocation checks outside
+Slurm. Run check-only with AMS's Python before submitting; parallel AMS execution
+is not yet cluster-validated. Preserve previous campaign directories.
