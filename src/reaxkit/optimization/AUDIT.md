@@ -146,6 +146,10 @@ path from that example is hard-coded into ReaxKit.
   The exact initial candidate was evaluated and remained best at
   1451.4515029431068. Conversion preserved 11 progress records and four artifacts.
 - Optional `job_workers` controls ParAMS geometry jobs per candidate (default 1).
+  AMS 2023.103 accepted explicit optimizations=1, parametervectors=1, jobs=4,
+  processes=1, threads=1 in a user-run constructor check. Its implicit
+  parametervectors default was 2; the runner now explicitly overrides it to 1.
+  This constructor check performed no engine evaluations.
   CMA candidates remain serial; each geometry uses one process and one thread.
   Parallel runs require a single-node, single-task Slurm allocation with enough
   CPUs and affinity. Parallel AMS execution still requires a Roar smoke test;
