@@ -6,7 +6,7 @@ Native command mappings and external-runner escape hatches are available.
 No GUI or real HPC validation is claimed.
 See [the permanent user guide](../../../docs/ffield_optimization.md) for native
 launch capabilities, environment isolation and the Roar smoke-test procedure.
-See [AUDIT.md](AUDIT.md) for exact supported output variants and prerequisites.
+See [validation and limitations](../../../docs/optimization_validation.md) for evidence levels and adapter contracts.
 
 ## Commands
 

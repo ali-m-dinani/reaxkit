@@ -45,7 +45,7 @@ Unsupported native workflows fail before submission. INDEEDopt has dataset-speci
 constants and rewrites bounds using gpf=5. MoS2 PIBO uses its own VASP data, fixed
 parameter catalog and checkout-relative files. EZFF needs an objective callback.
 Configurable isolated runners belong in those projects under their own licenses.
-See src/reaxkit/optimization/AUDIT.md for inspected revisions and output formats.
+See [validation and limitations](optimization_validation.md) for evidence levels and adapter contracts.
 
 ### EZFF cobalt result collection
 

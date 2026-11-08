@@ -25,7 +25,7 @@ ReaxKit is designed for researchers who want a transparent, scriptable bridge be
 - Analysis components separated from engine IO so the same computations can be reused across scripts, workflows, web UI, and presentation modules
 
 ### Workflows
-- `optimize-ffield` provides YAML templates, native mappings or explicit external runners, independent Slurm jobs, periodic collection, conversion, and smoke-test evidence reports. GUI integration is deferred; Linux/Roar validation and adapter limits are explicit. See the [optimization guide](docs/ffield_optimization.md), [backend contracts](src/reaxkit/optimization/README.md), and [adapter audit](src/reaxkit/optimization/AUDIT.md).
+- `optimize-ffield` provides YAML templates, native mappings or explicit external runners, independent Slurm jobs, periodic collection, conversion, and smoke-test evidence reports. GUI integration is deferred; Linux/Roar validation and adapter limits are explicit. See the [optimization guide](docs/ffield_optimization.md), [backend contracts](src/reaxkit/optimization/README.md), and [validation summary](docs/optimization_validation.md).
 - Reproducible workflows organized by data handling, file tools, meta orchestration, presentation, and study design
 - Automation paths for common ReaxFF pre-processing, analysis, post-processing, and presentation tasks
 

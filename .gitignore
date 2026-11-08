@@ -76,6 +76,7 @@ improvement plans and files/
 
 # Project-local files to ignore
 /FFIELD_OPTIMIZATION_PLAN.md
+/src/reaxkit/optimization/AUDIT.md
 README.txt
 ../other/done/README_convert_to_txt.py
 README_full_version.md
