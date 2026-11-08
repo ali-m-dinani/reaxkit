@@ -46,5 +46,6 @@ def convert(root, options=None):
                     status="ok" if values and all(value is not None for value in values) else "nonfinite",
                 ))
     collect_cobalt(reader, archive)
+    reader.artifact(reader.root / "ffield_best", "parameter_only")
     reader.result.warnings.append("Epoch errors are recommended candidates, not all evaluations; component names/units and weights are defined by the external objective")
     return reader.result

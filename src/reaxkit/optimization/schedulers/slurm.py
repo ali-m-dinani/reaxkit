@@ -17,10 +17,12 @@ JOB_TEMPLATE = """#!/bin/bash
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:10:00
+#SBATCH --account=ACCOUNT
+#SBATCH --partition=PARTITION
 
 # reaxkit-worker-contract: 1
 set -e
-# Add your account, partition, memory, hardware and module/environment setup.
+# Replace ACCOUNT and PARTITION; add memory and module/environment setup.
 # The submitted worker runs once; it launches your optimizer inside this allocation.
 # Keep the worker invocation last, replacing the old hard-coded engine command.
 exec bash "$1"

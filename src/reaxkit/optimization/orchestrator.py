@@ -18,8 +18,9 @@ import yaml
 from .conversion import collect_native
 from .launching import prepare_launch, staged_hashes, verify_staged
 from .models import OptimizationError, identity
-from .registry import specification
+from .registry import JOB_ABBREVIATIONS, specification
 from .schedulers.slurm import Slurm, SubmissionUnknown
+from .schedulers.render import render_job
 from .storage import atomic_text, digest, lock, now, read_json, write_json
 
 
@@ -60,7 +61,9 @@ def prepare(config):
                     raise OptimizationError("prepared_inputs must contain regular files/directories, not symlinks")
                 shutil.copytree(section["prepared_inputs"], directory / "native", dirs_exist_ok=True)
             staged_job = directory / "job" / "submit.sh"
-            atomic_text(staged_job, Path(section["job"]).read_text(encoding="utf-8"))
+            job_name = f"{JOB_ABBREVIATIONS[optimizer]}-r{replica:02d}-{campaign_id[:12]}"
+            atomic_text(staged_job, render_job(Path(section["job"]).read_text(encoding="utf-8"),
+                                              optimizer, section.get("resources", {}), job_name))
             seed = None if config["seed"] is None else int.from_bytes(
                 hashlib.sha256(f"{config['seed']}:{optimizer}:{replica}".encode()).digest()[:4], "big"
             ) % 2147483647
@@ -78,6 +81,7 @@ def prepare(config):
                 "comparison_status": "unverified",
                 "created_at": now(), "native_directory": str(directory / "native"),
                 "job_sha256": digest(staged_job),
+                "resources": section.get("resources", {}),
                 "collection_interval_seconds": config["collection_interval_seconds"],
             }
             request = {
@@ -123,7 +127,7 @@ def prepare(config):
             atomic_text(directory / "job" / "worker.sh", "#!/bin/bash\nset -e\nexec " + shlex.join(worker_command) + "\n")
             run["worker_sha256"] = digest(directory / "job" / "worker.sh")
             write_json(directory / "run.json", run)
-            write_json(directory / "job" / "submission.json", {"state": "staged", "name": run_id})
+            write_json(directory / "job" / "submission.json", {"state": "staged", "name": job_name})
             manifest["runs"].append(relative)
             write_json(root / "campaign.json", manifest)
     manifest["state"] = "prepared"

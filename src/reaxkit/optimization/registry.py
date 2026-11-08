@@ -15,6 +15,20 @@ OPTIMIZERS = (
     "jax_reaxff", "indeedopt", "ogolem", "pibo", "ezff", "glompo", "flocky",
 )
 
+JOB_ABBREVIATIONS = {
+    "ams_mcff": "mcf",
+    "ams_cmaes": "cma",
+    "standalone_soppi": "sop",
+    "jax_soppi": "jsp",
+    "jax_reaxff": "jrx",
+    "indeedopt": "ind",
+    "ogolem": "ogo",
+    "pibo": "pib",
+    "ezff": "ezf",
+    "glompo": "glo",
+    "flocky": "flk",
+}
+
 
 @lru_cache(maxsize=None)
 def specification(optimizer: str) -> dict:

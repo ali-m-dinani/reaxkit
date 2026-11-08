@@ -12,6 +12,14 @@ See [validation and limitations](../../../docs/optimization_validation.md) for e
 
 ## Commands
 
+See [multi-optimizer campaigns](../../../docs/MULTI_OPTIMIZER_CAMPAIGNS.md)
+for a shared job template, per-method resource allocations, and the
+60-minute optimization / 75-minute Slurm workflow.
+
+See [time budgets and checkpointing](../../../docs/OPTIMIZATION_TIME_LIMITS.md)
+before scheduling timed runs. Cooperative stop support is engine-specific;
+an allocation timeout is not graceful optimizer completion.
+
 ```bash
 reaxkit optimize-ffield --generate-template settings.yaml
 reaxkit optimize-ffield --generate-job-template roar_job.sh
@@ -32,6 +40,34 @@ paths use the settings directory; CLI input overrides use the current directory.
 An existing campaign output directory is never overwritten. Use `--submit` after
 a dry-run; attempted jobs are not submitted again. No jobs are submitted during
 ReaxKit tests.
+
+## Slurm job names
+
+New campaigns use names such as `ogo-r01-<campaign-id>`: a three-letter
+optimizer abbreviation, a replica number padded to at least two digits, and
+a unique campaign suffix for submission reconciliation. Each optimizer/replica
+receives its own independent Slurm job; three optimizers with two replicas
+produce six jobs.
+
+| Optimizer identifier | Job abbreviation |
+| --- | --- |
+| `ams_mcff` | `mcf` |
+| `ams_cmaes` | `cma` |
+| `standalone_soppi` | `sop` |
+| `jax_soppi` | `jsp` |
+| `jax_reaxff` | `jrx` |
+| `indeedopt` | `ind` |
+| `ogolem` | `ogo` |
+| `pibo` | `pib` |
+| `ezff` | `ezf` |
+| `glompo` | `glo` |
+| `flocky` | `flk` |
+
+These abbreviations only affect job names. YAML identifiers, run IDs and
+directory names remain unchanged, as do previously prepared campaigns.
+Replica numbers above 99 are not truncated. Generated job templates use
+generic `ACCOUNT` and `PARTITION` placeholders; replace these locally before
+submission and keep site-specific account details private.
 
 ## Job and runner contracts
 

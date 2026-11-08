@@ -89,5 +89,6 @@ def convert(root, options=None):
     for name in ("glompo_log.h5", "glompo_manager_log.yml", "trajectories.png", "best/candidate.json"):
         reader.artifact(directory / name)
     reader.artifact(directory / "best" / "ffield", "parameter_only")
+    reader.artifact(directory / "ffield_best", "parameter_only")
     reader.result.warnings.append("No labeled reference/prediction export; parity and cross-optimizer comparability remain unverified")
     return reader.result

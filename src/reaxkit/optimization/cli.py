@@ -44,8 +44,10 @@ def build_parser(parser):
     ):
         action = mode.add_argument(flag, action="store_true", help=help_text)
         action.help_metadata = ("Execution", "short")
-    for key in ("ffield", "params", "trainset", "geo", "control"):
-        action = parser.add_argument("--" + key, type=Path, help=f"Override the {key} input path; relative to the current directory.")
+    for key in ("ffield", "params", "trainset", "geo", "control", "job"):
+        help_text = ("Default Slurm job template; per-optimizer job paths retain precedence."
+                     if key == "job" else f"Override the {key} input path; relative to the current directory.")
+        action = parser.add_argument("--" + key, type=Path, help=help_text)
         action.help_metadata = ("Input and file selection", "short")
     action = parser.add_argument("--optimizer", choices=OPTIMIZERS, help="Optimizer format for --convert.")
     action.help_metadata = ("Scientific choices", "short")
@@ -59,7 +61,7 @@ def build_parser(parser):
 def run_main(args):
     if getattr(args, "resume", None):
         raise OptimizationError("--resume is an analysis option; native optimizer recovery requires an explicitly prepared new run")
-    overrides = {key: str(getattr(args, key)) for key in ("ffield", "params", "trainset", "geo", "control") if getattr(args, key)}
+    overrides = {key: str(getattr(args, key)) for key in ("ffield", "params", "trainset", "geo", "control", "job") if getattr(args, key, None)}
     if (args.validate or args.dry_run or overrides) and not args.settings:
         raise OptimizationError("Input overrides, --validate and --dry-run require --settings")
     if (args.optimizer or args.output or args.conversion_config) and not args.convert:

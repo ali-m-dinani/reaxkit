@@ -40,6 +40,7 @@ PARSER_OVERRIDES = {
         "--params": ("Input and file selection", "short"),
         "--trainset": ("Input and file selection", "short"),
         "--geo": ("Input and file selection", "short"),
+        "--job": ("Input and file selection", "short"),
         "--control": ("Input and file selection", "short"),
         "--optimizer": ("Scientific choices", "short"),
         "--output": ("Outputs and plots", "short"),

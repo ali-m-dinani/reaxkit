@@ -114,7 +114,7 @@ def load_config(filename, overrides=None):
         raise OptimizationError(f"Invalid YAML in {source}: {error}") from error
     mapping(config, (
         "schema_version", "replicas", "optimizers", "seed", "output", "job",
-        "inputs", "scheduler", "optimizer_settings", "collection_interval_seconds",
+        "inputs", "scheduler", "optimizer_settings", "collection_interval_seconds", "optimization_time_limit_seconds", "resources",
     ), "settings")
     for key in ("schema_version", "replicas", "optimizers", "output", "inputs"):
         if key not in config:
@@ -131,6 +131,7 @@ def load_config(filename, overrides=None):
     for optimizer in selected:
         specification(optimizer)
     config.setdefault("seed", 42)
+    check_value(config.get("optimization_time_limit_seconds"), {"type": "number", "minimum": 0.001}, "optimization_time_limit_seconds")
     check_value(config["seed"], {"type": "integer", "minimum": 0, "maximum": 2147483647}, "seed")
     config.setdefault("collection_interval_seconds", 30)
     check_value(config["collection_interval_seconds"], {"type": "number", "minimum": 1}, "collection_interval_seconds")
@@ -140,7 +141,11 @@ def load_config(filename, overrides=None):
     config["output"] = path_value(config["output"], base, "output", exists=False)
     if config["output"] is None:
         raise OptimizationError("output: required")
-    config["job"] = path_value(config.get("job"), base, "job")
+    job_override = (overrides or {}).get("job")
+    config["job"] = path_value(job_override if job_override is not None else config.get("job"),
+                              Path.cwd() if job_override is not None else base, "job")
+    from .schedulers.render import resolve_resources, validate_resources, render_job
+    validate_resources(config.setdefault("resources", {}))
     inputs = mapping(config["inputs"], ("ffield", "params", "trainset", "geo", "control", "params_bounds_order"), "inputs")
     for key in ("ffield", "params", "trainset", "geo", "control"):
         override = (overrides or {}).get(key)
@@ -160,12 +165,25 @@ def load_config(filename, overrides=None):
     all_settings = mapping(config.setdefault("optimizer_settings", {}), OPTIMIZERS, "optimizer_settings")
     for optimizer, section in all_settings.items():
         prefix = f"optimizer_settings.{optimizer}"
-        mapping(section, ("runtime", "job", "settings", "conversion", "prepared_inputs", "explicit_settings"), prefix)
+        mapping(section, ("runtime", "job", "settings", "conversion", "prepared_inputs", "explicit_settings", "resources"), prefix)
+        section["resources"] = resolve_resources(optimizer, config["resources"], section.get("resources", {}))
         rules = specification(optimizer)["settings"]
         settings = mapping(section.setdefault("settings", {}), rules, prefix + ".settings")
         for key, value in settings.items():
             check_value(value, rules[key], prefix + ".settings." + key)
-        runtime = mapping(section.setdefault("runtime", {}), ("mode", "command", "version", "engine_version", "environment", "source", "bridge_python", "timeout_seconds"), prefix + ".runtime")
+        runtime = mapping(section.setdefault("runtime", {}), ("mode", "command", "version", "engine_version", "environment", "source", "bridge_python", "timeout_seconds", "optimization_time_limit_seconds", "shutdown_grace_seconds", "cooperative_stop_file"), prefix + ".runtime")
+        runtime.setdefault("cooperative_stop_file", False)
+        if type(runtime["cooperative_stop_file"]) is not bool:
+            raise OptimizationError("cooperative_stop_file must be boolean")
+        runtime.setdefault("optimization_time_limit_seconds", config.get("optimization_time_limit_seconds"))
+        runtime.setdefault("shutdown_grace_seconds", 600)
+        for key in ("optimization_time_limit_seconds", "shutdown_grace_seconds"):
+            check_value(runtime.get(key), {"type": "number", "minimum": 0.001}, prefix + ".runtime." + key)
+        if runtime["shutdown_grace_seconds"] is None:
+            raise OptimizationError("shutdown_grace_seconds cannot be null")
+        unsupported = optimizer == "ams_cmaes" or (optimizer == "standalone_soppi" and not runtime["cooperative_stop_file"])
+        if optimizer in selected and unsupported and runtime["optimization_time_limit_seconds"] is not None:
+            raise OptimizationError(f"{optimizer}: cooperative time limit is not verified for this executable; runtime.timeout_seconds is interruption, not graceful stopping")
         runtime.setdefault("mode", "external_runner")
         if runtime["mode"] not in ("native", "external_runner"):
             raise OptimizationError(prefix + ".runtime.mode: choose native or external_runner")
@@ -212,7 +230,7 @@ def load_config(filename, overrides=None):
         if not section["job"]:
             raise OptimizationError(prefix + ".job: a Slurm job file is required")
         from .schedulers.slurm import validate_job
-        validate_job(Path(section["job"]))
+        render_job(validate_job(Path(section["job"])), optimizer, section["resources"])
         section["prepared_inputs"] = path_value(section.get("prepared_inputs"), base, prefix + ".prepared_inputs")
         if section["prepared_inputs"] and not Path(section["prepared_inputs"]).is_dir():
             raise OptimizationError(prefix + ".prepared_inputs: expected a directory")
@@ -257,6 +275,8 @@ def generate_template(path):
         },
         "scheduler": {"type": "slurm", "profile": "roar_collab"},
         "collection_interval_seconds": 30,
+        "optimization_time_limit_seconds": None,
+        "resources": {},
     }
     text = (
         "# ReaxKit optimization schema v1. Fill paths before validation/submission.\n"
@@ -281,8 +301,9 @@ def generate_template(path):
             "runtime": {"mode": "native" if optimizer in commands else "external_runner",
                         "command": commands.get(optimizer, ["/path/to/external/runner", "{run_config}"]),
                         "version": None, "engine_version": None, "source": None,
-                        "bridge_python": None, "timeout_seconds": None, "environment": {}},
-            "job": None, "prepared_inputs": None, "conversion": {},
+                        "bridge_python": None, "timeout_seconds": None,
+                        "shutdown_grace_seconds": 600, "environment": {}},
+            "job": None, "resources": {}, "prepared_inputs": None, "conversion": {},
         }
         text += "\n".join("  " + line for line in yaml.safe_dump({optimizer: section}, sort_keys=False).splitlines()) + "\n"
         text += "    settings:\n"

@@ -70906,6 +70906,18 @@
   {
     "parser": "reaxkit optimize-ffield",
     "flags": [
+      "--job"
+    ],
+    "required": false,
+    "default": "None",
+    "choices": null,
+    "help": "Default Slurm job template; per-optimizer job paths retain precedence.",
+    "category": "Input and file selection",
+    "visibility": "short"
+  },
+  {
+    "parser": "reaxkit optimize-ffield",
+    "flags": [
       "--list-optimizers"
     ],
     "required": false,

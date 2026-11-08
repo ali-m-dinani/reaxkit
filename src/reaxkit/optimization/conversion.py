@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import shutil
 from pathlib import Path
 
 from .config import validate_conversion
-from .models import OptimizationError, identity, finite
+from .models import OptimizationError, identity, finite, progress
 from .registry import converter, specification
-from .storage import atomic_text, lock, read_json, write_json
+from .storage import atomic_text, digest, lock, read_json, write_json
 
 
 def collect_native(optimizer, native, output, options=None, metadata=None):
@@ -19,6 +20,50 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
     validate_conversion(options or {})
     with lock(output, ".conversion.lock"):
         result = converter(optimizer)(native, options)
+        events = native / "optimization-events.jsonl"
+        if not result.progress and events.is_file():
+            payload = events.read_bytes()
+            result.sources[events.name] = {"size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()}
+            for number, line in enumerate(payload.splitlines(keepends=True), 1):
+                if not line.endswith(b"\n"):
+                    break
+                try:
+                    event = json.loads(line)
+                    result.progress.append(progress(
+                        events.name, number, event["score"],
+                        native_step=event["completed"], step_kind="checkpoint",
+                        elapsed_seconds=event["elapsed_seconds"],
+                        record_kind="live_checkpoint", comparison_status="unverified",
+                    ))
+                except (ValueError, KeyError, TypeError):
+                    result.warnings.append(f"{events.name}:{number}: invalid live checkpoint")
+            result.warnings.append("Live checkpoints are completed optimizer units, not guaranteed engine evaluation counts")
+        timing = None
+        timing_file = native / "optimization-timing.json"
+        if timing_file.is_file():
+            try:
+                timing = read_json(timing_file)
+            except (OSError, ValueError):
+                result.warnings.append("Timing file incomplete; retry collection")
+        for artifact in result.artifacts:
+            if artifact.get("restart") in (None, "neither"):
+                continue
+            source = (native / artifact["path"]).resolve()
+            if native not in source.parents:
+                raise OptimizationError("Checkpoint artifact escapes native directory")
+            destination = output / "checkpoints" / artifact["sha256"]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if not destination.exists():
+                temporary = destination.with_suffix(".tmp")
+                try:
+                    shutil.copyfile(source, temporary)
+                    if digest(temporary) != artifact["sha256"]:
+                        result.warnings.append(f"{artifact['path']}: changed while preserving checkpoint; retry")
+                        continue
+                    temporary.replace(destination)
+                finally:
+                    temporary.unlink(missing_ok=True)
+            artifact["preserved_path"] = str(destination.relative_to(output)).replace("\\", "/")
         previous_path = output / "conversion.json"
         previous = read_json(previous_path) if previous_path.is_file() else {}
         transitions = []
@@ -77,6 +122,7 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
             "progress": result.progress, "predictions": result.predictions,
             "artifacts": result.artifacts, "warnings": result.warnings,
             "sources": result.sources,
+            "timing": timing,
         }
         snapshot_id = identity(payload)
         snapshot = output / "snapshots" / snapshot_id
@@ -96,6 +142,7 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
             ),
             "prediction_count": len(result.predictions), "artifact_count": len(result.artifacts),
             "coverage": "partial" if result.warnings else "available",
+            "timing": timing,
         }
         write_json(snapshot / "conversion.json", report)
         if transitions:
