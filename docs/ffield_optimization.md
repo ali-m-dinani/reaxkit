@@ -27,7 +27,7 @@ select it as `inputs.geo`. Validation does not rewrite the user's files.
 
 ### Adapter matrix
 
-All nine adapters have output converters. Native launching has explicit limits:
+All ten adapters have output converters. Native launching has explicit limits:
 
 | Adapter | Native entrypoint | Requirements |
 | --- | --- | --- |
@@ -39,6 +39,7 @@ All nine adapters have output converters. Native launching has explicit limits:
 | ogolem | Compatible Java/OGolem jar | runtime.source and runtime.bridge_python; explicit AMS/JAX/custom evaluator |
 | pibo cobalt | python -m pibo_calculation.cobalt_pibo | Explicit acknowledgement of the native cobalt subset/LAMMPS objective |
 | pibo MoS2, indeedopt, ezff | External runner accepting run-config.json | Not universal native common-input interfaces |
+| glompo | External GPL-3.0 runner accepting run-config.json | Initial one-worker CMA/AMS-ParAMS profile; [setup and validation gates](GLOMPO.md); ReaxFF engine validation pending |
 
 Unsupported native workflows fail before submission. INDEEDopt has dataset-specific
 constants and rewrites bounds using gpf=5. MoS2 PIBO uses its own VASP data, fixed

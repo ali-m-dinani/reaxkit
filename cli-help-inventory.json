@@ -70931,7 +70931,8 @@
       "indeedopt",
       "ogolem",
       "pibo",
-      "ezff"
+      "ezff",
+      "glompo"
     ],
     "help": "Optimizer format for --convert.",
     "category": "Scientific choices",

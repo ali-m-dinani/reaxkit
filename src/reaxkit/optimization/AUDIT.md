@@ -131,6 +131,22 @@ path from that example is hard-coded into ReaxKit.
 
 ## External references
 
+### GloMPO (2026-11-08)
+
+- Upstream `mfgustavo/glompo` ac76da2, GPL-3.0, maintained separately in
+  `ali-m-dinani/glompo`. No upstream implementation is copied into ReaxKit.
+- Inspected real local CMA/sphere run: 12 evaluations; HDF5 iter_hist columns
+  call_id/x/fx, YAML summary, trajectory PNG. Exporter runs in GloMPO's environment.
+- Hash-bound JSONL conversion preserves per-optimizer candidate identities and
+  parameter-space/profile metadata. No HDF5 optimizer objects are deserialized.
+- Initial external runner uses the upstream AMS/ParAMS ReaxFF SSE interface,
+  one CMA worker, strict classic-input conversion and parameter-only best field.
+- ReaxFF execution, SCM API compatibility and Roar acceptance remain unverified.
+  No parity predictions, reproducible RNG forwarding or exact restart claimed.
+  See `docs/GLOMPO.md` for the prerequisite gate and subsequent submission path.
+
+### Reference links
+
 - [SCM MCFF documentation](https://www.scm.com/doc/OldReaxFF/MCFFOptimizer.html)
 - [SCM CMA-ES documentation](https://www.scm.com/doc/OldReaxFF/CMAESFFOptimizer.html)
 - [Roar batch jobs](https://docs.icds.psu.edu/running-jobs/batch-jobs/)

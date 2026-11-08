@@ -1,0 +1,18 @@
+{
+  "id": "glompo",
+  "engine": "SCM AMS/ParAMS ReaxFF",
+  "objective": "ParAMS SSE (native dataset sigma/weights)",
+  "license": "GPL-3.0 (separate executable; no optimizer code bundled)",
+  "revision": "ac76da2 plus external runner",
+  "seed": "unsupported",
+  "resume": "parameter_only",
+  "launch": "external_runner_contract_v1",
+  "cluster_validated": false,
+  "settings": {
+    "max_function_calls": {"type": "integer", "default": 12, "minimum": 1, "native": "MaxFuncCalls"},
+    "max_seconds": {"type": "number", "default": 300, "minimum": 0.001, "native": "MaxSeconds session_max"},
+    "population_size": {"type": "integer", "default": 4, "minimum": 2, "native": "CMAOptimizer popsize"},
+    "max_iterations": {"type": "integer", "default": 3, "minimum": 1, "native": "CMAOptimizer maxiter"},
+    "sigma0": {"type": "number", "default": 0.1, "minimum": 0.000001, "maximum": 1, "native": "CMAOptimizer sigma0 in scaled space"}
+  }
+}
