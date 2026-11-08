@@ -53,20 +53,26 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
         spec = specification(optimizer)
         metadata = metadata or {}
         for record in result.progress + result.predictions:
+            source_profile = record.get("profile_source") is not None
             record.update({
                 "optimizer": optimizer,
                 "run_id": metadata.get("run_id"),
                 "replica": metadata.get("replica"),
                 "dataset_fingerprint": metadata.get("dataset_fingerprint"),
                 "comparison_fingerprint": metadata.get("comparison_fingerprint"),
-                "objective_definition": metadata.get("objective", spec["objective"]),
-                "engine_identity": metadata.get("engine", record.get("engine_identity", spec["engine"])),
-                "optimizer_version": metadata.get("optimizer_version"),
+                "objective_definition": record.get("objective_definition", metadata.get("objective", spec["objective"])),
+                "engine_identity": record.get("engine_identity", metadata.get("engine", spec["engine"])),
+                "optimizer_version": record.get("optimizer_version", metadata.get("optimizer_version")),
                 "engine_version": metadata.get("engine_version"),
-                "comparison_status": metadata.get("comparison_status", "unverified"),
-                "dataset_scope": metadata.get("dataset_scope", "native_input_semantics"),
+                "comparison_status": "unverified" if source_profile else metadata.get("comparison_status", "unverified"),
+                "dataset_scope": record.get("dataset_scope", metadata.get("dataset_scope", "native_input_semantics")),
                 "seed_forwarded": metadata.get("seed_forwarded"),
             })
+            if source_profile:
+                record["comparison_fingerprint"] = identity(
+                    metadata.get("comparison_fingerprint"), record["engine_identity"],
+                    record["objective_definition"], record["dataset_scope"], record["optimizer_version"],
+                )
         payload = {
             "progress": result.progress, "predictions": result.predictions,
             "artifacts": result.artifacts, "warnings": result.warnings,

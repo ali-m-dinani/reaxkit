@@ -2,6 +2,7 @@
 
 from ..base import Reader
 from ...models import finite, progress
+from .cobalt import collect_cobalt
 
 
 def convert(root, options=None):
@@ -29,6 +30,7 @@ def convert(root, options=None):
         for path in sorted(epoch.glob("all_evaluated_*.npz")):
             reader.artifact(path)
     archives = [path for epoch in epochs for path in sorted(epoch.glob("all_evaluated_*.npz"))]
+    archive = None
     if archives:
         path = archives[-1]
         archive = reader.npz(path)
@@ -43,5 +45,6 @@ def convert(root, options=None):
                     objectives={f"objective_{component + 1}": value for component, value in enumerate(values)},
                     status="ok" if values and all(value is not None for value in values) else "nonfinite",
                 ))
+    collect_cobalt(reader, archive)
     reader.result.warnings.append("Epoch errors are recommended candidates, not all evaluations; component names/units and weights are defined by the external objective")
     return reader.result

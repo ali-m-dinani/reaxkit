@@ -46,6 +46,24 @@ parameter catalog and checkout-relative files. EZFF needs an objective callback.
 Configurable isolated runners belong in those projects under their own licenses.
 See src/reaxkit/optimization/AUDIT.md for inspected revisions and output formats.
 
+### EZFF cobalt result collection
+
+The project-owned cobalt runner's `cobalt-run.json` identifies its LAMMPS ReaxFF
+engine and explicit Co_clusters/Co2_cluster energy subset. Its objective is
+`sqrt(sum(((prediction-reference)/tolerance)**2))`, not RMSE or a full-trainset
+score. Validated output-profile metadata takes precedence over generic launch
+descriptions in normalized records; it never establishes cross-method comparability.
+
+The converter checks candidate IDs, parameter vectors against the evaluated NPZ
+archive, energy expressions, weighted residuals, and aggregate loss before
+extracting labeled kcal/mol predictions. Training-entry identities remain
+source-scoped. Invalid, missing, or partial reports produce warnings without
+discarding available progress. Epoch recommendations remain distinct from engine
+evaluations and link to an evaluated candidate only when parameters and loss
+match uniquely. The baseline-plus-two-candidate smoke yields four progress
+records, 54 predictions, and two artifacts. Subset/comparison warnings remain
+intentional. Run `--collect` on existing results; no optimization rerun is needed.
+
 ## Environment isolation
 
 Use separate Linux virtual/Conda environments for ReaxKit and each optimizer;
