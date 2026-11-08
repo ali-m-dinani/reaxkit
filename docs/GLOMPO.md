@@ -14,32 +14,49 @@ evaluation's call number, optimizer ID, parameter vector, score and running
 best. HDF5 and YAML remain artifacts, not unsafe Python deserialization inputs.
 An incomplete/stale export is rejected; it can be regenerated after termination.
 
-The AMS/ParAMS runner is implemented but **not yet engine- or Roar-validated**.
+The AMS/ParAMS runner is implemented but **not yet ReaxFF-engine validated**.
 Its objective is native ParAMS SSE with dataset sigma/weights. Parameters in
 its history are scaled to [0,1], not literal force-field values. Native summary
 and best-field artifacts are retained, but no labeled parity predictions or
 cross-optimizer scientific equivalence are claimed. A downloaded analytic
 benchmark must never be presented as ReaxFF training.
 
-## Roar: first prerequisite gate
+Roar's AMS 2023.103 Python 3.8 completed a 10-evaluation sphere benchmark;
+downloaded HDF5/JSONL hashes and scores agree. Its official SCM conversion
+preserved 12 active parameter bounds, 144 energy expressions/references and
+147 jobs. Weight/Sigma-squared matches inverse accuracy-squared. The converted
+jobs include 130 geometry optimizations and 17 single points, not an entirely
+single-point smoke workload. These checks are not a successful engine fit.
+
+## Roar: AMS 2023.103 prerequisite gate
 
 From the existing campaign parent directory:
 
 ```bash
 git -C reaxkit pull --ff-only
 git clone https://github.com/ali-m-dinani/glompo.git glompo
-reaxkit/.venv/bin/python -m venv envs/glompo
-envs/glompo/bin/python -m pip install -r glompo/requirements-reaxkit.txt
-envs/glompo/bin/python -m pip install -e ./glompo
-envs/glompo/bin/python -m pip check
 module load ams/2023.103
-envs/glompo/bin/python -c "from glompo.interfaces.params import ReaxFFError; print('GloMPO/ParAMS import OK')"
+(
+  cd glompo
+  "$AMSBIN/amspython" -c "from glompo.interfaces.params import ReaxFFError; print('GloMPO/ParAMS import OK')"
+)
 ```
 
 Stop on an import error and preserve the full traceback. The old upstream
 interface uses SCM internals that may differ in installed AMS versions.
 The sphere benchmark does not validate that API. Do not submit a calculation
 until this check passes. Keep optimizer dependencies out of ReaxKit's venv.
+If the checkout already exists, use `git -C glompo pull --ff-only` instead of
+cloning again. Use AMS's bundled interpreter for this profile, not the separate
+modern `envs/glompo` interpreter. Do not install modern pinned dependencies into
+AMS's shared environment. The latter environment remains useful for benchmarks.
+
+The fork's ReaxKit runner explicitly requests SCM-style conversion, including
+`use_weights=True` and the supplied control path. It stages params in min/max
+order. Strict checking accepts either endpoint (cobalt p_ovun2=-2.5 is valid)
+without recentering, while rejecting invalid ranges and missing training jobs.
+`--check-only` now performs conversion on temporary copies, not merely imports.
+Actual runs save converted YAML in `native/converted_to_params` for inspection.
 
 ## After the prerequisite gate passes
 
@@ -55,7 +72,7 @@ optimizer_settings:
     runtime:
       mode: external_runner
       command:
-        - /absolute/campaign-parent/envs/glompo/bin/python
+        - /storage/icds/RISE/sw8/ams2023.103/bin/amspython
         - /absolute/campaign-parent/glompo/reaxkit_runner.py
         - '{run_config}'
     settings:
