@@ -42,11 +42,14 @@ def parser_rows(path, parser):
         category, visibility = metadata_for_action(action, parser)
         if action.required and visibility != "short":
             raise ValueError(f"Required action omitted from short help: {path} {flags}")
+        help_text = action.help
+        if isinstance(action, argparse.BooleanOptionalAction) and isinstance(help_text, str):
+            help_text = help_text.removesuffix(" (default: %(default)s)")
         rows.append({
             "parser": path, "flags": flags, "required": action.required,
             "default": repr(action.default),
             "choices": list(action.choices) if action.choices is not None else None,
-            "help": action.help, "category": category, "visibility": visibility,
+            "help": help_text, "category": category, "visibility": visibility,
         })
     return rows
 
