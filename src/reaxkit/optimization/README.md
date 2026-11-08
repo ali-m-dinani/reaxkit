@@ -3,7 +3,9 @@
 ReaxKit stages YAML campaigns, submits isolated Slurm jobs, records scheduler and
 worker state, and converts native results. Engines/objectives remain external.
 Native command mappings and external-runner escape hatches are available.
-No GUI or real HPC validation is claimed.
+GUI integration is deferred. Selected configurations have completed HPC smoke
+tests; this does not establish universal cluster compatibility or scientific
+validation for every adapter, engine version, and dataset.
 See [the permanent user guide](../../../docs/ffield_optimization.md) for native
 launch capabilities, environment isolation and the Roar smoke-test procedure.
 See [validation and limitations](../../../docs/optimization_validation.md) for evidence levels and adapter contracts.
@@ -104,11 +106,13 @@ or surrogate-to-engine relabeling. Missing prediction identities prevent automat
 cross-file matching. JAX text reports are rounded to two decimals; JAX-SOPPI
 residual array identities are source-local. No engine runs merely to populate plots.
 
-AMS progress requires a version-specific mapping until native samples establish
-defaults. Example conversion options (indices must match the actual file):
+Recognized AMS MCFF and CMA-ES progress layouts have native parsers. Other
+tabular layouts can use explicit zero-based column mappings; inspect the file
+before choosing indices. For a custom table containing step, score, and elapsed
+seconds in that order, an illustrative configuration is:
 
 ```yaml
-progress_file: MCFFOptimizer.log
+progress_file: custom_progress.txt
 skip_rows: 1
 columns:
   step: 0
@@ -117,7 +121,9 @@ columns:
 ```
 
 Pass this file using `--conversion-config`, or put the mapping in the optimizer's
-`conversion` section. The example is illustrative, not an AMS format claim.
+`conversion` section. This example is not the layout of MCFFOptimizer.log or
+cmaes_progress.txt. Column mappings do not establish prediction identities or
+scientific comparability; unsupported report layouts require a parser update.
 
 The worker periodically collects output and collects again on exit. SIGTERM or
 SIGINT stops its child process group where possible and preserves available
@@ -135,16 +141,20 @@ completed with scientific results unavailable.
 
 ## Validation scope
 
-Synthetic fixtures test every adapter's declared format, including explicit AMS
-column mappings. Six existing local optimizer output sets also passed read-only
-conversion checks. Mocked Slurm and subprocess tests do not validate cluster
-resources, MPI launch behavior, a licensed engine, or native optimization.
-Linux-specific real-process tests and a dedicated CI workflow are provided.
-Actual Linux execution and authorized Roar smoke tests remain open gates:
-no usable local Linux distribution or configured Roar connection was found.
-The read-only smoke report checks evidence but never certifies scientific/site
-validation automatically. The broader
-CLI suite currently has two independently reproduced pre-existing failures:
-stale generated active-site workflow documentation and missing help metadata for
-the unrelated --export-per-atom-csv option. The optimization command's own help
-inventory is checked separately.
+Synthetic fixtures exercise supported converter formats, including native AMS
+progress parsers and explicit column mappings. Mocked Slurm and subprocess tests
+do not validate cluster resources, MPI behavior, licensed engines, or scientific
+optimization. Linux-specific real-process tests and a dedicated CI workflow
+provide separate infrastructure checks.
+
+A successful engine smoke test applies only to its tested configuration. Full
+acceptance still requires checking native and normalized results, parameter and
+prediction identities, restart limitations, and the target site's execution
+environment. The read-only smoke report checks evidence but never certifies
+scientific or site validation automatically. Adapter validation flags are not
+automatically promoted by a successful individual run.
+
+Run `python -m pytest tests/optimization -q -rs` from an installed checkout and
+review skips explicitly. See [validation and limitations](../../../docs/optimization_validation.md)
+for evidence levels and reproducible checks. Keep project-specific run evidence
+and investigation notes in the local audit, not in public user documentation.
