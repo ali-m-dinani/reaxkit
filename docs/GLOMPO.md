@@ -14,7 +14,11 @@ evaluation's call number, optimizer ID, parameter vector, score and running
 best. HDF5 and YAML remain artifacts, not unsafe Python deserialization inputs.
 An incomplete/stale export is rejected; it can be regenerated after termination.
 
-The AMS/ParAMS runner is implemented but **not yet ReaxFF-engine validated**.
+The AMS/ParAMS runner has **engine smoke evidence, not full scientific validation**.
+Job 57122446 reached nine finite recorded evaluations and exited
+successfully at the manager time limit; full scientific acceptance is still
+pending. Its first candidate was transformed by CMA and is not an unchanged
+original-field baseline.
 Its objective is native ParAMS SSE with dataset sigma/weights. Parameters in
 its history are scaled to [0,1], not literal force-field values. Native summary
 and best-field artifacts are retained, but no labeled parity predictions or
@@ -57,6 +61,16 @@ order. Strict checking accepts either endpoint (cobalt p_ovun2=-2.5 is valid)
 without recentering, while rejecting invalid ranges and missing training jobs.
 `--check-only` now performs conversion on temporary copies, not merely imports.
 Actual runs save converted YAML in `native/converted_to_params` for inspection.
+
+The updated GloMPO runner preserves the exact requested scaled vector as the
+first CMA population member (no extra evaluation outside the budget). Profiles
+record `initial_candidate_policy` and `initial_parameters_scaled`. The converter
+marks an `initial_parameter_evaluation` only if call 1 matches the recorded
+vector; older/mismatching histories remain ordinary evaluations with a warning.
+Existing runs are not retroactively treated as original-field baselines.
+The fork also fixes active/full range selection and endpoint handling in its
+parameter-setting warning. Run `examples/reaxkit_initial_check.py` with AMS's
+`amspython` from the GloMPO checkout before preparing a fresh engine campaign.
 
 ## After the prerequisite gate passes
 

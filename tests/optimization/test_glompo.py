@@ -73,6 +73,33 @@ def test_missing_export_keeps_native_artifact(tmp_path):
     assert any("--export-native" in warning for warning in result.warnings)
 
 
+def test_initial_candidate_requires_matching_profile_vector(tmp_path):
+    write_export(tmp_path)
+    profile = dict(profile="ams_params", parameter_space="scaled_0_1",
+                   initial_candidate_policy="exact_first_evaluation",
+                   initial_parameters_scaled=[0.5])
+    path = tmp_path / "glompo-profile.json"
+    path.write_text(json.dumps(profile))
+    result = convert(tmp_path)
+    assert result.progress[0]["is_initial_candidate"] is True
+    assert result.progress[0]["record_kind"] == "initial_parameter_evaluation"
+    assert result.progress[1]["is_initial_candidate"] is False
+    profile["initial_parameters_scaled"] = [1.0]
+    path.write_text(json.dumps(profile))
+    result = convert(tmp_path)
+    assert not any(record["is_initial_candidate"] for record in result.progress)
+    assert any("original-field baseline" in warning for warning in result.warnings)
+
+
+def test_old_profile_does_not_claim_a_baseline(tmp_path):
+    write_export(tmp_path)
+    (tmp_path / "glompo-profile.json").write_text(json.dumps(dict(profile="ams_params")))
+    result = convert(tmp_path)
+    assert len(result.progress) == 2
+    assert not any(record["is_initial_candidate"] for record in result.progress)
+    assert any("original-field baseline" in warning for warning in result.warnings)
+
+
 def test_external_runner_campaign(tmp_path):
     import yaml
     from reaxkit.optimization.config import load_config
