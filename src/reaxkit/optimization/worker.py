@@ -145,7 +145,7 @@ def run_worker(directory):
             collect_available()
             state["finished_at"] = now()
             state["elapsed_seconds"] = time.monotonic() - started
-            state["scientific_results"] = "available" if state.get("last_conversion", {}).get("progress_count", 0) else "unavailable"
+            state["scientific_results"] = "available" if state.get("last_conversion", {}).get("finite_progress_count", 0) else "unavailable"
             write_json(state_path, state)
             for signum, previous in handlers.items():
                 signal.signal(signum, previous)

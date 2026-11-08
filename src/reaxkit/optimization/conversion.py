@@ -7,7 +7,7 @@ import hashlib
 from pathlib import Path
 
 from .config import validate_conversion
-from .models import OptimizationError, identity
+from .models import OptimizationError, identity, finite
 from .registry import converter, specification
 from .storage import atomic_text, lock, read_json, write_json
 
@@ -89,6 +89,11 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
             "schema_version": 1, "parser_version": 1, "optimizer": optimizer,
             "snapshot": "snapshots/" + snapshot_id, "sources": result.sources,
             "warnings": result.warnings, "progress_count": len(result.progress),
+            "finite_progress_count": sum(
+                finite(record.get("score")) is not None
+                or finite(record.get("best_score")) is not None
+                for record in result.progress
+            ),
             "prediction_count": len(result.predictions), "artifact_count": len(result.artifacts),
             "coverage": "partial" if result.warnings else "available",
         }

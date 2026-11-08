@@ -30,6 +30,8 @@ def convert(root, options=None):
                 continue
             previous = iteration
             score = finite(fields[1])
+            if score is None:
+                reader.result.warnings.append(f"{path.name}:{row}: nonfinite fitness; not a usable scientific result")
             reader.result.progress.append(progress(
                 reader.relative(path), row, fields[1], native_step=iteration,
                 step_kind="iteration", cycle=cycle, best_score=score,

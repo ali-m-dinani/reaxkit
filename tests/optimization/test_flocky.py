@@ -5,6 +5,7 @@ import yaml
 
 from reaxkit.optimization.adapters.flocky import convert
 from reaxkit.optimization.config import load_config
+from reaxkit.optimization.conversion import collect_native
 from reaxkit.optimization.orchestrator import prepare
 from reaxkit.optimization.registry import specification
 from reaxkit.optimization.schedulers.slurm import JOB_TEMPLATE
@@ -37,6 +38,19 @@ def test_partial_duplicate_and_nonfinite(tmp_path):
 def test_empty_output(tmp_path):
     assert not convert(tmp_path).progress
     assert specification("flocky")["cluster_validated"] is False
+
+
+def test_nonfinite_checkpoints_are_not_scientific_results(tmp_path):
+    native = tmp_path / "native"
+    native.mkdir()
+    (native / "opti_log.out.0").write_text("0 inf\n1 inf\n")
+    report = collect_native("flocky", native, tmp_path / "normalized")
+    assert report["progress_count"] == 2
+    assert report["finite_progress_count"] == 0
+    assert any("nonfinite fitness" in warning for warning in report["warnings"])
+    (native / "opti_log.out.0").write_text("0 inf\n1 3.5\n")
+    report = collect_native("flocky", native, tmp_path / "normalized")
+    assert report["finite_progress_count"] == 1
 
 
 @pytest.mark.parametrize("swarm_size", [2, 4])
