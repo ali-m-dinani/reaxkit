@@ -222,7 +222,7 @@ def load_config(filename, overrides=None):
         for key, rule in rules.items():
             settings.setdefault(key, copy.deepcopy(rule["default"]))
             if rule["type"] == "path":
-                settings[key] = path_value(settings[key], base, prefix + ".settings." + key, resolve_symlinks=key != "engine_python")
+                settings[key] = path_value(settings[key], base, prefix + ".settings." + key, resolve_symlinks=key not in ("engine_python", "jax_python"))
         section["explicit_settings"] = sorted(supplied)
         if optimizer == "jax_reaxff" and settings["use_valid"] and not all(settings[key] for key in ("valid_file", "valid_geo_file")):
             raise OptimizationError(prefix + ": validation requires valid_file and valid_geo_file")

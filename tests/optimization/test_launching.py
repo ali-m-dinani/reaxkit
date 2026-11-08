@@ -218,6 +218,34 @@ def test_legacy_units_and_required_random_input(settings_file):
 
 
 @pytest.mark.parametrize("linked_interpreters", [False, True])
+def test_indeedopt_preserves_jax_interpreter(settings_file, linked_interpreters):
+    interpreter = Path(sys.executable)
+    if linked_interpreters:
+        interpreter = settings_file.parent / "jax-env" / "bin" / "python"
+        interpreter.parent.mkdir(parents=True)
+        try:
+            interpreter.symlink_to(Path(sys.executable).resolve())
+        except OSError as error:
+            pytest.skip(f"Interpreter symlinks unavailable: {error}")
+    supplied = str(interpreter.relative_to(settings_file.parent)) if linked_interpreters else str(interpreter)
+
+    def update(data):
+        data["optimizers"] = ["indeedopt"]
+        data["optimizer_settings"] = {"indeedopt": {
+            "runtime": {"mode": "external_runner", "command": [sys.executable, "runner.py", "{run_config}"]},
+            "settings": {"engine": "jax-md", "short_samples": 2, "jax_python": supplied},
+        }}
+
+    edit_config(settings_file, update)
+    config = load_config(settings_file)
+    assert config["optimizer_settings"]["indeedopt"]["settings"]["jax_python"] == str(interpreter)
+    directory, request = first_run(config)
+    assert request["settings"]["jax_python"] == str(interpreter)
+    assert str(interpreter) in request["external_file_hashes"]
+    assert not (directory / "input/settings/jax_python").exists()
+
+
+@pytest.mark.parametrize("linked_interpreters", [False, True])
 def test_ogolem_external_bridge_plan_and_custom_evaluator(settings_file, linked_interpreters):
     source = settings_file.parent / "ogolem"
     (source / "tools").mkdir(parents=True)
