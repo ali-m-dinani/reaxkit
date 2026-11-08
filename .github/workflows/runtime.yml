@@ -16,6 +16,6 @@ jobs:
           python -m pytest tests/core/test_frame_pipeline.py
           tests/core/test_artifacts.py tests/core/test_reducers.py
           tests/core/test_unified_rollout.py tests/core/test_rollout_completion.py
-          tests/core/test_command_inventory.py -q
+          tests/core/test_command_inventory.py tests/cli/test_metadata_coverage.py -q
       - name: Small deterministic benchmark
         run: python -m reaxkit.core.runtime.benchmark --frames 24 --payload-mib 1 --workers 1 2 --output benchmark_results/ci.json
