@@ -171,12 +171,43 @@ def test_pibo_native_cobalt_subset_is_explicit(settings_file):
     assert "--seed" in command
 
 
+@pytest.mark.parametrize("seed", ["", "\n", "NaN", "Infinity", "abc", "1 2"])
+def test_legacy_rejects_invalid_seed(settings_file, seed):
+    random_file = settings_file.parent / "random"
+    random_file.write_text(seed)
+    native_config(settings_file, "standalone_soppi", {"random_file": str(random_file)}, control=True)
+    with pytest.raises(OptimizationError, match="finite numeric seed"):
+        load_config(settings_file)
+
+
+@pytest.mark.parametrize("geometry", ["DESCRP a\nEND\n", "DESCRP a\nEND\nDESCRP b\nEND\n\n"])
+def test_legacy_rejects_missing_geometry_separator(settings_file, geometry):
+    random_file = settings_file.parent / "random"
+    random_file.write_text("1.2345D4\n")
+    native_config(settings_file, "standalone_soppi", {"random_file": str(random_file)}, control=True)
+    source = settings_file.parent / "geo"
+    source.write_text(geometry)
+    with pytest.raises(OptimizationError, match="blank separator"):
+        load_config(settings_file)
+    assert source.read_text() == geometry
+
+
+@pytest.mark.parametrize("command", [None, ["/missing/legacy/reac"]])
+def test_legacy_missing_executable_guidance(settings_file, command):
+    native_config(settings_file, "standalone_soppi", runtime={"command": command}, control=True)
+    with pytest.raises(OptimizationError, match="Contact Adri van Duin") as error:
+        load_config(settings_file)
+    assert "run make" in str(error.value)
+    assert "does not distribute" in str(error.value)
+
+
 def test_legacy_units_and_required_random_input(settings_file):
     native_config(settings_file, "standalone_soppi", control=True)
     with pytest.raises(OptimizationError, match="random_file"):
         load_config(settings_file)
     random_file = settings_file.parent / "random"
     random_file.write_text("12345\n")
+    (settings_file.parent / "geo").write_text("DESCRP molecule\nEND\n\n")
     edit_config(settings_file, lambda data: data["optimizer_settings"]["standalone_soppi"]["settings"].update(random_file=str(random_file)))
     directory, request = first_run(load_config(settings_file))
     assert (directory / "native/fort.20").read_text() == "  1\n"

@@ -196,6 +196,9 @@ def load_config(filename, overrides=None):
         if optimizer not in selected:
             continue
         if command is None:
+            if optimizer == "standalone_soppi" and runtime["mode"] == "native":
+                from .adapters.standalone_soppi.launch import EXECUTABLE_GUIDANCE
+                raise OptimizationError(EXECUTABLE_GUIDANCE)
             raise OptimizationError(prefix + ".runtime.command: configure the native entrypoint or external runner argv")
         for argument in command:
             if "\0" in argument or "\n" in argument or "\r" in argument:

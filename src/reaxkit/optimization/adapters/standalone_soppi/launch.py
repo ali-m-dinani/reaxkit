@@ -1,17 +1,44 @@
 """Explicit unit mapping for the audited legacy ffopt executable."""
 
 from pathlib import Path
+import math
+import re
+import shutil
 
 from ...launching import control_text, native_plan, parameters, stage_common
 from ...models import OptimizationError
 from ...storage import atomic_text
 
 
+EXECUTABLE_GUIDANCE = (
+    "standalone_soppi requires your own compiled reac executable in runtime.command. "
+    "ReaxKit does not distribute the Fortran source or executable. "
+    "Contact Adri van Duin to obtain the source (the source header lists duin@wag.caltech.edu). "
+    "With gfortran and make installed, run make in the supplied source directory to build reac."
+)
+
+
 def validate(config, section):
+    command = section["runtime"].get("command")
+    if not command or not shutil.which(command[0]):
+        raise OptimizationError(EXECUTABLE_GUIDANCE)
     if not config["inputs"].get("control"):
         raise OptimizationError("standalone_soppi requires a compatible legacy control file")
     if not section["settings"].get("random_file"):
         raise OptimizationError("standalone_soppi requires random_file (native fort.35 input), even for deterministic search")
+    try:
+        seed_text = Path(section["settings"]["random_file"]).read_text(encoding="utf-8").strip()
+        if not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eEdD][+-]?\d+)?", seed_text):
+            raise ValueError("invalid numeric seed")
+        seed = float(seed_text.replace("D", "E").replace("d", "e"))
+        if not math.isfinite(seed):
+            raise ValueError("nonfinite seed")
+    except (OSError, UnicodeError, ValueError) as error:
+        raise OptimizationError("standalone_soppi random_file must contain one finite numeric seed, e.g. 12345 followed by a newline; an empty fort.35 is invalid") from error
+    lines = Path(config["inputs"]["geo"]).read_text(encoding="utf-8").splitlines()
+    endings = [index for index, line in enumerate(lines) if line.strip() == "END"]
+    if not endings or any(index + 1 >= len(lines) or lines[index + 1].strip() for index in endings):
+        raise OptimizationError("standalone_soppi geo requires a blank separator record after every END, including the final structure; add separators to a separate copy and select that copy as inputs.geo")
     control_text(config["inputs"]["control"], {key: value for key, value in section["settings"].items() if key != "random_file"},
                  section["explicit_settings"], fixed_width=True)
     for row in parameters(config["inputs"]["params"], config["inputs"]["params_bounds_order"]):
@@ -20,7 +47,6 @@ def validate(config, section):
 
 
 def prepare(request):
-    import shutil
     native = Path(request["native_directory"])
     stage_common(request, native, bounds_order="max_min", names={"ffield": "fort.4", "geo": "fort.3", "params": "fort.21"})
     settings = {key: value for key, value in request["settings"].items() if key != "random_file"}

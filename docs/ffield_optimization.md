@@ -10,6 +10,23 @@ Linux/MPI/engine correctness. Complete the acceptance procedure before productio
 
 ## Supported launch paths
 
+### Standalone SOPPI preflight
+
+Supply your own compiled `reac` in the native `runtime.command`; ReaxKit does
+not distribute the original Fortran source or executable. To obtain the source,
+contact Adri van Duin (the source header lists `duin@wag.caltech.edu`). With
+gfortran and make installed, run `make` in the supplied source directory to
+build `reac`. Use an executable path accessible on the validation and compute hosts.
+
+Native validation rejects an empty or nonnumeric `random_file` (`fort.35`);
+provide one finite number, for example `12345` followed by a newline. It also
+requires a blank separator record after every geometry `END`, including the
+last structure. A newline terminating `END` alone is not a blank record. If
+needed, prepare a separate geometry copy with the missing blank records and
+select it as `inputs.geo`. Validation does not rewrite the user's files.
+
+### Adapter matrix
+
 All nine adapters have output converters. Native launching has explicit limits:
 
 | Adapter | Native entrypoint | Requirements |
