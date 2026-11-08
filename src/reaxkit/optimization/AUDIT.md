@@ -173,6 +173,12 @@ path from that example is hard-coded into ReaxKit.
 - Native serial build, engine compatibility, actual execution and Roar submission
   remain unverified. Native fixed-charge parsing treats any token '5' in control
   as activation; the runner rejects this unsupported auxiliary-file case.
+- Roar NLopt 2.7.1 installation succeeded. The first Flocky build failed on a
+  missing Boost stream header and serial-only source defects (unguarded MPI
+  calls, unmatched brace, duplicate declaration, and MPI-only fitness variables).
+  Corrections live in Flocky's fork, not ReaxKit. Both translation units pass
+  a local Cygwin GNU C++11 syntax check with NLopt 2.4.2 headers; Roar linking
+  against Boost 1.81/NLopt 2.7.1 and engine execution still need verification.
 - Checkpoints are best-so-far by cycle, not all evaluations. Prediction report
   candidate association, cross-engine objective equivalence, RNG forwarding and
   exact restart are not established. See docs/FLOCKY.md for prerequisite gates.
