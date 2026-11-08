@@ -10393,6 +10393,21 @@
     {
       "aliases": [],
       "artifact_policy": "workflow_public_outputs",
+      "command": "optimize-ffield",
+      "execution": {
+        "shape": "global",
+        "thread_safe": false
+      },
+      "kind": "workflow",
+      "output_resolution": "workflow_expressions_and_user_selected_paths",
+      "outputs": [],
+      "task_inventory": null,
+      "workflow": "reaxkit.optimization.cli",
+      "workflow_output_sites": []
+    },
+    {
+      "aliases": [],
+      "artifact_policy": "workflow_public_outputs",
       "command": "orthogonalize-geo",
       "execution": {
         "shape": "single",

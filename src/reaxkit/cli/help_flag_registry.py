@@ -1,6 +1,9 @@
 """Reviewed canonical flag roles for the registered CLI."""
 
 FLAG_METADATA = {
+    '--num-atoms': ('Scientific choices', 'short'),
+    '--relative': ('Scientific choices', 'short'),
+    '--export-per-atom-csv': ('Outputs and plots', 'short'),
     '--local-charge-method': ('Scientific choices', 'short'),
     '--geometric-zero-tolerance': ('Scientific choices', 'short'),
     '--export-local-csv': ('Outputs and plots', 'short'),

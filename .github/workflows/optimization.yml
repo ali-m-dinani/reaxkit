@@ -5,9 +5,10 @@ on:
   workflow_dispatch:
 jobs:
   optimization:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
         python-version: ['3.9', '3.12']
     steps:
