@@ -22,6 +22,41 @@ def write(root, name, text):
     return path
 
 
+def test_indeedopt_candidate_predictions(tmp_path):
+    native, output = tmp_path / "native", tmp_path / "normalized"
+    write(native, "short_results/results.csv", "sample,loss\n0,4\n1,1\n")
+    for sample, predicted in enumerate((4, 2)):
+        report = {"loss": (predicted / 2) ** 2,
+                  "items": [{"prediction": predicted, "target": 0, "weight": 2}]}
+        write(native, f"ffield-{sample}/jax_md_results/evaluation.json", json.dumps(report))
+    result = collect_native("indeedopt", native, output)
+    predictions = snapshot(output, "predictions.jsonl")
+    assert result["prediction_count"] == 2
+    assert [row["candidate_id"] for row in predictions] == ["sample:0", "sample:1"]
+    assert [row["weighted_squared_error"] for row in predictions] == [4, 1]
+    assert all(row["identity_scope"] == "source" and row["unit"] is None for row in predictions)
+    assert all(row["engine_identity"] == "JAX-ReaxFF (jax-md)" for row in snapshot(output, "progress.jsonl"))
+    assert result["coverage"] == "partial"
+    assert collect_native("indeedopt", native, output)["snapshot"] == result["snapshot"]
+
+
+@pytest.mark.parametrize("report", [
+    "{", "[]", '{"loss":4,"items":[]}',
+    '{"loss":4,"items":[{"prediction":4,"target":0,"weight":0}]}',
+    '{"loss":4,"items":[{"prediction":"nan","target":0,"weight":2}]}',
+    '{"loss":5,"items":[{"prediction":4,"target":0,"weight":2}]}',
+    '{"loss":4,"items":[{"prediction":2,"target":0,"weight":2}]}',
+])
+def test_indeedopt_invalid_report_preserves_progress(tmp_path, report):
+    native, output = tmp_path / "native", tmp_path / "normalized"
+    write(native, "short_results/results.csv", "sample,loss\n0,4\n")
+    write(native, "ffield-0/jax_md_results/evaluation.json", report)
+    result = collect_native("indeedopt", native, output)
+    assert result["progress_count"] == 1
+    assert result["prediction_count"] == 0
+    assert result["warnings"]
+
+
 @pytest.mark.parametrize("optimizer,filename,content,options,expected", [
     ("ams_mcff", "MCFFOptimizer.log", "iteration error seconds\n1 9.5 2.0\n2 8.0 4.0\n",
      {"skip_rows": 1, "columns": {"step": 0, "score": 1, "elapsed_seconds": 2}}, 9.5),

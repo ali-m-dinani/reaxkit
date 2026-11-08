@@ -60,7 +60,7 @@ def collect_native(optimizer, native, output, options=None, metadata=None):
                 "dataset_fingerprint": metadata.get("dataset_fingerprint"),
                 "comparison_fingerprint": metadata.get("comparison_fingerprint"),
                 "objective_definition": metadata.get("objective", spec["objective"]),
-                "engine_identity": metadata.get("engine", spec["engine"]),
+                "engine_identity": metadata.get("engine", record.get("engine_identity", spec["engine"])),
                 "optimizer_version": metadata.get("optimizer_version"),
                 "engine_version": metadata.get("engine_version"),
                 "comparison_status": metadata.get("comparison_status", "unverified"),
