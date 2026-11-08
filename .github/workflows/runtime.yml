@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e . pytest ase matplotlib networkx
+      - run: python -m pip install -e . pytest ase matplotlib networkx imageio
       - name: Scientific equivalence and bounded-memory contracts
         run: >-
           python -m pytest tests/core/test_frame_pipeline.py
