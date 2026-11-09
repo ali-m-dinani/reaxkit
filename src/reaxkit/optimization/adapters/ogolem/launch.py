@@ -1,10 +1,11 @@
 """Invoke the separately installed OGolem input bridge and Java optimizer."""
 
 from pathlib import Path
+import re
 
 from ...launching import native_plan, stage_common
 from ...models import OptimizationError
-from ...storage import read_json, write_json
+from ...storage import atomic_text, read_json, write_json
 
 
 def validate(config, section):
@@ -60,6 +61,17 @@ def after_prepare(request):
     bundle = Path(request["launch"]["results_directory"])
     path = bundle / "evaluator.json"
     settings = request["settings"]
+    if request["runtime"].get("optimization_time_limit_seconds") is not None:
+        adaptive = bundle / "fit.ogo"
+        content = adaptive.read_text()
+        if content.count("<ADAPTIVE>") != 1 or content.count("</ADAPTIVE>") != 1:
+            raise OptimizationError("ogolem: expected exactly one ADAPTIVE block for timed dispatch")
+        before, remainder = content.split("<ADAPTIVE>")
+        block, after = remainder.split("</ADAPTIVE>")
+        block = re.sub(r"(?m)^[ \t]*MaxTasksToSubmit=.*\n?", "", block)
+        workers = settings.get("workers") or 1
+        block = f"\nMaxTasksToSubmit={workers}\n" + block.lstrip("\n")
+        atomic_text(adaptive, before + "<ADAPTIVE>" + block + "</ADAPTIVE>" + after)
     config = read_json(path)
     config["timeout_seconds"] = settings["timeout_seconds"]
     if settings["backend"] == "custom":

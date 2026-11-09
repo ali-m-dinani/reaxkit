@@ -48,7 +48,7 @@ completion of arbitrarily slow engine calls.
 | EZFF cobalt driver | Objective call; interrupted epoch recommendations may be absent |
 | GloMPO AMS/ParAMS | Existing MaxSeconds manager criterion; live received evaluations |
 | Flocky serial | Population/generation boundary; rebuild the executable |
-| OGolem | Existing STOP file checked by the native dispatcher |
+| OGolem | Existing STOP file checked by the native dispatcher; timed runs set MaxTasksToSubmit to the worker count |
 | AMS MCFF | Native istop: annotated AMS 2023 Key uses 2 to stop; StopKey layouts use 1; checks can lag by multiple iterations |
 | Standalone SOPPI | Local source stop hook after a saved parameter row; rebuild required |
 | AMS CMA-ES | No verified cooperative wall-time hook; configuration rejects this budget |
@@ -56,6 +56,12 @@ completion of arbitrarily slow engine calls.
 PIBO and INDEEDopt entries do not promise time limits for unrelated native
 workflows. Proprietary AMS binaries are not modified. Do not describe a hard
 timeout of AMS CMA-ES as graceful stopping.
+
+OGolem's default dispatch batch is 1000 tasks. For timed runs, ReaxKit limits
+that batch to the configured worker count in the generated fit.ogo. This avoids
+waiting for a large queued batch before checking STOP. An active optimization
+task can still outlast the shutdown allowance; this is not cancellation inside
+an engine call or local optimization. Prepare a fresh campaign to apply the change.
 
 For standalone SOPPI, only set runtime.cooperative_stop_file to true after
 rebuilding and testing your locally patched executable. The local hook reads
