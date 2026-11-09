@@ -25,6 +25,19 @@ class RunTimeout(Exception):
     pass
 
 
+def mcff_stop_text(content):
+    layouts = (
+        (r"(?m)^(\s*)([012])(?=[ \t]+!Key:[ \t]*1[ \t]*-[ \t]*tell program to use the values below,[ \t]*2[ \t]*-[ \t]*stop[ \t]*$)", "2"),
+        (r"(?m)^(\s*)([01])(?=[ \t]+StopKey\b)", "1"),
+        (r"(?m)^([ \t]*StopKey[ \t]+)([01])\b", "1"),
+    )
+    matches = [(match, value) for pattern, value in layouts for match in re.finditer(pattern, content)]
+    if len(matches) != 1:
+        raise OptimizationError("Unrecognized or ambiguous AMS istop layout; refusing to guess stop key")
+    match, value = matches[0]
+    return content[:match.start(2)] + value + content[match.end(2):]
+
+
 def require_allocation():
     if platform.system() != "Linux" or not os.environ.get("SLURM_JOB_ID"):
         raise OptimizationError("Optimization workers require a Linux Slurm allocation")
@@ -132,12 +145,7 @@ def run_worker(directory):
                         raise OptimizationError("AMS istop is missing; cannot request a graceful stop")
                     if control.is_file():
                         content = control.read_text()
-                        replacement, count = re.subn(r"(?m)^(\s*)0(\s+StopKey\b)", r"\g<1>1\2", content)
-                        if count == 0:
-                            replacement, count = re.subn(r"(?m)^(\s*StopKey\s+)0\b", r"\g<1>1", content)
-                        if count != 1:
-                            raise OptimizationError("Unrecognized AMS istop layout; refusing to guess StopKey")
-                        atomic_text(control, replacement)
+                        atomic_text(control, mcff_stop_text(content))
                 stop_requested = time.monotonic()
                 state["stop_requested_at"] = now()
             if stop_requested is not None and time.monotonic() - stop_requested >= grace:

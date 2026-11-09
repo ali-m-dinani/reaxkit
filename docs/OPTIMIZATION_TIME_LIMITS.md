@@ -49,7 +49,7 @@ completion of arbitrarily slow engine calls.
 | GloMPO AMS/ParAMS | Existing MaxSeconds manager criterion; live received evaluations |
 | Flocky serial | Population/generation boundary; rebuild the executable |
 | OGolem | Existing STOP file checked by the native dispatcher |
-| AMS MCFF | Native istop StopKey; checks can lag by multiple iterations |
+| AMS MCFF | Native istop: annotated AMS 2023 Key uses 2 to stop; StopKey layouts use 1; checks can lag by multiple iterations |
 | Standalone SOPPI | Local source stop hook after a saved parameter row; rebuild required |
 | AMS CMA-ES | No verified cooperative wall-time hook; configuration rejects this budget |
 
